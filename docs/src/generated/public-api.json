@@ -8653,19 +8653,35 @@
               "memberDocs": []
             },
             {
+              "name": "HISTORY_DIFF_NONE",
+              "kind": "variable",
+              "signature": "4294967295",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L32",
+              "jsDocTags": [],
+              "documentation": "Author index of a change that no write in the retained log reaches: the\ndifference is older than the log, so its author is not known. Also the\n`beforeRow` and `beforeCol` of a cell on a row or column added later.",
+              "memberDocs": []
+            },
+            {
               "name": "HistoryArchive",
               "kind": "class",
-              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; restoreVersion: (grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions) => Promise<ApplyTransactionResult>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
+              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; diffVersions: (request: HistoryDiffRequest) => Promise<HistoryDiffPage>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; restoreVersion: (grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions) => Promise<ApplyTransactionResult>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
               "owners": [
                 "src/history-archive.ts"
               ],
-              "source": "src/history-archive.ts#L440",
+              "source": "src/history-archive.ts#L515",
               "jsDocTags": [],
               "documentation": "Opt-in archive of named and automatic versions for one document. It stores\ncontent-addressed checkpoints plus the committed transactions since each\none, through a host `HistoryStorageAdapter`. A grid that never imports this\nmodule has no history state.\n\nCalls that change the archive run one at a time. Each publishes atomically,\nso a failure or abort leaves the last durable version readable.",
               "memberDocs": [
                 {
                   "name": "deleteVersion",
                   "documentation": "Delete one version. Records it shares with other versions stay."
+                },
+                {
+                  "name": "diffVersions",
+                  "documentation": "One page of the difference between two retained versions: the cells that\nchanged, with before and after and who wrote them; sheets added, removed\nor changed outside their cells; and workbook fields that changed.\n\nBoth versions are rebuilt in private engine instances and compared in\nbounded windows by the history diff kernel, a separate WASM module that\nloads on the first diff. Rows and columns are aligned through the\nstructural operations of the log, so an inserted row does not make the\nrows below it changed. Nothing is kept between pages: pass `cursor` to\ncontinue, and each page rebuilds the versions again."
                 },
                 {
                   "name": "initialize",
@@ -8712,10 +8728,200 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L178",
+              "source": "src/version-history/types.ts#L185",
               "jsDocTags": [],
               "documentation": "Host-controlled archive configuration. No history is created until explicitly opened.",
               "memberDocs": []
+            },
+            {
+              "name": "HistoryDiffCell",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffCell { value: CellScalar; formula?: string; style?: CellStyle; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L82",
+              "jsDocTags": [],
+              "documentation": "Source and style of one cell in one version.",
+              "memberDocs": [
+                {
+                  "name": "value",
+                  "documentation": "Calculated value in that version, for preview."
+                }
+              ]
+            },
+            {
+              "name": "HistoryDiffCells",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffCells { readonly sheet: Uint32Array; readonly row: Uint32Array; readonly col: Uint32Array; readonly beforeRow: Uint32Array; readonly beforeCol: Uint32Array; readonly flags: Uint8Array; readonly author: Uint32Array; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L67",
+              "jsDocTags": [],
+              "documentation": "Changed cells of one page as parallel typed columns, in sheet order and then\nrow by row. Row and column numbers are those of the later version.",
+              "memberDocs": [
+                {
+                  "name": "author",
+                  "documentation": "Index into `HistoryDiffPage.authors` of the last writer, or `HISTORY_DIFF_NONE`."
+                },
+                {
+                  "name": "beforeRow",
+                  "documentation": "Position in the earlier version, or `HISTORY_DIFF_NONE` on an added row or column."
+                },
+                {
+                  "name": "flags",
+                  "documentation": "`HistoryDiffFlag` bits."
+                },
+                {
+                  "name": "sheet",
+                  "documentation": "Index into `HistoryDiffPage.sheetIds`."
+                }
+              ]
+            },
+            {
+              "name": "HistoryDiffCursor",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffCursor { readonly sheet: number; readonly row: number; readonly piece: number; readonly cell: number; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L41",
+              "jsDocTags": [],
+              "documentation": "Where the next page of a diff starts. Pass it back unchanged.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryDiffDetail",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffDetail { before: HistoryDiffCell | null; after: HistoryDiffCell; writers: readonly number[]; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L90",
+              "jsDocTags": [],
+              "documentation": "Before and after of one changed cell of the page.",
+              "memberDocs": [
+                {
+                  "name": "before",
+                  "documentation": "`null` on a row or column that the earlier version did not have."
+                },
+                {
+                  "name": "writers",
+                  "documentation": "Everyone who wrote the cell between the versions, as `authors` indexes, first writer first."
+                }
+              ]
+            },
+            {
+              "name": "HistoryDiffFlag",
+              "kind": "variable",
+              "signature": "Readonly<{ value: 1; formula: 2; style: 4; added: 8; removed: 16; }>",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L14",
+              "jsDocTags": [],
+              "documentation": "Bits of `HistoryDiffCells.flags`; a change has one or more of them.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryDiffPage",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffPage { sheets: readonly HistoryDiffSheet[]; workbook: readonly string[]; sheetIds: readonly SheetId[]; authors: readonly string[]; cells: HistoryDiffCells; details: readonly HistoryDiffDetail[]; logComplete: boolean; cursor?: HistoryDiffCursor; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L111",
+              "jsDocTags": [],
+              "documentation": "One bounded page of the difference between two versions.",
+              "memberDocs": [
+                {
+                  "name": "authors",
+                  "documentation": "Author IDs that the `author` and `writers` indexes name."
+                },
+                {
+                  "name": "cursor",
+                  "documentation": "Present when more changes follow; pass it to the next request."
+                },
+                {
+                  "name": "details",
+                  "documentation": "Before and after of each changed cell, in `cells` order."
+                },
+                {
+                  "name": "logComplete",
+                  "documentation": "`false` when part of the log between the versions is no longer retained:\nrows and columns are then compared by position before the retained part,\nand changes there have no known author."
+                },
+                {
+                  "name": "sheetIds",
+                  "documentation": "Sheet IDs that `cells.sheet` indexes."
+                },
+                {
+                  "name": "sheets",
+                  "documentation": "Sheets added, removed or changed outside their cells; the same on every page."
+                },
+                {
+                  "name": "workbook",
+                  "documentation": "Workbook fields that differ, such as `namedRanges` or `calculation`."
+                }
+              ]
+            },
+            {
+              "name": "HistoryDiffRequest",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffRequest { from: string; to: string; cursor?: HistoryDiffCursor; maxEntries?: number; signal?: AbortSignal; kernel?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L49",
+              "jsDocTags": [],
+              "documentation": "One diff request between two retained versions.",
+              "memberDocs": [
+                {
+                  "name": "cursor",
+                  "documentation": "The `cursor` of the previous page; omit for the first page."
+                },
+                {
+                  "name": "from",
+                  "documentation": "The earlier version."
+                },
+                {
+                  "name": "kernel",
+                  "documentation": "Where the diff kernel WASM comes from; see `@sheetwrite/wasm/history`."
+                },
+                {
+                  "name": "maxEntries",
+                  "documentation": "Changes per page, from 1 to 1,000; default 1,000."
+                },
+                {
+                  "name": "to",
+                  "documentation": "The later version."
+                }
+              ]
+            },
+            {
+              "name": "HistoryDiffSheet",
+              "kind": "interface",
+              "signature": "export interface HistoryDiffSheet { sheet: SheetId; name: string; change: \"added\" | \"removed\" | \"changed\"; fields: readonly string[]; author: number; }",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L99",
+              "jsDocTags": [],
+              "documentation": "A sheet that was added, removed, or changed outside its cell values.",
+              "memberDocs": [
+                {
+                  "name": "author",
+                  "documentation": "Last writer of a structural or sheet setting change, or `HISTORY_DIFF_NONE`."
+                },
+                {
+                  "name": "fields",
+                  "documentation": "For `changed`: the sheet fields that differ, such as `name`, `rowCount` or `merges`."
+                },
+                {
+                  "name": "name",
+                  "documentation": "Name in the later version, or in the earlier one for a removed sheet."
+                }
+              ]
             },
             {
               "name": "HistoryError",
@@ -8748,7 +8954,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L128",
+              "source": "src/version-history/types.ts#L135",
               "jsDocTags": [],
               "documentation": "Fetch metadata or a bounded immutable payload; leased reads renew their lease.",
               "memberDocs": []
@@ -8756,11 +8962,11 @@
             {
               "name": "HistoryHead",
               "kind": "interface",
-              "signature": "export interface HistoryHead { revision: number; checkpoint: string; tail: readonly string[]; time: number; activeMs: number; automaticAt: number; checkpointAt: number; checkpointTransactions: number; checkpointLogBytes: number; }",
+              "signature": "export interface HistoryHead { revision: number; checkpoint: string; tail: readonly string[]; checkpoints: readonly string[]; time: number; activeMs: number; automaticAt: number; checkpointAt: number; checkpointTransactions: number; checkpointLogBytes: number; }",
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L68",
+              "source": "src/version-history/types.ts#L73",
               "jsDocTags": [],
               "documentation": "Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.",
               "memberDocs": [
@@ -8779,6 +8985,10 @@
                 {
                   "name": "checkpointLogBytes",
                   "documentation": "Encoded operation bytes since the last checkpoint."
+                },
+                {
+                  "name": "checkpoints",
+                  "documentation": "Checkpoints made since the newest version marker; the next marker takes them over."
                 },
                 {
                   "name": "checkpointTransactions",
@@ -8866,7 +9076,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L154",
+              "source": "src/version-history/types.ts#L161",
               "jsDocTags": [],
               "documentation": "Metadata-only response in newest-first order.",
               "memberDocs": []
@@ -8878,7 +9088,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L144",
+              "source": "src/version-history/types.ts#L151",
               "jsDocTags": [],
               "documentation": "Bounded metadata-only page. Cursors are scoped to a manifest generation.",
               "memberDocs": []
@@ -8890,7 +9100,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L95",
+              "source": "src/version-history/types.ts#L102",
               "jsDocTags": [],
               "documentation": "Archive state, read without fetching any payload.",
               "memberDocs": [
@@ -8907,7 +9117,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L118",
+              "source": "src/version-history/types.ts#L125",
               "jsDocTags": [],
               "documentation": "Acquire or release a five-minute renewable reader lease through the storage seam.",
               "memberDocs": []
@@ -8919,7 +9129,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L162",
+              "source": "src/version-history/types.ts#L169",
               "jsDocTags": [],
               "documentation": "Retention removes automatic markers, or one explicitly selected named marker.",
               "memberDocs": []
@@ -8931,7 +9141,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L109",
+              "source": "src/version-history/types.ts#L116",
               "jsDocTags": [],
               "documentation": "Atomically publish immutable records and a new head or version marker.",
               "memberDocs": []
@@ -8943,7 +9153,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L125",
+              "source": "src/version-history/types.ts#L132",
               "jsDocTags": [],
               "documentation": "A storage write either publishes one complete revision or manages a reader lease.",
               "memberDocs": []
@@ -8955,7 +9165,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L136",
+              "source": "src/version-history/types.ts#L143",
               "jsDocTags": [],
               "documentation": "Metadata for one immutable record; listings never return payload bytes.",
               "memberDocs": []
@@ -8996,7 +9206,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L185",
+              "source": "src/version-history/types.ts#L192",
               "jsDocTags": [],
               "documentation": "Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.",
               "memberDocs": []
@@ -9008,7 +9218,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L170",
+              "source": "src/version-history/types.ts#L177",
               "jsDocTags": [],
               "documentation": "Atomic storage seam for local databases and host-owned history backends.",
               "memberDocs": []
@@ -9020,7 +9230,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L102",
+              "source": "src/version-history/types.ts#L109",
               "jsDocTags": [],
               "documentation": "Common document identity, ceilings, and cancellation for adapter calls.",
               "memberDocs": []
@@ -9032,7 +9242,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L87",
+              "source": "src/version-history/types.ts#L94",
               "jsDocTags": [],
               "documentation": "Retained storage of one document, including headers and index entries.",
               "memberDocs": []
@@ -9044,7 +9254,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L53",
+              "source": "src/version-history/types.ts#L58",
               "jsDocTags": [],
               "documentation": "Immutable, content-addressed history payload and the records it refers to.",
               "memberDocs": [
@@ -9069,7 +9279,7 @@
             {
               "name": "HistoryVersion",
               "kind": "interface",
-              "signature": "export interface HistoryVersion { id: string; revision: number; kind: \"named\" | \"automatic\"; name?: string; authorId: string; time: number; checkpoint: string; tail: readonly string[]; }",
+              "signature": "export interface HistoryVersion { id: string; revision: number; kind: \"named\" | \"automatic\"; name?: string; authorId: string; time: number; checkpoint: string; tail: readonly string[]; checkpoints: readonly string[]; }",
               "owners": [
                 "src/version-history/types.ts"
               ],
@@ -9086,6 +9296,10 @@
                   "documentation": "Record ID of the checkpoint the version rebuilds from."
                 },
                 {
+                  "name": "checkpoints",
+                  "documentation": "Checkpoints made since the previous marker. The marker keeps them, so the\nlog between two retained versions stays readable for a diff."
+                },
+                {
                   "name": "id",
                   "documentation": "Content ID of the marker fields."
                 },
@@ -9100,13 +9314,25 @@
               ]
             },
             {
+              "name": "MAX_HISTORY_DIFF_ENTRIES",
+              "kind": "variable",
+              "signature": "1000",
+              "owners": [
+                "src/version-history/diff.ts"
+              ],
+              "source": "src/version-history/diff.ts#L35",
+              "jsDocTags": [],
+              "documentation": "Largest page a diff returns.",
+              "memberDocs": []
+            },
+            {
               "name": "MemoryHistoryStorage",
               "kind": "class",
               "signature": "class MemoryHistoryStorage extends AtomicHistoryStorage { transact: <T>(request: HistoryStorageRequest, action: (transaction: HistoryStorageTransaction) => Promise<T>) => Promise<T> }",
               "owners": [
                 "src/version-history/storage.ts"
               ],
-              "source": "src/version-history/storage.ts#L786",
+              "source": "src/version-history/storage.ts#L794",
               "jsDocTags": [],
               "documentation": "In-memory history for one page session and for tests. Transactions run one\nat a time per adapter and write through `PendingMapWrites`, so a failure or\nan abort leaves the stored maps unchanged without copying them.",
               "memberDocs": []
@@ -14153,6 +14379,95 @@
               ]
             }
           ]
+        },
+        {
+          "subpath": "./history",
+          "target": "./history.d.ts",
+          "source": "history.d.ts",
+          "kind": "typescript",
+          "classification": "internal",
+          "exports": [
+            {
+              "name": "DiffKernel",
+              "kind": "class",
+              "signature": "class DiffKernel { constructor(limit: number); addSheet: (rows: number, cols: number, earlier: boolean) => number; cellAuthors: (slot: number, row: number, col: number) => Uint32Array; clearPage: () => void; colSegments: (slot: number) => Uint32Array; compare: (slot: number, earlier: boolean, piece_row: number, piece_col: number, rows: number, cols: number, row0: number, col0: number, before_row0: number, before_col0: number, from: number) => number; free: () => void; insertCols: (slot: number, at: number, count: number) => void; insertRows: (slot: number, at: number, count: number) => void; loadAfter: (bytes: Uint8Array | number[]) => boolean; loadBefore: (bytes: Uint8Array | number[]) => boolean; moveCols: (slot: number, from: number, count: number, to: number) => void; moveRows: (slot: number, from: number, count: number, to: number) => void; pageAuthors: () => Uint32Array; pageBeforeCols: () => Uint32Array; pageBeforeRows: () => Uint32Array; pageCols: () => Uint32Array; pageFlags: () => Uint8Array; pageLength: () => number; pageRows: () => Uint32Array; pageSheets: () => Uint32Array; removeCols: (slot: number, at: number, count: number) => void; removeRows: (slot: number, at: number, count: number) => void; removeSheet: (slot: number) => void; rowSegments: (slot: number) => Uint32Array; setStyles: (before: Uint32Array | number[], after: Uint32Array | number[]) => void; touch: (slot: number, r0: number, c0: number, r1: number, c1: number, author: number) => void }",
+              "owners": [
+                "pkg-history/sheetwrite_history.d.ts"
+              ],
+              "source": "pkg-history/sheetwrite_history.d.ts#L8",
+              "jsDocTags": [],
+              "documentation": "Diff state for one comparison. JavaScript creates one per request and\nfrees it when the request ends.",
+              "memberDocs": [
+                {
+                  "name": "addSheet",
+                  "documentation": "Track a sheet with `rows` by `cols` cells. A sheet of the earlier\nversion starts with every line at its earlier position; a sheet added\nlater has no earlier lines. Returns the sheet's slot."
+                },
+                {
+                  "name": "cellAuthors",
+                  "documentation": "Everyone who wrote a cell of the later version, in the order of their first write."
+                },
+                {
+                  "name": "colSegments",
+                  "documentation": "`[start, length, earlier start]` per column segment."
+                },
+                {
+                  "name": "compare",
+                  "documentation": "Compare a `rows` by `cols` piece of the loaded later window, at\n`(piece_row, piece_col)` inside it, with the loaded earlier cells (or\nwith nothing when `earlier` is false). Cells are taken row by row from\nordinal `from`. `row0`, `col0` and `before_row0`, `before_col0` are\nthe sheet coordinates of the piece in each version. Returns the ordinal\nof the next cell to compare: `rows * cols` when the piece is done, less\nwhen the page filled up first."
+                },
+                {
+                  "name": "loadAfter",
+                  "documentation": "Decode one window of the later version. Returns `false` for bytes that\nare not an engine range transfer."
+                },
+                {
+                  "name": "loadBefore",
+                  "documentation": "Decode the earlier cells of the next piece. Returns `false` for bytes\nthat are not an engine range transfer."
+                },
+                {
+                  "name": "new",
+                  "documentation": "A kernel whose pages hold at most `limit` changes."
+                },
+                {
+                  "name": "pageLength",
+                  "documentation": "Changes written since the last `clearPage`."
+                },
+                {
+                  "name": "removeSheet",
+                  "documentation": "Stop tracking a removed sheet."
+                },
+                {
+                  "name": "rowSegments",
+                  "documentation": "`[start, length, earlier start]` per row segment; the earlier start is\n`0xFFFFFFFF` for inserted rows."
+                },
+                {
+                  "name": "setStyles",
+                  "documentation": "Content IDs for the style IDs of each version's store."
+                },
+                {
+                  "name": "touch",
+                  "documentation": "Record that `author` wrote rows `r0..=r1` and columns `c0..=c1`."
+                }
+              ]
+            },
+            {
+              "name": "loadHistoryKernel",
+              "kind": "function",
+              "signature": "(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void>",
+              "owners": [
+                "history.d.ts"
+              ],
+              "source": "history.d.ts#L10",
+              "jsDocTags": [],
+              "documentation": "Instantiate the history-only diff kernel once. It is a separate WASM module\nwith no formula engine; `@sheetwrite/core/history` loads it the first time a\ndiff runs. `source` overrides where the WASM comes from, for example a URL\nthat a bundler emitted for `@sheetwrite/wasm/history/wasm`. A failed load\ncan be retried.",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./history/wasm",
+          "target": "./pkg-history/sheetwrite_history_bg.wasm",
+          "kind": "asset",
+          "classification": "asset",
+          "exports": []
         },
         {
           "subpath": "./wasm",

@@ -5039,6 +5039,7 @@ needs its confirmed persistence revision attached by the host.
 | `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
 | `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
 | `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
+| `diffVersions({ from, to, cursor?, maxEntries?, signal?, kernel? })` | One page of the changes between two versions; see [Compare versions](#compare-versions). |
 | `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
 | `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
 | `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |
@@ -5051,7 +5052,9 @@ blocks. Content IDs include the schema, encoding, references, and compressed
 payload. Unchanged pages are shared across checkpoints. SHA-256 verification and
 bounded inflate run before replay.
 
-An automatic marker is made after five active minutes with committed edits.
+An automatic marker is made after five active minutes with committed edits. Each
+marker keeps the checkpoints made since the marker before it, so the log between two
+retained versions stays readable for a diff.
 A checkpoint is due after 30 active minutes, 1,000 transactions, or 2 MiB of log.
 No history timer or workbook-sized version cache runs in the background.
 
@@ -5122,6 +5125,41 @@ In a shared document, pass the grid's `SyncCoordinator`. The restore needs it on
 with no pending or conflicted commits, and rejects with `conflict` if the document
 changes while the version is read. A restore commit is never rebased; see
 [Restoring versions](https://www.sheetwrite.dev/docs/features/collaboration/#restoring-versions).
+
+### Compare versions
+
+`archive.diffVersions({ from, to })` returns one page of the changes from an earlier
+version to a later one. Both versions are rebuilt in private engine instances and
+compared in windows of at most 65,536 cells by a small, history-only WASM kernel
+(`@sheetwrite/wasm/history`, about 17 KB gzip). The kernel has no formula engine. It
+loads the first time a diff runs, so a grid that never compares versions downloads
+nothing for it. Pass `kernel` to load its WASM from a URL your bundler emitted for
+`@sheetwrite/wasm/history/wasm`.
+
+| Page field | Contents |
+| --- | --- |
+| `cells` | Changed cells as typed columns: `sheet` (index into `sheetIds`), `row`, `col`, `beforeRow`, `beforeCol`, `flags` and `author` (index into `authors`). |
+| `details` | Before and after of each changed cell (value, formula source, style) and every person who wrote it between the versions. |
+| `sheets` | Sheets that were added, removed, or changed outside their cells, with the changed fields (for example `name`, `rowCount` or `merges`) and the last person who changed them. |
+| `workbook` | Workbook fields that changed, such as `namedRanges` or `calculation`. |
+| `cursor` | Present when more changes follow. Pass it back to read the next page. |
+
+`flags` combines the `HistoryDiffFlag` bits `value`, `formula`, `style`, `added` and
+`removed`. Sources are compared, not calculated values: a formula whose result changed
+but whose source did not is not a change. Styles are compared by content.
+
+Rows and columns are aligned through the structural operations of the log, so an
+inserted, removed or moved row does not make the rows below it changed. `beforeRow` and
+`beforeCol` give the position of a cell in the earlier version, or `HISTORY_DIFF_NONE`
+on a row or column that was added. A sorted range (`permuteRows`) is compared by
+position, so its moved cells show as changed. Each change names the last person whose
+logged write reached the cell; the write follows the cell through inserted and removed
+rows. When a change is older than the retained log, or a version between the two was
+deleted, `author` is `HISTORY_DIFF_NONE` and `logComplete` is `false`.
+
+A page holds at most 1,000 changes (`maxEntries`). Nothing is kept between pages: each
+request rebuilds both versions and continues from `cursor`, so a closed or aborted diff
+holds no memory.
 
 ## Large undo
 
@@ -16961,10 +16999,20 @@ Readonly<HistoryLimits>
 
 Default byte, count, cadence, and retention bounds (decision recorded in #228).
 
+##### `HISTORY_DIFF_NONE` — variable
+
+```ts
+4294967295
+```
+
+Author index of a change that no write in the retained log reaches: the
+difference is older than the log, so its author is not known. Also the
+`beforeRow` and `beforeCol` of a cell on a row or column added later.
+
 ##### `HistoryArchive` — class
 
 ```ts
-class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; restoreVersion: (grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions) => Promise<ApplyTransactionResult>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }
+class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; diffVersions: (request: HistoryDiffRequest) => Promise<HistoryDiffPage>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; restoreVersion: (grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions) => Promise<ApplyTransactionResult>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }
 ```
 
 Opt-in archive of named and automatic versions for one document. It stores
@@ -16977,6 +17025,16 @@ so a failure or abort leaves the last durable version readable.
 
 Members:
 - `deleteVersion` — Delete one version. Records it shares with other versions stay.
+- `diffVersions` — One page of the difference between two retained versions: the cells that
+changed, with before and after and who wrote them; sheets added, removed
+or changed outside their cells; and workbook fields that changed.
+
+Both versions are rebuilt in private engine instances and compared in
+bounded windows by the history diff kernel, a separate WASM module that
+loads on the first diff. Rows and columns are aligned through the
+structural operations of the log, so an inserted row does not make the
+rows below it changed. Nothing is kept between pages: pass `cursor` to
+continue, and each page rebuilds the versions again.
 - `initialize` — Store the first checkpoint: a complete, committed snapshot of the document at `time`.
 - `listVersions` — One bounded page of version metadata, newest first.
 - `open` — Open an archive by reading its manifest only; no workbook is loaded.
@@ -17009,6 +17067,107 @@ export interface HistoryArchiveOptions { documentId: string; storage: HistorySto
 
 Host-controlled archive configuration. No history is created until explicitly opened.
 
+##### `HistoryDiffCell` — interface
+
+```ts
+export interface HistoryDiffCell { value: CellScalar; formula?: string; style?: CellStyle; }
+```
+
+Source and style of one cell in one version.
+
+Members:
+- `value` — Calculated value in that version, for preview.
+
+##### `HistoryDiffCells` — interface
+
+```ts
+export interface HistoryDiffCells { readonly sheet: Uint32Array; readonly row: Uint32Array; readonly col: Uint32Array; readonly beforeRow: Uint32Array; readonly beforeCol: Uint32Array; readonly flags: Uint8Array; readonly author: Uint32Array; }
+```
+
+Changed cells of one page as parallel typed columns, in sheet order and then
+row by row. Row and column numbers are those of the later version.
+
+Members:
+- `author` — Index into `HistoryDiffPage.authors` of the last writer, or `HISTORY_DIFF_NONE`.
+- `beforeRow` — Position in the earlier version, or `HISTORY_DIFF_NONE` on an added row or column.
+- `flags` — `HistoryDiffFlag` bits.
+- `sheet` — Index into `HistoryDiffPage.sheetIds`.
+
+##### `HistoryDiffCursor` — interface
+
+```ts
+export interface HistoryDiffCursor { readonly sheet: number; readonly row: number; readonly piece: number; readonly cell: number; }
+```
+
+Where the next page of a diff starts. Pass it back unchanged.
+
+##### `HistoryDiffDetail` — interface
+
+```ts
+export interface HistoryDiffDetail { before: HistoryDiffCell | null; after: HistoryDiffCell; writers: readonly number[]; }
+```
+
+Before and after of one changed cell of the page.
+
+Members:
+- `before` — `null` on a row or column that the earlier version did not have.
+- `writers` — Everyone who wrote the cell between the versions, as `authors` indexes, first writer first.
+
+##### `HistoryDiffFlag` — variable
+
+```ts
+Readonly<{ value: 1; formula: 2; style: 4; added: 8; removed: 16; }>
+```
+
+Bits of `HistoryDiffCells.flags`; a change has one or more of them.
+
+##### `HistoryDiffPage` — interface
+
+```ts
+export interface HistoryDiffPage { sheets: readonly HistoryDiffSheet[]; workbook: readonly string[]; sheetIds: readonly SheetId[]; authors: readonly string[]; cells: HistoryDiffCells; details: readonly HistoryDiffDetail[]; logComplete: boolean; cursor?: HistoryDiffCursor; }
+```
+
+One bounded page of the difference between two versions.
+
+Members:
+- `authors` — Author IDs that the `author` and `writers` indexes name.
+- `cursor` — Present when more changes follow; pass it to the next request.
+- `details` — Before and after of each changed cell, in `cells` order.
+- `logComplete` — `false` when part of the log between the versions is no longer retained:
+rows and columns are then compared by position before the retained part,
+and changes there have no known author.
+- `sheetIds` — Sheet IDs that `cells.sheet` indexes.
+- `sheets` — Sheets added, removed or changed outside their cells; the same on every page.
+- `workbook` — Workbook fields that differ, such as `namedRanges` or `calculation`.
+
+##### `HistoryDiffRequest` — interface
+
+```ts
+export interface HistoryDiffRequest { from: string; to: string; cursor?: HistoryDiffCursor; maxEntries?: number; signal?: AbortSignal; kernel?: BufferSource | URL | string | Request | WebAssembly.Module; }
+```
+
+One diff request between two retained versions.
+
+Members:
+- `cursor` — The `cursor` of the previous page; omit for the first page.
+- `from` — The earlier version.
+- `kernel` — Where the diff kernel WASM comes from; see `@sheetwrite/wasm/history`.
+- `maxEntries` — Changes per page, from 1 to 1,000; default 1,000.
+- `to` — The later version.
+
+##### `HistoryDiffSheet` — interface
+
+```ts
+export interface HistoryDiffSheet { sheet: SheetId; name: string; change: "added" | "removed" | "changed"; fields: readonly string[]; author: number; }
+```
+
+A sheet that was added, removed, or changed outside its cell values.
+
+Members:
+- `author` — Last writer of a structural or sheet setting change, or `HISTORY_DIFF_NONE`.
+- `fields` — For `changed`: the sheet fields that differ, such as `name`, `rowCount` or `merges`.
+- `name` — Name in the later version, or in the earlier one for a removed sheet.
+
 ##### `HistoryError` — class
 
 ```ts
@@ -17036,7 +17195,7 @@ Fetch metadata or a bounded immutable payload; leased reads renew their lease.
 ##### `HistoryHead` — interface
 
 ```ts
-export interface HistoryHead { revision: number; checkpoint: string; tail: readonly string[]; time: number; activeMs: number; automaticAt: number; checkpointAt: number; checkpointTransactions: number; checkpointLogBytes: number; }
+export interface HistoryHead { revision: number; checkpoint: string; tail: readonly string[]; checkpoints: readonly string[]; time: number; activeMs: number; automaticAt: number; checkpointAt: number; checkpointTransactions: number; checkpointLogBytes: number; }
 ```
 
 Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.
@@ -17046,6 +17205,7 @@ Members:
 - `automaticAt` — `activeMs` at the last automatic version.
 - `checkpointAt` — `activeMs` at the last checkpoint.
 - `checkpointLogBytes` — Encoded operation bytes since the last checkpoint.
+- `checkpoints` — Checkpoints made since the newest version marker; the next marker takes them over.
 - `checkpointTransactions` — Transactions since the last checkpoint.
 - `time` — Time of the last archived commit.
 
@@ -17208,7 +17368,7 @@ Members:
 ##### `HistoryVersion` — interface
 
 ```ts
-export interface HistoryVersion { id: string; revision: number; kind: "named" | "automatic"; name?: string; authorId: string; time: number; checkpoint: string; tail: readonly string[]; }
+export interface HistoryVersion { id: string; revision: number; kind: "named" | "automatic"; name?: string; authorId: string; time: number; checkpoint: string; tail: readonly string[]; checkpoints: readonly string[]; }
 ```
 
 A durable marker at one archived revision.
@@ -17216,9 +17376,19 @@ A durable marker at one archived revision.
 Members:
 - `authorId` — Who saved a named version, or who made the last change of an automatic one.
 - `checkpoint` — Record ID of the checkpoint the version rebuilds from.
+- `checkpoints` — Checkpoints made since the previous marker. The marker keeps them, so the
+log between two retained versions stays readable for a diff.
 - `id` — Content ID of the marker fields.
 - `name` — Present on named versions.
 - `tail` — Transaction envelope IDs applied after the checkpoint, in order.
+
+##### `MAX_HISTORY_DIFF_ENTRIES` — variable
+
+```ts
+1000
+```
+
+Largest page a diff returns.
 
 ##### `MemoryHistoryStorage` — class
 
@@ -20535,6 +20705,63 @@ Members:
 - `takePacked` — Consume the complete fixed-width window payload. The returned
 `Uint8Array` is copied by wasm-bindgen into JS-owned memory.
 - `takeStrings` — Consume formula-error sentinel strings referenced by the packed data.
+
+#### `@sheetwrite/wasm/history` — internal
+
+Declaration target: `./history.d.ts`
+Source entry: `history.d.ts`
+Page: https://www.sheetwrite.dev/docs/api/wasm-history/
+
+##### `DiffKernel` — class
+
+```ts
+class DiffKernel { constructor(limit: number); addSheet: (rows: number, cols: number, earlier: boolean) => number; cellAuthors: (slot: number, row: number, col: number) => Uint32Array; clearPage: () => void; colSegments: (slot: number) => Uint32Array; compare: (slot: number, earlier: boolean, piece_row: number, piece_col: number, rows: number, cols: number, row0: number, col0: number, before_row0: number, before_col0: number, from: number) => number; free: () => void; insertCols: (slot: number, at: number, count: number) => void; insertRows: (slot: number, at: number, count: number) => void; loadAfter: (bytes: Uint8Array | number[]) => boolean; loadBefore: (bytes: Uint8Array | number[]) => boolean; moveCols: (slot: number, from: number, count: number, to: number) => void; moveRows: (slot: number, from: number, count: number, to: number) => void; pageAuthors: () => Uint32Array; pageBeforeCols: () => Uint32Array; pageBeforeRows: () => Uint32Array; pageCols: () => Uint32Array; pageFlags: () => Uint8Array; pageLength: () => number; pageRows: () => Uint32Array; pageSheets: () => Uint32Array; removeCols: (slot: number, at: number, count: number) => void; removeRows: (slot: number, at: number, count: number) => void; removeSheet: (slot: number) => void; rowSegments: (slot: number) => Uint32Array; setStyles: (before: Uint32Array | number[], after: Uint32Array | number[]) => void; touch: (slot: number, r0: number, c0: number, r1: number, c1: number, author: number) => void }
+```
+
+Diff state for one comparison. JavaScript creates one per request and
+frees it when the request ends.
+
+Members:
+- `addSheet` — Track a sheet with `rows` by `cols` cells. A sheet of the earlier
+version starts with every line at its earlier position; a sheet added
+later has no earlier lines. Returns the sheet's slot.
+- `cellAuthors` — Everyone who wrote a cell of the later version, in the order of their first write.
+- `colSegments` — `[start, length, earlier start]` per column segment.
+- `compare` — Compare a `rows` by `cols` piece of the loaded later window, at
+`(piece_row, piece_col)` inside it, with the loaded earlier cells (or
+with nothing when `earlier` is false). Cells are taken row by row from
+ordinal `from`. `row0`, `col0` and `before_row0`, `before_col0` are
+the sheet coordinates of the piece in each version. Returns the ordinal
+of the next cell to compare: `rows * cols` when the piece is done, less
+when the page filled up first.
+- `loadAfter` — Decode one window of the later version. Returns `false` for bytes that
+are not an engine range transfer.
+- `loadBefore` — Decode the earlier cells of the next piece. Returns `false` for bytes
+that are not an engine range transfer.
+- `new` — A kernel whose pages hold at most `limit` changes.
+- `pageLength` — Changes written since the last `clearPage`.
+- `removeSheet` — Stop tracking a removed sheet.
+- `rowSegments` — `[start, length, earlier start]` per row segment; the earlier start is
+`0xFFFFFFFF` for inserted rows.
+- `setStyles` — Content IDs for the style IDs of each version's store.
+- `touch` — Record that `author` wrote rows `r0..=r1` and columns `c0..=c1`.
+
+##### `loadHistoryKernel` — function
+
+```ts
+(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void>
+```
+
+Instantiate the history-only diff kernel once. It is a separate WASM module
+with no formula engine; `@sheetwrite/core/history` loads it the first time a
+diff runs. `source` overrides where the WASM comes from, for example a URL
+that a bundler emitted for `@sheetwrite/wasm/history/wasm`. A failed load
+can be retried.
+
+#### `@sheetwrite/wasm/history/wasm` — asset
+
+Declaration target: `./pkg-history/sheetwrite_history_bg.wasm`
+Page: https://www.sheetwrite.dev/docs/api/wasm-history-wasm/
 
 #### `@sheetwrite/wasm/wasm` — asset
 

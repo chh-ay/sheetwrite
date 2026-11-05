@@ -1,5 +1,5 @@
 // Eight-hour history session: retained storage, memory, replay and engine-instance
-// cost, restore time, plus incremental bundle sizes. Usage:
+// cost, restore and diff time, plus incremental bundle and diff kernel sizes. Usage:
 //   bun bench/src/version-history-bench.ts [--base <develop checkout>]
 // With --base, the default entry of that checkout is measured for comparison.
 import { heapStats } from "bun:jsc";
@@ -279,8 +279,33 @@ async function restoreMs(
 }
 
 /**
- * Restore on a live 100,000-cell grid: the whole workbook back to its start
- * (about 3,000 changed cells), and one sheet back by one transaction.
+ * First page (1,000 changes) of the diff from the start to the previous
+ * version, and the heap that stays after the samples: a closed diff keeps none.
+ */
+async function diffMs(archive: HistoryArchive, from: string, to: string) {
+  await collectGarbage();
+  const before = observation();
+  const samples: number[] = [];
+  let changes = 0;
+
+  for (let sample = 0; sample < REPLAY_SAMPLES; sample++) {
+    const started = performance.now();
+    const page = await archive.diffVersions({ from, to });
+    samples.push(performance.now() - started);
+
+    changes = page.cells.flags.length;
+  }
+
+  await collectGarbage();
+  const after = observation();
+
+  return { firstPageMs: median(samples), changes, before, after };
+}
+
+/**
+ * Restore and diff on a live 100,000-cell grid: the whole workbook back to its
+ * start (about 3,000 changed cells), one sheet back by one transaction, and the
+ * first diff page between those versions.
  */
 async function restore() {
   // The DOM is installed only now, so the session measurements above do not include it.
@@ -319,6 +344,7 @@ async function restore() {
         kind: "sheet",
         sheet: "sales",
       }),
+      diff: await diffMs(archive, start.id, previous),
     };
   } finally {
     grid.destroy();
@@ -386,6 +412,12 @@ async function bundles() {
       ]),
     );
 
+    rows.push(
+      await bundle(directory, "history-kernel-loader", [
+        resolve(ROOT, "packages/wasm/history.mjs"),
+      ]),
+    );
+
     return rows;
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -406,6 +438,19 @@ async function engineHashes() {
   return engines;
 }
 
+/** The history diff kernel WASM, which loads only when a diff runs. */
+async function kernelWasm() {
+  const bytes = await readFile(
+    resolve(ROOT, "packages/wasm/pkg-history/sheetwrite_history_bg.wasm"),
+  );
+
+  return {
+    bytes: bytes.length,
+    gzipBytes: gzipSync(bytes).length,
+    brotliBytes: brotliCompressSync(bytes).length,
+  };
+}
+
 await initSheetwrite();
 
 const startupMs = await instanceStartupMs();
@@ -422,6 +467,7 @@ const report = {
   capture: { ...capture, afterRelease },
   restore: await restore(),
   bundles: await bundles(),
+  kernel: await kernelWasm(),
   engines: await engineHashes(),
 };
 
