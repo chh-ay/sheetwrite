@@ -223,6 +223,8 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "exportCsv",
   "exportXlsx",
   "importXlsx",
+  "versionHistory",
+  "saveVersion",
   "undo",
   "redo",
 ];
@@ -3434,6 +3436,10 @@ export class GridImpl implements Grid {
         const { pickXlsxWorkbook } = await import("./workbook-io.js");
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
+      versionHistory: () => this.config?.history?.(this, "open"),
+      saveVersion: () => {
+        if (!this.readOnly) this.config?.history?.(this, "save");
+      },
       editNote: () => {
         // Same gate as the cell editor: do not open an editor whose save must fail.
         const focus = this.selection.focusCell;
@@ -3586,6 +3592,12 @@ export class GridImpl implements Grid {
     if (command === "redo") {
       return {
         disabled: this.readOnly || !this.document.canRedo,
+        activity: "inactive",
+      };
+    }
+    if (command === "versionHistory" || command === "saveVersion") {
+      return {
+        disabled: !this.config?.history || (command === "saveVersion" && this.readOnly),
         activity: "inactive",
       };
     }

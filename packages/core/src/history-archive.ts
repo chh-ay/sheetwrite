@@ -78,6 +78,10 @@ export type {
   HistoryDiffSheet,
 } from "./version-history/diff.js";
 export type { HistoryRestoreOptions, HistoryRestoreScope } from "./version-history/restore.js";
+export {
+  createHistoryCommands,
+  type HistoryCommandsOptions,
+} from "./version-history/history-ui.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,
@@ -905,14 +909,21 @@ export class HistoryArchive {
   ): Promise<T> {
     checkAbort(signal);
 
-    const version = versionResponse(
-      await this.storage.get({ ...this.request(signal), kind: "version", id }),
-    );
-
     const token = crypto.randomUUID();
-    await this.storage.put({ ...this.request(signal), kind: "pin", token, versionId: id });
+    const leased = await this.storage.put({
+      ...this.request(signal),
+      kind: "pin",
+      token,
+      versionId: id,
+    });
 
     try {
+      // The current document is leased by the same storage transaction that reads its head.
+      const head = id === "head" ? manifestResponse(leased).head : undefined;
+      const version: HistoryVersion = head
+        ? { ...head, id, kind: "automatic", authorId: "" }
+        : versionResponse(await this.storage.get({ ...this.request(signal), kind: "version", id }));
+
       const maxReadBytes = this.limits.maxSnapshotBytes + this.limits.maxTransactionBytes;
       let readBytes = 0;
 
