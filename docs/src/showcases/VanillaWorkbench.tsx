@@ -18,6 +18,7 @@ import { ENGINE_THEME } from "./scenarios/engine.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRadioGroup, DemoRadioItem } from "./ui/DemoRadioGroup.js";
 import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
+import type { RendererState, RenderingMode } from "./ui/rendering-mode.js";
 import {
   addSummarySheet,
   createWorkbench,
@@ -28,20 +29,14 @@ import {
   WORKBENCH_ROWS,
   type Workbench,
   type WorkbenchDataMode,
-  type WorkbenchRendererState,
 } from "./vanilla-workbench.js";
-
-import "@sheetwrite/core/styles.css";
-import "@sheetwrite/core/shell.css";
-
-export type WorkbenchRenderer = "canvas" | "worker";
 
 export interface VanillaWorkbenchProps {
   /** Deep-linked construction options; the URL is the source of truth. */
-  renderer: WorkbenchRenderer;
+  renderer: RenderingMode;
   data: WorkbenchDataMode;
   /** Reflect construction-bound choices back into the route search params. */
-  onSpecChange: (spec: { renderer: WorkbenchRenderer; data: WorkbenchDataMode }) => void;
+  onSpecChange: (spec: { renderer: RenderingMode; data: WorkbenchDataMode }) => void;
 }
 
 type Phase = "booting" | "live" | "failed" | "destroyed";
@@ -63,7 +58,7 @@ const WORKBENCH_SCENARIOS: ReadonlyArray<{
   { id: "xlsx", label: "XLSX", kicker: "Workbook ownership" },
 ];
 
-function rendererLabel(kind: WorkbenchRenderer): string {
+function rendererLabel(kind: RenderingMode): string {
   return kind === "worker" ? "Web Worker" : "Main thread";
 }
 
@@ -95,7 +90,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
   const [readOnly, setReadOnly] = useState(false);
   const [selection, setSelection] = useState("No active cell");
   const [bootError, setBootError] = useState<string | null>(null);
-  const [rendererState, setRendererState] = useState<WorkbenchRendererState | null>(null);
+  const [rendererState, setRendererState] = useState<RendererState | null>(null);
   const [fallbackCount, setFallbackCount] = useState(0);
   const [pagedStats, setPagedStats] = useState<PagedStoreStats | null>(null);
   const [activity, setActivity] = useState<string | null>(null);
@@ -117,7 +112,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
       return current === "paged" ? "lifecycle" : current;
     });
   }, [data, hydrated]);
-  const spec: { renderer: WorkbenchRenderer; data: WorkbenchDataMode } = hydrated
+  const spec: { renderer: RenderingMode; data: WorkbenchDataMode } = hydrated
     ? { renderer, data }
     : { renderer: "canvas", data: "columnar" };
 
@@ -190,7 +185,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     [],
   );
 
-  function changeRenderer(next: WorkbenchRenderer): void {
+  function changeRenderer(next: RenderingMode): void {
     if (next === spec.renderer) return;
     record(
       `Renderer is construction-bound — rebuilding on the ${rendererLabel(next).toLowerCase()}`,

@@ -49,6 +49,7 @@ import {
   ENGINE_THEME,
 } from "./scenarios/engine.js";
 import { pagedStatsOf } from "./scenarios/scale.js";
+import type { RendererState, RenderingMode } from "./ui/rendering-mode.js";
 
 /** The fixture sheet every non-imported mount hydrates. */
 const WORKBENCH_SHEET: SheetId = ENGINE_SHEET_ID;
@@ -68,24 +69,17 @@ export type WorkbenchDataMode = "columnar" | "paged";
 
 /** Everything that requires a new Grid generation when it changes. */
 export interface WorkbenchSpec {
-  renderer: "canvas" | "worker";
+  renderer: RenderingMode;
   data: WorkbenchDataMode;
   /** Hydrate an imported document instead of the revenue fixture. */
   snapshot?: WorkbookSnapshot;
-}
-
-/** Requested vs. actually active paint backend, plus any fallback reason. */
-export interface WorkbenchRendererState {
-  requested: "canvas" | "worker";
-  active: "canvas" | "worker";
-  fallback: string | null;
 }
 
 /** Host callbacks fed exclusively from public grid events. */
 export interface WorkbenchEvents {
   onActivity(message: string): void;
   onSelectionChange(selection: Selection | null): void;
-  onRendererChange(state: WorkbenchRendererState): void;
+  onRendererChange(state: RendererState): void;
   onPagedStats(stats: PagedStoreStats | null): void;
 }
 

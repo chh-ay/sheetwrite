@@ -51,9 +51,10 @@ import {
   SCALE_THEME,
   type ScanAttempt,
 } from "../showcases/scenarios/scale.js";
+import type { RendererState, RenderingMode } from "../showcases/ui/rendering-mode.js";
 
-import stylesheet from "../styles/showcase-performance.css?url";
 import "@sheetwrite/core/styles.css";
+import stylesheet from "../styles/showcase-performance.css?url";
 
 declare global {
   interface Window {
@@ -98,12 +99,6 @@ const COMPARISON_LOG_TICKS = Array.from(
 function comparisonLogPercent(ratio: number): number {
   if (!Number.isFinite(ratio) || ratio <= 1) return 0;
   return Math.min(100, (Math.log10(ratio) / COMPARISON_LOG_MAX_EXPONENT) * 100);
-}
-
-interface RendererState {
-  requested: "canvas" | "worker";
-  active: "canvas" | "worker";
-  fallback: string | null;
 }
 
 interface VisibleWindow {
@@ -284,7 +279,7 @@ function PerformanceRoute() {
     firstColumn: 0,
     lastColumn: 0,
   });
-  const [renderer, setRenderer] = useState<"canvas" | "worker">("canvas");
+  const [renderer, setRenderer] = useState<RenderingMode>("canvas");
   const [rendererState, setRendererState] = useState<RendererState | null>(null);
   const [gridState, setGridState] = useState<"loading" | "ready" | "error">("loading");
   const [telemetry, setTelemetry] = useState<DatasourceTelemetry>(emptyTelemetry);

@@ -29,6 +29,7 @@ import {
 } from "./scenarios/business.js";
 
 import "@sheetwrite/vue/styles.css";
+import type { RenderingMode } from "./ui/rendering-mode.js";
 
 // The scenario module owns the governed workbook (validation rules, protected
 // totals, notes, merges, frozen panes). This component owns what Vue is for:
@@ -139,7 +140,7 @@ const App = defineComponent({
     const workbook = shallowRef(createWorkbenchWorkbook());
     const data = shallowRef(createBusinessData());
     const mutationPolicy = ref<"atomic" | "partial">("atomic");
-    const rendererMode = ref<"canvas" | "worker">("canvas");
+    const rendererMode = ref<RenderingMode>("canvas");
 
     // Live adapter inputs — plain reactive state, no Grid replacement.
     const readOnly = ref(false);
@@ -489,7 +490,7 @@ const App = defineComponent({
       );
     }
 
-    function setRenderer(next: "canvas" | "worker"): void {
+    function setRenderer(next: RenderingMode): void {
       if (!ready.value || pendingCount.value > 0 || rendererMode.value === next) return;
       rendererMode.value = next;
       resetGridInput(":renderer", `${next} — reset-bound input, grid rebuilds`);
@@ -497,9 +498,7 @@ const App = defineComponent({
 
     let stopObservingTheme: (() => void) | null = null;
     onMounted(() => {
-      stopObservingTheme = observeSiteTheme(() =>
-        window.__sheetwriteVueWorkbench?.grid.replaceTheme(BUSINESS_THEME),
-      );
+      stopObservingTheme = observeSiteTheme(() => gridOf()?.replaceTheme(BUSINESS_THEME));
     });
 
     onBeforeUnmount(() => {
