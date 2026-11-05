@@ -6,8 +6,6 @@
 //! depends on the locale; they sort after the documented characters by
 //! their lowercase code point.
 
-use std::cmp::Ordering;
-
 /// Punctuation in the documented order, after the digits and space.
 const PUNCTUATION_ORDER: &[u8] = b" !\"#$%&()*,./:;?@[\\]^_`{|}~+<=>";
 
@@ -19,9 +17,6 @@ const FIRST_DIGIT_RANK: u8 = 32;
 const FIRST_PUNCTUATION_RANK: u8 = FIRST_DIGIT_RANK + 10;
 const FIRST_LETTER_RANK: u8 = FIRST_PUNCTUATION_RANK + PUNCTUATION_ORDER.len() as u8;
 const DELETE_RANK: u8 = FIRST_LETTER_RANK + LETTER_COUNT;
-
-/// Ranks start above every ASCII rank, so other characters sort last.
-const FIRST_OTHER_RANK: u32 = ASCII_COUNT as u32;
 
 const ASCII_RANKS: [u8; ASCII_COUNT] = ascii_ranks();
 
@@ -57,31 +52,42 @@ const fn ascii_ranks() -> [u8; ASCII_COUNT] {
     ranks
 }
 
-fn character_rank(character: char) -> u32 {
-    if character.is_ascii() {
-        return u32::from(ASCII_RANKS[character as usize]);
+/// Lead byte of a character outside ASCII. It is above every ASCII rank, so
+/// such characters sort after the documented ones.
+const OTHER_CHARACTER_LEAD: u8 = 0x80;
+
+/// Append the collation key of `text` to `arena`: one rank byte for each
+/// ASCII character and four bytes for any other character, so that a plain
+/// byte comparison of two keys gives Excel's order. Returns whether the text
+/// holds a hyphen, which decides a tie.
+pub(crate) fn push_collation_key(text: &str, arena: &mut Vec<u8>) -> bool {
+    if text.is_ascii() {
+        let bytes = text.as_bytes();
+        arena.extend(
+            bytes
+                .iter()
+                .filter(|&&byte| byte != b'\'' && byte != b'-')
+                .map(|&byte| ASCII_RANKS[usize::from(byte)]),
+        );
+        return bytes.contains(&b'-');
     }
 
-    let folded = character.to_lowercase().next().unwrap_or(character);
-    FIRST_OTHER_RANK + u32::from(folded)
-}
+    let mut has_hyphen = false;
 
-fn is_skipped(character: char) -> bool {
-    character == '\'' || character == '-'
-}
+    for character in text.chars() {
+        has_hyphen |= character == '-';
+        if character == '\'' || character == '-' {
+            continue;
+        }
 
-/// Compare two texts in Excel's ascending sort order.
-pub(crate) fn compare_sort_text(left: &str, right: &str) -> Ordering {
-    let primary = sort_ranks(left).cmp(sort_ranks(right));
-    if primary != Ordering::Equal {
-        return primary;
+        if character.is_ascii() {
+            arena.push(ASCII_RANKS[character as usize]);
+            continue;
+        }
+
+        let folded = character.to_lowercase().next().unwrap_or(character);
+        let [_, high, middle, low] = u32::from(folded).to_be_bytes();
+        arena.extend_from_slice(&[OTHER_CHARACTER_LEAD, high, middle, low]);
     }
-
-    left.contains('-').cmp(&right.contains('-'))
-}
-
-fn sort_ranks(text: &str) -> impl Iterator<Item = u32> + '_ {
-    text.chars()
-        .filter(|&character| !is_skipped(character))
-        .map(character_rank)
+    has_hyphen
 }

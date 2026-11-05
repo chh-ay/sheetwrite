@@ -21,6 +21,7 @@ use super::pivot_output::{attempt_cut, shift_anchor, ShiftAxis};
 use super::{CellStore, TableColumnDefinition};
 use crate::calc::shift_range;
 use crate::eval::{calculated_slot, settled_cell_value};
+use crate::formula_slots::{FormulaStore, FormulaWork};
 use crate::graph::{DirtyRect, DirtySeeds};
 use crate::pivot::{
     source_fields, Aggregation, PivotCache, PivotDefinition, PivotFilter, PivotLayout, PivotSource,
@@ -28,7 +29,7 @@ use crate::pivot::{
 };
 use crate::sheet::SheetData;
 use crate::spill::SpillRange;
-use crate::types::{AbsCellKey, CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
+use crate::types::{CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
 
 /// Pivots one sheet may hold; a payload with more is malformed. Core's
 /// workbook pivot bound is lower.
@@ -376,6 +377,7 @@ impl SourceRect {
 struct StoreSource<'a> {
     sheet: &'a SheetData,
     strings: &'a StringStorage,
+    slots: &'a FormulaStore,
     rect: SourceRect,
     /// A table's column names, which are its field names.
     names: Option<&'a [TableColumnDefinition]>,
@@ -402,6 +404,7 @@ impl PivotSource for StoreSource<'_> {
                 self.strings,
                 row as usize,
                 self.rect.col_start as usize + field,
+                self.slots,
             )
         })
     }
@@ -412,6 +415,7 @@ impl PivotSource for StoreSource<'_> {
             self.strings,
             self.rect.first as usize + row,
             self.rect.col_start as usize + field,
+            self.slots,
         )
     }
 }
@@ -730,6 +734,7 @@ impl CellStore {
                 source_fields(&StoreSource {
                     sheet: &self.sheets[rect.sheet],
                     strings: &self.strings,
+                    slots: &self.formula_slots,
                     rect,
                     names,
                 })
@@ -796,11 +801,8 @@ impl CellStore {
     /// rows each pivot must update (cells written or recalculated in the
     /// pass, including the formula results in `affected`), and whether a
     /// change inside its output range means its output must be placed again.
-    pub(crate) fn capture_pivot_changes<I>(
-        &mut self,
-        sheets: I,
-        affected: Option<&FxHashSet<AbsCellKey>>,
-    ) where
+    pub(crate) fn capture_pivot_changes<I>(&mut self, sheets: I, affected: Option<&FormulaWork>)
+    where
         I: IntoIterator<Item = usize> + Clone,
     {
         let Some(registry) = self.pivots.as_deref_mut() else {
@@ -817,6 +819,7 @@ impl CellStore {
                         finished(rect.sheet),
                         affected,
                         &mut pivot.pending,
+                        &self.formula_slots,
                     );
                 }
 
@@ -1001,6 +1004,7 @@ impl CellStore {
         let source = StoreSource {
             sheet: &self.sheets[rect.sheet],
             strings: &self.strings,
+            slots: &self.formula_slots,
             rect,
             names,
         };
@@ -1182,8 +1186,9 @@ fn capture_source(
     data: &SheetData,
     rect: SourceRect,
     capture_dirty: bool,
-    affected: Option<&FxHashSet<AbsCellKey>>,
+    affected: Option<&FormulaWork>,
     pending: &mut Pending,
+    slots: &FormulaStore,
 ) {
     if pending.rebuild {
         return;
@@ -1207,7 +1212,7 @@ fn capture_source(
         }
     }
     // Formula results stored in the pass are not dirty seeds.
-    for key in affected.into_iter().flatten() {
+    for key in affected.into_iter().flat_map(|work| work.keys(slots)) {
         if key.sheet as usize == rect.sheet {
             rect.touch(key.local(), pending);
         }

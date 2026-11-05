@@ -7,8 +7,9 @@ use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
+use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
-use crate::sort_text::compare_sort_text;
+use crate::sort_text::push_collation_key;
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -211,8 +212,9 @@ impl CellStore {
                     KIND_FORMULA => {
                         let (kind, payload) = dense_resolved(raw, payloads[row]);
                         (!matches!(kind, KIND_STRING | KIND_BOOL | KIND_EMPTY)
-                            && cell_key(row, col)
-                                .is_some_and(|key| formula_error_at(s, key).is_none()))
+                            && cell_key(row, col).is_some_and(|key| {
+                                formula_error_at(s, key, &self.formula_slots).is_none()
+                            }))
                         .then(|| payload_num(payload))
                     }
                     // A spilled value sits in a calculated slot with no source.
@@ -234,7 +236,7 @@ impl CellStore {
             while start < end {
                 let run = s.cells.run(start, end);
                 for index in run.start..run.end {
-                    if let Some(value) = numeric_cell_value(s, index) {
+                    if let Some(value) = numeric_cell_value(s, index, &self.formula_slots) {
                         acc.add(value, op);
                     }
                 }
@@ -323,7 +325,7 @@ impl CellStore {
                     KIND_EMPTY => false,
                     _ => cell_matches_text(
                         s,
-                        &self.strings,
+                        self,
                         base + row,
                         &needle,
                         FILTER_CASE_INSENSITIVE,
@@ -357,7 +359,7 @@ impl CellStore {
                 } else {
                     cell_matches_text(
                         s,
-                        &self.strings,
+                        self,
                         index,
                         &needle,
                         FILTER_CASE_INSENSITIVE,
@@ -483,7 +485,7 @@ impl CellStore {
                 let i = base + row;
                 if cell_matches_text(
                     s,
-                    &self.strings,
+                    self,
                     i,
                     &needle,
                     case_insensitive,
@@ -532,25 +534,27 @@ impl CellStore {
         // (one pool deref per row) instead of rebuilding both operands inside
         // the comparator — a comparison sort would otherwise reconstruct keys
         // ~2·n·log2(n) times, each a scattered heap deref for text cells.
-        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
+        let mut keys = SortKeyBuilder::with_capacity(s.cells.row_count());
         let mut start = base;
         let end = base + s.cells.row_count();
         while start < end {
             let run = s.cells.run(start, end);
             for index in run.start..run.end {
-                keys.push(ComparableCell::from_run(s, &self.strings, &run, index));
+                keys.push(ComparableCell::from_run(
+                    s,
+                    &self.strings,
+                    &run,
+                    index,
+                    &self.formula_slots,
+                ));
             }
             start = run.end;
         }
+        let keys = keys.rank();
 
         let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
         order.sort_unstable_by(|&a, &b| {
-            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
-            // has exactly `row_count` entries.
-            let ka = unsafe { keys.get_unchecked(a as usize) };
-            // SAFETY: as above.
-            let kb = unsafe { keys.get_unchecked(b as usize) };
-            let ord = ka.sort_cmp(kb, ascending);
+            let ord = keys.compare(a as usize, b as usize, ascending);
             if ord == Ordering::Equal {
                 a.cmp(&b)
             } else {
@@ -602,7 +606,7 @@ impl CellStore {
         // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
         // every time. Keys are stored key-major so the first key — the one that
         // decides nearly every comparison — stays contiguous.
-        let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
+        let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
 
@@ -614,16 +618,26 @@ impl CellStore {
                 if index < run.start || index >= run.end {
                     *run = data.cells.run(index, base + data.cells.row_count());
                 }
-                keys.push(ComparableCell::from_run(data, &self.strings, run, index));
+                keys.push(ComparableCell::from_run(
+                    data,
+                    &self.strings,
+                    run,
+                    index,
+                    &self.formula_slots,
+                ));
             }
         }
+        let keys = keys.rank();
+
         let mut positions: Vec<u32> = (0..row_count as u32).collect();
         // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
         positions.sort_by(|&left, &right| {
             for key in 0..cols.len() {
-                let a = &keys[key * row_count + left as usize];
-                let b = &keys[key * row_count + right as usize];
-                let order = a.sort_cmp(b, ascending.get(key).copied().unwrap_or(1) != 0);
+                let order = keys.compare(
+                    key * row_count + left as usize,
+                    key * row_count + right as usize,
+                    ascending.get(key).copied().unwrap_or(1) != 0,
+                );
                 if order != Ordering::Equal {
                     return order;
                 }
@@ -703,7 +717,7 @@ impl CellStore {
         'rows: for row in 0..data.cells.row_count() {
             for i in 0..cols.len() {
                 let index = cols[i] as usize * data.cells.row_count() + row;
-                let kind = resolved_kind(data, index);
+                let kind = resolved_kind(data, index, &self.formula_slots);
                 let matches = match kinds[i] {
                     0 => {
                         let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
@@ -712,14 +726,21 @@ impl CellStore {
                         match &value_sets[i] {
                             ValueSet::Linear => {
                                 if kind == 1 {
-                                    if let Some(value) = numeric_cell_value(data, index) {
+                                    if let Some(value) =
+                                        numeric_cell_value(data, index, &self.formula_slots)
+                                    {
                                         hit |= value_nums
                                             .get(num_offsets[i]..num_offsets[i] + nc)
                                             .unwrap_or(&[])
                                             .contains(&value);
                                     }
                                 } else if kind == 2 {
-                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                    if let Some(text) = resolved_text(
+                                        data,
+                                        &self.strings,
+                                        index,
+                                        &self.formula_slots,
+                                    ) {
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
                                             .unwrap_or(&[])
@@ -727,7 +748,9 @@ impl CellStore {
                                             .any(|picked| picked == text);
                                     }
                                 } else if kind == 3 {
-                                    if let Some(value) = boolean_cell_value(data, index) {
+                                    if let Some(value) =
+                                        boolean_cell_value(data, index, &self.formula_slots)
+                                    {
                                         let expected = if value {
                                             VALUE_SET_TRUE
                                         } else {
@@ -747,16 +770,25 @@ impl CellStore {
                                 bools,
                             } => {
                                 if kind == 1 {
-                                    if let Some(value) = numeric_cell_value(data, index) {
+                                    if let Some(value) =
+                                        numeric_cell_value(data, index, &self.formula_slots)
+                                    {
                                         let normalized = if value == 0.0 { 0.0 } else { value };
                                         hit |= numbers.binary_search(&normalized.to_bits()).is_ok();
                                     }
                                 } else if kind == 2 {
-                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                    if let Some(text) = resolved_text(
+                                        data,
+                                        &self.strings,
+                                        index,
+                                        &self.formula_slots,
+                                    ) {
                                         hit |= texts.contains(text);
                                     }
                                 } else if kind == 3 {
-                                    if let Some(value) = boolean_cell_value(data, index) {
+                                    if let Some(value) =
+                                        boolean_cell_value(data, index, &self.formula_slots)
+                                    {
                                         let picked_bit = if value {
                                             VALUE_SET_TRUE_BIT
                                         } else {
@@ -776,7 +808,7 @@ impl CellStore {
                             .unwrap_or("");
                         cell_matches_text(
                             data,
-                            &self.strings,
+                            self,
                             index,
                             needle,
                             flags.get(i).copied().unwrap_or(0) == 0,
@@ -784,16 +816,18 @@ impl CellStore {
                             &mut match_caches[cache_index[i]],
                         )
                     }
-                    2 => numeric_cell_value(data, index).is_some_and(|value| {
-                        match flags.get(i).copied().unwrap_or(0) {
-                            0 => value > nums.get(i).copied().unwrap_or(0.0),
-                            1 => value >= nums.get(i).copied().unwrap_or(0.0),
-                            2 => value < nums.get(i).copied().unwrap_or(0.0),
-                            3 => value <= nums.get(i).copied().unwrap_or(0.0),
-                            4 => value == nums.get(i).copied().unwrap_or(0.0),
-                            _ => value != nums.get(i).copied().unwrap_or(0.0),
-                        }
-                    }),
+                    2 => {
+                        numeric_cell_value(data, index, &self.formula_slots).is_some_and(|value| {
+                            match flags.get(i).copied().unwrap_or(0) {
+                                0 => value > nums.get(i).copied().unwrap_or(0.0),
+                                1 => value >= nums.get(i).copied().unwrap_or(0.0),
+                                2 => value < nums.get(i).copied().unwrap_or(0.0),
+                                3 => value <= nums.get(i).copied().unwrap_or(0.0),
+                                4 => value == nums.get(i).copied().unwrap_or(0.0),
+                                _ => value != nums.get(i).copied().unwrap_or(0.0),
+                            }
+                        })
+                    }
                     3 => kind == 0,
                     4 => kind != 0,
                     _ => false,
@@ -816,7 +850,9 @@ impl CellStore {
         if col >= data.cells.n_cols() {
             return out;
         }
-        let text_at = |index: usize| resolved_text(data, &self.strings, index).unwrap_or("");
+        let text_at = |index: usize| {
+            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or("")
+        };
         // Stored text carries a pool id that stands for its value, so the scan
         // dedupes it through one bit per id instead of hashing the characters.
         // Text without an id — the sentinel a formula error reports reads back as
@@ -831,10 +867,12 @@ impl CellStore {
             let mut needs_content = false;
             for row in 0..data.cells.row_count() {
                 let index = col * data.cells.row_count() + row;
-                let kind = resolved_kind(data, index);
+                let kind = resolved_kind(data, index, &self.formula_slots);
                 let fresh = match kind {
                     1 => seen.insert(DistinctKey::Number(
-                        numeric_cell_value(data, index).unwrap_or(0.0).to_bits(),
+                        numeric_cell_value(data, index, &self.formula_slots)
+                            .unwrap_or(0.0)
+                            .to_bits(),
                     )),
                     2 if pooled => match data.cells.str_id_at(index) {
                         NO_STRING => {
@@ -845,7 +883,7 @@ impl CellStore {
                     },
                     2 => seen.insert(DistinctKey::Text(text_at(index))),
                     3 => seen.insert(DistinctKey::Bool(
-                        boolean_cell_value(data, index).unwrap_or(false),
+                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false),
                     )),
                     _ => seen.insert(DistinctKey::Blank),
                 };
@@ -855,14 +893,15 @@ impl CellStore {
                 out.kinds.push(kind);
                 if kind == 1 {
                     out.numbers
-                        .push(numeric_cell_value(data, index).unwrap_or(0.0));
+                        .push(numeric_cell_value(data, index, &self.formula_slots).unwrap_or(0.0));
                 } else if kind == 3 {
-                    out.numbers
-                        .push(if boolean_cell_value(data, index).unwrap_or(false) {
+                    out.numbers.push(
+                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false) {
                             1.0
                         } else {
                             0.0
-                        });
+                        },
+                    );
                 } else if kind == 2 {
                     out.texts.push(text_at(index).to_owned());
                 }
@@ -913,7 +952,7 @@ impl CellStore {
                     && match column.map(|column| column.raw_kind(r)) {
                         Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
                         Some(KIND_EMPTY) => false,
-                        _ => resolved_kind(data, index) != 0,
+                        _ => resolved_kind(data, index, &self.formula_slots) != 0,
                     }
             })
         };
@@ -921,7 +960,7 @@ impl CellStore {
     }
 }
 
-fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
+fn resolved_kind(sheet: &SheetData, index: usize, slots: &FormulaStore) -> u8 {
     match sheet.cells.kind_at(index) {
         KIND_NUMBER => 1,
         KIND_STRING => 2,
@@ -930,7 +969,7 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
             let Some(key) = key_for_index(sheet, index) else {
                 return 0;
             };
-            if formula_error_at(sheet, key).is_some() {
+            if formula_error_at(sheet, key, slots).is_some() {
                 return 2;
             }
             match sheet.cells.formula_value_kind(index) {
@@ -952,12 +991,12 @@ fn boolean_text(value: bool) -> &'static str {
     }
 }
 
-fn boolean_cell_value(sheet: &SheetData, index: usize) -> Option<bool> {
+fn boolean_cell_value(sheet: &SheetData, index: usize, slots: &FormulaStore) -> Option<bool> {
     match sheet.cells.kind_at(index) {
         KIND_BOOL => Some(sheet.cells.num_at(index) != 0.0),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            (formula_error_at(sheet, key).is_none()
+            (formula_error_at(sheet, key, slots).is_none()
                 && sheet.cells.formula_value_kind(index) == FormulaValueKind::Bool)
                 .then(|| sheet.cells.num_at(index) != 0.0)
         }
@@ -969,8 +1008,9 @@ fn resolved_text<'a>(
     sheet: &SheetData,
     strings: &'a StringStorage,
     index: usize,
+    slots: &FormulaStore,
 ) -> Option<&'a str> {
-    if let Some(value) = boolean_cell_value(sheet, index) {
+    if let Some(value) = boolean_cell_value(sheet, index, slots) {
         return Some(boolean_text(value));
     }
     match sheet.cells.kind_at(index) {
@@ -978,7 +1018,7 @@ fn resolved_text<'a>(
             string_from_pool_ref(strings, sheet.cells.str_id_at(index))
         }
         KIND_FORMULA => key_for_index(sheet, index)
-            .and_then(|key| formula_error_at(sheet, key))
+            .and_then(|key| formula_error_at(sheet, key, slots))
             .map(FormulaError::sentinel),
         _ => None,
     }
@@ -1016,12 +1056,16 @@ impl DistinctColumn {
     }
 }
 
-pub(crate) fn numeric_cell_value(sheet: &SheetData, index: usize) -> Option<f64> {
+pub(crate) fn numeric_cell_value(
+    sheet: &SheetData,
+    index: usize,
+    slots: &FormulaStore,
+) -> Option<f64> {
     match sheet.cells.kind_at(index) {
         KIND_NUMBER => Some(sheet.cells.num_at(index)),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            if formula_error_at(sheet, key).is_none()
+            if formula_error_at(sheet, key, slots).is_none()
                 && sheet.cells.formula_value_kind(index) == FormulaValueKind::Number
             {
                 Some(sheet.cells.num_at(index))
@@ -1203,14 +1247,16 @@ impl MatchCache {
 
 pub(crate) fn cell_matches_text(
     sheet: &SheetData,
-    strings: &StringStorage,
+    store: &CellStore,
     index: usize,
     needle: &str,
     case_insensitive: bool,
     whole_cell: bool,
     cache: &mut MatchCache,
 ) -> bool {
-    if let Some(value) = boolean_cell_value(sheet, index) {
+    let strings = &store.strings;
+    let slots = &store.formula_slots;
+    if let Some(value) = boolean_cell_value(sheet, index, slots) {
         return matches_needle(boolean_text(value), needle, case_insensitive, whole_cell);
     }
     match sheet.cells.kind_at(index) {
@@ -1224,7 +1270,7 @@ pub(crate) fn cell_matches_text(
             let Some(key) = key_for_index(sheet, index) else {
                 return false;
             };
-            if let Some(error) = formula_error_at(sheet, key) {
+            if let Some(error) = formula_error_at(sheet, key, slots) {
                 matches_needle(error.sentinel(), needle, case_insensitive, whole_cell)
             } else if sheet.cells.str_id_at(index) != NO_STRING {
                 cache.matches(
@@ -1463,7 +1509,11 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
 pub(crate) enum ComparableCell<'a> {
     Number(OrderedNumber),
     Bool(bool),
-    Text(&'a str),
+    /// A string of the pool and its id.
+    Text {
+        id: u32,
+        text: &'a str,
+    },
     Error,
     Empty,
 }
@@ -1473,6 +1523,7 @@ impl<'a> ComparableCell<'a> {
         sheet: &'a SheetData,
         strings: &'a StringStorage,
         index: usize,
+        slots: &FormulaStore,
     ) -> Self {
         match sheet.cells.kind_at(index) {
             KIND_NUMBER => ComparableCell::Number(OrderedNumber(sheet.cells.num_at(index))),
@@ -1481,24 +1532,28 @@ impl<'a> ComparableCell<'a> {
                 let Some(key) = key_for_index(sheet, index) else {
                     return ComparableCell::Empty;
                 };
-                if formula_error_at(sheet, key).is_some() {
+                if formula_error_at(sheet, key, slots).is_some() {
                     ComparableCell::Error
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Blank {
                     ComparableCell::Empty
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Bool {
                     ComparableCell::Bool(sheet.cells.num_at(index) != 0.0)
-                } else if let Some(text) =
-                    string_from_pool_ref(strings, sheet.cells.str_id_at(index))
-                {
-                    ComparableCell::Text(text)
+                } else if let Some(text) = Self::pool_text(strings, sheet.cells.str_id_at(index)) {
+                    text
                 } else {
                     ComparableCell::Number(OrderedNumber(sheet.cells.num_at(index)))
                 }
             }
-            KIND_STRING => string_from_pool_ref(strings, sheet.cells.str_id_at(index))
-                .map_or(ComparableCell::Empty, ComparableCell::Text),
+            KIND_STRING => Self::pool_text(strings, sheet.cells.str_id_at(index))
+                .unwrap_or(ComparableCell::Empty),
             _ => ComparableCell::Empty,
         }
+    }
+
+    /// Text of pool string `id`, which keeps its id so that a sort collates
+    /// each distinct string once.
+    fn pool_text(strings: &'a StringStorage, id: u32) -> Option<Self> {
+        string_from_pool_ref(strings, id).map(|text| Self::Text { id, text })
     }
 
     fn from_run(
@@ -1506,9 +1561,10 @@ impl<'a> ComparableCell<'a> {
         strings: &'a StringStorage,
         run: &CellRun<'_>,
         index: usize,
+        slots: &FormulaStore,
     ) -> Self {
         if sheet.cells.is_paged() {
-            return Self::from_cell(sheet, strings, index);
+            return Self::from_cell(sheet, strings, index, slots);
         }
         let (kind, payload) = run.source(index);
         // Spill owners install calculated output in these same dense slots.
@@ -1521,23 +1577,20 @@ impl<'a> ComparableCell<'a> {
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
             KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-            KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
-                .map_or(Self::Empty, Self::Text),
+            KIND_STRING => Self::pool_text(strings, payload_str_id(payload)).unwrap_or(Self::Empty),
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
                 };
-                if formula_error_at(sheet, key).is_some() {
+                if formula_error_at(sheet, key, slots).is_some() {
                     return Self::Error;
                 }
                 let (kind, payload) = run.resolved(index);
                 match kind {
                     KIND_EMPTY => Self::Empty,
                     KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-                    KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload)).map_or(
-                        Self::Number(OrderedNumber(payload_num(payload))),
-                        Self::Text,
-                    ),
+                    KIND_STRING => Self::pool_text(strings, payload_str_id(payload))
+                        .unwrap_or(Self::Number(OrderedNumber(payload_num(payload)))),
                     _ => Self::Number(OrderedNumber(payload_num(payload))),
                 }
             }
@@ -1546,36 +1599,173 @@ impl<'a> ComparableCell<'a> {
     }
 }
 
-impl ComparableCell<'_> {
-    /// Excel's sort order: numbers, text, `FALSE` before `TRUE`, then errors,
-    /// which are all equal. A descending sort reverses this order, but blank
-    /// cells are last in both directions.
-    pub(crate) fn sort_cmp(&self, other: &Self, ascending: bool) -> Ordering {
-        match (self, other) {
-            (ComparableCell::Empty, ComparableCell::Empty) => Ordering::Equal,
-            (ComparableCell::Empty, _) => Ordering::Greater,
-            (_, ComparableCell::Empty) => Ordering::Less,
-            _ if ascending => self.ascending_cmp(other),
-            _ => other.ascending_cmp(self),
+/// Classes of sort keys, in Excel's ascending order of value types. Blank
+/// cells have the highest class because they sort last in both directions.
+const CLASS_NUMBER: u8 = 0;
+const CLASS_TEXT: u8 = 1;
+const CLASS_BOOL: u8 = 2;
+const CLASS_ERROR: u8 = 3;
+const CLASS_EMPTY: u8 = 4;
+
+/// The collation key of one distinct string: its span in the arena, and
+/// whether the string holds a hyphen, which decides a tie.
+#[derive(Clone, Copy)]
+struct CollatedText {
+    start: u32,
+    end: u32,
+    has_hyphen: bool,
+}
+
+/// Marks a pool id whose string is not collated yet.
+const NOT_COLLATED: u32 = u32::MAX;
+
+/// Sort keys of one sort call while its rows are read. Each key is a class
+/// and a 64-bit value in flat arrays. Each distinct pool string is collated
+/// once into one byte arena; a flat table indexed by pool id finds the key
+/// of a string seen before. A text value holds the index of its string
+/// until [`Self::rank`] replaces it by the string's rank.
+pub(crate) struct SortKeyBuilder {
+    classes: Vec<u8>,
+    values: Vec<u64>,
+    texts: Vec<CollatedText>,
+    text_by_pool_id: Vec<u32>,
+    arena: Vec<u8>,
+}
+
+impl SortKeyBuilder {
+    pub(crate) fn with_capacity(rows: usize) -> Self {
+        Self {
+            classes: Vec::with_capacity(rows),
+            values: Vec::with_capacity(rows),
+            texts: Vec::new(),
+            text_by_pool_id: Vec::new(),
+            arena: Vec::new(),
         }
     }
 
-    fn ascending_cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (ComparableCell::Number(a), ComparableCell::Number(b)) => a.cmp(b),
-            (ComparableCell::Text(a), ComparableCell::Text(b)) => compare_sort_text(a, b),
-            (ComparableCell::Bool(a), ComparableCell::Bool(b)) => a.cmp(b),
-            _ => self.type_rank().cmp(&other.type_rank()),
+    pub(crate) fn push(&mut self, cell: ComparableCell<'_>) {
+        let (class, value) = match cell {
+            ComparableCell::Number(number) => (CLASS_NUMBER, number.0.to_bits()),
+            ComparableCell::Text { id, text } => (CLASS_TEXT, u64::from(self.collate(id, text))),
+            ComparableCell::Bool(value) => (CLASS_BOOL, u64::from(value)),
+            ComparableCell::Error => (CLASS_ERROR, 0),
+            ComparableCell::Empty => (CLASS_EMPTY, 0),
+        };
+
+        self.classes.push(class);
+        self.values.push(value);
+    }
+
+    /// The index of the collation key of pool string `id`, collated on its
+    /// first use.
+    fn collate(&mut self, id: u32, text: &str) -> u32 {
+        let slot = id as usize;
+        if slot >= self.text_by_pool_id.len() {
+            self.text_by_pool_id.resize(slot + 1, NOT_COLLATED);
+        }
+
+        let known = self.text_by_pool_id[slot];
+        if known != NOT_COLLATED {
+            return known;
+        }
+
+        let start = self.arena.len() as u32;
+        let has_hyphen = push_collation_key(text, &mut self.arena);
+        let index = self.texts.len() as u32;
+        self.texts.push(CollatedText {
+            start,
+            end: self.arena.len() as u32,
+            has_hyphen,
+        });
+        self.text_by_pool_id[slot] = index;
+        index
+    }
+
+    /// Bytes allocated for collation: the arena, the distinct-text spans and
+    /// the pool-id table.
+    #[cfg(test)]
+    pub(crate) fn collation_bytes(&self) -> usize {
+        self.arena.capacity()
+            + self.texts.capacity() * std::mem::size_of::<CollatedText>()
+            + self.text_by_pool_id.capacity() * std::mem::size_of::<u32>()
+    }
+
+    /// Bytes of collation keys in the arena.
+    #[cfg(test)]
+    pub(crate) fn arena_len(&self) -> usize {
+        self.arena.len()
+    }
+
+    /// Sort the distinct strings once and give each its rank in collation
+    /// order; equal keys get equal ranks. Rows then compare text by rank, so
+    /// the row sort makes no byte comparison. The arena is dropped here.
+    pub(crate) fn rank(mut self) -> SortKeys {
+        let mut order: Vec<u32> = (0..self.texts.len() as u32).collect();
+        order.sort_unstable_by(|&a, &b| self.collation_cmp(a, b));
+
+        let mut ranks = vec![0u32; self.texts.len()];
+        let mut rank = 0u32;
+        for (position, &text) in order.iter().enumerate() {
+            if position > 0 && self.collation_cmp(order[position - 1], text) != Ordering::Equal {
+                rank += 1;
+            }
+            ranks[text as usize] = rank;
+        }
+
+        for (class, value) in self.classes.iter().zip(self.values.iter_mut()) {
+            if *class == CLASS_TEXT {
+                *value = u64::from(ranks[*value as usize]);
+            }
+        }
+
+        SortKeys {
+            classes: self.classes,
+            values: self.values,
         }
     }
 
-    fn type_rank(&self) -> u8 {
-        match self {
-            ComparableCell::Number(_) => 0,
-            ComparableCell::Text(_) => 1,
-            ComparableCell::Bool(_) => 2,
-            ComparableCell::Error => 3,
-            ComparableCell::Empty => 4,
+    fn collation_cmp(&self, a: u32, b: u32) -> Ordering {
+        let a = self.texts[a as usize];
+        let b = self.texts[b as usize];
+        let a_key = &self.arena[a.start as usize..a.end as usize];
+        let b_key = &self.arena[b.start as usize..b.end as usize];
+        a_key.cmp(b_key).then(a.has_hyphen.cmp(&b.has_hyphen))
+    }
+}
+
+/// Ranked sort keys of one sort call: a class and a value per key. A number
+/// value holds its `f64` bits, text its collation rank, and a logical value
+/// 0 or 1.
+pub(crate) struct SortKeys {
+    classes: Vec<u8>,
+    values: Vec<u64>,
+}
+
+impl SortKeys {
+    /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
+    /// before `TRUE`, then errors, which are all equal. A descending sort
+    /// reverses this order, but blank cells are last in both directions.
+    pub(crate) fn compare(&self, left: usize, right: usize, ascending: bool) -> Ordering {
+        let class_left = self.classes[left];
+        let class_right = self.classes[right];
+        if class_left == CLASS_EMPTY || class_right == CLASS_EMPTY {
+            return class_left.cmp(&class_right);
+        }
+
+        let order = if class_left != class_right {
+            class_left.cmp(&class_right)
+        } else if class_left == CLASS_NUMBER {
+            let a = f64::from_bits(self.values[left]);
+            let b = f64::from_bits(self.values[right]);
+            a.partial_cmp(&b).unwrap_or(Ordering::Equal)
+        } else {
+            self.values[left].cmp(&self.values[right])
+        };
+
+        if ascending {
+            order
+        } else {
+            order.reverse()
         }
     }
 }

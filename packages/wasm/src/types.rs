@@ -634,7 +634,7 @@ impl FormulaEntry {
     }
 
     /// Heap allocations owned by this formula entry. The inline entry is
-    /// accounted by the formula hash-table bucket that stores it.
+    /// accounted by the workbook's formula slot array.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         out.add_payload(self.source.len(), self.source.capacity());
         out.add_payload(
