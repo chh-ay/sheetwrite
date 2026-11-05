@@ -13,8 +13,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
   occupied: "its output would cover cells that other content uses",
 };
 
+const READ_ONLY = "The grid is read-only; nothing was written.";
+
 function transactionMessage(result: ApplyTransactionResult): string | null {
   if (result.status === "applied") return null;
+  if (result.status === "noop" && result.reason === "read-only") return READ_ONLY;
   if (result.status === "rejected") return result.issues[0]?.message ?? NOT_APPLIED;
   return NOT_APPLIED;
 }
