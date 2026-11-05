@@ -235,6 +235,13 @@ export interface SyncCoordinatorOptions {
   pendingStorage?: PendingCommitStorage;
   initialConnection?: "offline" | "online";
   /**
+   * Authenticated ID of the person editing through this grid. Each new pending
+   * commit carries it to the authority, which records it in history. Restored
+   * commits keep the author they were made with. At most `maxMutationIdBytes`
+   * UTF-8 bytes.
+   */
+  authorId?: string;
+  /**
    * Optional host recovery hook. Return the missing ordered operations, or a
    * snapshot for the host to remount before calling `resumeAfterReload`.
    */
@@ -394,6 +401,7 @@ export class SyncCoordinator {
     this.limits = resolveLimits(options.limits);
     assertDocumentId(options.documentId);
     assertVersion(options.serverVersion, "serverVersion");
+    if (options.authorId !== undefined) assertAuthorId(options.authorId, this.limits);
 
     this.version = options.serverVersion;
     this.connection = options.initialConnection ?? "online";
@@ -606,6 +614,7 @@ export class SyncCoordinator {
         baseVersion: record.baseVersion,
         clientMutationId: record.clientMutationId,
         operations: record.operations,
+        ...(record.authorId !== undefined ? { authorId: record.authorId } : {}),
         signal: controller.signal,
       };
 
@@ -844,6 +853,8 @@ export class SyncCoordinator {
             ? { clientMutationId: inspected.clientMutationId }
             : {}),
           ...(inspected.batch !== undefined ? { batch: { ...inspected.batch } } : {}),
+          ...(inspected.authorId !== undefined ? { authorId: inspected.authorId } : {}),
+          ...(inspected.committedAt !== undefined ? { committedAt: inspected.committedAt } : {}),
         },
         bytes: inspected.bytes,
       };
@@ -1018,6 +1029,7 @@ export class SyncCoordinator {
         ...(record.versionOperationCounts
           ? { versionOperationCounts: record.versionOperationCounts }
           : {}),
+        ...(record.authorId !== undefined ? { authorId: record.authorId } : {}),
       };
       const versions = serverVersionsOf(record);
       for (let index = 0; index < versions; index++) baseVersion = incrementVersion(baseVersion);
@@ -1234,6 +1246,7 @@ export class SyncCoordinator {
         clientMutationId: reservation.clientMutationId,
         operations,
         ...(versionOperationCounts ? { versionOperationCounts } : {}),
+        ...(this.options.authorId !== undefined ? { authorId: this.options.authorId } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
 
@@ -1733,7 +1746,8 @@ export class SyncCoordinator {
         : assembly !== undefined &&
           member.index === assembly.members.length &&
           member.count === assembly.count &&
-          operation.clientMutationId === assembly.clientMutationId);
+          operation.clientMutationId === assembly.clientMutationId &&
+          operation.authorId === assembly.authorId);
     if (!continuesBatch) {
       const startVersion = assembly?.members[0]?.version ?? operation.version;
       this.batchAssembly = undefined;
@@ -1754,6 +1768,7 @@ export class SyncCoordinator {
       ...(operation.clientMutationId !== undefined
         ? { clientMutationId: operation.clientMutationId }
         : {}),
+      ...(operation.authorId !== undefined ? { authorId: operation.authorId } : {}),
     };
 
     if (next.bytes + input.bytes > this.limits.maxBatchBytes) {
@@ -2044,6 +2059,8 @@ interface LocalPendingReservation {
 /** Contiguous members of one remote atomic batch received so far. */
 interface BatchAssembly {
   clientMutationId?: string;
+  /** Every member of one batch names the same author. */
+  authorId?: string;
   count: number;
   members: VersionedOperation[];
   /** Encoded operation bytes of the members, bounded by `maxBatchBytes`. */
@@ -2219,6 +2236,8 @@ interface InspectedVersionedOperation {
   operations: readonly DocumentOp[];
   clientMutationId?: string;
   batch?: VersionBatchMember;
+  authorId?: string;
+  committedAt?: number;
   bytes: number;
 }
 
@@ -2299,6 +2318,8 @@ function assertPendingCommit(
 
   assertVersion(ownDataValue(record, "baseVersion"), "pending baseVersion");
   assertMutationId(ownDataValue(record, "clientMutationId"), limits);
+  const authorId = optionalOwnDataValue(record, "authorId");
+  if (authorId !== undefined) assertAuthorId(authorId, limits);
   const operations = ownDataValue(record, "operations");
   const bytes = assertOperationResources(
     operations,
@@ -2396,6 +2417,22 @@ function assertMutationId(
   }
 }
 
+function assertAuthorId(
+  value: unknown,
+  limits: Readonly<SyncCoordinatorLimits>,
+): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    utf8ByteLength(value, limits.maxMutationIdBytes) > limits.maxMutationIdBytes
+  ) {
+    throw new SyncProtocolError(
+      "invalid-id",
+      `authorId must be nonempty and at most ${limits.maxMutationIdBytes} UTF-8 bytes`,
+    );
+  }
+}
+
 function assertOperations(value: unknown, limits: Readonly<SyncCoordinatorLimits>): number {
   return assertOperationResources(
     value,
@@ -2451,11 +2488,20 @@ function inspectVersionedOperation(
   if (mutationId !== undefined) assertMutationId(mutationId, limits);
   const batchValue = optionalOwnDataValue(record, "batch");
   const batch = batchValue === undefined ? undefined : assertBatchMember(batchValue, limits);
+
+  const authorId = optionalOwnDataValue(record, "authorId");
+  if (authorId !== undefined) assertAuthorId(authorId, limits);
+
+  const committedAt = optionalOwnDataValue(record, "committedAt");
+  if (committedAt !== undefined) assertVersion(committedAt, "committedAt");
+
   return {
     version,
     operations: operations as readonly DocumentOp[],
     ...(mutationId !== undefined ? { clientMutationId: mutationId } : {}),
     ...(batch !== undefined ? { batch } : {}),
+    ...(authorId !== undefined ? { authorId } : {}),
+    ...(committedAt !== undefined ? { committedAt } : {}),
     bytes,
   };
 }
@@ -2731,6 +2777,7 @@ function clonePendingCommit(commit: PendingCommit): PendingCommit {
     ...(commit.versionOperationCounts
       ? { versionOperationCounts: [...commit.versionOperationCounts] }
       : {}),
+    ...(commit.authorId !== undefined ? { authorId: commit.authorId } : {}),
   };
 }
 
@@ -2771,6 +2818,8 @@ function cloneVersionedOperation(operation: VersionedOperation): VersionedOperat
     operations: cloneJsonValue(operation.operations),
     ...(operation.clientMutationId ? { clientMutationId: operation.clientMutationId } : {}),
     ...(operation.batch ? { batch: { ...operation.batch } } : {}),
+    ...(operation.authorId !== undefined ? { authorId: operation.authorId } : {}),
+    ...(operation.committedAt !== undefined ? { committedAt: operation.committedAt } : {}),
   };
 }
 

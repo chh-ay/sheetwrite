@@ -45,13 +45,16 @@ interface StoredPendingCommit extends PendingCommit {
   sequence?: number;
 }
 
-/** The atomic batch shape of a commit; one-version commits store no field. */
-function storedVersionOperationCounts(
+/** Optional commit fields: the atomic batch shape and the author, stored only when present. */
+function storedOptionalFields(
   commit: PendingCommit,
-): Pick<PendingCommit, "versionOperationCounts"> {
-  return commit.versionOperationCounts
-    ? { versionOperationCounts: [...commit.versionOperationCounts] }
-    : {};
+): Pick<PendingCommit, "versionOperationCounts" | "authorId"> {
+  return {
+    ...(commit.versionOperationCounts
+      ? { versionOperationCounts: [...commit.versionOperationCounts] }
+      : {}),
+    ...(commit.authorId !== undefined ? { authorId: commit.authorId } : {}),
+  };
 }
 
 function assertVersionOperationCounts(commit: PendingCommit): void {
@@ -167,7 +170,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
         baseVersion: commit.baseVersion,
         clientMutationId: commit.clientMutationId,
         operations: cloneJsonValue(commit.operations),
-        ...storedVersionOperationCounts(commit),
+        ...storedOptionalFields(commit),
       } satisfies StoredPendingCommit);
 
       await transactionDone(transaction, signal);
@@ -246,7 +249,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
             baseVersion: commit.baseVersion,
             clientMutationId: commit.clientMutationId,
             operations: cloneJsonValue(commit.operations),
-            ...storedVersionOperationCounts(commit),
+            ...storedOptionalFields(commit),
           } satisfies StoredPendingCommit);
         }
 
@@ -370,7 +373,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
           baseVersion: record.baseVersion,
           clientMutationId: record.clientMutationId,
           operations: record.operations,
-          ...storedVersionOperationCounts(record),
+          ...storedOptionalFields(record),
         });
       });
       await completion;

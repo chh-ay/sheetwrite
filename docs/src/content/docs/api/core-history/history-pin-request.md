@@ -8,7 +8,7 @@ description: "HistoryPinRequest interface in @sheetwrite/core/history: Acquire o
 Acquire or release a five-minute renewable reader lease through the storage seam.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L134"><code>packages/core/src/version-history/types.ts#L134</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L118"><code>packages/core/src/version-history/types.ts#L118</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
