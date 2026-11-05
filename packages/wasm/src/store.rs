@@ -35,6 +35,8 @@ pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+#[cfg(feature = "analysis")]
+mod relationships;
 #[cfg(all(test, feature = "analysis"))]
 mod tests;
 mod transfer;
@@ -295,6 +297,12 @@ pub struct CellStore {
     pub(crate) pivots: Option<Box<pivots::PivotRegistry>>,
     #[cfg(not(feature = "analysis"))]
     pub(crate) pivots: Option<Box<pivot_output::SavedPivots>>,
+    /// Table relationships of the full engine (#229). `None` until the host
+    /// sends one, so a workbook without relationships pays one pointer.
+    // Boxed so the field stays one pointer: most workbooks have no model.
+    #[cfg(feature = "analysis")]
+    #[allow(clippy::box_collection)]
+    pub(crate) relationships: Option<Box<Vec<relationships::Relationship>>>,
     /// Formulas each recompute pass selected, summed over passes. Tests read
     /// it to bound recalculation work, which no value can show.
     #[cfg(test)]
@@ -385,6 +393,8 @@ impl CellStore {
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
             iteration: None,
             pivots: None,
+            #[cfg(feature = "analysis")]
+            relationships: None,
             tables: HashMap::new(),
             #[cfg(test)]
             recomputed_formulas: 0,
