@@ -3,7 +3,7 @@ title: "Statistical functions"
 description: "Every statistical formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 92 functions of the statistical family. Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 126 functions of the statistical family. Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -104,6 +104,40 @@ This page lists the 92 functions of the statistical family. Taxonomy/source: [St
 <tr data-formula-name="QUARTILE" data-engine="full"><td><code>QUARTILE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
 <tr data-formula-name="RANK" data-engine="full"><td><code>RANK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-rank">Signature: <code>rank</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
 <tr data-formula-name="TREND" data-engine="full"><td><code>TREND</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regression-predict">Signature: <code>regression-predict</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="BETADIST" data-engine="full"><td><code>BETADIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-beta-cumulative">Signature: <code>beta-cumulative</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="BETAINV" data-engine="full"><td><code>BETAINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-beta-inverse">Signature: <code>beta-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="BINOMDIST" data-engine="full"><td><code>BINOMDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binom-dist">Signature: <code>binom-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="CHIDIST" data-engine="full"><td><code>CHIDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-tail">Signature: <code>distribution-tail</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="CHIINV" data-engine="full"><td><code>CHIINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-inverse">Signature: <code>distribution-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="CHITEST" data-engine="full"><td><code>CHITEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-chi-test">Signature: <code>chi-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="CONFIDENCE" data-engine="full"><td><code>CONFIDENCE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-confidence">Signature: <code>confidence</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="COVAR" data-engine="full"><td><code>COVAR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="CRITBINOM" data-engine="full"><td><code>CRITBINOM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binom-inverse">Signature: <code>binom-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="EXPONDIST" data-engine="full"><td><code>EXPONDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-expon-dist">Signature: <code>expon-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="FDIST" data-engine="full"><td><code>FDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-f-tail">Signature: <code>f-tail</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="FINV" data-engine="full"><td><code>FINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-f-inverse">Signature: <code>f-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="FTEST" data-engine="full"><td><code>FTEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="GAMMADIST" data-engine="full"><td><code>GAMMADIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-gamma-dist">Signature: <code>gamma-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="GAMMAINV" data-engine="full"><td><code>GAMMAINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-gamma-inverse">Signature: <code>gamma-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="HYPGEOMDIST" data-engine="full"><td><code>HYPGEOMDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-hypgeom-mass">Signature: <code>hypgeom-mass</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="LOGINV" data-engine="full"><td><code>LOGINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lognorm-inverse">Signature: <code>lognorm-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="LOGNORMDIST" data-engine="full"><td><code>LOGNORMDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-standardize">Signature: <code>standardize</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="MODE" data-engine="full"><td><code>MODE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="NEGBINOMDIST" data-engine="full"><td><code>NEGBINOMDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-negbinom-mass">Signature: <code>negbinom-mass</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="NORMDIST" data-engine="full"><td><code>NORMDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-norm-dist">Signature: <code>norm-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="NORMINV" data-engine="full"><td><code>NORMINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-norm-inv">Signature: <code>norm-inv</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="NORMSDIST" data-engine="full"><td><code>NORMSDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="NORMSINV" data-engine="full"><td><code>NORMSINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="POISSON" data-engine="full"><td><code>POISSON</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-poisson-dist">Signature: <code>poisson-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="STDEV" data-engine="full"><td><code>STDEV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="STDEVP" data-engine="full"><td><code>STDEVP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="TDIST" data-engine="full"><td><code>TDIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-t-dist-tails">Signature: <code>t-dist-tails</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="TINV" data-engine="full"><td><code>TINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-inverse">Signature: <code>distribution-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="TTEST" data-engine="full"><td><code>TTEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-t-test">Signature: <code>t-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="VAR" data-engine="full"><td><code>VAR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="VARP" data-engine="full"><td><code>VARP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="WEIBULL" data-engine="full"><td><code>WEIBULL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-weibull-dist">Signature: <code>weibull-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
+<tr data-formula-name="ZTEST" data-engine="full"><td><code>ZTEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-z-test">Signature: <code>z-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -609,6 +643,105 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-beta-cumulative"><summary>Signature: beta-cumulative</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `beta` | yes | none | `scalar`, `reference` | `once` |
+| `lower` | no | 0 | `scalar`, `reference` | `once` |
+| `upper` | no | 1 | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-chi-test"><summary>Signature: chi-test</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `actualRange` | yes | none | `range`, `array`, `reference` | `once` |
+| `expectedRange` | yes | none | `range`, `array`, `reference` | `once` |
+
+</details>
+
+<details id="signature-binom-inverse"><summary>Signature: binom-inverse</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `trials` | yes | none | `scalar`, `reference` | `once` |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-hypgeom-mass"><summary>Signature: hypgeom-mass</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `sampleSuccesses` | yes | none | `scalar`, `reference` | `once` |
+| `sampleSize` | yes | none | `scalar`, `reference` | `once` |
+| `populationSuccesses` | yes | none | `scalar`, `reference` | `once` |
+| `populationSize` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-negbinom-mass"><summary>Signature: negbinom-mass</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `failures` | yes | none | `scalar`, `reference` | `once` |
+| `successes` | yes | none | `scalar`, `reference` | `once` |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-t-dist-tails"><summary>Signature: t-dist-tails</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
+| `tails` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-t-test"><summary>Signature: t-test</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array1` | yes | none | `range`, `array`, `reference` | `once` |
+| `array2` | yes | none | `range`, `array`, `reference` | `once` |
+| `tails` | yes | none | `scalar`, `reference` | `once` |
+| `type` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-z-test"><summary>Signature: z-test</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `sigma` | no | none | `scalar`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -733,6 +866,30 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 </details>
 
+<details id="dialect-analysis-hypothesis"><summary>Dialect: analysis-hypothesis</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding.
+
+</details>
+
+<details id="dialect-analysis-compatibility"><summary>Dialect: analysis-compatibility</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. STDEV, STDEVP, VAR, VARP, MODE and COVAR evaluate with STDEV.S, STDEV.P, VAR.S, VAR.P, MODE.SNGL and COVARIANCE.P.
+
+</details>
+
 ## Implementation profiles
 
 <details id="implementation-implemented-assisted"><summary>Implementation: implemented-assisted</summary>
@@ -776,5 +933,27 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/regression.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/regression.rs)<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
+
+</details>
+
+<details id="implementation-analysis-compatibility"><summary>Implementation: analysis-compatibility</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/compatibility.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/compatibility.rs)<br />[`packages/wasm/src/eval/analysis/distributions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/distributions.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
+
+</details>
+
+<details id="implementation-analysis-hypothesis"><summary>Implementation: analysis-hypothesis</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/hypothesis.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/hypothesis.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
 
 </details>

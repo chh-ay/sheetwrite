@@ -273,13 +273,12 @@ impl CellStore {
 mod saved {
     use std::mem::size_of;
 
-    use rustc_hash::FxHashSet;
     use wasm_bindgen::prelude::*;
 
     use super::super::utf16_slices;
     use super::{attempt_cut, shift_anchor, CellStore, ShiftAxis, MAX_PIVOT_OUTPUT_CELLS};
     use crate::spill::SpillRange;
-    use crate::types::{AbsCellKey, CellKey, FormulaError, Value};
+    use crate::types::{CellKey, FormulaError, Value};
 
     /// Spill contention between saved output and formula spills settles in a
     /// few rounds; a pivot that is still pending after this many rounds
@@ -469,7 +468,7 @@ mod saved {
         pub(crate) fn capture_pivot_changes<I>(
             &mut self,
             sheets: I,
-            _affected: Option<&FxHashSet<AbsCellKey>>,
+            _affected: Option<&crate::formula_slots::FormulaWork>,
         ) where
             I: IntoIterator<Item = usize>,
         {
