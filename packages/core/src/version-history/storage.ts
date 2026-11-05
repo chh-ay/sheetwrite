@@ -327,8 +327,21 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       throw new HistoryError("invalid-history", "Invalid history reader token");
     }
 
-    const versions = await transaction.versions();
-    const version = versions.find((candidate) => candidate.id === request.versionId);
+    const versions = request.versionId === "head" ? [] : await transaction.versions();
+    const head = manifest.head;
+    const version: HistoryVersion | undefined =
+      request.versionId === "head" && head
+        ? {
+            id: "head",
+            revision: head.revision,
+            kind: "automatic",
+            authorId: "",
+            time: head.time,
+            checkpoint: head.checkpoint,
+            tail: head.tail,
+            checkpoints: head.checkpoints,
+          }
+        : versions.find((candidate) => candidate.id === request.versionId);
     if (!version) {
       throw new HistoryError("not-found", "History version does not exist");
     }

@@ -81,13 +81,14 @@ fn argument_shape(
     store: &CellStore,
     ast: &Ast,
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     match ast {
         Ast::Num(_) | Ast::Bool(_) | Ast::Str(_) => Ok((1, 1, 1)),
         // A scalar expression such as 1/0 or A1*2 gives one value; its
         // error, if any, appears when it is evaluated.
         _ if !is_reference(ast) && !ast_produces_array(ast) => Ok((1, 1, 1)),
-        _ => store.matrix_shape(ast, sheet),
+        _ => store.matrix_shape(ast, sheet, pass),
     }
 }
 
@@ -99,13 +100,14 @@ pub(crate) fn shape(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let (rows, cols) = if name == "FREQUENCY" {
         if args.len() != FREQUENCY_ARGS {
             return Err(FormulaError::Value);
         }
-        let (_, _, data_cells) = argument_shape(store, &args[0], sheet)?;
-        let (_, _, bin_cells) = argument_shape(store, &args[1], sheet)?;
+        let (_, _, data_cells) = argument_shape(store, &args[0], sheet, pass)?;
+        let (_, _, bin_cells) = argument_shape(store, &args[1], sheet, pass)?;
         validate_frequency_resources(data_cells, bin_cells)?;
         (bin_cells + 1, 1)
     } else if name == "MODE.MULT" {
@@ -114,7 +116,7 @@ pub(crate) fn shape(
         }
         let mut cells = 0usize;
         for arg in args {
-            let (_, _, arg_cells) = argument_shape(store, arg, sheet)?;
+            let (_, _, arg_cells) = argument_shape(store, arg, sheet, pass)?;
             cells = cells.checked_add(arg_cells).ok_or(FormulaError::Num)?;
         }
         validate_mode_resources(cells)?;
@@ -124,17 +126,17 @@ pub(crate) fn shape(
         if args.is_empty() || args.len() > LINEST_MAX_ARGS {
             return Err(FormulaError::Value);
         }
-        let (y_rows, y_cols, y_cells) = argument_shape(store, &args[0], sheet)?;
+        let (y_rows, y_cols, y_cells) = argument_shape(store, &args[0], sheet, pass)?;
         let (x_rows, x_cols, x_cells) = optional_ast(args, 1)
             .map_or(Ok((y_rows, y_cols, y_cells)), |ast| {
-                argument_shape(store, ast, sheet)
+                argument_shape(store, ast, sheet, pass)
             })?;
         let predictors = predictor_count(y_rows, y_cols, x_rows, x_cols)?;
         validate_fit_resources(y_cells, predictors)?;
         if name == "LINEST" || name == "LOGEST" {
             (statistics_rows_bound(args), predictors + 1)
         } else if let Some(ast) = optional_ast(args, 2) {
-            let (new_rows, new_cols, new_cells) = argument_shape(store, ast, sheet)?;
+            let (new_rows, new_cols, new_cells) = argument_shape(store, ast, sheet, pass)?;
             let output = prediction_shape(predictors, y_cols == 1, new_rows, new_cols)?;
             validate_prediction_resources(y_cells + x_cells, new_rows, new_cols, new_cells)?;
             output
@@ -150,8 +152,9 @@ pub(crate) fn bound(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, args, sheet).map(|(_, _, cells)| cells)
+    shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 fn statistics_rows_bound(args: &[Ast]) -> usize {
@@ -271,7 +274,7 @@ pub(crate) fn evaluate_array(
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
-    shape(store, name, args, sheet)?;
+    shape(store, name, args, sheet, pass)?;
     let mut evaluation = Evaluation {
         store,
         sheet,

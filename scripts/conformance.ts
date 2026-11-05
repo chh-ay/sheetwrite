@@ -1,7 +1,6 @@
 import { captureExcel } from "./conformance/adapters/excel.js";
 import { captureGoogle } from "./conformance/adapters/google.js";
 import { loadCorpus } from "./conformance/corpus.js";
-import { writeConformanceEvidence } from "./conformance/generate.js";
 import { sha256 } from "./conformance/normalize.js";
 import { runOffline } from "./conformance/offline.js";
 import { captureLibreOfficeWorkbookRoundtrips } from "./conformance/roundtrip.js";
@@ -24,11 +23,10 @@ export { compareResults, compareReviewedObservation } from "./conformance/compar
 export { loadCorpus } from "./conformance/corpus.js";
 export {
   generateConformanceEvidence,
-  readConformanceManifest,
+  generatedConformanceEvidence,
   readFormulaInventory,
   supportedInventorySubjects,
   supportedNamesChecksum,
-  writeConformanceEvidence,
 } from "./conformance/generate.js";
 export { canonicalJson, sha256, sha256Bytes } from "./conformance/normalize.js";
 export { runOffline } from "./conformance/offline.js";
@@ -82,13 +80,6 @@ export function compatibilityCheckSummary(
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "validate";
-  if (command === "generate") {
-    const manifest = await writeConformanceEvidence();
-    console.log(
-      `Compatibility test set generated: formulas=${manifest.counts.formula} workbook changes=${manifest.counts.mutation} workbook examples=${manifest.counts.workbook} file hash=${manifest.corpusSha256}`,
-    );
-    return;
-  }
   if (command === "roundtrip-libreoffice") {
     const artifact = await captureLibreOfficeWorkbookRoundtrips(process.argv[3]);
     console.log(
