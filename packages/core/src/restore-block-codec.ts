@@ -1,10 +1,11 @@
 import { inflateSync } from "fflate";
 
 import { SheetwriteError } from "./errors.js";
+import type { Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
 export const MAX_RESTORE_BLOCK_DECODED_BYTES = 64 * 1024 * 1024;
-export const MAX_RESTORE_BLOCK_CELLS = 4_000_000;
+const MAX_RESTORE_BLOCK_CELLS = 4_000_000;
 type RestoreBlock = Extract<DocumentOp, { op: "restoreBlock" }>;
 
 /** A restore block that does not encode a valid cell block. */
@@ -20,6 +21,27 @@ export function invalidRestoreBlock(cause?: unknown): never {
 /** A restore block above its cell or decoded byte limit. */
 export function restoreBlockLimit(message: string): SheetwriteError {
   return new SheetwriteError("resource-limit", "transaction", message);
+}
+
+/** Check that `block` stays within `MAX_RESTORE_BLOCK_CELLS`. */
+export function assertRestoreBlockCells(block: PackedCellBlock): void {
+  if (block.rowCount > Math.floor(MAX_RESTORE_BLOCK_CELLS / block.colCount)) {
+    throw restoreBlockLimit("Restore block exceeds the cell limit");
+  }
+}
+
+/**
+ * Check that `block` stays within the cell limit and has exactly the rows and
+ * columns of `range`, with a style table for any style IDs.
+ */
+export function assertRestoreBlockFits(range: Range, block: PackedCellBlock): void {
+  assertRestoreBlockCells(block);
+  if (
+    block.rowCount !== Math.abs(range.end.row - range.start.row) + 1 ||
+    block.colCount !== Math.abs(range.end.col - range.start.col) + 1 ||
+    (block.styleIds !== undefined && block.styleTable === undefined)
+  )
+    invalidRestoreBlock();
 }
 
 /** Decode bounded JSON; callers must validate the packed cell fields before use. */
@@ -48,16 +70,7 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
     new TextDecoder("utf-8", { fatal: true }).decode(bytes),
   ) as PackedCellBlock;
   if (!block || typeof block !== "object") invalidRestoreBlock();
-  if (block.rowCount > Math.floor(MAX_RESTORE_BLOCK_CELLS / block.colCount)) {
-    throw restoreBlockLimit("Restore block exceeds the cell limit");
-  }
-
-  if (
-    block.rowCount !== Math.abs(operation.range.end.row - operation.range.start.row) + 1 ||
-    block.colCount !== Math.abs(operation.range.end.col - operation.range.start.col) + 1 ||
-    (block.styleIds !== undefined && block.styleTable === undefined)
-  )
-    invalidRestoreBlock();
+  assertRestoreBlockFits(operation.range, block);
   return block;
 }
 

@@ -206,10 +206,9 @@ A family is one Rust file that owns a group of functions. Only the full engine c
 
    ```sh
    bun scripts/conformance.ts generate && bun fmt test/conformance/corpus.manifest.json
-   bun run docs:generate
    bun test scripts/formula-contract.test.ts
    ```
 
-   The contract test fails if a `NAMES` spelling is not in the inventory, if a family file is not registered in `mod.rs`, or if the full engine reports names that the inventory does not list.
+   The core build regenerates the function table in `packages/core/src/generated/`, and the docs build regenerates the formula reference pages; neither is committed. The contract test fails if a `NAMES` spelling is not in the inventory, if a family file is not registered in `mod.rs`, or if the full engine reports names that the inventory does not list.
 
 6. Build both engines and confirm that the default `packages/wasm/pkg/sheetwrite_wasm_bg.wasm` did not change size.

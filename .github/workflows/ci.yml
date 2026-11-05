@@ -197,7 +197,7 @@ jobs:
           cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
           cargo test --manifest-path packages/wasm/history/Cargo.toml
           cargo test --manifest-path packages/queries/engine/Cargo.toml
-      - name: Type checks, public API and committed generated docs
+      - name: Type checks, public API and generated docs
         run: |
           bun run typecheck
           bun run api:check

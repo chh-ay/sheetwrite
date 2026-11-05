@@ -4,6 +4,15 @@
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/600.css";
 
+/* Tailwind skips gitignored files when it looks for class names, and the
+   generated pages and data are gitignored, so name them here. */
+@source "../generated";
+@source "../content/docs/api";
+@source "../content/docs/performance";
+@source "../content/docs/reference";
+@source "../../public/llms.txt";
+@source "../../public/llms-full.txt";
+
 /* Colours are mixed in OKLCH (a blue-navy neutral at hue 258, a green accent at
    hue 163) and written as hex because the canvas grid reads them through
    computed styles. Dark: a deep navy ground, not near-black; body text about

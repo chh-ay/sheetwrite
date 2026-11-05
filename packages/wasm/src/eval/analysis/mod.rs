@@ -2,12 +2,14 @@
 
 mod aggregate;
 mod bessel;
+mod bytes;
 mod compatibility;
 mod complex;
 mod database;
 mod dates;
 mod depreciation;
 mod descriptive;
+mod discrete;
 mod distributions;
 mod engineering;
 mod finance;
@@ -123,6 +125,13 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
+        names: discrete::NAMES,
+        reference_cells: &[],
+        evaluate: Some(discrete::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
@@ -154,6 +163,13 @@ const FAMILIES: &[Family] = &[
         names: units::NAMES,
         reference_cells: &[],
         evaluate: Some(units::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bytes::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bytes::evaluate),
         evaluate_ast: None,
         array: None,
     },

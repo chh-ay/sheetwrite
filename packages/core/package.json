@@ -83,9 +83,10 @@
     "provenance": true
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.types.json && rm -f dist/types/*.js dist/types/*.js.map && bun ../../scripts/package-dist.ts . && cp src/icons/sheet.svg dist/icons.svg && cp src/icons/icons.json dist/icons.json",
+    "generate": "bun ../../scripts/function-metadata.ts",
+    "build": "bun run generate && rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.types.json && rm -f dist/types/*.js dist/types/*.js.map && bun ../../scripts/package-dist.ts . && cp src/icons/sheet.svg dist/icons.svg && cp src/icons/icons.json dist/icons.json",
     "prepublishOnly": "bun run build",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "bun run generate && tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@sheetwrite/wasm": "workspace:*",

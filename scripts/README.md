@@ -88,6 +88,11 @@ a script nobody will run.
   own builds; readable package files keep stack traces and debugging in
   `node_modules` useful. The size report measures the packed files;
   `size-history.json` records published releases, not unreleased measurements.
+- **`size:first-paint` measures; `size:first-paint:check` decides.** Measurement
+  writes `test-results/bundlers/first-paint.json` for the baseline and the
+  fixture-only deferred-loading candidate. The separate check evaluates that
+  saved evidence against the candidate's size and timing thresholds. A rejected
+  candidate does not fail the measurement command.
 - **Package assembly has one owner: `release-artifacts.ts`.** Packed-consumer
   verification, delivery-size measurement, and bundler fixtures use its release
   file selection and manifest policy, even without `--artifacts`. To pack
@@ -98,10 +103,20 @@ a script nobody will run.
   toolchain/tree, and writes the canonical manifest. Existing `--artifacts`
   inputs continue to consume and verify those canonical tarballs.
 
-- **`docs:generate` owns `docs/src/generated/*`, the API pages, and
-  `docs/public/llms*.txt`**. Never hand-edit its output. `docs:check` rejects
-  stale generated content; the agent-readable files contain authored guides
-  and API declarations from the same inputs as the site.
+- **`docs:generate` owns `docs/src/generated/*`, the API, formula-function,
+  Performance and generated reference pages, and `docs/public/llms*.txt`**.
+  None of it is committed: `.gitignore` lists it, and the docs dev server,
+  typecheck and site build generate it first, after the packages are built.
+  `GENERATED_CONTENT_DIRECTORIES` and `GENERATED_CONTENT_PAGES` in
+  `docs-shared.ts` name the owned pages. `docs:check` renders them in memory
+  and checks them with the authored pages, so a hand-written link to a page
+  or heading that no longer exists fails without a generated copy on disk.
+  The agent-readable files contain authored guides and API declarations from
+  the same inputs as the site.
+- **`function-metadata.ts` writes the core function table**
+  (`packages/core/src/generated/function-metadata.ts`, not committed). The
+  core build and typecheck run it first; `test:unit` runs it and
+  `docs:generate` before the unit suites.
   Source TSDoc `@example` blocks use `ts` or `tsx` fences. The generator marks
   them for type checking, including examples in member rows. Use `@see Symbol`,
   `@see {@link Symbol | Label}`, or a guide URL for related links.

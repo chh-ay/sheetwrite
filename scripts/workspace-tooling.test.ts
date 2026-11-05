@@ -188,30 +188,26 @@ describe("changeset workspace contract", () => {
     expect(packageSizeHistoryVersionFromHeadRef("automation/package-size-history-next")).toBe(
       undefined,
     );
+    expect(isGeneratedPackageSizeHistoryChange(["scripts/size-history.json"])).toBeTrue();
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/performance/delivery-size.md",
         "scripts/size-history.json",
+        "scripts/size-report.json",
       ]),
     ).toBeTrue();
     expect(
-      isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/performance/delivery-size.md",
-        "docs/src/generated/docs-contract.json",
-        "scripts/size-history.json",
-      ]),
-    ).toBeTrue();
+      isGeneratedPackageSizeHistoryChange(["scripts/changeset-ci.ts", "scripts/size-history.json"]),
+    ).toBeFalse();
+    // The docs build renders the landing data, so a branch committing it needs a changeset.
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/performance/delivery-size.md",
-        "scripts/changeset-ci.ts",
+        "docs/src/generated/landing-bench.json",
         "scripts/size-history.json",
       ]),
     ).toBeFalse();
-    expect(isGeneratedPackageSizeHistoryChange(["scripts/size-history.json"])).toBeFalse();
+    expect(isGeneratedPackageSizeHistoryChange(["scripts/size-report.json"])).toBeFalse();
     expect(
       isGeneratedPackageSizeHistoryChange([
-        "docs/src/content/docs/performance/delivery-size.md",
         "scripts/size-history.json",
         "scripts/size-history.json",
       ]),
