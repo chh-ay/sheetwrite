@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "50b030d1263671c57f51e7fc5e1455568e31d050232a0e6315eaf443bdfbee98",
+  "sha256": "d211bf2555699736117f03722d193206e58d8cbfec0637832d80012ef61e7026",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -202,6 +202,7 @@
         "Range",
         "RebaseConflict",
         "RebaseConflictCode",
+        "RelationshipStatus",
         "RemoteOperationOptions",
         "RemoteOperationSource",
         "ReplaceResult",

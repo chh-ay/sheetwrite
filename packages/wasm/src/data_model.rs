@@ -158,11 +158,11 @@ impl KeyIndex {
         Ok(index)
     }
 
-    /// Sorts number keys with their rows. The sort is stable, so equal keys
-    /// keep row order.
+    /// Sorts number keys with their rows; equal keys keep row order.
     fn sorted_numbers(numbers: Vec<f64>, rows: Vec<u32>) -> Self {
-        let mut order: Vec<u32> = (0..numbers.len() as u32).collect();
-        order.sort_by(|&left, &right| numbers[left as usize].total_cmp(&numbers[right as usize]));
+        let order = sorted_entries(numbers.len(), &|left, right| {
+            numbers[left as usize].total_cmp(&numbers[right as usize])
+        });
         Self {
             numbers: order.iter().map(|&entry| numbers[entry as usize]).collect(),
             rows: order.iter().map(|&entry| rows[entry as usize]).collect(),
@@ -171,7 +171,7 @@ impl KeyIndex {
     }
 
     /// Sorts text keys, given in row order as `text` split at `ends`, with
-    /// their rows. The sort is stable, so equal keys keep row order.
+    /// their rows; equal keys keep row order.
     fn sorted_text(text: &[u8], ends: &[u32], rows: Vec<u32>) -> Self {
         let key = |entry: u32| {
             let start = if entry == 0 {
@@ -181,8 +181,7 @@ impl KeyIndex {
             };
             &text[start as usize..ends[entry as usize] as usize]
         };
-        let mut order: Vec<u32> = (0..ends.len() as u32).collect();
-        order.sort_by(|&left, &right| key(left).cmp(key(right)));
+        let order = sorted_entries(ends.len(), &|left, right| key(left).cmp(key(right)));
 
         let mut sorted = Vec::with_capacity(text.len());
         let mut sorted_ends = Vec::with_capacity(ends.len());
@@ -265,6 +264,48 @@ impl KeyIndex {
         self.numbers.capacity() * size_of::<f64>()
             + self.text.capacity()
             + (self.text_ends.capacity() + self.rows.capacity()) * size_of::<u32>()
+    }
+}
+
+/// Entries `0..count` sorted by `compare`, then by entry, so equal keys keep
+/// row order.
+///
+/// This is a heapsort over `dyn` comparisons: O(n log n) in time with no
+/// extra memory, and about 0.5 KB of code for both key kinds. A slice sort
+/// instance (`sort_unstable_by`) adds about 9 KB to the engine.
+fn sorted_entries(count: usize, compare: &dyn Fn(u32, u32) -> Ordering) -> Vec<u32> {
+    let mut order: Vec<u32> = (0..count as u32).collect();
+    let less = |left: u32, right: u32| compare(left, right).then(left.cmp(&right)).is_lt();
+
+    for start in (0..count / 2).rev() {
+        sift_down(&mut order, start, count, &less);
+    }
+
+    for end in (1..count).rev() {
+        order.swap(0, end);
+        sift_down(&mut order, 0, end, &less);
+    }
+    order
+}
+
+/// Moves `order[root]` down the max-heap held in `order[..end]`.
+fn sift_down(order: &mut [u32], root: usize, end: usize, less: &dyn Fn(u32, u32) -> bool) {
+    let mut parent = root;
+    loop {
+        let mut child = 2 * parent + 1;
+        if child >= end {
+            return;
+        }
+
+        if child + 1 < end && less(order[child], order[child + 1]) {
+            child += 1;
+        }
+
+        if !less(order[parent], order[child]) {
+            return;
+        }
+        order.swap(parent, child);
+        parent = child;
     }
 }
 
@@ -388,5 +429,32 @@ mod tests {
         )
         .unwrap();
         assert_eq!(index.heap_bytes(), ROWS as usize * 12);
+    }
+
+    #[test]
+    fn scrambled_keys_all_resolve_and_a_late_duplicate_is_found() {
+        const ROWS: u32 = 1_000;
+        // 7919 is prime to ROWS, so this visits every key once in scrambled order.
+        let key = |row: u32| Value::Number(f64::from(row * 7_919 % ROWS));
+        let index = KeyIndex::build(ROWS, key, 0, |_| Value::Blank).unwrap();
+        for row in 0..ROWS {
+            assert_eq!(find(&index, key(row)), row);
+        }
+
+        let words = |row: u32| text(&format!("k{}", row * 7_919 % ROWS));
+        let index = KeyIndex::build(ROWS, words, 0, |_| Value::Blank).unwrap();
+        for row in 0..ROWS {
+            assert_eq!(find(&index, words(row)), row);
+        }
+
+        let late_duplicate =
+            |row: u32| Value::Number(f64::from(if row == ROWS - 1 { 5 } else { row }));
+        assert_eq!(
+            KeyIndex::build(ROWS, late_duplicate, 0, |_| Value::Blank).unwrap_err(),
+            KeyProblem::DuplicateKey {
+                first: 5,
+                second: ROWS - 1
+            }
+        );
     }
 }
