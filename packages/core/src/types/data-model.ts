@@ -28,10 +28,34 @@ export interface TableRelationship {
   to: TableColumnRef;
 }
 
+/** A model formula evaluated separately in each pivot cell's filter context. */
+export interface Measure {
+  /** Stable identity, unique in the workbook. */
+  id: string;
+  /** Caption, unique among measures ignoring case. */
+  name: string;
+  /** Home table, used to organize the field list. */
+  table: WorkbookTableId;
+  /** Formula with its leading `=` and qualified model-column references. */
+  formula: string;
+}
+
+/**
+ * Status of a saved measure, checked from the saved model: `missingTable`
+ * when its home table is gone, `syntax` when the formula does not parse,
+ * `unavailable` for an unknown ID. A reference that does not resolve shows
+ * its error in the pivot cells that calculate the measure.
+ */
+export interface MeasureStatus {
+  status: "ok" | "syntax" | "missingTable" | "unavailable";
+}
+
 /** The workbook's data model. Every workbook table is a model table. */
 export interface DataModel {
   /** Relationships; at most one joins a pair of tables, and they form no cycle. */
   relationships: TableRelationship[];
+  /** Saved model formulas; absent means none. */
+  measures?: Measure[];
 }
 
 /**

@@ -1,3 +1,9 @@
+import {
+  CONTENT_TYPES_NS,
+  PACKAGE_RELATIONSHIPS_NS,
+  RELATIONSHIPS_NS,
+  STRICT_RELATIONSHIPS_NS,
+} from "./format.js";
 import { boundedErrorText, emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
   assertXmlRoot,
@@ -7,16 +13,12 @@ import {
   type XmlElement,
   xmlAttribute,
   xmlChildren,
+  xmlLocalName,
 } from "./xml.js";
 import { asciiFold, normalizeDecodedPartName, normalizePartName, ZipReader } from "./zip.js";
 
-const TRANSITIONAL_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const STRICT_REL_NS = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
-const CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types";
-
 export function relationshipTypeMatches(type: string, kind: string): boolean {
-  return type === `${TRANSITIONAL_REL_NS}/${kind}` || type === `${STRICT_REL_NS}/${kind}`;
+  return type === `${RELATIONSHIPS_NS}/${kind}` || type === `${STRICT_RELATIONSHIPS_NS}/${kind}`;
 }
 
 export interface OpcRelationship {
@@ -33,7 +35,8 @@ function opcFailure(message: string, cause?: unknown): never {
   );
 }
 
-function relationshipsPart(sourcePart: string): string {
+/** The relationships part of `sourcePart`; the package's own is `_rels/.rels`. */
+export function relationshipsPart(sourcePart: string): string {
   if (sourcePart === "") return "_rels/.rels";
   const slash = sourcePart.lastIndexOf("/");
   const directory = slash < 0 ? "" : sourcePart.slice(0, slash + 1);
@@ -41,7 +44,8 @@ function relationshipsPart(sourcePart: string): string {
   return `${directory}_rels/${filename}.rels`;
 }
 
-function relationshipSourcePart(part: string): string {
+/** The part whose relationships `part` holds; `""` for the package's own. */
+export function relationshipSourcePart(part: string): string {
   if (part.toLowerCase() === "_rels/.rels") return "";
   const match = /^(.*\/)?_rels\/([^/]+)\.rels$/i.exec(part);
   if (!match) return opcFailure(`relationship part name ${part} is invalid`);
@@ -88,7 +92,7 @@ function parseRelationships(
   sourcePart: string,
   context: XlsxCodecContext,
 ): OpcRelationship[] {
-  assertXmlRoot(root, "Relationships", [PACKAGE_REL_NS], relationshipsPart(sourcePart));
+  assertXmlRoot(root, "Relationships", [PACKAGE_RELATIONSHIPS_NS], relationshipsPart(sourcePart));
   const relationships: OpcRelationship[] = [];
   const ids = new Set<string>();
   for (const element of xmlChildren(root, "Relationship")) {
@@ -155,9 +159,7 @@ export class OpcPackage {
     const context = this.#context;
     assertXmlRoot(root, "Types", [CONTENT_TYPES_NS], "[Content_Types].xml");
     for (const item of root.children) {
-      const local = item.name.includes(":")
-        ? item.name.slice(item.name.indexOf(":") + 1)
-        : item.name;
+      const local = xmlLocalName(item.name);
       const contentType = xmlAttribute(item, "ContentType");
       if (!contentType) opcFailure("content type declaration is incomplete");
       if (local === "Default") {
@@ -255,7 +257,7 @@ export function contentTypesXml(
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-  xml.append('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">');
+  xml.append(`<Types xmlns="${CONTENT_TYPES_NS}">`);
   xml.append(
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
   );
@@ -285,9 +287,7 @@ export function relationshipsXml(
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-  xml.append(
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
-  );
+  xml.append(`<Relationships xmlns="${PACKAGE_RELATIONSHIPS_NS}">`);
   for (const relationship of relationships) {
     xml.append(
       `<Relationship Id="${escapeXml(relationship.id)}" Type="${escapeXml(relationship.type)}" Target="${escapeXml(relationship.target)}"${relationship.external ? ' TargetMode="External"' : ""}/>`,
