@@ -350,11 +350,11 @@
   color: var(--sw-fg-strong);
   cursor: pointer;
   list-style: none;
-  transition: background-color 120ms ease;
+  transition: background-color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
 .api-declaration summary {
-  border-radius: calc(0.6rem - 1px);
+  border-radius: calc(var(--sw-radius-md) - var(--sw-border-width));
   padding: var(--sw-space-3) var(--sw-space-4);
 }
 
@@ -373,8 +373,11 @@
 .api-declaration summary::before {
   content: "";
   flex: none;
+  /* Centred on the first line of the row, which may wrap. */
+  align-self: flex-start;
   width: var(--sw-icon-sm);
   height: var(--sw-icon-sm);
+  margin-top: calc((1lh - var(--sw-icon-sm)) / 2);
   background: currentColor;
   color: var(--sw-fg-muted);
   mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;

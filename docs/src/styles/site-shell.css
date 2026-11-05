@@ -974,9 +974,6 @@ html:has(.sw-nav-dialog[open]) {
   .sw-document {
     padding-top: var(--sw-space-6);
   }
-  .sw-document__header h1 {
-    font-size: var(--sw-text-h2);
-  }
   .sw-breadcrumb ol {
     margin-bottom: var(--sw-space-4);
   }
