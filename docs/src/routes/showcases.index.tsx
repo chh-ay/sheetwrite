@@ -29,6 +29,7 @@ const SCENE_ORDER = [
   "spreadsheet",
   "analysis",
   "data-model",
+  "dashboards",
   "queries",
   "sort",
   "functions",
@@ -62,6 +63,7 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   sort: "Sort the cells in place as Excel does, or only the view, and see which formulas follow.",
   queries: "Saved queries shape a CSV feed into tables. Refresh, change a step, refresh again.",
   "data-model": "Relate tables, pivot by a related column with a measure, then break a key.",
+  dashboards: "Pivots and slicers on a dashboard sheet. Move, resize and add items; undo each.",
   "version-history": "Edit with a teammate, compare versions by author, and restore a range.",
   functions: "Engineering, financial, statistics, lookup and regex functions, calculated live.",
   recalculation:
@@ -113,7 +115,8 @@ function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup
     owner.id === "functions" ||
     owner.id === "recalculation" ||
     owner.id === "analysis" ||
-    owner.id === "data-model"
+    owner.id === "data-model" ||
+    owner.id === "dashboards"
   ) {
     return "formulas";
   }
@@ -605,6 +608,19 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
             ["Revision", "You"],
             ["Travel cut", "Sam"],
             ["Approved", "Sam"],
+          ]}
+        />
+      );
+    case "dashboards":
+      return (
+        <FeatureScene
+          caption="pivot and slicer items · twelve-column grid"
+          formula="=SUM(Orders[Revenue])"
+          id="dashboards"
+          rows={[
+            ["Revenue by region", "pivot"],
+            ["Revenue by channel", "pivot"],
+            ["Region", "slicer"],
           ]}
         />
       );

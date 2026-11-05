@@ -20,6 +20,7 @@ import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as ShowcasesAnalysisRouteImport } from './routes/showcases.analysis'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
+import { Route as ShowcasesDashboardsRouteImport } from './routes/showcases.dashboards'
 import { Route as ShowcasesDataModelRouteImport } from './routes/showcases.data-model'
 import { Route as ShowcasesDataToolsRouteImport } from './routes/showcases.data-tools'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
@@ -96,6 +97,11 @@ const ShowcasesAnalysisRoute = ShowcasesAnalysisRouteImport.update({
 const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
   id: '/showcases/collaboration',
   path: '/showcases/collaboration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesDashboardsRoute = ShowcasesDashboardsRouteImport.update({
+  id: '/showcases/dashboards',
+  path: '/showcases/dashboards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesDataModelRoute = ShowcasesDataModelRouteImport.update({
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/dashboards': typeof ShowcasesDashboardsRoute
   '/showcases/data-model': typeof ShowcasesDataModelRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/dashboards': typeof ShowcasesDashboardsRoute
   '/showcases/data-model': typeof ShowcasesDataModelRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
@@ -292,6 +300,7 @@ export interface FileRoutesById {
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/dashboards': typeof ShowcasesDashboardsRoute
   '/showcases/data-model': typeof ShowcasesDataModelRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
@@ -329,6 +338,7 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/collaboration'
+    | '/showcases/dashboards'
     | '/showcases/data-model'
     | '/showcases/data-tools'
     | '/showcases/database'
@@ -364,6 +374,7 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/collaboration'
+    | '/showcases/dashboards'
     | '/showcases/data-model'
     | '/showcases/data-tools'
     | '/showcases/database'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/collaboration'
+    | '/showcases/dashboards'
     | '/showcases/data-model'
     | '/showcases/data-tools'
     | '/showcases/database'
@@ -435,6 +447,7 @@ export interface RootRouteChildren {
   DocsSplatRoute: typeof DocsSplatRoute
   ShowcasesAnalysisRoute: typeof ShowcasesAnalysisRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
+  ShowcasesDashboardsRoute: typeof ShowcasesDashboardsRoute
   ShowcasesDataModelRoute: typeof ShowcasesDataModelRoute
   ShowcasesDataToolsRoute: typeof ShowcasesDataToolsRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
@@ -538,6 +551,13 @@ declare module '@tanstack/react-router' {
       path: '/showcases/collaboration'
       fullPath: '/showcases/collaboration'
       preLoaderRoute: typeof ShowcasesCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/dashboards': {
+      id: '/showcases/dashboards'
+      path: '/showcases/dashboards'
+      fullPath: '/showcases/dashboards'
+      preLoaderRoute: typeof ShowcasesDashboardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/data-model': {
@@ -707,6 +727,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsSplatRoute: DocsSplatRoute,
   ShowcasesAnalysisRoute: ShowcasesAnalysisRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
+  ShowcasesDashboardsRoute: ShowcasesDashboardsRoute,
   ShowcasesDataModelRoute: ShowcasesDataModelRoute,
   ShowcasesDataToolsRoute: ShowcasesDataToolsRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,

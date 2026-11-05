@@ -1,0 +1,38 @@
+```ts prelude="core" title="dashboards.ts"
+// A dashboard sheet holds pivots and slicers on a twelve-column grid
+grid.addSheet({ id: "dashboard", name: "Sales dashboard", kind: "dashboard" });
+grid.setPivot(
+  {
+    id: "by-region",
+    name: "Revenue by region",
+    source: { table: "orders" },
+    anchor: { row: 0, col: 0 },
+    rows: [1],
+    columns: [],
+    values: [{ field: 4, aggregation: "SUM", name: "Revenue" }],
+  },
+  "dashboard",
+);
+
+// Each item change is one undo step, saved and synced with the workbook
+grid.applyTransaction({
+  patches: [
+    {
+      op: "setDashboardItem",
+      sheet: "dashboard",
+      item: { id: "region-pivot", kind: "pivot", pivot: "by-region", box: { x: 0, y: 0, w: 6, h: 6 } },
+    },
+    {
+      op: "setDashboardItem",
+      sheet: "dashboard",
+      item: {
+        id: "region-slicer",
+        kind: "slicer",
+        field: { table: "orders", column: "region" },
+        selected: ["EMEA"],
+        box: { x: 0, y: 6, w: 4, h: 5 },
+      },
+    },
+  ],
+});
+```

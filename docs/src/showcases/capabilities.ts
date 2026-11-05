@@ -29,7 +29,8 @@ export type CapabilityOwnerId =
   | "data-model"
   | "version-history"
   | "functions"
-  | "recalculation";
+  | "recalculation"
+  | "dashboards";
 
 export type CapabilityArea =
   | "editing"
@@ -261,6 +262,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.recalculation.tsx",
     responsibility:
       "Recalculation timed in the browser: one edit under 100,000 formulas, 1,000 lookups over 100,000 rows, and the order of edit, results and paint.",
+    kind: "capability",
+  },
+  {
+    id: "dashboards",
+    label: "Dashboards",
+    href: "/showcases/dashboards/",
+    routeFile: "docs/src/routes/showcases.dashboards.tsx",
+    responsibility:
+      "Dashboard sheets of pivot and slicer items on a twelve-column grid: move, resize, add items and keep slicer values, each one undo step.",
     kind: "capability",
   },
 ];
@@ -619,6 +629,21 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/queries.ts"],
     boundary:
       "Source fetching, credentials and network policy are host-owned; the session never calls fetch itself.",
+  },
+  {
+    id: "modeling.dashboards",
+    title: "Dashboards",
+    area: "modeling",
+    primary: "dashboards",
+    interaction:
+      "Add a pivot item, swap two pivots, keep one slicer value and undo; drag or use the item's actions menu with the arrow keys to move and resize items.",
+    scope: "browser",
+    accessibility:
+      "Items have keyboard Move and Resize from their actions menu; the saved layout is text in the side panel.",
+    testPath: "test/browser/showcase-dashboards.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/dashboards.ts"],
+    boundary:
+      "Slicers save their selection but do not filter pivots yet; dashboard pivots need the full engine.",
   },
   {
     id: "modeling.data-model",

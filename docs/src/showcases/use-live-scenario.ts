@@ -63,7 +63,8 @@ export function useLiveScenario<Snapshot, Scenario>(
 
 /**
  * Run a side-panel action on the scenario. A failure shows as the action's
- * error, named by `what`; the controls stay disabled until the scenario is ready.
+ * error: the scenario's own message, or `what` failed when it threw no Error.
+ * The controls stay disabled until the scenario is ready.
  */
 export function useScenarioAction<Scenario>(scenario: Scenario | null) {
   const action = useAction();
@@ -72,7 +73,7 @@ export function useScenarioAction<Scenario>(scenario: Scenario | null) {
       async () => {
         if (scenario) await call(scenario);
       },
-      (cause) => `${what} failed: ${errorText(cause)}`,
+      (cause) => (cause instanceof Error ? cause.message : `${what} failed: ${errorText(cause)}`),
     );
 
   return { run, disabled: scenario === null || action.pending, error: action.error };
