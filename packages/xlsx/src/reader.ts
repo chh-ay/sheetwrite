@@ -2675,7 +2675,13 @@ export async function readWorkbook(
   const sheetParts = sourceReferences.map((reference) => reference.relationship.target);
   const modelledPivotParts = await readPivots(
     packageFile,
-    { snapshot, sheetParts, metadata, extendSheet },
+    {
+      snapshot,
+      sheetParts,
+      metadata,
+      extendSheet,
+      numberFormat: (numFmtId) => styles.numberFormat(numFmtId),
+    },
     context,
   );
   const chartParts = await readCharts(

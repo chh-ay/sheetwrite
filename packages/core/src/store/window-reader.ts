@@ -6,6 +6,7 @@ import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell
 import type { SheetId } from "../types/coordinates.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import { utf8ByteLength } from "../utf8.js";
+import { pivotStatusAt } from "./pivot-status.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import {
@@ -566,6 +567,7 @@ export class StoreWindowReader {
 
     const windowStyles = this.stylesFrom(styleDict);
     this.mergeHyperlinkStyles(sheet, rows, cols, order, styleIds, windowStyles);
+    this.mergePivotFormats(sheet, rows, cols, order, styleIds, windowStyles);
 
     if (condMatches.length > 0) {
       this.mergeCondMatches(sheet, condMatches, styleIds, windowStyles);
@@ -862,6 +864,59 @@ export class StoreWindowReader {
     );
     this.wasm.setConditionalRules(handle, kinds, bounds, nums, strs, flags);
     return (packable.length > 0 ? CONDITIONAL_HAS_RULES : 0) | CONDITIONAL_RULES_UPDATED;
+  }
+
+  /**
+   * The number format of each value field over its value cells, as Excel
+   * applies Value Field Settings › Number Format. Value fields repeat across
+   * each column group, so a data column's field is its offset modulo the
+   * number of value fields. Header rows and label columns keep their style.
+   */
+  private mergePivotFormats(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    order: Uint32Array | undefined,
+    styleIds: Uint32Array,
+    styles: CellStyle[],
+  ): void {
+    const pivots = this.sheets.sheetMeta(sheet).pivots ?? [];
+    const formatted = pivots.some((pivot) => pivot.values.some((value) => value.numberFormat));
+    if (!formatted || !this.wasm.pivotStatus || cols.length === 0) return;
+
+    const status = this.wasm.pivotStatus(this.sheets.handleOf(sheet));
+    const mergedIds = new Map<string, number>();
+    const rowCount = Math.min(rows.end - rows.start, Math.floor(styleIds.length / cols.length));
+    pivots.forEach((pivot, index) => {
+      const record = pivotStatusAt(status, index);
+      const formats = pivot.values.map((value) => value.numberFormat);
+      if (!record || record.error !== 0 || !formats.some((format) => format)) return;
+      const firstRow = record.row + record.headerRows;
+      const lastRow = record.row + record.rows - 1;
+      const firstCol = record.col + record.labelCols;
+      const lastCol = record.col + record.cols - 1;
+
+      for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+        const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
+        if (dataRow < firstRow || dataRow > lastRow) continue;
+        for (let colIndex = 0; colIndex < cols.length; colIndex++) {
+          const col = cols[colIndex] ?? -1;
+          if (col < firstCol || col > lastCol) continue;
+          const format = formats[(col - firstCol) % formats.length];
+          if (!format) continue;
+          const offset = rowIndex * cols.length + colIndex;
+          const base = styleIds[offset] ?? 0;
+          const key = `${base}:${format}`;
+          let merged = mergedIds.get(key);
+          if (merged === undefined) {
+            merged = styles.length;
+            styles.push({ ...styles[base], numberFormat: format });
+            mergedIds.set(key, merged);
+          }
+          styleIds[offset] = merged;
+        }
+      }
+    });
   }
 
   private mergeHyperlinkStyles(
