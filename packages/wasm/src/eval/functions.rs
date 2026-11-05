@@ -321,7 +321,14 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::CovarianceP
         | Func::CountBlank
         | Func::MaxIfs
-        | Func::MinIfs => statistics_family(func, values),
+        | Func::MinIfs
+        | Func::AverageA
+        | Func::MaxA
+        | Func::MinA
+        | Func::StdevA
+        | Func::StdevPA
+        | Func::VarA
+        | Func::VarPA => statistics_family(func, values),
         Func::Pv
         | Func::Fv
         | Func::Pmt
@@ -662,7 +669,14 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
         | Func::GeoMean
         | Func::CountBlank
         | Func::Npv
-        | Func::Irr => true,
+        | Func::Irr
+        | Func::AverageA
+        | Func::MaxA
+        | Func::MinA
+        | Func::StdevA
+        | Func::StdevPA
+        | Func::VarA
+        | Func::VarPA => true,
         #[cfg(feature = "analysis")]
         Func::Analysis(id) => super::analysis::treats_cell_as_reference(super::analysis::name(id)),
         _ => false,
