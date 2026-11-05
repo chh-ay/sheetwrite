@@ -491,9 +491,23 @@ export interface XlsxSourceGraph {
    * change makes the graph stale, so it is dropped.
    */
   readonly queries?: string;
+  /**
+   * Power Query members of a kept DataMashup that no saved query represents,
+   * with the codec's reason. They leave with the graph, so a list never names
+   * a member that the next XLSX save would drop.
+   */
+  readonly unsupportedQueries?: readonly XlsxUnsupportedQuery[];
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];
+}
+
+/** A kept Power Query member and why the query engine cannot run it. */
+export interface XlsxUnsupportedQuery {
+  /** Section member name, at most 1,024 characters. */
+  readonly member: string;
+  /** The codec's reason code, at most 64 characters. */
+  readonly reason: string;
 }
 
 /** Bounded, frozen record of the OOXML parts Sheetwrite does not model. */

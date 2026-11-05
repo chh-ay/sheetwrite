@@ -3,6 +3,7 @@
 import type { ApplyTransactionResult } from "../types/transaction.js";
 
 const NOT_APPLIED = "The grid did not accept this change.";
+const READ_ONLY = "The grid is read-only; nothing was written.";
 
 /**
  * What a panel shows after one grid operation: null when it was applied, else
@@ -10,6 +11,7 @@ const NOT_APPLIED = "The grid did not accept this change.";
  */
 export function rejectionMessage(result: ApplyTransactionResult): string | null {
   if (result.status === "applied") return null;
+  if (result.status === "noop" && result.reason === "read-only") return READ_ONLY;
   if (result.status === "rejected") return result.issues[0]?.message ?? NOT_APPLIED;
   return NOT_APPLIED;
 }

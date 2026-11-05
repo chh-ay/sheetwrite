@@ -10,7 +10,9 @@ import type {
   Workbook,
   WorkbookTable,
 } from "@sheetwrite/core";
+import { registerQueryCommands } from "@sheetwrite/core";
 
+import { sessionCommands } from "./commands.js";
 import { QueryError } from "./errors.js";
 import { packOutput } from "./materialize.js";
 import type {
@@ -474,7 +476,7 @@ export function createSessionWithEngine(
       : { status: "rejected", transaction };
   };
 
-  return {
+  const session: QuerySession = {
     define(query) {
       const diagnostic = check(query, savedQueries());
       if (diagnostic) return { status: "invalid", diagnostic };
@@ -500,6 +502,13 @@ export function createSessionWithEngine(
 
     dispose() {
       lifetime.abort();
+      unregister();
     },
   };
+
+  // The grid's Get Data, Refresh All and Queries & Connections commands appear
+  // while this session is alive.
+  const unregister = registerQueryCommands(grid, sessionCommands(session));
+
+  return session;
 }

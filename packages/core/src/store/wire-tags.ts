@@ -1,5 +1,7 @@
 // Unless marked JS-only, these values cross the WASM boundary and must change
-// together with their Rust owner. Cell kinds mirror packages/wasm/src/types.rs.
+// together with their Rust owner. Cell kinds mirror packages/wasm/src/types.rs;
+// bulk store paths, window reads and the paint worker all encode cells with
+// these tags.
 export const KIND_EMPTY = 0 as const;
 export const KIND_NUMBER = 1 as const;
 export const KIND_STRING = 2 as const;
