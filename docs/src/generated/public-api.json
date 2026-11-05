@@ -1571,7 +1571,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L454",
+              "source": "src/grid.ts#L455",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1598,7 +1598,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1099",
+              "source": "src/row-bridge.ts#L1121",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1900,9 +1900,9 @@
               "kind": "variable",
               "signature": "Readonly<SyncCoordinatorLimits>",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L163",
+              "source": "src/sync-protocol.ts#L63",
               "jsDocTags": [],
               "documentation": "Security and durability defaults bound hostile remote versions, recovery\nbuffers, acknowledgement memory, and the offline pending queue independently.",
               "memberDocs": []
@@ -1914,7 +1914,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L328",
+              "source": "src/grid.ts#L329",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -3079,7 +3079,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L372",
+              "source": "src/grid.ts#L373",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3130,7 +3130,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L384",
+              "source": "src/grid.ts#L385",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3578,7 +3578,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L44",
+              "source": "src/sync.ts#L54",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -3603,7 +3603,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L55",
+              "source": "src/sync.ts#L65",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -4351,7 +4351,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L389",
+              "source": "src/grid.ts#L390",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4518,7 +4518,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L403",
+              "source": "src/row-bridge.ts#L405",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -4785,7 +4785,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1107",
+              "source": "src/row-bridge.ts#L1129",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -5485,7 +5485,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L155",
+              "source": "src/store.ts#L164",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5617,7 +5617,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L85",
+              "source": "src/store.ts#L87",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -5947,7 +5947,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L74",
+              "source": "src/sync.ts#L84",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
               "memberDocs": []
@@ -5959,7 +5959,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L301",
+              "source": "src/sync.ts#L208",
               "jsDocTags": [],
               "documentation": "Outcome of `SyncCoordinator.recoverConflict`.",
               "memberDocs": []
@@ -5971,7 +5971,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L286",
+              "source": "src/sync.ts#L193",
               "jsDocTags": [],
               "documentation": "Why a conflict cannot be recovered in place; the host reloads the document instead.",
               "memberDocs": []
@@ -5983,7 +5983,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L72",
+              "source": "src/sync.ts#L82",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -5995,7 +5995,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L352",
+              "source": "src/sync.ts#L259",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6035,7 +6035,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L256",
+              "source": "src/sync.ts#L163",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -6045,9 +6045,9 @@
               "kind": "interface",
               "signature": "export interface SyncCoordinatorLimits { maxMutationIdBytes: number; maxOperationsPerVersion: number; maxVersionPayloadBytes: number; maxFutureVersionDistance: number; maxBufferedVersions: number; maxBufferedOperations: number; maxBufferedBytes: number; maxRecentAcknowledgements: number; maxBatchVersions: number; maxBatchBytes: number; maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L126",
+              "source": "src/sync-protocol.ts#L26",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -6112,7 +6112,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L231",
+              "source": "src/sync.ts#L138",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -6170,7 +6170,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L219",
+              "source": "src/sync.ts#L126",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -6182,7 +6182,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L84",
+              "source": "src/sync.ts#L94",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -6192,9 +6192,9 @@
               "kind": "interface",
               "signature": "export interface SyncPendingQueueLimits { maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L116",
+              "source": "src/sync-protocol.ts#L16",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -6217,9 +6217,9 @@
               "kind": "class",
               "signature": "class SyncProtocolError extends SheetwriteError { constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions); code: SyncProtocolErrorCode; name: \"SyncProtocolError\" }",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L209",
+              "source": "src/sync-protocol.ts#L109",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -6229,9 +6229,9 @@
               "kind": "type",
               "signature": "export type SyncProtocolErrorCode = | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\";",
               "owners": [
-                "src/sync.ts"
+                "src/sync-protocol.ts"
               ],
-              "source": "src/sync.ts#L188",
+              "source": "src/sync-protocol.ts#L88",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -6243,7 +6243,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L92",
+              "source": "src/sync.ts#L102",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -6276,7 +6276,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L108",
+              "source": "src/sync.ts#L118",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []
@@ -7509,7 +7509,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1099",
+              "source": "src/row-bridge.ts#L1121",
               "jsDocTags": [
                 "example",
                 "see"
@@ -7893,7 +7893,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L403",
+              "source": "src/row-bridge.ts#L405",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -8160,7 +8160,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1107",
+              "source": "src/row-bridge.ts#L1129",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -9507,7 +9507,7 @@
               "owners": [
                 "src/datasource-controller.ts"
               ],
-              "source": "src/datasource-controller.ts#L27",
+              "source": "src/datasource-controller.ts#L35",
               "jsDocTags": [],
               "documentation": "Installs a deterministic monotonic clock through the public testing entrypoint.",
               "memberDocs": []
