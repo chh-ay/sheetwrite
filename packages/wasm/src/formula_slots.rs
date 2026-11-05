@@ -1,7 +1,7 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
 use crate::memory::{StoreMemoryStats, FORMULAS};
-use crate::types::{AbsCellKey, CellKey, EvalResult, FormulaEntry, FormulaError};
+use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, FormulaError};
 
 const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
@@ -582,6 +582,9 @@ pub(crate) struct FormulaResults {
 struct RangeSums {
     slots: Vec<u32>,
     sums: Vec<(u32, Result<f64, FormulaError>)>,
+    /// The range of the last shared sum read or stored. Readers of one range
+    /// usually evaluate in a row, so they skip the group lookup.
+    last: Option<(CellRange, Result<f64, FormulaError>)>,
 }
 
 impl RangeSums {
@@ -681,20 +684,38 @@ impl FormulaResults {
         self.count
     }
 
-    /// The shared sum of range group `group` in this pass.
-    pub(crate) fn range_sum(&self, group: usize) -> Option<Result<f64, FormulaError>> {
-        self.range_sums.get(group)
+    /// The shared sum of `range` when it was the last range shared.
+    #[inline]
+    pub(crate) fn last_range_sum(&self, range: CellRange) -> Option<Result<f64, FormulaError>> {
+        self.range_sums
+            .last
+            .filter(|&(last, _)| last == range)
+            .map(|(_, sum)| sum)
+    }
+
+    /// The shared sum of range group `group` in this pass, which becomes the
+    /// last shared range.
+    pub(crate) fn range_sum(
+        &mut self,
+        range: CellRange,
+        group: usize,
+    ) -> Option<Result<f64, FormulaError>> {
+        let sum = self.range_sums.get(group)?;
+        self.range_sums.last = Some((range, sum));
+        Some(sum)
     }
 
     /// Shares the sum of a literal-only range group for the rest of the pass;
     /// `groups` is the index's group count.
     pub(crate) fn share_range_sum(
         &mut self,
+        range: CellRange,
         group: usize,
         groups: usize,
         sum: Result<f64, FormulaError>,
     ) {
         self.range_sums.insert(group, groups, sum);
+        self.range_sums.last = Some((range, sum));
     }
 
     /// Clear touched positions so a small edit does not scan all slots.
@@ -707,6 +728,7 @@ impl FormulaResults {
         }
         self.values.clear();
         self.range_sums.sums.clear();
+        self.range_sums.last = None;
         self.count = 0;
     }
 

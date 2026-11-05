@@ -100,11 +100,15 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
+        if let Some(sum) = pass.results.last_range_sum(range) {
+            return sum_value(sum);
+        }
+
         let group = self
             .graph
             .index()
             .and_then(|index| index.shared_range_group(range));
-        if let Some(sum) = group.and_then(|(group, _)| pass.results.range_sum(group)) {
+        if let Some(sum) = group.and_then(|(group, _)| pass.results.range_sum(range, group)) {
             return sum_value(sum);
         }
 
@@ -123,7 +127,7 @@ impl CellStore {
             Err(error) => (Err(error), false),
         };
         if let (Some((group, groups)), true) = (group, literal_only) {
-            pass.results.share_range_sum(group, groups, sum);
+            pass.results.share_range_sum(range, group, groups, sum);
         }
         sum_value(sum)
     }
