@@ -68,6 +68,12 @@ For custom UI, use the composable primitives. All active column filters are ANDe
 together, hidden rows and collapsed groups are subtracted, and the remaining rows
 are sorted by the active multi-key sort.
 
+Sort keys use Excel's sort order: numbers, then text, then `FALSE` and `TRUE`,
+then errors. Text compares without case, character by character, in Excel's
+documented character order, and skips apostrophes and hyphens. Errors are equal
+to each other. A descending sort reverses this order, but blank cells are last
+in both directions. Rows with equal keys keep their order.
+
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.sortByMulti([
   { col: 4, ascending: false }, // primary key
