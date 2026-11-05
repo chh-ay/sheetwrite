@@ -14,9 +14,11 @@ mod group;
 mod join;
 mod json;
 mod keys;
+mod m;
 mod mixed;
 mod plan;
 mod plan_wire;
+mod power_query;
 mod predicate;
 mod source;
 mod source_json;
@@ -26,6 +28,9 @@ mod wire;
 
 pub use column::{Batch, Column, Value};
 pub use execute::execute;
+pub use m::{
+    decode_queries, emit_section, import_section, MQuery, MSource, MSourceKind, Unsupported,
+};
 pub use plan::{
     Aggregate, AggregateOp, ColumnSpec, ColumnType, CompareOp, Diagnostic, ErrorPolicy, JoinKind,
     Limits, Literal, OutputColumn, Plan, Predicate, SourceSpec, Step,

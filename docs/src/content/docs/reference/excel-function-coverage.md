@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **304 supported**, **93 partly supported**, and **123 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **336 supported**, **93 partly supported**, and **91 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -182,61 +182,61 @@ The full engine has **304 supported**, **93 partly supported**, and **123 not su
 
 | Excel function | Full engine | Lite engine | Notes and differences |
 | --- | --- | --- | --- |
-| [`ACCRINT`](https://support.microsoft.com/en-us/excel/functions/accrint-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ACCRINTM`](https://support.microsoft.com/en-us/excel/functions/accrintm-function) | Not supported | Not supported | Not registered in either engine. |
-| [`AMORDEGRC`](https://support.microsoft.com/en-us/excel/functions/amordegrc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`AMORLINC`](https://support.microsoft.com/en-us/excel/functions/amorlinc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COUPDAYBS`](https://support.microsoft.com/en-us/excel/functions/coupdaybs-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COUPDAYS`](https://support.microsoft.com/en-us/excel/functions/coupdays-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COUPDAYSNC`](https://support.microsoft.com/en-us/excel/functions/coupdaysnc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COUPNCD`](https://support.microsoft.com/en-us/excel/functions/coupncd-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COUPNUM`](https://support.microsoft.com/en-us/excel/functions/coupnum-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COUPPCD`](https://support.microsoft.com/en-us/excel/functions/couppcd-function) | Not supported | Not supported | Not registered in either engine. |
+| [`ACCRINT`](https://support.microsoft.com/en-us/excel/functions/accrint-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`ACCRINTM`](https://support.microsoft.com/en-us/excel/functions/accrintm-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`AMORDEGRC`](https://support.microsoft.com/en-us/excel/functions/amordegrc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`AMORLINC`](https://support.microsoft.com/en-us/excel/functions/amorlinc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`COUPDAYBS`](https://support.microsoft.com/en-us/excel/functions/coupdaybs-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`COUPDAYS`](https://support.microsoft.com/en-us/excel/functions/coupdays-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`COUPDAYSNC`](https://support.microsoft.com/en-us/excel/functions/coupdaysnc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`COUPNCD`](https://support.microsoft.com/en-us/excel/functions/coupncd-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`COUPNUM`](https://support.microsoft.com/en-us/excel/functions/coupnum-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`COUPPCD`](https://support.microsoft.com/en-us/excel/functions/couppcd-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`CUMIPMT`](https://support.microsoft.com/en-us/excel/functions/cumipmt-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`CUMPRINC`](https://support.microsoft.com/en-us/excel/functions/cumprinc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`DB`](https://support.microsoft.com/en-us/excel/functions/db-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`DDB`](https://support.microsoft.com/en-us/excel/functions/ddb-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
-| [`DISC`](https://support.microsoft.com/en-us/excel/functions/disc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DOLLARDE`](https://support.microsoft.com/en-us/excel/functions/dollarde-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DOLLARFR`](https://support.microsoft.com/en-us/excel/functions/dollarfr-function) | Not supported | Not supported | Not registered in either engine. |
-| [`DURATION`](https://support.microsoft.com/en-us/excel/functions/duration-function) | Not supported | Not supported | Not registered in either engine. |
+| [`DISC`](https://support.microsoft.com/en-us/excel/functions/disc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`DOLLARDE`](https://support.microsoft.com/en-us/excel/functions/dollarde-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`DOLLARFR`](https://support.microsoft.com/en-us/excel/functions/dollarfr-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`DURATION`](https://support.microsoft.com/en-us/excel/functions/duration-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`EFFECT`](https://support.microsoft.com/en-us/excel/functions/effect-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`FV`](https://support.microsoft.com/en-us/excel/functions/fv-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
 | [`FVSCHEDULE`](https://support.microsoft.com/en-us/excel/functions/fvschedule-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
-| [`INTRATE`](https://support.microsoft.com/en-us/excel/functions/intrate-function) | Not supported | Not supported | Not registered in either engine. |
+| [`INTRATE`](https://support.microsoft.com/en-us/excel/functions/intrate-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`IPMT`](https://support.microsoft.com/en-us/excel/functions/ipmt-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
 | [`IRR`](https://support.microsoft.com/en-us/excel/functions/irr-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
-| [`ISPMT`](https://support.microsoft.com/en-us/excel/functions/ispmt-function) | Not supported | Not supported | Not registered in either engine. |
-| [`MDURATION`](https://support.microsoft.com/en-us/excel/functions/mduration-function) | Not supported | Not supported | Not registered in either engine. |
+| [`ISPMT`](https://support.microsoft.com/en-us/excel/functions/ispmt-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`MDURATION`](https://support.microsoft.com/en-us/excel/functions/mduration-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`MIRR`](https://support.microsoft.com/en-us/excel/functions/mirr-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`NOMINAL`](https://support.microsoft.com/en-us/excel/functions/nominal-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`NPER`](https://support.microsoft.com/en-us/excel/functions/nper-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`NPV`](https://support.microsoft.com/en-us/excel/functions/npv-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
-| [`ODDFPRICE`](https://support.microsoft.com/en-us/excel/functions/oddfprice-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ODDFYIELD`](https://support.microsoft.com/en-us/excel/functions/oddfyield-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ODDLPRICE`](https://support.microsoft.com/en-us/excel/functions/oddlprice-function) | Not supported | Not supported | Not registered in either engine. |
-| [`ODDLYIELD`](https://support.microsoft.com/en-us/excel/functions/oddlyield-function) | Not supported | Not supported | Not registered in either engine. |
+| [`ODDFPRICE`](https://support.microsoft.com/en-us/excel/functions/oddfprice-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`ODDFYIELD`](https://support.microsoft.com/en-us/excel/functions/oddfyield-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`ODDLPRICE`](https://support.microsoft.com/en-us/excel/functions/oddlprice-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`ODDLYIELD`](https://support.microsoft.com/en-us/excel/functions/oddlyield-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`PDURATION`](https://support.microsoft.com/en-us/excel/functions/pduration-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`PMT`](https://support.microsoft.com/en-us/excel/functions/pmt-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
 | [`PPMT`](https://support.microsoft.com/en-us/excel/functions/ppmt-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
-| [`PRICE`](https://support.microsoft.com/en-us/excel/functions/price-function) | Not supported | Not supported | Not registered in either engine. |
-| [`PRICEDISC`](https://support.microsoft.com/en-us/excel/functions/pricedisc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`PRICEMAT`](https://support.microsoft.com/en-us/excel/functions/pricemat-function) | Not supported | Not supported | Not registered in either engine. |
+| [`PRICE`](https://support.microsoft.com/en-us/excel/functions/price-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`PRICEDISC`](https://support.microsoft.com/en-us/excel/functions/pricedisc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`PRICEMAT`](https://support.microsoft.com/en-us/excel/functions/pricemat-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`PV`](https://support.microsoft.com/en-us/excel/functions/pv-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
 | [`RATE`](https://support.microsoft.com/en-us/excel/functions/rate-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/financial/) |
-| [`RECEIVED`](https://support.microsoft.com/en-us/excel/functions/received-function) | Not supported | Not supported | Not registered in either engine. |
+| [`RECEIVED`](https://support.microsoft.com/en-us/excel/functions/received-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`RRI`](https://support.microsoft.com/en-us/excel/functions/rri-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`SLN`](https://support.microsoft.com/en-us/excel/functions/sln-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`SYD`](https://support.microsoft.com/en-us/excel/functions/syd-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
-| [`TBILLEQ`](https://support.microsoft.com/en-us/excel/functions/tbilleq-function) | Not supported | Not supported | Not registered in either engine. |
-| [`TBILLPRICE`](https://support.microsoft.com/en-us/excel/functions/tbillprice-function) | Not supported | Not supported | Not registered in either engine. |
-| [`TBILLYIELD`](https://support.microsoft.com/en-us/excel/functions/tbillyield-function) | Not supported | Not supported | Not registered in either engine. |
-| [`VDB`](https://support.microsoft.com/en-us/excel/functions/vdb-function) | Not supported | Not supported | Not registered in either engine. |
+| [`TBILLEQ`](https://support.microsoft.com/en-us/excel/functions/tbilleq-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`TBILLPRICE`](https://support.microsoft.com/en-us/excel/functions/tbillprice-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`TBILLYIELD`](https://support.microsoft.com/en-us/excel/functions/tbillyield-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`VDB`](https://support.microsoft.com/en-us/excel/functions/vdb-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`XIRR`](https://support.microsoft.com/en-us/excel/functions/xirr-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 | [`XNPV`](https://support.microsoft.com/en-us/excel/functions/xnpv-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
-| [`YIELD`](https://support.microsoft.com/en-us/excel/functions/yield-function) | Not supported | Not supported | Not registered in either engine. |
-| [`YIELDDISC`](https://support.microsoft.com/en-us/excel/functions/yielddisc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`YIELDMAT`](https://support.microsoft.com/en-us/excel/functions/yieldmat-function) | Not supported | Not supported | Not registered in either engine. |
+| [`YIELD`](https://support.microsoft.com/en-us/excel/functions/yield-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`YIELDDISC`](https://support.microsoft.com/en-us/excel/functions/yielddisc-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
+| [`YIELDMAT`](https://support.microsoft.com/en-us/excel/functions/yieldmat-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/financial/) |
 
 ## Information functions
 
