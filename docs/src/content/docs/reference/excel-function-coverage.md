@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **250 supported**, **93 partly supported**, and **177 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **254 supported**, **93 partly supported**, and **173 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -123,10 +123,10 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 
 | Excel function | Full engine | Lite engine | Notes and differences |
 | --- | --- | --- | --- |
-| [`BESSELI`](https://support.microsoft.com/en-us/excel/functions/besseli-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BESSELJ`](https://support.microsoft.com/en-us/excel/functions/besselj-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BESSELK`](https://support.microsoft.com/en-us/excel/functions/besselk-function) | Not supported | Not supported | Not registered in either engine. |
-| [`BESSELY`](https://support.microsoft.com/en-us/excel/functions/bessely-function) | Not supported | Not supported | Not registered in either engine. |
+| [`BESSELI`](https://support.microsoft.com/en-us/excel/functions/besseli-function) | Supported | Not supported | Lite engine: not registered. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BESSELJ`](https://support.microsoft.com/en-us/excel/functions/besselj-function) | Supported | Not supported | Lite engine: not registered. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BESSELK`](https://support.microsoft.com/en-us/excel/functions/besselk-function) | Supported | Not supported | Lite engine: not registered. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`BESSELY`](https://support.microsoft.com/en-us/excel/functions/bessely-function) | Supported | Not supported | Lite engine: not registered. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8. [Contract](/docs/reference/formula-functions/engineering/) |
 | [`BIN2DEC`](https://support.microsoft.com/en-us/excel/functions/bin2dec-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BIN2HEX`](https://support.microsoft.com/en-us/excel/functions/bin2hex-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BIN2OCT`](https://support.microsoft.com/en-us/excel/functions/bin2oct-function) | Not supported | Not supported | Not registered in either engine. |

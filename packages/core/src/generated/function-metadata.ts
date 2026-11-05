@@ -16,6 +16,7 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     "Text",
     "Formula operators",
     "Database",
+    "Engineering",
   ],
   profiles: [
     {"arguments":[{"name":"text","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"delimiter","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"instanceNum","types":["scalar","reference"],"optional":true,"repeating":false},{"name":"matchMode","types":["scalar","reference"],"optional":true,"repeating":false},{"name":"matchEnd","types":["scalar","reference"],"optional":true,"repeating":false},{"name":"ifNotFound","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
@@ -168,6 +169,7 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"actualRange","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"expectedRange","types":["range","array","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"array1","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"array2","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"tails","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"type","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"array","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"x","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"sigma","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"x","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"n","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -515,5 +517,9 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["VARP",7,13,4],
     ["WEIBULL",7,89,4],
     ["ZTEST",7,149,4],
+    ["BESSELI",11,150,4],
+    ["BESSELJ",11,150,4],
+    ["BESSELK",11,150,4],
+    ["BESSELY",11,150,4],
   ],
 };
