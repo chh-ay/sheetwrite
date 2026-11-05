@@ -5,7 +5,7 @@
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import { iconNode } from "../icons/resolve.js";
-import { menuKeyTarget } from "../menu-surface.js";
+import { TWO_AXIS_STEPS, menuKeyTarget } from "../menu-surface.js";
 import type {
   ChartDefinition,
   ChartKind,
@@ -142,7 +142,7 @@ function renderChartPanel(
     const index = kindButtons.findIndex((button) => button === event.target);
     if (index === -1) return;
     const next = menuKeyTarget(event.key, index, kindButtons.length, {
-      axis: "both",
+      steps: TWO_AXIS_STEPS,
       wrap: true,
     });
     const kind = next === null ? undefined : CHART_KINDS[next]?.kind;

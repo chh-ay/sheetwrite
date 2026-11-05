@@ -4,7 +4,7 @@
 
 import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
-import { menuKeyTarget } from "../menu-surface.js";
+import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-surface.js";
 import { Scope } from "../scope.js";
 import type {
   CommandFlags,
@@ -453,7 +453,7 @@ export class CommandToolbar {
     if (current === -1) return;
 
     const next = menuKeyTarget(event.key, current, stops.length, {
-      axis: "horizontal",
+      steps: HORIZONTAL_STEPS,
       wrap: false,
     });
     if (next === null) return;

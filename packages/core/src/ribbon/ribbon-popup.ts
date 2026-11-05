@@ -8,12 +8,13 @@ import {
   menuKeyTarget,
   type PopupPlacement,
   popupPosition,
+  TWO_AXIS_STEPS,
 } from "../menu-surface.js";
 
 /** Popups open under their trigger, with a gap so the two never read as one surface. */
 const POPUP_PLACEMENT: PopupPlacement = { side: "below", gap: 4 };
 /** Arrow keys move through a popup's items in either direction and wrap at the ends. */
-const POPUP_KEYS: MenuKeyOptions = { axis: "both", wrap: true };
+const POPUP_KEYS: MenuKeyOptions = { steps: TWO_AXIS_STEPS, wrap: true };
 
 /** Elements arrow keys move between inside an open popup. */
 const NAVIGABLE =
