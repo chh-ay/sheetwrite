@@ -315,6 +315,11 @@ class HistoryPanel {
       item.textContent = `Workbook: ${page.workbook.join(", ")}`;
       list.append(item);
     }
+    // Names of the later version where the diff reports them, else the live names.
+    const names = new Map(
+      this.grid.store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name]),
+    );
+    for (const sheet of page.sheets) names.set(sheet.sheet, sheet.name);
     for (let at = 0; at < page.cells.flags.length; at++) {
       const flags = page.cells.flags[at] ?? 0;
       const added = (flags & HistoryDiffFlag.added) !== 0;
@@ -328,7 +333,7 @@ class HistoryPanel {
       const item = document.createElement("li");
       item.className = `history-change ${added ? "history-added" : removed ? "history-removed" : ""}`;
       const title = document.createElement("strong");
-      title.textContent = `${kind} ${sheet}!${colToA1(col)}${row + 1}`;
+      title.textContent = `${kind} ${names.get(sheet) ?? sheet}!${colToA1(col)}${row + 1}`;
       const values = document.createElement("p");
       values.textContent = `${detail?.before?.formula ?? detail?.before?.value ?? "Empty"} → ${detail?.after.formula ?? detail?.after.value ?? "Empty"}`;
       const by = document.createElement("small");

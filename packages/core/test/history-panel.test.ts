@@ -173,7 +173,7 @@ it("saves a named version, shows the edit and its author, and restores it as one
 
   buttonIn(panel(host), "Before price change").click();
   const change = await until(() => host.querySelector(".history-change"));
-  expect(change.textContent).toContain("Changed (≠) data!A1");
+  expect(change.textContent).toContain("Changed (≠) Data!A1");
   expect(change.textContent).toContain("1 → 5");
   expect(change.textContent).toContain("Last changed by Alice");
 
