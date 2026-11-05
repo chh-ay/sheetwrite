@@ -86,6 +86,15 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn bessel_functions_read_cells() {
+    assert_results(&[
+        ("=ROUND(BESSELJ(Data!A3,1),6)", "0.339059"),
+        ("=BESSELI(Data!F1,0)", "1"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn legacy_statistics_names_read_references_as_their_successors() {
     assert_results(&[
         ("=STDEV(Data!A1:A3)", "1"),
