@@ -483,61 +483,85 @@ fn classify(list: &ListView<'_>) -> Option<UniformKind> {
     found
 }
 
-/// Exact-match class order: blank, `""`, numbers, other text, logicals.
-/// Within a class, entries the lookup order calls equal sort together.
-fn class_of(entry: Entry<'_>) -> u8 {
-    match entry {
-        Entry::Blank => 0,
-        Entry::Text("") => 1,
-        Entry::Number(_) => 2,
-        Entry::Text(_) => 3,
-        Entry::Bool(_) => 4,
-        Entry::Error(_) => 5,
-    }
-}
+/// Exact-match classes. Two entries share a class and value exactly when
+/// the lookup order calls them equal within one type; blank equals `0`,
+/// `""` and `FALSE` across types, so a key looks in each class it can equal.
+const CLASS_BLANK: u8 = 0;
+const CLASS_EMPTY_TEXT: u8 = 1;
+const CLASS_NUMBER: u8 = 2;
+const CLASS_TEXT: u8 = 3;
+const CLASS_BOOL: u8 = 4;
 
-/// The index order of two entries: by class, then by value within it. Only
-/// lists without an error or NaN are indexed, so numbers have a total order.
-fn index_order(left: Entry<'_>, right: Entry<'_>) -> Ordering {
-    class_of(left)
-        .cmp(&class_of(right))
-        .then_with(|| match (left, right) {
-            (Entry::Number(left), Entry::Number(right)) => {
-                left.partial_cmp(&right).unwrap_or(Ordering::Equal)
-            }
-            (Entry::Text(left), Entry::Text(right)) => compare_text_case_insensitive(left, right),
-            (Entry::Bool(left), Entry::Bool(right)) => left.cmp(&right),
-            _ => Ordering::Equal,
-        })
+/// One list position under its class and value. A number value is its bits
+/// with `-0` as `0`, text its case-folded rank, and a logical 0 or 1.
+#[derive(Clone, Copy)]
+struct IndexEntry {
+    class: u8,
+    value: u64,
+    position: u32,
 }
 
 /// Every position sorted by class, value and position, so an equal run is
-/// contiguous and its ends are its first and last position. Entries are read
-/// from the list, so the index holds 4 B per position and no copy of a text.
-/// Blank equals `0`, `""` and `FALSE` across classes, so a key looks in each
-/// class it can equal.
+/// contiguous and its ends are its first and last position. Text is ranked
+/// once by its case-folded order, so the main sort compares integers only.
 struct ExactIndex {
-    order: Vec<u32>,
+    entries: Vec<IndexEntry>,
+    /// One position per distinct case-folded text, in rank order.
+    texts: Vec<u32>,
 }
 
 impl ExactIndex {
     /// The index of `list`, or `None` for a list with an error or NaN, whose
     /// scan order must decide.
     fn build(list: &ListView<'_>) -> Option<Self> {
+        let mut entries = Vec::with_capacity(list.len());
+        let mut text_positions = Vec::new();
         for position in 0..list.len() {
-            match list.entry(position) {
+            let (class, value) = match list.entry(position) {
                 Entry::Error(_) => return None,
                 Entry::Number(number) if number.is_nan() => return None,
-                _ => {}
-            }
+                Entry::Blank => (CLASS_BLANK, 0),
+                Entry::Number(number) => (CLASS_NUMBER, number_value(number)),
+                Entry::Text("") => (CLASS_EMPTY_TEXT, 0),
+                Entry::Text(_) => {
+                    text_positions.push(position as u32);
+                    (CLASS_TEXT, 0)
+                }
+                Entry::Bool(value) => (CLASS_BOOL, u64::from(value)),
+            };
+            entries.push(IndexEntry {
+                class,
+                value,
+                position: position as u32,
+            });
         }
 
-        let mut order: Vec<u32> = (0..list.len() as u32).collect();
-        merge_sort(&mut order, &mut |left, right| {
-            index_order(list.entry(left as usize), list.entry(right as usize))
-                .then(left.cmp(&right))
+        let text_of = |position: u32| match list.entry(position as usize) {
+            Entry::Text(text) => text,
+            _ => "",
+        };
+        merge_sort(&mut text_positions, &mut |left, right| {
+            compare_text_case_insensitive(text_of(left), text_of(right))
         });
-        Some(Self { order })
+        let mut texts: Vec<u32> = Vec::new();
+        for &position in &text_positions {
+            let distinct = texts.last().is_none_or(|&last| {
+                compare_text_case_insensitive(text_of(last), text_of(position)) != Ordering::Equal
+            });
+            if distinct {
+                texts.push(position);
+            }
+            entries[position as usize].value = (texts.len() - 1) as u64;
+        }
+        drop(text_positions);
+
+        let mut order: Vec<u32> = (0..entries.len() as u32).collect();
+        merge_sort(&mut order, &mut |left, right| {
+            let (left, right) = (entries[left as usize], entries[right as usize]);
+            (left.class, left.value).cmp(&(right.class, right.value))
+        });
+        let entries = order.iter().map(|&index| entries[index as usize]).collect();
+        Some(Self { entries, texts })
     }
 
     /// The first (or last) position equal to `key`, or `None` for a key the
@@ -549,20 +573,20 @@ impl ExactIndex {
         search_reverse: bool,
     ) -> Option<Option<usize>> {
         let mut found: Option<usize> = None;
-        let mut consider = |probe: Entry<'_>| {
-            let versus = |position: &u32| index_order(list.entry(*position as usize), probe);
+        let mut consider = |class: u8, value: u64| {
             let start = self
-                .order
-                .partition_point(|position| versus(position).is_lt());
-            let end =
-                start + self.order[start..].partition_point(|position| versus(position).is_eq());
+                .entries
+                .partition_point(|entry| (entry.class, entry.value) < (class, value));
+            let end = start
+                + self.entries[start..]
+                    .partition_point(|entry| (entry.class, entry.value) == (class, value));
             if start == end {
                 return;
             }
             let position = if search_reverse {
-                self.order[end - 1]
+                self.entries[end - 1].position
             } else {
-                self.order[start]
+                self.entries[start].position
             } as usize;
             found = Some(match found {
                 None => position,
@@ -573,28 +597,54 @@ impl ExactIndex {
 
         match key {
             Entry::Blank => {
-                consider(Entry::Blank);
-                consider(Entry::Number(0.0));
-                consider(Entry::Text(""));
-                consider(Entry::Bool(false));
+                consider(CLASS_BLANK, 0);
+                consider(CLASS_NUMBER, 0);
+                consider(CLASS_EMPTY_TEXT, 0);
+                consider(CLASS_BOOL, 0);
             }
-            Entry::Bool(false) | Entry::Text("") => {
-                consider(key);
-                consider(Entry::Blank);
+            Entry::Bool(false) => {
+                consider(CLASS_BOOL, 0);
+                consider(CLASS_BLANK, 0);
             }
-            Entry::Number(number) if number == 0.0 => {
-                consider(key);
-                consider(Entry::Blank);
+            Entry::Bool(true) => consider(CLASS_BOOL, 1),
+            Entry::Text("") => {
+                consider(CLASS_EMPTY_TEXT, 0);
+                consider(CLASS_BLANK, 0);
             }
-            Entry::Number(number) if number.is_nan() => return None,
-            Entry::Error(_) => return None,
-            _ => consider(key),
+            Entry::Text(text) => {
+                let rank =
+                    self.texts
+                        .binary_search_by(|&position| match list.entry(position as usize) {
+                            Entry::Text(stored) => compare_text_case_insensitive(stored, text),
+                            _ => Ordering::Less,
+                        });
+                if let Ok(rank) = rank {
+                    consider(CLASS_TEXT, rank as u64);
+                }
+            }
+            Entry::Number(number) if !number.is_nan() => {
+                consider(CLASS_NUMBER, number_value(number));
+                if number == 0.0 {
+                    consider(CLASS_BLANK, 0);
+                }
+            }
+            _ => return None,
         }
         Some(found)
     }
 
     fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
-        stats.add_vec::<u32>(self.order.len(), self.order.capacity());
+        stats.add_vec::<IndexEntry>(self.entries.len(), self.entries.capacity());
+        stats.add_vec::<u32>(self.texts.len(), self.texts.capacity());
+    }
+}
+
+/// A number's index value: its bits, with `-0` folded into `0`.
+fn number_value(number: f64) -> u64 {
+    if number == 0.0 {
+        0
+    } else {
+        number.to_bits()
     }
 }
 
