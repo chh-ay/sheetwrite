@@ -18,6 +18,7 @@ Stable failure category for history validation, storage, and replay.
 ```ts generated
 export type HistoryErrorCode =
   | "invalid-history"
+  | "invalid-scope"
   | "conflict"
   | "capacity"
   | "not-found"
