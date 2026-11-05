@@ -1,5 +1,6 @@
 import { MAX_ATOMIC_BATCH_VERSIONS } from "./atomic-batch.js";
 import {
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
@@ -71,6 +72,13 @@ const MAX_OPERATIONS =
 
 /** Clean page cache of the paged replay store. */
 const REPLAY_WINDOW_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Encoded operation bytes applied as one replay transaction: the default
+ * per-transaction ceiling, so a batch costs no more working memory than one
+ * ordinary edit. A larger archived transaction is applied alone.
+ */
+const REPLAY_BATCH_BYTES = DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes;
 
 /** Working-set bytes per encoded operation byte: the JSON bytes, the string and the parsed operations. */
 const TRANSACTION_RESERVATION_MULTIPLIER = 4;
@@ -276,10 +284,45 @@ function versionResponse(
 }
 
 /**
- * Build a paged replay store in its own engine instance, apply `tail`, and
- * export the result. The private instance holds all replay memory, so the
- * document engine keeps its size; the store and the instance are freed on
- * every exit.
+ * Dense storage when the historical workbook fits the dense-cell ceiling that
+ * documents use: in the eight-hour history bench a dense store replays the log
+ * more than ten times faster than a paged one. Larger sparse sheets use paged
+ * storage.
+ */
+function replayStorage(snapshot: WorkbookSnapshot): "dense" | "paged" {
+  let logicalCells = 0;
+  for (const sheet of snapshot.sheets) {
+    logicalCells += sheet.rowCount * sheet.columns.length;
+  }
+
+  return logicalCells <= DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ? "dense" : "paged";
+}
+
+function applyBatch(store: SheetwriteStore, operations: DocumentOp[]): void {
+  if (operations.length === 0) {
+    return;
+  }
+
+  const outcome = store.applyTransaction({ patches: operations }, { source: "remote" });
+  const complete =
+    outcome.status === "applied" &&
+    outcome.transaction.patches.length === operations.length &&
+    !outcome.rejections?.length;
+
+  if (!complete) {
+    throw new HistoryError("integrity", "Archived transaction could not be replayed completely");
+  }
+}
+
+/**
+ * Build a replay store in its own engine instance, apply `tail`, and export
+ * the result. The private instance holds all replay memory, so the document
+ * engine keeps its size; the store and the instance are freed on every exit.
+ *
+ * Consecutive transactions are applied as one store transaction of at most
+ * `REPLAY_BATCH_BYTES`: operations apply in order inside a transaction, so the
+ * result is the same, and the store recalculates once per batch instead of
+ * once per archived transaction.
  */
 async function replay(
   snapshot: WorkbookSnapshot,
@@ -294,7 +337,7 @@ async function replay(
   try {
     store = buildOnEngineInstance(instance, () =>
       SheetwriteStore.fromSnapshot(snapshot, {
-        storage: "paged",
+        storage: replayStorage(snapshot),
         cacheBytes: REPLAY_WINDOW_BYTES,
         transactionResourceLimits: {
           maxOperations: MAX_OPERATIONS,
@@ -313,31 +356,33 @@ async function replay(
 
   try {
     let revision = snapshot.version ?? 0;
+    let batch: DocumentOp[] = [];
+    let batchBytes = 0;
 
     for (const transactionId of tail) {
       const commit = await readCommit(transactionId, read, limits);
-      checkCommit(commit, revision, 0, limits);
+      const bytes = checkCommit(commit, revision, 0, limits);
 
-      const outcome = store.applyTransaction(
-        { patches: [...commit.operations] },
-        { source: "remote" },
-      );
+      const full =
+        batch.length + commit.operations.length > MAX_OPERATIONS ||
+        batchBytes + bytes > REPLAY_BATCH_BYTES;
 
-      const complete =
-        outcome.status === "applied" &&
-        outcome.transaction.patches.length === commit.operations.length &&
-        !outcome.rejections?.length;
-
-      if (!complete) {
-        throw new HistoryError(
-          "integrity",
-          "Archived transaction could not be replayed completely",
-        );
+      if (full) {
+        applyBatch(store, batch);
+        batch = [];
+        batchBytes = 0;
       }
 
+      for (const operation of commit.operations) {
+        batch.push(operation);
+      }
+
+      batchBytes += bytes;
       revision = commit.revision;
       checkAbort(signal);
     }
+
+    applyBatch(store, batch);
 
     return { ...store.exportSnapshot(), version: revision };
   } finally {

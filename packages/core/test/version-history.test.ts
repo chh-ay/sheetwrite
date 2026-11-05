@@ -280,6 +280,39 @@ for (const backend of ["memory", "indexeddb"] as const) {
 }
 
 describe("history replay memory", () => {
+  it("replays a structural edit and the edits after it in commit order", async () => {
+    const archive = await open(new MemoryHistoryStorage());
+    await archive.initialize(snapshot(), 0);
+
+    await archive.record({
+      ...change(1),
+      operations: [{ op: "addRows", sheet: "sales", at: 0, count: 1 }],
+    });
+    await archive.record(change(2, "inserted"));
+    await archive.record({
+      ...change(3),
+      operations: [
+        {
+          op: "set",
+          addr: { sheet: "sales", row: 1, col: 0 },
+          value: { kind: "formula", src: '=A1&"!"' },
+        },
+      ],
+    });
+    const version = await archive.saveVersion("Rows", "alice", 3 * MINUTE_MS);
+
+    const replayed = await archive.readVersion(version.id);
+    const sheet = replayed.sheets[0];
+    const cells = sheet?.cells[0]?.cells ?? [];
+
+    expect(sheet?.rowCount).toBe(101);
+    expect(cells.map((cell) => [cell.rowOffset, cell.value])).toEqual([
+      [0, { kind: "literal", value: "inserted" }],
+      [1, { kind: "formula", src: '=A1&"!"' }],
+    ]);
+    expect(sheet?.notes).toEqual([{ addr: { sheet: "sales", row: 1, col: 0 }, text: "Baseline" }]);
+  });
+
   it("replays a large version without growing the document engine's memory", async () => {
     const rows = 40_000;
     const text = (row: number) => `${row}:${"history".repeat(28)}`;
