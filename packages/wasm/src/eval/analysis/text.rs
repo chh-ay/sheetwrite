@@ -1,5 +1,5 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
-use rustc_hash::{FxHashMap, FxHashSet};
+use crate::formula_slots::{FormulaResults, FormulaWork};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -667,13 +667,12 @@ pub(super) fn shape(
     args: &[Ast],
     sheet: usize,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let affected = FxHashSet::default();
-    let mut memo = FxHashMap::default();
-    let mut visiting = FxHashSet::default();
+    let affected = FormulaWork::default();
+    let mut results = FormulaResults::default();
+
     let mut pass = EvalPass {
         affected: &affected,
-        memo: &mut memo,
-        visiting: &mut visiting,
+        results: &mut results,
     };
     let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0)?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
