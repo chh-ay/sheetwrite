@@ -38,6 +38,8 @@ mod formula_xlsx;
 mod graph;
 #[cfg(feature = "formula-engine")]
 mod memory;
+#[cfg(feature = "formula-engine")]
+mod permute;
 #[cfg(feature = "analysis")]
 mod pivot;
 #[cfg(feature = "formula-engine")]
@@ -67,6 +69,8 @@ mod formula_syntax_tests;
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod permute_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod sort_order_tests;
 #[cfg(all(test, feature = "formula-engine"))]

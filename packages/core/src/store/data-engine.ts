@@ -66,6 +66,12 @@ import {
   type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { restoreBlockFacts } from "../restore-block.js";
+import {
+  decodeRowOrder,
+  invertRowOrder,
+  isRowPermutation,
+  type PermuteRowsOperation,
+} from "../row-order.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -131,6 +137,7 @@ import {
   workbookTableNameKey,
 } from "../workbook-table.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
+import { permutedHyperlinks, permutedMerges, permutedNotes } from "./permute-rows.js";
 import {
   integerAt,
   mergeCrossesFreeze,
@@ -1951,6 +1958,32 @@ export class StoreDataEngine {
   }
 
   /**
+   * Cells, at their address before the move, whose formula a `permuteRows`
+   * operation adjusts in a way that its inverse cannot undo. History captures
+   * them before the operation applies.
+   */
+  permuteRowsLosses(patch: PermuteRowsOperation): CellAddress[] {
+    const bounds = normalizedRange(patch.range);
+    const order = decodeRowOrder(patch);
+    const handle = this.handles.get(bounds.sheet);
+    if (!order || handle === undefined) return [];
+
+    const cols = bounds.end.col - bounds.start.col + 1;
+    const offsets = this.wasm.permuteRowsLosses(
+      handle,
+      bounds.start.row,
+      bounds.start.col,
+      cols,
+      order,
+    );
+    return Array.from(offsets, (offset) => ({
+      sheet: bounds.sheet,
+      row: bounds.start.row + Math.floor(offset / cols),
+      col: bounds.start.col + (offset % cols),
+    }));
+  }
+
+  /**
    * Capture resolved cells and serializable sources in input order. Rows with
    * the same selected columns share a source read, without capturing the empty
    * bounding rectangle of a sparse selection.
@@ -2735,6 +2768,9 @@ export class StoreDataEngine {
 
       case "moveRows":
         return this.moveRows(patch, changes);
+
+      case "permuteRows":
+        return this.permuteRows(patch);
 
       case "addColumns": {
         const meta = this.sheetMeta(patch.sheet);
@@ -3547,6 +3583,49 @@ export class StoreDataEngine {
     }
 
     return this.restoreMovedNamedFormulas(movedNamedFormulas);
+  }
+
+  /**
+   * Move the rows of a range by the operation's permutation. The engine moves
+   * cells and adjusts their formulas; notes, hyperlinks and merged cells of
+   * the range move here. Nothing changes when a check fails.
+   */
+  private permuteRows(patch: PermuteRowsOperation): boolean {
+    const bounds = normalizedRange(patch.range);
+    const sheet = this.sheetMeta(bounds.sheet);
+    const order = decodeRowOrder(patch);
+    if (
+      bounds.start.row < 0 ||
+      bounds.start.col < 0 ||
+      bounds.end.row >= sheet.rowCount ||
+      bounds.end.col >= sheet.columns.length ||
+      !order ||
+      !isRowPermutation(order)
+    ) {
+      return false;
+    }
+
+    const move = { bounds, targets: invertRowOrder(order) };
+    const merges = permutedMerges(sheet.merges ?? [], move);
+    if (!merges || merges.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
+
+    this.noteRangeMutationFfi(order.length);
+    const status = this.wasm.permuteRows(
+      this.handleOf(bounds.sheet),
+      bounds.start.row,
+      bounds.start.col,
+      bounds.end.col - bounds.start.col + 1,
+      order,
+    );
+    if (status !== 0) return false;
+
+    if (sheet.merges) {
+      sheet.merges = merges;
+      this.spillBlockersDirty.add(bounds.sheet);
+    }
+    if (sheet.notes) sheet.notes = permutedNotes(sheet.notes, move);
+    if (sheet.hyperlinks) sheet.hyperlinks = permutedHyperlinks(sheet.hyperlinks, move);
+    return true;
   }
 
   private moveColumns(

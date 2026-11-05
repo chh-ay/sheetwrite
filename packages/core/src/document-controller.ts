@@ -31,6 +31,13 @@ import {
   encodeMeasuredRestoreBlock,
   estimateRestoreBlockBytes,
 } from "./restore-block.js";
+import {
+  decodeRowOrder,
+  encodeRowOrder,
+  invertRowOrder,
+  type PermuteRowsOperation,
+  ROW_ORDER_ENCODING,
+} from "./row-order.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import {
@@ -551,6 +558,9 @@ export class DocumentController {
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
 
+      case "permuteRows":
+        return this.inversePermutation(patch);
+
       case "addColumns":
         return [
           {
@@ -1070,6 +1080,25 @@ export class DocumentController {
 
       return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
     });
+  }
+
+  /**
+   * The inverse order moves every row back. A formula whose adjusted text
+   * lost a reference (`#REF!`) cannot be adjusted back, so its cell is
+   * captured before the sort and restored after the inverse order.
+   */
+  private inversePermutation(patch: PermuteRowsOperation): DocumentOp[] {
+    const order = decodeRowOrder(patch);
+    if (!order) return [];
+
+    const reverse: PermuteRowsOperation = {
+      op: "permuteRows",
+      range: { ...patch.range, start: { ...patch.range.start }, end: { ...patch.range.end } },
+      encoding: ROW_ORDER_ENCODING,
+      order: encodeRowOrder(invertRowOrder(order)),
+    };
+    const losses = storeEngine(this.options.store)?.permuteRowsLosses(patch) ?? [];
+    return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
   }
 
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
