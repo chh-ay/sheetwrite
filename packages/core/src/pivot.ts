@@ -217,15 +217,9 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
   }
   const measure = ownValue(value, "measure");
   if (measure !== undefined) {
-    if (
-      typeof measure !== "string" ||
-      measure.length === 0 ||
-      measure.length > MAX_PIVOT_NAME_LENGTH ||
-      ownValue(value, "field") !== undefined ||
-      ownValue(value, "aggregation") !== undefined
-    ) {
-      issue(issues, `${path}.measure`, "measure must be an ID without a field or aggregation");
-    }
+    const mixed =
+      ownValue(value, "field") !== undefined || ownValue(value, "aggregation") !== undefined;
+    if (!isBoundedName(measure) || mixed) issue(issues, `${path}.measure`, "Invalid measure value");
   } else {
     if (!isIndex(ownValue(value, "field"), MAX_PIVOT_FIELD_INDEX)) {
       issue(issues, `${path}.field`, "field must be a source column index");
@@ -239,6 +233,11 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
   if (name !== undefined && (typeof name !== "string" || name.length > MAX_PIVOT_NAME_LENGTH)) {
     issue(issues, `${path}.name`, `name must be a string of at most ${MAX_PIVOT_NAME_LENGTH}`);
   }
+}
+
+/** A non-empty string no longer than a pivot name. */
+function isBoundedName(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_PIVOT_NAME_LENGTH;
 }
 
 /** Each field takes at most one filter, and all filters share one value budget. */
@@ -428,7 +427,7 @@ export function validatePivotReferences(
   issues: PivotIssueSink,
 ): void {
   if (!("model" in pivot.source) && pivot.values.some((value) => "measure" in value)) {
-    issue(issues, `${path}.values`, "Measures require a model source");
+    issue(issues, `${path}.values`, "Measures need a model source");
   }
 
   // Deleting every row keeps an anchor at row 0, so an empty sheet still owns it.

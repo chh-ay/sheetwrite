@@ -26,6 +26,7 @@ import {
 } from "../dashboard.js";
 import {
   type DataModelIssue,
+  findMeasure,
   findRelationship,
   validateMeasureAdmission,
   withMeasure,
@@ -3746,7 +3747,7 @@ export class StoreDataEngine {
           const issues: DataModelIssue[] = [];
           validateMeasureAdmission(patch.measure, current, this.workbook.sheets, issues);
           if (issues.length > 0) return false;
-        } else if (!current?.measures?.some((measure) => measure.id === patch.id)) {
+        } else if (!findMeasure(current, patch.id)) {
           return false;
         }
 
