@@ -3,9 +3,9 @@
   "testSet": {
     "version": 1,
     "libraryVersion": "0.6.1",
-    "checksum": "ed5f4987a8525c9d0d1cde4ed8643eadd3b2af2ea0f7217b3ed33347106065a7",
+    "checksum": "330aa3e2d3f96b2306934263b74f3fb26a5994b246bdcae6c6c00fa79d92b20a",
     "totalTests": 2350,
-    "publishedExamples": 198,
+    "publishedExamples": 188,
     "formulaTests": 2000,
     "editSequenceTests": 250,
     "workbookTests": 100,
@@ -682,46 +682,6 @@
       {
         "value": "function:PPMT",
         "label": "Function · PPMT"
-      },
-      {
-        "value": "function:LENB",
-        "label": "Function · LENB"
-      },
-      {
-        "value": "function:LEFTB",
-        "label": "Function · LEFTB"
-      },
-      {
-        "value": "function:RIGHTB",
-        "label": "Function · RIGHTB"
-      },
-      {
-        "value": "function:MIDB",
-        "label": "Function · MIDB"
-      },
-      {
-        "value": "function:REPLACEB",
-        "label": "Function · REPLACEB"
-      },
-      {
-        "value": "function:FINDB",
-        "label": "Function · FINDB"
-      },
-      {
-        "value": "function:SEARCHB",
-        "label": "Function · SEARCHB"
-      },
-      {
-        "value": "function:ASC",
-        "label": "Function · ASC"
-      },
-      {
-        "value": "function:DBCS",
-        "label": "Function · DBCS"
-      },
-      {
-        "value": "function:BAHTTEXT",
-        "label": "Function · BAHTTEXT"
       },
       {
         "value": "operator:subtract",
@@ -7470,317 +7430,7 @@
       "observations": []
     },
     {
-      "position": 990,
-      "id": "formula.function.lenb.normal.1",
-      "label": "LENB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:LENB",
-      "featureLabel": "Function · LENB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=LENB(\"abc\")=3",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "5c76f01a7ab01266a5c0039df226410a3dab259eb53386174e5aa7a728383427",
-      "observations": []
-    },
-    {
       "position": 996,
-      "id": "formula.function.leftb.normal.1",
-      "label": "LEFTB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:LEFTB",
-      "featureLabel": "Function · LEFTB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=LEFTB(\"abc\",2)=\"ab\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "dab8e81c7a0d121e9c622f93cd1e76c9eeca45e9704dac1c6a99a113a2233d91",
-      "observations": []
-    },
-    {
-      "position": 1002,
-      "id": "formula.function.rightb.normal.1",
-      "label": "RIGHTB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:RIGHTB",
-      "featureLabel": "Function · RIGHTB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=RIGHTB(\"abc\",2)=\"bc\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "1ff59f060e506bcc5de88b7a786ad0be808d46f9e71dcf8488c61fb2872cd7b2",
-      "observations": []
-    },
-    {
-      "position": 1008,
-      "id": "formula.function.midb.normal.1",
-      "label": "MIDB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:MIDB",
-      "featureLabel": "Function · MIDB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=MIDB(\"abcd\",2,2)=\"bc\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "894005db7e4c4b646afbc3956dcc59a2f6f2e141ccaec2df26553505b648a72d",
-      "observations": []
-    },
-    {
-      "position": 1014,
-      "id": "formula.function.replaceb.normal.1",
-      "label": "REPLACEB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:REPLACEB",
-      "featureLabel": "Function · REPLACEB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=REPLACEB(\"abc\",2,1,\"x\")=\"axc\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "c0265f10ca82b97b1d243181ae40f7a0845d7ac43d085f2b0f30461699284931",
-      "observations": []
-    },
-    {
-      "position": 1020,
-      "id": "formula.function.findb.normal.1",
-      "label": "FINDB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:FINDB",
-      "featureLabel": "Function · FINDB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=FINDB(\"b\",\"abc\")=2",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "db73d1e4e49f7ff892eaff8deb2008bb3a097e4312c11583a0a78f4aff44b988",
-      "observations": []
-    },
-    {
-      "position": 1026,
-      "id": "formula.function.searchb.normal.1",
-      "label": "SEARCHB · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:SEARCHB",
-      "featureLabel": "Function · SEARCHB",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=SEARCHB(\"B\",\"abc\")=2",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "7c4f2937a5a6884ed8c325bd2f1bb4fb405d050cafb3c4e1d9d4c56e2568d4e0",
-      "observations": []
-    },
-    {
-      "position": 1032,
-      "id": "formula.function.asc.normal.1",
-      "label": "ASC · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:ASC",
-      "featureLabel": "Function · ASC",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=ASC(\"ＡＢＣ\")=\"ABC\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "efa219fe0bc63041e63612d69beb603cc1e7624bf3a66ba1267f3969c5abddd1",
-      "observations": []
-    },
-    {
-      "position": 1038,
-      "id": "formula.function.dbcs.normal.1",
-      "label": "DBCS · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:DBCS",
-      "featureLabel": "Function · DBCS",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=DBCS(\"ABC\")=\"ＡＢＣ\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "6fd27f57d3b6749fd740d528d3ff9e913c8c40f0d7501f99e0146243892c7b34",
-      "observations": []
-    },
-    {
-      "position": 1044,
-      "id": "formula.function.bahttext.normal.1",
-      "label": "BAHTTEXT · Normal",
-      "kind": "formula",
-      "area": "formula",
-      "category": "normal",
-      "family": "text",
-      "behavior": "shared",
-      "featureValue": "function:BAHTTEXT",
-      "featureLabel": "Function · BAHTTEXT",
-      "statusTags": [
-        "local-pass",
-        "result-unavailable"
-      ],
-      "formula": "=BAHTTEXT(0)=\"ศูนย์บาทถ้วน\"",
-      "target": "D4",
-      "inputs": [],
-      "expected": {
-        "type": "boolean",
-        "value": true
-      },
-      "tolerance": {
-        "kind": "exact"
-      },
-      "unsupported": false,
-      "sourceIndex": 12,
-      "evidenceIndex": 11,
-      "testChecksum": "1e1ff4894f827bc2e623b3e84611a7595268f59bc2ec037d936505211e4f433e",
-      "observations": []
-    },
-    {
-      "position": 1056,
       "id": "formula.operator.subtract.normal.1",
       "label": "subtract · Normal",
       "kind": "formula",
@@ -7811,7 +7461,7 @@
       "observations": []
     },
     {
-      "position": 1068,
+      "position": 1008,
       "id": "formula.operator.divide.normal.1",
       "label": "divide · Normal",
       "kind": "formula",
@@ -7842,7 +7492,7 @@
       "observations": []
     },
     {
-      "position": 1074,
+      "position": 1014,
       "id": "formula.operator.power.normal.1",
       "label": "power · Normal",
       "kind": "formula",
@@ -7873,7 +7523,7 @@
       "observations": []
     },
     {
-      "position": 1080,
+      "position": 1020,
       "id": "formula.operator.concatenate.normal.1",
       "label": "concatenate · Normal",
       "kind": "formula",
@@ -7904,7 +7554,7 @@
       "observations": []
     },
     {
-      "position": 1086,
+      "position": 1026,
       "id": "formula.operator.equal.normal.1",
       "label": "equal · Normal",
       "kind": "formula",
@@ -7935,7 +7585,7 @@
       "observations": []
     },
     {
-      "position": 1092,
+      "position": 1032,
       "id": "formula.operator.not-equal.normal.1",
       "label": "not-equal · Normal",
       "kind": "formula",
@@ -7966,7 +7616,7 @@
       "observations": []
     },
     {
-      "position": 1098,
+      "position": 1038,
       "id": "formula.operator.less-than.normal.1",
       "label": "less-than · Normal",
       "kind": "formula",
@@ -7997,7 +7647,7 @@
       "observations": []
     },
     {
-      "position": 1104,
+      "position": 1044,
       "id": "formula.operator.less-than-or-equal.normal.1",
       "label": "less-than-or-equal · Normal",
       "kind": "formula",
@@ -8028,7 +7678,7 @@
       "observations": []
     },
     {
-      "position": 1110,
+      "position": 1050,
       "id": "formula.operator.greater-than.normal.1",
       "label": "greater-than · Normal",
       "kind": "formula",
@@ -8059,7 +7709,7 @@
       "observations": []
     },
     {
-      "position": 1116,
+      "position": 1056,
       "id": "formula.operator.greater-than-or-equal.normal.1",
       "label": "greater-than-or-equal · Normal",
       "kind": "formula",
@@ -8090,7 +7740,7 @@
       "observations": []
     },
     {
-      "position": 1122,
+      "position": 1062,
       "id": "formula.operator.percent.normal.1",
       "label": "percent · Normal",
       "kind": "formula",
@@ -8121,7 +7771,7 @@
       "observations": []
     },
     {
-      "position": 1128,
+      "position": 1068,
       "id": "formula.operator.unary-plus.normal.1",
       "label": "unary-plus · Normal",
       "kind": "formula",
@@ -8152,7 +7802,7 @@
       "observations": []
     },
     {
-      "position": 1134,
+      "position": 1074,
       "id": "formula.operator.unary-minus.normal.1",
       "label": "unary-minus · Normal",
       "kind": "formula",
@@ -8183,7 +7833,7 @@
       "observations": []
     },
     {
-      "position": 1140,
+      "position": 1080,
       "id": "formula.operator.intersection.normal.1",
       "label": "intersection · Normal",
       "kind": "formula",
@@ -8239,7 +7889,7 @@
       "observations": []
     },
     {
-      "position": 1146,
+      "position": 1086,
       "id": "formula.operator.union.normal.1",
       "label": "union · Normal",
       "kind": "formula",
