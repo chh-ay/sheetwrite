@@ -24,7 +24,8 @@ export type CapabilityOwnerId =
   | "data-tools"
   | "host-rows"
   | "spreadsheet"
-  | "analysis";
+  | "analysis"
+  | "sort";
 
 export type CapabilityArea =
   | "editing"
@@ -211,6 +212,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.analysis.tsx",
     responsibility:
       "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
+    kind: "capability",
+  },
+  {
+    id: "sort",
+    label: "Sort in place",
+    href: "/showcases/sort/",
+    routeFile: "docs/src/routes/showcases.sort.tsx",
+    responsibility:
+      "Excel's in-place sort of a range by several keys, the Sort panel, and the view-only sort, with formulas that read the sorted cells.",
     kind: "capability",
   },
 ];
@@ -541,6 +551,21 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
     boundary:
       "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
+  },
+  {
+    id: "data.sort-in-place",
+    title: "Sort in place",
+    area: "modeling",
+    primary: "sort",
+    interaction:
+      "Sort 40 orders in place by one or two keys, then sort the view only; formulas that read row 1 follow the in-place sort and keep their value under the view sort.",
+    scope: "browser",
+    accessibility:
+      "Labeled buttons, a polite status of moved rows, and the formula results as text in the side panel.",
+    testPath: "test/browser/showcase-sort.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/sort.ts"],
+    boundary:
+      "Sorting runs on the client document; servers that validate operations must accept `permuteRows` and the `sort` commit reason.",
   },
   {
     id: "workflow.ribbon",

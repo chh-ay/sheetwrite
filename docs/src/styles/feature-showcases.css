@@ -1,0 +1,21 @@
+/* Side-panel pieces shared by the 0.7.0 feature showcases (feature-controls.tsx). */
+.sw-feature-actions {
+  display: grid;
+  gap: var(--sw-space-2);
+}
+
+.sw-feature-button {
+  justify-content: flex-start;
+  width: 100%;
+  text-align: start;
+}
+
+.sw-feature-button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Two buttons side by side, such as Undo and Redo. */
+.sw-feature-actions[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

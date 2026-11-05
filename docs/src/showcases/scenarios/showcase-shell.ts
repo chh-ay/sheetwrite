@@ -1,0 +1,69 @@
+import type { Grid, GridOptions } from "@sheetwrite/core";
+import { createSpreadsheetShell } from "@sheetwrite/core/shell";
+
+import { initFullEngine, whenStylesReady } from "../../lib/full-engine.js";
+import { observeSiteTheme } from "../../lib/site-theme.js";
+import { siteGridTheme } from "../site-grid-theme.js";
+
+/** A spreadsheet shell with the site's theme, as the feature showcases mount it. */
+export interface ShowcaseShell {
+  readonly grid: Grid;
+  readonly element: HTMLElement;
+  dispose(): void;
+}
+
+/**
+ * Select the full engine, then mount the spreadsheet shell (ribbon, name box,
+ * formula bar, sheet tabs) in `host` with the site's colours, following the
+ * site theme. Resolves `null` when the page reloads to select the engine or
+ * `signal` aborted first; create nothing then.
+ */
+export async function mountShowcaseShell(
+  host: HTMLElement,
+  grid: Omit<GridOptions, "theme">,
+  signal: AbortSignal,
+): Promise<ShowcaseShell | null> {
+  if (!(await initFullEngine())) return null;
+  await whenStylesReady();
+  if (signal.aborted) return null;
+
+  const shell = createSpreadsheetShell(host, {
+    ribbon: { mode: "auto" },
+    grid: { ...grid, theme: siteGridTheme() },
+  });
+  const stopTheme = observeSiteTheme(() => shell.setTheme(siteGridTheme()));
+
+  return {
+    grid: shell.grid,
+    element: shell.element,
+    dispose() {
+      stopTheme();
+      shell.destroy();
+    },
+  };
+}
+
+/** Throws with the transaction's first issue, so a broken setup shows on the page. */
+export function requireApplied(
+  result: { status: string; issues?: ReadonlyArray<{ message: string }> },
+  what: string,
+): void {
+  if (result.status === "applied") return;
+
+  throw new Error(`${what} failed: ${result.issues?.[0]?.message ?? result.status}`);
+}
+
+/** The listeners of a scenario's snapshot. */
+export function createListeners() {
+  const listeners = new Set<() => void>();
+
+  return {
+    subscribe(listener: () => void): () => void {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    notify(): void {
+      for (const listener of listeners) listener();
+    },
+  };
+}
