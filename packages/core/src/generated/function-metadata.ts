@@ -179,6 +179,7 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"inumber1","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"inumber2","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"inumber","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"number","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"inumber","types":["scalar","range","array","reference"],"optional":false,"repeating":true}],"returnKind":"scalar"},
+    {"arguments":[{"name":"x","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"n","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -575,5 +576,9 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["IMSUB",11,157,4],
     ["IMSUM",11,159,4],
     ["IMTAN",11,156,4],
+    ["BESSELI",11,160,4],
+    ["BESSELJ",11,160,4],
+    ["BESSELK",11,160,4],
+    ["BESSELY",11,160,4],
   ],
 };
