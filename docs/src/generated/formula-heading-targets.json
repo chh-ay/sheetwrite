@@ -189,6 +189,10 @@
   "semantics-analysis-database": "/docs/reference/formula-functions/database/#semantics-analysis-database",
   "dialect-analysis-database": "/docs/reference/formula-functions/database/#dialect-analysis-database",
   "implementation-analysis-database": "/docs/reference/formula-functions/database/#implementation-analysis-database",
+  "signature-convert": "/docs/reference/formula-functions/engineering/#signature-convert",
+  "semantics-analysis-engineering": "/docs/reference/formula-functions/engineering/#semantics-analysis-engineering",
+  "dialect-analysis-engineering": "/docs/reference/formula-functions/engineering/#dialect-analysis-engineering",
+  "implementation-analysis-engineering": "/docs/reference/formula-functions/engineering/#implementation-analysis-engineering",
   "dynamic-array": "/docs/reference/formula-functions/array/",
   "date-and-time": "/docs/reference/formula-functions/date-time/",
   "financial": "/docs/reference/formula-functions/financial/",
@@ -198,5 +202,6 @@
   "math-and-trigonometry": "/docs/reference/formula-functions/math/",
   "statistical": "/docs/reference/formula-functions/statistical/",
   "text": "/docs/reference/formula-functions/text/",
-  "database": "/docs/reference/formula-functions/database/"
+  "database": "/docs/reference/formula-functions/database/",
+  "engineering": "/docs/reference/formula-functions/engineering/"
 }

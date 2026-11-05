@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **250 supported**, **93 partly supported**, and **177 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **251 supported**, **93 partly supported**, and **176 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -136,7 +136,7 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 | [`BITRSHIFT`](https://support.microsoft.com/en-us/excel/functions/bitrshift-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BITXOR`](https://support.microsoft.com/en-us/excel/functions/bitxor-function) | Not supported | Not supported | Not registered in either engine. |
 | [`COMPLEX`](https://support.microsoft.com/en-us/excel/functions/complex-function) | Not supported | Not supported | Not registered in either engine. |
-| [`CONVERT`](https://support.microsoft.com/en-us/excel/functions/convert-function) | Not supported | Not supported | Not registered in either engine. |
+| [`CONVERT`](https://support.microsoft.com/en-us/excel/functions/convert-function) | Supported | Not supported | Lite engine: not registered. CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits. [Contract](/docs/reference/formula-functions/engineering/) |
 | [`DEC2BIN`](https://support.microsoft.com/en-us/excel/functions/dec2bin-function) | Not supported | Not supported | Not registered in either engine. |
 | [`DEC2HEX`](https://support.microsoft.com/en-us/excel/functions/dec2hex-function) | Not supported | Not supported | Not registered in either engine. |
 | [`DEC2OCT`](https://support.microsoft.com/en-us/excel/functions/dec2oct-function) | Not supported | Not supported | Not registered in either engine. |
