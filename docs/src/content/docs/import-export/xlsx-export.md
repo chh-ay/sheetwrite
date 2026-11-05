@@ -68,7 +68,8 @@ workbooks and workbooks with only range names do not load the formula engine.
 | Named ranges and native booleans | Preserved. |
 | HTTPS/mailto and internal range hyperlinks | Preserved, with stable IDs in Sheetwrite metadata. |
 | Supported ordered conditional formats | Native rules preserve priority and stop behavior. |
-| Tables | Autofilter rules, sort state, calculated-column formulas and totals-row functions round-trip. |
+| Tables | Autofilter rules, sort state, calculated-column formulas and totals-row functions round-trip. An in-place sort of a table body records the table sort state, as Excel does. |
+| Sorting | An in-place sort writes the cells in their sorted rows, so the file opens sorted. A view sort writes the cells in source order and the worksheet `sortState`; Sheetwrite reads it back from its own metadata. An imported worksheet `sortState` is kept and written back, but not applied. |
 | Validation | Sheetwrite metadata preserved; supported list/numeric/date/text-length rules also emit native Excel validation. |
 | Protected ranges | Metadata preserved; no Excel sheet-protection claim is made. |
 | Cell notes | Metadata preserved and native Excel notes emitted. |

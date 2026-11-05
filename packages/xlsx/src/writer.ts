@@ -484,6 +484,24 @@ function appendTableRule(
 
 type WrittenTable = NonNullable<SheetSnapshot["tables"]>[number];
 
+/** A1 references such as `A2:C9` or `B2`; `$` markers are accepted. */
+const A1_REFERENCE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?$/u;
+
+/** Whether every `ref` in a kept worksheet `sortState` lies inside the sheet. */
+function sortStateFits(rule: WorkbookTableXmlElement, rows: number, cols: number): boolean {
+  const reference = rule.attributes.ref;
+  if (reference !== undefined) {
+    const match = A1_REFERENCE.exec(reference);
+    if (!match) return false;
+
+    const [, startCol = "", startRow, endCol = startCol, endRow = startRow] = match;
+    const lastCol = Math.max(labelToCol(startCol.toUpperCase()), labelToCol(endCol.toUpperCase()));
+    const lastRow = Math.max(Number(startRow), Number(endRow));
+    if (lastCol >= cols || lastRow > rows) return false;
+  }
+  return rule.children.every((child) => sortStateFits(child, rows, cols));
+}
+
 /**
  * Re-anchor stored autofilter and sort references to the table's current
  * rectangle. Row and column edits move `table.range` but not these strings,
@@ -812,6 +830,17 @@ function* writeSheet(
       );
     }
     xml.append("</sortState>");
+  } else if (sheet.sortState) {
+    if (sortStateFits(sheet.sortState, sheet.rowCount, sheet.columns.length)) {
+      appendTableRule(xml, sheet.sortState, styles);
+    } else {
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message:
+          "The imported worksheet sortState refers to cells outside the sheet and was dropped",
+        sheet: sheet.name,
+      });
+    }
   }
   if (sheet.merges?.length) {
     xml.append(`<mergeCells count="${sheet.merges.length}">`);
