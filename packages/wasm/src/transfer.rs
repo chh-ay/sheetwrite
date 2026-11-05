@@ -337,15 +337,11 @@ impl<'a> Reader<'a> {
     }
 
     pub(crate) fn error(&mut self) -> TransferResult<Option<FormulaError>> {
-        use FormulaError::*;
         match self.u32()? {
             u32::MAX => Ok(None),
-            value @ 0..=10 => Ok(Some(
-                [
-                    Cycle, DivZero, Ref, Num, Value, Name, Na, Spill, Calc, Loading, Null,
-                ][value as usize],
-            )),
-            _ => Err("invalid transfer error".into()),
+            slot => FormulaError::from_slot(u64::from(slot))
+                .map(Some)
+                .ok_or_else(|| "invalid transfer error".into()),
         }
     }
 

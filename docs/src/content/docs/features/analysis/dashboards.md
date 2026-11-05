@@ -8,13 +8,17 @@ A dashboard is a sheet of the workbook with `kind: "dashboard"`. It has a tab, a
 - a **pivot** item shows a pivot of the same sheet,
 - a **slicer** item lists the values of one table column and holds the values that pass.
 
-A dashboard view, slicer filtering, charts and KPI cards follow in later releases ([#231](https://github.com/chh-ay/sheetwrite/issues/231)).
+Slicer filtering, charts and KPI cards follow in later releases ([#231](https://github.com/chh-ay/sheetwrite/issues/231)).
 
 ## Add a dashboard
+
+**Insert › New Dashboard** adds a dashboard sheet named `Dashboard1`, `Dashboard2`, and so on, and shows it. Hosts can do the same with `grid.actions.newDashboard()`, or choose the name:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.addSheet({ name: "Report", kind: "dashboard" });
 ```
+
+On a dashboard, **Insert › PivotTable** asks for the table to analyze. It adds a pivot over that table and an item that shows it in the first free place, in one undo step, and opens the field list.
 
 A dashboard snapshot has `rowCount: 0`, no columns and no cells. Cell, row, column, table and sheet-format operations that target a dashboard leave it unchanged. Its pivots read a table or the data model, not a range, because slicers filter tables.
 
@@ -104,6 +108,15 @@ store.setDashboardItem("dash", {
 | `title` | The caption of a slicer; absent shows the column name. |
 
 Items do not overlap, and a dashboard holds at most 64 items. They are kept in reading order: by `box.y`, then by `box.x`.
+
+## The dashboard view
+
+While a dashboard is the active sheet, the grid shows its items over the cells. The toolbar, the side panel and the sheet tabs stay as they are. The view loads as its own chunk the first time a dashboard is shown.
+
+- A pivot item shows the pivot's result as a table. Pivots on a dashboard compute without placing output in cells. With the default engine, the item says that it needs the full engine.
+- A slicer item lists the values of its column. A click keeps one value, and Ctrl or Cmd with a click adds or removes a value; a slicer always keeps at least one value. **Clear** keeps every value. Each change is saved with the item.
+- Drag an item's header to move it, and drag its bottom-right corner to resize it. With the keyboard, open the item's actions menu, choose **Move** or **Resize**, then use the arrow keys; Enter or Escape ends. Each drop or arrow step is one undo step. A place that another item holds is refused, and the view says so.
+- In a read-only grid, items cannot move, resize or change.
 
 ## Undo and collaboration
 

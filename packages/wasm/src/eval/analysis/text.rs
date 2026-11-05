@@ -2,7 +2,9 @@
 use crate::formula_slots::{FormulaResults, FormulaWork};
 use std::rc::Rc;
 
-use regex_lite::{Captures, Regex, RegexBuilder};
+use regex_lite::{Captures, Regex};
+
+use super::super::regex_patterns::build_regex;
 
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS};
 use super::super::number_format::{format_number, general_text, round_decimal, Rounding};
@@ -27,13 +29,13 @@ pub(crate) const NAMES: &[&str] = &[
 const MAX_TEXT_CHARS: usize = 32_767;
 const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 const MAX_MATCH_WORK: usize = 2_000_000;
-const MAX_REGEX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_DECIMALS: i64 = 127;
 
 struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
     pass: &'a mut EvalPass<'p>,
+    /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
 }
 impl Context<'_, '_> {
@@ -372,47 +374,24 @@ fn to_text(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Va
     }
     text_value(output)
 }
-/// `regex-lite` folds case for ASCII only, so a case-insensitive pattern with
-/// a non-ASCII cased character or a code point escape could give a wrong match.
-fn needs_unicode_case(pattern: &str, insensitive: bool) -> bool {
-    let folds = insensitive
-        || pattern.split("(?").skip(1).any(|group| {
-            group
-                .split(|c: char| !c.is_ascii_alphabetic())
-                .next()
-                .is_some_and(|flags| flags.contains('i'))
-        });
-    folds
-        && (pattern
-            .chars()
-            .any(|c| !c.is_ascii() && (c.to_lowercase().ne([c]) || c.to_uppercase().ne([c])))
-            || ["\\x", "\\u", "\\U"]
-                .iter()
-                .any(|escape| pattern.contains(escape)))
-}
-
-/// The compiled program for `pattern`. Formulas in one recalculation that use
-/// the same pattern and case mode share one program, which the pass drops when
-/// it ends, so no regex memory outlives the recalculation.
+/// The compiled program for a REGEX call's pattern. A literal pattern uses
+/// the program its formulas share. A computed pattern uses the program this
+/// recalculation keeps for it, which the pass drops when it ends.
 fn compile_regex(
     results: &mut FormulaResults,
+    args: &[Ast],
     pattern: &str,
     insensitive: bool,
 ) -> Result<Rc<Regex>, FormulaError> {
+    if let Some(Ast::RegexPattern(shared)) = args.get(1) {
+        return shared.program(insensitive);
+    }
+
     if let Some(regex) = results.pass_regex(pattern, insensitive) {
         return Ok(regex);
     }
 
-    if needs_unicode_case(pattern, insensitive) {
-        return Err(FormulaError::Value);
-    }
-
-    let regex = RegexBuilder::new(pattern)
-        .case_insensitive(insensitive)
-        .size_limit(MAX_REGEX_BYTES)
-        .build()
-        .map_err(|_| FormulaError::Value)?;
-    let regex = Rc::new(regex);
+    let regex = build_regex(pattern, insensitive)?;
     results.share_regex(pattern, insensitive, Rc::clone(&regex));
     Ok(regex)
 }
@@ -470,7 +449,7 @@ fn regex_scalar(
     let text = context.text(args, 0, "")?;
     let pattern = context.text(args, 1, "")?;
     let insensitive = mode(context, args, if name == "REGEXREPLACE" { 4 } else { 2 })?;
-    let regex = compile_regex(context.pass.results, &pattern, insensitive)?;
+    let regex = compile_regex(context.pass.results, args, &pattern, insensitive)?;
     if name == "REGEXTEST" {
         return Ok(Value::Bool(regex.is_match(&text)));
     }
@@ -504,7 +483,7 @@ fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, Fo
         return Err(FormulaError::Value);
     }
     let insensitive = mode(context, args, 3)?;
-    let regex = compile_regex(context.pass.results, &pattern, insensitive)?;
+    let regex = compile_regex(context.pass.results, args, &pattern, insensitive)?;
     let mut values = Vec::new();
     if return_mode == 1.0 {
         for matched in regex.find_iter(&text) {

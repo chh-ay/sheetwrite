@@ -718,6 +718,12 @@ pub enum Ast {
         cols: usize,
         values: std::rc::Rc<Vec<crate::types::Value>>,
     },
+    /// The literal pattern of a REGEX call, shared by every formula in the
+    /// store with the same pattern text. Its compiled programs live as long
+    /// as the formulas that hold it.
+    #[cfg(feature = "analysis")]
+    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
     Name(String),
     NamedRange(NamedRangeRef),
     /// A defined name that holds a formula. Shared, because one name can be
@@ -774,6 +780,42 @@ impl Ast {
         }
     }
 
+    /// Whether `test` holds for a direct child expression: a function
+    /// argument, an operand, or the expression a LET use stands for. A named
+    /// formula's expression is its own definition, not a child; a walker that
+    /// follows names matches `Ast::NamedFormula` itself. Every node kind is
+    /// listed, so a new kind must say whether it has children.
+    pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Ast) -> bool) -> bool {
+        match self {
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(test),
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => test(left) || test(right),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => test(inner),
+            Ast::LetSlot { expression, .. } => test(expression),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } => false,
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => false,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Array { .. } => false,
+        }
+    }
+
     /// Heap payload owned below an inline AST root. The root itself is already
     /// included in its formula hash-table bucket.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
@@ -782,6 +824,9 @@ impl Ast {
             Ast::BoundMatrix { values, .. } => {
                 out.add_vec::<crate::types::Value>(values.len(), values.capacity());
             }
+            // The store's pattern index counts each shared pattern once.
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => {}
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
             // A shared expansion is counted once, by the store's cache that
@@ -2086,16 +2131,10 @@ pub(crate) fn place_span(span: &mut SheetSpanRef, order: &[u32]) -> bool {
     true
 }
 
+/// Whether the formula's own tree holds a 3-D reference; a defined name's
+/// spans belong to the name, which `refresh_sheet_spans` does not rewrite.
 pub(crate) fn ast_contains_sheet_span(ast: &Ast) -> bool {
-    match ast {
-        Ast::SheetSpan(_) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_sheet_span),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_contains_sheet_span(left) || ast_contains_sheet_span(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_sheet_span(inner),
-        _ => false,
-    }
+    matches!(ast, Ast::SheetSpan(_)) || ast.any_child(&mut ast_contains_sheet_span)
 }
 
 /// Re-places every 3-D reference in `ast` after tabs were moved, inserted or
@@ -2576,6 +2615,8 @@ fn translate_relative_refs_inner(
         | Ast::Array { .. } => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(_) => true,
     }
 }
 
@@ -3086,6 +3127,8 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),
         Ast::Array { cols, values } => {
             out.push('{');
@@ -3280,7 +3323,8 @@ fn write_a1(row: u32, col: u32, flags: RefFlags, out: &mut String) {
     out.push_str(&(u64::from(row) + 1).to_string());
 }
 
-fn write_col(mut col: u32, out: &mut String) {
+/// Append the A1 letters of a 0-based column (`0` → `A`, `26` → `AA`).
+pub(crate) fn write_col(mut col: u32, out: &mut String) {
     let mut letters = [0u8; 7];
     let mut index = letters.len();
     loop {
