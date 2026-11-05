@@ -1,6 +1,5 @@
 // Uniform row geometry stays arithmetic and allocation-free. The first non-default
-// height materializes parallel height/Fenwick arrays for O(log n) updates and lookups;
-// structural rebuilds remain O(n) and are rare.
+// height materializes parallel height/Fenwick arrays for O(log n) updates and lookups.
 
 export class OffsetIndex {
   private n: number;
@@ -53,15 +52,6 @@ export class OffsetIndex {
 
   get totalHeight(): number {
     return this.total;
-  }
-
-  get defaultRowHeight(): number {
-    return this.defaultHeight;
-  }
-
-  /** Bytes reserved by the optional dense typed-array backing stores. */
-  get backingStoreBytes(): number {
-    return (this.heights?.byteLength ?? 0) + (this.tree?.byteLength ?? 0);
   }
 
   heightOf(row: number): number {
@@ -126,52 +116,6 @@ export class OffsetIndex {
     }
     // `pos` rows fit entirely above `offset`, so `offset` is inside row `pos`.
     return { row: pos, top: offset - remaining };
-  }
-
-  insertRows(at: number, count: number, height = this.defaultHeight): void {
-    if (count <= 0) return;
-    const clamp = Math.max(0, Math.min(at, this.n));
-    const heights = this.heights;
-    if (!heights) {
-      this.n += count;
-      if (height === this.defaultHeight) {
-        this.total = this.n * this.defaultHeight;
-        return;
-      }
-      const next = new Float64Array(this.n);
-      next.fill(this.defaultHeight);
-      next.fill(height, clamp, clamp + count);
-      this.heights = next;
-      this.tree = new Float64Array(this.n + 1);
-      this.build();
-      return;
-    }
-    const next = new Float64Array(this.n + count);
-    next.set(heights.subarray(0, clamp), 0);
-    next.fill(height, clamp, clamp + count);
-    next.set(heights.subarray(clamp), clamp + count);
-    this.heights = next;
-    this.n += count;
-    this.tree = new Float64Array(this.n + 1);
-    this.build();
-  }
-
-  removeRows(at: number, count: number): void {
-    if (count <= 0 || at >= this.n) return;
-    const c = Math.min(count, this.n - at);
-    const heights = this.heights;
-    if (!heights) {
-      this.n -= c;
-      this.total = this.n * this.defaultHeight;
-      return;
-    }
-    const next = new Float64Array(this.n - c);
-    next.set(heights.subarray(0, at), 0);
-    next.set(heights.subarray(at + c), at);
-    this.heights = next;
-    this.n -= c;
-    this.tree = new Float64Array(this.n + 1);
-    this.build();
   }
 }
 

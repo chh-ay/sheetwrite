@@ -975,15 +975,6 @@ export class StoreDataEngine {
     this.pivotSheetsDirty.clear();
   }
 
-  private spillAnchor(addr: CellAddress): CellAddress | null {
-    const handle = this.handleOf(addr.sheet);
-    const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
-    if (row === NO_CELL_COORDINATE) return null;
-    const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
-    if (col === NO_CELL_COORDINATE) return null;
-    return { sheet: addr.sheet, row, col };
-  }
-
   private admitsSourceRange(range: Range): boolean {
     const bounds = normalizedRange(range);
     return this.wasm.admitSourceRange(
@@ -1634,7 +1625,7 @@ export class StoreDataEngine {
       const range = savedOutputRange(sheet, pivot);
       if (!range) continue;
       // An installed output owns its anchor; a blocked one does not.
-      const owner = this.spillAnchor({ sheet, row: range.start.row, col: range.start.col });
+      const owner = this.getSpillAnchor({ sheet, row: range.start.row, col: range.start.col });
       if (owner && owner.row === range.start.row && owner.col === range.start.col) {
         outputs.push({ id: pivot.id, range });
       }
@@ -1663,7 +1654,7 @@ export class StoreDataEngine {
     if (!record) {
       const result = uncomputedPivotResult(sheet, pivot);
       if (!pivot.savedOutput) return result;
-      const owner = this.spillAnchor({ sheet, ...pivot.anchor });
+      const owner = this.getSpillAnchor({ sheet, ...pivot.anchor });
       if (owner && owner.row === pivot.anchor.row && owner.col === pivot.anchor.col) return result;
       return { ...result, status: "error", error: "#SPILL!", rows: 0, cols: 0, cells: [] };
     }
@@ -1731,16 +1722,12 @@ export class StoreDataEngine {
     }
   }
 
-  private rawCell(addr: CellAddress): ResolvedCell {
+  getCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.handleOf(addr.sheet), addr.row, addr.col);
     const resolved = resolvedScalar(cell.kind, cell.num, cell.string ?? null);
     const style = this.styles.get(cell.style);
     cell.free();
     return { resolved, style };
-  }
-
-  getCell(addr: CellAddress): ResolvedCell {
-    return this.rawCell(addr);
   }
 
   /** The formula source at `addr`, or null if the cell isn't a formula. */
@@ -1750,7 +1737,12 @@ export class StoreDataEngine {
 
   /** The owning formula anchor for a spill cell, including the anchor itself. */
   getSpillAnchor(addr: CellAddress): CellAddress | null {
-    return this.spillAnchor(addr);
+    const handle = this.handleOf(addr.sheet);
+    const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
+    if (row === NO_CELL_COORDINATE) return null;
+    const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
+    if (col === NO_CELL_COORDINATE) return null;
+    return { sheet: addr.sheet, row, col };
   }
 
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
@@ -2728,7 +2720,6 @@ export class StoreDataEngine {
 
       this.flushSpillBlockers();
       this.flushPivots();
-      if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
       this.rangeMutationStats.documentOperations += appliedPatches.length;
       this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
 
@@ -3362,7 +3353,7 @@ export class StoreDataEngine {
         return this.addSheetSnapshot(patch.sheet, changes);
 
       case "removeSheet":
-        return this.removeSheetSnapshot(patch.sheet, changes);
+        return this.removeSheetSnapshot(patch.sheet);
 
       case "renameSheet": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
@@ -4367,7 +4358,7 @@ export class StoreDataEngine {
     return true;
   }
 
-  private removeSheetSnapshot(sheetId: SheetId, _changes: ChangeEvent["changes"] | null): boolean {
+  private removeSheetSnapshot(sheetId: SheetId): boolean {
     const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
     if (index < 0 || this.workbook.sheets.length <= 1) return false;
     const removed = this.workbook.sheets[index]!;
@@ -4826,15 +4817,13 @@ export class StoreDataEngine {
   /** Rewrite resolved formula sheet identity without changing the stable WASM handle. */
   renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
     const handle = this.handleOf(sheet);
-    if (!this.wasm.renameSheet(handle, sheet, name)) return false;
-    return true;
+    return this.wasm.renameSheet(handle, sheet, name);
   }
 
   /** Tombstone a stable WASM handle and rewrite surviving formulas to `#REF!`. */
   removeSheetFormulaIdentity(sheet: SheetId): boolean {
     const handle = this.handleOf(sheet);
-    if (!this.wasm.removeSheet(handle)) return false;
-    return true;
+    return this.wasm.removeSheet(handle);
   }
 
   /** Give the engine the tab order, which 3-D references such as `Sheet1:Sheet3!A1` span. */

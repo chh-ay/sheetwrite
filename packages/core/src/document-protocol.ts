@@ -2711,20 +2711,10 @@ interface MergeIntervalNode {
   maxIndex: number;
 }
 
-export interface MergeValidationStats {
-  normalized: number;
+/** Work counters a caller may pass to `overlappingMergeIndices` to observe its cost. */
+export interface MergeScanStats {
+  /** Interval-tree nodes visited while searching for overlaps. */
   nodeVisits: number;
-  errors: number;
-}
-
-let lastMergeValidationStats: MergeValidationStats = {
-  normalized: 0,
-  nodeVisits: 0,
-  errors: 0,
-};
-
-export function getLastMergeValidationStatsForTest(): MergeValidationStats {
-  return { ...lastMergeValidationStats };
 }
 
 function mergeNodeHeight(node: MergeIntervalNode | null): number {
@@ -2818,35 +2808,40 @@ function removeMergeNode(
 function lowerIndexOverlap(
   node: MergeIntervalNode | null,
   rect: IndexedMerge,
+  stats: MergeScanStats | undefined,
 ): IndexedMerge | null {
   if (!node || node.maxC1 < rect.c0 || node.minIndex >= rect.index) return null;
-  lastMergeValidationStats.nodeVisits += 1;
-  const left = lowerIndexOverlap(node.left, rect);
+  if (stats) stats.nodeVisits += 1;
+  const left = lowerIndexOverlap(node.left, rect, stats);
   if (left) return left;
   if (node.rect.index < rect.index && node.rect.c0 <= rect.c1 && node.rect.c1 >= rect.c0) {
     return node.rect;
   }
   if (node.rect.c0 > rect.c1) return null;
-  return lowerIndexOverlap(node.right, rect);
+  return lowerIndexOverlap(node.right, rect, stats);
 }
 
 function higherIndexOverlap(
   node: MergeIntervalNode | null,
   rect: IndexedMerge,
+  stats: MergeScanStats | undefined,
 ): IndexedMerge | null {
   if (!node || node.maxC1 < rect.c0 || node.maxIndex <= rect.index) return null;
-  lastMergeValidationStats.nodeVisits += 1;
-  const left = higherIndexOverlap(node.left, rect);
+  if (stats) stats.nodeVisits += 1;
+  const left = higherIndexOverlap(node.left, rect, stats);
   if (left) return left;
   if (node.rect.index > rect.index && node.rect.c0 <= rect.c1 && node.rect.c1 >= rect.c0) {
     return node.rect;
   }
   if (node.rect.c0 > rect.c1) return null;
-  return higherIndexOverlap(node.right, rect);
+  return higherIndexOverlap(node.right, rect, stats);
 }
 
 /** Flags every merge that overlaps another merge, in O(n log n) with an interval tree. */
-export function overlappingMergeIndices(merges: readonly MergeRange[]): boolean[] {
+export function overlappingMergeIndices(
+  merges: readonly MergeRange[],
+  stats?: MergeScanStats,
+): boolean[] {
   const indexed: IndexedMerge[] = merges.map((merge, index) => ({ ...merge, index }));
   const starts = indexed
     .slice()
@@ -2866,12 +2861,12 @@ export function overlappingMergeIndices(merges: readonly MergeRange[]): boolean[
       unflagged = removeMergeNode(unflagged, expired);
     }
 
-    if (lowerIndexOverlap(active, rect)) overlapping[rect.index] = true;
-    let later = higherIndexOverlap(unflagged, rect);
+    if (lowerIndexOverlap(active, rect, stats)) overlapping[rect.index] = true;
+    let later = higherIndexOverlap(unflagged, rect, stats);
     while (later) {
       overlapping[later.index] = true;
       unflagged = removeMergeNode(unflagged, later);
-      later = higherIndexOverlap(unflagged, rect);
+      later = higherIndexOverlap(unflagged, rect, stats);
     }
 
     active = insertMergeNode(active, rect);
@@ -3154,7 +3149,6 @@ function validateSnapshotPivots(
 
 function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
-  lastMergeValidationStats = { normalized: 0, nodeVisits: 0, errors: 0 };
   const candidate = recordAt(input, "$", errors);
   if (!candidate) return { ok: false, errors };
 
@@ -3253,7 +3247,6 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const merges: MergeRange[] = [];
     for (const [mergeIndex, sourceMerge] of (sheet.merges ?? []).entries()) {
       const merge = normalizedMerge(sourceMerge);
-      lastMergeValidationStats.normalized += 1;
       const mergePath = `${path}.merges[${mergeIndex}]`;
       if (merge.r1 >= sheet.rowCount || merge.c1 >= sheet.columns.length) {
         invalid(errors, mergePath, "Merge lies outside the sheet", "out-of-bounds");
@@ -3265,7 +3258,6 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const overlappingMerges = overlappingMergeIndices(merges);
     for (let mergeIndex = 0; mergeIndex < overlappingMerges.length; mergeIndex++) {
       if (!overlappingMerges[mergeIndex]) continue;
-      lastMergeValidationStats.errors += 1;
       invalid(
         errors,
         `${path}.merges[${mergeIndex}]`,
