@@ -47,6 +47,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-get-window-rows"><code>getWindowRows</code></a>
 <a href="#cell-store-import-range-memory-state"><code>importRangeMemoryState</code></a>
 <a href="#cell-store-insert-cols"><code>insertCols</code></a>
+<a href="#cell-store-invert-row-order"><code>invertRowOrder</code></a>
 <a href="#cell-store-is-fully-loaded"><code>isFullyLoaded</code></a>
 <a href="#cell-store-is-paged"><code>isPaged</code></a>
 <a href="#cell-store-loaded-spans"><code>loadedSpans</code></a>
@@ -80,6 +81,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-reset-query-resource-stats"><code>resetQueryResourceStats</code></a>
 <a href="#cell-store-restore-range"><code>restoreRange</code></a>
 <a href="#cell-store-row-count"><code>rowCount</code></a>
+<a href="#cell-store-row-order-targets"><code>rowOrderTargets</code></a>
 <a href="#cell-store-search"><code>search</code></a>
 <a href="#cell-store-set-block-packed"><code>setBlockPacked</code></a>
 <a href="#cell-store-set-bool"><code>setBool</code></a>
@@ -104,6 +106,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-sheet-span-formula-cells"><code>sheetSpanFormulaCells</code></a>
 <a href="#cell-store-snapshot-numbers"><code>snapshotNumbers</code></a>
 <a href="#cell-store-snapshot-texts"><code>snapshotTexts</code></a>
+<a href="#cell-store-sort-range-order"><code>sortRangeOrder</code></a>
 <a href="#cell-store-sort-rows-multi"><code>sortRowsMulti</code></a>
 <a href="#cell-store-spill-anchor-col"><code>spillAnchorCol</code></a>
 <a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
@@ -113,7 +116,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>99</span>
+## Members <span class="api-count" data-pagefind-ignore>102</span>
 
 <div class="api-member-list">
 
@@ -477,6 +480,15 @@ insertCols: (sheet: number, at: number, count: number) => boolean;
 
 </details>
 
+<details class="api-member" id="cell-store-invert-row-order" data-pagefind-weight="1">
+<summary><code>invertRowOrder</code> <span class="api-member-summary">The base64 order that moves every row of order back, or None when order is not a permutation of rows rows.</span></summary>
+
+```ts generated
+invertRowOrder: (order: string, rows: number) => string | undefined;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-is-fully-loaded" data-pagefind-weight="1">
 <summary><code>isFullyLoaded</code></summary>
 
@@ -572,28 +584,28 @@ pagedStats: (sheet: number) => Float64Array;
 </details>
 
 <details class="api-member" id="cell-store-permute-rows" data-pagefind-weight="1">
-<summary><code>permuteRows</code> <span class="api-member-summary">Move the rows of a rectangle: target row offset i gets the cells of source row offset order[i], for the cols columns from startcol.</span></summary>
+<summary><code>permuteRows</code> <span class="api-member-summary">Move the rows of a rectangle of rows × cols cells: target row offset i gets the cells of source row offset order[i].</span></summary>
 
 ```ts generated
-permuteRows: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => number;
+permuteRows: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, order: string) => number;
 ```
 
-<p class="api-member-doc">Move the rows of a rectangle: target row offset `i` gets the cells of
-source row offset `order[i]`, for the `cols` columns from `start_col`.
-`order` must be a permutation of `0..order.len()`. Status: `0` success,
-`1` invalid shape, bounds or order, `3` dirty-capacity rejection, `4`
-a spill range that the rectangle moves only in part.</p>
+<p class="api-member-doc">Move the rows of a rectangle of `rows` × `cols` cells: target row
+offset `i` gets the cells of source row offset `order[i]`. `order` is
+the base64 row order of a `permuteRows` operation. Status: `0`
+success, `1` invalid shape, bounds or order, `3` dirty-capacity
+rejection, `4` a spill range that the rectangle moves only in part.</p>
 </details>
 
 <details class="api-member" id="cell-store-permute-rows-losses" data-pagefind-weight="1">
-<summary><code>permuteRowsLosses</code> <span class="api-member-summary">Row-major offsets, in the rectangle before the move, of the formula cells whose adjusted text the inverse permutation cannot restore: a reference that leaves the sheet becomes #REF!.</span></summary>
+<summary><code>permuteRowsLosses</code> <span class="api-member-summary">Row-major offsets, in the rectangle before the move, of the formula cells whose adjusted text the inverse order cannot restore: a reference that leaves the sheet becomes #REF!.</span></summary>
 
 ```ts generated
-permuteRowsLosses: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => Uint32Array;
+permuteRowsLosses: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, order: string) => Uint32Array;
 ```
 
 <p class="api-member-doc">Row-major offsets, in the rectangle before the move, of the formula
-cells whose adjusted text the inverse permutation cannot restore: a
+cells whose adjusted text the inverse order cannot restore: a
 reference that leaves the sheet becomes `#REF!`. Undo restores these
 cells from a capture. An invalid shape or order gives no offsets.</p>
 </details>
@@ -812,6 +824,18 @@ restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) =
 rowCount: (sheet: number) => number;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-row-order-targets" data-pagefind-weight="1">
+<summary><code>rowOrderTargets</code> <span class="api-member-summary">Where each row of a base64 row order goes: entry i is the new row offset of source row offset i.</span></summary>
+
+```ts generated
+rowOrderTargets: (order: string, rows: number) => Uint32Array | undefined;
+```
+
+<p class="api-member-doc">Where each row of a base64 row order goes: entry `i` is the new row
+offset of source row offset `i`. `None` when the order is not a
+permutation of `rows` rows.</p>
 </details>
 
 <details class="api-member" id="cell-store-search" data-pagefind-weight="1">
@@ -1124,6 +1148,21 @@ snapshotTexts: (snapshot: RangeSnapshot) => string[];
 
 </details>
 
+<details class="api-member" id="cell-store-sort-range-order" data-pagefind-weight="1">
+<summary><code>sortRangeOrder</code> <span class="api-member-summary">The base64 row order that sorts the records of a range: starts are the first rows of the records that may move, in sheet order, and each record has height rows.</span></summary>
+
+```ts generated
+sortRangeOrder: (sheet: number, data_start: number, rows: number, height: number, cols: Uint32Array, ascending: Uint8Array, starts: Uint32Array) => string | undefined;
+```
+
+<p class="api-member-doc">The base64 row order that sorts the records of a range: `starts` are
+the first rows of the records that may move, in sheet order, and each
+record has `height` rows. Records sort by the keys of their first row;
+rows of the range that start no listed record keep their place. `None`
+when the starts or the height do not fit the `rows` rows from
+`data_start`.</p>
+</details>
+
 <details class="api-member" id="cell-store-sort-rows-multi" data-pagefind-weight="1">
 <summary><code>sortRowsMulti</code></summary>
 
@@ -1329,6 +1368,7 @@ class CellStore {
     col_start: number,
   ) => RangeSnapshot;
   insertCols: (sheet: number, at: number, count: number) => boolean;
+  invertRowOrder: (order: string, rows: number) => string | undefined;
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;
   loadedSpans: (
@@ -1360,15 +1400,17 @@ class CellStore {
     sheet: number,
     start_row: number,
     start_col: number,
+    rows: number,
     cols: number,
-    order: Uint32Array,
+    order: string,
   ) => number;
   permuteRowsLosses: (
     sheet: number,
     start_row: number,
     start_col: number,
+    rows: number,
     cols: number,
-    order: Uint32Array,
+    order: string,
   ) => Uint32Array;
   persistedCellData: (sheet: number) => Float64Array;
   pinReadWindow: (
@@ -1430,6 +1472,7 @@ class CellStore {
     snapshot: RangeSnapshot,
   ) => boolean;
   rowCount: (sheet: number) => number;
+  rowOrderTargets: (order: string, rows: number) => Uint32Array | undefined;
   search: (
     sheet: number,
     cols: Uint32Array,
@@ -1590,6 +1633,15 @@ class CellStore {
   sheetSpanFormulaCells: (sheet: number) => Uint32Array;
   snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array;
   snapshotTexts: (snapshot: RangeSnapshot) => string[];
+  sortRangeOrder: (
+    sheet: number,
+    data_start: number,
+    rows: number,
+    height: number,
+    cols: Uint32Array,
+    ascending: Uint8Array,
+    starts: Uint32Array,
+  ) => string | undefined;
   sortRowsMulti: (
     sheet: number,
     cols: Uint32Array,

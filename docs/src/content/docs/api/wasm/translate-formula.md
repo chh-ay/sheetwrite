@@ -10,7 +10,7 @@ its source cell to its target cell. Absolute parts stay; a reference
 moved off the sheet becomes `#REF!`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L637"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L637</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L657"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L657</code></a></dd></div>
 </dl>
 
 ## Declaration

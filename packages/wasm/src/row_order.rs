@@ -88,9 +88,10 @@ pub(crate) fn decode_row_order(text: &str, rows: usize) -> Option<Vec<u32>> {
         return None;
     }
 
-    let order: Vec<u32> = bytes
-        .chunks_exact(BYTES_PER_ROW)
-        .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+    let (rows_bytes, _) = bytes.as_chunks::<BYTES_PER_ROW>();
+    let order: Vec<u32> = rows_bytes
+        .iter()
+        .map(|&row| u32::from_le_bytes(row))
         .collect();
     is_permutation(&order).then_some(order)
 }

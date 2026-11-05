@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L641"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L641</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L661"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L661</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -65,6 +65,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-import-memory-state"><code>cellstore_importMemoryState</code></a>
 <a href="#init-output-cellstore-import-range-memory-state"><code>cellstore_importRangeMemoryState</code></a>
 <a href="#init-output-cellstore-insert-cols"><code>cellstore_insertCols</code></a>
+<a href="#init-output-cellstore-invert-row-order"><code>cellstore_invertRowOrder</code></a>
 <a href="#init-output-cellstore-is-fully-loaded"><code>cellstore_isFullyLoaded</code></a>
 <a href="#init-output-cellstore-is-paged"><code>cellstore_isPaged</code></a>
 <a href="#init-output-cellstore-loaded-spans"><code>cellstore_loadedSpans</code></a>
@@ -99,6 +100,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-reset-query-resource-stats"><code>cellstore_resetQueryResourceStats</code></a>
 <a href="#init-output-cellstore-restore-range"><code>cellstore_restoreRange</code></a>
 <a href="#init-output-cellstore-row-count"><code>cellstore_rowCount</code></a>
+<a href="#init-output-cellstore-row-order-targets"><code>cellstore_rowOrderTargets</code></a>
 <a href="#init-output-cellstore-search"><code>cellstore_search</code></a>
 <a href="#init-output-cellstore-set-block-packed"><code>cellstore_setBlockPacked</code></a>
 <a href="#init-output-cellstore-set-bool"><code>cellstore_setBool</code></a>
@@ -123,6 +125,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-sheet-span-formula-cells"><code>cellstore_sheetSpanFormulaCells</code></a>
 <a href="#init-output-cellstore-snapshot-numbers"><code>cellstore_snapshotNumbers</code></a>
 <a href="#init-output-cellstore-snapshot-texts"><code>cellstore_snapshotTexts</code></a>
+<a href="#init-output-cellstore-sort-range-order"><code>cellstore_sortRangeOrder</code></a>
 <a href="#init-output-cellstore-sort-rows-multi"><code>cellstore_sortRowsMulti</code></a>
 <a href="#init-output-cellstore-spill-anchor-col"><code>cellstore_spillAnchorCol</code></a>
 <a href="#init-output-cellstore-spill-anchor-row"><code>cellstore_spillAnchorRow</code></a>
@@ -171,7 +174,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>157</span>
+## Members <span class="api-count" data-pagefind-ignore>160</span>
 
 <div class="api-member-list">
 
@@ -652,6 +655,15 @@ readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => n
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-invert-row-order" data-pagefind-weight="1">
+<summary><code>cellstore_invertRowOrder</code></summary>
+
+```ts generated
+readonly cellstore_invertRowOrder: (a: number, b: number, c: number, d: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-is-fully-loaded" data-pagefind-weight="1">
 <summary><code>cellstore_isFullyLoaded</code></summary>
 
@@ -746,7 +758,7 @@ readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
 <summary><code>cellstore_permuteRows</code></summary>
 
 ```ts generated
-readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
 ```
 
 </details>
@@ -755,7 +767,7 @@ readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: 
 <summary><code>cellstore_permuteRowsLosses</code></summary>
 
 ```ts generated
-readonly cellstore_permuteRowsLosses: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
+readonly cellstore_permuteRowsLosses: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number];
 ```
 
 </details>
@@ -954,6 +966,15 @@ readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e:
 
 ```ts generated
 readonly cellstore_rowCount: (a: number, b: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-row-order-targets" data-pagefind-weight="1">
+<summary><code>cellstore_rowOrderTargets</code></summary>
+
+```ts generated
+readonly cellstore_rowOrderTargets: (a: number, b: number, c: number, d: number) => [number, number];
 ```
 
 </details>
@@ -1170,6 +1191,15 @@ readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number];
 
 ```ts generated
 readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-sort-range-order" data-pagefind-weight="1">
+<summary><code>cellstore_sortRangeOrder</code></summary>
+
+```ts generated
+readonly cellstore_sortRangeOrder: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number];
 ```
 
 </details>
@@ -1823,6 +1853,12 @@ export interface InitOutput {
     c: number,
     d: number,
   ) => number;
+  readonly cellstore_invertRowOrder: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly cellstore_isFullyLoaded: (a: number, b: number) => number;
   readonly cellstore_isPaged: (a: number, b: number) => number;
   readonly cellstore_loadedSpans: (
@@ -1871,6 +1907,7 @@ export interface InitOutput {
     e: number,
     f: number,
     g: number,
+    h: number,
   ) => number;
   readonly cellstore_permuteRowsLosses: (
     a: number,
@@ -1880,6 +1917,7 @@ export interface InitOutput {
     e: number,
     f: number,
     g: number,
+    h: number,
   ) => [number, number];
   readonly cellstore_persistedCellData: (
     a: number,
@@ -1986,6 +2024,12 @@ export interface InitOutput {
     e: number,
   ) => number;
   readonly cellstore_rowCount: (a: number, b: number) => number;
+  readonly cellstore_rowOrderTargets: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly cellstore_search: (
     a: number,
     b: number,
@@ -2246,6 +2290,19 @@ export interface InitOutput {
   readonly cellstore_snapshotTexts: (
     a: number,
     b: number,
+  ) => [number, number];
+  readonly cellstore_sortRangeOrder: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
   ) => [number, number];
   readonly cellstore_sortRowsMulti: (
     a: number,
