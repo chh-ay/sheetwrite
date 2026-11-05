@@ -55,6 +55,7 @@ import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
@@ -232,6 +233,7 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "importXlsx",
   "versionHistory",
   "saveVersion",
+  "newDashboard",
   "undo",
   "redo",
 ];
@@ -569,6 +571,8 @@ export class GridImpl implements Grid {
   private activeSheet: SheetId;
   /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
   private activeSheetCache: Sheet | null = null;
+  /** Shows the dashboard view while a dashboard sheet is active; spreadsheet grids only. */
+  private dashboardView: DashboardViewHook | null = null;
   /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
   private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
   private readonly virtualColumnTargets = new Map<SheetId, number>();
@@ -1160,6 +1164,9 @@ export class GridImpl implements Grid {
   private attachPanels(): void {
     if (this.presentation !== "spreadsheet") return;
     this.lifetime.add(attachPanelTriggers(this, this.config?.icons));
+    const dashboard = attachDashboardView(this, this.viewportEl, () => this.readOnly);
+    this.dashboardView = dashboard;
+    this.lifetime.add(() => dashboard.dispose());
   }
 
   private refreshSourcePresence(): void {
@@ -2657,6 +2664,7 @@ export class GridImpl implements Grid {
   /** Bring editors, tabs, the find bar and command state in line with `readOnly`. */
   private syncReadOnlyChrome(readOnly: boolean): void {
     this.sheetTabs?.setReadOnly(readOnly);
+    this.dashboardView?.sync();
     if (readOnly) {
       this.cancelAutoFit();
       this.interactions.reconcile("read-only");
@@ -2958,6 +2966,15 @@ export class GridImpl implements Grid {
     };
     const result = this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
     return { ...result, sheet: id };
+  }
+
+  /** A dashboard named like Excel names new sheets, made active. */
+  private newDashboard(): void {
+    const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.name.toLowerCase()));
+    let number = 1;
+    while (names.has(`dashboard${number}`)) number += 1;
+    const result = this.addSheet({ id: "dashboard", name: `Dashboard${number}`, kind: "dashboard" });
+    if (result.status === "applied") this.setActiveSheet(result.sheet);
   }
 
   removeSheet(id: SheetId): SheetLifecycleResult {
@@ -3436,6 +3453,7 @@ export class GridImpl implements Grid {
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
       versionHistory: () => this.config?.history?.(this, "open"),
+      newDashboard: () => this.newDashboard(),
       saveVersion: () => {
         if (!this.readOnly) this.config?.history?.(this, "save");
       },

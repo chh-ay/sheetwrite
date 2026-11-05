@@ -23,6 +23,8 @@ import {
   setFilterValues,
   setSortOrder,
   shiftField,
+  compareScalars,
+  scalarLabel,
   sourceDataRange,
   baseTable,
   relatedTables,
@@ -51,7 +53,6 @@ const NEEDS_FULL_ENGINE =
 const MISSING_PIVOT = "This pivot table no longer exists.";
 const TOO_MANY_VALUES = `This field has more than ${MAX_FILTER_VALUES.toLocaleString("en-US")} values, so it cannot be a filter.`;
 const EMPTY_AREA = "Drag fields here";
-const BLANK_LABEL = "(blank)";
 
 /** What a drag carries: a source field, or an entry that leaves its area. */
 interface DragState {
@@ -66,27 +67,6 @@ export function pivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true)
     focus,
     render: (body) => renderPivotPanel(body, grid, sheet, id),
   };
-}
-
-/** Sort order of filter values: numbers, then text, then logicals, then blank. */
-function compareScalars(a: CellScalar, b: CellScalar): number {
-  const rank = (value: CellScalar): number =>
-    typeof value === "number"
-      ? 0
-      : typeof value === "string"
-        ? 1
-        : typeof value === "boolean"
-          ? 2
-          : 3;
-  const byRank = rank(a) - rank(b);
-  if (byRank !== 0) return byRank;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
-  return Number(a) - Number(b);
-}
-
-function scalarLabel(value: CellScalar): string {
-  return value === null || value === "" ? BLANK_LABEL : String(value);
 }
 
 function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: string): () => void {
