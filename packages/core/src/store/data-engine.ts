@@ -2,7 +2,6 @@ import type { CellSnapshot, EngineInstance, RangeSnapshot } from "@sheetwrite/wa
 
 import { type FormulaAxisEdit, remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
-import { EMPTY_STYLE } from "../cell-style-fields.js";
 import {
   assertWorkbookCharts,
   type ChartAxisEdit,
@@ -636,6 +635,7 @@ function literalOf(value: CellScalar): CellValue {
 }
 
 /** Shared empty style; keeps change capture from allocating a style per cell. */
+const EMPTY_STYLE: CellStyle = {};
 const TEXT_ENCODER = new TextEncoder();
 /** Worst-case UTF-8 bytes of one UTF-16 code unit, used to size a retry. */
 const MAX_UTF8_BYTES_PER_CODE_UNIT = 3;
