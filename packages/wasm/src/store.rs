@@ -3633,7 +3633,7 @@ impl CellStore {
         let ast = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
         let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
-        let mut ast = resolve_structured_refs(
+        let ast = resolve_structured_refs(
             ast,
             formula_sheet,
             formula_row,
@@ -3643,22 +3643,21 @@ impl CellStore {
             },
         );
         #[cfg(feature = "analysis")]
-        self.bind_regex_patterns(source, &mut ast);
+        let ast = self.bind_regex_patterns(source, ast);
         Ok(ast)
     }
 
     /// Points the literal REGEX patterns of a new formula at the patterns the
     /// store's formulas share, so formulas with one pattern compile it once.
     #[cfg(feature = "analysis")]
-    fn bind_regex_patterns(&self, source: &str, ast: &mut Ast) {
-        if !crate::eval::analysis::regex_patterns::may_call_regex(source) {
-            return;
+    fn bind_regex_patterns(&self, source: &str, mut ast: Ast) -> Ast {
+        if crate::eval::analysis::regex_patterns::may_call_regex(source) {
+            self.regex_patterns
+                .borrow_mut()
+                .get_or_insert_with(Box::default)
+                .bind(&mut ast);
         }
-
-        self.regex_patterns
-            .borrow_mut()
-            .get_or_insert_with(Box::default)
-            .bind(ast);
+        ast
     }
 
     /// Resolve the sheet names of a parsed formula to stable handles.
