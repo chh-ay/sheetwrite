@@ -8,7 +8,7 @@ description: "SheetwriteErrorContextValue type in @sheetwrite/core: JSON-safe va
 JSON-safe values accepted in a public failure context.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L196"><code>packages/core/src/errors.ts#L196</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L202"><code>packages/core/src/errors.ts#L202</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>6</span>
@@ -86,6 +86,7 @@ export type SheetwriteErrorContextValue =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

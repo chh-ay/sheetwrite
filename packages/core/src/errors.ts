@@ -18,6 +18,10 @@ export type SheetwriteErrorCode =
   | "xlsx-resource-limit"
   | "resource-limit"
   | "invalid-snapshot"
+  | "invalid-history"
+  | "invalid-scope"
+  | "capacity"
+  | "integrity"
   | "invalid-argument"
   | "aborted"
   | "not-found"
@@ -49,7 +53,6 @@ export type SheetwriteErrorCode =
   | "batch-limit"
   | "pending-capacity"
   | "presence-failed"
-  | "revision-failed"
   | "comment-failed"
   | "sync-failed"
   | "sync-storage-failed"
@@ -79,6 +82,10 @@ export const SHEETWRITE_ERROR_CODES = [
   "xlsx-resource-limit",
   "resource-limit",
   "invalid-snapshot",
+  "invalid-history",
+  "invalid-scope",
+  "capacity",
+  "integrity",
   "invalid-argument",
   "aborted",
   "not-found",
@@ -110,7 +117,6 @@ export const SHEETWRITE_ERROR_CODES = [
   "batch-limit",
   "pending-capacity",
   "presence-failed",
-  "revision-failed",
   "comment-failed",
   "sync-failed",
   "sync-storage-failed",
@@ -143,9 +149,9 @@ export type SheetwriteErrorOperation =
   | "snapshot-allocate"
   | "persistence"
   | "pending-storage"
+  | "history"
   | "synchronize"
   | "presence"
-  | "revision"
   | "comment"
   | "query"
   | "row-bridge"
@@ -179,9 +185,9 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "snapshot-allocate",
   "persistence",
   "pending-storage",
+  "history",
   "synchronize",
   "presence",
-  "revision",
   "comment",
   "query",
   "row-bridge",

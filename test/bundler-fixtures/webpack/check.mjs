@@ -39,6 +39,9 @@ const RIBBON_MARKER = "sheetwrite-ribbon-tabs";
 const TOOLBAR_MARKER = "sheetwrite-command-toolbar";
 const CHROME_MARKER = "sheetwrite-ribbon-";
 const PANEL_MARKER = "sheetwrite-panel-section";
+// Text that only the Sort panel renders. The Sort panel is a chunk of its own,
+// apart from the other side panels, so it loads only when it opens.
+const SORT_PANEL_MARKER = "My data has headers";
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
@@ -47,6 +50,7 @@ const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
 const chromeChunks = [];
 const panelChunks = [];
+const sortPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const workers = [];
@@ -54,7 +58,8 @@ const documentChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
-  if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
+  else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
   else if (code.includes(FUNCTION_TABLE_MARKER)) functionTableChunks.push(file);
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
     chromeChunks.push(file);
@@ -74,6 +79,8 @@ for (const marker of [RIBBON_MARKER, TOOLBAR_MARKER]) {
 }
 if (panelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
+if (sortPanelChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sortPanelChunks.length}`);
 if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (functionTableChunks.length !== 1) {
@@ -90,6 +97,9 @@ for (const marker of [CHROME_MARKER, TOOLBAR_MARKER]) {
 if (mainCode.includes(PANEL_MARKER)) {
   throw new Error("The side panels are in webpack's main.js; they must load lazily");
 }
+if (mainCode.includes(SORT_PANEL_MARKER)) {
+  throw new Error("The Sort panel is in webpack's main.js; it must load lazily");
+}
 if (mainCode.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
 }
@@ -100,6 +110,13 @@ for (const marker of [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER]) {
   if (mainCode.includes(marker)) {
     throw new Error(`A cold document operation is in webpack's main.js: ${marker}`);
   }
+}
+
+// The fixture creates no grid, so it needs no store. Lazy modules that import
+// the store make webpack keep the store's helpers in shared startup modules.
+const STORE_MARKER = "Encoded JSON exceeds the";
+if (mainCode.includes(STORE_MARKER)) {
+  throw new Error("Store helpers are in webpack's main.js; a lazy module imports the store");
 }
 
 const assets = publicFiles.map((file) => {
@@ -113,9 +130,14 @@ const assets = publicFiles.map((file) => {
     owner = "worker-async";
     roles = ["worker-async"];
   } else if (
-    [chromeChunks, panelChunks, functionTableChunks, findChunks, documentChunks].some((chunks) =>
-      chunks.includes(file),
-    )
+    [
+      chromeChunks,
+      panelChunks,
+      sortPanelChunks,
+      functionTableChunks,
+      findChunks,
+      documentChunks,
+    ].some((chunks) => chunks.includes(file))
   ) {
     // The function table loads from the panels and formula help, as Vite's chrome graph counts it.
     owner = "chrome-async";

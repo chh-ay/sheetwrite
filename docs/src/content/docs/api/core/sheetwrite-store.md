@@ -61,6 +61,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-get-pivots"><code>getPivots</code></a>
 <a href="#sheetwrite-store-get-range-mutation-allocation-stats"><code>getRangeMutationAllocationStats</code></a>
 <a href="#sheetwrite-store-get-ref-target"><code>getRefTarget</code></a>
+<a href="#sheetwrite-store-get-relationship-status"><code>getRelationshipStatus</code></a>
 <a href="#sheetwrite-store-get-relationships"><code>getRelationships</code></a>
 <a href="#sheetwrite-store-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
 <a href="#sheetwrite-store-get-spill-anchor"><code>getSpillAnchor</code></a>
@@ -93,9 +94,9 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-set-pivot"><code>setPivot</code></a>
 <a href="#sheetwrite-store-set-protection-resolver"><code>setProtectionResolver</code></a>
 <a href="#sheetwrite-store-set-relationship"><code>setRelationship</code></a>
+<a href="#sheetwrite-store-set-view-sort"><code>setViewSort</code></a>
 <a href="#sheetwrite-store-show-rows"><code>showRows</code></a>
-<a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
-<a href="#sheetwrite-store-sort-by-multi"><code>sortByMulti</code></a>
+<a href="#sheetwrite-store-sort-range"><code>sortRange</code></a>
 <a href="#sheetwrite-store-ungroup-rows"><code>ungroupRows</code></a>
 <a href="#sheetwrite-store-view-row-count"><code>viewRowCount</code></a>
 <a href="#sheetwrite-store-view-row-of"><code>viewRowOf</code></a>
@@ -103,7 +104,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>68</span>
+## Members <span class="api-count" data-pagefind-ignore>69</span>
 
 <div class="api-member-list">
 
@@ -389,6 +390,18 @@ getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
 getRefTarget: (addr: CellAddress) => CellAddress | null;
 ```
 
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-relationship-status" data-pagefind-weight="1">
+<summary><code>getRelationshipStatus</code> <span class="api-member-summary">Whether the keys of the relationship with id resolve, checked now from the cell values.</span></summary>
+
+```ts generated
+getRelationshipStatus: (id: string) => RelationshipStatus;
+```
+
+<p class="api-member-doc">Whether the keys of the relationship with `id` resolve, checked now from
+the cell values. The default engine checks no keys and reports
+`unavailable`, as it does for an unknown ID.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-get-relationships" data-pagefind-weight="1">
@@ -691,6 +704,30 @@ exist, at most one relationship may join two tables, and relationships
 must not form a cycle; otherwise the result is a no-op.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-set-view-sort" data-pagefind-weight="1">
+<summary><code>setViewSort</code> <span class="api-member-summary">Sort the displayed rows of a sheet by keys (first key primary; stable) without moving any cell; an empty list clears the view sort.</span></summary>
+
+```ts generated
+setViewSort: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult;
+```
+
+Sort the displayed rows of a sheet by `keys` (first key primary; stable)
+without moving any cell; an empty list clears the view sort. The keys
+are saved in the sheet and export to XLSX as `sortState`. To move the
+cells, as Excel's Sort does, use `sortRange`.
+
+### Examples
+
+```ts compile
+import type { SheetwriteStore } from "@sheetwrite/core";
+
+function showLargestFirst(store: SheetwriteStore) {
+  return store.setViewSort("s1", [{ col: 2, ascending: false }]);
+}
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-show-rows" data-pagefind-weight="1">
 <summary><code>showRows</code></summary>
 
@@ -700,20 +737,31 @@ showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult;
 
 </details>
 
-<details class="api-member" id="sheetwrite-store-sort-by" data-pagefind-weight="1">
-<summary><code>sortBy</code></summary>
+<details class="api-member" id="sheetwrite-store-sort-range" data-pagefind-weight="1">
+<summary><code>sortRange</code> <span class="api-member-summary">Sort the rows of range in place, as Excel's Sort does: cells move with their row in one undoable transaction, and formulas follow Excel's rules for sorted rows.</span></summary>
 
 ```ts generated
-sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult;
+sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult;
 ```
 
-</details>
+Sort the rows of `range` in place, as Excel's Sort does: cells move with
+their row in one undoable transaction, and formulas follow Excel's
+rules for sorted rows. Hidden and filtered-out rows keep their place.
+With `hasHeader`, the first row of `range` stays. A sort that would
+move part of a merged cell or spill range is rejected.
 
-<details class="api-member" id="sheetwrite-store-sort-by-multi" data-pagefind-weight="1">
-<summary><code>sortByMulti</code></summary>
+### Examples
 
-```ts generated
-sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult;
+```ts compile
+import type { SheetwriteStore } from "@sheetwrite/core";
+
+function sortByRevenue(store: SheetwriteStore) {
+  return store.sortRange(
+    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+    [{ col: 2, ascending: false }],
+    { hasHeader: true },
+  );
+}
 ```
 
 </details>
@@ -842,6 +890,7 @@ class SheetwriteStore implements Store {
   getPivots: (sheet?: SheetId) => PivotDefinition[];
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getRelationshipStatus: (id: string) => RelationshipStatus;
   getRelationships: () => TableRelationship[];
   getRuntimeResourceSnapshot: (
     operation: RuntimeResourceOperation,
@@ -930,18 +979,20 @@ class SheetwriteStore implements Store {
   setRelationship: (
     relationship: TableRelationship,
   ) => ApplyTransactionResult;
+  setViewSort: (
+    sheet: SheetId,
+    keys: readonly SortKey[],
+  ) => ApplyTransactionResult;
   showRows: (
     sheet: SheetId,
     rows?: readonly number[],
   ) => ApplyTransactionResult;
-  sortBy: (
-    sheet: SheetId,
-    col: number,
-    ascending: boolean,
-  ) => ApplyTransactionResult;
-  sortByMulti: (
-    sheet: SheetId,
+  sortRange: (
+    range: Range,
     keys: readonly SortKey[],
+    options?: {
+      hasHeader?: boolean;
+    },
   ) => ApplyTransactionResult;
   ungroupRows: (
     sheet: SheetId,
@@ -972,6 +1023,7 @@ class SheetwriteStore implements Store {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

@@ -33,6 +33,8 @@ import {
   validatePivotShape,
 } from "./pivot.js";
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
+import { ROW_ORDER_ENCODING } from "./row-order.js";
+import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -2386,6 +2388,17 @@ export function validateDocumentOperationShape(
       optionalBoolean(operation, "style", path, errors);
       break;
 
+    case "permuteRows":
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      if (ownValue(operation, "encoding") !== ROW_ORDER_ENCODING) {
+        invalid(errors, `${path}.encoding`, "Row order encoding is invalid");
+      }
+
+      if (typeof ownValue(operation, "order") !== "string") {
+        invalid(errors, `${path}.order`, "Row order must be a string");
+      }
+      break;
+
     case "addRows":
     case "removeRows":
       validateOperationSheetId(operation, path, errors);
@@ -2634,6 +2647,14 @@ export function validateDocumentOperationShape(
       break;
 
     case "removeRelationship":
+      requireString(operation, "id", path, errors, true);
+      break;
+
+    case "setQuery":
+      validateSavedQueryShape(ownValue(operation, "query"), `${path}.query`, errors);
+      break;
+
+    case "removeQuery":
       requireString(operation, "id", path, errors, true);
       break;
 
@@ -3164,6 +3185,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const dataModel = ownValue(workbook, "dataModel");
     if (dataModel !== undefined) {
       validateDataModelShape(dataModel, "workbook.dataModel", errors);
+    }
+
+    const queries = ownValue(workbook, "queries");
+    if (queries !== undefined) {
+      validateSavedQueriesShape(queries, "workbook.queries", errors);
     }
   }
 
@@ -3706,6 +3732,7 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return operation.range.sheet;
 
     case "addTable":
@@ -3757,6 +3784,12 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "removeRelationship":
       return `relationship:${operation.id}`;
+
+    case "setQuery":
+      return `query:${operation.query.id}`;
+
+    case "removeQuery":
+      return `query:${operation.id}`;
 
     default: {
       const exhaustive: never = operation;

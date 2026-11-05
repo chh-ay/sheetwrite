@@ -8,7 +8,7 @@ description: "PresenceActor interface in @sheetwrite/core: Public collaborator i
 Public collaborator identity attached to presence updates.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L8"><code>packages/core/src/collaboration.ts#L8</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L7"><code>packages/core/src/collaboration.ts#L7</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -67,6 +67,7 @@ export interface PresenceActor {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
@@ -79,6 +80,5 @@ export interface PresenceActor {
 <li><a href="/docs/api/core/presence-coordinator-options/"><code>PresenceCoordinatorOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-message/"><code>PresenceMessage</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-privacy-options/"><code>PresencePrivacyOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/revision-summary/"><code>RevisionSummary</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

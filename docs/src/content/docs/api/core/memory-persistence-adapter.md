@@ -8,10 +8,10 @@ description: "MemoryPersistenceAdapter class in @sheetwrite/core: Executable dat
 Executable database-neutral reference adapter for tests, demos, and local workflows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L107"><code>packages/core/src/persistence.ts#L107</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L112"><code>packages/core/src/persistence.ts#L112</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -46,9 +46,24 @@ commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceComm
 <summary><code>load</code></summary>
 
 ```ts generated
-load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>
+load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>;
 ```
 
+</details>
+
+<details class="api-member" id="memory-persistence-adapter-record-history" data-pagefind-weight="1">
+<summary><code>recordHistory</code> <span class="api-member-summary">Record every later commit of documentId in journal, as part of the commit: if the journal rejects, the commit is not applied, published or acknowledged, and the client keeps it pending.</span></summary>
+
+```ts generated
+recordHistory: (documentId: string, journal: CommitJournal) => void
+```
+
+<p class="api-member-doc">Record every later commit of `documentId` in `journal`, as part of the
+commit: if the journal rejects, the commit is not applied, published or
+acknowledged, and the client keeps it pending. While a journal is
+attached, a commit without `authorId` is rejected. The journal must
+already describe the current version, for example a `HistoryArchive`
+initialized with the loaded snapshot.</p>
 </details>
 </div>
 
@@ -70,6 +85,7 @@ class MemoryPersistenceAdapter implements PersistenceAdapter {
     documentId: string,
     signal?: AbortSignal,
   ) => Promise<WorkbookSnapshot>;
+  recordHistory: (documentId: string, journal: CommitJournal) => void;
 }
 ```
 
@@ -84,6 +100,7 @@ class MemoryPersistenceAdapter implements PersistenceAdapter {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

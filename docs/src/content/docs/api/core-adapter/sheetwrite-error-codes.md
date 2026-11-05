@@ -10,7 +10,7 @@ Sheetwrite itself does not read this array, so a bundle that does not import
 it does not contain it.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L68"><code>packages/core/src/errors.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/errors.ts#L71"><code>packages/core/src/errors.ts#L71</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -32,6 +32,10 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "xlsx-resource-limit",
   "resource-limit",
   "invalid-snapshot",
+  "invalid-history",
+  "invalid-scope",
+  "capacity",
+  "integrity",
   "invalid-argument",
   "aborted",
   "not-found",
@@ -63,7 +67,6 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "batch-limit",
   "pending-capacity",
   "presence-failed",
-  "revision-failed",
   "comment-failed",
   "sync-failed",
   "sync-storage-failed",
@@ -87,6 +90,7 @@ const SHEETWRITE_ERROR_CODES: readonly [
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

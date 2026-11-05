@@ -8,7 +8,7 @@ description: "SyncInitInput type in @sheetwrite/wasm: Sources accepted by synchr
 Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L784"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L784</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L817"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L817</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -36,6 +36,7 @@ export type SyncInitInput = BufferSource | WebAssembly.Module;
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/formulas/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/queries/query-engine-options/"><code>QueryEngineOptions</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/wasm/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

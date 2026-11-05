@@ -7,12 +7,18 @@
         "src/index.ts",
         "src/adapter.ts",
         "src/functions.ts",
+        "src/history-archive.ts",
+        "src/history-indexeddb.ts",
         "src/indexeddb.ts",
         "src/shell.ts",
         "src/testing.ts",
         "src/worker.ts",
         "test/**/*.test.ts"
       ],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/queries": {
+      "entry": ["src/index.ts", "src/node.ts", "test/**/*.test.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "packages/react": {

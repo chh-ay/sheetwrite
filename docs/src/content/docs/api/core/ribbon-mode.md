@@ -8,7 +8,7 @@ description: "RibbonMode type in @sheetwrite/core: Layout of the Excel-style rib
 Layout of the Excel-style ribbon. `auto` chooses compact below the configured width.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L346"><code>packages/core/src/types/grid.ts#L346</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L351"><code>packages/core/src/types/grid.ts#L351</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -30,6 +30,7 @@ export type RibbonMode = "full" | "compact" | "auto";
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

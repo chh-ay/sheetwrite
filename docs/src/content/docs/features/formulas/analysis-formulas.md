@@ -331,6 +331,10 @@ await initSheetwrite(undefined, formulas);
 | Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE`, `ARRAYTOTEXT` |
 | Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET`, `DMAX`, `DSTDEV` |
 | Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ`, `COMBIN` |
+| Unit conversion | `CONVERT` |
+| Bessel functions | `BESSELJ`, `BESSELY`, `BESSELI`, `BESSELK` |
+| Complex numbers | `COMPLEX`, `IMSUM`, `IMPRODUCT`, `IMABS`, `IMEXP`, `IMSQRT` |
+| Engineering | `DEC2HEX`, `HEX2DEC`, `BITAND`, `BITLSHIFT`, `ERF`, `GESTEP` |
 | Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
 | LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `BYCOL`, `MAKEARRAY`, `ISOMITTED` |
 | Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |

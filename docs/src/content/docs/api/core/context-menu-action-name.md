@@ -8,7 +8,7 @@ description: "ContextMenuActionName type in @sheetwrite/core: Built-in action na
 Built-in action names accepted by custom context-menu rows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L377"><code>packages/core/src/types/grid.ts#L377</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L382"><code>packages/core/src/types/grid.ts#L382</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -36,6 +36,10 @@ export type ContextMenuActionName =
   | "showAllColumns"
   | "autoFitColumn"
   | "clearFilter"
+  | "sortAscending"
+  | "sortDescending"
+  | "sortViewAscending"
+  | "sortViewDescending"
   | "exportCsv"
   | "exportXlsx"
   | "editNote"
@@ -55,6 +59,7 @@ export type ContextMenuActionName =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

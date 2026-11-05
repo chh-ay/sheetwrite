@@ -1,0 +1,22 @@
+[package]
+name = "sheetwrite-queries"
+version = "0.6.1"
+edition = "2021"
+license = "MIT"
+description = "Optional columnar query steps with typed buffers and no source fetching."
+repository = "https://github.com/chh-ay/sheetwrite"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["--no-inline=*_family", "-O3", "-g"]

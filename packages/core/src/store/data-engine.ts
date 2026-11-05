@@ -73,6 +73,19 @@ import {
   type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { restoreBlockFacts } from "../restore-block.js";
+import {
+  decodeRowOrder,
+  encodeRowOrder,
+  type PermuteRowsOperation,
+  ROW_ORDER_ENCODING,
+} from "../row-order.js";
+import {
+  type SavedQueryIssue,
+  validateQueryAdmission,
+  validateQueryRemoval,
+  withoutQuery,
+  withQuery,
+} from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -88,6 +101,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
+import type { DataModel, RelationshipStatus } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -110,6 +124,7 @@ import type {
   Sheet,
   SheetSnapshot,
   SnapshotCell,
+  SortKey,
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
@@ -138,6 +153,14 @@ import {
   workbookTableNameKey,
 } from "../workbook-table.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
+import {
+  MERGED_CELLS_SORT_MESSAGE,
+  permutedHyperlinks,
+  permutedMerges,
+  permutedNotes,
+  type SortRangePlan,
+  tablesAllowRowMove,
+} from "./permute-rows.js";
 import {
   integerAt,
   mergeCrossesFreeze,
@@ -233,6 +256,39 @@ function pivotStatusAt(status: Uint32Array, index: number): PivotStatusRecord | 
     headerRows: at(5),
     labelCols: at(6),
   };
+}
+
+/** Values in a `relationshipStatus` record: code, firstRow, secondRow, unmatched. */
+const RELATIONSHIP_STATUS_STRIDE = 4;
+/** Codes of `relationshipStatus`; twins of the `STATUS_*` codes in `store/relationships.rs`. */
+const RELATIONSHIP_STATUS = {
+  ok: 0,
+  missingTable: 1,
+  missingColumn: 2,
+  oneSideType: 3,
+  manySideType: 4,
+  duplicateKey: 5,
+} as const;
+
+/** Decodes one engine `relationshipStatus` record. */
+function relationshipStatusOf(record: Uint32Array): RelationshipStatus {
+  const [code, first = 0, second = 0, unmatched = 0] = record;
+  switch (code) {
+    case RELATIONSHIP_STATUS.ok:
+      return { status: "ok", unmatched };
+    case RELATIONSHIP_STATUS.missingTable:
+      return { status: "missingTable" };
+    case RELATIONSHIP_STATUS.missingColumn:
+      return { status: "missingColumn" };
+    case RELATIONSHIP_STATUS.oneSideType:
+      return { status: "typeMismatch", side: "to", row: first };
+    case RELATIONSHIP_STATUS.manySideType:
+      return { status: "typeMismatch", side: "from", row: first };
+    case RELATIONSHIP_STATUS.duplicateKey:
+      return { status: "duplicateKey", rows: [first, second] };
+    default:
+      throw new Error(`Sheetwrite: unknown relationship status code ${code}`);
+  }
 }
 
 /** Rows per allocation-lazy chunk; this matches the store engine's native default. */
@@ -624,6 +680,11 @@ export class StoreDataEngine {
       }
     }
 
+    if (!this.syncRelationships(workbook.dataModel)) {
+      this.wasm.free();
+      throw storeFailure("invalid-snapshot", "invalid data model");
+    }
+
     this.loadPivots();
 
     // Before any cell is loaded, so formulas compute once under the stored limits.
@@ -946,6 +1007,26 @@ export class StoreDataEngine {
 
   private namedRangeScope(scope: SheetId | undefined): number {
     return scope === undefined ? -1 : this.handleOf(scope);
+  }
+
+  /**
+   * Sends every relationship of `model` to an engine that checks keys.
+   * Returns false when the engine refuses them; an engine without the call
+   * keeps them only in the workbook.
+   */
+  private syncRelationships(
+    model: DataModel | undefined,
+    wasm: RecomputingCellStore = this.wasm,
+  ): boolean {
+    if (!wasm.setRelationships) return true;
+    const strings = (model?.relationships ?? []).flatMap((relationship) => [
+      relationship.id,
+      relationship.from.table,
+      relationship.from.column,
+      relationship.to.table,
+      relationship.to.column,
+    ]);
+    return wasm.setRelationships(strings);
   }
 
   private syncTable(table: WorkbookTable): boolean {
@@ -1518,6 +1599,13 @@ export class StoreDataEngine {
     return outputs;
   }
 
+  /** Key status of the relationship with `id`, checked now from the cell values. */
+  getRelationshipStatus(id: string): RelationshipStatus {
+    const record = this.wasm.relationshipStatus?.(id);
+    if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
+    return relationshipStatusOf(record);
+  }
+
   /**
    * Plain view of one pivot's output: one status call and one bulk read.
    * Null when `sheet` holds no pivot with `id`.
@@ -1958,6 +2046,179 @@ export class StoreDataEngine {
   }
 
   /**
+   * Cells, at their address before the move, whose formula a `permuteRows`
+   * operation adjusts in a way that its inverse cannot undo. History captures
+   * them before the operation applies.
+   */
+  permuteRowsLosses(patch: PermuteRowsOperation): CellAddress[] {
+    const bounds = normalizedRange(patch.range);
+    const handle = this.handles.get(bounds.sheet);
+    const order = decodeRowOrder(patch);
+    if (handle === undefined || !order) return [];
+
+    const cols = bounds.end.col - bounds.start.col + 1;
+    const offsets = this.wasm.permuteRowsLosses(
+      handle,
+      bounds.start.row,
+      bounds.start.col,
+      cols,
+      order,
+    );
+    return Array.from(offsets, (offset) => ({
+      sheet: bounds.sheet,
+      row: bounds.start.row + Math.floor(offset / cols),
+      col: bounds.start.col + (offset % cols),
+    }));
+  }
+
+  /** The operation that moves every row of `patch` back, or `null` for an invalid order. */
+  invertedPermutation(patch: PermuteRowsOperation): PermuteRowsOperation | null {
+    const order = decodeRowOrder(patch);
+    const inverse = order ? this.wasm.rowOrderTargets(order) : null;
+    if (!order || !inverse || inverse.length !== order.length) return null;
+
+    const { range } = patch;
+    return {
+      op: "permuteRows",
+      range: { ...range, start: { ...range.start }, end: { ...range.end } },
+      encoding: ROW_ORDER_ENCODING,
+      order: encodeRowOrder(inverse),
+    };
+  }
+
+  /** Excel's current region around a data cell: the block bounded by empty rows and columns. */
+  currentRegion(addr: CellAddress): Range | null {
+    const handle = this.handles.get(addr.sheet);
+    if (handle === undefined) return null;
+
+    const [top, left, bottom, right] = this.wasm.currentRegion(handle, addr.row, addr.col);
+    if (top === undefined || left === undefined || bottom === undefined || right === undefined) {
+      return null;
+    }
+
+    return { sheet: addr.sheet, start: { row: top, col: left }, end: { row: bottom, col: right } };
+  }
+
+  /**
+   * The plan that sorts the data rows of `range` by `keys`: a `permuteRows`
+   * operation, no change, or Excel's refusal. Rows that are hidden or
+   * filtered out keep their place, as in Excel; the others take the sorted
+   * order among the visible positions. Keys are columns inside the range.
+   */
+  sortRangePlan(range: Range, keys: readonly SortKey[], hasHeader: boolean): SortRangePlan {
+    const bounds = normalizedRange(range);
+    const sheet = this.sheetMeta(bounds.sheet);
+    const dataStart = bounds.start.row + (hasHeader ? 1 : 0);
+    const keysInside = keys.every(
+      (key) => integerAt(key.col) && key.col >= bounds.start.col && key.col <= bounds.end.col,
+    );
+    if (
+      keys.length === 0 ||
+      !keysInside ||
+      bounds.start.row < 0 ||
+      bounds.start.col < 0 ||
+      bounds.end.row >= sheet.rowCount ||
+      bounds.end.col >= sheet.columns.length ||
+      dataStart > bounds.end.row
+    ) {
+      return { kind: "unchanged" };
+    }
+
+    const height = this.recordHeight(sheet, bounds, dataStart);
+    if (height === null) return { kind: "refused", message: MERGED_CELLS_SORT_MESSAGE };
+
+    const starts = this.visibleRecordStarts(bounds.sheet, dataStart, bounds.end.row, height);
+    if (starts.length < 2) return { kind: "unchanged" };
+
+    const sorted = this.wasm.sortRowsMulti(
+      this.handleOf(bounds.sheet),
+      Uint32Array.from(keys, (key) => key.col),
+      Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0)),
+      starts,
+    );
+    const order = new Uint32Array(bounds.end.row - dataStart + 1);
+    for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
+    for (const [position, target] of starts.entries()) {
+      const source = sorted[position] ?? target;
+      for (let row = 0; row < height; row++)
+        order[target - dataStart + row] = source - dataStart + row;
+    }
+
+    return {
+      kind: "move",
+      operation: {
+        op: "permuteRows",
+        range: {
+          sheet: bounds.sheet,
+          start: { row: dataStart, col: bounds.start.col },
+          end: { row: bounds.end.row, col: bounds.end.col },
+        },
+        encoding: ROW_ORDER_ENCODING,
+        order: encodeRowOrder(order),
+      },
+    };
+  }
+
+  /**
+   * Visible rows from `first` to `last` that start a record of `height`
+   * rows, in sheet order. A record is visible when its first row is.
+   */
+  private visibleRecordStarts(
+    sheet: SheetId,
+    first: number,
+    last: number,
+    height: number,
+  ): Uint32Array {
+    const hidden = this.sheetMeta(sheet).hiddenRows;
+    const filtered = this.view.hasView(sheet);
+    const rows = new Uint32Array(Math.ceil((last - first + 1) / height));
+    let count = 0;
+    for (let row = first; row <= last; row += height) {
+      if (hidden?.has(row)) continue;
+      if (filtered && this.view.viewRowOf(sheet, row) === null) continue;
+      rows[count] = row;
+      count += 1;
+    }
+    return rows.subarray(0, count);
+  }
+
+  /**
+   * Rows per sorted record, or `null` when Excel refuses the sort. Merged
+   * cells in the data rows must all have the same size, start on record
+   * boundaries, lie inside the range and repeat in every record; they then
+   * make records of their height, which sort as units. Microsoft Learn, "An
+   * error message when you sort a range that contains merged cells in Excel".
+   */
+  private recordHeight(sheet: Sheet, bounds: Range, dataStart: number): number | null {
+    const merges = (sheet.merges ?? []).filter(
+      (merge) =>
+        merge.r0 <= bounds.end.row &&
+        merge.r1 >= dataStart &&
+        merge.c0 <= bounds.end.col &&
+        merge.c1 >= bounds.start.col,
+    );
+    const [first] = merges;
+    if (!first) return 1;
+
+    const rows = bounds.end.row - dataStart + 1;
+    const height = first.r1 - first.r0 + 1;
+    const width = first.c1 - first.c0 + 1;
+    if (rows % height !== 0) return null;
+
+    const recordColumns = new Set<number>();
+    for (const merge of merges) {
+      const sameSize = merge.r1 - merge.r0 + 1 === height && merge.c1 - merge.c0 + 1 === width;
+      const inside =
+        merge.r0 >= dataStart && merge.c0 >= bounds.start.col && merge.c1 <= bounds.end.col;
+      if (!sameSize || !inside || (merge.r0 - dataStart) % height !== 0) return null;
+      recordColumns.add(merge.c0);
+    }
+
+    const everyRecordMerged = merges.length === (rows / height) * recordColumns.size;
+    return everyRecordMerged ? height : null;
+  }
+
+  /**
    * Capture resolved cells and serializable sources in input order. Rows with
    * the same selected columns share a source read, without capturing the empty
    * bounding rectangle of a sparse selection.
@@ -2373,7 +2634,8 @@ export class StoreDataEngine {
           patch.op === "setBlock" ||
           patch.op === "restoreBlock" ||
           patch.op === "setRangeStyle" ||
-          patch.op === "clearRange"
+          patch.op === "clearRange" ||
+          patch.op === "permuteRows"
         ) {
           touchedSheets.add(patch.range.sheet);
         } else if (patch.op === "addTable") {
@@ -2384,6 +2646,8 @@ export class StoreDataEngine {
           patch.op !== "setCalculation" &&
           patch.op !== "setRelationship" &&
           patch.op !== "removeRelationship" &&
+          patch.op !== "setQuery" &&
+          patch.op !== "removeQuery" &&
           patch.op !== "removeSheet"
         ) {
           touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
@@ -2744,6 +3008,9 @@ export class StoreDataEngine {
 
       case "moveRows":
         return this.moveRows(patch, changes);
+
+      case "permuteRows":
+        return this.permuteRows(patch, changes, captureDetailedChanges);
 
       case "addColumns": {
         const meta = this.sheetMeta(patch.sheet);
@@ -3346,13 +3613,33 @@ export class StoreDataEngine {
           issues,
         );
         if (issues.length > 0) return false;
-        this.workbook.dataModel = withRelationship(this.workbook.dataModel, patch.relationship);
+        const model = withRelationship(this.workbook.dataModel, patch.relationship);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 
       case "removeRelationship": {
         if (!findRelationship(this.workbook.dataModel, patch.id)) return false;
-        this.workbook.dataModel = withoutRelationship(this.workbook.dataModel, patch.id);
+        const model = withoutRelationship(this.workbook.dataModel, patch.id);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
+        return true;
+      }
+
+      case "setQuery": {
+        const issues: SavedQueryIssue[] = [];
+        validateQueryAdmission(patch.query, this.workbook.queries, issues);
+        if (issues.length > 0) return false;
+        this.workbook.queries = withQuery(this.workbook.queries, patch.query);
+        return true;
+      }
+
+      case "removeQuery": {
+        const issues: SavedQueryIssue[] = [];
+        validateQueryRemoval(patch.id, this.workbook.queries, issues);
+        if (issues.length > 0) return false;
+        this.workbook.queries = withoutQuery(this.workbook.queries, patch.id);
         return true;
       }
     }
@@ -3575,6 +3862,89 @@ export class StoreDataEngine {
     }
 
     return this.restoreMovedNamedFormulas(movedNamedFormulas);
+  }
+
+  /**
+   * Move the rows of a range by the operation's permutation. The engine moves
+   * cells and adjusts their formulas; notes, hyperlinks and merged cells of
+   * the range move here. Nothing changes when a check fails.
+   */
+  private permuteRows(
+    patch: PermuteRowsOperation,
+    changes: ChangeEvent["changes"] | null,
+    captureDetailedChanges: boolean,
+  ): boolean {
+    const bounds = normalizedRange(patch.range);
+    const sheet = this.sheetMeta(bounds.sheet);
+    const rows = bounds.end.row - bounds.start.row + 1;
+    const order = decodeRowOrder(patch);
+    if (
+      !order ||
+      bounds.start.row < 0 ||
+      bounds.start.col < 0 ||
+      bounds.end.row >= sheet.rowCount ||
+      bounds.end.col >= sheet.columns.length
+    ) {
+      return false;
+    }
+
+    const targets = this.wasm.rowOrderTargets(order);
+    if (targets.length !== rows) return false;
+
+    const move = { bounds, targets };
+    const merges = permutedMerges(sheet.merges ?? [], move);
+    if (!merges || merges.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
+    if (!tablesAllowRowMove(sheet.tables ?? [], bounds)) return false;
+
+    const cols = bounds.end.col - bounds.start.col + 1;
+    const beforeCells =
+      changes && captureDetailedChanges ? this.captureBlockBeforeCells(bounds, rows, cols) : null;
+
+    this.noteRangeMutationFfi(rows);
+    const status = this.wasm.permuteRows(
+      this.handleOf(bounds.sheet),
+      bounds.start.row,
+      bounds.start.col,
+      cols,
+      order,
+    );
+    if (status !== 0) return false;
+
+    if (sheet.merges) {
+      sheet.merges = merges;
+      this.spillBlockersDirty.add(bounds.sheet);
+    }
+    if (sheet.notes) sheet.notes = permutedNotes(sheet.notes, move);
+    if (sheet.hyperlinks) sheet.hyperlinks = permutedHyperlinks(sheet.hyperlinks, move);
+
+    if (beforeCells && changes) this.pushPermutedChanges(bounds, beforeCells, changes);
+    return true;
+  }
+
+  /**
+   * Cell-level effects of a row permutation, for listeners that ask for them
+   * (such as a row bridge). Other listeners read the operation's range.
+   */
+  private pushPermutedChanges(
+    bounds: Range,
+    beforeCells: Array<{ addr: CellAddress; before: ResolvedCell }>,
+    changes: ChangeEvent["changes"],
+  ): void {
+    const after = this.captureCells(
+      bounds.sheet,
+      beforeCells.map(({ addr }) => addr),
+    );
+    for (const [index, entry] of beforeCells.entries()) {
+      const next = after[index];
+      if (!next) continue;
+
+      changes.push({
+        addr: entry.addr,
+        oldValue: literalOf(entry.before.resolved),
+        newValue: next.value,
+        oldStyle: entry.before.style,
+      });
+    }
   }
 
   private moveColumns(
@@ -4645,6 +5015,9 @@ export class StoreDataEngine {
       // that call them. The registry switches to the replacement only in
       // commit, so an aborted release leaves it on the live store.
       this.hostFunctions?.restore(replacement);
+      if (!this.syncRelationships(this.workbook.dataModel, replacement)) {
+        throw new Error("Sheetwrite: the replacement engine refused the relationships");
+      }
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
       }

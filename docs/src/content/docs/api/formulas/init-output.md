@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/formulas: Result of module ini
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L666"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L666</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L712"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L712</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -51,6 +51,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-columns-fully-loaded"><code>cellstore_columnsFullyLoaded</code></a>
 <a href="#init-output-cellstore-commit-sources"><code>cellstore_commitSources</code></a>
 <a href="#init-output-cellstore-compact-string-storage"><code>cellstore_compactStringStorage</code></a>
+<a href="#init-output-cellstore-current-region"><code>cellstore_currentRegion</code></a>
 <a href="#init-output-cellstore-data-edge"><code>cellstore_dataEdge</code></a>
 <a href="#init-output-cellstore-data-edge-ordered"><code>cellstore_dataEdgeOrdered</code></a>
 <a href="#init-output-cellstore-distinct-values"><code>cellstore_distinctValues</code></a>
@@ -76,6 +77,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-new"><code>cellstore_new</code></a>
 <a href="#init-output-cellstore-paged-dirty-coordinates"><code>cellstore_pagedDirtyCoordinates</code></a>
 <a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
+<a href="#init-output-cellstore-permute-rows"><code>cellstore_permuteRows</code></a>
+<a href="#init-output-cellstore-permute-rows-losses"><code>cellstore_permuteRowsLosses</code></a>
 <a href="#init-output-cellstore-persisted-cell-data"><code>cellstore_persistedCellData</code></a>
 <a href="#init-output-cellstore-pin-read-window"><code>cellstore_pinReadWindow</code></a>
 <a href="#init-output-cellstore-pin-viewport-bands"><code>cellstore_pinViewportBands</code></a>
@@ -89,6 +92,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-recompute-volatile"><code>cellstore_recomputeVolatile</code></a>
 <a href="#init-output-cellstore-reference-target"><code>cellstore_referenceTarget</code></a>
 <a href="#init-output-cellstore-references-targeting"><code>cellstore_referencesTargeting</code></a>
+<a href="#init-output-cellstore-relationship-status"><code>cellstore_relationshipStatus</code></a>
 <a href="#init-output-cellstore-remap-range-styles"><code>cellstore_remapRangeStyles</code></a>
 <a href="#init-output-cellstore-remove-cols"><code>cellstore_removeCols</code></a>
 <a href="#init-output-cellstore-remove-named-range"><code>cellstore_removeNamedRange</code></a>
@@ -100,6 +104,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-reset-query-resource-stats"><code>cellstore_resetQueryResourceStats</code></a>
 <a href="#init-output-cellstore-restore-range"><code>cellstore_restoreRange</code></a>
 <a href="#init-output-cellstore-row-count"><code>cellstore_rowCount</code></a>
+<a href="#init-output-cellstore-row-order-targets"><code>cellstore_rowOrderTargets</code></a>
 <a href="#init-output-cellstore-search"><code>cellstore_search</code></a>
 <a href="#init-output-cellstore-set-block-packed"><code>cellstore_setBlockPacked</code></a>
 <a href="#init-output-cellstore-set-bool"><code>cellstore_setBool</code></a>
@@ -116,6 +121,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
 <a href="#init-output-cellstore-set-pivots"><code>cellstore_setPivots</code></a>
+<a href="#init-output-cellstore-set-relationships"><code>cellstore_setRelationships</code></a>
 <a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
 <a href="#init-output-cellstore-set-sheet-order"><code>cellstore_setSheetOrder</code></a>
 <a href="#init-output-cellstore-set-sparse-block"><code>cellstore_setSparseBlock</code></a>
@@ -176,7 +182,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>162</span>
+## Members <span class="api-count" data-pagefind-ignore>168</span>
 
 <div class="api-member-list">
 
@@ -531,6 +537,15 @@ readonly cellstore_compactStringStorage: (a: number) => void;
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-current-region" data-pagefind-weight="1">
+<summary><code>cellstore_currentRegion</code></summary>
+
+```ts generated
+readonly cellstore_currentRegion: (a: number, b: number, c: number, d: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-data-edge" data-pagefind-weight="1">
 <summary><code>cellstore_dataEdge</code></summary>
 
@@ -756,6 +771,24 @@ readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-permute-rows" data-pagefind-weight="1">
+<summary><code>cellstore_permuteRows</code></summary>
+
+```ts generated
+readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-permute-rows-losses" data-pagefind-weight="1">
+<summary><code>cellstore_permuteRowsLosses</code></summary>
+
+```ts generated
+readonly cellstore_permuteRowsLosses: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-persisted-cell-data" data-pagefind-weight="1">
 <summary><code>cellstore_persistedCellData</code></summary>
 
@@ -873,6 +906,15 @@ readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [nu
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-relationship-status" data-pagefind-weight="1">
+<summary><code>cellstore_relationshipStatus</code></summary>
+
+```ts generated
+readonly cellstore_relationshipStatus: (a: number, b: number, c: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-remap-range-styles" data-pagefind-weight="1">
 <summary><code>cellstore_remapRangeStyles</code></summary>
 
@@ -968,6 +1010,15 @@ readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e:
 
 ```ts generated
 readonly cellstore_rowCount: (a: number, b: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-row-order-targets" data-pagefind-weight="1">
+<summary><code>cellstore_rowOrderTargets</code></summary>
+
+```ts generated
+readonly cellstore_rowOrderTargets: (a: number, b: number, c: number) => [number, number];
 ```
 
 </details>
@@ -1112,6 +1163,15 @@ readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: nu
 
 ```ts generated
 readonly cellstore_setPivots: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-relationships" data-pagefind-weight="1">
+<summary><code>cellstore_setRelationships</code></summary>
+
+```ts generated
+readonly cellstore_setRelationships: (a: number, b: number, c: number) => number;
 ```
 
 </details>
@@ -1768,6 +1828,12 @@ export interface InitOutput {
   ) => number;
   readonly cellstore_commitSources: (a: number) => void;
   readonly cellstore_compactStringStorage: (a: number) => void;
+  readonly cellstore_currentRegion: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
   readonly cellstore_dataEdge: (
     a: number,
     b: number,
@@ -1914,6 +1980,24 @@ export interface InitOutput {
     b: number,
   ) => [number, number];
   readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
+  readonly cellstore_permuteRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => number;
+  readonly cellstore_permuteRowsLosses: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => [number, number];
   readonly cellstore_persistedCellData: (
     a: number,
     b: number,
@@ -1971,6 +2055,11 @@ export interface InitOutput {
     b: number,
     c: number,
   ) => [number, number];
+  readonly cellstore_relationshipStatus: (
+    a: number,
+    b: number,
+    c: number,
+  ) => [number, number];
   readonly cellstore_remapRangeStyles: (
     a: number,
     b: number,
@@ -2021,6 +2110,11 @@ export interface InitOutput {
     e: number,
   ) => number;
   readonly cellstore_rowCount: (a: number, b: number) => number;
+  readonly cellstore_rowOrderTargets: (
+    a: number,
+    b: number,
+    c: number,
+  ) => [number, number];
   readonly cellstore_search: (
     a: number,
     b: number,
@@ -2199,6 +2293,11 @@ export interface InitOutput {
     d: number,
     e: number,
     f: number,
+  ) => number;
+  readonly cellstore_setRelationships: (
+    a: number,
+    b: number,
+    c: number,
   ) => number;
   readonly cellstore_setSheetName: (
     a: number,

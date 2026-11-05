@@ -91,3 +91,50 @@ Removing a table or a column keeps the relationships that refer to it, and undo 
 | `getRelationships()` | Copies of the saved relationships |
 | `setRelationship(relationship)` | Inserts it, or replaces the one with its ID |
 | `removeRelationship(id)` | Removes it |
+| `getRelationshipStatus(id)` | Whether the keys resolve, checked from the current cells |
+
+## Key checks
+
+The full engine checks the key values each time `getRelationshipStatus` is called. Keys match as pivot group keys do: numbers by value, and text without case. A blank key matches nothing.
+
+| Status | Meaning |
+| --- | --- |
+| `ok` | Every non-blank one-side key is unique. `unmatched` counts the non-blank many-side keys that no one-side row holds. |
+| `missingTable`, `missingColumn` | A table or a column was removed. |
+| `typeMismatch` | The key at `row` on side `from` or `to` is a boolean, an error on the one side, or a number among text keys (or text among numbers). |
+| `duplicateKey` | Two one-side rows hold equal keys. `rows` are their data-row offsets. |
+| `unavailable` | The default engine checks no keys, or no relationship has this ID. |
+
+## Pivots across related tables
+
+A model source names a base table (the many side) and the fields to read. Each field is a table and column ID. A field's table must be the base table or a table the base reaches through many-to-one relationships. Field `i` in `rows`, `columns`, `values` and `filters` is `model.fields[i]`.
+
+```ts prelude="core" partial="requires a full-engine grid with the tables and relationship above" title="Amount by customer region"
+grid.setPivot({
+  id: "by-region",
+  name: "By region",
+  source: {
+    model: {
+      table: "orders",
+      fields: [
+        { table: "customers", column: "region" },
+        { table: "orders", column: "amount" },
+      ],
+    },
+  },
+  anchor: { row: 0, col: 0 },
+  rows: [0],
+  columns: [],
+  values: [{ field: 1, aggregation: "SUM" }],
+});
+```
+
+The result equals a pivot over the table you get by looking up each related column for every base row:
+
+| Case | Related value |
+| --- | --- |
+| The key matches one row | That row's cell |
+| The key matches no row, or is blank | Blank |
+| The many-side key is an error | That error |
+
+A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.

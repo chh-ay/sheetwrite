@@ -10,7 +10,7 @@ This is lexical: unknown future functions and incomplete formulas still
 round-trip without a parse/serialize pass changing their source text.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L623"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L623</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L669"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L669</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -90,6 +90,7 @@ const entryRoles = {
   "worker.html": "worker-loader-initial",
   "xlsx.html": "xlsx-loader-initial",
   "charts.html": "charts-loader-initial",
+  "queries.html": "queries-loader-initial",
   "shell.html": "shell-initial",
 };
 const defaultInitialChunks = new Set();
@@ -125,8 +126,10 @@ const xlsxChunks = classifyLazyChunks("xlsx.html", "xlsx-async");
 if (xlsxChunks.size === 0) throw new Error("Vite emitted no lazy XLSX chunk");
 const chartsChunks = classifyLazyChunks("charts.html", "charts-async");
 if (chartsChunks.size === 0) throw new Error("Vite emitted no lazy charts chunk");
+const queryChunks = classifyLazyChunks("queries.html", "queries-async");
+if (queryChunks.size === 0) throw new Error("Vite emitted no lazy query chunk");
 // Chunks already classified as optional-package code; the chrome walk below skips them.
-const optionalPackageChunks = new Set([...xlsxChunks, ...chartsChunks]);
+const optionalPackageChunks = new Set([...xlsxChunks, ...chartsChunks, ...queryChunks]);
 
 // Minifiers rename `createChartViewCache`, but keep this error text from the
 // charts view cache. It must be in the lazy charts chunk and in no initial chunk.
@@ -173,6 +176,24 @@ for (const marker of CHROME_MARKERS) {
   }
 }
 
+// The Sort panel is a dynamic entry of its own, apart from the other side
+// panels, so it loads only when it opens. Minifiers keep this panel text.
+const SORT_PANEL_MARKER = "My data has headers";
+const sortPanelKeys = Object.keys(manifest).filter(
+  (key) => manifest[key].isDynamicEntry && manifest[key].src?.endsWith("panels/sort-panel.js"),
+);
+if (sortPanelKeys.length !== 1) {
+  throw new Error(`Expected one lazy Vite Sort panel chunk, got ${sortPanelKeys.length}`);
+}
+if (!(await chunkSource(sortPanelKeys[0])).includes(SORT_PANEL_MARKER)) {
+  throw new Error("The lazy Vite Sort panel chunk does not contain the Sort panel");
+}
+for (const key of [...defaultInitialChunks, ...chromeVisited]) {
+  if (key !== sortPanelKeys[0] && (await chunkSource(key)).includes(SORT_PANEL_MARKER)) {
+    throw new Error(`The Sort panel is also in ${manifest[key].file}`);
+  }
+}
+
 const emitted = await walk(root);
 const publicFiles = emitted
   .map((path) => relative(root, path).replaceAll("\\", "/"))
@@ -195,10 +216,18 @@ if (/\bfrom\s*["']\.{1,2}\/|\bimport\s*\(\s*["']\.{1,2}\//.test(defaultWorker)) 
   throw new Error(`Core default worker ${defaultWorkers[0]} was copied, not bundled`);
 }
 const wasmFiles = publicFiles.filter((path) => path.endsWith(".wasm"));
-if (wasmFiles.length !== 1)
-  throw new Error(`Expected one Vite WASM asset, got ${wasmFiles.length}`);
-if (!rolesByFile.has(wasmFiles[0])) {
-  for (const role of initialRoles) addFile(wasmFiles[0], role);
+const queryWasmFiles = wasmFiles.filter((file) => rolesByFile.get(file)?.has("queries-async"));
+if (queryWasmFiles.length !== 1) {
+  throw new Error(`Expected one lazy query WASM asset, got ${queryWasmFiles.length}`);
+}
+
+const defaultWasmFiles = wasmFiles.filter((file) => !queryWasmFiles.includes(file));
+if (defaultWasmFiles.length !== 1) {
+  throw new Error(`Expected one default Vite WASM asset, got ${defaultWasmFiles.length}`);
+}
+
+if (!rolesByFile.has(defaultWasmFiles[0])) {
+  for (const role of initialRoles) addFile(defaultWasmFiles[0], role);
 }
 for (const file of publicFiles) {
   if (!rolesByFile.has(file)) throw new Error(`Unclassified Vite emitted asset: ${file}`);

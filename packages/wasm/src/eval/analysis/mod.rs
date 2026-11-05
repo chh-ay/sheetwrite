@@ -1,12 +1,15 @@
 //! Optional function families for the complete analysis engine.
 
 mod aggregate;
+mod bessel;
 mod compatibility;
+mod complex;
 mod database;
 mod dates;
 mod depreciation;
 mod descriptive;
 mod distributions;
+mod engineering;
 mod finance;
 mod groupby;
 mod hypothesis;
@@ -18,6 +21,7 @@ mod regression;
 mod reshape;
 mod securities;
 mod text;
+mod units;
 
 use crate::calc::Ast;
 use crate::store::CellStore;
@@ -122,6 +126,34 @@ const FAMILIES: &[Family] = &[
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: engineering::NAMES,
+        reference_cells: &[],
+        evaluate: Some(engineering::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: complex::NAMES,
+        reference_cells: &[],
+        evaluate: Some(complex::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bessel::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bessel::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: units::NAMES,
+        reference_cells: &[],
+        evaluate: Some(units::evaluate),
         evaluate_ast: None,
         array: None,
     },

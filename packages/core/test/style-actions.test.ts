@@ -58,7 +58,7 @@ describe("StyleActions underline/strikethrough toggles", () => {
   it("styles the selected rows in a descending sorted view", () => {
     const grid = makeGrid();
     const store = grid.store as SheetwriteStore;
-    store.sortBy("s1", 1, false);
+    store.setViewSort("s1", [{ col: 1, ascending: false }]);
     grid.setSelection({
       kind: "range",
       range: {

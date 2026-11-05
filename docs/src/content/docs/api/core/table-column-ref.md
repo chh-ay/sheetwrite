@@ -57,6 +57,7 @@ export interface TableColumnRef {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
@@ -66,6 +67,7 @@ export interface TableColumnRef {
 <p class="api-consumers-label">Public exports naming <code>TableColumnRef</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/pivot-source/"><code>PivotSource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/table-relationship/"><code>TableRelationship</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

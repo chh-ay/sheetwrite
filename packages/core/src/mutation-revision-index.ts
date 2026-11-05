@@ -68,6 +68,7 @@ export class MutationRevisionIndex {
         }
         case "setBlock":
         case "restoreBlock":
+        case "permuteRows":
           this.rectangles.push({ range: normalize(operation.range), revision });
           break;
         case "clearRange":

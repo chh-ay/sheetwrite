@@ -7,12 +7,14 @@
     "runtime": "bun run ./src/runtime.mjs",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
     "bundle:frameworks": "vite build",
-    "runtime:formulas": "bun run ./src/runtime-formulas.mjs"
+    "runtime:formulas": "bun run ./src/runtime-formulas.mjs",
+    "runtime:queries": "node ./src/runtime-queries.mjs && bun run ./src/runtime-queries.mjs"
   },
   "dependencies": {
     "@sheetwrite/charts": "file:artifacts/sheetwrite-charts-0.6.1.tgz",
     "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.6.1.tgz",
     "@sheetwrite/formulas": "file:artifacts/sheetwrite-formulas-0.6.1.tgz",
+    "@sheetwrite/queries": "file:artifacts/sheetwrite-queries-0.6.1.tgz",
     "@sheetwrite/react": "file:artifacts/sheetwrite-react-0.6.1.tgz",
     "@sheetwrite/svelte": "file:artifacts/sheetwrite-svelte-0.6.1.tgz",
     "@sheetwrite/vue": "file:artifacts/sheetwrite-vue-0.6.1.tgz",

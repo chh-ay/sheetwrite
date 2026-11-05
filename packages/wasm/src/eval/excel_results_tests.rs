@@ -86,6 +86,55 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn engineering_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=DEC2HEX(Data!B3)", "1E"),
+        ("=BIN2DEC(Data!A1&Data!A2-Data!A2)", "2"),
+        ("=BITAND(Data!B1,Data!A3)", "2"),
+        ("=ERF(Data!F1)", "0"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn complex_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=IMSUM(Data!A1:A3)", "6"),
+        ("=IMSUM(Data!D1:D3)", "#NUM!"),
+        ("=IMPRODUCT(Data!A2:A3,COMPLEX(0,1))", "6i"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn bessel_functions_read_cells() {
+    assert_results(&[
+        ("=ROUND(BESSELJ(Data!A3,1),6)", "0.339059"),
+        ("=BESSELI(Data!F1,0)", "1"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn convert_reads_cells() {
+    assert_results(&[("=CONVERT(Data!A1,\"m\",\"cm\")", "100")]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn legacy_statistics_names_read_references_as_their_successors() {
+    assert_results(&[
+        ("=STDEV(Data!A1:A3)", "1"),
+        ("=VAR(Report:Data!C1:C3)", "1"),
+        ("=MODE((Data!A1:A2,Data!A2:A3))", "2"),
+        ("=VARP(Data!D1:D3,Data!A1)", "4"),
+        ("=ZTEST(Data!D2:D3,1)", "#N/A"),
+        ("=CHITEST(Data!A1:A3,Data!B1:B2)", "#N/A"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn financial_functions_read_cells_text_dates_and_blanks() {
     assert_results(&[
         ("=DOLLARDE(Data!A1+0.02,16)", "1.125"),
@@ -103,19 +152,6 @@ fn financial_functions_read_cells_text_dates_and_blanks() {
             "180",
         ),
         ("=COUPPCD(\"2011-01-25\",\"2011-11-15\",2,1)", "40497"),
-    ]);
-}
-
-#[cfg(feature = "analysis")]
-#[test]
-fn legacy_statistics_names_read_references_as_their_successors() {
-    assert_results(&[
-        ("=STDEV(Data!A1:A3)", "1"),
-        ("=VAR(Report:Data!C1:C3)", "1"),
-        ("=MODE((Data!A1:A2,Data!A2:A3))", "2"),
-        ("=VARP(Data!D1:D3,Data!A1)", "4"),
-        ("=ZTEST(Data!D2:D3,1)", "#N/A"),
-        ("=CHITEST(Data!A1:A3,Data!B1:B2)", "#N/A"),
     ]);
 }
 

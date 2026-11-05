@@ -1183,7 +1183,7 @@ impl CellStore {
             }
             for change in spill_changes {
                 stale_readers.extend(
-                    direct_readers(index, change.sheet, &change.cells)
+                    direct_readers(index, &self.formula_slots, change.sheet, &change.cells)
                         .into_iter()
                         .map(|reader| StaleReader {
                             reader,
@@ -2502,7 +2502,8 @@ impl CellStore {
             return None;
         }
         let range = range_from_ast(&args[0], sheet)?;
-        let mut reader = match RangeReader::new(self, range, depth + 1) {
+        let reader_depth = depth + 1;
+        let mut reader = match RangeReader::new(self, range, reader_depth) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2510,6 +2511,9 @@ impl CellStore {
             Ok(criterion) => criterion,
             Err(error) => return Some(Value::Error(error)),
         };
+        if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
+            return Some(Value::number(count as f64));
+        }
         let mut matches = 0.0;
         loop {
             match reader.next_allow_errors(pass) {
@@ -2523,6 +2527,50 @@ impl CellStore {
             }
         }
         Some(Value::number(matches))
+    }
+
+    /// COUNTIF with a numeric criterion over dense columns that hold only
+    /// number literals: it compares the stored payloads directly instead of
+    /// reading each cell as a `Value`. `None` sends the caller to the cell
+    /// reader, for paged storage, any other cell kind or any other criterion.
+    /// Call it only after `RangeReader::new` accepted `range`: it clamps the
+    /// range to the used extent the same way.
+    ///
+    /// Out of line, and named `*_family`, so neither LLVM nor wasm-opt puts
+    /// its loops into `eval_ast`. The scan is scalar: enabling `simd128` for
+    /// one function enables it for the whole module, which makes other range
+    /// formulas up to 1.8x slower on x86-64 (#342).
+    #[inline(never)]
+    fn dense_number_count_if_family(
+        &self,
+        range: CellRange,
+        criterion: &Criterion,
+        reader_depth: usize,
+    ) -> Option<usize> {
+        // At the depth limit the reader reads literals through `eval_at`,
+        // which fails; see `LiteralSources::new`.
+        if reader_depth >= FORMULA_RECURSION_LIMIT {
+            return None;
+        }
+
+        let cells = &self.sheets.get(range.sheet as usize)?.cells;
+        let row_start = range.row_start as usize;
+        let row_end = (range.row_end as usize).min(cells.row_count().checked_sub(1)?);
+        let col_end = (range.col_end as usize).min(cells.n_cols().checked_sub(1)?);
+
+        let mut count = 0;
+        for col in range.col_start as usize..=col_end {
+            let column = cells.dense_column(col)?;
+            let (kinds, numbers) = column.raw_slices();
+            let kinds = kinds.get(row_start..=row_end)?;
+            // A literal's raw kind is its kind, and a number's payload is its
+            // `f64` bits. Formulas and blanks have other raw kinds.
+            if kinds.iter().any(|&kind| kind != KIND_NUMBER) {
+                return None;
+            }
+            count += criterion.count_numbers(&numbers[row_start..=row_end])?;
+        }
+        Some(count)
     }
 
     fn streamed_count_ifs(

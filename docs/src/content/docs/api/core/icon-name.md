@@ -8,7 +8,7 @@ description: "IconName type in @sheetwrite/core: The name of one glyph on the co
 The name of one glyph on the command icon sheet; the key of `IconOverrides`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/icons/icon-names.ts#L96"><code>packages/core/src/icons/icon-names.ts#L96</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/icons/icon-names.ts#L98"><code>packages/core/src/icons/icon-names.ts#L98</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -30,6 +30,7 @@ export type IconName = (typeof ICON_NAMES)[number];
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

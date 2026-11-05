@@ -8,7 +8,7 @@ description: "SyncConflictReloadReason type in @sheetwrite/core: Why a conflict 
 Why a conflict cannot be recovered in place; the host reloads the document instead.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L279"><code>packages/core/src/sync.ts#L279</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L288"><code>packages/core/src/sync.ts#L288</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -22,7 +22,8 @@ export type SyncConflictReloadReason =
   | "overlapping-work"
   | "version-advanced"
   | "own-mutation"
-  | "rejected";
+  | "rejected"
+  | "restore";
 ```
 
 </div>
@@ -36,6 +37,7 @@ export type SyncConflictReloadReason =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
