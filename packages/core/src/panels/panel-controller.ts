@@ -1,14 +1,15 @@
-// Opens the Chart panel, the pivot field list and the Explain Formula panel,
-// and runs the Insert › Chart and Insert › PivotTable commands. This module
-// is the panel chunk: panel-loader.ts loads it on first use and attaches it
-// once per grid. Everything goes through the public Grid API.
+// Opens the Chart panel, the pivot field list, the Explain Formula panel and
+// the Sort panel, and runs the Insert › Chart and Insert › PivotTable
+// commands. This module is the panel chunk: panel-loader.ts loads it on first
+// use and attaches it once per grid. The Sort panel is a chunk of its own
+// (`openLazyPanel`). Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
 import { sheetNameKey } from "../name-key.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot } from "../types/document.js";
-import type { Grid, IconOverrides } from "../types/grid.js";
+import type { Grid, GridPanel, IconOverrides } from "../types/grid.js";
 import type { PivotDefinition } from "../types/pivot.js";
 import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
@@ -22,11 +23,13 @@ import { parseRangeText } from "./range-text.js";
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" };
+  | { readonly kind: "explain" | "names" | "sort" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
   open: OpenPanel | null;
+  /** The latest lazy panel request; an older one that finishes loading later opens nothing. */
+  lazyRequest: symbol | null;
 }
 
 const STATES = new WeakMap<Grid, PanelState>();
@@ -34,7 +37,7 @@ const STATES = new WeakMap<Grid, PanelState>();
 function stateOf(grid: Grid): PanelState {
   let state = STATES.get(grid);
   if (state === undefined) {
-    state = { icons: undefined, open: null };
+    state = { icons: undefined, open: null, lazyRequest: null };
     STATES.set(grid, state);
   }
   return state;
@@ -91,6 +94,42 @@ export function openNamePanel(grid: Grid, define = false): void {
   grid.openPanel({
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
+/** Show the Sort panel for the selection or the current region. */
+export function openSortPanel(grid: Grid): void {
+  // A dynamic import, so bundlers emit the Sort panel as its own chunk that
+  // loads on first open instead of with every grid.
+  openLazyPanel(grid, { kind: "sort" }, async () => (await import("./sort-panel.js")).sortPanel);
+}
+
+/**
+ * Open a panel whose code is a chunk of its own, loaded on first open. The
+ * panel opens once the chunk is ready; until then the grid stays as it is.
+ * The latest request wins, so a second command during the load opens only
+ * its own panel. A failed load is not cached: the next open tries again, and
+ * the failure stays a rejected promise that the host's unhandled-rejection
+ * path observes.
+ */
+function openLazyPanel(
+  grid: Grid,
+  open: OpenPanel,
+  load: () => Promise<(grid: Grid) => GridPanel>,
+): void {
+  const state = stateOf(grid);
+  const request = Symbol(open.kind);
+  state.lazyRequest = request;
+
+  void load().then((build) => {
+    if (state.lazyRequest !== request) return;
+
+    state.lazyRequest = null;
+    const panel = build(grid);
+    grid.openPanel({
+      ...panel,
+      render: (body) => trackOpen(state, open, panel.render(body)),
+    });
   });
 }
 

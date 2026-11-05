@@ -235,7 +235,7 @@ describe("export", () => {
     });
     store.setColumnFilter("view", 0, { kind: "contains", text: "keep" });
     store.hideRows("view", [2]);
-    store.sortBy("view", 1, true);
+    store.setViewSort("view", [{ col: 1, ascending: true }]);
 
     expect(toCsv(store.getWorkbook().sheets[0]!, store)).toBe("\ufeffA\r\nkeep-c\r\nkeep-a");
 
@@ -250,7 +250,7 @@ describe("export", () => {
       columns: { a: ["zero", "one", "two"], b: [0, 1, 2] },
     });
     store.setColumnFilter("s", 0, { kind: "values", values: ["two"] });
-    store.sortBy("s", 1, false);
+    store.setViewSort("s", [{ col: 1, ascending: false }]);
 
     expect(toTsv({ sheet: "s", start: { row: 2, col: 1 }, end: { row: 0, col: 0 } }, store)).toBe(
       "zero\t0\r\none\t1\r\ntwo\t2",

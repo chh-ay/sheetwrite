@@ -58,6 +58,28 @@ const assets = selected.map((path) => {
 if (!assets.some((asset) => asset.kind === "javascript" && asset.roles.includes("core-initial"))) {
   throw new Error("Next.js manifest identified no initial browser JavaScript");
 }
+
+// The Sort panel is a chunk of its own, apart from the other side panels and
+// from every initial chunk, so it loads only when it opens. Minifiers keep the
+// panel text.
+const SORT_PANEL_MARKER = "My data has headers";
+const PANEL_MARKER = "sheetwrite-panel-section";
+const sortPanelChunks = [];
+for (const path of selected.filter((file) => file.endsWith(".js"))) {
+  const code = await readFile(path, "utf8");
+  if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push({ path, code });
+}
+if (sortPanelChunks.length !== 1) {
+  throw new Error(`Expected one lazy Next.js Sort panel chunk, got ${sortPanelChunks.length}`);
+}
+const [sortPanelChunk] = sortPanelChunks;
+const sortPanelUrl = relative(nextRoot, sortPanelChunk.path).replaceAll("\\", "/");
+if (lifecycleInitialUrls.has(sortPanelUrl) || attributionInitialUrls.has(sortPanelUrl)) {
+  throw new Error(`The Sort panel is in the initial Next.js chunk ${sortPanelUrl}`);
+}
+if (sortPanelChunk.code.includes(PANEL_MARKER)) {
+  throw new Error("The Sort panel shares a Next.js chunk with the other side panels");
+}
 const attributionAssetFiles = selected
   .map((path) => relative(nextRoot, path).replaceAll("\\", "/"))
   .filter((path) => path.endsWith(".js") && attributionInitialUrls.has(path));

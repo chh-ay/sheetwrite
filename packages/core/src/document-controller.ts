@@ -160,10 +160,16 @@ export class DocumentController {
     return outcome;
   }
 
+  /**
+   * Commit `input` as one undoable transaction. `trailingInverse` runs at the
+   * end of this transaction's undo, after every captured inverse: history
+   * restore uses it to put back sources that an inverse insert alone cannot.
+   */
   commit(
     input: DocumentOp[],
     reason: CommitReason,
     admitted?: AdmittedTransactionResources,
+    trailingInverse: readonly DocumentOp[] = [],
   ): ApplyTransactionResult {
     const atomic = isAtomicBatch(input);
     const limits = atomic
@@ -270,6 +276,9 @@ export class DocumentController {
 
     const applied = outcome.transaction.patches;
     const inverse = this.takeAppliedInverses(patches, inverseByPatch, applied);
+    for (const operation of trailingInverse) {
+      inverse.push({ kind: "patches", patches: [operation] });
+    }
 
     this.rebaseHistoryFor(applied);
     this.history.push(inverse, applied);

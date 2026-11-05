@@ -160,9 +160,37 @@ storage; the IndexedDB adapter uses atomic database transactions and closes its
 database connection after each request.
 
 `HistoryError` extends `SheetwriteError`. Its stable codes distinguish invalid
-history, generation conflicts, capacity, missing records, integrity, unavailable
-storage, blocked database open, and transaction failures. An abort rejects with
+history, an invalid restore scope, generation conflicts, capacity, missing records,
+integrity, unavailable storage, blocked database open, and transaction failures. An abort rejects with
 the caller's `signal.reason`. It never publishes a partial marker.
+
+### Restore a version
+
+`archive.restoreVersion(grid, versionId, scope, { sync, signal })` brings back part or
+all of a version on a live grid as **one undoable change**: one undo step, one `change`
+event with `commitReason: "restore"`, and, with `sync`, one synchronized transaction.
+The version is rebuilt in a separate engine instance. Sheet and workbook settings are
+compared and only the changed ones are written; the cells of the scope are cleared and
+written again from the version. All of it uses ordinary document operations, so the
+undo step and the synchronized transaction grow with the size of the scope.
+
+| Scope | Restores | Keeps current |
+| --- | --- | --- |
+| `{ kind: "workbook" }` | Every sheet (re-creating removed sheets with their IDs and removing later ones), sheet order, names, table relationships, calculation options | Retained OOXML parts (`xlsxSource`), as undo does |
+| `{ kind: "sheet", sheet }` | That sheet's name, size, columns, cells, styles, notes, merges, rules, hyperlinks, protected ranges, row metadata, frozen panes, tables, charts and pivots; a removed sheet comes back with its ID | Other sheets, workbook names |
+| `{ kind: "range", range }` | Values, formulas, styles, notes, and merged cells and hyperlinks inside the range | Sheet size, rules, tables, charts, pivots, everything outside the range |
+
+A sheet keeps its ID, so formulas on other sheets keep their references. When a
+sheet was smaller in the version, its last rows or columns are deleted: as with a
+manual delete, a reference into those rows becomes `#REF!`, and undoing the restore
+brings the rows and the references back. A range restore rejects with `invalid-scope`
+when the range cuts a merged cell or hyperlink, now or in the version; the message
+names the object's rows and columns, so the user can widen the range.
+
+In a shared document, pass the grid's `SyncCoordinator`. The restore needs it online
+with no pending or conflicted commits, and rejects with `conflict` if the document
+changes while the version is read. A restore commit is never rebased; see
+[Restoring versions](/docs/features/collaboration/#restoring-versions).
 
 ## Large undo
 

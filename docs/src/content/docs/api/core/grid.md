@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/core/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L791"><code>packages/core/src/types/grid.ts#L791</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L800"><code>packages/core/src/types/grid.ts#L800</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -58,10 +58,10 @@ function updateTotal(grid: Grid) {
 <a href="#grid-define-cell-renderer"><code>defineCellRenderer</code></a>
 <a href="#grid-aggregate"><code>aggregate</code></a>
 <a href="#grid-sort-by"><code>sortBy</code></a>
-<a href="#grid-sort-by-multi"><code>sortByMulti</code></a>
 <a href="#grid-filter-by"><code>filterBy</code></a>
 <a href="#grid-set-column-filter"><code>setColumnFilter</code></a>
-<a href="#grid-set-sort"><code>setSort</code></a>
+<a href="#grid-set-view-sort"><code>setViewSort</code></a>
+<a href="#grid-sort-range"><code>sortRange</code></a>
 <a href="#grid-get-column-filters"><code>getColumnFilters</code></a>
 <a href="#grid-distinct-values"><code>distinctValues</code></a>
 <a href="#grid-hide-rows"><code>hideRows</code></a>
@@ -429,36 +429,30 @@ function total(grid: Grid) {
 </details>
 
 <details class="api-member" id="grid-sort-by" data-pagefind-weight="1">
-<summary><code>sortBy</code> <span class="api-member-summary">Sort the displayed rows by a column (does not mutate stored data).</span></summary>
+<summary><code>sortBy</code> <span class="api-member-summary">Excel's quick sort by column col: sort the cells of the table body that holds the focus cell, or else of the selected range, or else of the current region around the focus cell.</span></summary>
 
 ```ts generated
 sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
 ```
 
-Sort the displayed rows by a column (does not mutate stored data).
+Excel's quick sort by column `col`: sort the cells of the table body
+that holds the focus cell, or else of the selected range, or else of the
+current region around the focus cell. A first row of text over other
+values stays as a header.
 
 ### Examples
 
 ```ts compile
 import type { Grid } from "@sheetwrite/core";
 
-function showLargestFirst(grid: Grid) {
+function largestFirst(grid: Grid) {
   grid.sortBy(1, false);
 }
 ```
 
 ### See also
 
-- [Grid.clearView](/docs/api/core/grid/#grid-clear-view)
-
-</details>
-
-<details class="api-member" id="grid-sort-by-multi" data-pagefind-weight="1">
-<summary><code>sortByMulti</code> <span class="api-member-summary">Multi-key sort of the displayed rows (first key primary; stable).</span></summary>
-
-```ts generated
-sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult;
-```
+- [Grid.sortRange](/docs/api/core/grid/#grid-sort-range)
 
 </details>
 
@@ -498,11 +492,57 @@ setColumnFilter(col: number, filter: ColumnFilter | null): void;
 and compose with the active sort and hidden rows.</p>
 </details>
 
-<details class="api-member" id="grid-set-sort" data-pagefind-weight="1">
-<summary><code>setSort</code> <span class="api-member-summary">Persisted multi-key sort of the active sheet.</span></summary>
+<details class="api-member" id="grid-set-view-sort" data-pagefind-weight="1">
+<summary><code>setViewSort</code> <span class="api-member-summary">Sort the displayed rows of the active sheet by keys (first key primary; stable) without moving any cell; an empty list clears the view sort.</span></summary>
 
 ```ts generated
-setSort(keys: readonly SortKey[]): ApplyTransactionResult;
+setViewSort(keys: readonly SortKey[]): ApplyTransactionResult;
+```
+
+Sort the displayed rows of the active sheet by `keys` (first key primary;
+stable) without moving any cell; an empty list clears the view sort. The
+keys are saved with the sheet and export to XLSX as `sortState`.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+  grid.setViewSort([{ col: 1, ascending: false }]);
+}
+```
+
+### See also
+
+- [Grid.clearView](/docs/api/core/grid/#grid-clear-view)
+
+</details>
+
+<details class="api-member" id="grid-sort-range" data-pagefind-weight="1">
+<summary><code>sortRange</code> <span class="api-member-summary">Sort the cells of range in place, as Excel's Sort does: one undoable change that collaborators receive as one transaction.</span></summary>
+
+```ts generated
+sortRange( range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean }, ): ApplyTransactionResult;
+```
+
+Sort the cells of `range` in place, as Excel's Sort does: one undoable
+change that collaborators receive as one transaction. With `hasHeader`
+the first row stays. Merged cells of different sizes reject the sort and
+emit `mutation-rejected`.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function sortOrders(grid: Grid) {
+  grid.sortRange(
+    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+    [{ col: 2, ascending: false }],
+    { hasHeader: true },
+  );
+}
 ```
 
 </details>
@@ -1336,10 +1376,16 @@ export interface Grid {
   defineCellRenderer(name: string, renderer: CellRenderer): void;
   aggregate(col: number, op: AggregateOp): number;
   sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
-  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult;
   filterBy(col: number, needle: string): void;
   setColumnFilter(col: number, filter: ColumnFilter | null): void;
-  setSort(keys: readonly SortKey[]): ApplyTransactionResult;
+  setViewSort(keys: readonly SortKey[]): ApplyTransactionResult;
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options?: {
+      hasHeader?: boolean;
+    },
+  ): ApplyTransactionResult;
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
   distinctValues(col: number, limit?: number): CellScalar[];
   hideRows(rows: readonly number[]): void;
@@ -1472,12 +1518,12 @@ export interface Grid {
 <li><a href="/docs/api/core/create-grid-from-snapshot/"><code>createGridFromSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid-config/"><code>GridConfig</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-coordinator/"><code>PresenceCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/revision-coordinator/"><code>RevisionCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/toolbar-item/"><code>ToolbarItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-workbook/"><code>toXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-workbook-stream/"><code>toXlsxWorkbookStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/grid-publication-adapter/"><code>GridPublicationAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li class="api-consumer-more">and 20 more</li>
 </ul>
 </div>
