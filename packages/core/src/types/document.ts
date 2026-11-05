@@ -465,6 +465,12 @@ export interface XlsxSourceGraph {
   readonly target: string;
   /** Pivot cache id written into `<pivotCaches>`. */
   readonly cacheId?: string;
+  /**
+   * 64-bit hex digest of `workbook.queries` at import, for graphs that hold
+   * saved query definitions (the DataMashup and its connections). Any query
+   * change makes the graph stale, so it is dropped.
+   */
+  readonly queries?: string;
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];

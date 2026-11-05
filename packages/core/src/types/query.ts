@@ -136,3 +136,48 @@ export interface SavedQuery {
   /** Absent for a query that only feeds other queries. */
   readonly output?: SavedQueryOutput;
 }
+
+/** One place where exported M behaves differently from the Sheetwrite engine. */
+export interface PowerQueryLoss {
+  /** Saved query identity. */
+  readonly query: string;
+  /** Zero-based step, or null for the source or the query as a whole. */
+  readonly step: number | null;
+  /** Stable code, such as `host-source` or `outer-join-order`. */
+  readonly code: string;
+}
+
+/** A `Section1.m` document and the member name each query was written under. */
+export interface PowerQueryExport {
+  readonly section: string;
+  /** Section member name for each query, in the order the queries were given. */
+  readonly members: readonly string[];
+  readonly losses: readonly PowerQueryLoss[];
+}
+
+/** An imported section member outside the supported subset, kept as text. */
+export interface PowerQueryUnsupported {
+  readonly member: string;
+  /** Stable code, such as `syntax`, `source`, `step` or `dependency`. */
+  readonly reason: string;
+  /** The M function or form involved, if known. */
+  readonly detail: string;
+  /** The member's original text. */
+  readonly text: string;
+}
+
+/** Queries read from M, without outputs; the XLSX reader binds them to tables. */
+export interface PowerQueryImport {
+  readonly queries: readonly SavedQuery[];
+  readonly unsupported: readonly PowerQueryUnsupported[];
+}
+
+/**
+ * Translates saved queries to and from Power Query M. Import reads text only:
+ * it never evaluates M or fetches a source. `@sheetwrite/queries` provides one.
+ */
+export interface PowerQueryCodec {
+  encode(queries: readonly SavedQuery[]): PowerQueryExport;
+  /** Throws when the text is not a `section Section1;` document. */
+  decode(section: string): PowerQueryImport;
+}

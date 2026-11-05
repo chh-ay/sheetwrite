@@ -1793,6 +1793,17 @@ function cellNumberFormatOverride(
   return "General";
 }
 
+/** Excel links customXml items from the workbook part; other writers may link them from the root. */
+function hasCustomXml(packageFile: OpcPackage): boolean {
+  return [
+    ...packageFile.relationships(packageFile.officeDocumentPart()),
+    ...packageFile.relationships(""),
+  ].some(
+    (relationship) =>
+      !relationship.external && relationshipTypeMatches(relationship.type, "customXml"),
+  );
+}
+
 function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnapshot): void {
   for (const sheet of snapshot.sheets) {
     const meta =
@@ -2611,6 +2622,13 @@ export async function readWorkbook(
       new Set([...modelledPivotParts, ...chartParts.modelled]),
       chartParts.replacements,
     );
+  // The Power Query module loads only for workbooks that can hold queries:
+  // saved definitions in the hidden metadata, or a customXml item.
+  const sidecarQueries = metadata?.workbook.queries;
+  if (sidecarQueries?.length || hasCustomXml(packageFile)) {
+    const { readPowerQuery } = await import("./power-query.js");
+    await readPowerQuery(packageFile, snapshot, sidecarQueries, context);
+  }
   const formulas = await convertWorkbookFormulas(snapshot, "import");
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {

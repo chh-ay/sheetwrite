@@ -66,6 +66,14 @@ Shared parts such as a pivot and its cache form one graph: they are kept or drop
 
 A drawing that holds both charts that Sheetwrite reads and other objects is split. The charts go to `Sheet.charts`, and the kept drawing keeps only the other anchors. On export, Sheetwrite charts go into the sheet's kept drawing, because a worksheet has only one drawing.
 
+Power Query parts (the `DataMashup` customXml item and `xl/connections.xml`)
+hold saved query definitions. They are kept only while `workbook.queries` is
+unchanged since import. If a query was added, edited or removed, the kept M
+would be stale. Export then drops these parts, writes output tables as values,
+and reports a `query-loss` warning. With a Power Query codec, export writes new
+parts for the current queries instead. See
+[Power Query in XLSX](/docs/features/data/data-operations/#power-query-in-xlsx).
+
 ## Drops and warnings
 
 Parts reached through a relationship into worksheet, table, styles or workbook parts are dropped because Sheetwrite rewrites those parts. External links, chart sheets, digital signatures and graphs whose relationships point outside the kept parts are also dropped with warnings.
