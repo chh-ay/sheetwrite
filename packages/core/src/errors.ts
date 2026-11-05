@@ -19,6 +19,7 @@ export type SheetwriteErrorCode =
   | "resource-limit"
   | "invalid-snapshot"
   | "invalid-history"
+  | "invalid-scope"
   | "capacity"
   | "integrity"
   | "invalid-argument"
@@ -83,6 +84,7 @@ export const SHEETWRITE_ERROR_CODES = [
   "resource-limit",
   "invalid-snapshot",
   "invalid-history",
+  "invalid-scope",
   "capacity",
   "integrity",
   "invalid-argument",
