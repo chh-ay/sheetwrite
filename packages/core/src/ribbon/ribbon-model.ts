@@ -721,7 +721,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            ...button("Manage Data Model", "dataModel", openDataModel, "view", { large: true }),
+            // Excel's "Manage Data Model" wraps to three lines under a large glyph.
+            ...button("Data Model", "dataModel", openDataModel, "view", { large: true }),
             available: (grid) => workbookTableCount(grid) > 0,
           },
           {

@@ -95,7 +95,7 @@ export function openNamePanel(grid: Grid, define = false): void {
   });
 }
 
-/** Data › Manage Data Model and Data › Relationships open the data model panel. */
+/** Data › Data Model and Data › Relationships open the data model panel. */
 export function openDataModelPanel(grid: Grid): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "dataModel" };

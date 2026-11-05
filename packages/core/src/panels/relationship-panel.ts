@@ -169,6 +169,12 @@ export function relationshipPanel(grid: Grid): GridPanel {
 
         const engine = storeEngine(grid.store);
         entries.replaceChildren();
+        if (relationships().length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "sheetwrite-panel-note";
+          empty.textContent = "No relationships yet. Pick two tables and their key columns below.";
+          entries.append(empty);
+        }
         for (const relationship of relationships()) {
           const label = `${columnLabel(workbookTables, relationship.from.table, relationship.from.column)} → ${columnLabel(workbookTables, relationship.to.table, relationship.to.column)}`;
           const row = panelSection(label);

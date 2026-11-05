@@ -90,7 +90,7 @@ async function setup() {
 it("shows the Data Tools commands once the workbook has tables to manage and relate", async () => {
   const { control, openTab, addTable } = await setup();
   const shown = () => ({
-    manage: control("Manage Data Model") !== null,
+    manage: control("Data Model") !== null,
     relate: control("Relationships") !== null,
   });
   openTab("Data");

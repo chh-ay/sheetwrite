@@ -73,7 +73,7 @@ store.dispose();
 
 ## Data model panel
 
-In the ribbon, **Data › Data Tools › Manage Data Model** and **Relationships** open the data model panel. Manage Data Model appears when the workbook has a table, and Relationships when it has two. The panel loads on first use.
+In the ribbon, **Data › Data Tools › Data Model** and **Relationships** open the data model panel. Data Model appears when the workbook has a table, and Relationships when it has two. The panel loads on first use.
 
 - **Tables** lists each table with its column and data-row counts.
 - **Relationships** lists each relationship as `Data[Key] → Lookup[Key]` with its key status, and **Edit** and **Delete** buttons.
