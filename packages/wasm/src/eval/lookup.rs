@@ -143,42 +143,45 @@ fn compare(left: Entry<'_>, right: Entry<'_>) -> Result<Ordering, FormulaError> 
     }
 }
 
-/// A search list: its length and the entry at each position.
-pub(super) trait LookupList {
-    fn len(&self) -> usize;
-    fn entry(&self, position: usize) -> Entry<'_>;
+/// A search list: a range's literal sources read in place, or values.
+/// Matching on the list kind per entry keeps one copy of every search.
+pub(super) enum ListView<'a> {
+    /// Entry `i` is the slot `first + i * step` of a dense sheet's sources.
+    Storage {
+        kinds: &'a [u8],
+        payloads: &'a [u64],
+        strings: &'a StringStorage,
+        first: usize,
+        step: usize,
+        len: usize,
+    },
+    Values(&'a [Value]),
 }
 
-impl LookupList for [Value] {
+impl ListView<'_> {
     fn len(&self) -> usize {
-        <[Value]>::len(self)
-    }
-
-    fn entry(&self, position: usize) -> Entry<'_> {
-        Entry::of(&self[position])
-    }
-}
-
-/// A list of literal sources read in place: entry `i` is the slot
-/// `first + i * step` of the sheet's dense source arrays.
-pub(super) struct StorageList<'a> {
-    pub(super) kinds: &'a [u8],
-    pub(super) payloads: &'a [u64],
-    pub(super) strings: &'a StringStorage,
-    pub(super) first: usize,
-    pub(super) step: usize,
-    pub(super) len: usize,
-}
-
-impl LookupList for StorageList<'_> {
-    fn len(&self) -> usize {
-        self.len
+        match self {
+            Self::Storage { len, .. } => *len,
+            Self::Values(values) => values.len(),
+        }
     }
 
     #[inline]
     fn entry(&self, position: usize) -> Entry<'_> {
-        let index = self.first + position * self.step;
-        Entry::literal(self.strings, self.kinds[index], self.payloads[index])
+        match self {
+            Self::Storage {
+                kinds,
+                payloads,
+                strings,
+                first,
+                step,
+                ..
+            } => {
+                let index = first + position * step;
+                Entry::literal(strings, kinds[index], payloads[index])
+            }
+            Self::Values(values) => Entry::of(&values[position]),
+        }
     }
 }
 
@@ -205,11 +208,7 @@ pub(crate) struct SearchState {
 }
 
 impl SearchState {
-    fn sorted_ok(
-        &mut self,
-        list: &(impl LookupList + ?Sized),
-        search_mode: i32,
-    ) -> Result<bool, FormulaError> {
+    fn sorted_ok(&mut self, list: &ListView<'_>, search_mode: i32) -> Result<bool, FormulaError> {
         let requires_ascending = search_mode == 2;
         let slot = if requires_ascending {
             &mut self.ascending
@@ -219,20 +218,20 @@ impl SearchState {
         *slot.get_or_insert_with(|| monotonicity_walk(list, requires_ascending))
     }
 
-    fn uniform_kind(&mut self, list: &(impl LookupList + ?Sized)) -> Option<UniformKind> {
+    fn uniform_kind(&mut self, list: &ListView<'_>) -> Option<UniformKind> {
         *self.kind.get_or_insert_with(|| classify(list))
     }
 
     /// Whether the boundary search can answer for `key`: the list is one
     /// comparison domain, ascending, and the key belongs to that domain.
-    fn boundary_gate(&mut self, list: &(impl LookupList + ?Sized), key: Entry<'_>) -> bool {
+    fn boundary_gate(&mut self, list: &ListView<'_>, key: Entry<'_>) -> bool {
         let Some(kind) = self.uniform_kind(list) else {
             return false;
         };
         key_fits_domain(key, kind) && matches!(self.sorted_ok(list, 2), Ok(true))
     }
 
-    fn exact_index(&mut self, list: &(impl LookupList + ?Sized)) -> Option<&ExactIndex> {
+    fn exact_index(&mut self, list: &ListView<'_>) -> Option<&ExactIndex> {
         self.exact
             .get_or_insert_with(|| ExactIndex::build(list))
             .as_ref()
@@ -242,7 +241,7 @@ impl SearchState {
 /// Searches `list` with the plain scan's rules. With `state`, the second and
 /// later searches of the pass use the index where it proves the same answer.
 pub(super) fn find_match(
-    list: &(impl LookupList + ?Sized),
+    list: &ListView<'_>,
     key: &Value,
     match_mode: i32,
     search_mode: i32,
@@ -282,7 +281,7 @@ pub(super) fn find_match(
 /// an error, and the plain scan decides everything else, including its error
 /// order.
 fn exact_match(
-    list: &(impl LookupList + ?Sized),
+    list: &ListView<'_>,
     key: Entry<'_>,
     search_reverse: bool,
     use_index: bool,
@@ -327,7 +326,7 @@ fn exact_match(
 /// Nearest value across the key, on the side `match_mode` asks for, at the
 /// first position of the nearest value.
 fn approximate_scan(
-    list: &(impl LookupList + ?Sized),
+    list: &ListView<'_>,
     key: Entry<'_>,
     match_mode: i32,
 ) -> Result<Option<usize>, FormulaError> {
@@ -364,10 +363,7 @@ fn approximate_scan(
 
 /// The plain scan's pair walk: the first non-monotone pair is `Ok(false)`,
 /// the first failed comparison is its error, and a clean walk is `Ok(true)`.
-fn monotonicity_walk(
-    list: &(impl LookupList + ?Sized),
-    requires_ascending: bool,
-) -> Result<bool, FormulaError> {
+fn monotonicity_walk(list: &ListView<'_>, requires_ascending: bool) -> Result<bool, FormulaError> {
     let violation = if requires_ascending {
         Ordering::Greater
     } else {
@@ -383,7 +379,7 @@ fn monotonicity_walk(
 
 /// First (or last) wildcard match. A non-text key matches nothing.
 fn wildcard_scan(
-    list: &(impl LookupList + ?Sized),
+    list: &ListView<'_>,
     key: Entry<'_>,
     search_reverse: bool,
 ) -> Result<Option<usize>, FormulaError> {
@@ -408,7 +404,7 @@ fn wildcard_scan(
 /// and the first position above it bound the equal run; without an equal
 /// entry the answer is the first position of the nearest value.
 fn approximate_boundary(
-    list: &(impl LookupList + ?Sized),
+    list: &ListView<'_>,
     key: Entry<'_>,
     match_mode: i32,
 ) -> Result<Option<usize>, FormulaError> {
@@ -427,10 +423,7 @@ fn approximate_boundary(
 }
 
 /// First position whose entry is not below `probe`.
-fn first_not_below(
-    list: &(impl LookupList + ?Sized),
-    probe: Entry<'_>,
-) -> Result<usize, FormulaError> {
+fn first_not_below(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, FormulaError> {
     let (mut low, mut high) = (0, list.len());
     while low < high {
         let middle = low + (high - low) / 2;
@@ -444,7 +437,7 @@ fn first_not_below(
 }
 
 /// First position whose entry is above `probe`.
-fn first_above(list: &(impl LookupList + ?Sized), probe: Entry<'_>) -> Result<usize, FormulaError> {
+fn first_above(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, FormulaError> {
     let (mut low, mut high) = (0, list.len());
     while low < high {
         let middle = low + (high - low) / 2;
@@ -472,7 +465,7 @@ fn key_fits_domain(key: Entry<'_>, kind: UniformKind) -> bool {
 
 /// The domain every entry shares, or `None` when the list mixes domains or
 /// holds an error or NaN. Blanks belong to every domain.
-fn classify(list: &(impl LookupList + ?Sized)) -> Option<UniformKind> {
+fn classify(list: &ListView<'_>) -> Option<UniformKind> {
     let mut found: Option<UniformKind> = None;
     for position in 0..list.len() {
         let kind = match list.entry(position) {
@@ -491,135 +484,142 @@ fn classify(list: &(impl LookupList + ?Sized)) -> Option<UniformKind> {
     found
 }
 
-/// Exact-match classes. Two entries share a class and value exactly when the
-/// lookup order calls them equal within one type; blank equals `0`, `""` and
-/// `FALSE` across types, so a key looks in each class it can equal.
-const CLASS_BLANK: u8 = 0;
-const CLASS_EMPTY_TEXT: u8 = 1;
-const CLASS_NUMBER: u8 = 2;
-const CLASS_TEXT: u8 = 3;
-const CLASS_BOOL: u8 = 4;
+/// First and last position of one class of equal entries.
+type Bounds = (u32, u32);
 
-/// One list position under its class and value. A number value is its bits
-/// with `-0` as `0`, text is its case-folded rank, and a logical is 0 or 1.
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
-struct IndexEntry {
-    class: u8,
-    value: u64,
-    position: u32,
+fn widen(bounds: &mut Option<Bounds>, position: u32) {
+    *bounds = Some(match *bounds {
+        None => (position, position),
+        Some((first, _)) => (first, position),
+    });
 }
 
-/// Every position sorted by class, value and position, so the first and last
-/// position of an equal run are its ends. It holds no copy of an entry: text
-/// keys find their rank by binary search over one position per distinct
-/// text.
+/// The first and last position of every class of equal entries. Two
+/// entries share a class exactly when the lookup order calls them equal
+/// within one type; blank equals `0`, `""` and `FALSE` across types, so a key
+/// looks in each class it can equal.
+///
+/// Distinct numbers and case-folded texts are sorted once, with the sorts
+/// the engine already has for `u64` and `String`, and each class keeps only
+/// its bounds: the index holds no copy of a text.
 struct ExactIndex {
-    entries: Vec<IndexEntry>,
-    /// One position per distinct case-folded text, in rank order.
+    blank: Option<Bounds>,
+    empty_text: Option<Bounds>,
+    false_bool: Option<Bounds>,
+    true_bool: Option<Bounds>,
+    /// Distinct number values in sorted order, with their bounds.
+    numbers: Vec<u64>,
+    number_bounds: Vec<Bounds>,
+    /// One position per distinct case-folded text, in sorted order, with
+    /// the bounds of that text.
     texts: Vec<u32>,
+    text_bounds: Vec<Bounds>,
 }
 
 impl ExactIndex {
     /// The index of `list`, or `None` for a list with an error or NaN, whose
     /// scan order must decide.
-    fn build(list: &(impl LookupList + ?Sized)) -> Option<Self> {
-        let mut text_positions = Vec::new();
+    fn build(list: &ListView<'_>) -> Option<Self> {
+        let mut numbers = Vec::new();
+        let mut folded = Vec::new();
         for position in 0..list.len() {
             match list.entry(position) {
                 Entry::Error(_) => return None,
                 Entry::Number(number) if number.is_nan() => return None,
-                Entry::Text(text) if !text.is_empty() => text_positions.push(position as u32),
+                Entry::Number(number) => numbers.push(number_value(number)),
+                Entry::Text(text) if !text.is_empty() => folded.push(text.to_lowercase()),
                 _ => {}
             }
         }
 
-        let text_of = |position: u32| match list.entry(position as usize) {
-            Entry::Text(text) => text,
-            _ => "",
-        };
-        text_positions.sort_by(|&a, &b| {
-            compare_text_case_insensitive(text_of(a), text_of(b)).then(a.cmp(&b))
-        });
-        let mut ranks = vec![0u32; list.len()];
-        let mut texts: Vec<u32> = Vec::new();
-        for &position in &text_positions {
-            let distinct = texts.last().is_none_or(|&last| {
-                compare_text_case_insensitive(text_of(last), text_of(position)) != Ordering::Equal
-            });
-            if distinct {
-                texts.push(position);
-            }
-            ranks[position as usize] = (texts.len() - 1) as u32;
-        }
+        let mut distinct_numbers = numbers.clone();
+        distinct_numbers.sort_unstable();
+        distinct_numbers.dedup();
+        let mut distinct_texts = folded.clone();
+        distinct_texts.sort_unstable();
+        distinct_texts.dedup();
 
-        let mut entries: Vec<IndexEntry> = (0..list.len())
-            .map(|position| {
-                let (class, value) = match list.entry(position) {
-                    Entry::Blank => (CLASS_BLANK, 0),
-                    Entry::Number(number) => (CLASS_NUMBER, number_value(number)),
-                    Entry::Text("") => (CLASS_EMPTY_TEXT, 0),
-                    Entry::Text(_) => (CLASS_TEXT, u64::from(ranks[position])),
-                    Entry::Bool(value) => (CLASS_BOOL, u64::from(value)),
-                    Entry::Error(_) => (CLASS_BLANK, 0),
-                };
-                IndexEntry {
-                    class,
-                    value,
-                    position: position as u32,
+        let mut index = Self {
+            blank: None,
+            empty_text: None,
+            false_bool: None,
+            true_bool: None,
+            number_bounds: vec![(u32::MAX, 0); distinct_numbers.len()],
+            numbers: distinct_numbers,
+            texts: vec![u32::MAX; distinct_texts.len()],
+            text_bounds: vec![(u32::MAX, 0); distinct_texts.len()],
+        };
+        let (mut next_number, mut next_text) = (0, 0);
+        for position in 0..list.len() {
+            let at = position as u32;
+            match list.entry(position) {
+                Entry::Blank => widen(&mut index.blank, at),
+                Entry::Text("") => widen(&mut index.empty_text, at),
+                Entry::Bool(false) => widen(&mut index.false_bool, at),
+                Entry::Bool(true) => widen(&mut index.true_bool, at),
+                Entry::Number(_) => {
+                    let rank = index.numbers.binary_search(&numbers[next_number]).ok()?;
+                    next_number += 1;
+                    let bounds = &mut index.number_bounds[rank];
+                    *bounds = (bounds.0.min(at), at);
                 }
-            })
-            .collect();
-        drop(ranks);
-        entries.sort_unstable();
-        Some(Self { entries, texts })
+                Entry::Text(_) => {
+                    let rank = distinct_texts.binary_search(&folded[next_text]).ok()?;
+                    next_text += 1;
+                    if index.texts[rank] == u32::MAX {
+                        index.texts[rank] = at;
+                    }
+                    let bounds = &mut index.text_bounds[rank];
+                    *bounds = (bounds.0.min(at), at);
+                }
+                Entry::Error(_) => return None,
+            }
+        }
+        Some(index)
     }
 
     /// The first (or last) position equal to `key`, or `None` for a key the
     /// index does not classify (an error or NaN), which keeps the plain scan.
     fn find(
         &self,
-        list: &(impl LookupList + ?Sized),
+        list: &ListView<'_>,
         key: Entry<'_>,
         search_reverse: bool,
     ) -> Option<Option<usize>> {
         let mut found: Option<usize> = None;
-        let mut consider = |class: u8, value: u64| {
-            let start = self
-                .entries
-                .partition_point(|entry| (entry.class, entry.value) < (class, value));
-            let end = start
-                + self.entries[start..]
-                    .partition_point(|entry| (entry.class, entry.value) == (class, value));
-            if start == end {
+        let mut consider = |bounds: Option<Bounds>| {
+            let Some((first, last)) = bounds else {
                 return;
-            }
-            let position = if search_reverse {
-                self.entries[end - 1].position
-            } else {
-                self.entries[start].position
-            } as usize;
+            };
+            let position = if search_reverse { last } else { first } as usize;
             found = Some(match found {
                 None => position,
                 Some(current) if search_reverse => current.max(position),
                 Some(current) => current.min(position),
             });
         };
+        let number = |value: f64| {
+            self.numbers
+                .binary_search(&number_value(value))
+                .ok()
+                .map(|rank| self.number_bounds[rank])
+        };
 
         match key {
             Entry::Blank => {
-                consider(CLASS_BLANK, 0);
-                consider(CLASS_NUMBER, 0);
-                consider(CLASS_EMPTY_TEXT, 0);
-                consider(CLASS_BOOL, 0);
+                consider(self.blank);
+                consider(number(0.0));
+                consider(self.empty_text);
+                consider(self.false_bool);
             }
             Entry::Bool(false) => {
-                consider(CLASS_BOOL, 0);
-                consider(CLASS_BLANK, 0);
+                consider(self.false_bool);
+                consider(self.blank);
             }
-            Entry::Bool(true) => consider(CLASS_BOOL, 1),
+            Entry::Bool(true) => consider(self.true_bool),
             Entry::Text("") => {
-                consider(CLASS_EMPTY_TEXT, 0);
-                consider(CLASS_BLANK, 0);
+                consider(self.empty_text);
+                consider(self.blank);
             }
             Entry::Text(text) => {
                 let rank =
@@ -628,19 +628,24 @@ impl ExactIndex {
                             Entry::Text(stored) => compare_text_case_insensitive(stored, text),
                             _ => Ordering::Less,
                         });
-                if let Ok(rank) = rank {
-                    consider(CLASS_TEXT, rank as u64);
-                }
+                consider(rank.ok().map(|rank| self.text_bounds[rank]));
             }
-            Entry::Number(number) if !number.is_nan() => {
-                consider(CLASS_NUMBER, number_value(number));
-                if number == 0.0 {
-                    consider(CLASS_BLANK, 0);
+            Entry::Number(value) if !value.is_nan() => {
+                consider(number(value));
+                if value == 0.0 {
+                    consider(self.blank);
                 }
             }
             _ => return None,
         }
         Some(found)
+    }
+
+    fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
+        stats.add_vec::<u64>(self.numbers.len(), self.numbers.capacity());
+        stats.add_vec::<Bounds>(self.number_bounds.len(), self.number_bounds.capacity());
+        stats.add_vec::<u32>(self.texts.len(), self.texts.capacity());
+        stats.add_vec::<Bounds>(self.text_bounds.len(), self.text_bounds.capacity());
     }
 }
 
@@ -714,8 +719,7 @@ impl LookupStates {
         stats.add_vec::<(u32, LookupRangeState)>(self.states.len(), self.states.capacity());
         for (_, state) in &self.states {
             if let Some(Some(index)) = &state.search.exact {
-                stats.add_vec::<IndexEntry>(index.entries.len(), index.entries.capacity());
-                stats.add_vec::<u32>(index.texts.len(), index.texts.capacity());
+                index.add_memory_stats(stats);
             }
         }
     }
@@ -983,7 +987,7 @@ impl CellStore {
                     ListPart::Whole if range.rows == 1 => (range.row_count, range.cols),
                     ListPart::Whole => (1, range.rows * range.cols),
                 };
-                let list = StorageList {
+                let list = ListView::Storage {
                     kinds,
                     payloads,
                     strings: &self.strings,
@@ -1009,7 +1013,7 @@ impl CellStore {
                     }
                     ListPart::FirstRow => &values[..(*cols).min(values.len())],
                 };
-                find_match(list, key, match_mode, search_mode, None)
+                find_match(&ListView::Values(list), key, match_mode, search_mode, None)
             }
         }
     }
