@@ -93,11 +93,7 @@ try {
   chart.click();
   await loadPanels(grid);
   await Promise.resolve();
-  assert.equal(
-    evaluations,
-    1,
-    "the first Chart click must import the panels once",
-  );
+  assert.equal(evaluations, 1, "the first Chart click must import the panels once");
   assert.equal(insertions, 1);
   assert.equal(insertedInto, grid);
 } finally {
