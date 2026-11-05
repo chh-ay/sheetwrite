@@ -11,7 +11,7 @@ import {
   type CompleteFormulaWorkloadResult,
   collectFixture,
   formulaSourceEnginePackage,
-  validateFormulaCapture,
+  validateRecordedFormulaCapture,
 } from "./formula-bench.js";
 import {
   benchmarkEnginePath,
@@ -143,7 +143,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
   );
   for (const capture of result.engines) {
     exactKeys(capture, ["engine", "shared", "wasm", "initialization"], "engine capture fields");
-    validateFormulaCapture(capture.shared);
+    validateRecordedFormulaCapture(capture.shared);
     if (
       capture.shared.mode !== "full" ||
       capture.shared.meta.commit !== result.meta.commit ||

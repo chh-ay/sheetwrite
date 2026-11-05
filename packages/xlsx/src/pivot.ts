@@ -756,10 +756,11 @@ function resolveWriteSource(
 
 /** Why the definition alone has no OOXML form, or undefined. */
 function definitionBlocker(pivot: PivotDefinition, width: number): string | undefined {
+  const values = implicitValues(pivot);
   const fields = [
     ...pivot.rows,
     ...pivot.columns,
-    ...pivot.values.map((value) => value.field),
+    ...values.map((value) => value.field),
     ...(pivot.filters ?? []).map((filter) => filter.field),
     ...(pivot.sort ?? []).map((sort) => sort.field),
   ];
@@ -770,13 +771,18 @@ function definitionBlocker(pivot: PivotDefinition, width: number): string | unde
   if (new Set(axisFields).size !== axisFields.length) {
     return "it uses one field more than once on its axes";
   }
-  if (pivot.values.some((value) => !SUBTOTAL_BY_AGGREGATION.has(value.aggregation))) {
+  if (values.some((value) => !SUBTOTAL_BY_AGGREGATION.has(value.aggregation))) {
     return "Excel pivot caches have no distinct count";
   }
   if (pivot.filters?.some((filter) => filter.values.length === 0)) {
     return "it filters out every value";
   }
   return undefined;
+}
+
+/** Value fields that aggregate a source field; measures have no pivot-cache form. */
+function implicitValues(pivot: PivotDefinition) {
+  return pivot.values.filter((value) => "field" in value);
 }
 
 /** Type and item statistics of one source field's data cells. */
@@ -1069,7 +1075,8 @@ function pivotTableXml(
   const subtotals = pivot.subtotals !== false;
   const rows = new Set(pivot.rows);
   const columns = new Set(pivot.columns);
-  const values = new Set(pivot.values.map((value) => value.field));
+  const dataFields = implicitValues(pivot);
+  const values = new Set(dataFields.map((value) => value.field));
   const filters = new Map((pivot.filters ?? []).map((filter) => [filter.field, filter]));
   const pages = [...filters.keys()].filter((field) => !rows.has(field) && !columns.has(field));
   const pageSet = new Set(pages);
@@ -1150,9 +1157,9 @@ function pivotTableXml(
     for (const field of pages) xml.append(`<pageField fld="${field}" hier="-1"/>`);
     xml.append("</pageFields>");
   }
-  if (pivot.values.length > 0) {
-    xml.append(`<dataFields count="${pivot.values.length}">`);
-    for (const value of pivot.values) {
+  if (dataFields.length > 0) {
+    xml.append(`<dataFields count="${dataFields.length}">`);
+    for (const value of dataFields) {
       const subtotal = SUBTOTAL_BY_AGGREGATION.get(value.aggregation) ?? "sum";
       xml.append(
         `<dataField${value.name !== undefined ? ` name="${escapeXml(encodeXstring(value.name))}"` : ""} fld="${value.field}"${subtotal === "sum" ? "" : ` subtotal="${subtotal}"`} baseField="0" baseItem="0"/>`,

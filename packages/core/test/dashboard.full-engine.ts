@@ -168,3 +168,43 @@ it("shows the pivot result as a table in the dashboard view", async () => {
     ["Total", "6"],
   ]);
 });
+
+it("shows measure values in a dashboard pivot, equal to the same pivot on a worksheet", () => {
+  const input = snapshot();
+  input.workbook.dataModel = {
+    relationships: [],
+    measures: [{ id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" }],
+  };
+  const byMeasure = (id: string, anchorRow: number): PivotDefinition => ({
+    id,
+    name: "Twice by region",
+    source: {
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "region" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    },
+    anchor: { row: anchorRow, col: 0 },
+    rows: [0],
+    columns: [],
+    values: [{ measure: "twice" }],
+  });
+  const [data, dash] = input.sheets;
+  if (data === undefined || dash === undefined) throw new Error("the fixture has two sheets");
+  data.pivots = [byMeasure("measure-on-sheet", 6)];
+  dash.pivots = [byMeasure("measure-on-dashboard", 0)];
+  dash.dashboard = { items: [] };
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+
+  const onSheet = grid.getPivotResult("data", "measure-on-sheet");
+  const onDashboard = dashboardPivotResult(grid, "dash", "measure-on-dashboard");
+  expect(onSheet?.status).toBe("ok");
+  expect(onDashboard?.cells).toEqual(onSheet?.cells);
+  expect(onDashboard?.cells).toContain(8);
+});

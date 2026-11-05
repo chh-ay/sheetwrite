@@ -36,11 +36,16 @@ import {
   validateSheetName,
   validateWorkbookTableName,
   validWorkbookTableXmlElement,
+  withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
 import { readCharts } from "./chart-read.js";
 import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";
-import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
+import {
+  convertFormulaSources,
+  formulaContainsExternalReference,
+  workbookFormulaSources,
+} from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
@@ -52,7 +57,11 @@ import {
   validateCodecSnapshot,
   type XlsxCodecContext,
 } from "./resources.js";
-import { shiftCellReferencesInText, translateSharedFormula } from "./shared-formula.js";
+import {
+  expandSharedFormulas,
+  type SharedFormulaGroup,
+  type SharedFormulaMember,
+} from "./shared-formula.js";
 import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
@@ -85,12 +94,17 @@ interface ColumnCells {
 }
 
 /** A shared-formula cell whose master may follow it in the worksheet. */
-interface PendingSharedFormula {
-  readonly cell: SnapshotCell;
+interface PendingSharedFormula extends SharedFormulaMember {
+  /** The group's `si` index. */
   readonly index: string;
-  readonly address: string;
-  /** Formula text the writer put on this cell too; Excel ignores it unless the master does not lex. */
-  readonly ownFormula: string | undefined;
+}
+
+/** The text and position of a shared formula's master cell. */
+interface SharedFormulaMaster {
+  formula: string;
+  row: number;
+  col: number;
+  authoritative: boolean;
 }
 
 const INITIAL_STYLE_INDEX_CAPACITY = 1_024;
@@ -159,6 +173,8 @@ interface ParsedSheet {
   readonly cells: SnapshotCell[];
   readonly cellStyles: CellStyleIndices;
   readonly columnCells: ReadonlyMap<number, ColumnCells>;
+  /** Shared formulas, expanded by the engine once every sheet is read. */
+  readonly sharedFormulas: readonly SharedFormulaGroup[];
   readonly rowCount: number;
   readonly columnCount: number;
   readonly conditionalFormats: ConditionalFormatRule[];
@@ -284,36 +300,72 @@ function uniqueSheetId(name: string, order: number, used: Set<string>): string {
 }
 
 /**
- * A shared-formula cell's own formula, expanded from its group's master.
- *
- * A master that does not lex has no copy rule, since the engine cannot parse
- * it either. Then the cell keeps the formula text its writer stored on it, if
- * any, and otherwise gets the reader's former text scan, which moves plain
- * cell references. Either way the result may differ from what Excel shows, so
- * the cell gets an `unsupported-feature` warning instead of a silently wrong
- * or unshifted formula.
+ * The sidecar sheet that holds each worksheet's Sheetwrite metadata, by
+ * worksheet order. A worksheet takes the sidecar sheet of the same name
+ * first; a worksheet without one then takes the sidecar sheet at its order,
+ * if no other worksheet claimed it (a renamed sheet). Each sidecar sheet and
+ * each sheet ID is claimed at most once, so a sheet inserted before a known
+ * sheet gets a new identity.
  */
-function expandSharedFormula(
-  master: { readonly formula: string; readonly row: number; readonly col: number },
-  pending: PendingSharedFormula,
+function claimSidecarSheets(
+  sources: readonly ParsedSheet[],
+  metadata: WorkbookSnapshot | null,
   context: XlsxCodecContext,
-  sheet: string,
-): string {
-  const rowDelta = pending.cell.rowOffset - master.row;
-  const colDelta = pending.cell.colOffset - master.col;
-  const expanded = translateSharedFormula(master.formula, rowDelta, colDelta);
-  if (expanded !== undefined) return expanded;
+): (SheetSnapshot | undefined)[] {
+  const claims: (SheetSnapshot | undefined)[] = sources.map(() => undefined);
+  if (!metadata) return claims;
 
-  emitWarning(context, {
-    code: "unsupported-feature",
-    message:
-      pending.ownFormula === undefined
-        ? "Shared formula master does not parse; its cell references were moved by a text scan"
-        : "Shared formula master does not parse; the cell keeps its own formula text",
-    sheet,
-    cell: pending.address,
+  const claimedIds = new Set<string>();
+  const claim = (order: number, meta: SheetSnapshot | undefined): boolean => {
+    if (!meta || claimedIds.has(meta.id)) return false;
+    claimedIds.add(meta.id);
+    claims[order] = meta;
+    return true;
+  };
+
+  sources.forEach((source, order) => {
+    const key = sheetNameKey(source.name);
+    claim(
+      order,
+      metadata.sheets.find((candidate) => sheetNameKey(candidate.name) === key),
+    );
   });
-  return pending.ownFormula ?? shiftCellReferencesInText(master.formula, rowDelta, colDelta);
+
+  sources.forEach((source, order) => {
+    if (claims[order]) return;
+    const ordinal = metadata.sheets.find((candidate) => candidate.order === order);
+    if (!claim(order, ordinal)) return;
+    emitWarning(context, {
+      code: "invalid-metadata",
+      message: `Reconciled renamed worksheet ${source.name} to sidecar identity by stable ordinal`,
+      sheet: source.name,
+    });
+  });
+
+  return claims;
+}
+
+/** Group each sheet's shared-formula cells under their master. */
+function sharedFormulaGroups(
+  pending: readonly PendingSharedFormula[],
+  masters: ReadonlyMap<string, SharedFormulaMaster>,
+  sheet: string,
+): SharedFormulaGroup[] {
+  const groups = new Map<string, SharedFormulaGroup & { members: SharedFormulaMember[] }>();
+  for (const member of pending) {
+    let group = groups.get(member.index);
+    if (!group) {
+      const master = masters.get(member.index);
+      if (!master) {
+        return readerFailure(`shared formula ${member.index} at ${member.address} has no master`);
+      }
+
+      group = { sheet, formula: master.formula, row: master.row, col: master.col, members: [] };
+      groups.set(member.index, group);
+    }
+    group.members.push(member);
+  }
+  return [...groups.values()];
 }
 
 function parseSharedStrings(
@@ -923,6 +975,48 @@ function columnWidthPixels(width: number): number {
   );
 }
 
+/**
+ * For each column, the index of the last declaration in `spans` that covers
+ * it, or -1. `spans` holds each declaration's first and last zero-based
+ * column. A later declaration wins, as in Excel. Declarations are visited
+ * last to first and each column is claimed once, so overlapping full-width
+ * declarations cost one pass over the columns, not one per declaration.
+ */
+function lastColumnDeclarations(spans: readonly number[]): Int32Array {
+  let columnCount = 0;
+  for (let at = 1; at < spans.length; at += 2) {
+    columnCount = Math.max(columnCount, (spans[at] ?? 0) + 1);
+  }
+
+  const owners = new Int32Array(columnCount).fill(-1);
+  // `nextFree[col]` leads to the first unclaimed column at or after `col`.
+  const nextFree = Int32Array.from({ length: columnCount + 1 }, (_, col) => col);
+  const firstFree = (col: number): number => {
+    let free = col;
+    while (nextFree[free] !== free) free = nextFree[free] ?? columnCount;
+
+    // Point every column on the walked path at the answer, so no path is walked twice.
+    let step = col;
+    while (step !== free) {
+      const next = nextFree[step] ?? columnCount;
+      nextFree[step] = free;
+      step = next;
+    }
+    return free;
+  };
+
+  for (let declaration = spans.length / 2 - 1; declaration >= 0; declaration--) {
+    const first = spans[declaration * 2] ?? 0;
+    const last = spans[declaration * 2 + 1] ?? -1;
+    for (let col = firstFree(first); col <= last; col = firstFree(col + 1)) {
+      owners[col] = declaration;
+      nextFree[col] = col + 1;
+    }
+  }
+
+  return owners;
+}
+
 function parseColumns(
   root: XmlElement,
   styles: ParsedStyles,
@@ -932,6 +1026,9 @@ function parseColumns(
   const columns = new Map<number, Partial<Column>>();
   const collection = xmlChild(root, "cols");
   if (!collection) return columns;
+
+  const spans: number[] = [];
+  const definitions: Partial<Column>[] = [];
   for (const element of xmlChildren(collection, "col")) {
     const min = parseUnsigned(xmlAttribute(element, "min"), "column minimum");
     const max = parseUnsigned(xmlAttribute(element, "max"), "column maximum");
@@ -963,18 +1060,23 @@ function parseColumns(
           ? "currency"
           : "number"
         : undefined;
-    for (let index = min - 1; index < max; index++) {
-      columns.set(index, {
-        ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
-        ...(xmlAttribute(element, "hidden") !== undefined
-          ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
-          : {}),
-        cellStyle: structuredClone(style.style ?? {}),
-        ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
-        ...(type ? { type } : {}),
-      });
-    }
+    spans.push(min - 1, max - 1);
+    definitions.push({
+      ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
+      ...(xmlAttribute(element, "hidden") !== undefined
+        ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
+        : {}),
+      cellStyle: structuredClone(style.style ?? {}),
+      ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
+      ...(type ? { type } : {}),
+    });
   }
+
+  // Readers copy a definition before they change it, so columns of one declaration share it.
+  lastColumnDeclarations(spans).forEach((declaration, col) => {
+    const definition = definitions[declaration];
+    if (definition) columns.set(col, definition);
+  });
   return columns;
 }
 
@@ -1220,6 +1322,54 @@ function parseTables(
   return tables;
 }
 
+type RowGroups = NonNullable<SheetSnapshot["rowGroups"]>;
+
+/**
+ * The row outline groups: for each level, each run of consecutive outlined
+ * rows at that level or deeper. A group is collapsed when its last row or the
+ * row after it is marked collapsed, or when every row of the group is hidden.
+ * Each level is one walk over the outlined rows in order.
+ */
+function outlineRowGroups(
+  levels: ReadonlyMap<number, number>,
+  collapsedRows: ReadonlySet<number>,
+  hiddenRows: ReadonlySet<number>,
+): RowGroups {
+  const rows = Uint32Array.from(levels.keys()).sort();
+  const rowLevels = Uint8Array.from(rows, (row) => levels.get(row) ?? 0);
+  const maxLevel = rowLevels.reduce((maximum, level) => Math.max(maximum, level), 0);
+  const groups: RowGroups = [];
+
+  for (let level = 1; level <= maxLevel; level++) {
+    let start = -1;
+    let end = -1;
+    let allHidden = true;
+    const close = (): void => {
+      const collapsed = collapsedRows.has(end + 1) || collapsedRows.has(end) || allHidden;
+      groups.push({ start, end, collapsed });
+    };
+
+    rows.forEach((row, index) => {
+      if ((rowLevels[index] ?? 0) < level) return;
+
+      if (start >= 0 && row === end + 1) {
+        end = row;
+        allHidden &&= hiddenRows.has(row);
+        return;
+      }
+
+      if (start >= 0) close();
+      start = row;
+      end = row;
+      allHidden = hiddenRows.has(row);
+    });
+
+    if (start >= 0) close();
+  }
+
+  return groups;
+}
+
 /**
  * Rows are streamed from the inflated worksheet; only cells and the small
  * non-row tree stay resident. `columnSource` is set for the second pass over a
@@ -1240,10 +1390,7 @@ async function parseSheet(
   const cellStyles = new CellStyleIndices();
   const columnCells = new Map<number, ColumnCells>();
   const pendingSharedFormulas: PendingSharedFormula[] = [];
-  const sharedMasters = new Map<
-    string,
-    { formula: string; row: number; col: number; authoritative: boolean }
-  >();
+  const sharedMasters = new Map<string, SharedFormulaMaster>();
   let inferredRow = 0;
   let maxRow = -1;
   let maxCol = -1;
@@ -1265,6 +1412,8 @@ async function parseSheet(
     columnStylesRead = true;
     const columnCollection = xmlChild(root, "cols");
     columnsPrecedeRows = columnCollection !== undefined;
+    const spans: number[] = [];
+    const columnStyles: string[] = [];
     for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
       const style = xmlAttribute(columnElement, "style");
       if (style === undefined) continue;
@@ -1272,8 +1421,14 @@ async function parseSheet(
       const max = parseUnsigned(xmlAttribute(columnElement, "max"), "column maximum");
       if (min < 1 || max < min) readerFailure("column range is invalid");
       assertResource(context, "maxColumnsPerSheet", max);
-      for (let index = min - 1; index < max; index++) inheritedColumnStyles.set(index, style);
+      spans.push(min - 1, max - 1);
+      columnStyles.push(style);
     }
+
+    lastColumnDeclarations(spans).forEach((declaration, col) => {
+      const style = columnStyles[declaration];
+      if (style !== undefined) inheritedColumnStyles.set(col, style);
+    });
   };
   if (columnSource) readColumnStyles(columnSource);
 
@@ -1464,28 +1619,7 @@ async function parseSheet(
     );
   }
   readColumnStyles(root);
-  for (const pending of pendingSharedFormulas) {
-    const master = sharedMasters.get(pending.index);
-    if (!master) {
-      return readerFailure(`shared formula ${pending.index} at ${pending.address} has no master`);
-    }
-    const { rowOffset: row, colOffset: col } = pending.cell;
-    const formula =
-      row === master.row && col === master.col
-        ? master.formula
-        : expandSharedFormula(master, pending, context, reference.name);
-    if (formulaContainsExternalReference(formula)) {
-      emitWarning(context, {
-        code: "external-formula",
-        message: "External shared formula was neutralized as inert text",
-        sheet: reference.name,
-        cell: pending.address,
-      });
-      pending.cell.value = { kind: "literal", value: `=${formula}` };
-    } else {
-      pending.cell.value = { kind: "formula", src: `=${formula}` };
-    }
-  }
+  const sharedFormulas = sharedFormulaGroups(pendingSharedFormulas, sharedMasters, reference.name);
   const dimension = xmlAttribute(
     xmlChild(root, "dimension") ?? { attributes: {}, children: [], name: "", text: "" },
     "ref",
@@ -1517,39 +1651,7 @@ async function parseSheet(
   const hiddenOutlineRows = new Set(
     rowMeta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
   );
-  const rowGroups: NonNullable<SheetSnapshot["rowGroups"]> = [];
-  const maxOutlineLevel = Math.max(0, ...outlineLevels.values());
-  for (let level = 1; level <= maxOutlineLevel; level++) {
-    let start: number | undefined;
-    let previous = -2;
-    const outlined = [...outlineLevels.entries()]
-      .filter(([, rowLevel]) => rowLevel >= level)
-      .map(([row]) => row)
-      .sort((left, right) => left - right);
-    for (const row of [...outlined, Number.NaN]) {
-      if (start === undefined) {
-        if (Number.isFinite(row)) {
-          start = row;
-          previous = row;
-        }
-      } else if (row === previous + 1) {
-        previous = row;
-      } else {
-        rowGroups.push({
-          start,
-          end: previous,
-          collapsed:
-            collapsedRows.has(previous + 1) ||
-            collapsedRows.has(previous) ||
-            outlined
-              .filter((candidate) => candidate >= start! && candidate <= previous)
-              .every((candidate) => hiddenOutlineRows.has(candidate)),
-        });
-        start = Number.isFinite(row) ? row : undefined;
-        previous = row;
-      }
-    }
-  }
+  const rowGroups = outlineRowGroups(outlineLevels, collapsedRows, hiddenOutlineRows);
   const view = xmlChildren(xmlChild(root, "sheetViews") ?? root, "sheetView").at(-1);
   const pane = view ? xmlChild(view, "pane") : undefined;
   const paneState = pane ? xmlAttribute(pane, "state") : undefined;
@@ -1668,6 +1770,7 @@ async function parseSheet(
     cells,
     cellStyles,
     columnCells,
+    sharedFormulas,
     rowCount: Math.max(0, maxRow + 1),
     columnCount: Math.max(1, maxCol + 1),
     columns,
@@ -1798,12 +1901,13 @@ function hasCustomXml(packageFile: OpcPackage): boolean {
   );
 }
 
-function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnapshot): void {
+/** Restore sidecar cell fields from the sidecar sheet each worksheet claimed, by sheet order. */
+function restoreSidecarFields(
+  snapshot: WorkbookSnapshot,
+  claims: readonly (SheetSnapshot | undefined)[],
+): void {
   for (const sheet of snapshot.sheets) {
-    const meta =
-      metadata.sheets.find(
-        (candidate) => sheetNameKey(candidate.name) === sheetNameKey(sheet.name),
-      ) ?? metadata.sheets.find((candidate) => candidate.order === sheet.order);
+    const meta = claims[sheet.order];
     if (!meta || sheet.cells.length === 0) continue;
     // Index the sidecar, which holds only the cells it restores, so the sheet's
     // cells are scanned once instead of indexed.
@@ -2040,6 +2144,40 @@ function externalNamedRanges(
   return ranges.length > 0 ? ranges : undefined;
 }
 
+/**
+ * Expand shared formulas, then convert every formula source to editor
+ * spelling, in one engine session. A workbook without formulas leaves the
+ * engine unloaded.
+ */
+async function importWorkbookFormulas(
+  snapshot: WorkbookSnapshot,
+  sharedFormulas: readonly SharedFormulaGroup[],
+  context: XlsxCodecContext,
+): Promise<void> {
+  if (sharedFormulas.length === 0 && workbookFormulaSources(snapshot).length === 0) return;
+
+  const converted = await withXlsxFormulaEngine((engine) => {
+    expandSharedFormulas(engine, sharedFormulas, context);
+    return convertFormulaSources(engine, workbookFormulaSources(snapshot), "import");
+  });
+  for (const sheet of snapshot.sheets) {
+    for (const block of sheet.cells) {
+      for (const cell of block.cells) {
+        if (cell.value.kind !== "formula") continue;
+        const source = converted.get(cell.value.src);
+        if (source === undefined) throw new Error("Missing imported cell formula");
+        cell.value.src = source;
+      }
+    }
+  }
+  for (const named of snapshot.workbook.namedRanges ?? []) {
+    if (named.formula === undefined) continue;
+    const source = converted.get(named.formula);
+    if (source === undefined) throw new Error("Missing imported defined-name formula");
+    named.formula = source;
+  }
+}
+
 /** Grow `sheet` so that `row` and `col` lie inside it; references may point past the cells. */
 function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
   sheet.rowCount = Math.max(sheet.rowCount, row + 1);
@@ -2215,25 +2353,15 @@ export async function readWorkbook(
       );
     }
   }
-  const usedIds = new Set<string>();
   const sheetIds = new Map<string, string>();
-  const resolvedMetadata = sourceSheets.map((source, order) => {
-    const exact = metadata?.sheets.find(
-      (candidate) => sheetNameKey(candidate.name) === sheetNameKey(source.name),
-    );
-    const ordinal = metadata?.sheets.find((candidate) => candidate.order === order);
-    if (!exact && ordinal) {
-      emitWarning(context, {
-        code: "invalid-metadata",
-        message: `Reconciled renamed worksheet ${source.name} to sidecar identity by stable ordinal`,
-        sheet: source.name,
-      });
-    }
-    return exact ?? ordinal;
-  });
+  const resolvedMetadata = claimSidecarSheets(sourceSheets, metadata, context);
+  const usedIds = new Set<string>();
+  for (const meta of resolvedMetadata) {
+    if (meta) usedIds.add(meta.id);
+  }
+
   const resolvedIds = sourceSheets.map((source, order) => {
     const id = resolvedMetadata[order]?.id ?? uniqueSheetId(source.name, order, usedIds);
-    usedIds.add(id);
     sheetIds.set(sheetNameKey(source.name), id);
     return id;
   });
@@ -2592,7 +2720,12 @@ export async function readWorkbook(
     },
     sheets,
   };
-  if (metadata) restoreSidecarFields(snapshot, metadata);
+  await importWorkbookFormulas(
+    snapshot,
+    sourceSheets.flatMap((source) => source.sharedFormulas),
+    context,
+  );
+  restoreSidecarFields(snapshot, resolvedMetadata);
   const sheetParts = sourceReferences.map((reference) => reference.relationship.target);
   const modelledPivotParts = await readPivots(
     packageFile,
@@ -2618,23 +2751,6 @@ export async function readWorkbook(
   if (sidecarQueries?.length || hasCustomXml(packageFile)) {
     const { readPowerQuery } = await import("./power-query.js");
     await readPowerQuery(packageFile, snapshot, sidecarQueries, context);
-  }
-  const formulas = await convertWorkbookFormulas(snapshot, "import");
-  for (const sheet of snapshot.sheets) {
-    for (const block of sheet.cells) {
-      for (const cell of block.cells) {
-        if (cell.value.kind !== "formula") continue;
-        const source = formulas.get(cell.value.src);
-        if (source === undefined) throw new Error("Missing imported cell formula");
-        cell.value.src = source;
-      }
-    }
-  }
-  for (const named of snapshot.workbook.namedRanges ?? []) {
-    if (named.formula === undefined) continue;
-    const source = formulas.get(named.formula);
-    if (source === undefined) throw new Error("Missing imported defined-name formula");
-    named.formula = source;
   }
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {

@@ -116,6 +116,25 @@ impl Writer {
     }
 }
 
+/// A vector of `count` zero words, or `None` when memory cannot hold it.
+/// Like `vec![0; count]`, it asks the allocator for zeroed memory, which
+/// fresh WASM pages already are.
+#[cfg(any(target_arch = "wasm32", test))]
+fn zeroed_vec<T: TransferWord>(count: usize) -> Option<Vec<T>> {
+    let layout = std::alloc::Layout::array::<T>(count).ok()?;
+    if layout.size() == 0 {
+        return Some(Vec::new());
+    }
+
+    // SAFETY: the layout has nonzero size. A non-null result points at
+    // `count` zeroed words, and zero is a valid TransferWord. The vector
+    // takes ownership with the global allocator and the same layout.
+    unsafe {
+        let pointer = std::alloc::alloc_zeroed(layout).cast::<T>();
+        (!pointer.is_null()).then(|| Vec::from_raw_parts(pointer, count, count))
+    }
+}
+
 #[cfg(any(target_arch = "wasm32", test))]
 pub(crate) struct Reader<'a> {
     #[cfg(not(target_arch = "wasm32"))]
@@ -251,7 +270,11 @@ impl<'a> Reader<'a> {
             return Err("invalid transfer length".into());
         }
 
-        let mut values = vec![T::default(); length / width];
+        // Runs of zeros take no stream bytes, so the declared length cannot be
+        // checked against the input. A length that memory cannot hold is an
+        // error, not an allocation abort.
+        let mut values =
+            zeroed_vec::<T>(length / width).ok_or("transfer array exceeds available memory")?;
         // SAFETY: TransferWord has nonzero size and no padding, and permits
         // every bit pattern the decoder can write. The vector owns exactly
         // length initialized bytes. u8 requires no stricter alignment, and

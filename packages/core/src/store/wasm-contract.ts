@@ -31,7 +31,10 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
     /** Full engine only: the output cells of a pivot on a dashboard, which places none in cells. */
     pivotOutput?(sheet: number, index: number): PivotOutputCells;
 
-    /** Full engine only: replace every relationship; five IDs each (`setRelationships`). */
+    /**
+     * Full engine only: replace every relationship and measure; five strings
+     * each (`setRelationships`).
+     */
     setRelationships?(strings: string[]): boolean;
 
     /** Full engine only: `[code, firstRow, secondRow, unmatched]`, empty for an unknown ID. */
