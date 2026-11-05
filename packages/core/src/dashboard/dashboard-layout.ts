@@ -4,6 +4,7 @@
 
 import { boxesOverlap } from "../dashboard.js";
 import type { DashboardBox, DashboardItem } from "../types/dashboard.js";
+import type { Grid } from "../types/grid.js";
 
 /** Columns of the dashboard grid. */
 export const DASHBOARD_COLUMNS = 12;
@@ -53,4 +54,13 @@ export function firstFreeBox(items: readonly DashboardItem[], w: number, h: numb
     }
   }
   return { x: 0, y: bottom, w: width, h };
+}
+
+/** Insert › New Dashboard: a dashboard named like Excel names new sheets, made active. */
+export function newDashboard(grid: Grid): void {
+  const names = new Set(grid.store.getWorkbook().sheets.map((sheet) => sheet.name.toLowerCase()));
+  let number = 1;
+  while (names.has(`dashboard${number}`)) number += 1;
+  const result = grid.addSheet({ id: "dashboard", name: `Dashboard${number}`, kind: "dashboard" });
+  if (result.status === "applied") grid.setActiveSheet(result.sheet);
 }

@@ -2961,19 +2961,6 @@ export class GridImpl implements Grid {
     return { ...result, sheet: id };
   }
 
-  /** A dashboard named like Excel names new sheets, made active. */
-  private newDashboard(): void {
-    const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.name.toLowerCase()));
-    let number = 1;
-    while (names.has(`dashboard${number}`)) number += 1;
-    const result = this.addSheet({
-      id: "dashboard",
-      name: `Dashboard${number}`,
-      kind: "dashboard",
-    });
-    if (result.status === "applied") this.setActiveSheet(result.sheet);
-  }
-
   removeSheet(id: SheetId): SheetLifecycleResult {
     const result = this.document.commit([{ op: "removeSheet", sheet: id }], "structure");
     return { ...result, sheet: id };
@@ -3450,7 +3437,9 @@ export class GridImpl implements Grid {
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
       versionHistory: () => this.config?.history?.(this, "open"),
-      newDashboard: () => this.newDashboard(),
+      // The dashboard chunk names and adds the sheet; first paint carries only this call.
+      newDashboard: () =>
+        void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
       saveVersion: () => {
         if (!this.readOnly) this.config?.history?.(this, "save");
       },

@@ -235,6 +235,9 @@ it("adds a dashboard from Insert and shows it", async () => {
   if (button === null) throw new Error("no New Dashboard command");
 
   press(button);
+  // The command loads the dashboard chunk first.
+  await import("../src/dashboard/dashboard-layout.js");
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   const added = grid.store.getWorkbook().sheets.at(-1);
   expect(added).toMatchObject({ name: "Dashboard1", kind: "dashboard" });
