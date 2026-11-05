@@ -1,4 +1,4 @@
-import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import { preparedHistoryBlock } from "./transaction-preparation.js";
 import type { CellStyle } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";

@@ -1,5 +1,6 @@
 import { validVersionOperationCounts } from "./atomic-batch.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import { cloneJsonValue, compareCodeUnits } from "./plain-data.js";
 import type { PendingCommitLoadOptions, PendingCommitStorage } from "./sync.js";
 import type { PendingCommit } from "./types/transaction.js";

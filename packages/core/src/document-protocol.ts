@@ -16,7 +16,7 @@ import {
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
 import { validateDataModelShape, validateRelationshipShape } from "./data-model.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
   isSafeExternalHyperlink,
@@ -25,7 +25,7 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
-import { measureJson } from "./json-bytes.js";
+import { boundedJsonByteLength, JsonByteLengthError, measureJson } from "./json-bytes.js";
 import { formulaNameKey } from "./name-key.js";
 import {
   clonePivot,

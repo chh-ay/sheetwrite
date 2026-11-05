@@ -4,8 +4,9 @@ import {
   SnapshotValidationError,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import { GridImpl } from "./grid.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { SheetwriteStore } from "./store.js";
 import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync-protocol.js";

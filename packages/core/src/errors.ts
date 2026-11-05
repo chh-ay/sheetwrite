@@ -1,6 +1,3 @@
-import { measureJson, type JsonMeasureOptions } from "./json-bytes.js";
-import { utf8ByteLength } from "./utf8.js";
-
 /**
  * Stable discriminator for every consumer-visible Sheetwrite failure. Messages
  * are diagnostic and are not API contracts. Each `SheetwriteError` subclass
@@ -322,7 +319,10 @@ function budgetedContextText(text: string, inspection: ContextInspection): strin
   if (inspection.textBudget === undefined) return text;
 
   const kept = boundedErrorText(text, inspection.textBudget);
-  inspection.textBudget = Math.max(0, inspection.textBudget - utf8ByteLength(kept));
+  inspection.textBudget = Math.max(
+    0,
+    inspection.textBudget - ERROR_TEXT_ENCODER.encode(kept).byteLength,
+  );
   return kept;
 }
 
@@ -566,43 +566,4 @@ export function unknownSheetError(sheet: string): SheetwriteError {
 /** A datasource page or option that breaks the datasource protocol. */
 export function datasourceFailure(message: string): SheetwriteError {
   return new SheetwriteError("datasource-request-failed", "datasource-request", message);
-}
-
-/**
- * Internal failure of `boundedJsonByteLength`. Callers that own a public code
- * catch it and throw their own failure; any other path lets it reach the host
- * as a transaction failure.
- */
-export class JsonByteLengthError extends SheetwriteError {
-  override readonly name = "JsonByteLengthError";
-  declare readonly code: "payload-limit" | "invalid-operations";
-
-  constructor(
-    code: "payload-limit" | "invalid-operations",
-    message: string,
-    readonly actual?: number,
-    readonly limit?: number,
-  ) {
-    super(
-      code,
-      "transaction",
-      message,
-      actual === undefined || limit === undefined ? {} : { context: { actual, limit } },
-    );
-  }
-}
-
-/** Exact JSON UTF-8 bytes of `value`, computed without building the encoded payload. */
-export function boundedJsonByteLength(
-  value: unknown,
-  limit: number,
-  options: JsonMeasureOptions = {},
-): number {
-  const { bytes, issue } = measureJson(value, limit, options);
-  if (issue === undefined) return bytes;
-
-  if (issue.kind === "limit") {
-    throw new JsonByteLengthError("payload-limit", issue.message, bytes, limit);
-  }
-  throw new JsonByteLengthError("invalid-operations", issue.message);
 }

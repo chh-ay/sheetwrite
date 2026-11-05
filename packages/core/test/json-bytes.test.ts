@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { boundedJsonByteLength, JsonByteLengthError } from "../src/errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "../src/json-bytes.js";
 
 const ENOUGH_BYTES = 1024;
 

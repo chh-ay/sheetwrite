@@ -5,11 +5,11 @@ import {
   partitionVersionOperations,
 } from "./atomic-batch.js";
 import {
-  JsonByteLengthError,
   normalizeSheetwriteError,
   SheetwriteError,
   type SheetwriteErrorContext,
 } from "./errors.js";
+import { JsonByteLengthError } from "./json-bytes.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { changesStructure, type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
 import { restoreProvenanceOf } from "./restore-commit.js";

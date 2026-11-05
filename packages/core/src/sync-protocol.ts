@@ -8,7 +8,8 @@ import {
   validateDocumentOperationShape,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import type { DocumentOp } from "./types/document.js";
 import type {
   PendingCommit,

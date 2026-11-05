@@ -1,4 +1,4 @@
-import { boundedJsonByteLength } from "./errors.js";
+import { boundedJsonByteLength } from "./json-bytes.js";
 import { decodeRestoreBlockPayload } from "./restore-block-codec.js";
 import { normalizedRange } from "./store/ranges.js";
 import type { Range } from "./types/coordinates.js";

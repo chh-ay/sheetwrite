@@ -1,7 +1,7 @@
 import { deflateSync } from "fflate";
 
 import { validateDocumentOperationShape } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import {
   assertRestoreBlockCells,
   assertRestoreBlockFits,

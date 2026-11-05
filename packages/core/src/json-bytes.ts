@@ -4,6 +4,7 @@
  * building the encoded text.
  */
 
+import { SheetwriteError } from "./errors.js";
 import { utf8CodePointBytes, utf8CodePointUnits } from "./utf8.js";
 
 /** Keys from the root to a value: numbers index arrays, strings name object fields. */
@@ -275,4 +276,43 @@ function visitJsonObject(walk: JsonWalk, record: object): void {
     visitJson(walk, descriptor.value);
     walk.segments.pop();
   }
+}
+
+/**
+ * Internal failure of `boundedJsonByteLength`. Callers that own a public code
+ * catch it and throw their own failure; any other path lets it reach the host
+ * as a transaction failure.
+ */
+export class JsonByteLengthError extends SheetwriteError {
+  override readonly name = "JsonByteLengthError";
+  declare readonly code: "payload-limit" | "invalid-operations";
+
+  constructor(
+    code: "payload-limit" | "invalid-operations",
+    message: string,
+    readonly actual?: number,
+    readonly limit?: number,
+  ) {
+    super(
+      code,
+      "transaction",
+      message,
+      actual === undefined || limit === undefined ? {} : { context: { actual, limit } },
+    );
+  }
+}
+
+/** Exact JSON UTF-8 bytes of `value`, computed without building the encoded payload. */
+export function boundedJsonByteLength(
+  value: unknown,
+  limit: number,
+  options: JsonMeasureOptions = {},
+): number {
+  const { bytes, issue } = measureJson(value, limit, options);
+  if (issue === undefined) return bytes;
+
+  if (issue.kind === "limit") {
+    throw new JsonByteLengthError("payload-limit", issue.message, bytes, limit);
+  }
+  throw new JsonByteLengthError("invalid-operations", issue.message);
 }
