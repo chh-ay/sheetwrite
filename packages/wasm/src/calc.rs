@@ -217,6 +217,8 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
+    Lookup,
+    TrimRange,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -413,6 +415,7 @@ define_function_registry! {
         CountA => "COUNTA";
         Filter => "FILTER";
         IsText => "ISTEXT";
+        Lookup => "LOOKUP";
         MaxIfs => "MAXIFS";
         Median => "MEDIAN";
         MinIfs => "MINIFS";
@@ -467,6 +470,7 @@ define_function_registry! {
         RoundDown => "ROUNDDOWN";
         TimeValue => "TIMEVALUE";
         Transpose => "TRANSPOSE";
+        TrimRange => "TRIMRANGE";
         AverageIfs => "AVERAGEIFS";
         ChooseCols => "CHOOSECOLS";
         ChooseRows => "CHOOSEROWS";

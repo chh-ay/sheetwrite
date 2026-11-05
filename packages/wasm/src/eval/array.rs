@@ -69,7 +69,8 @@ pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
             | Func::Take
             | Func::Drop
             | Func::ChooseCols
-            | Func::ChooseRows,
+            | Func::ChooseRows
+            | Func::TrimRange,
             _,
         ) => true,
         Ast::Func(Func::Let, args) => args.iter().any(ast_produces_array),
@@ -230,7 +231,7 @@ impl CellStore {
                 Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet),
                 Err(_) => None,
             },
-            Ast::Func(Func::Filter | Func::Sort | Func::Unique, args) => {
+            Ast::Func(Func::Filter | Func::Sort | Func::Unique | Func::TrimRange, args) => {
                 let Some(source) = args.first() else {
                     return Some(Err(FormulaError::Value));
                 };
@@ -378,6 +379,7 @@ impl CellStore {
             Ast::Func(Func::Sort, args) => self.eval_sort(args, sheet, pass, depth + 1),
             Ast::Func(Func::Unique, args) => self.eval_unique(args, sheet, pass, depth + 1),
             Ast::Func(Func::Transpose, args) => self.eval_transpose(args, sheet, pass, depth + 1),
+            Ast::Func(Func::TrimRange, args) => self.eval_trim_range(args, sheet, pass, depth + 1),
             Ast::Func(Func::Sequence, args) => self.eval_sequence(args, sheet, pass, depth + 1),
             Ast::Func(Func::Take, args) => self.eval_take_drop(args, false, sheet, pass, depth + 1),
             Ast::Func(Func::Drop, args) => self.eval_take_drop(args, true, sheet, pass, depth + 1),
@@ -860,6 +862,79 @@ impl CellStore {
         Ok(EvalMatrix::new(source.cols, source.rows, values))
     }
 
+    /// TRIMRANGE(range, [trim_rows], [trim_cols]): the range without its
+    /// leading and trailing blank rows and columns. Each trim argument is 0
+    /// (none), 1 (leading), 2 (trailing) or 3 (both, the default). A range
+    /// with no value left is `#REF!`, as in Excel.
+    fn eval_trim_range(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<EvalMatrix, FormulaError> {
+        if !(1..=3).contains(&args.len()) {
+            return Err(FormulaError::Value);
+        }
+
+        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
+        let trim_rows = self.trim_mode(optional_ast(args, 1), sheet, pass, depth)?;
+        let trim_cols = self.trim_mode(optional_ast(args, 2), sheet, pass, depth)?;
+        let filled =
+            |row: usize, col: usize| !matches!(source.get(row, col), Some(Value::Blank) | None);
+        let filled_rows: Vec<usize> = (0..source.rows)
+            .filter(|&row| (0..source.cols).any(|col| filled(row, col)))
+            .collect();
+        let filled_cols: Vec<usize> = (0..source.cols)
+            .filter(|&col| (0..source.rows).any(|row| filled(row, col)))
+            .collect();
+        let (Some(&first_row), Some(&last_row)) = (filled_rows.first(), filled_rows.last()) else {
+            return Err(FormulaError::Ref);
+        };
+        let (Some(&first_col), Some(&last_col)) = (filled_cols.first(), filled_cols.last()) else {
+            return Err(FormulaError::Ref);
+        };
+        let rows = trimmed_span(source.rows, first_row, last_row, trim_rows);
+        let cols = trimmed_span(source.cols, first_col, last_col, trim_cols);
+        let mut values = Vec::new();
+
+        values
+            .try_reserve_exact((rows.end - rows.start) * (cols.end - cols.start))
+            .map_err(|_| FormulaError::Num)?;
+
+        for row in rows.clone() {
+            for col in cols.clone() {
+                values.push(source.get(row, col).cloned().unwrap_or(Value::Blank));
+            }
+        }
+
+        Ok(EvalMatrix::new(
+            rows.end - rows.start,
+            cols.end - cols.start,
+            values,
+        ))
+    }
+
+    /// A TRIMRANGE trim argument: a whole number from 0 to 3, 3 when omitted.
+    fn trim_mode(
+        &self,
+        arg: Option<&Ast>,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<u8, FormulaError> {
+        let Some(arg) = arg else {
+            return Ok(TRIM_BOTH);
+        };
+        let mode = number_from_value(&self.eval_ast(arg, sheet, pass, depth + 1))?.trunc();
+
+        if !(0.0..=f64::from(TRIM_BOTH)).contains(&mode) {
+            return Err(FormulaError::Value);
+        }
+
+        Ok(mode as u8)
+    }
+
     fn eval_sequence(
         &self,
         args: &[Ast],
@@ -1161,6 +1236,33 @@ fn matrix_items_equal(
         }
     }
     Ok(true)
+}
+
+/// TRIMRANGE trims leading blanks for mode 1, trailing blanks for mode 2
+/// and both for mode 3.
+const TRIM_LEADING: u8 = 1;
+const TRIM_TRAILING: u8 = 2;
+const TRIM_BOTH: u8 = TRIM_LEADING | TRIM_TRAILING;
+
+/// The rows or columns that TRIMRANGE keeps, as a range of indexes.
+fn trimmed_span(
+    length: usize,
+    first_filled: usize,
+    last_filled: usize,
+    mode: u8,
+) -> std::ops::Range<usize> {
+    let start = if mode & TRIM_LEADING != 0 {
+        first_filled
+    } else {
+        0
+    };
+    let end = if mode & TRIM_TRAILING != 0 {
+        last_filled + 1
+    } else {
+        length
+    };
+
+    start..end
 }
 
 #[cfg(test)]

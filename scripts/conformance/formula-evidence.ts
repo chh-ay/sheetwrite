@@ -183,6 +183,8 @@ export const AUTHORED_ASSERTIONS: Readonly<Record<string, readonly [string, stri
   RATE: ["ABS(RATE(1,0,-100,110)-0.1)<0.0000001", "RATE(1,0,-100,120)>0"],
   IPMT: ["IPMT(0,1,10,1000)=0", "IPMT(0,2,10,1000)=0"],
   PPMT: ["PPMT(0,1,10,1000)=-100", "PPMT(0,2,10,1000)=-100"],
+  LOOKUP: ["LOOKUP(2.5,{1;2;3},{10;20;30})=20", "ISNA(LOOKUP(0,{1;2;3}))"],
+  TRIMRANGE: ["ROWS(TRIMRANGE({1;2}))=2", "SUM(TRIMRANGE({1,2;3,4}))=10"],
 };
 
 export function authoredAssertions(name: string): readonly [string, string] {

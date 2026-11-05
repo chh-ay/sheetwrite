@@ -121,6 +121,8 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
+  "trim-range": "A1:B3",
+  "vector-lookup": "60,A1:A3,B1:B3",
   percentile: "A1:A3,0.5",
   "period-payment": "0.1,1,10,1000",
   "pv-fv-pmt": "0.1,10,-100",

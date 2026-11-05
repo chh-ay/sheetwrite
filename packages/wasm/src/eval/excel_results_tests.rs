@@ -97,6 +97,39 @@ fn legacy_statistics_names_read_references_as_their_successors() {
     ]);
 }
 
+/// The vector example of the LOOKUP page on Microsoft Support, the array
+/// form in both orientations, and TRIMRANGE on a column with blank rows.
+#[test]
+fn lookup_and_trimrange_follow_the_microsoft_rules() {
+    assert_results(&[
+        (
+            "=LOOKUP(4.19,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "orange",
+        ),
+        (
+            "=LOOKUP(5.75,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "yellow",
+        ),
+        (
+            "=LOOKUP(7.66,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "blue",
+        ),
+        (
+            "=LOOKUP(0,{4.14;4.19;5.17;5.77;6.39},{\"red\";\"orange\";\"yellow\";\"green\";\"blue\"})",
+            "#N/A",
+        ),
+        ("=LOOKUP(2.5,Data!A1:A3,Data!B1:B3)", "20"),
+        ("=LOOKUP(3,Data!A1:A3)", "3"),
+        ("=LOOKUP(2,Data!A1:B3)", "20"),
+        ("=LOOKUP(15,{10,20,30;1,2,3})", "1"),
+        ("=ROWS(TRIMRANGE(Data!A1:A10))", "3"),
+        ("=ROWS(TRIMRANGE(Data!A1:A10,1))", "10"),
+        ("=SUM(TRIMRANGE(Data!A1:B10))", "66"),
+        ("=TRIMRANGE(Data!F1:F3)", "#REF!"),
+        ("=TRIMRANGE(Data!A1:A3,4)", "#VALUE!"),
+    ]);
+}
+
 #[test]
 fn whole_columns_and_rows_read_the_used_part_of_the_sheet() {
     assert_results(&[
