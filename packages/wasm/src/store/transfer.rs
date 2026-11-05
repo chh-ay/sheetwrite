@@ -19,10 +19,25 @@ fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
     }
 }
 
+/// Read a sheet handle and check that it names one of the `sheets`
+/// transferred sheets, so a malformed transfer fails while it is read
+/// instead of panicking after the store is published.
 #[cfg(any(target_arch = "wasm32", test))]
-fn read_names(input: &mut Reader<'_>) -> TransferResult<HashMap<String, usize>> {
+// One shared check instead of a copy at every handle the decoder reads.
+#[inline(never)]
+fn sheet_handle(input: &mut Reader<'_>, sheets: usize) -> TransferResult<u32> {
+    let handle = input.u32()?;
+    if handle as usize >= sheets {
+        return Err("invalid transferred sheet handle".into());
+    }
+
+    Ok(handle)
+}
+
+#[cfg(any(target_arch = "wasm32", test))]
+fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<String, usize>> {
     (0..input.count()?)
-        .map(|_| Ok((input.text()?, input.usize()?)))
+        .map(|_| Ok((input.text()?, sheet_handle(input, sheets)? as usize)))
         .collect()
 }
 
@@ -71,22 +86,20 @@ impl CellStore {
         col: u32,
     ) -> TransferResult<FormulaEntry> {
         let source = input.text()?;
+        let sheets = self.sheet_names.len();
 
         let is_reference = input.bool()?;
         let reference_ast = if is_reference {
             let target = AbsCellKey {
-                sheet: input.u32()?,
+                sheet: sheet_handle(input, sheets)?,
                 row: input.u32()?,
                 col: input.u32()?,
-            };
-            let Some(name) = self.sheet_names.get(target.sheet as usize) else {
-                return Err("invalid transferred reference sheet".into());
             };
 
             Some(Ast::AbsCell(
                 SheetRef {
                     handle: target.sheet,
-                    name: name.clone(),
+                    name: self.sheet_names[target.sheet as usize].clone(),
                     quoted: false,
                 },
                 target.row,
@@ -117,7 +130,7 @@ impl CellStore {
         let cells = (0..input.count()?)
             .map(|_| {
                 Ok(AbsCellKey {
-                    sheet: input.u32()?,
+                    sheet: sheet_handle(input, sheets)?,
                     row: input.u32()?,
                     col: input.u32()?,
                 })
@@ -127,7 +140,7 @@ impl CellStore {
         let ranges = (0..input.count()?)
             .map(|_| {
                 Ok(CellRange {
-                    sheet: input.u32()?,
+                    sheet: sheet_handle(input, sheets)?,
                     row_start: input.u32()?,
                     col_start: input.u32()?,
                     row_end: input.u32()?,
@@ -135,13 +148,6 @@ impl CellStore {
                 })
             })
             .collect::<TransferResult<Vec<_>>>()?;
-
-        let sheets = self.sheet_names.len();
-        let mut read_sheets =
-            (cells.iter().map(|key| key.sheet)).chain(ranges.iter().map(|range| range.sheet));
-        if read_sheets.any(|handle| handle as usize >= sheets) {
-            return Err("invalid transferred formula sheet".into());
-        }
 
         let mut entry =
             FormulaEntry::transferred_source(ast, source, ReadSet { cells, ranges }, is_reference);
@@ -151,59 +157,6 @@ impl CellStore {
         entry.set_produces_array(produces_array);
 
         Ok(entry)
-    }
-
-    /// Whether `handle` is one of the transferred sheets.
-    fn is_transferred_sheet(&self, handle: usize) -> bool {
-        handle < self.sheet_names.len()
-    }
-
-    /// Check the tab order and the sheet lookups: the tab order lists each
-    /// live sheet once, and every lookup names a transferred sheet. A
-    /// malformed transfer then fails here instead of panicking after the
-    /// store is published.
-    fn check_transferred_sheet_handles(&self) -> TransferResult<()> {
-        let order = self.tab_order();
-        let mut placed = vec![false; self.sheet_names.len()];
-        for &handle in order.iter() {
-            let handle = handle as usize;
-            let alive = self.sheet_alive.get(handle).copied().unwrap_or(false);
-            if !alive || std::mem::replace(&mut placed[handle], true) {
-                return Err("invalid transferred tab order".into());
-            }
-        }
-
-        let live = self.sheet_alive.iter().filter(|&&alive| alive).count();
-        let lookups = self.sheet_lookup.values().chain(self.sheet_ids.values());
-        if order.len() != live
-            || !lookups
-                .into_iter()
-                .all(|&handle| self.is_transferred_sheet(handle))
-        {
-            return Err("invalid transferred sheet handles".into());
-        }
-
-        Ok(())
-    }
-
-    /// Check that every defined-name scope, named range and table names a
-    /// transferred sheet.
-    fn check_transferred_name_handles(&self) -> TransferResult<()> {
-        let names = self.defined_names.iter().all(|((scope, _), definition)| {
-            let scope_valid = scope.is_none_or(|scope| self.is_transferred_sheet(scope as usize));
-            let sheet_valid = match definition {
-                names::DefinedName::Range(range) => self.is_transferred_sheet(range.sheet as usize),
-                names::DefinedName::Formula(_) => true,
-            };
-            scope_valid && sheet_valid
-        });
-        let tables =
-            (self.tables.values()).all(|table| self.is_transferred_sheet(table.sheet as usize));
-        if !names || !tables {
-            return Err("invalid transferred name or table sheet".into());
-        }
-
-        Ok(())
     }
 
     fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
@@ -218,22 +171,34 @@ impl CellStore {
             store.sheet_alive.push(input.bool()?);
         }
 
-        // Resolve 3-D reference spans in their transferred tab order.
-        // Sheet handles remain independent of tab positions.
+        // Resolve 3-D reference spans in their transferred tab order, which
+        // lists each live sheet once. Sheet handles remain independent of
+        // tab positions.
+        let sheets = store.sheet_names.len();
+        let mut placed = vec![false; sheets];
         let order = (0..input.count()?)
-            .map(|_| input.u32())
+            .map(|_| {
+                let handle = sheet_handle(&mut input, sheets)?;
+                let index = handle as usize;
+                if !store.sheet_alive[index] || std::mem::replace(&mut placed[index], true) {
+                    return Err("invalid transferred tab order".to_string());
+                }
+                Ok(handle)
+            })
             .collect::<TransferResult<Vec<_>>>()?;
+        if order.len() != store.sheet_alive.iter().filter(|&&alive| alive).count() {
+            return Err("invalid transferred tab order".into());
+        }
         if order != store.tab_order().as_ref() {
             store.sheet_order = Some(Box::new(order));
         }
 
-        store.sheet_lookup = read_names(&mut input)?;
-        store.sheet_ids = read_names(&mut input)?;
-        store.check_transferred_sheet_handles()?;
+        store.sheet_lookup = read_names(&mut input, sheets)?;
+        store.sheet_ids = read_names(&mut input, sheets)?;
 
         for _ in 0..input.count()? {
             let scope = if input.bool()? {
-                Some(input.u32()?)
+                Some(sheet_handle(&mut input, sheets)?)
             } else {
                 None
             };
@@ -242,7 +207,7 @@ impl CellStore {
             let range = NamedRangeRef {
                 name: input.text()?,
                 scope,
-                sheet: input.u32()?,
+                sheet: sheet_handle(&mut input, sheets)?,
                 row_start: input.u32()?,
                 col_start: input.u32()?,
                 row_end: input.u32()?,
@@ -256,7 +221,7 @@ impl CellStore {
 
         for _ in 0..input.count()? {
             let scope = if input.bool()? {
-                Some(input.u32()?)
+                Some(sheet_handle(&mut input, sheets)?)
             } else {
                 None
             };
@@ -270,7 +235,7 @@ impl CellStore {
             let mut table = TableDefinition {
                 id: input.text()?,
                 name: input.text()?,
-                sheet: input.u32()?,
+                sheet: sheet_handle(&mut input, sheets)?,
                 row_start: input.u32()?,
                 col_start: input.u32()?,
                 row_end: input.u32()?,
@@ -290,7 +255,6 @@ impl CellStore {
 
             store.tables.insert(key, table);
         }
-        store.check_transferred_name_handles()?;
 
         // The formulas below bind to the names, so resolve them first.
         store.resolve_name_definitions();
