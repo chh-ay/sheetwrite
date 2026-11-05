@@ -8,7 +8,7 @@ import type { PublicApiManifest } from "./public-api.js";
 
 /**
  * The generated JSON that `docs/src/lib/navigation.ts` and
- * `docs/src/lib/moved-pages.ts` import. The docs generator and checker load
+ * `docs/src/lib/moved-headings.ts` import. The docs generator and checker load
  * those modules, so `scripts/docs-cli.ts` writes these files before it loads
  * them. Nothing here may import the site's navigation or moved-page modules.
  */

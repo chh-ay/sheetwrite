@@ -146,6 +146,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/coverage-check.test.ts",
   "scripts/sheetwrite-code-hovers.test.ts",
   "scripts/normalize-sitemap.test.ts",
+  "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
   "scripts/check-local-paths.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
@@ -166,7 +167,6 @@ export const UNIT_TEST_PATHS = [
   "scripts/release-github.test.ts",
   "scripts/docs.test.ts",
   "scripts/docs-llms.test.ts",
-  "scripts/prepare-docs-deployment.test.ts",
   "bench/test",
   "docs/test",
 ] as const;

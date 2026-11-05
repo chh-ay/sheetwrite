@@ -3,7 +3,8 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
-import { MOVED_HEADINGS, MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_HEADINGS } from "../docs/src/lib/moved-headings.js";
+import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
 import {
   collectCapabilityIssues,
