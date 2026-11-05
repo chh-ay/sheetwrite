@@ -10,14 +10,21 @@ use super::wildcard::Wildcard;
 const MAX_TEXT_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_SEARCH_STEPS: usize = 4_000_000;
 
+mod baht;
+mod width;
+
+/// The byte functions (`LENB`, `LEFTB`, `RIGHTB`, `MIDB`, `REPLACEB`,
+/// `FINDB`, `SEARCHB`) count one byte per character, as Excel does when the
+/// default editing language is not a double-byte language. So they share
+/// the character functions.
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
-        Func::Len => unary_text(values, |text| {
+        Func::Len | Func::LenB => unary_text(values, |text| {
             Ok(Value::number(text.chars().count() as f64))
         }),
-        Func::Left => left_right(values, false),
-        Func::Right => left_right(values, true),
-        Func::Mid => mid(values),
+        Func::Left | Func::LeftB => left_right(values, false),
+        Func::Right | Func::RightB => left_right(values, true),
+        Func::Mid | Func::MidB => mid(values),
         Func::Concat | Func::Concatenate => concat(values),
         Func::Upper => unary_text(values, |text| change_case(text, true)),
         Func::Lower => unary_text(values, |text| change_case(text, false)),
@@ -46,9 +53,9 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         }
         Func::TextJoin => text_join(values),
         Func::Substitute => substitute(values),
-        Func::Replace => replace(values),
-        Func::Find => find_search(values, true),
-        Func::Search => find_search(values, false),
+        Func::Replace | Func::ReplaceB => replace(values),
+        Func::Find | Func::FindB => find_search(values, true),
+        Func::Search | Func::SearchB => find_search(values, false),
         Func::Value => value(values),
         Func::Clean => unary_text(values, clean_text),
         Func::Rept => repeat(values),
@@ -57,6 +64,9 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::UniChar => character(values, true),
         Func::Proper => proper(values),
         Func::NumberValue => number_value(values),
+        Func::Asc => unary_text(values, |text| bounded_text(width::half_width(&text))),
+        Func::Dbcs => unary_text(values, |text| bounded_text(width::full_width(&text))),
+        Func::BahtText => baht::baht_text(values),
         _ => return None,
     };
     Some(result)

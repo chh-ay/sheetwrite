@@ -255,9 +255,17 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Unicode
         | Func::UniChar
         | Func::Proper
-        | Func::NumberValue => {
-            text::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
-        }
+        | Func::NumberValue
+        | Func::LenB
+        | Func::LeftB
+        | Func::RightB
+        | Func::MidB
+        | Func::ReplaceB
+        | Func::FindB
+        | Func::SearchB
+        | Func::Asc
+        | Func::Dbcs
+        | Func::BahtText => text::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
         Func::Date
         | Func::DateValue
         | Func::Day

@@ -5292,6 +5292,14 @@
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
       ]
+    },
+    "excel-single-byte": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "LENB, LEFTB, RIGHTB, MIDB, REPLACEB, FINDB and SEARCHB count one byte per character, as Excel does when the default editing language is not a double-byte language. Excel counts two bytes for a double-byte character only when such a language is the default."
+      ]
     }
   },
   "implementationProfiles": {
@@ -5320,7 +5328,13 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
+        "paths": [
+          "packages/wasm/src/eval/mod.rs",
+          "packages/wasm/src/eval/functions.rs",
+          "packages/wasm/src/eval/text.rs",
+          "packages/wasm/src/eval/text/width.rs",
+          "packages/wasm/src/eval/text/baht.rs"
+        ]
       },
       "assist": {
         "status": "implemented",
@@ -5755,6 +5769,24 @@
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "language-services",
+      "title": "Language services",
+      "status": "unsupported",
+      "scope": "DETECTLANGUAGE and TRANSLATE call a translation service, and PHONETIC reads furigana that cells do not store. Formula evaluation calls no service and stores no phonetic text.",
+      "examples": ["DETECTLANGUAGE", "PHONETIC", "TRANSLATE"],
+      "source": "microsoft-excel-functions",
+      "section": "Text functions",
       "implementation": {
         "status": "missing",
         "paths": []
@@ -9870,6 +9902,126 @@
       "implementation": "analysis-hypothesis",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LENB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LEFTB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RIGHTB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MIDB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "mid",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "REPLACEB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "replace",
+      "semantics": "text-sensitive",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FINDB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "find-search",
+      "semantics": "text-sensitive",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SEARCHB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "find-search",
+      "semantics": "text-search",
+      "dialects": "excel-single-byte",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASC",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DBCS",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "BAHTTEXT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
     }
   ],
   "operators": [
