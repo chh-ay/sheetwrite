@@ -1,0 +1,925 @@
+/* Generated API reference. These rules intentionally sit after the shared
+   .sw-prose code-frame styling: signature fences dock flush inside their
+   disclosures, so the generic frame border/radius/margins must lose the
+   cascade here. Generated markup must never widen the document; long
+   identifiers wrap or scroll locally. */
+.api-pagehead,
+.api-metadata,
+.api-member-list,
+.api-member,
+.api-declaration,
+.api-symbol-grid,
+.api-symbol-card,
+.api-variant-list,
+.api-variant {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.api-status,
+.api-count {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  padding: 0.16rem 0.55rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+  font: 600 0.67rem / 1.3 var(--sw-font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* Count chips ride mid-cap beside display headings instead of dangling off
+   the baseline. */
+.sw-prose h2 .api-count,
+.sw-prose h3 .api-count {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* One hue system ties kind badges and classification chips together. */
+.api-symbol-badge[data-kind="class"],
+.api-symbol-badge[data-kind="enum"],
+.api-status[data-kind="class"],
+.api-status[data-kind="enum"],
+.api-status[data-status="test-only"] {
+  --api-kind-color: var(--sw-type-number);
+}
+
+.api-symbol-badge[data-kind="function"],
+.api-status[data-kind="function"],
+.api-status[data-status="supported"] {
+  --api-kind-color: var(--sw-accent);
+}
+
+.api-symbol-badge[data-kind="interface"],
+.api-symbol-badge[data-kind="variable"],
+.api-status[data-kind="interface"],
+.api-status[data-kind="variable"] {
+  --api-kind-color: var(--sw-type-name);
+}
+
+.api-symbol-badge[data-kind="type"],
+.api-status[data-kind="type"] {
+  --api-kind-color: var(--sw-type-keyword);
+}
+
+.api-status[data-kind],
+.api-status[data-status="supported"],
+.api-status[data-status="test-only"] {
+  border-color: color-mix(in srgb, var(--api-kind-color) 32%, var(--sw-border));
+  color: color-mix(in srgb, var(--api-kind-color) 72%, var(--sw-fg));
+  background: color-mix(in srgb, var(--api-kind-color) 8%, var(--sw-surface-2));
+}
+
+/* Symbol pages open with one quiet row: back link left, kind chip right. */
+.api-pagehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.sw-prose .api-backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.sw-prose .api-backlink::before {
+  content: "←";
+  color: var(--sw-fg-dim);
+}
+
+.sw-prose .api-backlink:hover,
+.sw-prose .api-backlink:hover::before {
+  color: var(--sw-accent-strong);
+}
+
+.api-metadata {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.api-metadata div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: baseline;
+}
+
+.api-metadata dt {
+  color: var(--sw-fg-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.api-metadata dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.api-metadata dd code {
+  overflow-wrap: anywhere;
+}
+
+/* Long member lists open with an anchor index, so a page with dozens of rows
+   reads as an outline instead of a scroll with a click per member. */
+.api-member-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.85rem;
+  align-items: baseline;
+  margin: 1.25rem 0 2rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  background: var(--sw-surface-1);
+  font-size: 0.78rem;
+}
+
+.sw-prose .api-member-index a {
+  color: var(--sw-fg-muted);
+  text-decoration: none;
+}
+
+.sw-prose .api-member-index a code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+
+.sw-prose .api-member-index a:hover,
+.sw-prose .api-member-index a:hover code {
+  color: var(--sw-accent-strong);
+}
+
+/* Entry-point tables: editorial rules instead of a boxed grid; the numeric
+   column right-aligns and rows light up on hover. */
+.sw-prose .api-entry-table {
+  margin: 1.25rem 0 2.5rem;
+  border: 0;
+  border-radius: 0;
+}
+
+.sw-prose .api-entry-table th,
+.sw-prose .api-entry-table td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: middle;
+}
+
+.sw-prose .api-entry-table th {
+  border-bottom-color: var(--sw-border-strong);
+  color: var(--sw-fg-dim);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sw-prose .api-entry-table tr:last-child td {
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-prose .api-entry-table th:first-child,
+.sw-prose .api-entry-table td:first-child {
+  width: 52%;
+  padding-inline-start: 0.2rem;
+}
+
+.sw-prose .api-entry-table th:last-child,
+.sw-prose .api-entry-table td:last-child {
+  padding-inline-end: 0.2rem;
+  text-align: right;
+}
+
+.sw-prose .api-entry-table td:last-child {
+  color: var(--sw-fg-muted);
+  font: 500 0.8rem var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .api-entry-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--sw-surface-2) 70%, transparent);
+}
+
+.sw-prose .api-entry-table a {
+  text-decoration: none;
+}
+
+.sw-prose .api-entry-table a > code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-accent-strong);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sw-prose .api-entry-table a:hover > code {
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+/* Exported-symbol cards: kind badge + strong name over a clamped summary. */
+.api-symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.8rem;
+  margin: 1.1rem 0 2.75rem;
+}
+
+.api-symbol-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  padding: 0.85rem 0.95rem;
+  background: var(--sw-surface-1);
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.api-symbol-card:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  background: var(--sw-surface-2);
+}
+
+.api-symbol-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.api-symbol-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 0.3rem;
+  color: var(--api-kind-color, var(--sw-fg-muted));
+  background: color-mix(in srgb, var(--api-kind-color, var(--sw-fg-muted)) 13%, transparent);
+  font: 650 0.7rem / 1 var(--sw-font-mono);
+}
+
+.sw-prose .api-symbol-card code {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg-strong);
+  font: 600 0.86rem / 1.45 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+  transition: color 120ms ease;
+}
+
+.api-symbol-card:hover code {
+  color: var(--sw-accent-strong);
+}
+
+.api-symbol-card__desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: 0.79rem;
+  line-height: 1.55;
+}
+
+/* Members: a dense flat property list — hairline rows, not stacked cards.
+   Every row keeps a real top border and an opaque background (contract-
+   checked); the background matches the page so the list reads flat. */
+.api-member-list {
+  margin: 1rem 0 2.25rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.api-member {
+  border-top: 1px solid var(--sw-border);
+  background: var(--sw-surface-0);
+}
+
+.api-member[open] {
+  border-top-color: var(--sw-border-strong);
+}
+
+/* The declaration stays a single docked panel: summary header, flush fence. */
+.api-declaration {
+  margin: 1.1rem 0 2.2rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  background: var(--sw-surface-1);
+  transition: border-color 120ms ease;
+}
+
+.api-declaration[open] {
+  border-color: var(--sw-border-strong);
+}
+
+.api-member summary,
+.api-declaration summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  border-radius: 0.35rem;
+  /* Member rows are a scan list: the name, then the one-line meaning. */
+  padding: 0.42rem 0.35rem;
+  color: var(--sw-fg-strong);
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 120ms ease;
+}
+
+.api-declaration summary {
+  border-radius: calc(0.6rem - 1px);
+  padding: 0.7rem 0.95rem;
+}
+
+/* An open row keeps its name where the reader left it and tints its own
+   header, so the revealed signature reads as part of that row. */
+.api-member[open] > summary {
+  background: color-mix(in srgb, var(--sw-surface-2) 80%, transparent);
+}
+
+.api-member summary::-webkit-details-marker,
+.api-declaration summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-member summary::before,
+.api-declaration summary::before {
+  content: "";
+  flex: none;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--sw-fg-dim);
+  transform: rotate(-45deg);
+  transition:
+    transform 140ms ease,
+    color 140ms ease;
+}
+
+.api-member[open] > summary::before,
+.api-declaration[open] > summary::before {
+  color: var(--sw-accent);
+  transform: translateY(-0.1rem) rotate(45deg);
+}
+
+/* Hover tints the row; keyboard focus keeps a quiet inset ring — the loud
+   outer ring read as a selection state on a full-width row. */
+.api-member summary:hover,
+.api-declaration summary:hover {
+  background: color-mix(in srgb, var(--sw-surface-2) 75%, transparent);
+}
+
+/* Focus wraps the WHOLE disclosure (summary + revealed body), never just the
+   summary strip: a quiet inset ring on flat member rows, an outer ring
+   following the declaration panel's radius. */
+.api-member summary:focus-visible,
+.api-declaration summary:focus-visible {
+  box-shadow: none;
+}
+
+.api-member:has(> summary:focus-visible) {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 30%, transparent);
+}
+
+.api-declaration:has(> summary:focus-visible) {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 30%, transparent);
+}
+
+.api-declaration[open] > summary {
+  border-bottom: 1px solid var(--sw-border);
+  border-radius: calc(0.6rem - 1px) calc(0.6rem - 1px) 0 0;
+  background: var(--sw-surface-2);
+}
+
+/* The name never shrinks below its own width (the summary text wraps
+   instead), but a pathologically long identifier still breaks rather than
+   widening the page. */
+.sw-prose .api-member summary code {
+  flex: 0 0 auto;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg-strong);
+  font: 600 0.84rem / 1.5 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.api-member[open] > summary code {
+  color: var(--sw-accent-strong);
+}
+
+.api-member-summary {
+  color: var(--sw-fg-muted);
+  font-family: var(--sw-font-body);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.sw-prose .api-member-summary code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg);
+  font-size: 0.72rem;
+}
+
+/* An aliased union prints as the alias name beside the member name; the chip
+   stays quiet so the member name and its summary still lead the row. */
+.sw-prose .api-member-alias {
+  flex: 0 0 auto;
+}
+
+.sw-prose .api-member-alias a {
+  text-decoration: none;
+}
+
+.sw-prose .api-member-alias code {
+  border: 1px solid color-mix(in srgb, var(--sw-type-name) 30%, var(--sw-border));
+  padding: 0.04rem 0.3rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--sw-type-name) 8%, var(--sw-surface-2));
+  color: color-mix(in srgb, var(--sw-type-name) 74%, var(--sw-fg));
+  font: 550 0.72rem / 1.5 var(--sw-font-mono);
+}
+
+.sw-prose .api-member-alias a:hover code {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  color: var(--sw-accent-strong);
+}
+
+/* Referenced by: who depends on the owning package, and which documented
+   exports name the symbol. Each chip carries the consumer and the relationship. */
+.api-consumers-label {
+  margin: 1.4rem 0 0.55rem;
+  color: var(--sw-fg-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.api-consumer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .api-consumer-list li {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  background: var(--sw-surface-1);
+  font-size: 0.76rem;
+}
+
+.sw-prose .api-consumer-list a {
+  color: var(--sw-fg-strong);
+  text-decoration: none;
+}
+
+.sw-prose .api-consumer-list a:hover {
+  color: var(--sw-accent-strong);
+}
+
+.sw-prose .api-consumer-list code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+
+.api-consumer-kind {
+  color: var(--sw-fg-dim);
+  font: 600 0.63rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.02em;
+}
+
+.sw-prose .api-consumer-list .api-consumer-more {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sw-fg-dim);
+  font-style: italic;
+}
+
+.api-declaration > summary {
+  color: var(--sw-fg-muted);
+  font-size: 0.84rem;
+  font-weight: 550;
+}
+
+.api-declaration > summary:hover,
+.api-declaration[open] > summary {
+  color: var(--sw-fg-strong);
+}
+
+/* The declaration fence docks flush inside its panel. */
+.sw-prose .api-declaration .expressive-code {
+  margin-block: 0;
+}
+
+.sw-prose .api-declaration .expressive-code figure.frame {
+  border: 0;
+  border-radius: 0 0 calc(0.6rem - 1px) calc(0.6rem - 1px);
+}
+
+/* Member signatures sit as one compact framed line indented under the name;
+   docs follow as plain prose, not another surface. */
+.sw-prose .api-member .expressive-code {
+  margin: 0.15rem 0 0.7rem 1.25rem;
+}
+
+.sw-prose .api-member .expressive-code figure.frame {
+  border: 1px solid var(--sw-border);
+  border-radius: 0.5rem;
+}
+
+/* Short signatures must not float in a tall empty frame. */
+.sw-prose .api-member .expressive-code pre,
+.sw-prose .api-declaration .expressive-code pre {
+  font-size: 0.78rem;
+}
+
+.api-member .expressive-code pre > code,
+.api-declaration .expressive-code pre > code {
+  padding-block: 0.5rem;
+}
+
+.api-member .api-member-doc {
+  max-width: 47rem;
+  margin: -0.3rem 0 0.8rem;
+  padding: 0 0.3rem 0 1.25rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+}
+
+/* Union variants: one surface with hairline dividers; each variant is a
+   docked highlighted fence so identifiers hover and link like declarations. */
+.api-variant-list {
+  margin: 1.1rem 0 2.75rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  background: var(--sw-surface-1);
+  overflow: hidden;
+}
+
+.api-variant + .api-variant {
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-prose .api-variant .expressive-code {
+  margin: 0;
+}
+
+.sw-prose .api-variant .expressive-code figure.frame {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.sw-prose .api-variant .expressive-code pre {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.78rem;
+}
+
+.api-variant .expressive-code pre > code {
+  padding-block: 0.55rem;
+}
+
+@media (max-width: 30rem) {
+  .api-pagehead {
+    flex-wrap: wrap;
+  }
+
+  .api-metadata div {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  /* The summary line drops below the member name instead of squeezing into a
+     ragged column beside it, and the signature loses its indent. */
+  .api-member summary {
+    flex-wrap: wrap;
+  }
+
+  .api-member-summary {
+    flex: 1 0 100%;
+    padding-left: 0.95rem;
+  }
+
+  .sw-prose .api-member .expressive-code {
+    margin-left: 0;
+  }
+
+  .api-member .api-member-doc {
+    padding-left: 0.3rem;
+  }
+}
+
+/* Hover tiers: documented/reference symbols carry a dotted accent underline;
+   plain type reveals stay fainter. A wavy line reads as a spelling error, so
+   no tier uses it. */
+.sw-code-popover__trigger {
+  border-radius: 0.2rem;
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 40%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  cursor: help;
+  outline: none;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+.sw-code-popover__trigger[data-hover-kind="documented"],
+.sw-code-popover__trigger[data-hover-kind="reference"] {
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-accent) 55%, transparent);
+  text-decoration-thickness: 1.5px;
+}
+
+.sw-code-popover__trigger:hover,
+.sw-code-popover__trigger[data-popover-open="true"] {
+  text-decoration-color: var(--sw-accent);
+  background: color-mix(in srgb, var(--sw-accent) 11%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 10%, transparent);
+}
+
+.sw-code-popover__trigger:focus-visible {
+  text-decoration-color: var(--sw-accent);
+  background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
+body .sw-code-popover__panel {
+  z-index: 1000;
+  display: block;
+  box-sizing: border-box;
+  /* Size to content: short signatures get small panels; floating-ui's size
+     middleware supplies the viewport max-width clamp inline. */
+  width: max-content;
+  max-width: min(34rem, calc(100vw - 1.5rem));
+  overflow: auto;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.65rem;
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  box-shadow:
+    0 1.25rem 3rem rgb(15 23 42 / 22%),
+    0 2px 6px rgb(15 23 42 / 10%);
+  overscroll-behavior: contain;
+  scrollbar-color: var(--sw-border-strong) transparent;
+}
+
+body .sw-code-popover__panel[hidden] {
+  display: none;
+}
+
+:root[data-theme="dark"] body .sw-code-popover__panel {
+  box-shadow:
+    0 1.5rem 3.5rem rgb(0 0 0 / 56%),
+    0 2px 8px rgb(0 0 0 / 40%);
+}
+
+body .sw-code-popover__signature {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 1rem 0.9rem 1.15rem;
+  overflow: auto hidden;
+  border-block-start: 2px solid color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: 500 0.72rem / 1.54 var(--sw-font-mono);
+  tab-size: 2;
+  text-align: start;
+  white-space: pre;
+}
+
+body .sw-code-popover__signature--narrow {
+  display: none;
+}
+
+body .sw-code-popover__signature span[style],
+body .sw-code-popover__example span[style] {
+  color: var(--1);
+}
+
+:root[data-theme="dark"] body .sw-code-popover__signature span[style],
+:root[data-theme="dark"] body .sw-code-popover__example span[style] {
+  color: var(--0);
+}
+
+body .sw-code-popover__docs,
+body .sw-code-popover__tags {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.75rem 1rem 0.82rem 1.15rem;
+  border-top: 1px solid var(--sw-border);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font: 450 0.72rem / 1.52 var(--sw-font-body);
+  text-align: start;
+  white-space: normal;
+}
+
+body .sw-code-popover__tags {
+  display: grid;
+  gap: 0.35rem;
+  padding-block-start: 0.65rem;
+  color: var(--sw-fg-muted);
+}
+
+body .sw-code-popover__tag,
+body .sw-code-popover__tag-name {
+  display: inline;
+}
+
+body .sw-code-popover__tag-name {
+  color: var(--sw-accent-strong);
+  font: 600 0.68rem / 1.4 var(--sw-font-mono);
+}
+
+/* An example tag is a small code block under its label, not inline prose. */
+body .sw-code-popover__tag--example {
+  display: grid;
+  gap: 0.3rem;
+}
+
+body .sw-code-popover__example {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.4rem;
+  background: var(--sw-surface-2);
+  color: var(--sw-fg);
+  font: 0.72rem / 1.55 var(--sw-font-mono);
+  white-space: pre;
+}
+
+body .sw-code-popover__link {
+  display: block;
+  padding: 0.55rem 1rem 0.6rem 1.15rem;
+  border-top: 1px solid var(--sw-border);
+  color: var(--sw-accent-strong);
+  background: var(--sw-surface-1);
+  font: 650 0.7rem / 1.4 var(--sw-font-body);
+  text-decoration: none;
+}
+
+body .sw-code-popover__link:hover {
+  background: color-mix(in srgb, var(--sw-accent) 8%, var(--sw-surface-1));
+}
+
+body .sw-code-popover__accessible-signature {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 40rem) {
+  body .sw-code-popover__signature--wide {
+    display: none;
+  }
+
+  body .sw-code-popover__signature--narrow {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-code-popover__trigger {
+    transition: none;
+  }
+}
+
+.sw-test-fixture {
+  min-height: 100vh;
+  padding: 1rem;
+  background: var(--sw-surface-0);
+}
+
+.sw-test-fixture [data-framework-lifecycle] {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sw-test-fixture output {
+  min-width: 2ch;
+}
+
+@media (max-width: 48rem) {
+  /* Narrow screens scroll wide tables locally instead of stretching the page.
+     Markdown tables already scroll inside their frame. */
+  .sw-prose table:not(.sw-table-frame > table) {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 48rem) {
+  .sw-architecture__step > div {
+    grid-template-columns: 2rem 1fr;
+  }
+
+  .sw-architecture__step p {
+    grid-column: 2;
+  }
+
+  body .sw-code-popover__signature--wide {
+    display: none;
+  }
+
+  body .sw-code-popover__signature--narrow {
+    display: block;
+  }
+}
+
+/* Search-target anchors exist for Pagefind sub-results and deep links only;
+   the visible member list already names them. Kept in flow (zero-height) so
+   #anchor navigation still lands on the right member. */
+.sw-prose .api-search-anchor {
+  display: block;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0;
+  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+}
+
+/* ToC deep links target member rows; keep them clear of the fixed header. */
+.sw-prose .api-member[id] {
+  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+}
+
+/* Type identifiers in generated declaration fences link to their API pages. */
+.sw-prose .expressive-code a.sw-code-ref {
+  color: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 65%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+
+.sw-prose .expressive-code a.sw-code-ref:hover {
+  color: var(--sw-accent-strong);
+  text-decoration-color: var(--sw-accent-strong);
+}
+
+/* Trigger-as-anchor (generated fences): hover previews, click navigates. */
+a.sw-code-popover__trigger {
+  color: inherit;
+  cursor: pointer;
+}
+
+/* A deep-linked member stands out via a quiet accent tint - no ring. */
+.sw-prose .api-member:target,
+.sw-prose .api-member[data-revealed] {
+  border-color: color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-accent) 4%, var(--sw-surface-1));
+}
