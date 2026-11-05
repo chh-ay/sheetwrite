@@ -17,7 +17,6 @@ export type CapabilityOwnerId =
   | "database"
   | "interoperability"
   | "formatting"
-  | "engine"
   | "formulas"
   | "performance"
   | "collaboration"
@@ -29,7 +28,8 @@ export type CapabilityOwnerId =
   | "queries"
   | "data-model"
   | "version-history"
-  | "functions";
+  | "functions"
+  | "recalculation";
 
 export type CapabilityArea =
   | "editing"
@@ -147,15 +147,6 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     kind: "capability",
   },
   {
-    id: "engine",
-    label: "Live engine view",
-    href: "/showcases/engine/",
-    routeFile: "docs/src/routes/showcases.engine.tsx",
-    responsibility:
-      "One real paged formula Grid with bounded request, result, formula, resource, drawing, and host-save events.",
-    kind: "capability",
-  },
-  {
     id: "formulas",
     label: "Formula analysis",
     href: "/showcases/formulas/",
@@ -263,10 +254,18 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
       "The function families 0.7.0 adds: engineering, financial, statistics, information, math and text, LOOKUP and TRIMRANGE, GETPIVOTDATA, regex, and references to other workbooks.",
     kind: "capability",
   },
+  {
+    id: "recalculation",
+    label: "Live recalculation",
+    href: "/showcases/recalculation/",
+    routeFile: "docs/src/routes/showcases.recalculation.tsx",
+    responsibility:
+      "Recalculation timed in the browser: one edit under 100,000 formulas, 1,000 lookups over 100,000 rows, and the order of edit, results and paint.",
+    kind: "capability",
+  },
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
-const ENGINE_LIVE_SCENARIO = "docs/src/showcases/scenarios/engine-live.ts";
 const FORMULAS_SCENARIO = "docs/src/showcases/scenarios/formulas.ts";
 const ANALYTICS_SCENARIO = "docs/src/showcases/scenarios/analytics.ts";
 const BUSINESS_SCENARIO = "docs/src/showcases/scenarios/business.ts";
@@ -284,7 +283,6 @@ const VUE_SPEC = "test/browser/vue-workbench.spec.ts";
 const SVELTE_SPEC = "test/browser/svelte-workbench.spec.ts";
 const INTEROP_SPEC = "test/browser/showcase-interoperability.spec.ts";
 const PERFORMANCE_SPEC = "test/browser/showcase-performance.spec.ts";
-const ENGINE_LIVE_SPEC = "test/browser/showcase-engine.spec.ts";
 const FORMULAS_SPEC = "test/browser/showcase-formulas.spec.ts";
 const DATABASE_COLLAB_SPEC = "test/browser/database-collaboration.spec.ts";
 const LIFECYCLE_SPEC = "test/browser/framework-lifecycle.spec.ts";
@@ -1195,18 +1193,18 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
 
   {
     id: "lifecycle.engine-events",
-    title: "Live engine events",
+    title: "Recalculation, results and paint in order",
     area: "lifecycle",
-    primary: "engine",
+    primary: "recalculation",
     interaction:
-      "Jump, edit, undo, change the drawing path, and save; the working Grid changes before its bounded text record updates.",
-    scope: "browser+worker",
+      "Change the cell that 100,000 formulas read, or move 1,000 lookups; the side panel lists when the edit was applied, its results were readable and the next frame was painted.",
+    scope: "browser",
     accessibility:
-      "Every visual lane has matching text, and play, pause, step, reset, and speed controls work from the keyboard.",
-    testPath: ENGINE_LIVE_SPEC,
-    sharedModules: [ENGINE_LIVE_SCENARIO],
+      "Every timing and the event order are text in the side panel; the bars are decorative.",
+    testPath: "test/browser/showcase-recalculation.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/recalculation.ts"],
     boundary:
-      "Sheetwrite reports Grid work; the host decides when to save and what an acknowledgement means.",
+      "Timings depend on the reader's device and browser; the release benchmarks measure fixed machines.",
   },
   {
     id: "workflow.host-owned-rows",

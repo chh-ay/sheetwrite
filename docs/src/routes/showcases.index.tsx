@@ -28,6 +28,12 @@ const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]))
 const SCENE_ORDER = [
   "spreadsheet",
   "analysis",
+  "data-model",
+  "queries",
+  "sort",
+  "functions",
+  "recalculation",
+  "version-history",
   "performance",
   "formulas",
   "collaboration",
@@ -35,7 +41,6 @@ const SCENE_ORDER = [
   "host-rows",
   "interoperability",
   "formatting",
-  "engine",
   "data-tools",
 ] as const satisfies readonly CapabilityOwnerId[];
 
@@ -50,11 +55,17 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   interoperability: "XLSX and delimited exchange with fixture-backed fidelity warnings.",
   formatting: "A styled P&L, mixed number formats, and a live XLSX fidelity check.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
-  engine: "A 50,000-row forecast with every public engine event traced beside it.",
   "data-tools": "Sort, filter and organize 4,800 orders; exercise validation and protection.",
   spreadsheet:
     "An Excel-style ribbon, formula bar and sheet tabs around one grid. Narrow it and watch the groups fold.",
   analysis: "A pivot table and a live chart over two years of orders. Edit an order and both move.",
+  sort: "Sort the cells in place as Excel does, or only the view, and see which formulas follow.",
+  queries: "Saved queries shape a CSV feed into tables. Refresh, change a step, refresh again.",
+  "data-model": "Relate tables, pivot by a related column with a measure, then break a key.",
+  "version-history": "Edit with a teammate, compare versions by author, and restore a range.",
+  functions: "Engineering, financial, statistics, lookup and regex functions, calculated live.",
+  recalculation:
+    "Edit a cell that a sheet full of formulas reads, and move its lookups, timed in your browser.",
 };
 
 /** Real import and mount line per first-party adapter. */
@@ -97,12 +108,19 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
-  if (owner.id === "formulas" || owner.id === "engine" || owner.id === "analysis")
+  if (
+    owner.id === "formulas" ||
+    owner.id === "functions" ||
+    owner.id === "recalculation" ||
+    owner.id === "analysis" ||
+    owner.id === "data-model"
+  ) {
     return "formulas";
+  }
   if (owner.id === "interoperability" || owner.id === "formatting" || owner.id === "spreadsheet") {
     return "workbook";
   }
-  if (owner.id === "collaboration") return "collaboration";
+  if (owner.id === "collaboration" || owner.id === "version-history") return "collaboration";
   return "data";
 }
 
@@ -268,21 +286,20 @@ function FormulasScene() {
   );
 }
 
-/** One change traced like a profiler waterfall: each stage starts where the last ends. */
-const ENGINE_STAGES = [
-  { label: "Page", width: 18 },
-  { label: "Recalc", width: 34 },
-  { label: "Paint", width: 22 },
-  { label: "Host ack", width: 26 },
+/** One edit traced like a profiler waterfall: each stage starts where the last ends. */
+const RECALCULATION_STAGES = [
+  { label: "Edit", width: 12 },
+  { label: "Recalc", width: 46 },
+  { label: "Paint", width: 42 },
 ] as const;
 
-function EngineScene() {
+function RecalculationScene() {
   let start = 0;
 
   return (
-    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--engine">
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--recalculation">
       <span className="sw-hub-waterfall">
-        {ENGINE_STAGES.map((stage) => {
+        {RECALCULATION_STAGES.map((stage) => {
           const offset = start;
 
           start += stage.width;
@@ -297,7 +314,35 @@ function EngineScene() {
           );
         })}
       </span>
-      <span className="sw-hub-scene__caption">one edit, traced from page to host</span>
+      <span className="sw-hub-scene__caption">one edit, timed in your browser</span>
+    </span>
+  );
+}
+
+/** A formula over label and value rows, the shape the formula-led scenes share. */
+function FeatureScene({
+  id,
+  formula,
+  rows,
+  caption,
+}: Readonly<{
+  id: SceneOwnerId;
+  formula: string;
+  rows: readonly (readonly [label: string, value: string])[];
+  caption: string;
+}>) {
+  return (
+    <span aria-hidden="true" className={`sw-hub-scene sw-hub-scene--${id}`}>
+      <HighlightedCode className="sw-hub-spill__formula" code={formula} language="formula" />
+      <span className="sw-hub-spill">
+        {rows.map(([label, value]) => (
+          <span key={label}>
+            <i>{label}</i>
+            <b>{value}</b>
+          </span>
+        ))}
+      </span>
+      <span className="sw-hub-scene__caption">{caption}</span>
     </span>
   );
 }
@@ -509,8 +554,73 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
       return <FormattingScene />;
     case "collaboration":
       return <CollaborationScene />;
-    case "engine":
-      return <EngineScene />;
+    case "recalculation":
+      return <RecalculationScene />;
+    case "sort":
+      return (
+        <FeatureScene
+          caption="in place or view only · Sort panel · undo"
+          formula="=Orders!A1"
+          id="sort"
+          rows={[
+            ["Revenue", "Z → A"],
+            ["Region", "A → Z"],
+            ["Formulas", "follow"],
+          ]}
+        />
+      );
+    case "queries":
+      return (
+        <FeatureScene
+          caption="CSV and JSON sources · Queries & Connections"
+          formula="=SUM(RegionTotals[Revenue])"
+          id="queries"
+          rows={[
+            ["Filter", "Shipped"],
+            ["Merge", "Regions"],
+            ["Group", "Region"],
+          ]}
+        />
+      );
+    case "data-model":
+      return (
+        <FeatureScene
+          caption="relationships · measures · model pivots"
+          formula='=GETPIVOTDATA("Revenue",$A$1)'
+          id="data-model"
+          rows={[
+            ["Orders", "many"],
+            ["Products", "one"],
+            ["Regions", "one"],
+          ]}
+        />
+      );
+    case "version-history":
+      return (
+        <FeatureScene
+          caption="save · compare by author · restore"
+          formula="=SUM(C2:F2)"
+          id="version-history"
+          rows={[
+            ["Revision", "You"],
+            ["Travel cut", "Sam"],
+            ["Approved", "Sam"],
+          ]}
+        />
+      );
+    case "functions":
+      return (
+        <FeatureScene
+          caption="engineering to regex · full engine"
+          formula='=CONVERT(B3,"km","mi")'
+          id="functions"
+          rows={[
+            ["Engineering", "DEC2HEX"],
+            ["Financial", "PRICE"],
+            ["Regex", "REGEXTEST"],
+          ]}
+        />
+      );
     case "data-tools":
       return <DataToolsScene />;
   }

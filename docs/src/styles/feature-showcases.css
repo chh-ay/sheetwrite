@@ -109,3 +109,43 @@
   outline: var(--sw-focus-ring-width) solid var(--sw-accent);
   outline-offset: var(--sw-space-0-5);
 }
+
+/* Recent measured runs: a label, a bar of engine then paint time, and the engine time. */
+.sw-feature-runs {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--sw-text-caption);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-feature-runs > li {
+  display: grid;
+  grid-template-columns: 7em minmax(0, 1fr) 4.5em;
+  gap: var(--sw-space-2);
+  align-items: center;
+  color: var(--sw-fg-muted);
+}
+
+.sw-feature-runs > li > span:last-child {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.sw-feature-runs__bar {
+  display: block;
+  height: var(--sw-space-2);
+  border-radius: var(--sw-radius-sm);
+  background: var(--sw-border-strong);
+}
+
+.sw-feature-runs__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sw-accent);
+}

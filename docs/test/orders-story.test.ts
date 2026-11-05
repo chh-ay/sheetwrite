@@ -2,13 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import { validateTransactionResources } from "../../packages/core/src/document-protocol.js";
 import {
-  ENGINE_ACCOUNT_ROWS,
-  ENGINE_DIP_REGION,
-  ENGINE_LIVE_ROWS,
-  ENGINE_REFORECAST_FIRST_MONTH,
-  engineLiveRow,
-} from "../src/showcases/scenarios/engine-live-data.js";
-import {
   apacPromotionOps,
   buildOrdersLedger,
   LEDGER_YEAR,
@@ -42,8 +35,6 @@ const LARGE_ORDER_REVENUE = 4_000;
 const LARGE_ORDERS_SHOWN = 5;
 /** Months of the year that a test compares; a story year has twelve. */
 const MONTHS_PER_YEAR = 12;
-/** Outside the dip, monthly actuals stay this close to the plan. */
-const PLAN_TOLERANCE = 0.03;
 
 interface OrderColumns {
   readonly rowCount: number;
@@ -257,74 +248,5 @@ describe("formulas ledger", () => {
   test("keeps the APAC promotion inside one Grid transaction", () => {
     // The Grid rejects a larger transaction, and the promotion button then does nothing.
     expect(validateTransactionResources(apacPromotionOps(ledger))).toMatchObject({ ok: true });
-  });
-});
-
-describe("engine forecast", () => {
-  const accounts = Math.floor((ENGINE_LIVE_ROWS - 2) / ENGINE_ACCOUNT_ROWS);
-  const dipMonths = DIP_MONTHS.map((month) => Number(month.slice(5)) - 1);
-
-  /** Monthly actual against plan, per region, for accounts that `include` selects. */
-  function attainment(include: (planVersion: string) => boolean, month: number) {
-    const totals = new Map<string, { actual: number; plan: number }>();
-    for (let account = 0; account < accounts; account++) {
-      const row = engineLiveRow(1 + account * ENGINE_ACCOUNT_ROWS + month);
-      if (!include(String(row.planVersion))) continue;
-
-      const region = String(row.region);
-      const total = totals.get(region) ?? { actual: 0, plan: 0 };
-      total.actual += Number(row.actual);
-      total.plan += Number(row.plan);
-      totals.set(region, total);
-    }
-    return new Map([...totals].map(([region, total]) => [region, total.actual / total.plan]));
-  }
-
-  const boardPlan = (version: string) => version.startsWith("Board");
-  const reforecast = (version: string) => version.startsWith("Re-forecast");
-
-  test("meets the January board plan, except the dip region from its price change", () => {
-    // The engine forecast covers FY26, so the dip months must fall in 2026.
-    for (const month of DIP_MONTHS) expect(month.startsWith(`${LEDGER_YEAR}-`)).toBe(true);
-
-    const firstDip = Math.min(...dipMonths);
-    const lastDip = Math.max(...dipMonths);
-    for (let month = 0; month < MONTHS_PER_YEAR; month++) {
-      for (const [region, ratio] of attainment(boardPlan, month)) {
-        if (region !== ENGINE_DIP_REGION || month < firstDip) {
-          expect(Math.abs(ratio - 1)).toBeLessThan(PLAN_TOLERANCE);
-        } else if (month <= lastDip) {
-          expect(ratio).toBeLessThan(DIP_SHARE_CEILING);
-        } else {
-          // A partial recovery: above the dip, still below the plan.
-          expect(ratio).toBeGreaterThan(DIP_SHARE_CEILING);
-          expect(ratio).toBeLessThan(1 - PLAN_TOLERANCE);
-        }
-      }
-    }
-  });
-
-  test("re-forecast plans include the dip region's partial recovery", () => {
-    for (let month = ENGINE_REFORECAST_FIRST_MONTH; month < MONTHS_PER_YEAR; month++) {
-      const ratio = attainment(reforecast, month).get(ENGINE_DIP_REGION) ?? 0;
-      expect(Math.abs(ratio - 1)).toBeLessThan(PLAN_TOLERANCE);
-
-      const board = attainment(boardPlan, month).get(ENGINE_DIP_REGION) ?? 0;
-      expect(board).toBeLessThan(1 - PLAN_TOLERANCE);
-    }
-  });
-
-  test("plans a Q4 peak over the summer lull", () => {
-    const plan = (month: number) => {
-      let total = 0;
-      for (let account = 0; account < accounts; account++) {
-        total += Number(engineLiveRow(1 + account * ENGINE_ACCOUNT_ROWS + month).plan);
-      }
-      return total;
-    };
-
-    const peak = mean(PEAK_MONTHS_OF_YEAR.map(plan));
-    const lull = mean(LULL_MONTHS_OF_YEAR.map(plan));
-    expect(peak / lull).toBeGreaterThan(SEASONAL_MARGIN);
   });
 });

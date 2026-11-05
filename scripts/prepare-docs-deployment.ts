@@ -1,7 +1,7 @@
 import { copyFile, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const requiredFiles = [
@@ -88,12 +88,16 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
             headers: { "cache-control": IMMUTABLE_CACHE },
             continue: true,
           })),
-          // Moved docs pages answer with a permanent redirect; the new page
-          // forwards an old #fragment itself, because a server never sees it.
-          ...Object.entries(MOVED_PAGES).map(([from, page]) => ({
+          // Moved docs pages and merged showcases answer with a permanent
+          // redirect; a new docs page forwards an old #fragment itself,
+          // because a server never sees it.
+          ...[
+            ...Object.entries(MOVED_PAGES).map(([from, page]) => [from, page.to] as const),
+            ...Object.entries(MOVED_SHOWCASES),
+          ].map(([from, to]) => ({
             src: `^${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\/$/, "")}/?$`,
             status: 308,
-            headers: { Location: page.to },
+            headers: { Location: to },
           })),
           { src: "^/$", dest: "/index.html" },
           ...[...files.keys()]

@@ -239,7 +239,7 @@
   --sw-hub-accent: var(--sw-danger);
 }
 
-.sw-hub-launch[data-owner="engine"] {
+.sw-hub-launch[data-owner="recalculation"] {
   --sw-hub-accent: var(--sw-code-keyword);
 }
 
