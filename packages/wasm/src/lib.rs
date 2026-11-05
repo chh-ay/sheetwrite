@@ -47,6 +47,8 @@ mod row_visibility;
 #[cfg(feature = "formula-engine")]
 mod sheet;
 #[cfg(feature = "formula-engine")]
+mod sort_text;
+#[cfg(feature = "formula-engine")]
 mod spill;
 #[cfg(feature = "formula-engine")]
 mod store;
@@ -65,6 +67,8 @@ mod formula_syntax_tests;
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod sort_order_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod structural_edit_tests;
 #[cfg(all(test, feature = "formula-engine"))]

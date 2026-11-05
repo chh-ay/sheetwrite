@@ -1406,8 +1406,8 @@ fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     store.set_number(sheet, 2, 1, 7.0, 0);
     store.recompute(sheet);
 
-    assert_eq!(store.sort_rows(sheet, 0, true), vec![4, 0, 3, 1, 2, 5]);
-    assert_eq!(store.sort_rows(sheet, 0, false), vec![5, 2, 1, 3, 0, 4]);
+    assert_eq!(store.sort_rows(sheet, 0, true), vec![4, 3, 1, 2, 0, 5]);
+    assert_eq!(store.sort_rows(sheet, 0, false), vec![0, 2, 1, 3, 4, 5]);
     assert_close(store.aggregate(sheet, 1, 0), 12.0);
     assert_close(store.aggregate(sheet, 1, 1), 6.0);
     assert_close(store.aggregate(sheet, 1, 2), 5.0);
@@ -3528,11 +3528,11 @@ mod spill_query_fixtures {
 
         assert_eq!(
             store.sort_rows_multi(sheet, &[0], &[1], &[]),
-            vec![5, 1, 4, 2, 3, 0, 6]
+            vec![5, 1, 2, 3, 4, 0, 6]
         );
         assert_eq!(
             store.sort_rows_multi(sheet, &[0], &[0], &[]),
-            vec![0, 6, 3, 2, 4, 1, 5]
+            vec![4, 3, 2, 1, 5, 0, 6]
         );
     }
 
@@ -3684,15 +3684,16 @@ mod multi_key_sort_fixtures {
     #[test]
     fn multi_key_sort_orders_kinds_numbers_text_booleans_blanks() {
         let (store, sheet) = mixed_kind_fixture();
-        // Ascending: numbers 1.0, 2.0, 3.0; then error text, "a", "b"; then
-        // false, true; the blank sorts last. Descending reverses each group.
+        // Ascending: numbers 1.0, 2.0, 3.0; then "a", "b"; then false, true;
+        // then the error; the blank sorts last. Descending reverses the groups
+        // and each group, and the blank stays last.
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
-            vec![4, 0, 8, 7, 1, 5, 6, 3, 2]
+            vec![4, 0, 8, 1, 5, 6, 3, 7, 2]
         );
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
-            vec![2, 3, 6, 5, 1, 7, 8, 0, 4]
+            vec![7, 3, 6, 5, 1, 8, 0, 4, 2]
         );
         // Candidates restrict the same order to the picked rows.
         assert_eq!(

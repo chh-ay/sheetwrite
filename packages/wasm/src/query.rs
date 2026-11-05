@@ -8,6 +8,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
 use crate::sheet::{formula_error_at, SheetData};
+use crate::sort_text::compare_sort_text;
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -549,8 +550,7 @@ impl CellStore {
             let ka = unsafe { keys.get_unchecked(a as usize) };
             // SAFETY: as above.
             let kb = unsafe { keys.get_unchecked(b as usize) };
-            let ord = ka.cmp(kb);
-            let ord = if ascending { ord } else { ord.reverse() };
+            let ord = ka.sort_cmp(kb, ascending);
             if ord == Ordering::Equal {
                 a.cmp(&b)
             } else {
@@ -623,11 +623,7 @@ impl CellStore {
             for key in 0..cols.len() {
                 let a = &keys[key * row_count + left as usize];
                 let b = &keys[key * row_count + right as usize];
-                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
-                    a.cmp(b)
-                } else {
-                    b.cmp(a)
-                };
+                let order = a.sort_cmp(b, ascending.get(key).copied().unwrap_or(1) != 0);
                 if order != Ordering::Equal {
                     return order;
                 }
@@ -1462,11 +1458,13 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
     }
 }
 
+/// The value of a sort key cell, as Excel's sort compares it.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ComparableCell<'a> {
     Number(OrderedNumber),
     Bool(bool),
     Text(&'a str),
+    Error,
     Empty,
 }
 
@@ -1483,8 +1481,8 @@ impl<'a> ComparableCell<'a> {
                 let Some(key) = key_for_index(sheet, index) else {
                     return ComparableCell::Empty;
                 };
-                if let Some(error) = formula_error_at(sheet, key) {
-                    ComparableCell::Text(error.sentinel())
+                if formula_error_at(sheet, key).is_some() {
+                    ComparableCell::Error
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Blank {
                     ComparableCell::Empty
                 } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Bool {
@@ -1529,8 +1527,8 @@ impl<'a> ComparableCell<'a> {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
                 };
-                if let Some(error) = formula_error_at(sheet, key) {
-                    return Self::Text(error.sentinel());
+                if formula_error_at(sheet, key).is_some() {
+                    return Self::Error;
                 }
                 let (kind, payload) = run.resolved(index);
                 match kind {
@@ -1548,26 +1546,37 @@ impl<'a> ComparableCell<'a> {
     }
 }
 
-impl Ord for ComparableCell<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
+impl ComparableCell<'_> {
+    /// Excel's sort order: numbers, text, `FALSE` before `TRUE`, then errors,
+    /// which are all equal. A descending sort reverses this order, but blank
+    /// cells are last in both directions.
+    pub(crate) fn sort_cmp(&self, other: &Self, ascending: bool) -> Ordering {
         match (self, other) {
             (ComparableCell::Empty, ComparableCell::Empty) => Ordering::Equal,
             (ComparableCell::Empty, _) => Ordering::Greater,
             (_, ComparableCell::Empty) => Ordering::Less,
-            (ComparableCell::Number(a), ComparableCell::Number(b)) => a.cmp(b),
-            (ComparableCell::Text(a), ComparableCell::Text(b)) => a.cmp(b),
-            (ComparableCell::Bool(a), ComparableCell::Bool(b)) => a.cmp(b),
-            (ComparableCell::Number(_), _) => Ordering::Less,
-            (_, ComparableCell::Number(_)) => Ordering::Greater,
-            (ComparableCell::Text(_), ComparableCell::Bool(_)) => Ordering::Less,
-            (ComparableCell::Bool(_), ComparableCell::Text(_)) => Ordering::Greater,
+            _ if ascending => self.ascending_cmp(other),
+            _ => other.ascending_cmp(self),
         }
     }
-}
 
-impl PartialOrd for ComparableCell<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+    fn ascending_cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (ComparableCell::Number(a), ComparableCell::Number(b)) => a.cmp(b),
+            (ComparableCell::Text(a), ComparableCell::Text(b)) => compare_sort_text(a, b),
+            (ComparableCell::Bool(a), ComparableCell::Bool(b)) => a.cmp(b),
+            _ => self.type_rank().cmp(&other.type_rank()),
+        }
+    }
+
+    fn type_rank(&self) -> u8 {
+        match self {
+            ComparableCell::Number(_) => 0,
+            ComparableCell::Text(_) => 1,
+            ComparableCell::Bool(_) => 2,
+            ComparableCell::Error => 3,
+            ComparableCell::Empty => 4,
+        }
     }
 }
 
