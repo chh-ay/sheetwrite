@@ -3,6 +3,7 @@
 //! formulas that read them.
 
 use crate::cells::CellStorage;
+use crate::formula_slots::FormulaStore;
 use crate::graph::SheetFormulas;
 use crate::memory::StoreMemoryStats;
 use crate::row_visibility::RowVisibility;
@@ -130,11 +131,13 @@ impl SheetData {
         sheet: u32,
         at: usize,
         count: usize,
+        slots: &mut FormulaStore,
     ) -> Result<(), String> {
         let at = at.min(self.cells.row_count());
         self.cells.insert_rows(at, count)?;
         if count != 0 {
-            self.formulas.insert_rows(sheet, at as u32, count as u32);
+            self.formulas
+                .insert_rows(sheet, at as u32, count as u32, slots);
             self.visibility.insert_rows(at as u32, count as u32);
         }
         Ok(())
@@ -146,6 +149,7 @@ impl SheetData {
         sheet: u32,
         at: usize,
         count: usize,
+        slots: &mut FormulaStore,
     ) -> Result<(), String> {
         let extent = self.cells.row_count();
         if count == 0 || at >= extent {
@@ -154,7 +158,8 @@ impl SheetData {
 
         let count = count.min(extent - at);
         self.cells.delete_rows(at, count)?;
-        self.formulas.delete_rows(sheet, at as u32, count as u32);
+        self.formulas
+            .delete_rows(sheet, at as u32, count as u32, slots);
         self.visibility.delete_rows(at as u32, count as u32);
         Ok(())
     }
@@ -165,11 +170,13 @@ impl SheetData {
         sheet: u32,
         at: usize,
         count: usize,
+        slots: &mut FormulaStore,
     ) -> Result<(), String> {
         let at = at.min(self.cells.n_cols());
         self.cells.insert_cols(at, count)?;
         if count != 0 {
-            self.formulas.insert_cols(sheet, at as u32, count as u32);
+            self.formulas
+                .insert_cols(sheet, at as u32, count as u32, slots);
         }
         Ok(())
     }
@@ -180,6 +187,7 @@ impl SheetData {
         sheet: u32,
         at: usize,
         count: usize,
+        slots: &mut FormulaStore,
     ) -> Result<(), String> {
         let extent = self.cells.n_cols();
         if count == 0 || at >= extent {
@@ -188,7 +196,8 @@ impl SheetData {
 
         let count = count.min(extent - at);
         self.cells.delete_cols(at, count)?;
-        self.formulas.delete_cols(sheet, at as u32, count as u32);
+        self.formulas
+            .delete_cols(sheet, at as u32, count as u32, slots);
         Ok(())
     }
 
@@ -233,6 +242,10 @@ pub(crate) fn formula_error_with_entry(
         .or_else(|| entry.and_then(FormulaEntry::source_error))
 }
 
-pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {
-    formula_error_with_entry(sheet, key, sheet.formulas.get(key))
+pub(crate) fn formula_error_at(
+    sheet: &SheetData,
+    key: CellKey,
+    slots: &FormulaStore,
+) -> Option<FormulaError> {
+    formula_error_with_entry(sheet, key, sheet.formulas.get(key, slots))
 }
