@@ -1,5 +1,6 @@
-import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+import { Icon } from "./Icon.js";
 
 interface PagefindSubResult {
   url: string;
@@ -172,7 +173,7 @@ export function DocsSearch() {
         }}
         type="button"
       >
-        <Search aria-hidden="true" className="sw-icon" />
+        <Icon name="search" />
         <span>Search docs</span>
         <kbd>Ctrl K</kbd>
       </button>
@@ -193,7 +194,7 @@ export function DocsSearch() {
         <form method="dialog">
           <label>
             <span className="sw-visually-hidden">Search documentation</span>
-            <Search aria-hidden="true" className="sw-icon" data-size="md" />
+            <Icon name="search" size="md" />
             <input
               autoComplete="off"
               onChange={(event) => setQuery(event.currentTarget.value)}

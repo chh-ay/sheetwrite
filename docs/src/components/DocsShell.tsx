@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { Menu, X } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import {
@@ -23,6 +22,7 @@ import {
 } from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
+import { Icon } from "./Icon.js";
 import { PackageCommand } from "./PackageCommand.js";
 import { SiteTopbar } from "./SiteTopbar.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
@@ -160,6 +160,7 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
         <summary>
           <span>{item.label}</span>
           <NavigationBadgeLabel item={item} />
+          <Icon className="sw-disclosure-icon" name="chevron-right" />
         </summary>
         <div>
           <NavigationEntries
@@ -196,6 +197,7 @@ function NavigationSections({
           <summary>
             <span>{section.label}</span>
             <NavigationBadgeLabel item={section} />
+            <Icon className="sw-disclosure-icon" name="chevron-right" />
           </summary>
           <div>
             <NavigationEntries
@@ -275,7 +277,7 @@ function NavigationDrawer({
           onClick={onDismiss}
           type="button"
         >
-          <X aria-hidden="true" className="sw-icon" data-size="md" />
+          <Icon name="close" size="md" />
         </button>
       </div>
       <NavigationSections activeHref={activeHref} onNavigate={onDismiss} />
@@ -393,7 +395,7 @@ export function DocsShell({
             onClick={openNavigation}
             type="button"
           >
-            <Menu aria-hidden="true" className="sw-icon" data-size="md" />
+            <Icon name="menu" size="md" />
             <span className="sw-visually-hidden">Documentation menu</span>
           </button>
         }

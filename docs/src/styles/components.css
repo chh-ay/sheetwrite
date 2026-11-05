@@ -2,12 +2,20 @@
    badges, cards, callouts, tabs, tables and code tokens. Pages compose these
    classes instead of restyling their own copies. */
 
-/* ── Icons: Lucide only, one stroke, sizes on a 4 px grid ───────────────── */
+/* ── Icons: the Sheetwrite sprite, one stroke, sizes on a 4 px grid ──────
+   Stroke and colour are inherited into each <use>d symbol; the accent marks
+   the selected part of an icon. A filled control (primary button, active
+   badge) sets --sw-icon-accent to its ink so the accent never vanishes. */
 .sw-icon {
   flex: none;
   width: var(--sw-icon-sm);
   height: var(--sw-icon-sm);
+  fill: none;
+  stroke: currentColor;
   stroke-width: var(--sw-icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
 }
 
 .sw-icon[data-size="md"] {
@@ -59,6 +67,7 @@
 }
 
 .sw-button[data-variant="primary"] {
+  --sw-icon-accent: currentColor;
   border-color: var(--sw-accent);
   background: var(--sw-accent);
   color: var(--sw-accent-ink);
@@ -127,10 +136,9 @@
   color: var(--sw-fg-strong);
 }
 
-.sw-icon-button svg {
+.sw-icon-button .sw-icon {
   width: var(--sw-icon-md);
   height: var(--sw-icon-md);
-  stroke-width: var(--sw-icon-stroke);
 }
 
 /* ── Links ──────────────────────────────────────────────────────────────── */
@@ -234,51 +242,54 @@ a.sw-card:hover {
 /* ── Callouts: note, tip, warning, danger ───────────────────────────────── */
 .sw-callout {
   --sw-callout-tone: var(--sw-info);
-  --sw-callout-fill: var(--sw-info-soft);
+  --sw-icon-accent: var(--sw-callout-tone);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--sw-space-1) var(--sw-space-3);
+  align-items: center;
   margin: var(--sw-space-6) 0;
   padding: var(--sw-space-4) var(--sw-space-5);
-  border: var(--sw-border-width) solid color-mix(in srgb, var(--sw-callout-tone) 35%, transparent);
+  border: var(--sw-border-width) solid
+    color-mix(in srgb, var(--sw-callout-tone) 30%, var(--sw-border));
   border-left: var(--sw-space-1) solid var(--sw-callout-tone);
   border-radius: var(--sw-radius-md);
-  background: var(--sw-callout-fill);
+  background: color-mix(in srgb, var(--sw-callout-tone) 7%, var(--sw-surface-1));
   color: var(--sw-fg);
 }
 
 .sw-callout[data-tone="tip"] {
   --sw-callout-tone: var(--sw-accent);
-  --sw-callout-fill: var(--sw-accent-soft);
 }
 
 .sw-callout[data-tone="warning"] {
   --sw-callout-tone: var(--sw-warning);
-  --sw-callout-fill: var(--sw-warning-soft);
 }
 
 .sw-callout[data-tone="danger"] {
   --sw-callout-tone: var(--sw-danger);
-  --sw-callout-fill: var(--sw-danger-soft);
 }
 
 .sw-callout > .sw-icon {
-  grid-row: span 2;
-  margin-top: var(--sw-space-0-5);
   color: var(--sw-callout-tone);
 }
 
-.sw-callout__title {
+.sw-callout .sw-callout__title {
   margin: 0;
   color: var(--sw-fg-strong);
   font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
 }
 
-.sw-callout__body > :first-child {
+.sw-callout .sw-callout__body {
+  grid-column: 2;
+  font-size: var(--sw-text-body);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-callout .sw-callout__body > :first-child {
   margin-top: 0;
 }
 
-.sw-callout__body > :last-child {
+.sw-callout .sw-callout__body > :last-child {
   margin-bottom: 0;
 }
 
@@ -377,12 +388,15 @@ a.sw-card:hover {
   color: var(--sw-code-punctuation);
 }
 
-/* JetBrains Mono ligatures turn `===` into one glyph; code shows what is typed. */
+/* JetBrains Mono ligatures turn `===` into one glyph; code shows what is typed.
+   Feature settings survive the `font` shorthand that code frames set. */
 code,
 pre,
 kbd,
 samp {
-  font-variant-ligatures: none;
+  font-feature-settings:
+    "calt" 0,
+    "liga" 0;
 }
 
 /* ── Brand mark ─────────────────────────────────────────────────────────── */
@@ -482,11 +496,15 @@ samp {
   justify-self: end;
 }
 
-/* Phones: the section links move to a second, scrollable row. */
+/* Phones: the section links move to a second, scrollable row; the search
+   control stays in the first row between the brand and the actions. */
 @media (max-width: 54rem) {
-  .sw-header,
-  .sw-header[data-has-search="true"] {
+  .sw-header {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .sw-header[data-has-search="true"] {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .sw-header__nav {
@@ -497,8 +515,6 @@ samp {
   }
 
   .sw-header__search {
-    grid-row: 3;
-    grid-column: 1 / -1;
-    max-width: none;
+    justify-self: end;
   }
 }

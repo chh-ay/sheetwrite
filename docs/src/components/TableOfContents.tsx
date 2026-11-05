@@ -1,6 +1,8 @@
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { Icon } from "./Icon.js";
+
 export interface OutlineItem {
   id: string;
   label: string;
@@ -160,6 +162,7 @@ export function InlineTableOfContents({ items }: Readonly<{ items: readonly Outl
   return (
     <details className="sw-toc-inline" data-pagefind-ignore>
       <summary>
+        <Icon className="sw-disclosure-icon" name="chevron-right" />
         <span className="sw-toc__label">On this page</span>
       </summary>
       {items.length < MIN_OUTLINE_ENTRIES ? null : <OutlineLinks items={items} />}

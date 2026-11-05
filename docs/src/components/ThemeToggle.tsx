@@ -1,7 +1,7 @@
-import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { writePreference } from "../lib/preference-storage.js";
+import { Icon } from "./Icon.js";
 
 type Theme = "light" | "dark";
 
@@ -23,7 +23,6 @@ export function ThemeToggle() {
     setTheme(next);
   };
   const label = `Use ${theme === "dark" ? "light" : "dark"} theme`;
-  const Icon = theme === "dark" ? Sun : Moon;
 
   return (
     <button
@@ -33,7 +32,7 @@ export function ThemeToggle() {
       title={label}
       type="button"
     >
-      <Icon aria-hidden="true" className="sw-icon" data-size="md" />
+      <Icon name={theme === "dark" ? "sun" : "moon"} size="md" />
     </button>
   );
 }

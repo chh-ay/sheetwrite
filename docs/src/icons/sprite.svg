@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Sheetwrite icons. One language, drawn on a 24-unit grid:
+    - 2-unit strokes with round joins and caps, set by the <svg> that uses a
+      symbol (.sw-icon); 2-unit corner radius on containers, like cells.
+    - Colour is currentColor. One accent, the icon accent token, marks the
+      selection: the active cell and its fill handle, a found cell, a result,
+      a live signal. Actions (arrows, undo, sort) stay pure strokes; things
+      and states carry the accent.
+  -->
+  <symbol id="arrow-right" viewBox="0 0 24 24"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></symbol>
+  <symbol id="arrow-up" viewBox="0 0 24 24"><path d="M12 19.5v-15M6 10.5l6-6 6 6"/></symbol>
+  <symbol id="arrow-down" viewBox="0 0 24 24"><path d="M12 4.5v15M6 13.5l6 6 6-6"/></symbol>
+  <symbol id="chevron-down" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+  <symbol id="chevron-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h10"/></symbol>
+  <symbol id="external" viewBox="0 0 24 24"><path d="M13.5 3.5h7v7M20.5 3.5l-9 9M18 14v4.5a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2H10"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="m4.5 12.5 4.75 4.75L19.5 7" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5.5 5.5"/><rect x="7.75" y="7.75" width="4.5" height="4.5" rx=".75" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><path d="M14.5 6V5.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2H6"/><rect x="9.5" y="9.5" width="11" height="11" rx="2"/><rect x="18" y="18" width="3.5" height="3.5" rx=".5" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/><path d="M10.5 6.75h2.75a4 4 0 0 1 4 4v2.75" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.75" style="fill:var(--sw-icon-accent)"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.5 6.5 0 0 0 10 10Z"/><path d="M17.5 3v4M15.5 5h4" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="terminal" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m6.5 9.5 3 2.5-3 2.5"/><rect x="12" y="14" width="5" height="2" rx=".5" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="code" viewBox="0 0 24 24"><path d="m8 7.5-4.5 4.5L8 16.5M16 7.5l4.5 4.5-4.5 4.5"/><path d="m13.5 5-3 14" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 3.5 5v13.5c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5ZM12 6.5V20"/><path d="M15 5.4V10.5l1.75-1.25 1.75 1.25V4.9" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent);stroke-width:1"/></symbol>
+  <symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.75" r="1.4" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="tip" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2v.5h5V16c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3ZM9.5 19h5M10.5 21.5h3"/><circle cx="12" cy="9" r="1.6" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="warning" viewBox="0 0 24 24"><path d="M10.27 4 2.79 17A2 2 0 0 0 4.52 20h14.96a2 2 0 0 0 1.73-3L13.73 4a2 2 0 0 0-3.46 0ZM12 9v4.5"/><circle cx="12" cy="16.75" r="1.4" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="danger" viewBox="0 0 24 24"><path d="M8.4 3h7.2L21 8.4v7.2L15.6 21H8.4L3 15.6V8.4ZM12 7.5V13"/><circle cx="12" cy="16.25" r="1.4" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="sheet" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 8.5h18M8.5 3v18"/><rect x="11.5" y="11.5" width="6" height="6" rx=".5" style="stroke:var(--sw-icon-accent)"/><rect x="15.75" y="15.75" width="3.5" height="3.5" rx=".5" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 9v11M15 9v11M3 14.5h18"/><path d="M3 9h18" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="file" viewBox="0 0 24 24"><path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5ZM13.5 3v5.5H19M9 12.5h6M9 16.5h3"/><rect x="13.75" y="15" width="3.5" height="3.5" rx=".5" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="spill" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" style="stroke:var(--sw-icon-accent)"/><path d="M6.75 14v6.5M14 6.75h6.5M4.5 17l2.25 3.5L9 17M17 4.5l3.5 2.25L17 9M14 14h6.5v6.5H14Z"/></symbol>
+  <symbol id="formula" viewBox="0 0 24 24"><path d="M12 4.5c-1.6-.6-3 .1-3.4 1.7L6.2 17.8c-.3 1.6-1.7 2.3-3.2 1.7M5.75 10h5.5"/><path d="m14 10.5 6 7.5M20 10.5l-6 7.5" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="pivot" viewBox="0 0 24 24"><rect x="9.5" y="9.5" width="11" height="11" rx="2"/><path d="M9.5 15h11M15 9.5v11"/><path d="M4 14V9a5 5 0 0 1 5-5h4M10.5 1.5 13 4l-2.5 2.5" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M3.5 20.5h17M7 17V12M17 17v-3"/><rect x="10.25" y="5.5" width="3.5" height="11.5" rx="1" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="dashboard" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7.5" height="9" rx="2" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/><rect x="13" y="3.5" width="7.5" height="5" rx="2"/><rect x="13" y="10.5" width="7.5" height="10" rx="2"/><rect x="3.5" y="14.5" width="7.5" height="6" rx="2"/></symbol>
+  <symbol id="database" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7.5" ry="2.75"/><path d="M4.5 6v12c0 1.5 3.36 2.75 7.5 2.75s7.5-1.25 7.5-2.75V6"/><path d="M4.5 12c0 1.5 3.36 2.75 7.5 2.75s7.5-1.25 7.5-2.75" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="layers" viewBox="0 0 24 24"><path d="M12 3 2.5 8 12 13l9.5-5Z" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/><path d="m2.5 12 9.5 5 9.5-5M2.5 16l9.5 5 9.5-5"/></symbol>
+  <symbol id="bolt" viewBox="0 0 24 24"><path d="M13.5 2.5 4.5 13.5h6.5l-1 8 9-11h-6.5Z" style="fill:var(--sw-icon-accent)"/></symbol>
+  <symbol id="sparkle" viewBox="0 0 24 24"><path d="M11 3.5c.6 4.4 2.6 6.4 7 7-4.4.6-6.4 2.6-7 7-.6-4.4-2.6-6.4-7-7 4.4-.6 6.4-2.6 7-7Z" style="fill:var(--sw-icon-accent)"/><path d="M19 15.5v5M16.5 18h5"/></symbol>
+  <symbol id="history" viewBox="0 0 24 24"><path d="M3.5 12A8.5 8.5 0 1 0 6 6M3.5 3.5V8H8M12 7.5V12l3 2"/><circle cx="12" cy="12" r="1.4" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.25 2"/><circle cx="12" cy="12" r="1.4" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5" style="fill:var(--sw-icon-accent);stroke:none"/><path d="M7.76 7.76a6 6 0 0 0 0 8.48M16.24 7.76a6 6 0 0 1 0 8.48M4.93 4.93a10 10 0 0 0 0 14.14M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/><path d="M3 20a6 6 0 0 1 12 0M16 4.6a3.5 3.5 0 0 1 0 6.8M21 20a6 6 0 0 0-3.5-5.5"/></symbol>
+  <symbol id="merge" viewBox="0 0 24 24"><circle cx="6.5" cy="5.5" r="2.25"/><circle cx="6.5" cy="18.5" r="2.25"/><path d="M6.5 7.75v8.5M6.5 8c0 3 2.5 4 8.75 4"/><circle cx="17.5" cy="12" r="2.25" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.9 9a4.75 4.75 0 0 1-.4 9.5Z"/><path d="m9.5 13.5 2 2 3.5-3.75" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="cloud-off" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96 6 6 0 0 1 1.1-2.4M10.9 5.6A6 6 0 0 1 17.9 9a4.75 4.75 0 0 1 2.2 8.4M17 18.5H7M3.5 3.5l17 17"/></symbol>
+  <symbol id="monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M8 20.5h8M12 16.5v4"/><rect x="14.5" y="10" width="4" height="3.5" rx=".5" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.2 7.5 9.5 4.3-1.3 7.5-5 7.5-9.5V6Z"/><path d="m8.75 12 2.25 2.25 4.25-4.5" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.5" r="1.6" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="filter" viewBox="0 0 24 24"><path d="M4 5h16l-6.25 7.5v6.75L10.25 17.5v-5Z"/></symbol>
+  <symbol id="sort" viewBox="0 0 24 24"><path d="M7.5 4v16M4 16.5 7.5 20l3.5-3.5M16.5 20V4M13 7.5 16.5 4 20 7.5"/></symbol>
+  <symbol id="sort-asc" viewBox="0 0 24 24"><path d="M4 6h4M4 12h7M4 18h10M17.5 20V4M14 7.5 17.5 4 21 7.5"/></symbol>
+  <symbol id="sort-desc" viewBox="0 0 24 24"><path d="M4 6h10M4 12h7M4 18h4M17.5 4v16M14 16.5l3.5 3.5 3.5-3.5"/></symbol>
+  <symbol id="play" viewBox="0 0 24 24"><path d="M7.5 4.8v14.4a1 1 0 0 0 1.5.85l11.5-7.2a1 1 0 0 0 0-1.7L9 3.95a1 1 0 0 0-1.5.85Z"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9M18.5 3.5v4h-4M5.5 20.5v-4h4"/></symbol>
+  <symbol id="undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+  <symbol id="eye-off" viewBox="0 0 24 24"><path d="M10.6 5.6Q11.3 5.5 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.4 3.3M6.6 6.6C4 8.3 2.5 12 2.5 12S6 18.5 12 18.5c1.9 0 3.6-.6 5-1.5M9.9 9.9a3 3 0 0 0 4.2 4.2M3.5 3.5l17 17"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><path d="M3.5 7h9M17.5 7h3M3.5 17h3M11.5 17h9"/><circle cx="15" cy="7" r="2.5" style="fill:var(--sw-icon-accent);stroke:var(--sw-icon-accent)"/><circle cx="9" cy="17" r="2.5"/></symbol>
+  <symbol id="save" viewBox="0 0 24 24"><path d="M5.5 3.5h11l4 4v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2ZM8 3.5v4.5h7V3.5"/><rect x="7.5" y="13.5" width="9" height="7" rx=".5" style="stroke:var(--sw-icon-accent)"/></symbol>
+  <symbol id="compare" viewBox="0 0 24 24"><rect x="3" y="4" width="7.5" height="16" rx="2"/><rect x="13.5" y="4" width="7.5" height="16" rx="2" style="stroke:var(--sw-icon-accent)"/><path d="M5.75 9h2M5.75 13h2M16.25 9h2M16.25 13h2M16.25 16.5h2"/></symbol>
+  <symbol id="restore" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 3.5V8h4.5"/><rect x="10" y="10" width="4" height="4" rx=".5" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="key" viewBox="0 0 24 24"><circle cx="8" cy="16" r="4.5" style="stroke:var(--sw-icon-accent)"/><path d="m11.25 12.75 8.25-8.25M16 8l2.5 2.5M13.5 10.5l2 2"/></symbol>
+  <symbol id="gauge" viewBox="0 0 24 24"><path d="M4 17.5a8.5 8.5 0 1 1 16 0"/><path d="m12 14 4.25-4.25" style="stroke:var(--sw-icon-accent)"/><circle cx="12" cy="14" r="1.6" style="fill:var(--sw-icon-accent);stroke:none"/></symbol>
+  <symbol id="function" viewBox="0 0 24 24"><path d="M18 5H6l6.5 7L6 19h12"/></symbol>
+  <symbol id="download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M4.5 20h15"/></symbol>
+  <symbol id="upload" viewBox="0 0 24 24"><path d="M12 15.5v-11M7 9.5l5-5 5 5M4.5 20h15"/></symbol>
+</svg>
