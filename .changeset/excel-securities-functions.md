@@ -11,6 +11,6 @@ The full engine adds Excel's 32 remaining financial functions (#275):
 - Depreciation: `VDB`, `AMORDEGRC` and `AMORLINC`.
 - `DOLLARDE`, `DOLLARFR` and `ISPMT`.
 
-All five day-count bases follow Excel's rules. The results match 180,689 results recorded from Excel to 12 significant digits.
+All five day-count bases follow Excel's rules.
 
 The default engine does not change.

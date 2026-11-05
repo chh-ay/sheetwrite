@@ -3,8 +3,7 @@
 //! The rules follow Excel's results, which differ from the textbook rules in
 //! some places. The 30/360 US rule changes the end date in two ways, and
 //! coupon dates step back from maturity one period at a time, so a day that
-//! a short month clamps stays clamped. The ExcelFinancialFunctions test data
-//! (199,252 results recorded from Excel) confirms these rules.
+//! a short month clamps stays clamped.
 
 use super::super::super::date::{date_parts, date_serial};
 use crate::types::FormulaError;
