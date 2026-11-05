@@ -212,6 +212,9 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"sampleS","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"numberSample","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"populationS","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"numberPop","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"cumulative","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"numberF","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"numberS","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"probabilityS","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"cumulative","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"trials","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"probabilityS","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"numberS","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"numberS2","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"value","types":["scalar","range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"reference","types":["range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"typeText","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -691,5 +694,13 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["HYPGEOM.DIST",7,190,4],
     ["NEGBINOM.DIST",7,191,4],
     ["BINOM.DIST.RANGE",7,192,4],
+    ["ERROR.TYPE",3,10,6],
+    ["ISEVEN",3,11,6],
+    ["ISNONTEXT",3,10,6],
+    ["ISODD",3,11,6],
+    ["ISREF",3,10,6],
+    ["SHEET",3,193,7],
+    ["SHEETS",3,194,7],
+    ["INFO",3,195,7],
   ],
 };

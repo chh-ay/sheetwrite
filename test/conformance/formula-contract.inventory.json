@@ -5419,6 +5419,42 @@
         }
       ],
       "returns": "scalar"
+    },
+    "sheet-value": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": false,
+          "default": "formula-sheet",
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sheets-reference": {
+      "arguments": [
+        {
+          "name": "reference",
+          "required": false,
+          "default": "workbook",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "info-type": {
+      "arguments": [
+        {
+          "name": "typeText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -6859,6 +6895,14 @@
         "BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8.",
         "CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits."
       ]
+    },
+    "excel-info": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "INFO returns #N/A for \"directory\", \"origin\", \"osversion\", \"release\" and \"system\", which describe the desktop program and its window. \"numfile\" is the number of sheets and \"recalc\" is \"Automatic\"."
+      ]
     }
   },
   "implementationProfiles": {
@@ -7197,7 +7241,7 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/info.rs"]
+        "paths": ["packages/wasm/src/eval/info.rs", "packages/wasm/src/store.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -7372,7 +7416,7 @@
       "title": "External data functions",
       "status": "unsupported",
       "scope": "Functions that query external providers or live data connections are not evaluated.",
-      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD"],
+      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD", "STOCKHISTORY"],
       "source": "microsoft-excel-functions",
       "section": "Add-in and Automation functions",
       "implementation": {
@@ -13110,6 +13154,102 @@
       "implementation": "analysis-discrete",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERROR.TYPE",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISEVEN",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISNONTEXT",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISODD",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISREF",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SHEET",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "sheet-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SHEETS",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "sheets-reference",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "INFO",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "info-type",
+      "semantics": "information",
+      "dialects": "excel-info",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
     }
   ],
   "operators": [
