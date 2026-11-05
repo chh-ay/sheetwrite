@@ -69,6 +69,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-recompute-volatile"><code>recomputeVolatile</code></a>
 <a href="#cell-store-reference-target"><code>referenceTarget</code></a>
 <a href="#cell-store-references-targeting"><code>referencesTargeting</code></a>
+<a href="#cell-store-relationship-status"><code>relationshipStatus</code></a>
 <a href="#cell-store-remap-range-styles"><code>remapRangeStyles</code></a>
 <a href="#cell-store-remove-cols"><code>removeCols</code></a>
 <a href="#cell-store-remove-named-range"><code>removeNamedRange</code></a>
@@ -96,6 +97,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
 <a href="#cell-store-set-pivots"><code>setPivots</code></a>
+<a href="#cell-store-set-relationships"><code>setRelationships</code></a>
 <a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
 <a href="#cell-store-set-sheet-order"><code>setSheetOrder</code></a>
 <a href="#cell-store-set-sparse-block"><code>setSparseBlock</code></a>
@@ -114,7 +116,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>100</span>
+## Members <span class="api-count" data-pagefind-ignore>102</span>
 
 <div class="api-member-list">
 
@@ -712,6 +714,22 @@ referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array 
 targeting one sheet, bounded before crossing into the host.</p>
 </details>
 
+<details class="api-member" id="cell-store-relationship-status" data-pagefind-weight="1">
+<summary><code>relationshipStatus</code> <span class="api-member-summary">[code, firstRow, secondRow, unmatched] for the relationship with id, or an empty array for an unknown ID.</span></summary>
+
+```ts generated
+relationshipStatus: (id: string) => Uint32Array;
+```
+
+<p class="api-member-doc">`[code, firstRow, secondRow, unmatched]` for the relationship with
+`id`, or an empty array for an unknown ID. Codes: 0 ok, 1 missing
+table, 2 missing column, 3 and 4 a key of the wrong kind on the one
+or the many side (`firstRow`), 5 a duplicate one-side key (both
+rows). Rows are data-row offsets in their table. `unmatched` counts
+the non-blank many-side keys that match no one-side row. The keys
+are checked now, from the settled cell values.</p>
+</details>
+
 <details class="api-member" id="cell-store-remap-range-styles" data-pagefind-weight="1">
 <summary><code>remapRangeStyles</code> <span class="api-member-summary">Remap styles over a rectangle using parallel old/new id tables.</span></summary>
 
@@ -1035,6 +1053,19 @@ anchorCol, nRows, ...rowFields, nCols, ...colFields, nValues,
 Text slots index `strings`. A pivot whose definition did not change
 keeps its cache. Output appears at the next recalculation. Returns
 `false`, changing nothing, for a malformed payload or a dead sheet.</p>
+</details>
+
+<details class="api-member" id="cell-store-set-relationships" data-pagefind-weight="1">
+<summary><code>setRelationships</code> <span class="api-member-summary">Replaces every relationship with the packed definitions: five strings each, [id, fromTable, fromColumn, toTable, toColumn], by stable table and column IDs.</span></summary>
+
+```ts generated
+setRelationships: (strings: string[]) => boolean;
+```
+
+<p class="api-member-doc">Replaces every relationship with the packed definitions: five strings
+each, `[id, fromTable, fromColumn, toTable, toColumn]`, by stable
+table and column IDs. Returns `false`, changing nothing, for a
+malformed payload.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-sheet-name" data-pagefind-weight="1">
@@ -1402,6 +1433,7 @@ class CellStore {
     target_sheet: number,
     max_entries: number,
   ) => Uint32Array | undefined;
+  relationshipStatus: (id: string) => Uint32Array;
   remapRangeStyles: (
     sheet: number,
     r0: number,
@@ -1547,6 +1579,7 @@ class CellStore {
     numbers: Float64Array,
     strings: string[],
   ) => boolean;
+  setRelationships: (strings: string[]) => boolean;
   setSheetName: (sheet: number, id: string, name: string) => void;
   setSheetOrder: (order: Uint32Array) => boolean;
   setSparseBlock: (
