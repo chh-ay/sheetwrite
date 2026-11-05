@@ -996,7 +996,7 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       expect(rich.styles[rich.styleIds[0]!]).toMatchObject({ bold: true });
       expect(rich.styles[rich.styleIds[1]!]).toMatchObject({ italic: true });
 
-      store.sortBy("s1", 1, false);
+      store.setViewSort("s1", [{ col: 1, ascending: false }]);
       const sorted = store.getClipboardWindow("s1", { start: 0, end: 10 }, [1]);
       expect(Array.from(sorted.dataRows)).not.toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(sorted.values).toHaveLength(10);

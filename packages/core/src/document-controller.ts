@@ -32,6 +32,7 @@ import {
   encodeMeasuredRestoreBlock,
   estimateRestoreBlockBytes,
 } from "./restore-block.js";
+import type { PermuteRowsOperation } from "./row-order.js";
 import { cloneQuery, findQuery } from "./saved-query.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -159,10 +160,16 @@ export class DocumentController {
     return outcome;
   }
 
+  /**
+   * Commit `input` as one undoable transaction. `trailingInverse` runs at the
+   * end of this transaction's undo, after every captured inverse: history
+   * restore uses it to put back sources that an inverse insert alone cannot.
+   */
   commit(
     input: DocumentOp[],
     reason: CommitReason,
     admitted?: AdmittedTransactionResources,
+    trailingInverse: readonly DocumentOp[] = [],
   ): ApplyTransactionResult {
     const atomic = isAtomicBatch(input);
     const limits = atomic
@@ -269,6 +276,9 @@ export class DocumentController {
 
     const applied = outcome.transaction.patches;
     const inverse = this.takeAppliedInverses(patches, inverseByPatch, applied);
+    for (const operation of trailingInverse) {
+      inverse.push({ kind: "patches", patches: [operation] });
+    }
 
     this.rebaseHistoryFor(applied);
     this.history.push(inverse, applied);
@@ -552,6 +562,9 @@ export class DocumentController {
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
+
+      case "permuteRows":
+        return this.inversePermutation(patch);
 
       case "addColumns":
         return [
@@ -1101,6 +1114,20 @@ export class DocumentController {
 
       return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
     });
+  }
+
+  /**
+   * The inverse order moves every row back. A formula whose adjusted text
+   * lost a reference (`#REF!`) cannot be adjusted back, so its cell is
+   * captured before the sort and restored after the inverse order.
+   */
+  private inversePermutation(patch: PermuteRowsOperation): DocumentOp[] {
+    const engine = storeEngine(this.options.store);
+    const reverse = engine?.invertedPermutation(patch);
+    if (!engine || !reverse) return [];
+
+    const losses = engine.permuteRowsLosses(patch);
+    return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
   }
 
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {

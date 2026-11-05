@@ -209,7 +209,7 @@ it("tracks formula sources introduced by packed edits before later off-screen in
 
 it("maps painted view rows to backing rows for sorted edits", () => {
   const { grid, host } = mount();
-  grid.sortBy(1, false);
+  grid.setViewSort([{ col: 1, ascending: false }]);
   flushFrames();
   commit(grid, [
     {

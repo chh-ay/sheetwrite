@@ -136,8 +136,37 @@ function validateSourceShape(value: unknown, path: string, issues: PivotIssueSin
 
   const range = ownValue(value, "range");
   const table = ownValue(value, "table");
-  if ((range === undefined) === (table === undefined)) {
-    issue(issues, path, "Pivot source needs exactly one of range or table");
+  const model = ownValue(value, "model");
+  if ([range, table, model].filter((source) => source !== undefined).length !== 1) {
+    issue(issues, path, "Pivot source needs exactly one of range, table or model");
+    return;
+  }
+
+  if (model !== undefined) {
+    if (
+      !isPlainRecord(model) ||
+      typeof ownValue(model, "table") !== "string" ||
+      !ownValue(model, "table")
+    ) {
+      issue(issues, `${path}.model`, "model must name a base table");
+      return;
+    }
+    const fields = ownValue(model, "fields");
+    if (!Array.isArray(fields) || fields.length > MAX_PIVOT_FIELD_ENTRIES) {
+      issue(issues, `${path}.model.fields`, "model fields must be a bounded array");
+      return;
+    }
+    for (const [index, field] of fields.entries()) {
+      if (
+        !isPlainRecord(field) ||
+        typeof ownValue(field, "table") !== "string" ||
+        !ownValue(field, "table") ||
+        typeof ownValue(field, "column") !== "string" ||
+        !ownValue(field, "column")
+      ) {
+        issue(issues, `${path}.model.fields[${index}]`, "field must name a table and column");
+      }
+    }
     return;
   }
 
@@ -429,7 +458,9 @@ export function validatePivotReferences(
 
     width = range.end.col - range.start.col + 1;
   } else {
-    const tableWidth = scope.tableWidth(pivot.source.table);
+    const tableWidth = scope.tableWidth(
+      "model" in pivot.source ? pivot.source.model.table : pivot.source.table,
+    );
     if (tableWidth === undefined) {
       issue(
         issues,
@@ -440,7 +471,7 @@ export function validatePivotReferences(
       return;
     }
 
-    width = tableWidth;
+    width = "model" in pivot.source ? pivot.source.model.fields.length : tableWidth;
   }
 
   if (highestField(pivot) >= width) {
@@ -475,7 +506,14 @@ function cloneSource(source: PivotSource): PivotSource {
             end: { row: source.range.end.row, col: source.range.end.col },
           },
         }
-      : { table: source.table };
+      : "model" in source
+        ? {
+            model: {
+              table: source.model.table,
+              fields: source.model.fields.map((field) => ({ ...field })),
+            },
+          }
+        : { table: source.table };
   if (source.invalid) clone.invalid = true;
   return clone;
 }
@@ -871,7 +909,8 @@ export function rebasePivot(
   if (
     !source.invalid &&
     (("range" in source && source.range.sheet === plan.removedSheet) ||
-      ("table" in source && plan.removedTables.has(source.table)))
+      ("table" in source && plan.removedTables.has(source.table)) ||
+      ("model" in source && plan.removedTables.has(source.model.table)))
   ) {
     source = invalidated(source);
   }
@@ -957,6 +996,7 @@ export function savedOutputRange(sheet: SheetId, pivot: PivotDefinition): Range 
 const SOURCE_RANGE = 0;
 const SOURCE_TABLE = 1;
 const SOURCE_INVALID = 2;
+const SOURCE_MODEL = 3;
 /** Marks an absent string, such as a value field without a caption. */
 const NO_STRING = -1;
 /**
@@ -1029,6 +1069,9 @@ export function encodePivotPayload(
     } else if (!source.invalid && "table" in source) {
       numbers.push(SOURCE_TABLE, text(source.table));
       for (let slot = 0; slot < TABLE_SOURCE_PADDING; slot++) numbers.push(0);
+    } else if (!source.invalid && "model" in source) {
+      numbers.push(SOURCE_MODEL, text(source.model.table), source.model.fields.length);
+      for (const field of source.model.fields) numbers.push(text(field.table), text(field.column));
     } else {
       numbers.push(SOURCE_INVALID, NO_STRING);
       for (let slot = 0; slot < INVALID_SOURCE_PADDING; slot++) numbers.push(0);

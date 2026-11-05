@@ -10,7 +10,7 @@ at `at` on the formula's own sheet. A range loses its deleted rows or
 columns and becomes `#REF!` only when none are left.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L672"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L672</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L701"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L701</code></a></dd></div>
 </dl>
 
 ## Declaration

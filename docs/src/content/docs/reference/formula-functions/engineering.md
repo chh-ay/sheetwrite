@@ -3,7 +3,7 @@ title: "Engineering functions"
 description: "Every engineering formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 23 functions of the engineering family. Taxonomy/source: [Engineering functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 54 functions of the engineering family. Taxonomy/source: [Engineering functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -35,6 +35,37 @@ This page lists the 23 functions of the engineering family. Taxonomy/source: [En
 <tr data-formula-name="OCT2BIN" data-engine="full"><td><code>OCT2BIN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-base-places">Signature: <code>base-places</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
 <tr data-formula-name="OCT2DEC" data-engine="full"><td><code>OCT2DEC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
 <tr data-formula-name="OCT2HEX" data-engine="full"><td><code>OCT2HEX</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-base-places">Signature: <code>base-places</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="COMPLEX" data-engine="full"><td><code>COMPLEX</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex">Signature: <code>complex</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMABS" data-engine="full"><td><code>IMABS</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMAGINARY" data-engine="full"><td><code>IMAGINARY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMARGUMENT" data-engine="full"><td><code>IMARGUMENT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMCONJUGATE" data-engine="full"><td><code>IMCONJUGATE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMCOS" data-engine="full"><td><code>IMCOS</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMCOSH" data-engine="full"><td><code>IMCOSH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMCOT" data-engine="full"><td><code>IMCOT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMCSC" data-engine="full"><td><code>IMCSC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMCSCH" data-engine="full"><td><code>IMCSCH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMDIV" data-engine="full"><td><code>IMDIV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-pair">Signature: <code>complex-pair</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMEXP" data-engine="full"><td><code>IMEXP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMLN" data-engine="full"><td><code>IMLN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMLOG10" data-engine="full"><td><code>IMLOG10</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMLOG2" data-engine="full"><td><code>IMLOG2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMPOWER" data-engine="full"><td><code>IMPOWER</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-power">Signature: <code>complex-power</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMPRODUCT" data-engine="full"><td><code>IMPRODUCT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-variadic">Signature: <code>complex-variadic</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMREAL" data-engine="full"><td><code>IMREAL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSEC" data-engine="full"><td><code>IMSEC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSECH" data-engine="full"><td><code>IMSECH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSIN" data-engine="full"><td><code>IMSIN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSINH" data-engine="full"><td><code>IMSINH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSQRT" data-engine="full"><td><code>IMSQRT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSUB" data-engine="full"><td><code>IMSUB</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-pair">Signature: <code>complex-pair</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMSUM" data-engine="full"><td><code>IMSUM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-variadic">Signature: <code>complex-variadic</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="IMTAN" data-engine="full"><td><code>IMTAN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-complex-unary">Signature: <code>complex-unary</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="BESSELI" data-engine="full"><td><code>BESSELI</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="BESSELJ" data-engine="full"><td><code>BESSELJ</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="BESSELK" data-engine="full"><td><code>BESSELK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="BESSELY" data-engine="full"><td><code>BESSELY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="CONVERT" data-engine="full"><td><code>CONVERT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-convert">Signature: <code>convert</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -121,6 +152,83 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-complex"><summary>Signature: complex</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `realNum` | yes | none | `scalar`, `reference` | `once` |
+| `iNum` | yes | none | `scalar`, `reference` | `once` |
+| `suffix` | no | i | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-complex-unary"><summary>Signature: complex-unary</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `inumber` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-complex-pair"><summary>Signature: complex-pair</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `inumber1` | yes | none | `scalar`, `reference` | `once` |
+| `inumber2` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-complex-power"><summary>Signature: complex-power</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `inumber` | yes | none | `scalar`, `reference` | `once` |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-complex-variadic"><summary>Signature: complex-variadic</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `inumber` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+
+</details>
+
+<details id="signature-bessel"><summary>Signature: bessel</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `n` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-convert"><summary>Signature: convert</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `fromUnit` | yes | none | `scalar`, `reference` | `once` |
+| `toUnit` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -149,7 +257,7 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. IMSUM and IMPRODUCT skip blank cells in a range. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8. CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits.
 
 </details>
 
@@ -160,7 +268,7 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/engineering.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/engineering.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/engineering.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/engineering.rs)<br />[`packages/wasm/src/eval/analysis/complex.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/complex.rs)<br />[`packages/wasm/src/eval/analysis/bessel.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/bessel.rs)<br />[`packages/wasm/src/eval/analysis/units.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/units.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
 

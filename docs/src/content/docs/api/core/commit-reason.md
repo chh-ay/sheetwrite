@@ -30,8 +30,10 @@ export type CommitReason =
   | "structure"
   | "style"
   | "replace"
+  | "sort"
   | "undo"
   | "redo"
+  | "restore"
   | "api";
 ```
 

@@ -55,7 +55,7 @@ import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
+import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
@@ -65,6 +65,7 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
+import { registerGridDocument } from "./restore-commit.js";
 import type { CommandToolbar } from "./ribbon/command-toolbar.js";
 import {
   assertRibbonConfig,
@@ -78,6 +79,7 @@ import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
+import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
@@ -114,6 +116,7 @@ import type {
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
+  MutationIssue,
   MutationPolicyMode,
   ProtectedRange,
   ProtectionResolver,
@@ -700,6 +703,7 @@ export class GridImpl implements Grid {
       admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
       trustedResourceCallbacks: true,
     });
+    registerGridDocument(this, this.document);
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
     // construction; the input controller consults this on every keydown.
@@ -1420,6 +1424,7 @@ export class GridImpl implements Grid {
 
         case "setRangeStyle":
         case "clearRange":
+        case "permuteRows":
           range = patch.range;
           break;
 
@@ -3353,6 +3358,11 @@ export class GridImpl implements Grid {
         const f = this.selection.focusCell;
         if (f) this.sortBy(f.col, ascending);
       },
+      sortView: (ascending) => {
+        const f = this.selection.focusCell;
+        if (f) this.setViewSort([{ col: f.col, ascending }]);
+      },
+      customSort: () => showSortPanel(this),
       insertRowAbove: () => {
         const f = this.selection.focusCell;
         if (f) this.insertRows(this.toDataRow(f.row));
@@ -3701,7 +3711,7 @@ export class GridImpl implements Grid {
   }
 
   sortBy(col: number, ascending = true): ApplyTransactionResult {
-    return this.setSort([{ col, ascending }]);
+    return this.quickSort(col, ascending);
   }
 
   filterBy(col: number, needle: string): void {
@@ -3721,12 +3731,8 @@ export class GridImpl implements Grid {
     );
   }
 
-  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult {
-    return this.setSort(keys);
-  }
-
-  setSort(keys: readonly SortKey[]): ApplyTransactionResult {
-    const outcome = this.document.commit(
+  setViewSort(keys: readonly SortKey[]): ApplyTransactionResult {
+    return this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -3736,7 +3742,85 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    return outcome;
+  }
+
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options: { hasHeader?: boolean } = {},
+  ): ApplyTransactionResult {
+    const engine = storeEngine(this.store);
+    if (!engine || engine.queryCapability(range.sheet).status !== "complete") {
+      return { status: "noop", epoch: this.storeEpoch, reason: "incomplete-data" };
+    }
+
+    const plan = engine.sortRangePlan(range, keys, options.hasHeader ?? false);
+    if (plan.kind === "unchanged") {
+      return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    }
+    if (plan.kind === "refused") {
+      const issue: MutationIssue = {
+        kind: "invalid-operation",
+        severity: "error",
+        operationIndex: 0,
+        message: plan.message,
+      };
+      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+      return { status: "rejected", epoch: this.storeEpoch, issues: [issue] };
+    }
+
+    return this.document.commit([plan.operation], "sort");
+  }
+
+  /**
+   * Excel's quick sort: sort the table body that holds the focus cell, or
+   * else the selected range, or else the current region around the focus.
+   */
+  private quickSort(col: number, ascending: boolean): ApplyTransactionResult {
+    const focus = this.selection.focusCell;
+    const addr = {
+      sheet: this.activeSheet,
+      row: focus ? this.toDataRow(focus.row) : 0,
+      col,
+    };
+    const target = this.quickSortTarget(addr);
+    if (!target) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+
+    return this.sortRange(target.range, [{ col, ascending }], { hasHeader: target.hasHeader });
+  }
+
+  private quickSortTarget(addr: CellAddress): { range: Range; hasHeader: boolean } | null {
+    const table = this.sheet().tables?.find((candidate) => rangeHolds(candidate.range, addr));
+    if (table) {
+      const { range } = table;
+      const start = { row: range.start.row + (table.headerRow ? 1 : 0), col: range.start.col };
+      const end = { row: range.end.row - (table.totalsRow ? 1 : 0), col: range.end.col };
+      return { range: { sheet: range.sheet, start, end }, hasHeader: false };
+    }
+
+    const range = this.selectedSortRange() ?? currentRegion(this.store, addr);
+    if (!range || !rangeHolds(range, addr)) return null;
+
+    return { range, hasHeader: looksLikeHeader(this.store, range) };
+  }
+
+  /**
+   * The selected rectangle in data rows, when one rectangle of more than one
+   * cell is selected and the rows show in data order. A view sort or filter
+   * scatters the data rows of a view rectangle, so it gives `null`.
+   */
+  private selectedSortRange(): Range | null {
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push(rect));
+    const [rect] = rects;
+    if (rects.length !== 1 || !rect || this.loadable?.hasView(this.activeSheet)) return null;
+    if (rect.r0 === rect.r1 && rect.c0 === rect.c1) return null;
+
+    return {
+      sheet: this.activeSheet,
+      start: { row: rect.r0, col: rect.c0 },
+      end: { row: rect.r1, col: rect.c1 },
+    };
   }
 
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
@@ -4071,4 +4155,15 @@ function sameRibbonConfig(a: GridConfig["ribbon"], b: GridConfig["ribbon"]): boo
   if (typeof a !== "object" || typeof b !== "object") return Object.is(a, b);
 
   return a.mode === b.mode && a.compactWidth === b.compactWidth;
+}
+
+/** Whether `range` holds `addr`; ranges here are normalized. */
+function rangeHolds(range: Range, addr: CellAddress): boolean {
+  return (
+    range.sheet === addr.sheet &&
+    addr.row >= range.start.row &&
+    addr.row <= range.end.row &&
+    addr.col >= range.start.col &&
+    addr.col <= range.end.col
+  );
 }

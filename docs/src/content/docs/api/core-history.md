@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core/history."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/history-archive.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>23</dd></div>
+<div><dt>Exports</dt><dd>25</dd></div>
 </dl>
 
 Source entry: `packages/core/src/history-archive.ts`
@@ -23,7 +23,7 @@ Source entry: `packages/core/src/history-archive.ts`
 <a class="api-symbol-card" href="/docs/api/core-history/memory-history-storage/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>MemoryHistoryStorage</code></span><span class="api-symbol-card__desc">In-memory history for one page session and for tests.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>15</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>16</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-history/history-archive-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryArchiveOptions</code></span><span class="api-symbol-card__desc">Host-controlled archive configuration.</span></a>
@@ -36,6 +36,7 @@ Source entry: `packages/core/src/history-archive.ts`
 <a class="api-symbol-card" href="/docs/api/core-history/history-prune-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryPruneRequest</code></span><span class="api-symbol-card__desc">Retention removes automatic markers, or one explicitly selected named marker.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-publish-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryPublishRequest</code></span><span class="api-symbol-card__desc">Atomically publish immutable records and a new head or version marker.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-record-metadata/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryRecordMetadata</code></span><span class="api-symbol-card__desc">Metadata for one immutable record; listings never return payload bytes.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-history/history-restore-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryRestoreOptions</code></span><span class="api-symbol-card__desc">Options for HistoryArchive.restoreVersion.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-storage-adapter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryStorageAdapter</code></span><span class="api-symbol-card__desc">Atomic storage seam for local databases and host-owned history backends.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-storage-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryStorageRequest</code></span><span class="api-symbol-card__desc">Common document identity, ceilings, and cancellation for adapter calls.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-storage-usage/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryStorageUsage</code></span><span class="api-symbol-card__desc">Retained storage of one document, including headers and index entries.</span></a>
@@ -43,12 +44,13 @@ Source entry: `packages/core/src/history-archive.ts`
 <a class="api-symbol-card" href="/docs/api/core-history/history-version/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HistoryVersion</code></span><span class="api-symbol-card__desc">A durable marker at one archived revision.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>4</span>
+### Types <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-history/history-error-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HistoryErrorCode</code></span><span class="api-symbol-card__desc">Stable failure category for history validation, storage, and replay.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-get-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HistoryGetRequest</code></span><span class="api-symbol-card__desc">Fetch metadata or a bounded immutable payload; leased reads renew their lease.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-put-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HistoryPutRequest</code></span><span class="api-symbol-card__desc">A storage write either publishes one complete revision or manages a reader lease.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-history/history-restore-scope/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HistoryRestoreScope</code></span><span class="api-symbol-card__desc">What a restore covers.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-history/history-snapshot-provider/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HistorySnapshotProvider</code></span><span class="api-symbol-card__desc">Snapshot provider invoked only when a checkpoint is due.</span></a>
 </div>
 
