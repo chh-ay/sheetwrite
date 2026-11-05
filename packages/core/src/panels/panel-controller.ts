@@ -24,7 +24,7 @@ import { relationshipPanel } from "./relationship-panel.js";
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" | "sort" | "dataModel" };
+  | { readonly kind: "explain" | "names" | "sort" | "dataModel" | "history" };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -114,6 +114,11 @@ export function openSortPanel(grid: Grid): void {
   // A dynamic import, so bundlers emit the Sort panel as its own chunk that
   // loads on first open instead of with every grid.
   openLazyPanel(grid, { kind: "sort" }, async () => (await import("./sort-panel.js")).sortPanel);
+}
+
+/** Open an opted-in history panel in its own lazy chunk. */
+export function openHistoryPanel(grid: Grid, load: () => Promise<(grid: Grid) => GridPanel>): void {
+  openLazyPanel(grid, { kind: "history" }, load);
 }
 
 /**

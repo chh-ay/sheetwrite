@@ -786,6 +786,39 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
     ],
   },
   {
+    label: "Review",
+    reduceOrder: ["versionHistory"],
+    groups: [
+      {
+        id: "versionHistory",
+        label: "Version History",
+        icon: "versionHistory",
+        layout: "flow",
+        controls: [
+          {
+            ...button(
+              "Version History",
+              "versionHistory",
+              (grid) => grid.actions.versionHistory(),
+              "versionHistory",
+              { large: true },
+            ),
+            available: (grid) => !grid.getCommandState("versionHistory").disabled,
+          },
+          {
+            ...button(
+              "Save Version",
+              "saveVersion",
+              (grid) => grid.actions.saveVersion(),
+              "saveVersion",
+            ),
+            available: (grid) => !grid.getCommandState("versionHistory").disabled,
+          },
+        ],
+      },
+    ],
+  },
+  {
     label: "View",
     reduceOrder: ["zoom", "freeze"],
     groups: [

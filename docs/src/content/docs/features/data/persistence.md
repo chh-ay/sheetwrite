@@ -230,6 +230,36 @@ A page holds at most 1,000 changes (`maxEntries`). Nothing is kept between pages
 request rebuilds both versions and continues from `cursor`, so a closed or aborted diff
 holds no memory.
 
+`diffVersions({ from, to: "head" })` compares a version with the committed head. The
+head is leased for the call, so a concurrent prune cannot remove its records.
+
+### Version history panel
+
+Pass `createHistoryCommands` from `@sheetwrite/core/history` as `GridConfig.history`
+to show Review › **Version History** and **Save Version** in the full ribbon, the
+compact ribbon and the toolbar. The grid's first paint does not change: the panel
+loads as a separate chunk on the first command.
+
+```ts compile title="Opt in to the version history commands"
+import { createGrid } from "@sheetwrite/core";
+import { createHistoryCommands, type HistoryArchive } from "@sheetwrite/core/history";
+
+function mount(host: HTMLElement, archive: HistoryArchive, authorId: string) {
+  return createGrid(host, {
+    workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "Sheet1", rowCount: 10, columns: [] }] },
+    config: { ribbon: true, history: createHistoryCommands({ archive, authorId }) },
+  });
+}
+```
+
+The panel lists versions with their author and time and names the committed head
+after pending changes are sent. It compares a version with a later version or the
+current committed document, page by page, with added (+), removed (−) and changed (≠)
+cells, before and after, and authors. It opens a read-only preview, and restores the
+workbook, one sheet or a range after a confirmation. Pass `sync` so the panel waits
+for pending changes and restores through the coordinator, and `authorName` to show
+display names instead of IDs.
+
 ## Large undo
 
 Undo of a large clear can be larger than one transaction allows. Sheetwrite 0.5.0 sends such a restore as one compressed `restoreBlock` operation. Your server must accept that operation before it accepts 0.5.0 clients. When even the compressed restore needs more than one server version, the Grid uses an atomic batch, which needs `commitBatch`. Without `commitBatch`, only that undo is rejected; everything else works. See [Large undo and atomic batches](/docs/features/collaboration/#large-undo-and-atomic-batches).

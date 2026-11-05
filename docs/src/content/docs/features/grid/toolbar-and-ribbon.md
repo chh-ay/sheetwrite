@@ -100,9 +100,11 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Data Model** and **Relationships** (Data › Data Tools) open the [data model](/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
 
+**Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
+
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model and Relationships are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
