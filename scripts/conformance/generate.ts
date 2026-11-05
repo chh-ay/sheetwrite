@@ -254,7 +254,7 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   CSCH: { empty: "ISERROR(CSCH(C1))", boundary: "ISERROR(CSCH(C1))" },
   ARABIC: {
     empty: "ARABIC(C1)=0",
-    boundary: "ARABIC(C1)=0",
+    boundary: "ISERROR(ARABIC(C1))",
     mixed: "ISERROR(ARABIC(C1))",
     "range-array": "ISERROR(ARABIC(C1:C2))",
   },
