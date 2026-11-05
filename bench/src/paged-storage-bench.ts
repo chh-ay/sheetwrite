@@ -259,7 +259,8 @@ if (import.meta.main) {
   if (engine !== "wasm" && engine !== "formulas") throw new Error("--engine is wasm or formulas");
 
   const samples = Number(optionValue(process.argv, "--samples") ?? DEFAULT_SAMPLES);
-  if (!Number.isInteger(samples) || samples <= 0) throw new Error("--samples is a positive integer");
+  if (!Number.isInteger(samples) || samples <= 0)
+    throw new Error("--samples is a positive integer");
 
   const result = await runPagedStorageBench(engine, samples);
   const outputPath = optionValue(process.argv, "--output");
