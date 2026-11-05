@@ -151,6 +151,7 @@ const assets = publicFiles.map((file) => {
       functionTableChunks,
       findChunks,
       documentChunks,
+      dashboardChunks,
     ].some((chunks) => chunks.includes(file))
   ) {
     // The function table loads from the panels and formula help, as Vite's chrome graph counts it.
