@@ -3,6 +3,8 @@
 //! https://support.microsoft.com/en-us/office/define-and-use-names-in-formulas-4d0f13ac-53b7-422e-afd2-abd7ff379c64
 //! https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67
 
+use std::time::{Duration, Instant};
+
 use crate::store::CellStore;
 
 fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
@@ -123,6 +125,41 @@ fn a_chain_of_names_that_doubles_at_each_step_is_bounded() {
 
     assert_eq!(number(&store, sheet, 0, 3), 512.0);
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
+}
+
+/// Most time a formula may take to bind to a chain of 22 names. Expanding
+/// each name once per formula takes milliseconds; expanding it once per use
+/// takes 2^21 expansions, which is minutes in a debug build.
+const CHAIN_BIND_LIMIT: Duration = Duration::from_secs(1);
+
+/// A name over a sheet's own name reads differently on that sheet, so it is
+/// expanded where it is used. Each name of a chain is still expanded once per
+/// formula, not once per use.
+#[test]
+fn a_chain_of_names_over_a_sheets_own_name_binds_in_linear_time() {
+    let (mut store, sheet) = data_store();
+    let other = store.add_sheet(2, 2);
+    store.set_sheet_name(other, "other", "Other");
+    assert!(store.set_named_formula("Rate", -1, "=1"));
+    assert!(store.set_named_formula("Rate", other as i32, "=2"));
+    assert!(store.set_named_formula("Step_22", -1, "=Rate"));
+    for step in 1..22 {
+        let source = format!("=Step_{next}+Step_{next}", next = step + 1);
+        assert!(store.set_named_formula(&format!("Step_{step}"), -1, &source));
+    }
+
+    let started = Instant::now();
+    store.set_formula(sheet, 0, 3, "=Step_1", 0);
+    let elapsed = started.elapsed();
+    store.set_formula(sheet, 1, 3, "=Step_13", 0);
+    store.set_formula(other, 0, 0, "=Step_13", 0);
+    store.recompute(sheet);
+    store.recompute(other);
+
+    assert!(elapsed < CHAIN_BIND_LIMIT, "binding took {elapsed:?}");
+    assert_eq!(text(&store, sheet, 0, 3).as_deref(), Some("#NUM!"));
+    assert_eq!(number(&store, sheet, 1, 3), 512.0);
+    assert_eq!(number(&store, other, 0, 0), 1024.0);
 }
 
 #[test]

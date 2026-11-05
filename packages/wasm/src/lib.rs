@@ -68,6 +68,8 @@ mod types;
 mod window;
 
 #[cfg(all(test, feature = "formula-engine"))]
+mod external_reference_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod formula_rewrite_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_syntax_tests;
