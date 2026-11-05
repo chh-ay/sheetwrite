@@ -96,13 +96,9 @@ pub(crate) struct NamePlacement {
     /// it is not reused.
     lowest_cut: Cell<usize>,
     /// Whether the expansion in progress reads a name that some sheet
-    /// defines in its own scope. Only set while definitions are resolved for
-    /// every sheet.
+    /// defines in its own scope, so it reads differently on that sheet. Only
+    /// set while definitions are resolved for every sheet.
     sheet_bound: Cell<bool>,
-    /// Name keys that some sheet defines in its own scope, sorted. A
-    /// workbook definition that uses one of them reads differently on that
-    /// sheet. Empty when a formula binds.
-    sheet_scoped: Vec<String>,
     /// Expansions for this cell that depend on it, by name key, so a name
     /// used many times in one formula is expanded once. A formula uses few
     /// names, so a list is searched.
@@ -118,19 +114,7 @@ impl NamePlacement {
             positional: Cell::new(false),
             lowest_cut: Cell::new(usize::MAX),
             sheet_bound: Cell::new(false),
-            sheet_scoped: Vec::new(),
             placed: RefCell::new(Vec::new()),
-        }
-    }
-
-    /// The placement that resolves definitions for every sheet: at A1, with
-    /// the keys that sheets define in their own scope.
-    fn for_definitions(mut sheet_scoped: Vec<String>) -> Self {
-        sheet_scoped.sort_unstable();
-        sheet_scoped.dedup();
-        Self {
-            sheet_scoped,
-            ..Self::new(0, 0)
         }
     }
 
@@ -222,8 +206,8 @@ impl CellStore {
         placement: &NamePlacement,
     ) -> Option<NameTarget> {
         let mut key = workbook_name_key(name);
-        if formula_sheet == NO_SHEET && placement.sheet_scoped.binary_search(&key).is_ok() {
-            placement.sheet_bound.set(true);
+        if formula_sheet == NO_SHEET {
+            key = self.note_sheet_scoped(key, placement);
         }
         for scope in [Some(formula_sheet), None] {
             let scoped = (scope, key);
@@ -237,6 +221,20 @@ impl CellStore {
             key = scoped.1;
         }
         None
+    }
+
+    /// Mark the definition being resolved for every sheet as depending on
+    /// the sheet when some sheet defines `key` in its own scope. Returns `key`.
+    fn note_sheet_scoped(&self, key: String, placement: &NamePlacement) -> String {
+        let mut scoped = (None, key);
+        for (sheet, _) in (0u32..).zip(&self.sheet_names) {
+            scoped.0 = Some(sheet);
+            if self.defined_names.get(&scoped).is_some() {
+                placement.sheet_bound.set(true);
+                break;
+            }
+        }
+        scoped.1
     }
 
     /// Cell formulas and expanded name definitions use one resolver closure
@@ -324,18 +322,14 @@ impl CellStore {
     /// uses it is left unresolved and is expanded where it is used.
     pub(super) fn resolve_name_definitions(&mut self) {
         let mut keys = Vec::new();
-        let mut sheet_scoped = Vec::new();
         for (key, definition) in &mut self.defined_names {
-            if key.0.is_some() {
-                sheet_scoped.push(key.1.clone());
-            }
             if let DefinedName::Formula(definition) = definition {
                 definition.resolved = None;
                 keys.push(key.clone());
             }
         }
 
-        let placement = NamePlacement::for_definitions(sheet_scoped);
+        let placement = NamePlacement::new(0, 0);
         for key in keys {
             let resolved = self.resolve_definition(&key, &placement);
             if let Some(DefinedName::Formula(definition)) = self.defined_names.get_mut(&key) {
