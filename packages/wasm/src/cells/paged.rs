@@ -24,8 +24,6 @@ use crate::memory::{
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
-#[cfg(any(target_arch = "wasm32", test))]
-use crate::types::KIND_FORMULA;
 use crate::types::{CellKey, KIND_EMPTY};
 
 pub(super) const BITS_PER_WORD: usize = 64;
@@ -179,32 +177,12 @@ impl Directory {
         let columns = (0..input.count()?)
             .map(|_| input.ints())
             .collect::<TransferResult<_>>()?;
-        let directory = Self {
+        Ok(Self {
             columns,
             leaves: input.ints()?,
             leaf_ids: input.ints()?,
             free_leaves: input.ints()?,
-        };
-
-        let leaf_count = directory.leaf_ids.len();
-        let leaves_in_range = directory
-            .columns
-            .iter()
-            .flatten()
-            .chain(&directory.free_leaves)
-            .all(|&leaf| leaf == NONE || (leaf as usize) < leaf_count);
-        if directory.leaves.len() != leaf_count * LEAF_IDS || !leaves_in_range {
-            return Err("invalid transferred directory".into());
-        }
-
-        Ok(directory)
-    }
-
-    #[cfg(any(target_arch = "wasm32", test))]
-    fn ids_below(&self, len: usize) -> bool {
-        self.leaves
-            .iter()
-            .all(|&id| id == NONE || (id as usize) < len)
+        })
     }
 }
 
@@ -1792,12 +1770,7 @@ impl PagedStorage {
                 .collect::<Result<_, _>>()?;
             block.slots = input.ints()?;
 
-            let ordered = block.offsets.windows(2).all(|pair| pair[0] < pair[1]);
-            let in_block = block
-                .offsets
-                .last()
-                .is_none_or(|&last| usize::from(last) < DIRTY_BLOCK_ROWS);
-            if block.offsets.len() != block.slots.len() || !ordered || !in_block {
+            if block.offsets.len() != block.slots.len() {
                 return Err("invalid transferred dirty block".into());
             }
 
@@ -1857,52 +1830,7 @@ impl PagedStorage {
         paged.eviction_candidate_checks = input.u64()?;
         paged.evictions = input.u64()?;
 
-        if !paged.references_are_valid() {
-            return Err("invalid transferred page directory".into());
-        }
-
         Ok(paged)
-    }
-
-    /// Every id names an entry of its slab, so a transferred store cannot
-    /// index out of bounds.
-    #[cfg(any(target_arch = "wasm32", test))]
-    fn references_are_valid(&self) -> bool {
-        let in_slab = |id: u32, len: usize| id == NONE || (id as usize) < len;
-        let ids_in = |ids: &[u32], len: usize| ids.iter().all(|&id| (id as usize) < len);
-        let records = self.records.len();
-        let slots = self.slots.len();
-
-        let directories = self.pages.ids_below(records)
-            && self.dirty.ids_below(self.dirty_blocks.len())
-            && self.calculated.ids_below(self.calculated_blocks.len());
-        let pages = self.records.iter().all(|record| {
-            in_slab(record.clean, self.clean.len())
-                && in_slab(record.prev.get(), records)
-                && in_slab(record.next.get(), records)
-        });
-        let dirty = self
-            .dirty_blocks
-            .iter()
-            .all(|block| ids_in(&block.slots, slots));
-        let revisions = self
-            .revisions
-            .iter()
-            .all(|list| list.revision != FREE_SLOT && ids_in(&list.slots, slots));
-        let edits = self.live_slots().all(|slot| {
-            slot.kind <= KIND_FORMULA && (slot.block as usize) < self.dirty_blocks.len()
-        });
-        let lists = ids_in(&self.free_records, records)
-            && ids_in(&self.free_clean, self.clean.len())
-            && ids_in(&self.free_dirty_blocks, self.dirty_blocks.len())
-            && ids_in(&self.free_slots, slots)
-            && ids_in(&self.free_calculated_blocks, self.calculated_blocks.len())
-            && ids_in(&self.read_pins, records)
-            && ids_in(&self.viewport_pins, records)
-            && in_slab(self.lru_head.get(), records)
-            && in_slab(self.lru_tail.get(), records);
-
-        directories && pages && dirty && revisions && edits && lists
     }
 }
 
