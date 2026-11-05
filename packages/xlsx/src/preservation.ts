@@ -22,6 +22,7 @@ import {
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
+import { queriesDigest, queryWarning } from "./query-digest.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import {
@@ -580,10 +581,21 @@ export function preparePreserved(
 
   const sheets = new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet]));
   const digests = new Map<string, string>();
+  const savedQueries = queriesDigest(snapshot.workbook.queries);
   const partsByName = new Map(source.parts.map((part) => [part.name, part]));
   const valid = new Set<XlsxSourceGraph>();
   for (const graph of source.graphs) {
     checkAbort(context);
+    // Query definitions changed since import, so the retained Power Query parts are stale.
+    if (graph.queries !== undefined && graph.queries !== savedQueries) {
+      queryWarning(
+        context,
+        `Retained Power Query part ${graph.target} was dropped because the saved queries changed; output tables are written as values`,
+        graph.target,
+      );
+      continue;
+    }
+
     let reason: string | undefined;
     if (graph.sheetId !== undefined && !sheets.has(graph.sheetId)) reason = "its sheet was removed";
     for (const dependency of graph.dependencies) {
