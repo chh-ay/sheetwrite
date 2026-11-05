@@ -1399,3 +1399,37 @@ fn related_pivot_key_failures_recover_and_missing_relationships_show_ref() {
     // missing field, rather than accessing unrelated memory.
     assert_eq!(fixture.store.pivot_status(fixture.regions)[0], ref_error);
 }
+
+#[test]
+fn related_pivot_output_over_a_related_table_spills() {
+    let mut fixture = RelatedFixture::new(31);
+    let payload = PivotPayload {
+        source: fixture.flat,
+        last_row: 31,
+        last_col: 3,
+        rows: &[0],
+        value_field: 1,
+        aggregations: &[SUM],
+        anchor: (2, 1),
+        ..PivotPayload::default()
+    }
+    .numbers();
+    let mut model = payload;
+    model.splice(1..7, [3.0, 1.0, 2.0, 2.0, 3.0, 4.0, 5.0]);
+    let strings = ["related", "orders", "regions", "name", "orders", "amount"];
+    assert!(fixture
+        .store
+        .set_pivots(fixture.regions, &model, strings.map(String::from).to_vec()));
+    fixture.store.recompute_changed();
+
+    let status = fixture.store.pivot_status(fixture.regions);
+    assert_eq!(status[STATUS_ERROR], FormulaError::Spill.slot() as u32 + 1);
+    assert_eq!(
+        fixture
+            .store
+            .get_cell(fixture.regions, 2, 1)
+            .string()
+            .as_deref(),
+        Some("Region 1")
+    );
+}

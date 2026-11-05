@@ -1,22 +1,23 @@
 //! A pivot source that reads a lookup-flattened model without copying columns.
 //!
-//! Relationships are followed from the many side to the one side. Only the
-//! hops that fields use build key indexes. The indexes and lookup scratch
-//! live for one cache build; no index or row map is kept between recomputes.
-
-use std::cell::RefCell;
+//! Relationships are followed from the many side to the one side. Each hop
+//! that a field uses builds a sorted key index once and maps every parent row
+//! through it. The index and maps live for one cache build; nothing is kept
+//! between recomputes.
 
 use super::pivots::SourceRect;
 use super::relationships::{ColumnRef, KeyColumn, RelationshipError};
 use super::CellStore;
-use crate::data_model::{KeyIndex, NO_MATCH};
+use crate::data_model::{BLANK_KEY, KEY_ERROR, NO_MATCH};
 use crate::types::{FormulaError, Value};
 
-/// One many-to-one step from the table of route `parent`.
+/// One many-to-one step from the table of route `parent`: for each of its
+/// rows, the matched row of this route's table or a marker. Built in one
+/// pass over the parent's keys, so reads index a flat array in row order.
 struct Hop {
     parent: usize,
     from: KeyColumn,
-    index: KeyIndex,
+    rows: Vec<u32>,
 }
 
 struct Field<'a> {
@@ -35,7 +36,6 @@ pub(super) struct ModelSource<'a> {
     /// The hop into each route's table; `None` for the base table and for
     /// tables that no field reads.
     hops: Vec<Option<Hop>>,
-    scratch: RefCell<Vec<u8>>,
     /// Every table rectangle the source reads, base table first.
     pub(super) dependencies: Box<[SourceRect]>,
 }
@@ -93,13 +93,11 @@ impl<'a> ModelSource<'a> {
                     .table_by_id(&relationship.to.table)
                     .ok_or(FormulaError::Ref)?;
                 dependencies.push(SourceRect::table(one));
-                let (index, from) = store
-                    .relationship_index(relationship)
-                    .map_err(model_error)?;
+                let (rows, from) = store.relationship_rows(relationship).map_err(model_error)?;
                 hops[step] = Some(Hop {
                     parent: routes[step].1,
                     from,
-                    index,
+                    rows,
                 });
                 step = routes[step].1;
             }
@@ -109,7 +107,6 @@ impl<'a> ModelSource<'a> {
             store,
             fields,
             hops,
-            scratch: RefCell::new(Vec::new()),
             dependencies: dependencies.into(),
         })
     }
@@ -142,15 +139,10 @@ impl<'a> ModelSource<'a> {
             return Ok(row);
         };
 
-        let key = self
-            .store
-            .key_value(hop.from, self.row_in(hop.parent, row)?);
-        if matches!(key, Value::Error(_)) {
-            return Err(key);
-        }
-
-        match hop.index.find(&key, &mut self.scratch.borrow_mut()) {
-            NO_MATCH => Err(Value::Blank),
+        let parent_row = self.row_in(hop.parent, row)?;
+        match hop.rows[parent_row as usize] {
+            NO_MATCH | BLANK_KEY => Err(Value::Blank),
+            KEY_ERROR => Err(self.store.key_value(hop.from, parent_row)),
             matched => Ok(matched),
         }
     }

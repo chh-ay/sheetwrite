@@ -5,8 +5,10 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{CellStore, TableColumnDefinition, TableDefinition};
-use crate::data_model::{is_blank_key, KeyIndex, KeyProblem, NO_MATCH};
+use crate::cells::payload_str_id;
+use crate::data_model::{KeyCell, KeyIndex, KeyProblem, KEY_ERROR, NO_MATCH};
 use crate::eval::settled_cell_value;
+use crate::types::{string_from_pool_ref, KIND_STRING};
 
 /// Most relationships one workbook may hold; twin of `MAX_RELATIONSHIPS` in
 /// `packages/core/src/data-model.ts`.
@@ -139,8 +141,15 @@ impl CellStore {
         else {
             return Vec::new();
         };
-        let record = match self.relationship_index(relationship) {
-            Ok((index, many)) => [STATUS_OK, NO_ROW, NO_ROW, self.unmatched_keys(many, &index)],
+        let record = match self.relationship_rows(relationship) {
+            Ok((map, _)) => {
+                // Error keys match no row, so they count as unmatched.
+                let unmatched = map
+                    .iter()
+                    .filter(|&&target| target == NO_MATCH || target == KEY_ERROR)
+                    .count();
+                [STATUS_OK, NO_ROW, NO_ROW, unmatched as u32]
+            }
             Err(RelationshipError::MissingTable) => [STATUS_MISSING_TABLE, NO_ROW, NO_ROW, 0],
             Err(RelationshipError::MissingColumn) => [STATUS_MISSING_COLUMN, NO_ROW, NO_ROW, 0],
             Err(RelationshipError::Keys(KeyProblem::OneSideType { row })) => {
@@ -183,37 +192,41 @@ impl CellStore {
         )
     }
 
-    /// Builds the one-side key index of `relationship` and checks both key
-    /// columns. Returns the index with the many-side key column. The index
-    /// lives only as long as its caller keeps it.
-    pub(crate) fn relationship_index(
-        &self,
-        relationship: &Relationship,
-    ) -> Result<(KeyIndex, KeyColumn), RelationshipError> {
-        let one = self.key_column(&relationship.to)?;
-        let many = self.key_column(&relationship.from)?;
-        let index = KeyIndex::build(
-            one.rows,
-            |row| self.key_value(one, row),
-            many.rows,
-            |row| self.key_value(many, row),
-        )
-        .map_err(RelationshipError::Keys)?;
-        Ok((index, many))
-    }
-
-    /// Counts the non-blank keys in the many-side column `many` that `index`
-    /// does not hold. Error keys count: they match no row.
-    fn unmatched_keys(&self, many: KeyColumn, index: &KeyIndex) -> u32 {
-        let mut scratch = Vec::new();
-        let mut unmatched = 0;
-        for row in 0..many.rows {
-            let value = self.key_value(many, row);
-            if !is_blank_key(&value) && index.find(&value, &mut scratch) == NO_MATCH {
-                unmatched += 1;
+    /// The key of data row `row` of `column`. Literal text is borrowed from
+    /// the string pool; a settled value would copy it into a new `Rc<str>`.
+    fn key_cell(&self, column: KeyColumn, row: u32) -> KeyCell<'_> {
+        let cells = &self.sheets[column.sheet].cells;
+        let (row, col) = ((column.first_row + row) as usize, column.col as usize);
+        if cells.contains_cell(row, col) && cells.is_loaded(row, col) {
+            let index = cells.idx(row, col);
+            if cells.source_kind_at(index) == KIND_STRING {
+                let id = payload_str_id(cells.source_payload_at(index));
+                if let Some(text) = string_from_pool_ref(&self.strings, id) {
+                    return KeyCell::Text(text, id);
+                }
             }
         }
-        unmatched
+        KeyCell::Value(self.key_value(column, row as u32 - column.first_row))
+    }
+
+    /// Checks both key columns of `relationship` and maps each many-side
+    /// row to its one-side row (see [`KeyIndex::build`]). Returns the map
+    /// with the many-side key column. The sorted index is freed here; the
+    /// map lives only as long as its caller keeps it.
+    pub(crate) fn relationship_rows(
+        &self,
+        relationship: &Relationship,
+    ) -> Result<(Vec<u32>, KeyColumn), RelationshipError> {
+        let one = self.key_column(&relationship.to)?;
+        let many = self.key_column(&relationship.from)?;
+        let (_, map) = KeyIndex::build(
+            one.rows,
+            |row| self.key_cell(one, row),
+            many.rows,
+            |row| self.key_cell(many, row),
+        )
+        .map_err(RelationshipError::Keys)?;
+        Ok((map, many))
     }
 }
 

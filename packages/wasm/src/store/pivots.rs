@@ -502,9 +502,9 @@ struct Pivot {
     cache: Option<PivotCache>,
     /// The source the cache holds.
     source: Option<SourceRect>,
-    /// Every table rectangle a model pivot reads, base table first; edits in
-    /// them rebuild it. A pivot that writes into one of them shows
-    /// `#CYCLE!` through the settle rounds. No key index is kept.
+    /// Every table rectangle a model pivot reads, base table first. Edits in
+    /// them rebuild it, and output over any of them shows `#SPILL!`. No key
+    /// index or row map is kept.
     related: Option<Box<[SourceRect]>>,
     /// The layout of the installed output.
     layout: Option<PivotLayout>,
@@ -1044,7 +1044,13 @@ impl CellStore {
         };
 
         footprints[index].attempt = Some(range);
-        if meets_upstream_source(footprints, index, range) {
+        // Excel refuses output over any table a model pivot reads.
+        let meets_related = pivot
+            .related
+            .iter()
+            .flat_map(|rects| rects.iter())
+            .any(|rect| rect.sheet == owner && rect.meets(range));
+        if meets_related || meets_upstream_source(footprints, index, range) {
             return self.show_pivot_error(owner, pivot, FormulaError::Spill, Some(range));
         }
 
