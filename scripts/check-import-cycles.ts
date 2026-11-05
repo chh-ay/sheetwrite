@@ -116,6 +116,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     source: "packages/core/src/types/query.ts",
     dependencies: ["coordinates", "table"],
     exports: [
+      "PowerQueryCodec",
+      "PowerQueryExport",
+      "PowerQueryImport",
+      "PowerQueryLoss",
+      "PowerQueryUnsupported",
       "QueryAggregate",
       "QueryColumnSpec",
       "QueryColumnType",

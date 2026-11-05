@@ -15,6 +15,7 @@ import type {
   insertChart,
   insertPivot,
   openChartPanel,
+  openDataModelPanel,
   openExplainPanel,
   openNamePanel,
   openPivotPanel,
@@ -28,6 +29,7 @@ interface PanelController {
   insertChart: typeof insertChart;
   insertPivot: typeof insertPivot;
   openChartPanel: typeof openChartPanel;
+  openDataModelPanel: typeof openDataModelPanel;
   openExplainPanel: typeof openExplainPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
