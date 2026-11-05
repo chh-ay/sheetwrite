@@ -648,7 +648,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Insert",
-    reduceOrder: ["notes", "links", "charts", "tables", "rowsColumns"],
+    reduceOrder: ["notes", "links", "dashboard", "charts", "tables", "rowsColumns"],
     groups: [
       {
         id: "rowsColumns",
@@ -689,6 +689,26 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "chart",
         layout: "flow",
         controls: [chart],
+      },
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: "dashboard",
+        layout: "flow",
+        controls: [
+          {
+            ...button(
+              "New Dashboard",
+              "dashboard",
+              (grid) => grid.actions.newDashboard(),
+              "newDashboard",
+              {
+                large: true,
+              },
+            ),
+            id: "newDashboard",
+          },
+        ],
       },
       { id: "links", label: "Links", icon: "hyperlink", layout: "flow", controls: [hyperlink] },
       { id: "notes", label: "Notes", icon: "note", layout: "flow", controls: [note] },
