@@ -9,6 +9,7 @@ const NO_RESULT_POSITION: u32 = u32::MAX;
 const SLOT_CAPACITY_SLACK: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
+const DOUBLING_SLOT_LIMIT: usize = 4096;
 
 // One membership word of ids per page bounds moves of occupied entry storage.
 const SLOT_PAGE_LEN: usize = BITS_PER_WORD;
@@ -263,7 +264,16 @@ impl FormulaStore {
             self.grow_slot_family(location, entry)?
         };
 
-        self.track(id);
+        // A new or reused slot has no flag bits: retiring a slot clears them.
+        if let Some(entry) = self.get(id) {
+            let (volatile, subtotal) = (entry.volatile(), entry.calls_subtotal());
+            if volatile {
+                self.volatile.insert(id);
+            }
+            if subtotal {
+                self.subtotals.insert(id);
+            }
+        }
         Some(id)
     }
 
@@ -316,7 +326,14 @@ impl FormulaStore {
         let page = self.entries.last_mut()?;
         page.push(FormulaSlot::Occupied(entry));
         if index == self.locations.capacity() {
-            let growth = (index / SLOT_GROWTH_DIVISOR).max(MIN_SLOT_GROWTH);
+            // A small store doubles: steps of one eighth would copy its
+            // location array tens of times while it loads. A large store
+            // keeps the one-eighth step to bound unused capacity.
+            let growth = if index < DOUBLING_SLOT_LIMIT {
+                index.max(SLOT_PAGE_LEN)
+            } else {
+                index / SLOT_GROWTH_DIVISOR
+            };
             self.locations.reserve_exact(growth);
         }
         self.locations.push(location);
