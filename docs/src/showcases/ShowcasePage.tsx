@@ -42,8 +42,9 @@ export function ShowcasePage({
   const activeIndex = SHOWCASE_NAVIGATION.findIndex(
     (item) => item.href.replaceAll("/", "") === active,
   );
-  const activeItem = SHOWCASE_NAVIGATION[activeIndex] ?? SHOWCASE_NAVIGATION[0]!;
-  const nextItem = SHOWCASE_NAVIGATION[(activeIndex + 1) % SHOWCASE_NAVIGATION.length]!;
+  const activeItem = SHOWCASE_NAVIGATION[activeIndex] ?? SHOWCASE_NAVIGATION[0];
+  const nextItem =
+    SHOWCASE_NAVIGATION[(activeIndex + 1) % SHOWCASE_NAVIGATION.length] ?? SHOWCASE_NAVIGATION[0];
 
   return (
     <div className="sw-showcase-frame">

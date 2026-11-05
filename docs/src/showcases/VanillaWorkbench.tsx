@@ -223,7 +223,9 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     if (event.key === "End") nextIndex = WORKBENCH_SCENARIOS.length - 1;
     if (nextIndex === null) return;
     event.preventDefault();
-    const next = WORKBENCH_SCENARIOS[nextIndex]!;
+    const next = WORKBENCH_SCENARIOS[nextIndex];
+    if (!next) return;
+
     selectScenario(next.id);
     scenarioTabRefs.current[nextIndex]?.focus();
   }

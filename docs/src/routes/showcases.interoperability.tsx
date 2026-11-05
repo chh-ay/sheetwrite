@@ -351,6 +351,16 @@ interface ChoiceOption {
   label: string;
 }
 
+/** One choice per page, "1 of N" to "N of N"; a list always has its first page. */
+function pageChoices(pageCount: number): readonly [ChoiceOption, ...ChoiceOption[]] {
+  const choice = (page: number): ChoiceOption => ({
+    value: String(page),
+    label: `${page + 1} of ${pageCount}`,
+  });
+
+  return [choice(0), ...Array.from({ length: pageCount - 1 }, (_, index) => choice(index + 1))];
+}
+
 function ChoiceMenu({
   label,
   value,
@@ -360,12 +370,12 @@ function ChoiceMenu({
 }: {
   label: string;
   value: string;
-  options: readonly ChoiceOption[];
+  options: readonly [ChoiceOption, ...ChoiceOption[]];
   testId: string;
   onChange: (value: string) => void;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const selected = options.find((option) => option.value === value) ?? options[0]!;
+  const selected = options.find((option) => option.value === value) ?? options[0];
   return (
     <div className="sw-si-choice">
       <span>{label}</span>
@@ -1624,10 +1634,7 @@ function InteroperabilityRoute() {
                       );
                     }}
                     testId="compatibility-example-page"
-                    options={Array.from({ length: resultPageCount }, (_, page) => ({
-                      value: String(page),
-                      label: `${page + 1} of ${resultPageCount}`,
-                    }))}
+                    options={pageChoices(resultPageCount)}
                   />
                 )}
 
@@ -1739,10 +1746,7 @@ function InteroperabilityRoute() {
                       );
                     }}
                     testId="compatibility-record-page"
-                    options={Array.from({ length: inventoryPageCount }, (_, page) => ({
-                      value: String(page),
-                      label: `${page + 1} of ${inventoryPageCount}`,
-                    }))}
+                    options={pageChoices(inventoryPageCount)}
                   />
                 )}
                 <div className="sw-si-compat sw-si-inventory">

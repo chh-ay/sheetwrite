@@ -236,7 +236,7 @@ export function buildCompatibilityResults({
         kind: entry.evidence.kind,
         description: entry.evidence.oracle,
       }),
-      testChecksum: manifest.caseSha256[index]!,
+      testChecksum: caseChecksum(manifest, index),
       observations,
     };
   });
@@ -327,4 +327,13 @@ export function buildCompatibilityResults({
     evidence,
     cases,
   };
+}
+
+/** The manifest digest of one corpus case; the manifest lists one per case. */
+function caseChecksum(manifest: ConformanceManifest, index: number): string {
+  const checksum = manifest.caseSha256[index];
+  if (checksum === undefined)
+    throw new Error(`Conformance manifest has no digest for case ${index}`);
+
+  return checksum;
 }

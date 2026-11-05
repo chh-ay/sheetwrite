@@ -550,9 +550,12 @@ const App = defineComponent({
                 : event.key === "End"
                   ? TASKS.length - 1
                   : (index + (event.key === "ArrowRight" ? 1 : -1) + TASKS.length) % TASKS.length;
-            activeTask.value = TASKS[next]!.id;
+            const nextTask = TASKS[next];
+            if (!nextTask) return;
+
+            activeTask.value = nextTask.id;
             requestAnimationFrame(() =>
-              document.getElementById(`vue-task-${TASKS[next]!.id}`)?.focus(),
+              document.getElementById(`vue-task-${nextTask.id}`)?.focus(),
             );
           },
         },

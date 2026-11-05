@@ -1,8 +1,30 @@
 import iconLayout from "@sheetwrite/core/icons.json";
 import iconSheet from "@sheetwrite/core/icons.svg?url";
 import type { CSSProperties, ReactNode } from "react";
-import { ACTS, AFTER_REVENUE, BEFORE_REVENUE, CHART_MAX, COLUMNS, type Frame, frameAt, HERO_LOOP_SECONDS, money, PIVOT_COLUMNS, PIVOT_ROWS, type Range, revenue, ROWS, SALES, SALES_COLUMNS, STILL_SECONDS, sum, type Target, UNITS_AFTER, WEST } from "./heroFrame.js";
-import { count, lerp, span } from "./scene-math.js";
+
+import {
+  ACTS,
+  AFTER_REVENUE,
+  BEFORE_REVENUE,
+  CHART_MAX,
+  COLUMNS,
+  type Frame,
+  frameAt,
+  HERO_LOOP_SECONDS,
+  money,
+  PIVOT_COLUMNS,
+  PIVOT_ROWS,
+  type Range,
+  ROWS,
+  SALES,
+  SALES_COLUMNS,
+  STILL_SECONDS,
+  sum,
+  type Target,
+  UNITS_AFTER,
+  WEST,
+} from "./heroFrame.js";
+import { count, lerp } from "./scene-math.js";
 import { useTimeline } from "./useTimeline.js";
 
 /* ---- Rendering --------------------------------------------------------------- */

@@ -182,7 +182,13 @@ function createEngineTrace(limit = ENGINE_TRACE_LIMIT): EngineTrace {
       events.fill(undefined as never);
     },
     snapshot() {
-      return Array.from({ length: size }, (_, index) => events[(start + index) % limit]!);
+      const retained = [];
+      for (let index = 0; index < size; index++) {
+        const event = events[(start + index) % limit];
+        if (event !== undefined) retained.push(event);
+      }
+
+      return retained;
     },
     get size() {
       return size;
