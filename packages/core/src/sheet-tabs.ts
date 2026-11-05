@@ -1,5 +1,4 @@
 import {
-  HORIZONTAL_STEPS,
   type MenuKeyOptions,
   menuKeyTarget,
   type PopupPlacement,
@@ -73,7 +72,7 @@ const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
 /** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
 const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
 /** Arrow keys move along the tab strip and stop at its ends. */
-const TAB_STRIP_KEYS: MenuKeyOptions = { steps: HORIZONTAL_STEPS, wrap: false };
+const TAB_STRIP_KEYS: MenuKeyOptions = { axis: "horizontal", wrap: false };
 
 function createTabIcon(pathData: string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

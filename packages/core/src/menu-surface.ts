@@ -3,29 +3,24 @@
  * and where an anchored popup sits in the viewport.
  */
 
-/** Step of each arrow key in a vertical menu or list. */
-const VERTICAL_STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 };
-/** Step of each arrow key in a popup laid out in rows and columns. */
-export const TWO_AXIS_STEPS: Readonly<Record<string, number>> = {
-  ArrowDown: 1,
-  ArrowRight: 1,
-  ArrowUp: -1,
-  ArrowLeft: -1,
-};
-/** Step of each arrow key in a horizontal strip of tabs or buttons. */
-export const HORIZONTAL_STEPS: Readonly<Record<string, number>> = {
-  ArrowRight: 1,
-  ArrowLeft: -1,
+/** Step of each arrow key, by the direction a menu or strip lays out its items. */
+const STEPS_BY_AXIS: Readonly<Record<MenuAxis, Readonly<Record<string, number>>>> = {
+  vertical: { ArrowDown: 1, ArrowUp: -1 },
+  horizontal: { ArrowRight: 1, ArrowLeft: -1 },
+  both: { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 },
 };
 
+/** Direction a menu or strip lays out its items: which arrow keys move focus. */
+export type MenuAxis = "vertical" | "horizontal" | "both";
+
 export interface MenuKeyOptions {
-  /** Step of each arrow key that moves focus; other keys except Home and End are ignored. */
-  readonly steps: Readonly<Record<string, number>>;
+  /** Which arrow keys move focus; other keys except Home and End are ignored. */
+  readonly axis: MenuAxis;
   /** Wrap from the last item to the first and back, as WAI-ARIA menus do; otherwise stop at the ends. */
   readonly wrap: boolean;
 }
 
-const MENU_KEYS: MenuKeyOptions = { steps: VERTICAL_STEPS, wrap: true };
+const MENU_KEYS: MenuKeyOptions = { axis: "vertical", wrap: true };
 
 /**
  * Index of the item a navigation key moves focus to among `count` items, or
@@ -43,7 +38,7 @@ export function menuKeyTarget(
   if (key === "Home") return 0;
   if (key === "End") return count - 1;
 
-  const step = options.steps[key];
+  const step = STEPS_BY_AXIS[options.axis][key];
   if (step === undefined) return null;
   if (current < 0) return step > 0 ? 0 : count - 1;
 
