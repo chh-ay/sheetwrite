@@ -20,7 +20,7 @@ import { defineConfig, type Plugin } from "vite";
 
 import type { IconName } from "./src/icons/icon-names.ts";
 import { inlineIcon } from "./src/icons/inline-icon.ts";
-import { FORMULA_LANGUAGE, siteCodeThemes } from "./src/lib/code-theme.ts";
+import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { renderPerfBars } from "./src/lib/perf-bars.ts";
@@ -302,7 +302,7 @@ const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   themes: siteCodeThemes(),
   // The token colours are measured against AA in tokens.css; keep them exact.
   minSyntaxHighlightingColorContrast: 0,
-  shiki: { langs: [FORMULA_LANGUAGE] },
+  shiki: { langs: [FORMULA_LANGUAGE, tsMemberLanguage()] },
   styleOverrides: {
     codeFontFamily: "var(--sw-font-mono)",
     codeFontSize: "var(--sw-text-code)",

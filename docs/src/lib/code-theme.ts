@@ -1,7 +1,17 @@
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+
 import { ExpressiveCodeTheme } from "@expressive-code/core";
+import type { RehypeExpressiveCodeOptions } from "rehype-expressive-code";
 
 import { CODE_ROLES, type CodeRole } from "./code-roles.ts";
 import { type SiteTheme, themeTokens, tokenColour } from "./design-tokens.ts";
+
+type ShikiOptions = Exclude<NonNullable<RehypeExpressiveCodeOptions["shiki"]>, boolean>;
+/** One entry of Expressive Code's `shiki.langs`. */
+export type ShikiLanguageInput = NonNullable<ShikiOptions["langs"]>[number];
+/** One TextMate grammar Shiki registers; the plain-object form of a language input. */
+type ShikiLanguage = Extract<ShikiLanguageInput, { scopeName: string }>;
 
 /**
  * The site's code theme, built at build time from the `--sw-code-*` tokens.
@@ -62,6 +72,7 @@ const ROLE_SCOPES: Readonly<Record<CodeRole, readonly string[]>> = {
   property: [
     "variable.other.property",
     "variable.other.object.property",
+    "variable.object.property",
     "meta.object-literal.key",
     "support.type.property-name",
     "entity.other.attribute-name",
@@ -166,3 +177,65 @@ export const FORMULA_LANGUAGE = {
     punctuation: { name: "punctuation.separator.formula", match: "[(),;{}]" },
   },
 };
+
+/** TypeScript grammar rules a class or interface body is made of. */
+const CLASS_MEMBER_RULES = [
+  "comment",
+  "decorator",
+  "method-declaration",
+  "indexer-declaration",
+  "field-declaration",
+  "string",
+  "type-annotation",
+  "variable-initializer",
+  "access-modifier",
+  "property-accessor",
+  "async-modifier",
+  "expression",
+  "punctuation-comma",
+  "punctuation-semicolon",
+];
+
+const TS_MEMBER_GRAMMAR: ShikiLanguage = {
+  name: "ts-member",
+  scopeName: "source.ts.member",
+  embeddedLangs: ["typescript"],
+  patterns: CLASS_MEMBER_RULES.map((rule) => ({ include: `source.ts#${rule}` })),
+};
+
+/**
+ * The packages between the docs and Shiki's bundled grammars, outermost
+ * first. `ts-member` embeds TypeScript, and Shiki registers an embedded
+ * language only together with its grammar, so the docs load the exact
+ * grammar Expressive Code's own Shiki ships.
+ */
+const SHIKI_DEPENDENCY_CHAIN = [
+  "rehype-expressive-code",
+  "expressive-code",
+  "@expressive-code/plugin-shiki",
+  "shiki",
+];
+
+function bundledTypeScriptGrammarUrl(): string {
+  let resolved = createRequire(import.meta.url).resolve(SHIKI_DEPENDENCY_CHAIN[0] ?? "");
+  for (const next of SHIKI_DEPENDENCY_CHAIN.slice(1)) {
+    resolved = createRequire(resolved).resolve(next);
+  }
+  return pathToFileURL(createRequire(resolved).resolve("@shikijs/langs/typescript")).href;
+}
+
+/**
+ * TypeScript read as the inside of a class or interface, for API pages that
+ * show one member per fence (```ts-member). Plain TypeScript reads a lone
+ * `readonly store: Store;` as a labelled statement and leaves it uncoloured;
+ * this grammar gives modifiers, properties, methods and types their roles.
+ * Loaded with the TypeScript grammar it builds on.
+ */
+export function tsMemberLanguage(): ShikiLanguageInput {
+  const typescriptUrl = bundledTypeScriptGrammarUrl();
+  return async () => {
+    // The grammar is not a docs dependency; its path is resolved through Shiki at run time.
+    const typescript: { default: ShikiLanguage[] } = await import(typescriptUrl);
+    return [...typescript.default, TS_MEMBER_GRAMMAR];
+  };
+}
