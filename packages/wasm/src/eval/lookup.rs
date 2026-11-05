@@ -494,7 +494,7 @@ const CLASS_BOOL: u8 = 4;
 
 /// One list position under its class and value. A number value is its bits
 /// with `-0` as `0`, text its case-folded rank, and a logical 0 or 1.
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy)]
 struct IndexEntry {
     class: u8,
     value: u64,
@@ -540,8 +540,8 @@ impl ExactIndex {
             Entry::Text(text) => text,
             _ => "",
         };
-        text_positions.sort_unstable_by(|&left, &right| {
-            compare_text_case_insensitive(text_of(left), text_of(right)).then(left.cmp(&right))
+        merge_sort(&mut text_positions, &mut |left, right| {
+            compare_text_case_insensitive(text_of(left), text_of(right))
         });
         let mut texts: Vec<u32> = Vec::new();
         for &position in &text_positions {
@@ -555,7 +555,12 @@ impl ExactIndex {
         }
         drop(text_positions);
 
-        entries.sort_unstable();
+        let mut order: Vec<u32> = (0..entries.len() as u32).collect();
+        merge_sort(&mut order, &mut |left, right| {
+            let (left, right) = (entries[left as usize], entries[right as usize]);
+            (left.class, left.value).cmp(&(right.class, right.value))
+        });
+        let entries = order.iter().map(|&index| entries[index as usize]).collect();
         Some(Self { entries, texts })
     }
 
@@ -640,6 +645,38 @@ fn number_value(number: f64) -> u64 {
         0
     } else {
         number.to_bits()
+    }
+}
+
+/// A stable bottom-up merge sort. One copy serves every comparator, so the
+/// index adds no generic sort to the module.
+fn merge_sort(items: &mut [u32], compare: &mut dyn FnMut(u32, u32) -> Ordering) {
+    let len = items.len();
+    let mut scratch = vec![0u32; len];
+    let mut width = 1;
+    while width < len {
+        let mut start = 0;
+        while start < len {
+            let middle = (start + width).min(len);
+            let end = (start + 2 * width).min(len);
+            let (mut left, mut right, mut write) = (start, middle, start);
+            while left < middle && right < end {
+                if compare(items[right], items[left]).is_lt() {
+                    scratch[write] = items[right];
+                    right += 1;
+                } else {
+                    scratch[write] = items[left];
+                    left += 1;
+                }
+                write += 1;
+            }
+            scratch[write..write + middle - left].copy_from_slice(&items[left..middle]);
+            write += middle - left;
+            scratch[write..write + end - right].copy_from_slice(&items[right..end]);
+            start = end;
+        }
+        items.copy_from_slice(&scratch);
+        width *= 2;
     }
 }
 
