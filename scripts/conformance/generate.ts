@@ -242,6 +242,12 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
     boundary: "ISNA(ERROR.TYPE(C1))",
     "range-array": "ISNUMBER(ERROR.TYPE(C1:C2))+ISNA(ERROR.TYPE(C1:C2))=1",
   },
+  INFO: {
+    empty: "ISERROR(INFO(C1))",
+    mixed: "ISERROR(INFO(C1))",
+    boundary: "ISERROR(INFO(C1))",
+    "range-array": "ISERROR(INFO(C1:C2))",
+  },
   ISNONTEXT: { error: "ISNONTEXT(1/0)" },
   ISREF: {
     empty: "ISREF(C1)",
