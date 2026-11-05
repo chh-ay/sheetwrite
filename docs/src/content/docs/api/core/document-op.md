@@ -11,7 +11,7 @@ Exhaustive serializable operation union for workbook mutations.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L500"><code>packages/core/src/types/document.ts#L500</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>43</span>
+## Variants <span class="api-count" data-pagefind-ignore>44</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -72,6 +72,18 @@ Exhaustive serializable operation union for workbook mutations.
   range: Range;
   contents?: boolean;
   style?: boolean;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "permuteRows";
+  range: Range;
+  encoding: "u32le-base64-v1";
+  order: string;
 }
 ```
 
@@ -446,6 +458,12 @@ export type DocumentOp =
       range: Range;
       contents?: boolean;
       style?: boolean;
+    }
+  | {
+      op: "permuteRows";
+      range: Range;
+      encoding: "u32le-base64-v1";
+      order: string;
     }
   | {
       op: "addRows";

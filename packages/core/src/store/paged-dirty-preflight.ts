@@ -727,7 +727,11 @@ export class PagedDirtyPreflight {
             if (referenceSimulationExceeded) return referenceSimulationIssue();
           }
         }
-      } else if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
+      } else if (
+        patch.op === "setRangeStyle" ||
+        patch.op === "clearRange" ||
+        patch.op === "permuteRows"
+      ) {
         const range = normalizedRange(patch.range);
 
         rejection = addRectangle(
