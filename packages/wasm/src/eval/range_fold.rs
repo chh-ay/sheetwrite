@@ -47,6 +47,19 @@ impl CellStore {
             return Some(self.eval_shared_range_sum(range, pass, depth));
         }
 
+        self.eval_mixed_sum(args, sheet, pass, depth)
+    }
+
+    /// The mixed-argument half of [`Self::eval_sum_family`], kept out of line
+    /// so the shared one-range read stays small.
+    #[inline(never)]
+    fn eval_mixed_sum(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<EvalResult> {
         if args.is_empty()
             || args.len() > MAX_FUNCTION_ARGS
             || args
@@ -94,6 +107,7 @@ impl CellStore {
 
     /// One range's `SUM`. Formulas over the same literal-only range in a pass
     /// read one scan; a range with one reader keeps no shared sum.
+    #[inline]
     fn eval_shared_range_sum(
         &self,
         range: CellRange,
@@ -104,6 +118,18 @@ impl CellStore {
             return sum_value(sum);
         }
 
+        self.scan_range_sum(range, pass, depth)
+    }
+
+    /// Scans one range for [`Self::eval_shared_range_sum`] and shares the sum
+    /// when the range holds only literals and more than one formula reads it.
+    #[inline(never)]
+    fn scan_range_sum(
+        &self,
+        range: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
         let group = self
             .graph
             .index()
