@@ -1420,6 +1420,7 @@ export class GridImpl implements Grid {
 
         case "setRangeStyle":
         case "clearRange":
+        case "permuteRows":
           range = patch.range;
           break;
 

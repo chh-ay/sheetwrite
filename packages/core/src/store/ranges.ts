@@ -314,6 +314,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return patch.range.sheet;
     case "addTable":
       return patch.table.range.sheet;
@@ -351,6 +352,7 @@ export function pivotWrittenRange(patch: DocumentOp): Range | null {
     case "setRange":
     case "setBlock":
     case "restoreBlock":
+    case "permuteRows":
       return patch.range;
     case "clearRange":
       return patch.contents === false ? null : patch.range;
