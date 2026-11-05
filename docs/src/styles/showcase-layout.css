@@ -98,6 +98,8 @@
 .sw-showcase__control-group {
   display: grid;
   gap: var(--sw-space-2);
+  /* Groups side by side share a row height; their controls keep their own. */
+  align-content: start;
 }
 
 .sw-showcase__control-group + .sw-showcase__control-group {
