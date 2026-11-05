@@ -12,7 +12,8 @@ use crate::types::{EvalResult, FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &["CONVERT"];
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// Excel's unit groups. Units of different groups do not convert.
+#[derive(Clone, Copy)]
 enum Group {
     Mass,
     Distance,
@@ -30,61 +31,23 @@ enum Group {
 }
 
 /// The prefixes a unit accepts.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 enum Prefixes {
     None,
     Decimal,
     DecimalAndBinary,
 }
 
-/// One unit spelling. `power` is 2 or 3 for square and cubic metric units,
+const GROUP_MASK: u8 = 0x0f;
+const PREFIX_SHIFT: u8 = 4;
+const PREFIX_MASK: u8 = 0x03;
+const POWER_SHIFT: u8 = 6;
+
+/// Packs a unit's group (bits 0-3), accepted prefixes (bits 4-5) and prefix
+/// power (bits 6-7). The power is 2 or 3 for square and cubic metric units,
 /// whose prefix is squared or cubed: `km2` is 1E6 `m2`.
-struct Unit {
-    symbol: &'static str,
-    group: Group,
-    factor: f64,
-    prefixes: Prefixes,
-    power: i32,
-}
-
-const fn unit(symbol: &'static str, group: Group, factor: f64) -> Unit {
-    Unit {
-        symbol,
-        group,
-        factor,
-        prefixes: Prefixes::None,
-        power: 1,
-    }
-}
-
-const fn metric(symbol: &'static str, group: Group, factor: f64) -> Unit {
-    Unit {
-        symbol,
-        group,
-        factor,
-        prefixes: Prefixes::Decimal,
-        power: 1,
-    }
-}
-
-const fn metric_power(symbol: &'static str, group: Group, factor: f64, power: i32) -> Unit {
-    Unit {
-        symbol,
-        group,
-        factor,
-        prefixes: Prefixes::Decimal,
-        power,
-    }
-}
-
-const fn information(symbol: &'static str, factor: f64) -> Unit {
-    Unit {
-        symbol,
-        group: Group::Information,
-        factor,
-        prefixes: Prefixes::DecimalAndBinary,
-        power: 1,
-    }
+const fn kind(group: Group, prefixes: Prefixes, power: u8) -> u8 {
+    group as u8 | (prefixes as u8) << PREFIX_SHIFT | power << POWER_SHIFT
 }
 
 const INCH: f64 = 0.0254;
@@ -105,181 +68,321 @@ const UK_GALLON: f64 = 0.004_546_09;
 const HORSEPOWER: f64 = 550.0 * FOOT * POUND_FORCE;
 const ATMOSPHERE: f64 = 101_325.0;
 
-/// Spellings in Excel's documented groups. Temperatures use their own
-/// conversion; their factor is unused.
-const UNITS: &[Unit] = &[
-    metric("g", Group::Mass, 1.0),
-    unit("sg", Group::Mass, POUND_FORCE / FOOT * 1_000.0),
-    unit("lbm", Group::Mass, POUND_GRAMS),
-    metric("u", Group::Mass, 1.660_539_066_60e-24),
-    unit("ozm", Group::Mass, POUND_GRAMS / 16.0),
-    unit("grain", Group::Mass, POUND_GRAMS / 7_000.0),
-    unit("cwt", Group::Mass, POUND_GRAMS * 100.0),
-    unit("shweight", Group::Mass, POUND_GRAMS * 100.0),
-    unit("uk_cwt", Group::Mass, POUND_GRAMS * 112.0),
-    unit("lcwt", Group::Mass, POUND_GRAMS * 112.0),
-    unit("hweight", Group::Mass, POUND_GRAMS * 112.0),
-    unit("stone", Group::Mass, POUND_GRAMS * 14.0),
-    unit("ton", Group::Mass, POUND_GRAMS * 2_000.0),
-    unit("uk_ton", Group::Mass, POUND_GRAMS * 2_240.0),
-    unit("LTON", Group::Mass, POUND_GRAMS * 2_240.0),
-    unit("brton", Group::Mass, POUND_GRAMS * 2_240.0),
-    metric("m", Group::Distance, 1.0),
-    unit("mi", Group::Distance, MILE),
-    unit("Nmi", Group::Distance, NAUTICAL_MILE),
-    unit("in", Group::Distance, INCH),
-    unit("ft", Group::Distance, FOOT),
-    unit("yd", Group::Distance, 3.0 * FOOT),
-    metric("ang", Group::Distance, 1e-10),
-    unit("ell", Group::Distance, 45.0 * INCH),
-    metric("ly", Group::Distance, LIGHT_YEAR),
-    metric("parsec", Group::Distance, PARSEC),
-    metric("pc", Group::Distance, PARSEC),
-    unit("Picapt", Group::Distance, PICA_POINT),
-    unit("Pica", Group::Distance, PICA_POINT),
-    unit("pica", Group::Distance, INCH / 6.0),
-    unit("survey_mi", Group::Distance, 5_280.0 * SURVEY_FOOT),
-    unit("yr", Group::Time, 31_557_600.0),
-    unit("day", Group::Time, 86_400.0),
-    unit("d", Group::Time, 86_400.0),
-    unit("hr", Group::Time, 3_600.0),
-    unit("mn", Group::Time, 60.0),
-    unit("min", Group::Time, 60.0),
-    metric("sec", Group::Time, 1.0),
-    metric("s", Group::Time, 1.0),
-    metric("Pa", Group::Pressure, 1.0),
-    metric("p", Group::Pressure, 1.0),
-    metric("atm", Group::Pressure, ATMOSPHERE),
-    metric("at", Group::Pressure, ATMOSPHERE),
-    metric("mmHg", Group::Pressure, 133.322_387_415),
-    unit("psi", Group::Pressure, POUND_FORCE / (INCH * INCH)),
-    unit("Torr", Group::Pressure, ATMOSPHERE / 760.0),
-    metric("N", Group::Force, 1.0),
-    metric("dyn", Group::Force, 1e-5),
-    metric("dy", Group::Force, 1e-5),
-    unit("lbf", Group::Force, POUND_FORCE),
-    metric("J", Group::Energy, 1.0),
-    metric("e", Group::Energy, 1e-7),
-    metric("c", Group::Energy, 4.184),
-    metric("cal", Group::Energy, 4.186_8),
-    metric("eV", Group::Energy, 1.602_176_634e-19),
-    metric("ev", Group::Energy, 1.602_176_634e-19),
-    unit("HPh", Group::Energy, HORSEPOWER * 3_600.0),
-    unit("hh", Group::Energy, HORSEPOWER * 3_600.0),
-    metric("Wh", Group::Energy, 3_600.0),
-    metric("wh", Group::Energy, 3_600.0),
-    unit("flb", Group::Energy, FOOT * POUND_FORCE),
-    unit("BTU", Group::Energy, 1_055.055_852_62),
-    unit("btu", Group::Energy, 1_055.055_852_62),
-    unit("HP", Group::Power, HORSEPOWER),
-    unit("h", Group::Power, HORSEPOWER),
-    unit("PS", Group::Power, 735.498_75),
-    metric("W", Group::Power, 1.0),
-    metric("w", Group::Power, 1.0),
-    metric("T", Group::Magnetism, 1.0),
-    metric("ga", Group::Magnetism, 1e-4),
-    unit("C", Group::Temperature, 0.0),
-    unit("cel", Group::Temperature, 0.0),
-    unit("F", Group::Temperature, 0.0),
-    unit("fah", Group::Temperature, 0.0),
-    metric("K", Group::Temperature, 0.0),
-    metric("kel", Group::Temperature, 0.0),
-    unit("Rank", Group::Temperature, 0.0),
-    unit("Reau", Group::Temperature, 0.0),
-    unit("tsp", Group::Volume, US_GALLON / 768.0),
-    unit("tspm", Group::Volume, 5e-6),
-    unit("tbs", Group::Volume, US_GALLON / 256.0),
-    unit("oz", Group::Volume, US_GALLON / 128.0),
-    unit("cup", Group::Volume, US_GALLON / 16.0),
-    unit("pt", Group::Volume, US_GALLON / 8.0),
-    unit("us_pt", Group::Volume, US_GALLON / 8.0),
-    unit("uk_pt", Group::Volume, UK_GALLON / 8.0),
-    unit("qt", Group::Volume, US_GALLON / 4.0),
-    unit("uk_qt", Group::Volume, UK_GALLON / 4.0),
-    unit("gal", Group::Volume, US_GALLON),
-    unit("uk_gal", Group::Volume, UK_GALLON),
-    metric("l", Group::Volume, 1e-3),
-    metric("L", Group::Volume, 1e-3),
-    metric("lt", Group::Volume, 1e-3),
-    metric_power("ang3", Group::Volume, 1e-30, 3),
-    metric_power("ang^3", Group::Volume, 1e-30, 3),
-    unit("barrel", Group::Volume, 42.0 * US_GALLON),
-    unit("bushel", Group::Volume, 0.035_239_070_166_88),
-    unit("ft3", Group::Volume, FOOT * FOOT * FOOT),
-    unit("ft^3", Group::Volume, FOOT * FOOT * FOOT),
-    unit("in3", Group::Volume, INCH * INCH * INCH),
-    unit("in^3", Group::Volume, INCH * INCH * INCH),
-    unit("ly3", Group::Volume, LIGHT_YEAR * LIGHT_YEAR * LIGHT_YEAR),
-    unit("ly^3", Group::Volume, LIGHT_YEAR * LIGHT_YEAR * LIGHT_YEAR),
-    metric_power("m3", Group::Volume, 1.0, 3),
-    metric_power("m^3", Group::Volume, 1.0, 3),
-    unit("mi3", Group::Volume, MILE * MILE * MILE),
-    unit("mi^3", Group::Volume, MILE * MILE * MILE),
-    unit("yd3", Group::Volume, 27.0 * FOOT * FOOT * FOOT),
-    unit("yd^3", Group::Volume, 27.0 * FOOT * FOOT * FOOT),
-    unit(
-        "Nmi3",
-        Group::Volume,
-        NAUTICAL_MILE * NAUTICAL_MILE * NAUTICAL_MILE,
-    ),
-    unit(
-        "Nmi^3",
-        Group::Volume,
-        NAUTICAL_MILE * NAUTICAL_MILE * NAUTICAL_MILE,
-    ),
-    unit(
-        "Picapt3",
-        Group::Volume,
-        PICA_POINT * PICA_POINT * PICA_POINT,
-    ),
-    unit(
-        "Picapt^3",
-        Group::Volume,
-        PICA_POINT * PICA_POINT * PICA_POINT,
-    ),
-    unit("Pica3", Group::Volume, PICA_POINT * PICA_POINT * PICA_POINT),
-    unit(
-        "Pica^3",
-        Group::Volume,
-        PICA_POINT * PICA_POINT * PICA_POINT,
-    ),
-    unit("GRT", Group::Volume, 100.0 * FOOT * FOOT * FOOT),
-    unit("regton", Group::Volume, 100.0 * FOOT * FOOT * FOOT),
-    unit("MTON", Group::Volume, 40.0 * FOOT * FOOT * FOOT),
-    unit("uk_acre", Group::Area, 4_840.0 * 9.0 * FOOT * FOOT),
-    unit("us_acre", Group::Area, 43_560.0 * SURVEY_FOOT * SURVEY_FOOT),
-    metric_power("ang2", Group::Area, 1e-20, 2),
-    metric_power("ang^2", Group::Area, 1e-20, 2),
-    metric("ar", Group::Area, 100.0),
-    unit("ft2", Group::Area, FOOT * FOOT),
-    unit("ft^2", Group::Area, FOOT * FOOT),
-    unit("ha", Group::Area, 10_000.0),
-    unit("in2", Group::Area, INCH * INCH),
-    unit("in^2", Group::Area, INCH * INCH),
-    unit("ly2", Group::Area, LIGHT_YEAR * LIGHT_YEAR),
-    unit("ly^2", Group::Area, LIGHT_YEAR * LIGHT_YEAR),
-    metric_power("m2", Group::Area, 1.0, 2),
-    metric_power("m^2", Group::Area, 1.0, 2),
-    unit("Morgen", Group::Area, 2_500.0),
-    unit("mi2", Group::Area, MILE * MILE),
-    unit("mi^2", Group::Area, MILE * MILE),
-    unit("Nmi2", Group::Area, NAUTICAL_MILE * NAUTICAL_MILE),
-    unit("Nmi^2", Group::Area, NAUTICAL_MILE * NAUTICAL_MILE),
-    unit("Picapt2", Group::Area, PICA_POINT * PICA_POINT),
-    unit("Picapt^2", Group::Area, PICA_POINT * PICA_POINT),
-    unit("Pica2", Group::Area, PICA_POINT * PICA_POINT),
-    unit("Pica^2", Group::Area, PICA_POINT * PICA_POINT),
-    unit("yd2", Group::Area, 9.0 * FOOT * FOOT),
-    unit("yd^2", Group::Area, 9.0 * FOOT * FOOT),
-    information("bit", 1.0),
-    information("byte", 8.0),
-    unit("admkn", Group::Speed, 6_080.0 * FOOT / 3_600.0),
-    unit("kn", Group::Speed, NAUTICAL_MILE / 3_600.0),
-    metric("m/h", Group::Speed, 1.0 / 3_600.0),
-    metric("m/hr", Group::Speed, 1.0 / 3_600.0),
-    metric("m/s", Group::Speed, 1.0),
-    metric("m/sec", Group::Speed, 1.0),
-    unit("mph", Group::Speed, MILE / 3_600.0),
+/// Unit spellings separated by spaces. Position `i` here is entry `i` of
+/// `UNIT_KINDS` and `UNIT_FACTORS`.
+const UNIT_SYMBOLS: &str = "g sg lbm u ozm grain cwt shweight uk_cwt lcwt hweight stone ton uk_ton LTON brton m mi Nmi in ft yd ang ell ly parsec pc Picapt Pica pica survey_mi yr day d hr mn min sec s Pa p atm at mmHg psi Torr N dyn dy lbf J e c cal eV ev HPh hh Wh wh flb BTU btu HP h PS W w T ga C cel F fah K kel Rank Reau tsp tspm tbs oz cup pt us_pt uk_pt qt uk_qt gal uk_gal l L lt ang3 ang^3 barrel bushel ft3 ft^3 in3 in^3 ly3 ly^3 m3 m^3 mi3 mi^3 yd3 yd^3 Nmi3 Nmi^3 Picapt3 Picapt^3 Pica3 Pica^3 GRT regton MTON uk_acre us_acre ang2 ang^2 ar ft2 ft^2 ha in2 in^2 ly2 ly^2 m2 m^2 Morgen mi2 mi^2 Nmi2 Nmi^2 Picapt2 Picapt^2 Pica2 Pica^2 yd2 yd^2 bit byte admkn kn m/h m/hr m/s m/sec mph";
+
+/// The group, accepted prefixes and prefix power of each unit, packed by `kind`.
+const UNIT_KINDS: [u8; 152] = [
+    kind(Group::Mass, Prefixes::Decimal, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::Decimal, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Mass, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::Decimal, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::Decimal, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::Decimal, 1),
+    kind(Group::Distance, Prefixes::Decimal, 1),
+    kind(Group::Distance, Prefixes::Decimal, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Distance, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::None, 1),
+    kind(Group::Time, Prefixes::Decimal, 1),
+    kind(Group::Time, Prefixes::Decimal, 1),
+    kind(Group::Pressure, Prefixes::Decimal, 1),
+    kind(Group::Pressure, Prefixes::Decimal, 1),
+    kind(Group::Pressure, Prefixes::Decimal, 1),
+    kind(Group::Pressure, Prefixes::Decimal, 1),
+    kind(Group::Pressure, Prefixes::Decimal, 1),
+    kind(Group::Pressure, Prefixes::None, 1),
+    kind(Group::Pressure, Prefixes::None, 1),
+    kind(Group::Force, Prefixes::Decimal, 1),
+    kind(Group::Force, Prefixes::Decimal, 1),
+    kind(Group::Force, Prefixes::Decimal, 1),
+    kind(Group::Force, Prefixes::None, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::None, 1),
+    kind(Group::Energy, Prefixes::None, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::Decimal, 1),
+    kind(Group::Energy, Prefixes::None, 1),
+    kind(Group::Energy, Prefixes::None, 1),
+    kind(Group::Energy, Prefixes::None, 1),
+    kind(Group::Power, Prefixes::None, 1),
+    kind(Group::Power, Prefixes::None, 1),
+    kind(Group::Power, Prefixes::None, 1),
+    kind(Group::Power, Prefixes::Decimal, 1),
+    kind(Group::Power, Prefixes::Decimal, 1),
+    kind(Group::Magnetism, Prefixes::Decimal, 1),
+    kind(Group::Magnetism, Prefixes::Decimal, 1),
+    kind(Group::Temperature, Prefixes::None, 1),
+    kind(Group::Temperature, Prefixes::None, 1),
+    kind(Group::Temperature, Prefixes::None, 1),
+    kind(Group::Temperature, Prefixes::None, 1),
+    kind(Group::Temperature, Prefixes::Decimal, 1),
+    kind(Group::Temperature, Prefixes::Decimal, 1),
+    kind(Group::Temperature, Prefixes::None, 1),
+    kind(Group::Temperature, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::Decimal, 1),
+    kind(Group::Volume, Prefixes::Decimal, 1),
+    kind(Group::Volume, Prefixes::Decimal, 1),
+    kind(Group::Volume, Prefixes::Decimal, 3),
+    kind(Group::Volume, Prefixes::Decimal, 3),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::Decimal, 3),
+    kind(Group::Volume, Prefixes::Decimal, 3),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Volume, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::Decimal, 2),
+    kind(Group::Area, Prefixes::Decimal, 2),
+    kind(Group::Area, Prefixes::Decimal, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::Decimal, 2),
+    kind(Group::Area, Prefixes::Decimal, 2),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Area, Prefixes::None, 1),
+    kind(Group::Information, Prefixes::DecimalAndBinary, 1),
+    kind(Group::Information, Prefixes::DecimalAndBinary, 1),
+    kind(Group::Speed, Prefixes::None, 1),
+    kind(Group::Speed, Prefixes::None, 1),
+    kind(Group::Speed, Prefixes::Decimal, 1),
+    kind(Group::Speed, Prefixes::Decimal, 1),
+    kind(Group::Speed, Prefixes::Decimal, 1),
+    kind(Group::Speed, Prefixes::Decimal, 1),
+    kind(Group::Speed, Prefixes::None, 1),
+];
+
+/// The value of each unit in its group's SI unit. Temperatures convert
+/// with offsets instead; their factor is unused.
+const UNIT_FACTORS: [f64; 152] = [
+    1.0,
+    POUND_FORCE / FOOT * 1_000.0,
+    POUND_GRAMS,
+    1.660_539_066_60e-24,
+    POUND_GRAMS / 16.0,
+    POUND_GRAMS / 7_000.0,
+    POUND_GRAMS * 100.0,
+    POUND_GRAMS * 100.0,
+    POUND_GRAMS * 112.0,
+    POUND_GRAMS * 112.0,
+    POUND_GRAMS * 112.0,
+    POUND_GRAMS * 14.0,
+    POUND_GRAMS * 2_000.0,
+    POUND_GRAMS * 2_240.0,
+    POUND_GRAMS * 2_240.0,
+    POUND_GRAMS * 2_240.0,
+    1.0,
+    MILE,
+    NAUTICAL_MILE,
+    INCH,
+    FOOT,
+    3.0 * FOOT,
+    1e-10,
+    45.0 * INCH,
+    LIGHT_YEAR,
+    PARSEC,
+    PARSEC,
+    PICA_POINT,
+    PICA_POINT,
+    INCH / 6.0,
+    5_280.0 * SURVEY_FOOT,
+    31_557_600.0,
+    86_400.0,
+    86_400.0,
+    3_600.0,
+    60.0,
+    60.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    ATMOSPHERE,
+    ATMOSPHERE,
+    133.322_387_415,
+    POUND_FORCE / (INCH * INCH),
+    ATMOSPHERE / 760.0,
+    1.0,
+    1e-5,
+    1e-5,
+    POUND_FORCE,
+    1.0,
+    1e-7,
+    4.184,
+    4.186_8,
+    1.602_176_634e-19,
+    1.602_176_634e-19,
+    HORSEPOWER * 3_600.0,
+    HORSEPOWER * 3_600.0,
+    3_600.0,
+    3_600.0,
+    FOOT * POUND_FORCE,
+    1_055.055_852_62,
+    1_055.055_852_62,
+    HORSEPOWER,
+    HORSEPOWER,
+    735.498_75,
+    1.0,
+    1.0,
+    1.0,
+    1e-4,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    US_GALLON / 768.0,
+    5e-6,
+    US_GALLON / 256.0,
+    US_GALLON / 128.0,
+    US_GALLON / 16.0,
+    US_GALLON / 8.0,
+    US_GALLON / 8.0,
+    UK_GALLON / 8.0,
+    US_GALLON / 4.0,
+    UK_GALLON / 4.0,
+    US_GALLON,
+    UK_GALLON,
+    1e-3,
+    1e-3,
+    1e-3,
+    1e-30,
+    1e-30,
+    42.0 * US_GALLON,
+    0.035_239_070_166_88,
+    FOOT * FOOT * FOOT,
+    FOOT * FOOT * FOOT,
+    INCH * INCH * INCH,
+    INCH * INCH * INCH,
+    LIGHT_YEAR * LIGHT_YEAR * LIGHT_YEAR,
+    LIGHT_YEAR * LIGHT_YEAR * LIGHT_YEAR,
+    1.0,
+    1.0,
+    MILE * MILE * MILE,
+    MILE * MILE * MILE,
+    27.0 * FOOT * FOOT * FOOT,
+    27.0 * FOOT * FOOT * FOOT,
+    NAUTICAL_MILE * NAUTICAL_MILE * NAUTICAL_MILE,
+    NAUTICAL_MILE * NAUTICAL_MILE * NAUTICAL_MILE,
+    PICA_POINT * PICA_POINT * PICA_POINT,
+    PICA_POINT * PICA_POINT * PICA_POINT,
+    PICA_POINT * PICA_POINT * PICA_POINT,
+    PICA_POINT * PICA_POINT * PICA_POINT,
+    100.0 * FOOT * FOOT * FOOT,
+    100.0 * FOOT * FOOT * FOOT,
+    40.0 * FOOT * FOOT * FOOT,
+    4_840.0 * 9.0 * FOOT * FOOT,
+    43_560.0 * SURVEY_FOOT * SURVEY_FOOT,
+    1e-20,
+    1e-20,
+    100.0,
+    FOOT * FOOT,
+    FOOT * FOOT,
+    10_000.0,
+    INCH * INCH,
+    INCH * INCH,
+    LIGHT_YEAR * LIGHT_YEAR,
+    LIGHT_YEAR * LIGHT_YEAR,
+    1.0,
+    1.0,
+    2_500.0,
+    MILE * MILE,
+    MILE * MILE,
+    NAUTICAL_MILE * NAUTICAL_MILE,
+    NAUTICAL_MILE * NAUTICAL_MILE,
+    PICA_POINT * PICA_POINT,
+    PICA_POINT * PICA_POINT,
+    PICA_POINT * PICA_POINT,
+    PICA_POINT * PICA_POINT,
+    9.0 * FOOT * FOOT,
+    9.0 * FOOT * FOOT,
+    1.0,
+    8.0,
+    6_080.0 * FOOT / 3_600.0,
+    NAUTICAL_MILE / 3_600.0,
+    1.0 / 3_600.0,
+    1.0 / 3_600.0,
+    1.0,
+    1.0,
+    MILE / 3_600.0,
 ];
 
 const DECIMAL_PREFIXES: &[(&str, f64)] = &[
@@ -327,8 +430,16 @@ const REAUMUR_SCALE: f64 = 0.8;
 
 /// A unit spelling with its prefix multiplier.
 struct Resolved {
-    unit: &'static Unit,
+    symbol: &'static str,
+    kind: u8,
+    factor: f64,
     scale: f64,
+}
+
+impl Resolved {
+    fn group(&self) -> u8 {
+        self.kind & GROUP_MASK
+    }
 }
 
 pub(crate) fn evaluate(_name: &str, values: &FuncAccumulator) -> EvalResult {
@@ -341,47 +452,61 @@ fn convert(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     let from = resolve(&text_arg(values, 1, None)?).ok_or(FormulaError::Na)?;
     let to = resolve(&text_arg(values, 2, None)?).ok_or(FormulaError::Na)?;
 
-    if from.unit.group != to.unit.group {
+    if from.group() != to.group() {
         return Err(FormulaError::Na);
     }
 
-    if from.unit.group == Group::Temperature {
-        let kelvins = to_kelvin(number * from.scale, from.unit.symbol);
+    if from.group() == Group::Temperature as u8 {
+        let kelvins = to_kelvin(number * from.scale, from.symbol);
 
-        return Ok(from_kelvin(kelvins, to.unit.symbol) / to.scale);
+        return Ok(from_kelvin(kelvins, to.symbol) / to.scale);
     }
 
-    Ok(number * (from.unit.factor * from.scale) / (to.unit.factor * to.scale))
+    Ok(number * (from.factor * from.scale) / (to.factor * to.scale))
 }
 
 /// The unit for an exact spelling, or a prefix followed by a unit that
 /// accepts it. Spellings are case-sensitive.
 fn resolve(spelling: &str) -> Option<Resolved> {
-    if let Some(unit) = find(spelling) {
-        return Some(Resolved { unit, scale: 1.0 });
+    if let Some(unit) = find(spelling, 1.0) {
+        return Some(unit);
     }
 
     let binary = BINARY_PREFIXES.iter().find_map(|&(prefix, multiplier)| {
-        let unit = find(spelling.strip_prefix(prefix)?)?;
-        (unit.prefixes == Prefixes::DecimalAndBinary).then_some(Resolved {
-            unit,
-            scale: multiplier,
-        })
+        let unit = find(spelling.strip_prefix(prefix)?, multiplier)?;
+        let prefixes = unit.kind >> PREFIX_SHIFT & PREFIX_MASK;
+
+        (prefixes == Prefixes::DecimalAndBinary as u8).then_some(unit)
     });
 
     binary.or_else(|| {
         DECIMAL_PREFIXES.iter().find_map(|&(prefix, multiplier)| {
-            let unit = find(spelling.strip_prefix(prefix)?)?;
-            (unit.prefixes != Prefixes::None).then(|| Resolved {
-                unit,
-                scale: multiplier.powi(unit.power),
-            })
+            let mut unit = find(spelling.strip_prefix(prefix)?, 1.0)?;
+            let prefixes = unit.kind >> PREFIX_SHIFT & PREFIX_MASK;
+
+            if prefixes == Prefixes::None as u8 {
+                return None;
+            }
+
+            unit.scale = multiplier.powi(i32::from(unit.kind >> POWER_SHIFT));
+
+            Some(unit)
         })
     })
 }
 
-fn find(symbol: &str) -> Option<&'static Unit> {
-    UNITS.iter().find(|unit| unit.symbol == symbol)
+fn find(symbol: &str, scale: f64) -> Option<Resolved> {
+    let (index, symbol) = UNIT_SYMBOLS
+        .split(' ')
+        .enumerate()
+        .find(|&(_, candidate)| candidate == symbol)?;
+
+    Some(Resolved {
+        symbol,
+        kind: UNIT_KINDS[index],
+        factor: UNIT_FACTORS[index],
+        scale,
+    })
 }
 
 /// Converting through Celsius keeps exact results such as 68 F = 20 C.
@@ -492,14 +617,15 @@ mod tests {
     }
 
     #[test]
-    fn every_spelling_is_unique() {
-        for (index, unit) in UNITS.iter().enumerate() {
+    fn every_spelling_is_unique_and_has_one_entry() {
+        let symbols: Vec<&str> = UNIT_SYMBOLS.split(' ').collect();
+
+        assert_eq!(symbols.len(), UNIT_KINDS.len());
+
+        for (index, symbol) in symbols.iter().enumerate() {
             assert!(
-                UNITS[index + 1..]
-                    .iter()
-                    .all(|other| other.symbol != unit.symbol),
-                "{} is listed twice",
-                unit.symbol
+                !symbols[index + 1..].contains(symbol),
+                "{symbol} is listed twice"
             );
         }
     }

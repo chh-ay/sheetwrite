@@ -62,68 +62,80 @@ fn calculate(name: &str, values: &FuncAccumulator) -> Result<f64, FormulaError> 
 }
 
 fn j0(x: f64) -> f64 {
-    let magnitude = x.abs();
-
-    if magnitude < RATIONAL_LIMIT {
-        let y = x * x;
-        let numerator = 57_568_490_574.0
-            + y * (-13_362_590_354.0
-                + y * (651_619_640.7
-                    + y * (-11_214_424.18 + y * (77_392.330_17 + y * -184.905_245_6))));
-        let denominator = 57_568_490_411.0
-            + y * (1_029_532_985.0
-                + y * (9_494_680.718 + y * (59_272.648_53 + y * (267.853_271_2 + y))));
-
-        return numerator / denominator;
+    if x.abs() >= RATIONAL_LIMIT {
+        return asymptotic(x.abs(), 0, false);
     }
 
-    let z = RATIONAL_LIMIT / magnitude;
-    let y = z * z;
-    let phase = magnitude - QUARTER_PI;
-    let cosine_part = 1.0
-        + y * (-0.109_862_862_7e-2
-            + y * (0.273_451_040_7e-4 + y * (-0.207_337_063_9e-5 + y * 0.209_388_721_1e-6)));
-    let sine_part = -0.156_249_999_5e-1
-        + y * (0.143_048_876_5e-3
-            + y * (-0.691_114_765_1e-5 + y * (0.762_109_516_1e-6 - y * 0.934_935_152e-7)));
+    let y = x * x;
+    let numerator = 57_568_490_574.0
+        + y * (-13_362_590_354.0
+            + y * (651_619_640.7
+                + y * (-11_214_424.18 + y * (77_392.330_17 + y * -184.905_245_6))));
+    let denominator = 57_568_490_411.0
+        + y * (1_029_532_985.0
+            + y * (9_494_680.718 + y * (59_272.648_53 + y * (267.853_271_2 + y))));
 
-    (TWO_OVER_PI / magnitude).sqrt() * (phase.cos() * cosine_part - z * phase.sin() * sine_part)
+    numerator / denominator
 }
 
 fn j1(x: f64) -> f64 {
-    let magnitude = x.abs();
-
-    if magnitude < RATIONAL_LIMIT {
-        let y = x * x;
-        let numerator = x
-            * (72_362_614_232.0
-                + y * (-7_895_059_235.0
-                    + y * (242_396_853.1
-                        + y * (-2_972_611.439 + y * (15_704.482_60 + y * -30.160_366_06)))));
-        let denominator = 144_725_228_442.0
-            + y * (2_300_535_178.0
-                + y * (18_583_304.74 + y * (99_447.433_94 + y * (376.999_139_7 + y))));
-
-        return numerator / denominator;
+    if x.abs() >= RATIONAL_LIMIT {
+        return asymptotic(x.abs(), 1, false).copysign(x);
     }
 
-    let z = RATIONAL_LIMIT / magnitude;
+    let y = x * x;
+    let numerator = x
+        * (72_362_614_232.0
+            + y * (-7_895_059_235.0
+                + y * (242_396_853.1
+                    + y * (-2_972_611.439 + y * (15_704.482_60 + y * -30.160_366_06)))));
+    let denominator = 144_725_228_442.0
+        + y * (2_300_535_178.0
+            + y * (18_583_304.74 + y * (99_447.433_94 + y * (376.999_139_7 + y))));
+
+    numerator / denominator
+}
+
+/// J and Y of order 0 or 1 for x >= 8: sqrt(2 / (pi x)) times a phase
+/// combination of the polynomials P and Q in (8 / x)^2, which J and Y share.
+/// Numerical Recipes prints the last Q coefficient of order 0 as
+/// 0.934935152E-7 for J and 0.934945152E-7 for Y. Both use the first, which
+/// moves Y_0 by less than 1E-11.
+fn asymptotic(x: f64, order: u32, is_second_kind: bool) -> f64 {
+    let z = RATIONAL_LIMIT / x;
     let y = z * z;
-    let phase = magnitude - THREE_QUARTER_PI;
-    let cosine_part = 1.0
-        + y * (0.183_105e-2
-            + y * (-0.351_639_649_6e-4 + y * (0.245_752_017_4e-5 + y * -0.240_337_019e-6)));
-    let sine_part = 0.046_874_999_95
-        + y * (-0.200_269_087_3e-3
-            + y * (0.844_919_909_6e-5 + y * (-0.882_289_87e-6 + y * 0.105_787_412e-6)));
-    let result = (TWO_OVER_PI / magnitude).sqrt()
-        * (phase.cos() * cosine_part - z * phase.sin() * sine_part);
 
-    if x < 0.0 {
-        -result
+    let (phase, p, q) = if order == 0 {
+        (
+            x - QUARTER_PI,
+            1.0 + y
+                * (-0.109_862_862_7e-2
+                    + y * (0.273_451_040_7e-4
+                        + y * (-0.207_337_063_9e-5 + y * 0.209_388_721_1e-6))),
+            -0.156_249_999_5e-1
+                + y * (0.143_048_876_5e-3
+                    + y * (-0.691_114_765_1e-5 + y * (0.762_109_516_1e-6 - y * 0.934_935_152e-7))),
+        )
     } else {
-        result
-    }
+        (
+            x - THREE_QUARTER_PI,
+            1.0 + y
+                * (0.183_105e-2
+                    + y * (-0.351_639_649_6e-4 + y * (0.245_752_017_4e-5 + y * -0.240_337_019e-6))),
+            0.046_874_999_95
+                + y * (-0.200_269_087_3e-3
+                    + y * (0.844_919_909_6e-5 + y * (-0.882_289_87e-6 + y * 0.105_787_412e-6))),
+        )
+    };
+
+    let (sine, cosine) = (phase.sin(), phase.cos());
+    let combination = if is_second_kind {
+        sine * p + z * cosine * q
+    } else {
+        cosine * p - z * sine * q
+    };
+
+    (TWO_OVER_PI / x).sqrt() * combination
 }
 
 /// J_n(x). Above the order, the upward recurrence is stable; below it,
@@ -199,61 +211,38 @@ fn miller_j(order: u32, twice_inverse: f64) -> f64 {
 }
 
 fn y0(x: f64) -> f64 {
-    if x < RATIONAL_LIMIT {
-        let y = x * x;
-        let numerator = -2_957_821_389.0
-            + y * (7_062_834_065.0
-                + y * (-512_359_803.6
-                    + y * (10_879_881.29 + y * (-86_327.927_57 + y * 228.462_273_3))));
-        let denominator = 40_076_544_269.0
-            + y * (745_249_964.8
-                + y * (7_189_466.438 + y * (47_447.264_70 + y * (226.103_024_4 + y))));
-
-        return numerator / denominator + TWO_OVER_PI * j0(x) * x.ln();
+    if x >= RATIONAL_LIMIT {
+        return asymptotic(x, 0, true);
     }
 
-    let z = RATIONAL_LIMIT / x;
-    let y = z * z;
-    let phase = x - QUARTER_PI;
-    let sine_part = 1.0
-        + y * (-0.109_862_862_7e-2
-            + y * (0.273_451_040_7e-4 + y * (-0.207_337_063_9e-5 + y * 0.209_388_721_1e-6)));
-    let cosine_part = -0.156_249_999_5e-1
-        + y * (0.143_048_876_5e-3
-            + y * (-0.691_114_765_1e-5 + y * (0.762_109_516_1e-6 + y * -0.934_945_152e-7)));
+    let y = x * x;
+    let numerator = -2_957_821_389.0
+        + y * (7_062_834_065.0
+            + y * (-512_359_803.6
+                + y * (10_879_881.29 + y * (-86_327.927_57 + y * 228.462_273_3))));
+    let denominator = 40_076_544_269.0
+        + y * (745_249_964.8 + y * (7_189_466.438 + y * (47_447.264_70 + y * (226.103_024_4 + y))));
 
-    (TWO_OVER_PI / x).sqrt() * (phase.sin() * sine_part + z * phase.cos() * cosine_part)
+    numerator / denominator + TWO_OVER_PI * j0(x) * x.ln()
 }
 
 fn y1(x: f64) -> f64 {
-    if x < RATIONAL_LIMIT {
-        let y = x * x;
-        let numerator = x
-            * (-0.490_060_494_3e13
-                + y * (0.127_527_439_0e13
-                    + y * (-0.515_343_813_9e11
-                        + y * (0.734_926_455_1e9
-                            + y * (-0.423_792_272_6e7 + y * 0.851_193_793_5e4)))));
-        let denominator = 0.249_958_057_0e14
-            + y * (0.424_441_966_4e12
-                + y * (0.373_365_036_7e10
-                    + y * (0.224_590_400_2e8
-                        + y * (0.102_042_605_0e6 + y * (0.354_963_288_5e3 + y)))));
-
-        return numerator / denominator + TWO_OVER_PI * (j1(x) * x.ln() - 1.0 / x);
+    if x >= RATIONAL_LIMIT {
+        return asymptotic(x, 1, true);
     }
 
-    let z = RATIONAL_LIMIT / x;
-    let y = z * z;
-    let phase = x - THREE_QUARTER_PI;
-    let sine_part = 1.0
-        + y * (0.183_105e-2
-            + y * (-0.351_639_649_6e-4 + y * (0.245_752_017_4e-5 + y * -0.240_337_019e-6)));
-    let cosine_part = 0.046_874_999_95
-        + y * (-0.200_269_087_3e-3
-            + y * (0.844_919_909_6e-5 + y * (-0.882_289_87e-6 + y * 0.105_787_412e-6)));
+    let y = x * x;
+    let numerator = x
+        * (-0.490_060_494_3e13
+            + y * (0.127_527_439_0e13
+                + y * (-0.515_343_813_9e11
+                    + y * (0.734_926_455_1e9 + y * (-0.423_792_272_6e7 + y * 0.851_193_793_5e4)))));
+    let denominator = 0.249_958_057_0e14
+        + y * (0.424_441_966_4e12
+            + y * (0.373_365_036_7e10
+                + y * (0.224_590_400_2e8 + y * (0.102_042_605_0e6 + y * (0.354_963_288_5e3 + y)))));
 
-    (TWO_OVER_PI / x).sqrt() * (phase.sin() * sine_part + z * phase.cos() * cosine_part)
+    numerator / denominator + TWO_OVER_PI * (j1(x) * x.ln() - 1.0 / x)
 }
 
 /// Y_n(x) for x > 0, by the upward recurrence from Y_0 and Y_1.

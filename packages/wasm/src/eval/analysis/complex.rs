@@ -61,8 +61,10 @@ impl Complex {
         self.re == 0.0 && self.im == 0.0
     }
 
+    /// sqrt(re^2 + im^2). The engine already carries `sqrt`, while `hypot`
+    /// would add its own routine for parts above 1E154.
     fn modulus(self) -> f64 {
-        self.re.hypot(self.im)
+        (self.re * self.re + self.im * self.im).sqrt()
     }
 
     fn argument(self) -> f64 {
@@ -117,32 +119,30 @@ impl Complex {
         Ok(Self::new(self.modulus().ln(), self.argument()))
     }
 
+    /// sin(a + bi) = sin a cosh b + i cos a sinh b.
     fn sin(self) -> Self {
-        Self::new(
-            self.re.sin() * self.im.cosh(),
-            self.re.cos() * self.im.sinh(),
-        )
+        let (sinh, cosh) = hyperbolic(self.im);
+
+        Self::new(self.re.sin() * cosh, self.re.cos() * sinh)
     }
 
+    /// cos(a + bi) = cos a cosh b - i sin a sinh b.
     fn cos(self) -> Self {
-        Self::new(
-            self.re.cos() * self.im.cosh(),
-            -self.re.sin() * self.im.sinh(),
-        )
+        let (sinh, cosh) = hyperbolic(self.im);
+
+        Self::new(self.re.cos() * cosh, -self.re.sin() * sinh)
     }
 
+    /// sinh z = -i sin(iz).
     fn sinh(self) -> Self {
-        Self::new(
-            self.re.sinh() * self.im.cos(),
-            self.re.cosh() * self.im.sin(),
-        )
+        let rotated = Self::new(-self.im, self.re).sin();
+
+        Self::new(rotated.im, -rotated.re)
     }
 
+    /// cosh z = cos(iz).
     fn cosh(self) -> Self {
-        Self::new(
-            self.re.cosh() * self.im.cos(),
-            self.re.sinh() * self.im.sin(),
-        )
+        Self::new(-self.im, self.re).cos()
     }
 
     /// Polar form: |z|^n (cos n arg z + i sin n arg z).
@@ -164,6 +164,15 @@ impl Complex {
     fn is_finite(self) -> bool {
         self.re.is_finite() && self.im.is_finite()
     }
+}
+
+/// sinh x and cosh x from `exp_m1`, which keeps sinh precise near zero and
+/// is already in the engine.
+fn hyperbolic(x: f64) -> (f64, f64) {
+    let up = x.exp_m1();
+    let down = (-x).exp_m1();
+
+    ((up - down) / 2.0, (up + down) / 2.0 + 1.0)
 }
 
 /// The imaginary unit suffix that the arguments of one call use.
