@@ -1,14 +1,14 @@
 ---
 title: "HistoryVersion | @sheetwrite/core/history"
-description: "HistoryVersion interface in @sheetwrite/core/history: Named or automatically created durable revision marker."
+description: "HistoryVersion interface in @sheetwrite/core/history: A durable marker at one archived revision."
 ---
 <!-- api-export:@sheetwrite/core|./history|HistoryVersion -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Named or automatically created durable revision marker.
+A durable marker at one archived revision.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L32"><code>packages/core/src/version-history/types.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L52"><code>packages/core/src/version-history/types.ts#L52</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -27,7 +27,7 @@ Named or automatically created durable revision marker.
 <div class="api-member-list">
 
 <details class="api-member" id="history-version-id" data-pagefind-weight="1">
-<summary><code>id</code></summary>
+<summary><code>id</code> <span class="api-member-summary">Content ID of the marker fields.</span></summary>
 
 ```ts generated
 id: string;
@@ -54,7 +54,7 @@ kind: "named" | "automatic";
 </details>
 
 <details class="api-member" id="history-version-name" data-pagefind-weight="1">
-<summary><code>name</code></summary>
+<summary><code>name</code> <span class="api-member-summary">Present on named versions.</span></summary>
 
 ```ts generated
 name?: string;
@@ -63,7 +63,7 @@ name?: string;
 </details>
 
 <details class="api-member" id="history-version-author-id" data-pagefind-weight="1">
-<summary><code>authorId</code></summary>
+<summary><code>authorId</code> <span class="api-member-summary">Who saved a named version, or who made the last change of an automatic one.</span></summary>
 
 ```ts generated
 authorId: string;
@@ -81,7 +81,7 @@ time: number;
 </details>
 
 <details class="api-member" id="history-version-checkpoint" data-pagefind-weight="1">
-<summary><code>checkpoint</code></summary>
+<summary><code>checkpoint</code> <span class="api-member-summary">Record ID of the checkpoint the version rebuilds from.</span></summary>
 
 ```ts generated
 checkpoint: string;
@@ -90,7 +90,7 @@ checkpoint: string;
 </details>
 
 <details class="api-member" id="history-version-tail" data-pagefind-weight="1">
-<summary><code>tail</code></summary>
+<summary><code>tail</code> <span class="api-member-summary">Transaction envelope IDs applied after the checkpoint, in order.</span></summary>
 
 ```ts generated
 tail: readonly string[];

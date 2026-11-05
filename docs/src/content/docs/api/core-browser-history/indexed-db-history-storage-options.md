@@ -8,7 +8,7 @@ description: "IndexedDbHistoryStorageOptions interface in @sheetwrite/core/brows
 Database selection for a host-owned browser history archive.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-indexeddb.ts#L19"><code>packages/core/src/history-indexeddb.ts#L19</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-indexeddb.ts#L35"><code>packages/core/src/history-indexeddb.ts#L35</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -16,7 +16,7 @@ Database selection for a host-owned browser history archive.
 <div class="api-member-list">
 
 <details class="api-member" id="indexed-db-history-storage-options-database-name" data-pagefind-weight="1">
-<summary><code>databaseName</code></summary>
+<summary><code>databaseName</code> <span class="api-member-summary">Database name; defaults to sheetwrite-history.</span></summary>
 
 ```ts generated
 databaseName?: string;
@@ -25,7 +25,7 @@ databaseName?: string;
 </details>
 
 <details class="api-member" id="indexed-db-history-storage-options-indexed-db" data-pagefind-weight="1">
-<summary><code>indexedDB</code></summary>
+<summary><code>indexedDB</code> <span class="api-member-summary">IndexedDB factory; defaults to globalThis.indexedDB.</span></summary>
 
 ```ts generated
 indexedDB?: IDBFactory;

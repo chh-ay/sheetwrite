@@ -8133,9 +8133,9 @@
               "owners": [
                 "src/history-indexeddb.ts"
               ],
-              "source": "src/history-indexeddb.ts#L156",
+              "source": "src/history-indexeddb.ts#L159",
               "jsDocTags": [],
-              "documentation": "Browser-only history storage with atomic publication and restart-safe reference counts.",
+              "documentation": "Browser history storage. Import it from `@sheetwrite/core/browser/history`.\nEach call opens the database, runs one readwrite transaction over every\nstore, and closes the connection, so publication and reference counts are\natomic across restarts and tabs.",
               "memberDocs": []
             },
             {
@@ -8145,10 +8145,19 @@
               "owners": [
                 "src/history-indexeddb.ts"
               ],
-              "source": "src/history-indexeddb.ts#L19",
+              "source": "src/history-indexeddb.ts#L35",
               "jsDocTags": [],
               "documentation": "Database selection for a host-owned browser history archive.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "databaseName",
+                  "documentation": "Database name; defaults to `sheetwrite-history`."
+                },
+                {
+                  "name": "indexedDB",
+                  "documentation": "IndexedDB factory; defaults to `globalThis.indexedDB`."
+                }
+              ]
             }
           ]
         },
@@ -8393,57 +8402,57 @@
               "owners": [
                 "src/version-history/codec.ts"
               ],
-              "source": "src/version-history/codec.ts#L28",
+              "source": "src/version-history/codec.ts#L70",
               "jsDocTags": [],
-              "documentation": "Default byte, count, cadence, and retention bounds.",
+              "documentation": "Default byte, count, cadence, and retention bounds (decision recorded in #228).",
               "memberDocs": []
             },
             {
               "name": "HistoryArchive",
               "kind": "class",
-              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: { maxEntries?: number; maxBytes?: number; cursor?: string; signal?: AbortSignal; }) => Promise<HistoryListPage>; prune: (options?: { beforeTime?: number; targetBytes?: number; signal?: AbortSignal; }) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
+              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
               "owners": [
                 "src/history-archive.ts"
               ],
-              "source": "src/history-archive.ts#L196",
+              "source": "src/history-archive.ts#L358",
               "jsDocTags": [],
-              "documentation": "Opt-in, bounded history writer and replay module. The default grid never constructs it.",
+              "documentation": "Opt-in archive of named and automatic versions for one document. It stores\ncontent-addressed checkpoints plus the committed transactions since each\none, through a host `HistoryStorageAdapter`. A grid that never imports this\nmodule has no history state.\n\nCalls that change the archive run one at a time. Each publishes atomically,\nso a failure or abort leaves the last durable version readable.",
               "memberDocs": [
                 {
                   "name": "deleteVersion",
-                  "documentation": "Explicitly delete a marker; shared checkpoint pages remain while another owner needs them."
+                  "documentation": "Delete one version. Records it shares with other versions stay."
                 },
                 {
                   "name": "initialize",
-                  "documentation": "Persist the initial content-addressed checkpoint of a fully loaded committed document."
+                  "documentation": "Store the first checkpoint: a complete, committed snapshot of the document at `time`."
                 },
                 {
                   "name": "listVersions",
-                  "documentation": "Read a bounded newest-first metadata page without constructing a historical store."
+                  "documentation": "One bounded page of version metadata, newest first."
                 },
                 {
                   "name": "open",
-                  "documentation": "Open only the durable metadata cursor; this does not hydrate a workbook."
+                  "documentation": "Open an archive by reading its manifest only; no workbook is loaded."
                 },
                 {
                   "name": "prune",
-                  "documentation": "Expire automatic markers while keeping named versions and every referenced chunk."
+                  "documentation": "Remove automatic versions made at or before `beforeTime` (default: the age\nceiling) and, oldest first, while the archive is above `targetBytes`.\nNamed versions and every record they need stay."
                 },
                 {
                   "name": "readVersion",
-                  "documentation": "Reconstruct one committed version in isolation and dispose the replay store on every exit."
+                  "documentation": "Rebuild the document of one version. A reader lease keeps its records\nalive while a concurrent prune runs; the lease is released on every exit."
                 },
                 {
                   "name": "record",
-                  "documentation": "Archive one authority-confirmed transaction and checkpoint only when cadence requires it."
+                  "documentation": "Append one committed transaction. `capture` runs only when a checkpoint is\ndue and must return the committed document at `commit.revision`. An\nautomatic version is made after `automaticIntervalMs` of active time."
                 },
                 {
                   "name": "saveVersion",
-                  "documentation": "Name the durable head. Optimistic local operations must be flushed by the host first."
+                  "documentation": "Name the archived head. The host flushes pending edits first, so the name covers them."
                 },
                 {
                   "name": "storageUsage",
-                  "documentation": "Read aggregate retained storage without fetching payload bytes."
+                  "documentation": "Retained bytes and counts, read from the manifest without fetching any payload."
                 }
               ]
             },
@@ -8454,7 +8463,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L158",
+              "source": "src/version-history/types.ts#L194",
               "jsDocTags": [],
               "documentation": "Host-controlled archive configuration. No history is created until explicitly opened.",
               "memberDocs": []
@@ -8466,10 +8475,35 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L22",
+              "source": "src/version-history/types.ts#L36",
               "jsDocTags": [],
-              "documentation": "One authority-confirmed transaction, never an optimistic local change.",
-              "memberDocs": []
+              "documentation": "One committed transaction, confirmed by the document authority; never an optimistic local edit.",
+              "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person who made the change, at most 256 code units."
+                },
+                {
+                  "name": "baseRevision",
+                  "documentation": "Revision the transaction applies to; equals the archive head."
+                },
+                {
+                  "name": "mutationId",
+                  "documentation": "Stable mutation ID from the commit, at most 256 code units."
+                },
+                {
+                  "name": "operations",
+                  "documentation": "The committed document operations, in order."
+                },
+                {
+                  "name": "revision",
+                  "documentation": "Revision after the transaction; an atomic batch can advance up to 16 revisions."
+                },
+                {
+                  "name": "time",
+                  "documentation": "Commit time in milliseconds since the epoch; never before the previous commit."
+                }
+              ]
             },
             {
               "name": "HistoryError",
@@ -8478,7 +8512,7 @@
               "owners": [
                 "src/version-history/codec.ts"
               ],
-              "source": "src/version-history/codec.ts#L18",
+              "source": "src/version-history/codec.ts#L60",
               "jsDocTags": [],
               "documentation": "Expected archive failure; cancellation preserves the caller's abort reason.",
               "memberDocs": []
@@ -8490,7 +8524,7 @@
               "owners": [
                 "src/version-history/codec.ts"
               ],
-              "source": "src/version-history/codec.ts#L7",
+              "source": "src/version-history/codec.ts#L49",
               "jsDocTags": [],
               "documentation": "Stable failure category for history validation, storage, and replay.",
               "memberDocs": []
@@ -8502,7 +8536,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L108",
+              "source": "src/version-history/types.ts#L144",
               "jsDocTags": [],
               "documentation": "Fetch metadata or a bounded immutable payload; leased reads renew their lease.",
               "memberDocs": []
@@ -8514,10 +8548,35 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L55",
+              "source": "src/version-history/types.ts#L84",
               "jsDocTags": [],
-              "documentation": "Durable recorder cursor. It does not retain operation payloads.",
-              "memberDocs": []
+              "documentation": "Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.",
+              "memberDocs": [
+                {
+                  "name": "activeMs",
+                  "documentation": "Active editing time since the baseline; idle gaps count as at most one automatic interval."
+                },
+                {
+                  "name": "automaticAt",
+                  "documentation": "`activeMs` at the last automatic version."
+                },
+                {
+                  "name": "checkpointAt",
+                  "documentation": "`activeMs` at the last checkpoint."
+                },
+                {
+                  "name": "checkpointLogBytes",
+                  "documentation": "Encoded operation bytes since the last checkpoint."
+                },
+                {
+                  "name": "checkpointTransactions",
+                  "documentation": "Transactions since the last checkpoint."
+                },
+                {
+                  "name": "time",
+                  "documentation": "Time of the last archived commit."
+                }
+              ]
             },
             {
               "name": "HistoryLimits",
@@ -8529,7 +8588,64 @@
               "source": "src/version-history/types.ts#L4",
               "jsDocTags": [],
               "documentation": "Resource and retention ceilings for an opt-in history archive.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "automaticIntervalMs",
+                  "documentation": "Active time between automatic versions; defaults to 5 minutes."
+                },
+                {
+                  "name": "checkpointIntervalMs",
+                  "documentation": "Active time between checkpoints; defaults to 30 minutes."
+                },
+                {
+                  "name": "checkpointLogBytes",
+                  "documentation": "Encoded log bytes between checkpoints; defaults to 2 MiB."
+                },
+                {
+                  "name": "checkpointTransactions",
+                  "documentation": "Transactions between checkpoints; defaults to 1,000."
+                },
+                {
+                  "name": "maxAgeMs",
+                  "documentation": "Age after which automatic versions expire; defaults to 30 days."
+                },
+                {
+                  "name": "maxNamedVersions",
+                  "documentation": "Named versions per document; defaults to 100."
+                },
+                {
+                  "name": "maxPageBytes",
+                  "documentation": "JSON bytes of one metadata page; defaults to 256 KiB."
+                },
+                {
+                  "name": "maxPageEntries",
+                  "documentation": "Entries in one metadata page; defaults to 100."
+                },
+                {
+                  "name": "maxSegmentBytes",
+                  "documentation": "Decoded bytes of one log segment; defaults to 1 MiB."
+                },
+                {
+                  "name": "maxSnapshotBytes",
+                  "documentation": "Encoded bytes of one checkpoint snapshot or one record; defaults to 64 MiB."
+                },
+                {
+                  "name": "maxStorageBytes",
+                  "documentation": "Retained bytes per document, including headers and index entries; defaults to 512 MiB."
+                },
+                {
+                  "name": "maxTransactionBytes",
+                  "documentation": "Encoded operation bytes of one archived transaction; defaults to and cannot exceed 64 MiB."
+                },
+                {
+                  "name": "maxVersions",
+                  "documentation": "Named and automatic versions per document; defaults to 10,000."
+                },
+                {
+                  "name": "maxWorkingBytes",
+                  "documentation": "Working-set reservation for one capture, decode or replay; defaults to 256 MiB."
+                }
+              ]
             },
             {
               "name": "HistoryListPage",
@@ -8538,7 +8654,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L134",
+              "source": "src/version-history/types.ts#L170",
               "jsDocTags": [],
               "documentation": "Metadata-only response in newest-first order.",
               "memberDocs": []
@@ -8550,7 +8666,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L124",
+              "source": "src/version-history/types.ts#L160",
               "jsDocTags": [],
               "documentation": "Bounded metadata-only page. Cursors are scoped to a manifest generation.",
               "memberDocs": []
@@ -8562,10 +8678,15 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L76",
+              "source": "src/version-history/types.ts#L111",
               "jsDocTags": [],
-              "documentation": "Manifest state returned without fetching a workbook payload.",
-              "memberDocs": []
+              "documentation": "Archive state, read without fetching any payload.",
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "Increases on each publication or prune; writers compare it to detect a concurrent writer."
+                }
+              ]
             },
             {
               "name": "HistoryPinRequest",
@@ -8574,7 +8695,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L98",
+              "source": "src/version-history/types.ts#L134",
               "jsDocTags": [],
               "documentation": "Acquire or release a five-minute renewable reader lease through the storage seam.",
               "memberDocs": []
@@ -8586,7 +8707,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L142",
+              "source": "src/version-history/types.ts#L178",
               "jsDocTags": [],
               "documentation": "Retention removes automatic markers, or one explicitly selected named marker.",
               "memberDocs": []
@@ -8598,7 +8719,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L89",
+              "source": "src/version-history/types.ts#L125",
               "jsDocTags": [],
               "documentation": "Atomically publish immutable records and a new head or version marker.",
               "memberDocs": []
@@ -8610,7 +8731,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L105",
+              "source": "src/version-history/types.ts#L141",
               "jsDocTags": [],
               "documentation": "A storage write either publishes one complete revision or manages a reader lease.",
               "memberDocs": []
@@ -8622,7 +8743,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L116",
+              "source": "src/version-history/types.ts#L152",
               "jsDocTags": [],
               "documentation": "Metadata for one immutable record; listings never return payload bytes.",
               "memberDocs": []
@@ -8634,7 +8755,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L165",
+              "source": "src/version-history/types.ts#L201",
               "jsDocTags": [],
               "documentation": "Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.",
               "memberDocs": []
@@ -8646,7 +8767,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L150",
+              "source": "src/version-history/types.ts#L186",
               "jsDocTags": [],
               "documentation": "Atomic storage seam for local databases and host-owned history backends.",
               "memberDocs": []
@@ -8658,7 +8779,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L82",
+              "source": "src/version-history/types.ts#L118",
               "jsDocTags": [],
               "documentation": "Common document identity, ceilings, and cancellation for adapter calls.",
               "memberDocs": []
@@ -8670,9 +8791,9 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L68",
+              "source": "src/version-history/types.ts#L103",
               "jsDocTags": [],
-              "documentation": "Aggregate retained storage, including index and reference metadata.",
+              "documentation": "Retained storage of one document, including headers and index entries.",
               "memberDocs": []
             },
             {
@@ -8682,10 +8803,27 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L44",
+              "source": "src/version-history/types.ts#L69",
               "jsDocTags": [],
-              "documentation": "Immutable, content-addressed history payload and its dependency edges.",
-              "memberDocs": []
+              "documentation": "Immutable, content-addressed history payload and the records it refers to.",
+              "memberDocs": [
+                {
+                  "name": "bytes",
+                  "documentation": "Deflate-compressed payload."
+                },
+                {
+                  "name": "decodedBytes",
+                  "documentation": "Exact size after inflate."
+                },
+                {
+                  "name": "id",
+                  "documentation": "SHA-256 over the header and compressed bytes, as 64 lowercase hex digits."
+                },
+                {
+                  "name": "references",
+                  "documentation": "Records this record needs; they stay while this record exists."
+                }
+              ]
             },
             {
               "name": "HistoryVersion",
@@ -8694,10 +8832,31 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L32",
+              "source": "src/version-history/types.ts#L52",
               "jsDocTags": [],
-              "documentation": "Named or automatically created durable revision marker.",
-              "memberDocs": []
+              "documentation": "A durable marker at one archived revision.",
+              "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Who saved a named version, or who made the last change of an automatic one."
+                },
+                {
+                  "name": "checkpoint",
+                  "documentation": "Record ID of the checkpoint the version rebuilds from."
+                },
+                {
+                  "name": "id",
+                  "documentation": "Content ID of the marker fields."
+                },
+                {
+                  "name": "name",
+                  "documentation": "Present on named versions."
+                },
+                {
+                  "name": "tail",
+                  "documentation": "Transaction envelope IDs applied after the checkpoint, in order."
+                }
+              ]
             },
             {
               "name": "MemoryHistoryStorage",
@@ -8706,9 +8865,9 @@
               "owners": [
                 "src/version-history/storage.ts"
               ],
-              "source": "src/version-history/storage.ts#L519",
+              "source": "src/version-history/storage.ts#L786",
               "jsDocTags": [],
-              "documentation": "Bounded session storage. Transactions use copy-on-write maps, not workbook copies.",
+              "documentation": "In-memory history for one page session and for tests. Transactions run one\nat a time per adapter and write through `PendingMapWrites`, so a failure or\nan abort leaves the stored maps unchanged without copying them.",
               "memberDocs": []
             }
           ]

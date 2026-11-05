@@ -1,14 +1,17 @@
 ---
 title: "IndexedDbHistoryStorage | @sheetwrite/core/browser/history"
-description: "IndexedDbHistoryStorage class in @sheetwrite/core/browser/history: Browser-only history storage with atomic publication and restart-safe reference counts."
+description: "IndexedDbHistoryStorage class in @sheetwrite/core/browser/history: Browser history storage. Import it from @sheetwrite/core/browser/history."
 ---
 <!-- api-export:@sheetwrite/core|./browser/history|IndexedDbHistoryStorage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-browser-history/">@sheetwrite/core/browser/history</a><span class="api-status" data-kind="class">class</span></div>
 
-Browser-only history storage with atomic publication and restart-safe reference counts.
+Browser history storage. Import it from `@sheetwrite/core/browser/history`.
+Each call opens the database, runs one readwrite transaction over every
+store, and closes the connection, so publication and reference counts are
+atomic across restarts and tabs.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-indexeddb.ts#L156"><code>packages/core/src/history-indexeddb.ts#L156</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-indexeddb.ts#L159"><code>packages/core/src/history-indexeddb.ts#L159</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

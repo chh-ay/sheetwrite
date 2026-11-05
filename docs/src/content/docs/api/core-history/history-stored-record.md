@@ -1,14 +1,14 @@
 ---
 title: "HistoryStoredRecord | @sheetwrite/core/history"
-description: "HistoryStoredRecord interface in @sheetwrite/core/history: Immutable, content-addressed history payload and its dependency edges."
+description: "HistoryStoredRecord interface in @sheetwrite/core/history: Immutable, content-addressed history payload and the records it refers to."
 ---
 <!-- api-export:@sheetwrite/core|./history|HistoryStoredRecord -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Immutable, content-addressed history payload and its dependency edges.
+Immutable, content-addressed history payload and the records it refers to.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L44"><code>packages/core/src/version-history/types.ts#L44</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L69"><code>packages/core/src/version-history/types.ts#L69</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -35,7 +35,7 @@ schemaVersion: 1;
 </details>
 
 <details class="api-member" id="history-stored-record-id" data-pagefind-weight="1">
-<summary><code>id</code></summary>
+<summary><code>id</code> <span class="api-member-summary">SHA-256 over the header and compressed bytes, as 64 lowercase hex digits.</span></summary>
 
 ```ts generated
 id: string;
@@ -62,7 +62,7 @@ encoding: "deflate-json-v1" | "deflate-bytes-v1";
 </details>
 
 <details class="api-member" id="history-stored-record-decoded-bytes" data-pagefind-weight="1">
-<summary><code>decodedBytes</code></summary>
+<summary><code>decodedBytes</code> <span class="api-member-summary">Exact size after inflate.</span></summary>
 
 ```ts generated
 decodedBytes: number;
@@ -71,7 +71,7 @@ decodedBytes: number;
 </details>
 
 <details class="api-member" id="history-stored-record-bytes" data-pagefind-weight="1">
-<summary><code>bytes</code></summary>
+<summary><code>bytes</code> <span class="api-member-summary">Deflate-compressed payload.</span></summary>
 
 ```ts generated
 bytes: Uint8Array;
@@ -80,7 +80,7 @@ bytes: Uint8Array;
 </details>
 
 <details class="api-member" id="history-stored-record-references" data-pagefind-weight="1">
-<summary><code>references</code></summary>
+<summary><code>references</code> <span class="api-member-summary">Records this record needs; they stay while this record exists.</span></summary>
 
 ```ts generated
 references: readonly string[];

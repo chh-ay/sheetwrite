@@ -18,7 +18,7 @@ Source entry: `packages/core/src/history-indexeddb.ts`
 ### Classes <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/core-browser-history/indexed-db-history-storage/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>IndexedDbHistoryStorage</code></span><span class="api-symbol-card__desc">Browser-only history storage with atomic publication and restart-safe reference counts.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-browser-history/indexed-db-history-storage/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>IndexedDbHistoryStorage</code></span><span class="api-symbol-card__desc">Browser history storage. Import it from @sheetwrite/core/browser/history.</span></a>
 </div>
 
 ### Interfaces <span class="api-count" data-pagefind-ignore>1</span>

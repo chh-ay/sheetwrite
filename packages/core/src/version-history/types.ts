@@ -2,69 +2,104 @@ import type { DocumentOp, WorkbookSnapshot } from "../types/document.js";
 
 /** Resource and retention ceilings for an opt-in history archive. */
 export interface HistoryLimits {
+  /** Encoded bytes of one checkpoint snapshot or one record; defaults to 64 MiB. */
   maxSnapshotBytes: number;
+  /** Decoded bytes of one log segment; defaults to 1 MiB. */
   maxSegmentBytes: number;
+  /** Encoded operation bytes of one archived transaction; defaults to and cannot exceed 64 MiB. */
   maxTransactionBytes: number;
+  /** Retained bytes per document, including headers and index entries; defaults to 512 MiB. */
   maxStorageBytes: number;
+  /** Working-set reservation for one capture, decode or replay; defaults to 256 MiB. */
   maxWorkingBytes: number;
+  /** Named versions per document; defaults to 100. */
   maxNamedVersions: number;
+  /** Named and automatic versions per document; defaults to 10,000. */
   maxVersions: number;
+  /** Entries in one metadata page; defaults to 100. */
   maxPageEntries: number;
+  /** JSON bytes of one metadata page; defaults to 256 KiB. */
   maxPageBytes: number;
+  /** Age after which automatic versions expire; defaults to 30 days. */
   maxAgeMs: number;
+  /** Active time between automatic versions; defaults to 5 minutes. */
   automaticIntervalMs: number;
+  /** Active time between checkpoints; defaults to 30 minutes. */
   checkpointIntervalMs: number;
+  /** Transactions between checkpoints; defaults to 1,000. */
   checkpointTransactions: number;
+  /** Encoded log bytes between checkpoints; defaults to 2 MiB. */
   checkpointLogBytes: number;
 }
 
-/** One authority-confirmed transaction, never an optimistic local change. */
+/** One committed transaction, confirmed by the document authority; never an optimistic local edit. */
 export interface HistoryCommit {
+  /** Revision the transaction applies to; equals the archive head. */
   baseRevision: number;
+  /** Revision after the transaction; an atomic batch can advance up to 16 revisions. */
   revision: number;
+  /** Stable mutation ID from the commit, at most 256 code units. */
   mutationId: string;
+  /** Authenticated ID of the person who made the change, at most 256 code units. */
   authorId: string;
+  /** Commit time in milliseconds since the epoch; never before the previous commit. */
   time: number;
+  /** The committed document operations, in order. */
   operations: readonly DocumentOp[];
 }
 
-/** Named or automatically created durable revision marker. */
+/** A durable marker at one archived revision. */
 export interface HistoryVersion {
+  /** Content ID of the marker fields. */
   id: string;
   revision: number;
   kind: "named" | "automatic";
+  /** Present on named versions. */
   name?: string;
+  /** Who saved a named version, or who made the last change of an automatic one. */
   authorId: string;
   time: number;
+  /** Record ID of the checkpoint the version rebuilds from. */
   checkpoint: string;
+  /** Transaction envelope IDs applied after the checkpoint, in order. */
   tail: readonly string[];
 }
 
-/** Immutable, content-addressed history payload and its dependency edges. */
+/** Immutable, content-addressed history payload and the records it refers to. */
 export interface HistoryStoredRecord {
   schemaVersion: 1;
+  /** SHA-256 over the header and compressed bytes, as 64 lowercase hex digits. */
   id: string;
   kind: "cells" | "metadata" | "sheet" | "checkpoint" | "segment" | "transaction";
   encoding: "deflate-json-v1" | "deflate-bytes-v1";
+  /** Exact size after inflate. */
   decodedBytes: number;
+  /** Deflate-compressed payload. */
   bytes: Uint8Array;
+  /** Records this record needs; they stay while this record exists. */
   references: readonly string[];
 }
 
-/** Durable recorder cursor. It does not retain operation payloads. */
+/** Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters. */
 export interface HistoryHead {
   revision: number;
   checkpoint: string;
   tail: readonly string[];
+  /** Time of the last archived commit. */
   time: number;
+  /** Active editing time since the baseline; idle gaps count as at most one automatic interval. */
   activeMs: number;
+  /** `activeMs` at the last automatic version. */
   automaticAt: number;
+  /** `activeMs` at the last checkpoint. */
   checkpointAt: number;
+  /** Transactions since the last checkpoint. */
   checkpointTransactions: number;
+  /** Encoded operation bytes since the last checkpoint. */
   checkpointLogBytes: number;
 }
 
-/** Aggregate retained storage, including index and reference metadata. */
+/** Retained storage of one document, including headers and index entries. */
 export interface HistoryStorageUsage {
   encodedBytes: number;
   recordCount: number;
@@ -72,8 +107,9 @@ export interface HistoryStorageUsage {
   namedVersionCount: number;
 }
 
-/** Manifest state returned without fetching a workbook payload. */
+/** Archive state, read without fetching any payload. */
 export interface HistoryManifest extends HistoryStorageUsage {
+  /** Increases on each publication or prune; writers compare it to detect a concurrent writer. */
   generation: number;
   head?: HistoryHead;
 }

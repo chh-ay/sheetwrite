@@ -105,7 +105,7 @@ needs its confirmed persistence revision attached by the host.
 | `record(commit, captureSnapshot?, signal?)` | Append one confirmed transaction; create a checkpoint and automatic marker when due. |
 | `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
 | `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
-| `readVersion(id, signal?)` | Reconstruct a snapshot in isolation. Dispose the replay store before returning or rejecting. |
+| `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
 | `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
 | `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
 | `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |

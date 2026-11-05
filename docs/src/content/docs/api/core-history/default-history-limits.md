@@ -1,14 +1,14 @@
 ---
 title: "DEFAULT_HISTORY_LIMITS | @sheetwrite/core/history"
-description: "DEFAULT_HISTORY_LIMITS variable in @sheetwrite/core/history: Default byte, count, cadence, and retention bounds."
+description: "DEFAULT_HISTORY_LIMITS variable in @sheetwrite/core/history: Default byte, count, cadence, and retention bounds (decision recorded in #228)."
 ---
 <!-- api-export:@sheetwrite/core|./history|DEFAULT_HISTORY_LIMITS -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="variable">variable</span></div>
 
-Default byte, count, cadence, and retention bounds.
+Default byte, count, cadence, and retention bounds (decision recorded in #228).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/codec.ts#L28"><code>packages/core/src/version-history/codec.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/codec.ts#L70"><code>packages/core/src/version-history/codec.ts#L70</code></a></dd></div>
 </dl>
 
 ## Declaration

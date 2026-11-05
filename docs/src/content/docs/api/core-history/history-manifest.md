@@ -1,14 +1,14 @@
 ---
 title: "HistoryManifest | @sheetwrite/core/history"
-description: "HistoryManifest interface in @sheetwrite/core/history: Manifest state returned without fetching a workbook payload."
+description: "HistoryManifest interface in @sheetwrite/core/history: Archive state, read without fetching any payload."
 ---
 <!-- api-export:@sheetwrite/core|./history|HistoryManifest -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Manifest state returned without fetching a workbook payload.
+Archive state, read without fetching any payload.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L76"><code>packages/core/src/version-history/types.ts#L76</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L111"><code>packages/core/src/version-history/types.ts#L111</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
@@ -16,7 +16,7 @@ Manifest state returned without fetching a workbook payload.
 <div class="api-member-list">
 
 <details class="api-member" id="history-manifest-generation" data-pagefind-weight="1">
-<summary><code>generation</code></summary>
+<summary><code>generation</code> <span class="api-member-summary">Increases on each publication or prune; writers compare it to detect a concurrent writer.</span></summary>
 
 ```ts generated
 generation: number;

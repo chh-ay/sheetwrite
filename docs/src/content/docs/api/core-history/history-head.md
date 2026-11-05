@@ -1,14 +1,14 @@
 ---
 title: "HistoryHead | @sheetwrite/core/history"
-description: "HistoryHead interface in @sheetwrite/core/history: Durable recorder cursor. It does not retain operation payloads."
+description: "HistoryHead interface in @sheetwrite/core/history: Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters."
 ---
 <!-- api-export:@sheetwrite/core|./history|HistoryHead -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Durable recorder cursor. It does not retain operation payloads.
+Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L55"><code>packages/core/src/version-history/types.ts#L55</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L84"><code>packages/core/src/version-history/types.ts#L84</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -55,7 +55,7 @@ tail: readonly string[];
 </details>
 
 <details class="api-member" id="history-head-time" data-pagefind-weight="1">
-<summary><code>time</code></summary>
+<summary><code>time</code> <span class="api-member-summary">Time of the last archived commit.</span></summary>
 
 ```ts generated
 time: number;
@@ -64,7 +64,7 @@ time: number;
 </details>
 
 <details class="api-member" id="history-head-active-ms" data-pagefind-weight="1">
-<summary><code>activeMs</code></summary>
+<summary><code>activeMs</code> <span class="api-member-summary">Active editing time since the baseline; idle gaps count as at most one automatic interval.</span></summary>
 
 ```ts generated
 activeMs: number;
@@ -73,7 +73,7 @@ activeMs: number;
 </details>
 
 <details class="api-member" id="history-head-automatic-at" data-pagefind-weight="1">
-<summary><code>automaticAt</code></summary>
+<summary><code>automaticAt</code> <span class="api-member-summary">activeMs at the last automatic version.</span></summary>
 
 ```ts generated
 automaticAt: number;
@@ -82,7 +82,7 @@ automaticAt: number;
 </details>
 
 <details class="api-member" id="history-head-checkpoint-at" data-pagefind-weight="1">
-<summary><code>checkpointAt</code></summary>
+<summary><code>checkpointAt</code> <span class="api-member-summary">activeMs at the last checkpoint.</span></summary>
 
 ```ts generated
 checkpointAt: number;
@@ -91,7 +91,7 @@ checkpointAt: number;
 </details>
 
 <details class="api-member" id="history-head-checkpoint-transactions" data-pagefind-weight="1">
-<summary><code>checkpointTransactions</code></summary>
+<summary><code>checkpointTransactions</code> <span class="api-member-summary">Transactions since the last checkpoint.</span></summary>
 
 ```ts generated
 checkpointTransactions: number;
@@ -100,7 +100,7 @@ checkpointTransactions: number;
 </details>
 
 <details class="api-member" id="history-head-checkpoint-log-bytes" data-pagefind-weight="1">
-<summary><code>checkpointLogBytes</code></summary>
+<summary><code>checkpointLogBytes</code> <span class="api-member-summary">Encoded operation bytes since the last checkpoint.</span></summary>
 
 ```ts generated
 checkpointLogBytes: number;

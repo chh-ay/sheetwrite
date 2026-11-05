@@ -1,14 +1,16 @@
 ---
 title: "MemoryHistoryStorage | @sheetwrite/core/history"
-description: "MemoryHistoryStorage class in @sheetwrite/core/history: Bounded session storage. Transactions use copy-on-write maps, not workbook copies."
+description: "MemoryHistoryStorage class in @sheetwrite/core/history: In-memory history for one page session and for tests."
 ---
 <!-- api-export:@sheetwrite/core|./history|MemoryHistoryStorage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="class">class</span></div>
 
-Bounded session storage. Transactions use copy-on-write maps, not workbook copies.
+In-memory history for one page session and for tests. Transactions run one
+at a time per adapter and write through `PendingMapWrites`, so a failure or
+an abort leaves the stored maps unchanged without copying them.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/storage.ts#L519"><code>packages/core/src/version-history/storage.ts#L519</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/storage.ts#L786"><code>packages/core/src/version-history/storage.ts#L786</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

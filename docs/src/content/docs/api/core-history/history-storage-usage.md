@@ -1,14 +1,14 @@
 ---
 title: "HistoryStorageUsage | @sheetwrite/core/history"
-description: "HistoryStorageUsage interface in @sheetwrite/core/history: Aggregate retained storage, including index and reference metadata."
+description: "HistoryStorageUsage interface in @sheetwrite/core/history: Retained storage of one document, including headers and index entries."
 ---
 <!-- api-export:@sheetwrite/core|./history|HistoryStorageUsage -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Aggregate retained storage, including index and reference metadata.
+Retained storage of one document, including headers and index entries.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L68"><code>packages/core/src/version-history/types.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L103"><code>packages/core/src/version-history/types.ts#L103</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

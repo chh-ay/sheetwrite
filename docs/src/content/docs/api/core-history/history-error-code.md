@@ -8,7 +8,7 @@ description: "HistoryErrorCode type in @sheetwrite/core/history: Stable failure 
 Stable failure category for history validation, storage, and replay.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/codec.ts#L7"><code>packages/core/src/version-history/codec.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/codec.ts#L49"><code>packages/core/src/version-history/codec.ts#L49</code></a></dd></div>
 </dl>
 
 ## Declaration

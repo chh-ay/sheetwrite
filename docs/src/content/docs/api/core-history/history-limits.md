@@ -33,7 +33,7 @@ Resource and retention ceilings for an opt-in history archive.
 <div class="api-member-list">
 
 <details class="api-member" id="history-limits-max-snapshot-bytes" data-pagefind-weight="1">
-<summary><code>maxSnapshotBytes</code></summary>
+<summary><code>maxSnapshotBytes</code> <span class="api-member-summary">Encoded bytes of one checkpoint snapshot or one record; defaults to 64 MiB.</span></summary>
 
 ```ts generated
 maxSnapshotBytes: number;
@@ -42,7 +42,7 @@ maxSnapshotBytes: number;
 </details>
 
 <details class="api-member" id="history-limits-max-segment-bytes" data-pagefind-weight="1">
-<summary><code>maxSegmentBytes</code></summary>
+<summary><code>maxSegmentBytes</code> <span class="api-member-summary">Decoded bytes of one log segment; defaults to 1 MiB.</span></summary>
 
 ```ts generated
 maxSegmentBytes: number;
@@ -51,7 +51,7 @@ maxSegmentBytes: number;
 </details>
 
 <details class="api-member" id="history-limits-max-transaction-bytes" data-pagefind-weight="1">
-<summary><code>maxTransactionBytes</code></summary>
+<summary><code>maxTransactionBytes</code> <span class="api-member-summary">Encoded operation bytes of one archived transaction; defaults to and cannot exceed 64 MiB.</span></summary>
 
 ```ts generated
 maxTransactionBytes: number;
@@ -60,7 +60,7 @@ maxTransactionBytes: number;
 </details>
 
 <details class="api-member" id="history-limits-max-storage-bytes" data-pagefind-weight="1">
-<summary><code>maxStorageBytes</code></summary>
+<summary><code>maxStorageBytes</code> <span class="api-member-summary">Retained bytes per document, including headers and index entries; defaults to 512 MiB.</span></summary>
 
 ```ts generated
 maxStorageBytes: number;
@@ -69,7 +69,7 @@ maxStorageBytes: number;
 </details>
 
 <details class="api-member" id="history-limits-max-working-bytes" data-pagefind-weight="1">
-<summary><code>maxWorkingBytes</code></summary>
+<summary><code>maxWorkingBytes</code> <span class="api-member-summary">Working-set reservation for one capture, decode or replay; defaults to 256 MiB.</span></summary>
 
 ```ts generated
 maxWorkingBytes: number;
@@ -78,7 +78,7 @@ maxWorkingBytes: number;
 </details>
 
 <details class="api-member" id="history-limits-max-named-versions" data-pagefind-weight="1">
-<summary><code>maxNamedVersions</code></summary>
+<summary><code>maxNamedVersions</code> <span class="api-member-summary">Named versions per document; defaults to 100.</span></summary>
 
 ```ts generated
 maxNamedVersions: number;
@@ -87,7 +87,7 @@ maxNamedVersions: number;
 </details>
 
 <details class="api-member" id="history-limits-max-versions" data-pagefind-weight="1">
-<summary><code>maxVersions</code></summary>
+<summary><code>maxVersions</code> <span class="api-member-summary">Named and automatic versions per document; defaults to 10,000.</span></summary>
 
 ```ts generated
 maxVersions: number;
@@ -96,7 +96,7 @@ maxVersions: number;
 </details>
 
 <details class="api-member" id="history-limits-max-page-entries" data-pagefind-weight="1">
-<summary><code>maxPageEntries</code></summary>
+<summary><code>maxPageEntries</code> <span class="api-member-summary">Entries in one metadata page; defaults to 100.</span></summary>
 
 ```ts generated
 maxPageEntries: number;
@@ -105,7 +105,7 @@ maxPageEntries: number;
 </details>
 
 <details class="api-member" id="history-limits-max-page-bytes" data-pagefind-weight="1">
-<summary><code>maxPageBytes</code></summary>
+<summary><code>maxPageBytes</code> <span class="api-member-summary">JSON bytes of one metadata page; defaults to 256 KiB.</span></summary>
 
 ```ts generated
 maxPageBytes: number;
@@ -114,7 +114,7 @@ maxPageBytes: number;
 </details>
 
 <details class="api-member" id="history-limits-max-age-ms" data-pagefind-weight="1">
-<summary><code>maxAgeMs</code></summary>
+<summary><code>maxAgeMs</code> <span class="api-member-summary">Age after which automatic versions expire; defaults to 30 days.</span></summary>
 
 ```ts generated
 maxAgeMs: number;
@@ -123,7 +123,7 @@ maxAgeMs: number;
 </details>
 
 <details class="api-member" id="history-limits-automatic-interval-ms" data-pagefind-weight="1">
-<summary><code>automaticIntervalMs</code></summary>
+<summary><code>automaticIntervalMs</code> <span class="api-member-summary">Active time between automatic versions; defaults to 5 minutes.</span></summary>
 
 ```ts generated
 automaticIntervalMs: number;
@@ -132,7 +132,7 @@ automaticIntervalMs: number;
 </details>
 
 <details class="api-member" id="history-limits-checkpoint-interval-ms" data-pagefind-weight="1">
-<summary><code>checkpointIntervalMs</code></summary>
+<summary><code>checkpointIntervalMs</code> <span class="api-member-summary">Active time between checkpoints; defaults to 30 minutes.</span></summary>
 
 ```ts generated
 checkpointIntervalMs: number;
@@ -141,7 +141,7 @@ checkpointIntervalMs: number;
 </details>
 
 <details class="api-member" id="history-limits-checkpoint-transactions" data-pagefind-weight="1">
-<summary><code>checkpointTransactions</code></summary>
+<summary><code>checkpointTransactions</code> <span class="api-member-summary">Transactions between checkpoints; defaults to 1,000.</span></summary>
 
 ```ts generated
 checkpointTransactions: number;
@@ -150,7 +150,7 @@ checkpointTransactions: number;
 </details>
 
 <details class="api-member" id="history-limits-checkpoint-log-bytes" data-pagefind-weight="1">
-<summary><code>checkpointLogBytes</code></summary>
+<summary><code>checkpointLogBytes</code> <span class="api-member-summary">Encoded log bytes between checkpoints; defaults to 2 MiB.</span></summary>
 
 ```ts generated
 checkpointLogBytes: number;
