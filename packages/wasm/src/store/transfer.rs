@@ -230,6 +230,8 @@ impl CellStore {
 
             store.tables.insert(key, table);
         }
+        // The formulas below bind to the names, so resolve them first.
+        store.resolve_name_definitions();
 
         store.graph = FormulaGraph::read_transfer(&mut input)?;
         store.mutation_revision = input.u64()?;

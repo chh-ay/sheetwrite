@@ -669,6 +669,10 @@ pub struct NamedFormulaRef {
 pub enum NameTarget {
     Range(NamedRangeRef),
     Formula(std::rc::Rc<NamedFormulaRef>),
+    /// A reference with no sheet inside another name's expansion. It is
+    /// placed in the expansion as it is, so it reads the sheet of the formula
+    /// that evaluates it and the expansion does not depend on that sheet.
+    Reference(Ast),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2156,6 +2160,7 @@ where
         Ast::Name(name) => match resolve(&name, formula_sheet) {
             Some(NameTarget::Range(range)) => Ast::NamedRange(range),
             Some(NameTarget::Formula(formula)) => Ast::NamedFormula(formula),
+            Some(NameTarget::Reference(reference)) => reference,
             None => Ast::Name(name),
         },
         Ast::Func(Func::Let, args) if args.len() >= 3 && args.len() % 2 == 1 => {

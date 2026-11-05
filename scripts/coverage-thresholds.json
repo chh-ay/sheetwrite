@@ -45,6 +45,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/dashboard.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/data.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
