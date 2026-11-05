@@ -800,8 +800,9 @@ function renderMembers(
       `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
       `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
       "",
-      // A fenced block so member signatures get real syntax highlighting.
-      "```ts generated",
+      // A fenced block so member signatures get real syntax highlighting; the
+      // member grammar reads a lone `readonly name: Type;` as a class member.
+      "```ts-member generated",
       signature,
       "```",
       "",

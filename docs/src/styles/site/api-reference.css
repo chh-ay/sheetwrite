@@ -694,7 +694,7 @@
 /* Search-target anchors exist for Pagefind sub-results and deep links only;
    the visible member list already names them. Kept in flow (zero-height) so
    #anchor navigation still lands on the right member. */
-.sw-prose .api-search-anchor {
+.sw-docs .sw-prose .api-search-anchor {
   display: block;
   height: 0;
   margin: 0;

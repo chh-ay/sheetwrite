@@ -21,6 +21,8 @@ import { SheetwriteTypeEngine, type SheetwriteTypeHover } from "./sheetwrite-typ
 import { lineStartOffsets } from "./source-offsets.js";
 
 const SUPPORTED_LANGUAGES = new Set(["ts", "tsx", "vue", "svelte"]);
+/** Generated API fences: whole declarations (`ts`) and single members (`ts-member`). */
+const GENERATED_LANGUAGES = new Set(["ts", "ts-member"]);
 const LOW_QUALITY_HOVER = /\bany\b|\/\*unresolved\*\//;
 const LEADING_KIND = /^\(([\w-]+)\)\s+/gm;
 const IMPORT_SUFFIX = /\nimport .*$/s;
@@ -748,11 +750,11 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     name: "sheetwrite-code-hovers",
     hooks: {
       async preprocessCode({ codeBlock, config }) {
-        if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
         // Generated declaration fences carry no imports, so the type engine
         // cannot resolve their identifiers. The manifest can: each public
         // symbol gets a preview popover, and the token itself navigates.
         if (/\bgenerated\b/.test(codeBlock.meta)) {
+          if (!GENERATED_LANGUAGES.has(codeBlock.language)) return;
           await resolveManifest();
           signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
           const previews = symbolPreviews ?? new Map<string, SymbolPreview>();
@@ -828,6 +830,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           }
           return;
         }
+        if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
         if (options.shouldTransform && !options.shouldTransform(codeBlock)) return;
 
         signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
