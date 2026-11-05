@@ -1836,7 +1836,13 @@ impl CellStore {
             | Func::FormulaText
             | Func::IsFormula
             | Func::Hyperlink
-            | Func::Cell => return self.eval_information_family(func, args, sheet, pass, depth),
+            | Func::Cell
+            | Func::ErrorType
+            | Func::Info
+            | Func::IsNonText
+            | Func::IsRef
+            | Func::Sheet
+            | Func::Sheets => return self.eval_information_family(func, args, sheet, pass, depth),
             Func::Today | Func::Now | Func::Rand | Func::RandBetween => {
                 return self.eval_volatile_family(func, args, sheet, pass, depth)
             }

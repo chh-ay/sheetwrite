@@ -133,6 +133,46 @@ fn legacy_statistics_names_read_references_as_their_successors() {
     ]);
 }
 
+/// The examples of the ERROR.TYPE, ISEVEN, ISODD, SHEET and SHEETS pages on
+/// Microsoft Support, and the IS functions page for ISNONTEXT and ISREF.
+#[test]
+fn information_functions_follow_the_microsoft_examples() {
+    assert_results(&[
+        ("=ERROR.TYPE(1/0)", "2"),
+        ("=ERROR.TYPE(NA())", "7"),
+        ("=ERROR.TYPE(Data!A1)", "#N/A"),
+        ("=ISEVEN(-1)", "FALSE"),
+        ("=ISEVEN(2.5)", "TRUE"),
+        ("=ISEVEN(5)", "FALSE"),
+        ("=ISEVEN(0)", "TRUE"),
+        ("=ISEVEN(DATE(2011,12,23))", "TRUE"),
+        ("=ISODD(-1)", "TRUE"),
+        ("=ISODD(2.5)", "FALSE"),
+        ("=ISODD(5)", "TRUE"),
+        ("=ISEVEN(TRUE)", "#VALUE!"),
+        ("=ISNONTEXT(Data!F1)", "TRUE"),
+        ("=ISNONTEXT(Data!D2)", "FALSE"),
+        ("=ISNONTEXT(1/0)", "TRUE"),
+        ("=ISREF(Data!A1)", "TRUE"),
+        ("=ISREF(Data!A1:B2)", "TRUE"),
+        ("=ISREF(INDIRECT(\"Data!A1\"))", "TRUE"),
+        ("=ISREF(1)", "FALSE"),
+        ("=ISREF(\"A1\")", "FALSE"),
+        ("=SHEET()", "1"),
+        ("=SHEET(Data!A1)", "2"),
+        ("=SHEET(\"data\")", "2"),
+        ("=SHEET(\"Missing\")", "#N/A"),
+        ("=SHEETS()", "2"),
+        ("=SHEETS(Data!A1)", "1"),
+        ("=SHEETS(Report:Data!A1)", "2"),
+        ("=INFO(\"numfile\")", "2"),
+        ("=INFO(\"RECALC\")", "Automatic"),
+        ("=INFO(\"osversion\")", "#N/A"),
+        ("=INFO(\"memavail\")", "#N/A"),
+        ("=INFO(\"colour\")", "#VALUE!"),
+    ]);
+}
+
 #[cfg(feature = "analysis")]
 #[test]
 fn financial_functions_read_cells_text_dates_and_blanks() {
