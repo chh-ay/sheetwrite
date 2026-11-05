@@ -411,11 +411,14 @@ a.sw-card:hover {
 }
 
 /* JetBrains Mono ligatures turn `===` into one glyph; code shows what is typed.
-   Feature settings survive the `font` shorthand that code frames set. */
+   Expressive Code reverts every property inside its frames, so its code and
+   token spans need a selector that outranks that reset. */
 code,
 pre,
 kbd,
-samp {
+samp,
+:root .expressive-code pre,
+:root .expressive-code pre * {
   font-feature-settings:
     "calt" 0,
     "liga" 0;
