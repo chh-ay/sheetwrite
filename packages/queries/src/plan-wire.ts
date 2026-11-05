@@ -24,7 +24,7 @@ const LITERAL_FALSE = 1;
 const LITERAL_TRUE = 2;
 const LITERAL_NUMBER = 3;
 const LITERAL_TEXT = 4;
-const NO_COLUMN = 0xffff_ffff;
+export const NO_COLUMN = 0xffff_ffff;
 
 /** Rust rejects this code, so unknown runtime values become a `definition` diagnostic there. */
 const INVALID_CODE = 0xffff_fffe;
@@ -66,7 +66,8 @@ export interface PlanWire {
   readonly offsets: Uint32Array;
 }
 
-class Writer {
+/** Appends typed lanes in the order `plan_wire.rs` reads them. */
+export class PlanWriter {
   readonly codes: number[] = [];
   readonly numbers: number[] = [];
   readonly table: string[] = [];
@@ -155,6 +156,27 @@ class Writer {
     }
   }
 
+  optionalString(value: string | undefined): void {
+    if (value === undefined) this.codes.push(NO_COLUMN);
+    else this.string(value);
+  }
+
+  steps(steps: readonly QueryStep[]): void {
+    this.codes.push(steps.length);
+    for (const step of steps) this.step(step);
+  }
+
+  finish(): PlanWire {
+    const strings = packStrings(this.table);
+
+    return {
+      codes: Uint32Array.from(this.codes),
+      numbers: Float64Array.from(this.numbers),
+      text: strings.bytes,
+      offsets: strings.offsets,
+    };
+  }
+
   step(step: QueryStep): void {
     this.code(STEP_CODES, step.kind);
 
@@ -196,16 +218,8 @@ class Writer {
 
 /** Lays a saved step list out as typed lanes; Rust decodes and validates it. */
 export function encodePlan(steps: readonly QueryStep[]): PlanWire {
-  const writer = new Writer();
-  writer.codes.push(steps.length);
-  for (const step of steps) writer.step(step);
+  const writer = new PlanWriter();
+  writer.steps(steps);
 
-  const strings = packStrings(writer.table);
-
-  return {
-    codes: Uint32Array.from(writer.codes),
-    numbers: Float64Array.from(writer.numbers),
-    text: strings.bytes,
-    offsets: strings.offsets,
-  };
+  return writer.finish();
 }

@@ -131,25 +131,8 @@ impl<'a> RangeReader<'a> {
                 .and_then(|sources| sources.value_at(&self.store.strings, index))
             {
                 value
-            } else if self.data.cells.source_kind_at(index) != KIND_EMPTY {
-                self.store
-                    .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
             } else {
-                // Spill output shares the dense source slot, so this read is
-                // direct even when the source is empty.
-                match self
-                    .data
-                    .cells
-                    .calculated_cell_at(index)
-                    .unwrap_or((KIND_EMPTY, 0))
-                {
-                    (KIND_FORMULA, payload) => Value::Error(
-                        FormulaError::from_slot(payload).unwrap_or(FormulaError::Value),
-                    ),
-                    (kind, payload) => {
-                        super::literal_cell_value(&self.store.strings, kind, payload)
-                    }
-                }
+                self.dense_value_at(self.row, self.col, pass)
             }
         } else {
             let run = self.run_at(index);
@@ -172,6 +155,30 @@ impl<'a> RangeReader<'a> {
         }
 
         Ok(Some(value))
+    }
+
+    /// The value of a dense cell that is not a literal source: a formula is
+    /// evaluated, and spill output, which shares the dense source slot, is
+    /// read directly even when the source is empty.
+    pub(crate) fn dense_value_at(&self, row: usize, col: usize, pass: &mut EvalPass<'_>) -> Value {
+        let index = self.data.cells.idx(row, col);
+        if self.data.cells.source_kind_at(index) != KIND_EMPTY {
+            return self
+                .store
+                .eval_at(self.sheet, row, col, pass, self.depth + 1);
+        }
+
+        match self
+            .data
+            .cells
+            .calculated_cell_at(index)
+            .unwrap_or((KIND_EMPTY, 0))
+        {
+            (KIND_FORMULA, payload) => {
+                Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
+            }
+            (kind, payload) => super::literal_cell_value(&self.store.strings, kind, payload),
+        }
     }
 
     fn run_at(&mut self, index: usize) -> CellRun<'a> {

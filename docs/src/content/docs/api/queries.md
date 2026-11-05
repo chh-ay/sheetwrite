@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/queries."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>28</dd></div>
+<div><dt>Exports</dt><dd>29</dd></div>
 </dl>
 
 Source entry: `packages/queries/src/index.ts`
@@ -21,10 +21,11 @@ Source entry: `packages/queries/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/queries/query-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>QueryError</code></span><span class="api-symbol-card__desc">Fatal source or plan failure; cell-level errors stay in the returned column lanes.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>2</span>
+### Functions <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/queries/create-query-session/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createQuerySession</code></span><span class="api-symbol-card__desc">The one registration call for workbook queries: loads the engine and binds saved queries of grid to the host's fetchSource.</span></a>
+<a class="api-symbol-card" href="/docs/api/queries/load-power-query-codec/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>loadPowerQueryCodec</code></span><span class="api-symbol-card__desc">Loads the Power Query codec for XLSX import and export.</span></a>
 <a class="api-symbol-card" href="/docs/api/queries/load-query-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>loadQueryEngine</code></span><span class="api-symbol-card__desc">Importing this package loads no WASM; only this explicit call loads query execution.</span></a>
 </div>
 

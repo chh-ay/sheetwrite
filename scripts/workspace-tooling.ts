@@ -14,13 +14,21 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/wasm",
   "@sheetwrite/formulas",
   "@sheetwrite/core",
-  "@sheetwrite/queries",
   "@sheetwrite/xlsx",
+  "@sheetwrite/queries",
   "@sheetwrite/charts",
   "@sheetwrite/react",
   "@sheetwrite/vue",
   "@sheetwrite/svelte",
 ] as const;
+
+/** One published package name. */
+export type PublishablePackage = (typeof PUBLISHABLE_PACKAGE_ORDER)[number];
+
+/** Publication position of a package name, or -1 for a name that is not published. */
+export function publishableIndex(name: unknown): number {
+  return PUBLISHABLE_PACKAGE_ORDER.findIndex((candidate) => candidate === name);
+}
 
 export interface CommandNode {
   readonly id: string;

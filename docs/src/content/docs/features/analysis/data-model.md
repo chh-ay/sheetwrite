@@ -71,6 +71,16 @@ if (saved.length !== 1) throw new Error("The relationship was not saved");
 store.dispose();
 ```
 
+## Data model panel
+
+In the ribbon, **Data › Data Tools › Data Model** and **Relationships** open the data model panel. Data Model appears when the workbook has a table, and Relationships when it has two. The panel loads on first use.
+
+- **Tables** lists each table with its column and data-row counts.
+- **Relationships** lists each relationship as `Data[Key] → Lookup[Key]` with its key status, and **Edit** and **Delete** buttons.
+- The form picks the data table and its key column (the many side), and the lookup table and its key column (the one side).
+
+Each save and delete is one undo step. As Excel's Create Relationship dialog does, the panel does not keep a relationship whose lookup keys repeat or whose key types differ; it shows the reason instead. The API keeps such a relationship, because cells can change later.
+
 ## Rules
 
 A relationship refers to tables and columns by their stable IDs, so renames, column moves and row or column edits keep it. A new relationship is refused when:
@@ -138,3 +148,5 @@ The result equals a pivot over the table you get by looking up each related colu
 | The many-side key is an error | That error |
 
 A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.
+
+In the pivot field list, a pivot over a table shows a **Related** section for each table that its table reaches through relationships. The actions menu of a related column adds it to an area. A table source then becomes a model source whose first fields are the table's columns, so the fields in use keep their indices. This is one undo step. The field list names a related field with its table, for example `Customers › Region`.

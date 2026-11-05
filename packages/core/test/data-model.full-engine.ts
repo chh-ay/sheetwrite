@@ -16,6 +16,7 @@ import type {
   TableRelationship,
   WorkbookSnapshot,
 } from "../src/index.js";
+import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
@@ -109,6 +110,56 @@ it("checks keys from the current cells and keeps checking after a memory release
     expect(store.getRelationshipStatus(relationship.id)).toEqual({ status: "unavailable" });
   } finally {
     store.dispose();
+  }
+});
+
+it("refuses a relationship in the panel while its lookup keys repeat", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  delete input.workbook.dataModel;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const press = (target: Element | null) => {
+    if (target === null) throw new Error("missing control");
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  };
+  const panelText = () => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+  const setId = (value: string) =>
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "data", row: 3, col: 2 }, value: { kind: "literal", value } },
+      ],
+    });
+  try {
+    expect(setId("c1").status).toBe("applied");
+    (await loadPanels(grid)).openDataModelPanel(grid);
+    const save = host.querySelector('[data-focus-key="save-relationship"]');
+
+    // Orders is the data table and Customers the lookup table; each has one key column.
+    const [dataTable, , lookupTable] = host.querySelectorAll<HTMLSelectElement>(
+      ".sheetwrite-panel select",
+    );
+    if (dataTable === undefined || lookupTable === undefined) throw new Error("missing pickers");
+    for (const [picker, value] of [
+      [dataTable, "orders"],
+      [lookupTable, "customers"],
+    ] as const) {
+      picker.value = value;
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    press(save);
+    expect(grid.store.getWorkbook().dataModel).toBeUndefined();
+    expect(panelText()).toContain("The lookup table repeats a key in rows 1 and 3.");
+
+    expect(setId("C3").status).toBe("applied");
+    press(save);
+    expect(grid.store.getWorkbook().dataModel?.relationships).toHaveLength(1);
+    expect(panelText()).toContain("1 keys match no row and show as blank.");
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
   }
 });
 
@@ -249,6 +300,68 @@ it("keeps model pivot results equal to a flattened range through edits, undo and
     expect(grid.getPivots().find((definition) => definition.id === "related")?.source).toEqual(
       pivot.source,
     );
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
+  }
+});
+
+it("adds a related table's column to a table pivot from the field list, as one undo step", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  const data = input.sheets[0];
+  if (data === undefined) throw new Error("the fixture needs its data sheet");
+  data.rowCount = 20;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const press = (target: Element | null | undefined) => {
+    if (target == null) throw new Error("missing control");
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  };
+  const runMenu = (button: string, entry: string) => {
+    press(host.querySelector(`[aria-label="${button}"]`));
+    press(
+      [...host.querySelectorAll<HTMLElement>('.sheetwrite-panel-menu [role="menuitem"]')].find(
+        (candidate) => candidate.textContent === entry,
+      ),
+    );
+  };
+  const pivot: PivotDefinition = {
+    id: "orders",
+    name: "Orders",
+    source: { table: "orders" },
+    anchor: { row: 6, col: 0 },
+    rows: [],
+    columns: [],
+    values: [{ field: 0, aggregation: "COUNTA" }],
+  };
+  try {
+    expect(grid.setPivot(pivot, "data").status).toBe("applied");
+    (await loadPanels(grid)).openPivotPanel(grid, "data", "orders");
+    expect(host.querySelector(".sheetwrite-panel")?.textContent).toContain("Related: Customers");
+
+    runMenu("Customers › ID field actions", "Add to Rows");
+    const added = grid.getPivots("data")[0];
+    expect(added?.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "customer" },
+          { table: "customers", column: "id" },
+        ],
+      },
+    });
+    expect(added?.rows).toEqual([1]);
+    expect(grid.getPivotResult("data", "orders")?.status).toBe("ok");
+    // The column moves from the related section to the pivot's own fields, named with its table.
+    const panelText = host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+    expect(panelText.includes("Related: Customers")).toBe(false);
+    expect(panelText.includes("Customers › ID")).toBe(true);
+
+    grid.undo();
+    expect(grid.getPivots("data")[0]).toEqual(pivot);
   } finally {
     grid.destroy();
     host.remove();

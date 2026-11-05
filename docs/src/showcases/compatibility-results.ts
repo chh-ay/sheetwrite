@@ -5,6 +5,7 @@ import type {
   ConformanceObservation,
   KnownDivergence,
   OfflineConformanceResult,
+  ReviewedObservation,
 } from "../../../scripts/conformance/types.js";
 
 export type CompatibilityResultStatus =
@@ -104,7 +105,7 @@ interface BuildCompatibilityResultsOptions {
   readonly libraryVersion: string;
   readonly compareObservation: (
     expected: ConformanceCase["expected"],
-    observation: ConformanceObservation,
+    observation: ReviewedObservation,
     knownDifference?: KnownDivergence,
   ) => readonly string[];
 }
