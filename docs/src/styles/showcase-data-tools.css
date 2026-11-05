@@ -7,11 +7,11 @@
 .sw-data {
   width: calc(100% - 2 * var(--sw-page-inset));
   margin-inline: auto;
-  padding-block: 2rem 4rem;
+  padding-block: var(--sw-space-8) var(--sw-space-16);
 }
 .sw-data-workspace {
   border: 1px solid var(--sw-border);
-  border-radius: 1rem;
+  border-radius: var(--sw-radius-xl);
   background: var(--sw-surface-1);
   overflow: hidden;
   box-shadow: var(--sw-shadow-lg);
@@ -21,35 +21,35 @@
   display: flex;
   align-items: end;
   flex-wrap: wrap;
-  gap: 1rem;
-  padding: 1.25rem;
+  gap: var(--sw-space-4);
+  padding: var(--sw-space-5);
 }
 .sw-data-controls h2,
 .sw-data-panel h2 {
-  margin: 0.35rem 0 0.75rem;
+  margin: var(--sw-space-1-5) 0 var(--sw-space-3);
   color: var(--sw-fg-strong);
-  font-size: 1.25rem;
-  font-weight: 650;
+  font-size: var(--sw-text-h3);
+  font-weight: var(--sw-weight-semibold);
 }
 .sw-data-controls label {
   display: grid;
-  gap: 0.4rem;
-  font-size: 0.8rem;
+  gap: var(--sw-space-1-5);
+  font-size: var(--sw-text-caption);
   color: var(--sw-fg-muted);
 }
 .sw-data button:not(.sw-demo-select__trigger),
 .sw-data input {
   min-height: 2.5rem;
   border: 1px solid var(--sw-border-strong);
-  border-radius: 0.4rem;
+  border-radius: var(--sw-radius-sm);
   background: var(--sw-surface-2);
   color: var(--sw-fg);
-  padding: 0.5rem 0.75rem;
+  padding: var(--sw-space-2) var(--sw-space-3);
   font: inherit;
 }
 .sw-data button:not(.sw-demo-select__trigger) {
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-data button:not(.sw-demo-select__trigger):hover {
   border-color: var(--sw-accent);
@@ -65,12 +65,12 @@
 .sw-data-status {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--sw-space-4);
   justify-content: space-between;
-  padding: 0.8rem 1.25rem;
+  padding: var(--sw-space-3) var(--sw-space-5);
   border-top: 1px solid var(--sw-border);
   background: var(--sw-surface-1);
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
 }
 .sw-data-status strong {
   color: var(--sw-accent-strong);
@@ -78,7 +78,7 @@
 .sw-data-columns {
   flex-basis: 100%;
   color: var(--sw-fg-muted);
-  font-size: 0.75rem;
+  font-size: var(--sw-text-eyebrow);
 }
 .sw-data-grid {
   height: 440px;
@@ -87,7 +87,7 @@
 .sw-data-organize {
   align-items: center;
   border-top: 1px solid var(--sw-border);
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-data-organize small {
   color: var(--sw-fg-muted);
@@ -95,26 +95,26 @@
 .sw-data-lower {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin: 1.5rem 0;
+  gap: var(--sw-space-6);
+  margin: var(--sw-space-6) 0;
 }
 .sw-data-panel {
   min-width: 0;
-  padding: 1.5rem;
+  padding: var(--sw-space-6);
   border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
 }
 .sw-data-panel p {
   color: var(--sw-fg-muted);
-  font-size: 0.9rem;
+  font-size: var(--sw-text-small);
   line-height: 1.7;
 }
 /* One row per guarded column: the rule, the probe, and what the Grid did. */
 .sw-data-rules {
   display: grid;
   gap: 0;
-  margin: 1.25rem 0;
+  margin: var(--sw-space-5) 0;
   padding: 0;
   list-style: none;
   border-top: 1px solid var(--sw-border);
@@ -122,22 +122,22 @@
 .sw-data-rules li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem 1rem;
+  gap: var(--sw-space-2) var(--sw-space-4);
   align-items: center;
-  padding: 0.9rem 0;
+  padding: var(--sw-space-4) 0;
   border-bottom: 1px solid var(--sw-border);
 }
 .sw-data-rule {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--sw-space-1);
 }
 .sw-data-rule strong {
   color: var(--sw-fg-strong);
-  font-size: 0.95rem;
+  font-size: var(--sw-text-body);
 }
 .sw-data-rule span {
   color: var(--sw-fg-muted);
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
   line-height: 1.5;
 }
 .sw-data-rules button {
@@ -146,10 +146,10 @@
 .sw-data-result {
   grid-column: 1 / -1;
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   align-items: center;
   color: var(--sw-fg-muted);
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
 }
 /* A dot in the outcome colour; the words carry the meaning. */
 .sw-data-result::before {
@@ -181,16 +181,16 @@
 
 /* Two-way role switch: the pressed button is the role the resolver sees. */
 .sw-data-role {
-  margin-bottom: 1rem;
+  margin-bottom: var(--sw-space-4);
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   align-items: center;
 }
 .sw-data-role span {
-  margin-right: 0.25rem;
+  margin-right: var(--sw-space-1);
   color: var(--sw-fg-muted);
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
 }
 .sw-data-role button[aria-pressed="true"] {
   border-color: var(--sw-accent);
@@ -200,7 +200,7 @@
 
 .sw-data-events {
   max-height: 22rem;
-  margin: 1.25rem 0 0;
+  margin: var(--sw-space-5) 0 0;
   overflow: auto;
   padding: 0;
   list-style: none;
@@ -209,15 +209,15 @@
 .sw-data-events li {
   display: grid;
   grid-template-columns: 0.5rem minmax(0, 1fr);
-  gap: 0.15rem 0.75rem;
-  padding: 0.7rem 0;
+  gap: var(--sw-space-0-5) var(--sw-space-3);
+  padding: var(--sw-space-3) 0;
   border-bottom: 1px solid var(--sw-border);
 }
 .sw-data-events li::before {
   grid-row: 1 / 3;
   width: 0.5rem;
   height: 0.5rem;
-  margin-top: 0.45rem;
+  margin-top: var(--sw-space-2);
   border-radius: 50%;
   background: var(--sw-border-strong);
   content: "";
@@ -233,15 +233,15 @@
 }
 .sw-data-events span {
   color: var(--sw-fg);
-  font-size: 0.9rem;
+  font-size: var(--sw-text-small);
   line-height: 1.5;
 }
 .sw-data-events code {
   color: var(--sw-fg-muted);
-  font: 0.75rem / 1.4 var(--sw-font-mono);
+  font: var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
 }
 .sw-data-note {
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
   line-height: 1.7;
   color: var(--sw-fg-muted);
 }

@@ -16,7 +16,7 @@
 
   /* One column: copy, then the actions, then the app preview. */
   .sw-lp-hero {
-    row-gap: 1.75rem;
+    row-gap: var(--sw-space-8);
   }
 
   .sw-lp-hero h1 {
@@ -62,7 +62,7 @@
 @media (max-width: 48rem) {
   .sw-lp-head {
     grid-template-columns: minmax(0, 1fr);
-    row-gap: 1rem;
+    row-gap: var(--sw-space-4);
   }
 
   /* The full eyebrow wraps at phone width and strands its last word. */
@@ -72,8 +72,8 @@
 
   /* Keep every chapter reachable on touch screens. */
   .ha-acts button {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.6875rem;
+    padding: var(--sw-space-3) var(--sw-space-2);
+    font-size: var(--sw-text-eyebrow);
   }
 
   /* The architecture diagram's labels are too small at phone width; the
@@ -94,7 +94,7 @@
 
   .sw-bench__bars li {
     grid-template-columns: 5rem minmax(0, 1fr) 4.5rem;
-    gap: 0.4rem 0.75rem;
+    gap: var(--sw-space-1-5) var(--sw-space-3);
   }
 
   .sw-bench__capture {
@@ -106,7 +106,7 @@
   }
 
   .sw-reel__tabs button {
-    padding: 0.75rem 0.6rem;
+    padding: var(--sw-space-3) var(--sw-space-2);
     font-size: var(--sw-text-caption);
   }
 }

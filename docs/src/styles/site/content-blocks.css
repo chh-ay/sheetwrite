@@ -4,41 +4,41 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
   gap: 1px;
-  margin: 1.5rem 0 0.5rem;
+  margin: var(--sw-space-6) 0 var(--sw-space-2);
   border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-border);
   overflow: hidden;
 }
 .sw-prose .sw-fw-facts > div {
-  padding: 0.8rem 1rem;
+  padding: var(--sw-space-3) var(--sw-space-4);
   background: var(--sw-surface-1);
 }
 .sw-prose .sw-fw-facts dt {
   color: var(--sw-fg-muted);
-  font: 600 0.68rem / 1.6 var(--sw-font-mono);
-  letter-spacing: 0.06em;
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 .sw-prose .sw-fw-facts dd {
-  margin: 0.2rem 0 0;
+  margin: var(--sw-space-1) 0 0;
   color: var(--sw-fg-strong);
-  font-size: 0.88rem;
+  font-size: var(--sw-text-small);
 }
 
 /* Next steps close a page as cards, not as a bare bullet list. */
 .sw-prose .sw-next-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.7rem;
-  margin: 2rem 0 0;
+  gap: var(--sw-space-3);
+  margin: var(--sw-space-8) 0 0;
 }
 .sw-prose .sw-next-links a {
   display: grid;
-  gap: 0.25rem;
-  padding: 0.9rem 1rem;
+  gap: var(--sw-space-1);
+  padding: var(--sw-space-4) var(--sw-space-4);
   border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
   text-decoration: none;
   transition:
@@ -51,13 +51,13 @@
 }
 .sw-prose .sw-next-links span {
   color: var(--sw-fg-muted);
-  font: 600 0.68rem / 1.6 var(--sw-font-mono);
-  letter-spacing: 0.06em;
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 .sw-prose .sw-next-links strong {
   color: var(--sw-fg-strong);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 .sw-prose .sw-next-links strong::after {
   content: " →";
@@ -68,13 +68,13 @@
    SVG follows the light and dark themes; on phones the frame scrolls sideways
    instead of shrinking the labels below a readable size. */
 .sw-collab-flow {
-  margin: 1.75rem 0;
+  margin: var(--sw-space-8) 0;
 }
 .sw-collab-flow__frame {
   overflow-x: auto;
   border: 1px solid var(--sw-border);
-  border-radius: 0.85rem;
-  padding: 0.75rem;
+  border-radius: var(--sw-radius-lg);
+  padding: var(--sw-space-3);
   background: var(--sw-surface-1);
 }
 .sw-collab-flow svg {
@@ -94,13 +94,13 @@
 }
 .sw-collab-flow__lane-title {
   fill: var(--sw-fg-strong);
-  font-size: 14px;
-  font-weight: 650;
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
 }
 .sw-collab-flow__lane-detail {
   fill: var(--sw-fg-muted);
   font-family: var(--sw-font-mono);
-  font-size: 10.5px;
+  font-size: var(--sw-text-eyebrow);
 }
 .sw-collab-flow__message line {
   stroke: var(--sw-accent);
@@ -112,7 +112,7 @@
 .sw-collab-flow__message text {
   fill: var(--sw-fg);
   font-family: var(--sw-font-mono);
-  font-size: 11.5px;
+  font-size: var(--sw-text-eyebrow);
   paint-order: stroke;
   stroke: var(--sw-surface-1);
   stroke-width: 4px;
@@ -134,7 +134,7 @@
 }
 .sw-collab-flow__note text {
   fill: var(--sw-fg);
-  font-size: 12px;
+  font-size: var(--sw-text-eyebrow);
 }
 .sw-collab-flow__alt rect {
   fill: none;
@@ -144,37 +144,37 @@
 .sw-collab-flow__alt text {
   fill: var(--sw-code-number);
   font-family: var(--sw-font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: var(--sw-text-eyebrow);
+  font-weight: var(--sw-weight-semibold);
+  letter-spacing: var(--sw-tracking-eyebrow);
 }
 .sw-collab-flow figcaption {
-  margin-top: 0.6rem;
+  margin-top: var(--sw-space-2);
   color: var(--sw-fg-muted);
-  font-size: 0.86rem;
+  font-size: var(--sw-text-small);
 }
 
 /* A framed shell, with package-manager tabs in its header. */
 .sw-terminal {
-  margin: 1.25rem 0;
+  margin: var(--sw-space-5) 0;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-0);
   color: var(--sw-fg);
 }
 .sw-terminal__bar {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  padding: 0 0.8rem 0 1rem;
+  gap: var(--sw-space-5);
+  padding: 0 var(--sw-space-3) 0 var(--sw-space-4);
   border-bottom: 1px solid var(--sw-border);
   background: var(--sw-surface-2);
 }
 .sw-terminal__dots {
   display: flex;
-  gap: 0.4rem;
+  gap: var(--sw-space-1-5);
 }
 .sw-terminal__dots i {
   width: 0.55rem;
@@ -193,19 +193,19 @@
 }
 .sw-terminal__tabs {
   display: flex;
-  gap: 1.15rem;
+  gap: var(--sw-space-5);
 }
 .sw-terminal__tabs button,
 .sw-terminal__copy {
   border: 0;
   background: transparent;
   color: var(--sw-fg-muted);
-  font: 500 0.8rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.5 var(--sw-font-mono);
   cursor: pointer;
 }
 .sw-terminal__tabs button {
   margin-bottom: -1px;
-  padding: 0.7rem 0;
+  padding: var(--sw-space-3) 0;
   border-bottom: 2px solid transparent;
 }
 .sw-terminal__tabs button:hover,
@@ -218,8 +218,8 @@
 }
 .sw-terminal__copy {
   margin-left: auto;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.3rem;
+  padding: var(--sw-space-1-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-xs);
   font-family: var(--sw-font-body);
 }
 .sw-terminal__copy:hover {
@@ -228,13 +228,13 @@
 .sw-prose .sw-terminal__body,
 .sw-terminal__body {
   margin: 0;
-  padding: 1.15rem 1.25rem;
+  padding: var(--sw-space-5) var(--sw-space-5);
   overflow-x: auto;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--sw-fg-strong);
-  font: 0.88rem / 1.65 var(--sw-font-mono);
+  font: var(--sw-text-small) / 1.65 var(--sw-font-mono);
 }
 .sw-terminal__body code {
   padding: 0;
@@ -249,45 +249,45 @@
 }
 .sw-terminal__note {
   margin: 0;
-  padding: 0 1.25rem 1.15rem;
+  padding: 0 var(--sw-space-5) var(--sw-space-5);
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
   line-height: 1.6;
 }
 
 .sw-engine-choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 1.25rem 0;
+  gap: var(--sw-space-4);
+  margin: var(--sw-space-5) 0;
 }
 .sw-engine-choice {
-  padding: 1.25rem;
+  padding: var(--sw-space-5);
   border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
 }
 .sw-engine-choice > span,
 .sw-engine-choice > small {
   display: block;
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
   color: var(--sw-fg-muted);
 }
 /* The performance page lifts the card heading to h3; it keeps the h4 size. */
 .sw-docs .sw-prose .sw-engine-choice h3 {
-  margin: 0.5rem 0;
-  font-size: 1rem;
-  letter-spacing: -0.01em;
+  margin: var(--sw-space-2) 0;
+  font-size: var(--sw-text-body);
+  letter-spacing: var(--sw-tracking-heading);
 }
 .sw-prose .sw-engine-choice p {
-  margin: 0.75rem 0 1.25rem;
+  margin: var(--sw-space-3) 0 var(--sw-space-5);
   color: var(--sw-fg-muted);
-  font-size: 0.9rem;
+  font-size: var(--sw-text-small);
 }
 .sw-engine-choice > strong {
   display: block;
   color: var(--sw-fg-strong);
-  font: 600 1.8rem / 1.4 var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-h2) / 1.4 var(--sw-font-display);
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 40rem) {
@@ -311,5 +311,5 @@
 }
 .sw-prose .sw-moved-guides code {
   justify-self: start;
-  font-size: 0.75rem;
+  font-size: var(--sw-text-eyebrow);
 }

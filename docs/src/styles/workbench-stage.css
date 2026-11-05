@@ -23,9 +23,9 @@
   :is(.sw-vw-gridstage__header, .sw-rwb-commandbar, .sw-vuewb-controlbar, .sw-svw-chrome) {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  gap: var(--sw-space-3) var(--sw-space-4);
   align-items: center;
-  padding: 1rem 1.25rem;
+  padding: var(--sw-space-4) var(--sw-space-5);
   min-height: 4.5rem;
   background: var(--sw-stage-bg);
   color: var(--sw-stage-fg);
@@ -35,7 +35,7 @@
   h2 {
   color: var(--sw-stage-fg);
   /* Workbench chrome, not a page hero: the grid keeps the visual weight. */
-  font: 650 clamp(1.05rem, 1.5vw, 1.25rem) / 1.2 var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1.2 var(--sw-font-display);
 }
 /* The query cluster keeps its place beside the identity and absorbs the free
    width, so the primary action and status never land on a half-empty row. It
@@ -44,21 +44,21 @@
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
+  gap: var(--sw-space-2) var(--sw-space-3);
   min-width: 0;
 }
 .sw-workbench-stage .sw-workbench-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: var(--sw-space-1-5);
   height: 2rem;
-  padding: 0 0.75rem;
+  padding: 0 var(--sw-space-3);
   border: 1px solid var(--sw-workbench-accent);
   border-radius: var(--sw-radius-md);
   background: var(--sw-workbench-accent);
   color: var(--sw-accent-ink);
-  font: 650 var(--sw-text-small) var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) var(--sw-font-body);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -72,14 +72,14 @@
 }
 .sw-workbench-readout {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--sw-space-1);
   margin-left: auto;
   text-align: right;
   font-size: var(--sw-text-caption);
   color: var(--sw-stage-muted);
 }
 .sw-workbench-readout strong {
-  font: 600 var(--sw-text-small) / 1.3 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.3 var(--sw-font-mono);
   color: var(--sw-stage-fg);
 }
 .sw-workbench-stage .sw-demo-button {
@@ -89,8 +89,8 @@
 @media (max-width: 42rem) {
   .sw-workbench-stage
     :is(.sw-vw-gridstage__header, .sw-rwb-commandbar, .sw-vuewb-controlbar, .sw-svw-chrome) {
-    padding: 1rem;
-    gap: 0.75rem;
+    padding: var(--sw-space-4);
+    gap: var(--sw-space-3);
   }
   .sw-workbench-readout {
     width: auto;

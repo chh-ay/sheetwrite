@@ -36,7 +36,7 @@
 .sw-rwb-editrow__label {
   flex: none;
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-text-caption) / 1 var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-display);
   white-space: nowrap;
 }
 
@@ -48,7 +48,7 @@
   border-radius: var(--sw-radius-xs);
   background: var(--sw-surface-0);
   color: var(--sw-accent-strong);
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
   text-align: center;
   white-space: nowrap;
 }
@@ -72,7 +72,7 @@
   border-radius: var(--sw-radius-xs);
   background: var(--sw-surface-1);
   color: var(--sw-fg);
-  font: 500 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1 var(--sw-font-mono);
   outline: 0;
 }
 
@@ -108,7 +108,7 @@
   border-radius: var(--sw-radius-xs);
   background: var(--sw-surface-1);
   color: var(--sw-fg);
-  font: 650 var(--sw-text-caption) / 1 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-body);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -214,14 +214,14 @@
 .sw-rwb-history__heading > span,
 .sw-rwb-toolgroup h3 {
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
-  letter-spacing: 0.08em;
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .sw-rwb-state__header strong {
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-text-small) / 1.2 var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.2 var(--sw-font-display);
 }
 
 .sw-rwb-state__phase {
@@ -230,7 +230,7 @@
   gap: var(--sw-space-1);
   align-items: center;
   color: var(--sw-accent-strong);
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 
 .sw-rwb-state__phase::before {
@@ -271,15 +271,15 @@
 .sw-rwb-query dt,
 .sw-rwb-kpi dt {
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
-  letter-spacing: 0.05em;
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 /* Query values are short phrases; wrap them instead of hiding the segment. */
 .sw-rwb-query dd {
   color: var(--sw-fg-strong);
-  font: 600 var(--sw-text-caption) / 1.3 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.3 var(--sw-font-body);
   overflow-wrap: anywhere;
 }
 
@@ -315,7 +315,7 @@
   margin: 0;
   overflow: visible;
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-text-small) / 1.15 var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.15 var(--sw-font-display);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -335,7 +335,7 @@
 .sw-rwb-history__heading strong {
   min-width: 0;
   color: var(--sw-fg);
-  font: 500 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -348,7 +348,7 @@
   display: block;
   min-height: calc(var(--sw-text-caption) * 2.5);
   color: var(--sw-fg);
-  font: 500 var(--sw-text-caption) / 1.35 var(--sw-font-body);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.35 var(--sw-font-body);
 }
 
 .sw-rwb-generation {
@@ -356,7 +356,7 @@
   padding: var(--sw-space-2) var(--sw-space-3);
   border-top: 1px solid var(--sw-border);
   color: var(--sw-fg-muted);
-  font: 500 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 
 /* The native sheet tabs need a clear selected state, not a low-contrast pill. */
@@ -384,7 +384,7 @@
   align-items: center;
   padding-inline: var(--sw-space-3);
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-text-caption) / 1 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-body);
   cursor: pointer;
   list-style: none;
 }
@@ -396,13 +396,13 @@
 .sw-rwb-tools > summary small {
   flex: 1;
   color: var(--sw-fg-muted);
-  font: 500 var(--sw-text-caption) / 1.4 var(--sw-font-body);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.4 var(--sw-font-body);
 }
 
 .sw-rwb-tools > summary::after {
   color: var(--sw-accent-strong);
   content: "Open";
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 
 .sw-rwb-tools[open] > summary::after {
@@ -467,7 +467,7 @@
   display: block;
   margin-top: var(--sw-space-2);
   color: var(--sw-fg-muted);
-  font: 500 var(--sw-text-caption) / 1.35 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.35 var(--sw-font-mono);
 }
 
 .sw-rwb-workflow__import {
@@ -480,7 +480,7 @@
   border-radius: var(--sw-radius-xs);
   background: var(--sw-surface-1);
   color: var(--sw-fg);
-  font: 650 var(--sw-text-caption) / 1 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-body);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -512,7 +512,7 @@
   align-items: center;
   padding-inline: var(--sw-space-2);
   color: var(--sw-accent-strong);
-  font: 650 var(--sw-text-caption) / 1 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-body);
   text-underline-offset: var(--sw-space-1);
   white-space: nowrap;
 }

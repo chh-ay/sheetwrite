@@ -173,3 +173,42 @@
     top: calc(var(--sw-header-height) + var(--sw-space-4));
   }
 }
+
+/* The grid host inside a demo: tall enough to work in, never taller than the
+   viewport below the header. */
+.sw-showcase__grid {
+  height: clamp(22rem, 72vh, 40rem);
+  min-width: 0;
+}
+
+.sw-showcase__readout {
+  display: grid;
+  gap: var(--sw-space-1);
+  margin: 0;
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-showcase__readout > div {
+  display: flex;
+  gap: var(--sw-space-3);
+  justify-content: space-between;
+  padding: var(--sw-space-1-5) 0;
+  border-bottom: var(--sw-border-width) dashed var(--sw-border);
+}
+
+.sw-showcase__readout > div:last-child {
+  border-bottom: 0;
+}
+
+.sw-showcase__readout dt {
+  color: var(--sw-fg-muted);
+}
+
+.sw-showcase__readout dd {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

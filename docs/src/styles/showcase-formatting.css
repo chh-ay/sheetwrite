@@ -9,7 +9,7 @@
   .sw-formatting {
     width: calc(100% - 2 * var(--sw-page-inset));
     margin-inline: auto;
-    padding-block: 2rem 4rem;
+    padding-block: var(--sw-space-8) var(--sw-space-16);
   }
 
   .sw-formatting-workspace {
@@ -30,8 +30,8 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    padding: 0.85rem 1rem;
+    gap: var(--sw-space-3);
+    padding: var(--sw-space-3) var(--sw-space-4);
     border-bottom: 1px solid var(--sw-border);
     background: var(--sw-surface-2);
   }
@@ -42,7 +42,7 @@
   .sw-formatting-toolbar span,
   .sw-formatting-caption {
     color: var(--sw-fg-muted);
-    font-size: 0.8rem;
+    font-size: var(--sw-text-caption);
   }
   .sw-formatting-formula {
     --sheetwrite-widget-bg: var(--sw-surface-2);
@@ -61,19 +61,19 @@
   .sw-formatting-controls {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    padding: 1.25rem;
+    gap: var(--sw-space-5);
+    padding: var(--sw-space-5);
     border-left: 1px solid var(--sw-border);
     background: var(--sw-surface-1);
   }
   .sw-formatting-controls h2 {
     margin: 0;
-    font-size: 1.15rem;
+    font-size: var(--sw-text-lead);
     color: var(--sw-fg-strong);
   }
   .sw-formatting-controls p {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: var(--sw-text-small);
     color: var(--sw-fg-muted);
     line-height: 1.65;
   }
@@ -84,26 +84,26 @@
     border: 0;
   }
   .sw-formatting-controls legend {
-    margin-bottom: 0.6rem;
-    font-size: 0.75rem;
-    font-weight: 650;
+    margin-bottom: var(--sw-space-2);
+    font-size: var(--sw-text-eyebrow);
+    font-weight: var(--sw-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.09em;
+    letter-spacing: var(--sw-tracking-eyebrow);
     color: var(--sw-fg-muted);
   }
   .sw-formatting-buttons {
     display: flex;
-    gap: 0.4rem;
+    gap: var(--sw-space-1-5);
     flex-wrap: wrap;
   }
   .sw-formatting button {
     border: 1px solid var(--sw-border-strong);
     border-radius: var(--sw-radius-xs);
-    padding: 0.45rem 0.65rem;
+    padding: var(--sw-space-2) var(--sw-space-3);
     background: var(--sw-surface-2);
     color: var(--sw-fg);
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--sw-text-caption);
     cursor: pointer;
   }
   .sw-formatting button:hover {
@@ -123,7 +123,7 @@
     color: var(--sw-accent-strong);
   }
   .sw-formatting-proof {
-    margin-top: 2rem;
+    margin-top: var(--sw-space-8);
     border: 1px solid var(--sw-border);
     border-radius: var(--sw-radius-lg);
     overflow: hidden;
@@ -134,41 +134,41 @@
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
-    padding: 1.25rem;
+    gap: var(--sw-space-4);
+    padding: var(--sw-space-5);
     background: var(--sw-surface-1);
   }
   .sw-formatting-proof h2 {
-    margin: 0 0 0.35rem;
+    margin: 0 0 var(--sw-space-1-5);
     color: var(--sw-fg-strong);
-    font-size: 1.2rem;
+    font-size: var(--sw-text-h3);
   }
   .sw-formatting-proof p {
     margin: 0;
     color: var(--sw-fg-muted);
     max-width: 65ch;
     line-height: 1.6;
-    font-size: 0.9rem;
+    font-size: var(--sw-text-small);
   }
   .sw-formatting-proof output {
     display: block;
-    padding: 1rem 1.25rem;
+    padding: var(--sw-space-4) var(--sw-space-5);
     border-top: 1px solid var(--sw-border);
     color: var(--sw-accent-strong);
   }
   .sw-formatting-notes {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
+    gap: var(--sw-space-8);
+    margin-top: var(--sw-space-8);
   }
   .sw-formatting-notes h2 {
-    font-size: 1rem;
+    font-size: var(--sw-text-body);
     color: var(--sw-fg-strong);
   }
   .sw-formatting-notes p {
     color: var(--sw-fg-muted);
-    font-size: 0.9rem;
+    font-size: var(--sw-text-small);
     line-height: 1.75;
   }
   .sw-formatting-notes a {
@@ -188,7 +188,7 @@
     }
     .sw-formatting-notes {
       grid-template-columns: minmax(0, 1fr);
-      gap: 0.5rem;
+      gap: var(--sw-space-2);
     }
   }
   @media (max-width: 600px) {

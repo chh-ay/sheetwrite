@@ -65,22 +65,22 @@
 .sw-clb__forecast-hud span {
   color: var(--sw-fg);
   font-size: var(--sw-text-small);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-clb__forecast-hud strong {
   color: var(--sw-fg-strong);
-  font: 650 1.3rem / 1.2 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1.2 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .sw-clb__forecast-card output {
   padding: var(--sw-space-1) var(--sw-space-2);
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   background: color-mix(in srgb, var(--sw-clb-head) 12%, var(--sw-surface-1));
   color: var(--sw-clb-head);
   font-size: var(--sw-text-small);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-clb__forecast-card p {
@@ -118,23 +118,23 @@
   color: var(--sw-fg-muted);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-text-caption);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .sw-clb__convergence strong {
   color: var(--sw-fg-strong);
-  font: 650 1.5rem / 1.1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-h2) / 1.1 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .sw-clb__convergence output {
   padding: var(--sw-space-1) var(--sw-space-2);
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   background: color-mix(in srgb, var(--sw-clb-hub) 14%, var(--sw-surface-1));
   color: var(--sw-clb-hub);
   font-size: var(--sw-text-caption);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
   line-height: 1.4;
 }
 
@@ -206,7 +206,7 @@
   margin-right: var(--sw-space-2);
   color: var(--sw-fg-muted);
   font-family: var(--sw-font-mono);
-  letter-spacing: 0.05em;
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -231,7 +231,7 @@
   margin: 0;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-caption);
-  letter-spacing: 0.05em;
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -295,14 +295,14 @@
   color: var(--sw-fg-muted);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-text-caption);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .sw-clb__sequence > header output {
   color: var(--sw-fg-strong);
   font-family: var(--sw-font-mono);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-clb__challenge {
@@ -314,7 +314,7 @@
   color: var(--sw-accent);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-text-caption);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -433,7 +433,7 @@
   color: var(--sw-fg);
   font-family: var(--sw-font-body);
   font-size: var(--sw-text-small);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
   cursor: pointer;
 }
 
@@ -499,12 +499,12 @@
   justify-self: start;
   padding: var(--sw-space-1) var(--sw-space-2);
   border: 1px solid color-mix(in srgb, var(--sw-accent) 32%, var(--sw-border));
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   background: var(--sw-surface-2);
   color: var(--sw-accent-strong);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-text-caption);
-  letter-spacing: 0.07em;
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
