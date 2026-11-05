@@ -43,6 +43,5 @@ export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data"> & {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/create-grid-from-snapshot/"><code>createGridFromSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/revision-coordinator/"><code>RevisionCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

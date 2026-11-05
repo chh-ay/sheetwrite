@@ -275,6 +275,8 @@ export type CommitReason =
   | "sort"
   | "undo"
   | "redo"
+  /** Restore of a history version. */
+  | "restore"
   /** `store.applyTransaction` from host code / unclassified. */
   | "api";
 

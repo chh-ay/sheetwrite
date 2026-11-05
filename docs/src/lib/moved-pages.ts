@@ -80,7 +80,7 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
       presence: "/docs/features/collaboration/#presence",
       "remote-operations-and-version-gaps":
         "/docs/features/collaboration/#remote-operations-and-version-gaps",
-      revisions: "/docs/features/collaboration/#revisions",
+      revisions: "/docs/features/collaboration/#restoring-versions",
     },
   },
   "/docs/guides/configuration/": {

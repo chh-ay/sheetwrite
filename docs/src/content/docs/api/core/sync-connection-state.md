@@ -8,7 +8,7 @@ description: "SyncConnectionState type in @sheetwrite/core: Host-controlled onli
 Host-controlled online state reported by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L82"><code>packages/core/src/sync.ts#L82</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L84"><code>packages/core/src/sync.ts#L84</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -19,6 +19,7 @@ export type SheetwriteErrorCode =
   | "resource-limit"
   | "invalid-snapshot"
   | "invalid-history"
+  | "invalid-scope"
   | "capacity"
   | "integrity"
   | "invalid-argument"
@@ -52,7 +53,6 @@ export type SheetwriteErrorCode =
   | "batch-limit"
   | "pending-capacity"
   | "presence-failed"
-  | "revision-failed"
   | "comment-failed"
   | "sync-failed"
   | "sync-storage-failed"
@@ -83,6 +83,7 @@ export const SHEETWRITE_ERROR_CODES = [
   "resource-limit",
   "invalid-snapshot",
   "invalid-history",
+  "invalid-scope",
   "capacity",
   "integrity",
   "invalid-argument",
@@ -116,7 +117,6 @@ export const SHEETWRITE_ERROR_CODES = [
   "batch-limit",
   "pending-capacity",
   "presence-failed",
-  "revision-failed",
   "comment-failed",
   "sync-failed",
   "sync-storage-failed",
@@ -152,7 +152,6 @@ export type SheetwriteErrorOperation =
   | "history"
   | "synchronize"
   | "presence"
-  | "revision"
   | "comment"
   | "query"
   | "row-bridge"
@@ -189,7 +188,6 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "history",
   "synchronize",
   "presence",
-  "revision",
   "comment",
   "query",
   "row-bridge",

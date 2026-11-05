@@ -11,6 +11,7 @@ import {
   type SheetwriteErrorContext,
 } from "./errors.js";
 import { type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
+import { restoreProvenanceOf } from "./restore-commit.js";
 import {
   assertAuthorId,
   assertCommitOperations,
@@ -46,6 +47,7 @@ import type {
   PersistenceAdapter,
   PersistenceCommitResponse,
   RemoteOperationSource,
+  RestoreProvenance,
   SyncMutationRecord,
   VersionedOperation,
 } from "./types/transaction.js";
@@ -202,7 +204,9 @@ export type SyncConflictReloadReason =
   /** A pending mutation of this client is already in the server history. */
   | "own-mutation"
   /** The grid did not apply a missed server version. */
-  | "rejected";
+  | "rejected"
+  /** A pending commit restores a history version; a restore is never rebased. */
+  | "restore";
 
 /** Outcome of `SyncCoordinator.recoverConflict`. */
 export type SyncConflictRecovery =
@@ -522,6 +526,7 @@ export class SyncCoordinator {
         clientMutationId: record.clientMutationId,
         operations: record.operations,
         ...(record.authorId !== undefined ? { authorId: record.authorId } : {}),
+        ...(record.restore !== undefined ? { restore: { ...record.restore } } : {}),
         signal: controller.signal,
       };
 
@@ -842,6 +847,12 @@ export class SyncCoordinator {
     const conflict = this.outstandingConflict;
     if (!conflict) return { status: "no-conflict" };
     const { response, appliedVersion } = conflict;
+
+    // A restore was planned against the version it conflicted with; the user
+    // previews and restores again on the reloaded document.
+    if (this.queue.toArray().some((record) => record.restore !== undefined)) {
+      return { status: "reload-required", reason: "restore" };
+    }
     const reload = (
       reason: SyncConflictReloadReason,
       rebaseConflict?: RebaseConflict,
@@ -937,6 +948,7 @@ export class SyncCoordinator {
           ? { versionOperationCounts: record.versionOperationCounts }
           : {}),
         ...(record.authorId !== undefined ? { authorId: record.authorId } : {}),
+        ...(record.restore !== undefined ? { restore: record.restore } : {}),
       };
       const versions = serverVersionsOf(record);
       for (let index = 0; index < versions; index++) baseVersion = incrementVersion(baseVersion);
@@ -1062,11 +1074,13 @@ export class SyncCoordinator {
 
     const reservedVersions = this.versionOperationCounts(sizes, encodedBytes)?.length ?? 1;
     assertVersion(this.version + this.queue.versionCount + reservedVersions, "pending version");
+    const restore = restoreProvenanceOf(operations);
     const reservation: LocalPendingReservation = {
       status: "reserved",
       clientMutationId: "",
       operationCount: operations.length,
       encodedBytes,
+      ...(restore !== undefined ? { restore } : {}),
     };
 
     this.localReservations.push(reservation);
@@ -1154,6 +1168,7 @@ export class SyncCoordinator {
         operations,
         ...(versionOperationCounts ? { versionOperationCounts } : {}),
         ...(this.options.authorId !== undefined ? { authorId: this.options.authorId } : {}),
+        ...(reservation.restore !== undefined ? { restore: reservation.restore } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
 
@@ -1960,6 +1975,8 @@ interface LocalPendingReservation {
   appliedOperations?: readonly DocumentOp[];
   appliedEncodedBytes?: number;
   appliedVersionOperationCounts?: readonly number[];
+  /** Restore provenance of the reserved operations, if they restore a history version. */
+  restore?: RestoreProvenance;
   storageRevision?: bigint;
 }
 
@@ -2031,6 +2048,7 @@ function clonePendingCommit(commit: PendingCommit): PendingCommit {
       ? { versionOperationCounts: [...commit.versionOperationCounts] }
       : {}),
     ...(commit.authorId !== undefined ? { authorId: commit.authorId } : {}),
+    ...(commit.restore !== undefined ? { restore: { ...commit.restore } } : {}),
   };
 }
 

@@ -9,6 +9,7 @@ import type { DocumentOp } from "./types/document.js";
 import type {
   PendingCommit,
   PersistenceCommitResponse,
+  RestoreProvenance,
   VersionBatchMember,
 } from "./types/transaction.js";
 
@@ -207,6 +208,8 @@ export function assertPendingCommit(
   assertMutationId(ownDataValue(record, "clientMutationId"), limits);
   const authorId = optionalOwnDataValue(record, "authorId");
   if (authorId !== undefined) assertAuthorId(authorId, limits);
+  const restore = optionalOwnDataValue(record, "restore");
+  if (restore !== undefined) assertRestoreProvenance(restore, limits);
   const operations = ownDataValue(record, "operations");
   const bytes = assertOperationResources(
     operations,
@@ -318,6 +321,19 @@ export function assertAuthorId(
       `authorId must be nonempty and at most ${limits.maxMutationIdBytes} UTF-8 bytes`,
     );
   }
+}
+
+function assertRestoreProvenance(
+  value: unknown,
+  limits: Readonly<SyncCoordinatorLimits>,
+): asserts value is RestoreProvenance {
+  const record = assertPlainRecord(value, "Restore provenance must be a plain object");
+  const scope = ownDataValue(record, "scope");
+  if (scope !== "workbook" && scope !== "sheet" && scope !== "range") {
+    throw new SyncProtocolError("invalid-id", "Restore scope must be workbook, sheet or range");
+  }
+
+  assertAuthorId(ownDataValue(record, "versionId"), limits);
 }
 
 function assertOperations(value: unknown, limits: Readonly<SyncCoordinatorLimits>): number {

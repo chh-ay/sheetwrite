@@ -9,10 +9,20 @@ One transaction as the document authority committed it: its revisions, its
 author and its time. History archives record these, never optimistic edits.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L156"><code>packages/core/src/types/transaction.ts#L156</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L168"><code>packages/core/src/types/transaction.ts#L168</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#committed-transaction-base-revision"><code>baseRevision</code></a>
+<a href="#committed-transaction-revision"><code>revision</code></a>
+<a href="#committed-transaction-mutation-id"><code>mutationId</code></a>
+<a href="#committed-transaction-author-id"><code>authorId</code></a>
+<a href="#committed-transaction-time"><code>time</code></a>
+<a href="#committed-transaction-operations"><code>operations</code></a>
+<a href="#committed-transaction-restore"><code>restore</code></a>
+</nav>
+
+## Members <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-member-list">
 
@@ -69,6 +79,15 @@ operations: readonly DocumentOp[];
 ```
 
 </details>
+
+<details class="api-member" id="committed-transaction-restore" data-pagefind-weight="1">
+<summary><code>restore</code> <span class="api-member-summary">Present when the transaction restores a history version.</span></summary>
+
+```ts generated
+restore?: RestoreProvenance;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -84,6 +103,7 @@ export interface CommittedTransaction {
   authorId: string;
   time: number;
   operations: readonly DocumentOp[];
+  restore?: RestoreProvenance;
 }
 ```
 

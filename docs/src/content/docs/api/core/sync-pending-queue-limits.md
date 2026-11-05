@@ -8,7 +8,7 @@ description: "SyncPendingQueueLimits interface in @sheetwrite/core: Aggregate ce
 Aggregate ceilings for local commits retained until durable acknowledgement.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync-protocol.ts#L16"><code>packages/core/src/sync-protocol.ts#L16</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync-protocol.ts#L17"><code>packages/core/src/sync-protocol.ts#L17</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "168f1cc00fb9ebd2e774414f6ab5475291544c526609dd3a5cbdaa7e09e1b64c",
+  "sha256": "ebe202f6fde1b66687487d5a46071f584e987ca51e9d8c1293c716c6b92bd298",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -211,13 +211,7 @@
         "ResolvedCell",
         "ResolvedHyperlinkTarget",
         "ResourceOwnerBytes",
-        "RevisionAdapter",
-        "RevisionCoordinator",
-        "RevisionCoordinatorEvent",
-        "RevisionCoordinatorOptions",
-        "RevisionRestoreRequest",
-        "RevisionRestoreResponse",
-        "RevisionSummary",
+        "RestoreProvenance",
         "RibbonConfig",
         "RibbonMode",
         "RowBridge",
@@ -522,6 +516,8 @@
         "HistoryPublishRequest",
         "HistoryPutRequest",
         "HistoryRecordMetadata",
+        "HistoryRestoreOptions",
+        "HistoryRestoreScope",
         "HistorySnapshotProvider",
         "HistoryStorageAdapter",
         "HistoryStorageRequest",

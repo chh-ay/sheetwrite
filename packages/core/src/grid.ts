@@ -65,6 +65,7 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
+import { registerGridDocument } from "./restore-commit.js";
 import type { CommandToolbar } from "./ribbon/command-toolbar.js";
 import {
   assertRibbonConfig,
@@ -701,6 +702,7 @@ export class GridImpl implements Grid {
       admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
       trustedResourceCallbacks: true,
     });
+    registerGridDocument(this, this.document);
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
     // construction; the input controller consults this on every keydown.
