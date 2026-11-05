@@ -90,7 +90,9 @@ async function setup(readOnly = false) {
   const store = new SheetwriteStore(workbook());
   const write = (row: number, col: number, value: string | number) =>
     store.applyTransaction({
-      patches: [{ op: "set", addr: { sheet: "data", row, col }, value: { kind: "literal", value } }],
+      patches: [
+        { op: "set", addr: { sheet: "data", row, col }, value: { kind: "literal", value } },
+      ],
     });
   ["Region", "East", "West", "East"].forEach((value, row) => write(row, 0, value));
   ["Amount", 1, 2, 3].forEach((value, row) => write(row, 1, value));
@@ -98,7 +100,11 @@ async function setup(readOnly = false) {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 1200 }, clientHeight: { value: 600 } });
   document.body.appendChild(host);
-  const grid = new GridImpl(host, { workbook: workbook(), readOnly, config: { ribbon: true } }, store);
+  const grid = new GridImpl(
+    host,
+    { workbook: workbook(), readOnly, config: { ribbon: true } },
+    store,
+  );
   grids.push(grid);
   await import(RIBBON_MODULE);
 
@@ -185,9 +191,9 @@ it("resizes an item by dragging its corner", async () => {
 it("keeps one slicer value on a click and adds one with Ctrl, as saved changes", async () => {
   const { host, items, press, grid } = await setup();
   const value = (label: string) => {
-    const button = [...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value")].find(
-      (candidate) => candidate.textContent === label,
-    );
+    const button = [
+      ...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value"),
+    ].find((candidate) => candidate.textContent === label);
     if (button === undefined) throw new Error(`no slicer value ${label}`);
     return button;
   };
@@ -234,4 +240,18 @@ it("adds a dashboard from Insert and shows it", async () => {
   expect(added).toMatchObject({ name: "Dashboard1", kind: "dashboard" });
   expect(grid.getActiveSheet()).toBe(added?.id ?? "");
   expect(host.querySelector(".sheetwrite-dashboard-empty")?.textContent).toContain("empty");
+});
+
+it("computes dashboard pivots on the full engine, in its own process", async () => {
+  // Engine selection is process-wide, so the full-engine checks run apart.
+  const probe = Bun.spawn(
+    [process.execPath, "test", "./packages/core/test/dashboard.full-engine.ts"],
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+  );
+  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+
+  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+    exitCode: 0,
+    failures: [],
+  });
 });

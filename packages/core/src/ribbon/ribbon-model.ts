@@ -673,9 +673,15 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            ...button("New Dashboard", "dashboard", (grid) => grid.actions.newDashboard(), "newDashboard", {
-              large: true,
-            }),
+            ...button(
+              "New Dashboard",
+              "dashboard",
+              (grid) => grid.actions.newDashboard(),
+              "newDashboard",
+              {
+                large: true,
+              },
+            ),
             id: "newDashboard",
           },
         ],

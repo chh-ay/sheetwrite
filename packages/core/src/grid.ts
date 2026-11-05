@@ -11,6 +11,7 @@ import {
 import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
+import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
@@ -55,7 +56,6 @@ import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
@@ -2973,7 +2973,11 @@ export class GridImpl implements Grid {
     const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.name.toLowerCase()));
     let number = 1;
     while (names.has(`dashboard${number}`)) number += 1;
-    const result = this.addSheet({ id: "dashboard", name: `Dashboard${number}`, kind: "dashboard" });
+    const result = this.addSheet({
+      id: "dashboard",
+      name: `Dashboard${number}`,
+      kind: "dashboard",
+    });
     if (result.status === "applied") this.setActiveSheet(result.sheet);
   }
 

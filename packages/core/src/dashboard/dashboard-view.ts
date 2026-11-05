@@ -5,8 +5,8 @@
 // is one undo step. This module loads as its own chunk (#231).
 
 import { cellScalarToText } from "../cell-input.js";
-import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
 import { pivotsAvailable } from "../panels/panel-loader.js";
+import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
 import { compareScalars, scalarLabel, sourceDataRange } from "../panels/pivot-model.js";
 import { Scope } from "../scope.js";
 import type { CellScalar } from "../types/cell.js";
@@ -27,7 +27,8 @@ import {
   resizedBox,
 } from "./dashboard-layout.js";
 
-const NEEDS_FULL_ENGINE = "This item needs the full engine. Load @sheetwrite/formulas to compute it.";
+const NEEDS_FULL_ENGINE =
+  "This item needs the full engine. Load @sheetwrite/formulas to compute it.";
 const TAKEN = "Another item is in that place.";
 const MOVE_HINT = "Arrow keys move the item. Enter or Escape ends.";
 const RESIZE_HINT = "Arrow keys resize the item. Enter or Escape ends.";
@@ -72,8 +73,8 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   let rendered = "";
 
   const items = (): DashboardItem[] =>
-    grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard
-      ?.items ?? [];
+    grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
+    [];
 
   /** Commit `item`; a refused change leaves the dashboard as it was and says why. */
   const commit = (item: DashboardItem): boolean => {
@@ -266,7 +267,8 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     // Keep the focus on the same item through the rebuild.
     const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
     build();
-    if (focused !== undefined && root.contains(document.activeElement) === false) focusItem(focused);
+    if (focused !== undefined && root.contains(document.activeElement) === false)
+      focusItem(focused);
   };
 
   lifetime.add(grid.on("change", () => refresh()));
@@ -316,7 +318,12 @@ function note(text: string): HTMLElement {
 }
 
 /** The pivot's result as a table: header rows and label columns are header cells. */
-function renderPivot(body: HTMLElement, grid: Grid, sheet: SheetId, item: DashboardPivotItem): void {
+function renderPivot(
+  body: HTMLElement,
+  grid: Grid,
+  sheet: SheetId,
+  item: DashboardPivotItem,
+): void {
   if (!pivotsAvailable(grid)) {
     body.appendChild(note(NEEDS_FULL_ENGINE));
     return;
