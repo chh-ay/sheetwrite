@@ -29,6 +29,16 @@ function result<T>(request: IDBRequest<T>): Promise<T> {
   return promise;
 }
 
+/** A browser can report exhausted quota from a request or from the transaction abort. */
+function storageFailure(failure: unknown): unknown {
+  if (failure instanceof DOMException && failure.name === "QuotaExceededError") {
+    return new HistoryError("capacity", "IndexedDB history storage quota is exhausted", {
+      cause: failure,
+    });
+  }
+  return failure;
+}
+
 function openDatabase(
   factory: IDBFactory,
   name: string,
@@ -248,18 +258,11 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
         failure = cause;
         transaction.abort();
         await completion.promise;
-        throw cause;
+        throw storageFailure(cause);
       }
       await completion.promise;
       checkAbort(request.signal);
-      if (failure !== undefined) {
-        if (failure instanceof DOMException && failure.name === "QuotaExceededError") {
-          throw new HistoryError("capacity", "IndexedDB history storage quota is exhausted", {
-            cause: failure,
-          });
-        }
-        throw failure;
-      }
+      if (failure !== undefined) throw storageFailure(failure);
       return output;
     } finally {
       request.signal?.removeEventListener("abort", abort);

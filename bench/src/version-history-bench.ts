@@ -12,6 +12,7 @@ import {
   MemoryHistoryStorage,
   type HistoryCommit,
 } from "../../packages/core/src/history-archive.js";
+import { releaseEngineMemory } from "../../packages/core/src/index.js";
 import type { CellValue } from "../../packages/core/src/types/cell.js";
 import type { SnapshotCell, WorkbookSnapshot } from "../../packages/core/src/types/document.js";
 
@@ -141,22 +142,16 @@ async function session() {
   await collectGarbage();
   const baseline = observation();
   let peak = baseline;
-  let source: WorkbookSnapshot | undefined = workbook();
+  const source = workbook();
   const snapshotBytes = new TextEncoder().encode(JSON.stringify(source)).length;
-  let storage: MemoryHistoryStorage | undefined = new MemoryHistoryStorage();
-  let archive: HistoryArchive | undefined = await HistoryArchive.open({
-    documentId: "forecast",
-    storage,
-  });
+  const storage = new MemoryHistoryStorage();
+  const archive = await HistoryArchive.open({ documentId: "forecast", storage });
   const started = performance.now();
   await archive.initialize(source, 0);
   let reviewId = "";
   for (let revision = 1; revision <= TRANSACTIONS; revision++) {
     const entry = commit(revision, source);
-    await archive.record(entry, () => {
-      if (!source) throw new Error("Session snapshot was released too early");
-      return source;
-    });
+    await archive.record(entry, () => source);
     if (revision === TRANSACTIONS - 1)
       reviewId = (await archive.saveVersion("Review", "alice", entry.time)).id;
     if (revision % 125 === 0) {
@@ -181,11 +176,6 @@ async function session() {
   await verifyReplay(archive, reviewId);
   await collectGarbage();
   const afterReplay = observation();
-  source = undefined;
-  archive = undefined;
-  storage = undefined;
-  await collectGarbage();
-  const afterRelease = observation();
   return {
     cells: ROWS * COLS,
     transactions: TRANSACTIONS,
@@ -198,11 +188,16 @@ async function session() {
     peak,
     retained,
     afterReplay,
-    afterRelease,
   };
 }
 
+// Release is measured after the session frame returns, so no local keeps the archive alive.
 const capture = await session();
+await collectGarbage();
+const afterRelease = observation();
+await releaseEngineMemory();
+await collectGarbage();
+const afterEngineRelease = observation();
 const bundles = {
   default: await compressedBundle(resolve(ROOT, "packages/core/src/index.ts")),
   history: await compressedBundle(resolve(ROOT, "packages/core/src/history-archive.ts")),
@@ -214,5 +209,5 @@ for (const name of ["wasm", "formulas"]) {
   engines[name] = { bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
 }
 process.stdout.write(
-  `${JSON.stringify({ platform: process.platform, arch: process.arch, capture, bundles, engines }, null, 2)}\n`,
+  `${JSON.stringify({ platform: process.platform, arch: process.arch, capture: { ...capture, afterRelease, afterEngineRelease }, bundles, engines }, null, 2)}\n`,
 );

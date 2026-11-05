@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "7283d96880dfd08a6d500d1b000357930ad1e035327c2c02ea5b6560b421c5f1",
+  "sha256": "a1c2a502ad8b7407e162b4b7e7d3d50a25ff194b93e841741caf6f446b5ca985",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -30,7 +30,9 @@
     {
       "package": "@sheetwrite/charts",
       "entryPoint": "./register",
-      "exports": ["registerChartsBackend"]
+      "exports": [
+        "registerChartsBackend"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -469,6 +471,14 @@
     },
     {
       "package": "@sheetwrite/core",
+      "entryPoint": "./browser/history",
+      "exports": [
+        "IndexedDbHistoryStorage",
+        "IndexedDbHistoryStorageOptions"
+      ]
+    },
+    {
+      "package": "@sheetwrite/core",
       "entryPoint": "./functions",
       "exports": [
         "FormulaAnalysis",
@@ -488,6 +498,36 @@
         "listFunctions",
         "registerFunction",
         "unregisterFunction"
+      ]
+    },
+    {
+      "package": "@sheetwrite/core",
+      "entryPoint": "./history",
+      "exports": [
+        "DEFAULT_HISTORY_LIMITS",
+        "HistoryArchive",
+        "HistoryArchiveOptions",
+        "HistoryCommit",
+        "HistoryError",
+        "HistoryErrorCode",
+        "HistoryGetRequest",
+        "HistoryHead",
+        "HistoryLimits",
+        "HistoryListPage",
+        "HistoryListRequest",
+        "HistoryManifest",
+        "HistoryPinRequest",
+        "HistoryPruneRequest",
+        "HistoryPublishRequest",
+        "HistoryPutRequest",
+        "HistoryRecordMetadata",
+        "HistorySnapshotProvider",
+        "HistoryStorageAdapter",
+        "HistoryStorageRequest",
+        "HistoryStorageUsage",
+        "HistoryStoredRecord",
+        "HistoryVersion",
+        "MemoryHistoryStorage"
       ]
     },
     {
@@ -524,7 +564,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+      "exports": [
+        "WorkerAcknowledgement",
+        "createWorkerMessageHandler"
+      ]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -680,7 +723,9 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": ["registerXlsxBackends"]
+      "exports": [
+        "registerXlsxBackends"
+      ]
     }
   ]
 }

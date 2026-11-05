@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import { IDBFactory } from "fake-indexeddb";
+import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
 
 import { initSheetwrite } from "../src/grid.js";
 import {
@@ -253,6 +253,29 @@ for (const backend of ["memory", "indexeddb"] as const) {
 }
 
 describe("history trust and cancellation", () => {
+  it("maps exhausted IndexedDB quota to a capacity failure and keeps the last durable version", async () => {
+    const storage = new IndexedDbHistoryStorage({
+      databaseName: "history-quota",
+      indexedDB: new IDBFactory(),
+    });
+    const archive = await open(storage);
+    await archive.initialize(snapshot(), 0);
+    const version = await archive.saveVersion("Safe", "alice", 0);
+    const before = await archive.storageUsage();
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function quotaPut(this: IDBObjectStore, ...args) {
+      if (this.name === "records") throw new DOMException("Quota", "QuotaExceededError");
+      return put.apply(this, args);
+    };
+    try {
+      await expect(archive.record(change(1))).rejects.toMatchObject({ code: "capacity" });
+    } finally {
+      IDBObjectStore.prototype.put = put;
+    }
+    expect(await archive.storageUsage()).toEqual(before);
+    expect((await archive.readVersion(version.id)).version).toBe(0);
+  });
+
   it("rejects corrupted adapter bytes and releases the reader lease on failure", async () => {
     const durable = new MemoryHistoryStorage();
     let corrupt = false;

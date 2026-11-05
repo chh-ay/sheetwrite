@@ -3052,7 +3052,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L521",
+              "source": "src/errors.ts#L529",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure\nenvelopes by shape: a string `name` and `message`, a non-empty string `code`\nand `operation`, and a JSON-safe `context` when present. The guard does not\ncheck `code` against a list, so a code from a newer Sheetwrite still passes;\nhandle unknown codes in the `default` branch of a `switch`.",
               "memberDocs": []
@@ -5127,11 +5127,11 @@
             {
               "name": "SHEETWRITE_ERROR_CODES",
               "kind": "variable",
-              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"engine-failed\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"invalid-argument\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"engine-failed\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"invalid-history\", \"capacity\", \"integrity\", \"invalid-argument\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L68",
+              "source": "src/errors.ts#L71",
               "jsDocTags": [],
               "documentation": "Every `SheetwriteErrorCode`, for hosts that list the codes at run time.\nSheetwrite itself does not read this array, so a bundle that does not import\nit does not contain it.",
               "memberDocs": []
@@ -5139,11 +5139,11 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"engine\", \"store\", \"transaction\", \"render\", \"datasource-request\", \"renderer-worker\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comment\", \"query\", \"row-bridge\", \"resource-diagnostics\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"engine\", \"store\", \"transaction\", \"render\", \"datasource-request\", \"renderer-worker\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"history\", \"synchronize\", \"presence\", \"revision\", \"comment\", \"query\", \"row-bridge\", \"resource-diagnostics\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L162",
+              "source": "src/errors.ts#L169",
               "jsDocTags": [],
               "documentation": "Every `SheetwriteErrorOperation`, for hosts that list the operations at run\ntime. Sheetwrite itself does not read this array.",
               "memberDocs": []
@@ -5172,7 +5172,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L477",
+              "source": "src/errors.ts#L485",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.\nThe message is cut to an 8 KiB UTF-8 budget, and so is the sum of the\ncontext strings, because both can quote host or file data.",
               "memberDocs": []
@@ -5180,7 +5180,7 @@
             {
               "name": "SheetwriteErrorCode",
               "kind": "type",
-              "signature": "export type SheetwriteErrorCode = | \"initialization-failed\" | \"initialization-required\" | \"engine-failed\" | \"datasource-request-failed\" | \"renderer-fallback\" | \"export-failed\" | \"xlsx-import-failed\" | \"optional-backend-unavailable\" | \"delimited-text-resource-limit\" | \"delimited-text-invalid-limit\" | \"xlsx-resource-limit\" | \"resource-limit\" | \"invalid-snapshot\" | \"invalid-argument\" | \"aborted\" | \"not-found\" | \"commit-rejected\" | \"unavailable\" | \"blocked\" | \"quota\" | \"unsupported-schema\" | \"transaction\" | \"conflict\" | \"limit\" | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\" | \"pending-capacity\" | \"presence-failed\" | \"revision-failed\" | \"comment-failed\" | \"sync-failed\" | \"sync-storage-failed\" | \"incomplete-data\" | \"xlsx-invalid-options\" | \"unsafe-hyperlink\" | \"invalid-shortcut\" | \"shortcut-conflict\" | \"invalid-function\";",
+              "signature": "export type SheetwriteErrorCode = | \"initialization-failed\" | \"initialization-required\" | \"engine-failed\" | \"datasource-request-failed\" | \"renderer-fallback\" | \"export-failed\" | \"xlsx-import-failed\" | \"optional-backend-unavailable\" | \"delimited-text-resource-limit\" | \"delimited-text-invalid-limit\" | \"xlsx-resource-limit\" | \"resource-limit\" | \"invalid-snapshot\" | \"invalid-history\" | \"capacity\" | \"integrity\" | \"invalid-argument\" | \"aborted\" | \"not-found\" | \"commit-rejected\" | \"unavailable\" | \"blocked\" | \"quota\" | \"unsupported-schema\" | \"transaction\" | \"conflict\" | \"limit\" | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\" | \"pending-capacity\" | \"presence-failed\" | \"revision-failed\" | \"comment-failed\" | \"sync-failed\" | \"sync-storage-failed\" | \"incomplete-data\" | \"xlsx-invalid-options\" | \"unsafe-hyperlink\" | \"invalid-shortcut\" | \"shortcut-conflict\" | \"invalid-function\";",
               "owners": [
                 "src/errors.ts"
               ],
@@ -5196,7 +5196,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L205",
+              "source": "src/errors.ts#L213",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -5208,7 +5208,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L196",
+              "source": "src/errors.ts#L204",
               "jsDocTags": [],
               "documentation": "JSON-safe values accepted in a public failure context.",
               "memberDocs": []
@@ -5220,7 +5220,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L208",
+              "source": "src/errors.ts#L216",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -5228,11 +5228,11 @@
             {
               "name": "SheetwriteErrorOperation",
               "kind": "type",
-              "signature": "export type SheetwriteErrorOperation = | \"initialize\" | \"create-grid\" | \"engine\" | \"store\" | \"transaction\" | \"render\" | \"datasource-request\" | \"renderer-worker\" | \"xlsx-import\" | \"xlsx-export\" | \"delimited-parse\" | \"delimited-import\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-options\" | \"snapshot-validate\" | \"snapshot-allocate\" | \"persistence\" | \"pending-storage\" | \"synchronize\" | \"presence\" | \"revision\" | \"comment\" | \"query\" | \"row-bridge\" | \"resource-diagnostics\" | \"hyperlink-activate\" | \"keyboard-configure\" | \"chart-view\" | \"host-function\";",
+              "signature": "export type SheetwriteErrorOperation = | \"initialize\" | \"create-grid\" | \"engine\" | \"store\" | \"transaction\" | \"render\" | \"datasource-request\" | \"renderer-worker\" | \"xlsx-import\" | \"xlsx-export\" | \"delimited-parse\" | \"delimited-import\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-options\" | \"snapshot-validate\" | \"snapshot-allocate\" | \"persistence\" | \"pending-storage\" | \"history\" | \"synchronize\" | \"presence\" | \"revision\" | \"comment\" | \"query\" | \"row-bridge\" | \"resource-diagnostics\" | \"hyperlink-activate\" | \"keyboard-configure\" | \"chart-view\" | \"host-function\";",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L126",
+              "source": "src/errors.ts#L132",
               "jsDocTags": [],
               "documentation": "Stable operation at which a consumer-visible failure can surface.",
               "memberDocs": []
@@ -5244,7 +5244,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L218",
+              "source": "src/errors.ts#L226",
               "jsDocTags": [],
               "documentation": "Optional cause, diagnostic context, and boundary-known retryability.",
               "memberDocs": [
@@ -7555,7 +7555,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L521",
+              "source": "src/errors.ts#L529",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure\nenvelopes by shape: a string `name` and `message`, a non-empty string `code`\nand `operation`, and a JSON-safe `context` when present. The guard does not\ncheck `code` against a list, so a code from a newer Sheetwrite still passes;\nhandle unknown codes in the `default` branch of a `switch`.",
               "memberDocs": []
@@ -7866,11 +7866,11 @@
             {
               "name": "SHEETWRITE_ERROR_CODES",
               "kind": "variable",
-              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"engine-failed\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"invalid-argument\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"engine-failed\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"invalid-history\", \"capacity\", \"integrity\", \"invalid-argument\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"invalid-batch\", \"batch-limit\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\", \"unsafe-hyperlink\", \"invalid-shortcut\", \"shortcut-conflict\", \"invalid-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L68",
+              "source": "src/errors.ts#L71",
               "jsDocTags": [],
               "documentation": "Every `SheetwriteErrorCode`, for hosts that list the codes at run time.\nSheetwrite itself does not read this array, so a bundle that does not import\nit does not contain it.",
               "memberDocs": []
@@ -7878,11 +7878,11 @@
             {
               "name": "SHEETWRITE_ERROR_OPERATIONS",
               "kind": "variable",
-              "signature": "readonly [\"initialize\", \"create-grid\", \"engine\", \"store\", \"transaction\", \"render\", \"datasource-request\", \"renderer-worker\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comment\", \"query\", \"row-bridge\", \"resource-diagnostics\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"engine\", \"store\", \"transaction\", \"render\", \"datasource-request\", \"renderer-worker\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"history\", \"synchronize\", \"presence\", \"revision\", \"comment\", \"query\", \"row-bridge\", \"resource-diagnostics\", \"hyperlink-activate\", \"keyboard-configure\", \"chart-view\", \"host-function\"]",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L162",
+              "source": "src/errors.ts#L169",
               "jsDocTags": [],
               "documentation": "Every `SheetwriteErrorOperation`, for hosts that list the operations at run\ntime. Sheetwrite itself does not read this array.",
               "memberDocs": []
@@ -7894,7 +7894,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L477",
+              "source": "src/errors.ts#L485",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.\nThe message is cut to an 8 KiB UTF-8 budget, and so is the sum of the\ncontext strings, because both can quote host or file data.",
               "memberDocs": []
@@ -7902,7 +7902,7 @@
             {
               "name": "SheetwriteErrorCode",
               "kind": "type",
-              "signature": "export type SheetwriteErrorCode = | \"initialization-failed\" | \"initialization-required\" | \"engine-failed\" | \"datasource-request-failed\" | \"renderer-fallback\" | \"export-failed\" | \"xlsx-import-failed\" | \"optional-backend-unavailable\" | \"delimited-text-resource-limit\" | \"delimited-text-invalid-limit\" | \"xlsx-resource-limit\" | \"resource-limit\" | \"invalid-snapshot\" | \"invalid-argument\" | \"aborted\" | \"not-found\" | \"commit-rejected\" | \"unavailable\" | \"blocked\" | \"quota\" | \"unsupported-schema\" | \"transaction\" | \"conflict\" | \"limit\" | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\" | \"pending-capacity\" | \"presence-failed\" | \"revision-failed\" | \"comment-failed\" | \"sync-failed\" | \"sync-storage-failed\" | \"incomplete-data\" | \"xlsx-invalid-options\" | \"unsafe-hyperlink\" | \"invalid-shortcut\" | \"shortcut-conflict\" | \"invalid-function\";",
+              "signature": "export type SheetwriteErrorCode = | \"initialization-failed\" | \"initialization-required\" | \"engine-failed\" | \"datasource-request-failed\" | \"renderer-fallback\" | \"export-failed\" | \"xlsx-import-failed\" | \"optional-backend-unavailable\" | \"delimited-text-resource-limit\" | \"delimited-text-invalid-limit\" | \"xlsx-resource-limit\" | \"resource-limit\" | \"invalid-snapshot\" | \"invalid-history\" | \"capacity\" | \"integrity\" | \"invalid-argument\" | \"aborted\" | \"not-found\" | \"commit-rejected\" | \"unavailable\" | \"blocked\" | \"quota\" | \"unsupported-schema\" | \"transaction\" | \"conflict\" | \"limit\" | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\" | \"pending-capacity\" | \"presence-failed\" | \"revision-failed\" | \"comment-failed\" | \"sync-failed\" | \"sync-storage-failed\" | \"incomplete-data\" | \"xlsx-invalid-options\" | \"unsafe-hyperlink\" | \"invalid-shortcut\" | \"shortcut-conflict\" | \"invalid-function\";",
               "owners": [
                 "src/errors.ts"
               ],
@@ -7918,7 +7918,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L205",
+              "source": "src/errors.ts#L213",
               "jsDocTags": [],
               "documentation": "Stable, serialization-safe diagnostic context.",
               "memberDocs": []
@@ -7930,7 +7930,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L208",
+              "source": "src/errors.ts#L216",
               "jsDocTags": [],
               "documentation": "Structural form preserved across realms and JSON serialization.",
               "memberDocs": []
@@ -7938,11 +7938,11 @@
             {
               "name": "SheetwriteErrorOperation",
               "kind": "type",
-              "signature": "export type SheetwriteErrorOperation = | \"initialize\" | \"create-grid\" | \"engine\" | \"store\" | \"transaction\" | \"render\" | \"datasource-request\" | \"renderer-worker\" | \"xlsx-import\" | \"xlsx-export\" | \"delimited-parse\" | \"delimited-import\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-options\" | \"snapshot-validate\" | \"snapshot-allocate\" | \"persistence\" | \"pending-storage\" | \"synchronize\" | \"presence\" | \"revision\" | \"comment\" | \"query\" | \"row-bridge\" | \"resource-diagnostics\" | \"hyperlink-activate\" | \"keyboard-configure\" | \"chart-view\" | \"host-function\";",
+              "signature": "export type SheetwriteErrorOperation = | \"initialize\" | \"create-grid\" | \"engine\" | \"store\" | \"transaction\" | \"render\" | \"datasource-request\" | \"renderer-worker\" | \"xlsx-import\" | \"xlsx-export\" | \"delimited-parse\" | \"delimited-import\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-options\" | \"snapshot-validate\" | \"snapshot-allocate\" | \"persistence\" | \"pending-storage\" | \"history\" | \"synchronize\" | \"presence\" | \"revision\" | \"comment\" | \"query\" | \"row-bridge\" | \"resource-diagnostics\" | \"hyperlink-activate\" | \"keyboard-configure\" | \"chart-view\" | \"host-function\";",
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L126",
+              "source": "src/errors.ts#L132",
               "jsDocTags": [],
               "documentation": "Stable operation at which a consumer-visible failure can surface.",
               "memberDocs": []
@@ -8115,6 +8115,39 @@
               "source": "src/indexeddb.ts#L38",
               "jsDocTags": [],
               "documentation": "Database and store naming options for durable pending commits.",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./browser/history",
+          "target": "./dist/history-indexeddb.d.ts",
+          "source": "src/history-indexeddb.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "IndexedDbHistoryStorage",
+              "kind": "class",
+              "signature": "class IndexedDbHistoryStorage extends AtomicHistoryStorage { constructor(options?: IndexedDbHistoryStorageOptions); transact: <T>(request: HistoryStorageRequest, action: (transaction: HistoryStorageTransaction) => Promise<T>) => Promise<T> }",
+              "owners": [
+                "src/history-indexeddb.ts"
+              ],
+              "source": "src/history-indexeddb.ts#L156",
+              "jsDocTags": [],
+              "documentation": "Browser-only history storage with atomic publication and restart-safe reference counts.",
+              "memberDocs": []
+            },
+            {
+              "name": "IndexedDbHistoryStorageOptions",
+              "kind": "interface",
+              "signature": "export interface IndexedDbHistoryStorageOptions { databaseName?: string; indexedDB?: IDBFactory; }",
+              "owners": [
+                "src/history-indexeddb.ts"
+              ],
+              "source": "src/history-indexeddb.ts#L19",
+              "jsDocTags": [],
+              "documentation": "Database selection for a host-owned browser history archive.",
               "memberDocs": []
             }
           ]
@@ -8342,6 +8375,340 @@
                 "throws"
               ],
               "documentation": "Removes a host function from `store`. Formulas that call it show `#NAME?`.\nReturns whether the function existed.",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./history",
+          "target": "./dist/history-archive.d.ts",
+          "source": "src/history-archive.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "DEFAULT_HISTORY_LIMITS",
+              "kind": "variable",
+              "signature": "Readonly<HistoryLimits>",
+              "owners": [
+                "src/version-history/codec.ts"
+              ],
+              "source": "src/version-history/codec.ts#L28",
+              "jsDocTags": [],
+              "documentation": "Default byte, count, cadence, and retention bounds.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryArchive",
+              "kind": "class",
+              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: { maxEntries?: number; maxBytes?: number; cursor?: string; signal?: AbortSignal; }) => Promise<HistoryListPage>; prune: (options?: { beforeTime?: number; targetBytes?: number; signal?: AbortSignal; }) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
+              "owners": [
+                "src/history-archive.ts"
+              ],
+              "source": "src/history-archive.ts#L196",
+              "jsDocTags": [],
+              "documentation": "Opt-in, bounded history writer and replay module. The default grid never constructs it.",
+              "memberDocs": [
+                {
+                  "name": "deleteVersion",
+                  "documentation": "Explicitly delete a marker; shared checkpoint pages remain while another owner needs them."
+                },
+                {
+                  "name": "initialize",
+                  "documentation": "Persist the initial content-addressed checkpoint of a fully loaded committed document."
+                },
+                {
+                  "name": "listVersions",
+                  "documentation": "Read a bounded newest-first metadata page without constructing a historical store."
+                },
+                {
+                  "name": "open",
+                  "documentation": "Open only the durable metadata cursor; this does not hydrate a workbook."
+                },
+                {
+                  "name": "prune",
+                  "documentation": "Expire automatic markers while keeping named versions and every referenced chunk."
+                },
+                {
+                  "name": "readVersion",
+                  "documentation": "Reconstruct one committed version in isolation and dispose the replay store on every exit."
+                },
+                {
+                  "name": "record",
+                  "documentation": "Archive one authority-confirmed transaction and checkpoint only when cadence requires it."
+                },
+                {
+                  "name": "saveVersion",
+                  "documentation": "Name the durable head. Optimistic local operations must be flushed by the host first."
+                },
+                {
+                  "name": "storageUsage",
+                  "documentation": "Read aggregate retained storage without fetching payload bytes."
+                }
+              ]
+            },
+            {
+              "name": "HistoryArchiveOptions",
+              "kind": "interface",
+              "signature": "export interface HistoryArchiveOptions { documentId: string; storage: HistoryStorageAdapter; limits?: Partial<HistoryLimits>; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L158",
+              "jsDocTags": [],
+              "documentation": "Host-controlled archive configuration. No history is created until explicitly opened.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryCommit",
+              "kind": "interface",
+              "signature": "export interface HistoryCommit { baseRevision: number; revision: number; mutationId: string; authorId: string; time: number; operations: readonly DocumentOp[]; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L22",
+              "jsDocTags": [],
+              "documentation": "One authority-confirmed transaction, never an optimistic local change.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryError",
+              "kind": "class",
+              "signature": "class HistoryError extends SheetwriteError { constructor(code: HistoryErrorCode, message: string, options?: ErrorOptions); code: HistoryErrorCode; name: \"HistoryError\" }",
+              "owners": [
+                "src/version-history/codec.ts"
+              ],
+              "source": "src/version-history/codec.ts#L18",
+              "jsDocTags": [],
+              "documentation": "Expected archive failure; cancellation preserves the caller's abort reason.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryErrorCode",
+              "kind": "type",
+              "signature": "export type HistoryErrorCode = | \"invalid-history\" | \"conflict\" | \"capacity\" | \"not-found\" | \"integrity\" | \"unavailable\" | \"blocked\" | \"transaction\";",
+              "owners": [
+                "src/version-history/codec.ts"
+              ],
+              "source": "src/version-history/codec.ts#L7",
+              "jsDocTags": [],
+              "documentation": "Stable failure category for history validation, storage, and replay.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryGetRequest",
+              "kind": "type",
+              "signature": "export type HistoryGetRequest = HistoryStorageRequest & ( | { kind: \"manifest\" } | { kind: \"version\"; id: string } | { kind: \"record\"; id: string; maxBytes: number; pin?: string } );",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L108",
+              "jsDocTags": [],
+              "documentation": "Fetch metadata or a bounded immutable payload; leased reads renew their lease.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryHead",
+              "kind": "interface",
+              "signature": "export interface HistoryHead { revision: number; checkpoint: string; tail: readonly string[]; time: number; activeMs: number; automaticAt: number; checkpointAt: number; checkpointTransactions: number; checkpointLogBytes: number; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L55",
+              "jsDocTags": [],
+              "documentation": "Durable recorder cursor. It does not retain operation payloads.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryLimits",
+              "kind": "interface",
+              "signature": "export interface HistoryLimits { maxSnapshotBytes: number; maxSegmentBytes: number; maxTransactionBytes: number; maxStorageBytes: number; maxWorkingBytes: number; maxNamedVersions: number; maxVersions: number; maxPageEntries: number; maxPageBytes: number; maxAgeMs: number; automaticIntervalMs: number; checkpointIntervalMs: number; checkpointTransactions: number; checkpointLogBytes: number; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L4",
+              "jsDocTags": [],
+              "documentation": "Resource and retention ceilings for an opt-in history archive.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryListPage",
+              "kind": "interface",
+              "signature": "export interface HistoryListPage { versions: readonly HistoryVersion[]; records?: readonly HistoryRecordMetadata[]; cursor?: string; generation: number; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L134",
+              "jsDocTags": [],
+              "documentation": "Metadata-only response in newest-first order.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryListRequest",
+              "kind": "interface",
+              "signature": "export interface HistoryListRequest { kind?: \"versions\" | HistoryStoredRecord[\"kind\"]; fromRevision?: number; toRevision?: number; maxEntries: number; maxBytes: number; cursor?: string; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L124",
+              "jsDocTags": [],
+              "documentation": "Bounded metadata-only page. Cursors are scoped to a manifest generation.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryManifest",
+              "kind": "interface",
+              "signature": "export interface HistoryManifest { generation: number; head?: HistoryHead; encodedBytes: number; recordCount: number; versionCount: number; namedVersionCount: number; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L76",
+              "jsDocTags": [],
+              "documentation": "Manifest state returned without fetching a workbook payload.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryPinRequest",
+              "kind": "interface",
+              "signature": "export interface HistoryPinRequest { kind: \"pin\" | \"release\"; token: string; versionId: string; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L98",
+              "jsDocTags": [],
+              "documentation": "Acquire or release a five-minute renewable reader lease through the storage seam.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryPruneRequest",
+              "kind": "interface",
+              "signature": "export interface HistoryPruneRequest { expectedGeneration: number; beforeTime: number; deleteVersionId?: string; targetBytes?: number; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L142",
+              "jsDocTags": [],
+              "documentation": "Retention removes automatic markers, or one explicitly selected named marker.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryPublishRequest",
+              "kind": "interface",
+              "signature": "export interface HistoryPublishRequest { kind: \"publish\"; expectedGeneration: number; records: readonly HistoryStoredRecord[]; head?: HistoryHead; version?: HistoryVersion; documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L89",
+              "jsDocTags": [],
+              "documentation": "Atomically publish immutable records and a new head or version marker.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryPutRequest",
+              "kind": "type",
+              "signature": "export type HistoryPutRequest = HistoryPublishRequest | HistoryPinRequest;",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L105",
+              "jsDocTags": [],
+              "documentation": "A storage write either publishes one complete revision or manages a reader lease.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryRecordMetadata",
+              "kind": "interface",
+              "signature": "export interface HistoryRecordMetadata { id: string; kind: HistoryStoredRecord[\"kind\"]; encodedBytes: number; decodedBytes: number; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L116",
+              "jsDocTags": [],
+              "documentation": "Metadata for one immutable record; listings never return payload bytes.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistorySnapshotProvider",
+              "kind": "type",
+              "signature": "export type HistorySnapshotProvider = () => WorkbookSnapshot | Promise<WorkbookSnapshot>;",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L165",
+              "jsDocTags": [],
+              "documentation": "Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryStorageAdapter",
+              "kind": "interface",
+              "signature": "export interface HistoryStorageAdapter { put(request: HistoryPutRequest): Promise<HistoryManifest>; get(request: HistoryGetRequest): Promise<HistoryManifest | HistoryVersion | HistoryStoredRecord>; list(request: HistoryListRequest): Promise<HistoryListPage>; prune(request: HistoryPruneRequest): Promise<HistoryManifest>; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L150",
+              "jsDocTags": [],
+              "documentation": "Atomic storage seam for local databases and host-owned history backends.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryStorageRequest",
+              "kind": "interface",
+              "signature": "export interface HistoryStorageRequest { documentId: string; limits: Readonly<HistoryLimits>; signal?: AbortSignal; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L82",
+              "jsDocTags": [],
+              "documentation": "Common document identity, ceilings, and cancellation for adapter calls.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryStorageUsage",
+              "kind": "interface",
+              "signature": "export interface HistoryStorageUsage { encodedBytes: number; recordCount: number; versionCount: number; namedVersionCount: number; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L68",
+              "jsDocTags": [],
+              "documentation": "Aggregate retained storage, including index and reference metadata.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryStoredRecord",
+              "kind": "interface",
+              "signature": "export interface HistoryStoredRecord { schemaVersion: 1; id: string; kind: \"cells\" | \"metadata\" | \"sheet\" | \"checkpoint\" | \"segment\" | \"transaction\"; encoding: \"deflate-json-v1\" | \"deflate-bytes-v1\"; decodedBytes: number; bytes: Uint8Array; references: readonly string[]; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L44",
+              "jsDocTags": [],
+              "documentation": "Immutable, content-addressed history payload and its dependency edges.",
+              "memberDocs": []
+            },
+            {
+              "name": "HistoryVersion",
+              "kind": "interface",
+              "signature": "export interface HistoryVersion { id: string; revision: number; kind: \"named\" | \"automatic\"; name?: string; authorId: string; time: number; checkpoint: string; tail: readonly string[]; }",
+              "owners": [
+                "src/version-history/types.ts"
+              ],
+              "source": "src/version-history/types.ts#L32",
+              "jsDocTags": [],
+              "documentation": "Named or automatically created durable revision marker.",
+              "memberDocs": []
+            },
+            {
+              "name": "MemoryHistoryStorage",
+              "kind": "class",
+              "signature": "class MemoryHistoryStorage extends AtomicHistoryStorage { transact: <T>(request: HistoryStorageRequest, action: (transaction: HistoryStorageTransaction) => Promise<T>) => Promise<T> }",
+              "owners": [
+                "src/version-history/storage.ts"
+              ],
+              "source": "src/version-history/storage.ts#L519",
+              "jsDocTags": [],
+              "documentation": "Bounded session storage. Transactions use copy-on-write maps, not workbook copies.",
               "memberDocs": []
             }
           ]
