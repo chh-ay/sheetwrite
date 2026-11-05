@@ -61,18 +61,18 @@ const OTHER_CHARACTER_LEAD: u8 = 0x80;
 /// byte comparison of two keys gives Excel's order. Returns whether the text
 /// holds a hyphen, which decides a tie.
 pub(crate) fn push_collation_key(text: &str, arena: &mut Vec<u8>) -> bool {
-    let mut has_hyphen = false;
-
     if text.is_ascii() {
-        arena.reserve(text.len());
-        for &byte in text.as_bytes() {
-            has_hyphen |= byte == b'-';
-            if byte != b'\'' && byte != b'-' {
-                arena.push(ASCII_RANKS[usize::from(byte)]);
-            }
-        }
-        return has_hyphen;
+        let bytes = text.as_bytes();
+        arena.extend(
+            bytes
+                .iter()
+                .filter(|&&byte| byte != b'\'' && byte != b'-')
+                .map(|&byte| ASCII_RANKS[usize::from(byte)]),
+        );
+        return bytes.contains(&b'-');
     }
+
+    let mut has_hyphen = false;
 
     for character in text.chars() {
         has_hyphen |= character == '-';
