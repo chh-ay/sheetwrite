@@ -5,15 +5,28 @@
   margin-top: calc(var(--sw-space-12) * -1);
 }
 
+/* Hairlines between facts come from the gap over the border-coloured list. */
 .sw-lp-evidence dl {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--sw-border-width);
   margin: 0;
   overflow: hidden;
   border: var(--sw-border-width) solid var(--sw-border);
   border-radius: var(--sw-radius-xl);
-  background: var(--sw-surface-1);
+  background: var(--sw-border);
   box-shadow: var(--sw-shadow-lg);
+}
+
+@media (min-width: 36rem) {
+  .sw-lp-evidence dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 72rem) {
+  .sw-lp-evidence dl {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .sw-lp-fact {
@@ -21,11 +34,7 @@
   gap: var(--sw-space-2);
   align-content: start;
   padding: var(--sw-space-6);
-  border-right: var(--sw-border-width) solid var(--sw-border);
-}
-
-.sw-lp-fact:last-child {
-  border-right: 0;
+  background: var(--sw-surface-1);
 }
 
 .sw-lp-fact dt {
@@ -269,14 +278,5 @@
 @media (max-width: 48rem) {
   .sw-lp-close {
     padding: var(--sw-space-8) var(--sw-space-6);
-  }
-
-  .sw-lp-fact {
-    border-right: 0;
-    border-bottom: var(--sw-border-width) solid var(--sw-border);
-  }
-
-  .sw-lp-fact:last-child {
-    border-bottom: 0;
   }
 }
