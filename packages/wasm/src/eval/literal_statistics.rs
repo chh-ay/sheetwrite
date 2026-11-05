@@ -191,7 +191,7 @@ mod tests {
             format!("=COVARIANCE.P(A1:B15,D1:D{last})"),
             format!("=COVARIANCE.P(B1:B{last},C1:C{last})"),
             format!("=CORREL(F1:F{last},F1:F{last})"),
-            format!("=COVARIANCE.P(A1:A10,B1:B12)"),
+            "=COVARIANCE.P(A1:A10,B1:B12)".to_owned(),
         ]
     }
 
