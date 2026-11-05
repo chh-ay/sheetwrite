@@ -274,7 +274,8 @@ export function sourceDataRange(
     return { ...range, start: { row: range.start.row + 1, col: range.start.col } };
   }
 
-  const table = tables.find((candidate) => candidate.id === source.table);
+  const id = "model" in source ? source.model.table : source.table;
+  const table = tables.find((candidate) => candidate.id === id);
   if (table === undefined) return null;
   const first = table.range.start.row + (table.headerRow ? 1 : 0);
   const last = table.range.end.row - (table.totalsRow ? 1 : 0);
