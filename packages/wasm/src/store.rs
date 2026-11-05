@@ -285,9 +285,11 @@ pub struct CellStore {
     #[cfg(feature = "host-functions")]
     pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
     /// Weak index of the literal REGEX patterns this store's formulas share.
-    /// `None` until a formula uses one, and only the full engine has it.
+    /// `None` until a formula uses one, and only the full engine has it. A
+    /// `Cell` adds one pointer to the store, so readers take the index out
+    /// and put it back.
     #[cfg(feature = "analysis")]
-    regex_patterns: std::cell::RefCell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
+    regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
     defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
     tables: HashMap<String, TableDefinition>,
@@ -398,7 +400,7 @@ impl CellStore {
             #[cfg(feature = "host-functions")]
             custom_functions: None,
             #[cfg(feature = "analysis")]
-            regex_patterns: std::cell::RefCell::new(None),
+            regex_patterns: std::cell::Cell::new(None),
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
@@ -3309,8 +3311,9 @@ impl CellStore {
             results.add_memory_stats(&mut stats);
         }
         #[cfg(feature = "analysis")]
-        if let Some(patterns) = &*self.regex_patterns.borrow() {
+        if let Some(patterns) = self.regex_patterns.take() {
             patterns.add_memory_stats(stats.owner_mut(crate::memory::FORMULAS));
+            self.regex_patterns.set(Some(patterns));
         }
 
         self.graph.add_memory_stats(&mut stats);
@@ -3651,10 +3654,9 @@ impl CellStore {
     #[cfg(feature = "analysis")]
     fn bind_regex_patterns(&self, source: &str, mut ast: Ast) -> Ast {
         if crate::eval::regex_patterns::may_call_regex(source) {
-            self.regex_patterns
-                .borrow_mut()
-                .get_or_insert_with(Box::default)
-                .bind(&mut ast);
+            let mut patterns = self.regex_patterns.take().unwrap_or_default();
+            patterns.bind(&mut ast);
+            self.regex_patterns.set(Some(patterns));
         }
         ast
     }
