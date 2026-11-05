@@ -20,9 +20,10 @@ A durable marker at one archived revision.
 <a href="#history-version-time"><code>time</code></a>
 <a href="#history-version-checkpoint"><code>checkpoint</code></a>
 <a href="#history-version-tail"><code>tail</code></a>
+<a href="#history-version-checkpoints"><code>checkpoints</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>8</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -97,6 +98,17 @@ tail: readonly string[];
 ```
 
 </details>
+
+<details class="api-member" id="history-version-checkpoints" data-pagefind-weight="1">
+<summary><code>checkpoints</code> <span class="api-member-summary">Checkpoints made since the previous marker.</span></summary>
+
+```ts generated
+checkpoints: readonly string[];
+```
+
+<p class="api-member-doc">Checkpoints made since the previous marker. The marker keeps them, so the
+log between two retained versions stays readable for a diff.</p>
+</details>
 </div>
 
 ## Declaration
@@ -114,6 +126,7 @@ export interface HistoryVersion {
   time: number;
   checkpoint: string;
   tail: readonly string[];
+  checkpoints: readonly string[];
 }
 ```
 
