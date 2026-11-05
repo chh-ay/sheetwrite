@@ -215,6 +215,8 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"value","types":["scalar","range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"reference","types":["range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"typeText","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"lookupValue","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"lookupVector","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"resultVector","types":["range","array","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"range","types":["range","array","reference"],"optional":false,"repeating":false},{"name":"trimRows","types":["scalar","reference"],"optional":true,"repeating":false},{"name":"trimColumns","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"array"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -712,5 +714,7 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["ASC",8,10,4],
     ["DBCS",8,10,4],
     ["BAHTTEXT",8,11,4],
+    ["LOOKUP",5,196,6],
+    ["TRIMRANGE",0,197,6],
   ],
 };

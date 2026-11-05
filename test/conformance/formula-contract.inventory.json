@@ -5455,6 +5455,58 @@
         }
       ],
       "returns": "scalar"
+    },
+    "vector-lookup": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lookupVector",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "resultVector",
+          "required": false,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "trim-range": {
+      "arguments": [
+        {
+          "name": "range",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trimRows",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trimColumns",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
     }
   },
   "semanticsProfiles": {
@@ -6954,7 +7006,9 @@
           "packages/wasm/src/eval/math.rs",
           "packages/wasm/src/eval/math/trigonometry.rs",
           "packages/wasm/src/eval/math/numerals.rs",
-          "packages/wasm/src/eval/statistics.rs"
+          "packages/wasm/src/eval/statistics.rs",
+          "packages/wasm/src/eval/lookup.rs",
+          "packages/wasm/src/eval/array.rs"
         ]
       },
       "assist": {
@@ -13426,6 +13480,30 @@
       "dialects": "analysis-text-width",
       "implementation": "analysis-bytes",
       "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LOOKUP",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "vector-lookup",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TRIMRANGE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "trim-range",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     }
   ],
