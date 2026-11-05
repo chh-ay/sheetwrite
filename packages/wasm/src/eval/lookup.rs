@@ -194,13 +194,11 @@ enum UniformKind {
     Logical,
 }
 
-/// What one pass knows about a search list that several formulas read. The
-/// first search runs the plain scan, so a list searched once costs what it
-/// always did; later searches use the sorted flags, the exact-match index and
-/// the boundary search, each built on first use.
+/// What one pass knows about a search list that several formulas read: the
+/// sorted flags, the value domain and the exact-match index, each built on
+/// first use.
 #[derive(Default)]
 pub(crate) struct SearchState {
-    searches: u32,
     ascending: Option<Result<bool, FormulaError>>,
     descending: Option<Result<bool, FormulaError>>,
     kind: Option<Option<UniformKind>>,
@@ -251,10 +249,11 @@ pub(super) fn find_match(
         return Ok(None);
     }
 
+    // Only a list several formulas read has a state, so its index pays off
+    // from the first search; a list read once keeps the plain scan.
+    let use_index = state.is_some();
     let mut single = SearchState::default();
     let state = state.unwrap_or(&mut single);
-    let use_index = state.searches > 0;
-    state.searches = state.searches.saturating_add(1);
     if search_mode.abs() == 2 && !state.sorted_ok(list, search_mode)? {
         return Ok(None);
     }
