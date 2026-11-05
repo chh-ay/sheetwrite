@@ -192,37 +192,97 @@ impl CellStore {
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
         let mut literal_only = true;
+
+        // A one-column range is one contiguous stretch of the column-major
+        // arrays, so its runs of number cells fold without a dispatch per cell.
+        #[cfg(test)]
+        let folds_runs = !super::range_reader::LITERAL_COLUMNS_OFF.with(std::cell::Cell::get);
+        #[cfg(not(test))]
+        let folds_runs = true;
+
+        if cols == 1 && folds_runs {
+            let first = data.cells.idx(row_start, col_start);
+            let end = first + rows;
+            let mut index = first;
+
+            while index < end {
+                let numbers = kinds[index..end]
+                    .iter()
+                    .take_while(|&&kind| kind == KIND_NUMBER)
+                    .count();
+
+                if numbers > 0 {
+                    fold.push_number_run(&payloads[index..index + numbers])?;
+                    index += numbers;
+                    continue;
+                }
+
+                let cell = (row_start + index - first, col_start);
+                literal_only &= self.fold_dense_cell(
+                    fold,
+                    &reader,
+                    pass,
+                    (kinds[index], payloads[index]),
+                    cell,
+                )?;
+                index += 1;
+            }
+
+            return Ok(literal_only);
+        }
+
         for row in row_start..row_start + rows {
             for col in col_start..col_start + cols {
                 let index = data.cells.idx(row, col);
-                match kinds[index] {
-                    KIND_EMPTY => fold.push_blank()?,
-                    KIND_NUMBER => {
-                        let number = payload_num(payloads[index]);
-                        if !number.is_finite() {
-                            return Err(FormulaError::Num);
-                        }
-                        fold.push_number(number)?;
-                    }
-                    kind @ (KIND_STRING | KIND_BOOL) => {
-                        let value = literal_cell_value(&self.strings, kind, payloads[index]);
-                        if let Value::Error(error) = value {
-                            return Err(error);
-                        }
-                        fold.push(&value)?;
-                    }
-                    _ => {
-                        literal_only = false;
-                        let value = reader.dense_value_at(row, col, pass);
-                        if let Value::Error(error) = value {
-                            return Err(error);
-                        }
-                        fold.push(&value)?;
-                    }
-                }
+                literal_only &= self.fold_dense_cell(
+                    fold,
+                    &reader,
+                    pass,
+                    (kinds[index], payloads[index]),
+                    (row, col),
+                )?;
             }
         }
         Ok(literal_only)
+    }
+
+    /// Folds one dense cell from its raw kind and payload, evaluating it only
+    /// when it is not a literal or empty source. Returns whether it was one.
+    #[inline]
+    fn fold_dense_cell(
+        &self,
+        fold: &mut ReductionFold,
+        reader: &RangeReader<'_>,
+        pass: &mut EvalPass<'_>,
+        (kind, payload): (u8, u64),
+        (row, col): (usize, usize),
+    ) -> Result<bool, FormulaError> {
+        match kind {
+            KIND_EMPTY => fold.push_blank()?,
+            KIND_NUMBER => {
+                let number = payload_num(payload);
+                if !number.is_finite() {
+                    return Err(FormulaError::Num);
+                }
+                fold.push_number(number)?;
+            }
+            KIND_STRING | KIND_BOOL => {
+                let value = literal_cell_value(&self.strings, kind, payload);
+                if let Value::Error(error) = value {
+                    return Err(error);
+                }
+                fold.push(&value)?;
+            }
+            _ => {
+                let value = reader.dense_value_at(row, col, pass);
+                if let Value::Error(error) = value {
+                    return Err(error);
+                }
+                fold.push(&value)?;
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 }
 
@@ -262,7 +322,72 @@ fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
 
 #[cfg(test)]
 mod tests {
+    use crate::eval::range_reader::LITERAL_COLUMNS_OFF;
     use crate::store::CellStore;
+
+    /// Each formula's result, as kind, number bits and text, with one-column
+    /// number runs folded as runs or cell by cell.
+    fn reduction_results(runs: bool, sources: &[String]) -> Vec<(u8, u64, Option<String>)> {
+        LITERAL_COLUMNS_OFF.with(|off| off.set(!runs));
+        let rows = 60;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, rows + 2);
+        for row in 0..rows {
+            // A: runs of numbers broken by text, booleans and blanks.
+            match row % 9 {
+                3 => store.set_string(sheet, row, 0, "x", 0),
+                5 => store.set_bool(sheet, row, 0, true, 0),
+                7 => {}
+                _ => store.set_number(sheet, row, 0, (row as f64).mul_add(0.37, -9.1), 0),
+            }
+            // B: numbers only, with values whose sum depends on the order.
+            store.set_number(
+                sheet,
+                row,
+                1,
+                if row % 2 == 0 {
+                    1e16
+                } else {
+                    1.0 + row as f64 * 0.1
+                },
+                0,
+            );
+            // C: numbers with a formula cell and a non-finite number.
+            store.set_number(sheet, row, 2, row as f64 * -0.5, 0);
+        }
+        store.set_formula(sheet, 30, 2, "=B1*2", 0);
+        store.set_number(sheet, 50, 1, f64::INFINITY, 0);
+
+        for (row, source) in sources.iter().enumerate() {
+            store.set_formula(sheet, row, 5, source, 0);
+        }
+        store.recompute(sheet);
+        LITERAL_COLUMNS_OFF.with(|off| off.set(false));
+
+        (0..sources.len())
+            .map(|row| {
+                let cell = store.get_cell(sheet, row, 5);
+                (cell.kind(), cell.num().to_bits(), cell.string())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn one_column_number_runs_fold_like_single_cells() {
+        let mut sources = Vec::new();
+        for function in ["SUM", "AVERAGE", "MIN", "MAX", "COUNT", "COUNTA"] {
+            for range in ["A1:A60", "B1:B40", "B1:B60", "C1:C60", "A5:A20"] {
+                sources.push(format!("={function}({range})"));
+            }
+            sources.push(format!("={function}(A1:A60,B1:B40)"));
+        }
+
+        let cell_by_cell = reduction_results(false, &sources);
+        let runs = reduction_results(true, &sources);
+        for ((source, cell_by_cell), runs) in sources.iter().zip(&cell_by_cell).zip(&runs) {
+            assert_eq!(cell_by_cell, runs, "{source}");
+        }
+    }
 
     /// A: 0.1, "7", TRUE, blank, 0.2, =A1*3, =1/0 in rows 1-7. B1:B3 hold
     /// 1e16, 1, 1. Each case lists the expected display text.

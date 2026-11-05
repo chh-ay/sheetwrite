@@ -516,6 +516,43 @@ impl ReductionFold {
         Ok(())
     }
 
+    /// [`Self::push_number`] for a run of number cells, given as their `f64`
+    /// bits in reading order. A non-finite number fails the run with `#NUM!`,
+    /// as it fails the cell-by-cell fold. The values are added one after
+    /// another, so the sum equals the cell-by-cell fold's.
+    pub(super) fn push_number_run(&mut self, numbers: &[u64]) -> Result<(), FormulaError> {
+        let cells = self.cells.saturating_add(numbers.len() as u64);
+        if cells > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+
+        if matches!(self.kind, ReductionKind::Count | ReductionKind::CountA) {
+            if numbers
+                .iter()
+                .any(|&bits| !f64::from_bits(bits).is_finite())
+            {
+                return Err(FormulaError::Num);
+            }
+            self.count += numbers.len() as u64;
+        } else {
+            let (mut sum, mut min, mut max) = (self.sum, self.min, self.max);
+            for &bits in numbers {
+                let number = f64::from_bits(bits);
+                if !number.is_finite() {
+                    return Err(FormulaError::Num);
+                }
+                sum += number;
+                min = min.min(number);
+                max = max.max(number);
+            }
+            (self.sum, self.min, self.max) = (sum, min, max);
+            self.count += numbers.len() as u64;
+        }
+
+        self.cells = cells;
+        Ok(())
+    }
+
     /// [`Self::push`] for an empty cell, which only counts toward the limit.
     #[inline]
     pub(super) fn push_blank(&mut self) -> Result<(), FormulaError> {
