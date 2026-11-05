@@ -515,6 +515,7 @@
         "HISTORY_DIFF_NONE",
         "HistoryArchive",
         "HistoryArchiveOptions",
+        "HistoryCommandsOptions",
         "HistoryCommit",
         "HistoryDiffCell",
         "HistoryDiffCells",
@@ -532,6 +533,7 @@
         "HistoryListPage",
         "HistoryListRequest",
         "HistoryManifest",
+        "HistoryPanelArchive",
         "HistoryPinRequest",
         "HistoryPruneRequest",
         "HistoryPublishRequest",
@@ -546,7 +548,8 @@
         "HistoryStoredRecord",
         "HistoryVersion",
         "MAX_HISTORY_DIFF_ENTRIES",
-        "MemoryHistoryStorage"
+        "MemoryHistoryStorage",
+        "createHistoryCommands"
       ]
     },
     {

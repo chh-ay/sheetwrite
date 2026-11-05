@@ -1,13 +1,19 @@
 import { colToA1 } from "../a1.js";
-import type { HistoryDiffCursor, HistoryDiffPage, HistoryVersion } from "../history-archive.js";
-import { HISTORY_DIFF_NONE, HistoryDiffFlag } from "../history-archive.js";
 import { createGridFromSnapshot } from "../persistence.js";
 import type { SyncCoordinator } from "../sync.js";
 import type { Grid, GridPanel } from "../types/grid.js";
-import type { HistoryCommandsOptions } from "../version-history/history-ui.js";
+import {
+  HISTORY_DIFF_NONE,
+  type HistoryDiffCursor,
+  HistoryDiffFlag,
+  type HistoryDiffPage,
+} from "../version-history/diff.js";
+import type { HistoryCommandsOptions } from "../version-history/panel-contract.js";
 import type { HistoryRestoreScope } from "../version-history/restore.js";
+import type { HistoryVersion } from "../version-history/types.js";
 import { panelField, selectOf, rejectionMessage } from "./panel-dom.js";
 import { parseRangeText, type RangeTextSheet } from "./range-text.js";
+
 const PAGE_SIZE = 50;
 
 /** All DOM and requests of one open history panel; no state survives its close. */

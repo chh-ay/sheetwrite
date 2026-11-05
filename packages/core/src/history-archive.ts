@@ -78,10 +78,11 @@ export type {
   HistoryDiffSheet,
 } from "./version-history/diff.js";
 export type { HistoryRestoreOptions, HistoryRestoreScope } from "./version-history/restore.js";
-export {
-  createHistoryCommands,
-  type HistoryCommandsOptions,
-} from "./version-history/history-ui.js";
+export { createHistoryCommands } from "./version-history/history-ui.js";
+export type {
+  HistoryCommandsOptions,
+  HistoryPanelArchive,
+} from "./version-history/panel-contract.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,
