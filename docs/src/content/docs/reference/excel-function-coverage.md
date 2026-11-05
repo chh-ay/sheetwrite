@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **366 supported**, **93 partly supported**, and **61 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **366 supported**, **94 partly supported**, and **60 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -304,7 +304,7 @@ The full engine has **366 supported**, **93 partly supported**, and **61 not sup
 | [`EXPAND`](https://support.microsoft.com/en-us/excel/functions/expand-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/array/) |
 | [`FILTER`](https://support.microsoft.com/en-us/excel/functions/filter-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/array/) |
 | [`FORMULATEXT`](https://support.microsoft.com/en-us/excel/functions/formulatext-function) | Partly supported | Partly supported | CELL supports the info types address, col, contents, row and type. Other info types return #VALUE!. CELL without a reference describes the cell of the formula, as in LibreOffice. Excel uses the last changed cell. A formula that reads its own cell with FORMULATEXT, ISFORMULA or CELL is a #CYCLE! error. Cells inside a spilled range and host-linked reference cells hold no formula. For them, FORMULATEXT returns #N/A and ISFORMULA returns FALSE. [Contract](/docs/reference/formula-functions/lookup-reference/) |
-| [`GETPIVOTDATA`](https://support.microsoft.com/en-us/excel/functions/getpivotdata-function) | Not supported | Not supported | Not registered in either engine. |
+| [`GETPIVOTDATA`](https://support.microsoft.com/en-us/excel/functions/getpivotdata-function) | Partly supported | Not supported | Lite engine: not registered. Items name row and column fields only; the fields named on each axis must be its outer levels. An item list in braces, report filter fields and OLAP item names are not supported and give #REF!. [Contract](/docs/reference/formula-functions/lookup-reference/) |
 | [`GROUPBY`](https://support.microsoft.com/en-us/excel/functions/groupby-function) | Partly supported | Not supported | Lite engine: not registered. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported. Grouping and output use the engine spill and work limits. [Contract](/docs/reference/formula-functions/array/) |
 | [`HLOOKUP`](https://support.microsoft.com/en-us/excel/functions/hlookup-function) | Supported | Supported | [Contract](/docs/reference/formula-functions/lookup-reference/) |
 | [`HSTACK`](https://support.microsoft.com/en-us/excel/functions/hstack-function) | Supported | Not supported | Lite engine: not registered. [Contract](/docs/reference/formula-functions/array/) |

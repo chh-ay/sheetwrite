@@ -3,7 +3,7 @@ title: "Lookup and reference functions"
 description: "Every lookup and reference formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 17 functions of the lookup and reference family. Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 18 functions of the lookup and reference family. Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -29,6 +29,7 @@ This page lists the 17 functions of the lookup and reference family. Taxonomy/so
 <tr data-formula-name="AREAS" data-engine="default"><td><code>AREAS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-operators">Dialect: <code>excel-reference-operators</code></a><br /><a href="#implementation-implemented-reference-operators">Implementation: <code>implemented-reference-operators</code></a></details></td></tr>
 <tr data-formula-name="FORMULATEXT" data-engine="default"><td><code>FORMULATEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 <tr data-formula-name="HYPERLINK" data-engine="default"><td><code>HYPERLINK</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-hyperlink">Signature: <code>hyperlink</code></a><br /><a href="#semantics-hyperlink-display">Semantics: <code>hyperlink-display</code></a><br /><a href="#dialect-excel-hyperlink-value">Dialect: <code>excel-hyperlink-value</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="GETPIVOTDATA" data-engine="full"><td><code>GETPIVOTDATA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pivot-data">Signature: <code>pivot-data</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-analysis-pivot-data">Dialect: <code>analysis-pivot-data</code></a><br /><a href="#implementation-analysis-pivot-data">Implementation: <code>analysis-pivot-data</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -195,6 +196,18 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-pivot-data"><summary>Signature: pivot-data</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `dataField` | yes | none | `scalar`, `reference` | `once` |
+| `pivotTable` | yes | none | `reference` | `once` |
+| `fieldAndItem` | no | none | `scalar`, `reference` | `paired` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -317,6 +330,18 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 
 </details>
 
+<details id="dialect-analysis-pivot-data"><summary>Dialect: analysis-pivot-data</summary>
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in @sheetwrite/formulas. Items name row and column fields only; the fields named on each axis must be its outer levels. An item list in braces, report filter fields and OLAP item names are not supported and give #REF!.
+
+</details>
+
 ## Implementation profiles
 
 <details id="implementation-implemented-assisted"><summary>Implementation: implemented-assisted</summary>
@@ -360,5 +385,16 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 | Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/info.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
+
+</details>
+
+<details id="implementation-analysis-pivot-data"><summary>Implementation: analysis-pivot-data</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/pivot_data.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/pivot_data.rs)<br />[`packages/wasm/src/pivot.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/pivot.rs)<br />[`packages/wasm/src/store/pivots.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/store/pivots.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/store/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/store/tests.rs) |
 
 </details>

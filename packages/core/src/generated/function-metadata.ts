@@ -209,6 +209,7 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     {"arguments":[{"name":"text","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"number","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"radix","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"minLength","types":["scalar","reference"],"optional":true,"repeating":false}],"returnKind":"scalar"},
     {"arguments":[{"name":"text","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"radix","types":["scalar","reference"],"optional":false,"repeating":false}],"returnKind":"scalar"},
+    {"arguments":[{"name":"dataField","types":["scalar","reference"],"optional":false,"repeating":false},{"name":"pivotTable","types":["reference"],"optional":false,"repeating":false},{"name":"fieldAndItem","types":["scalar","reference"],"optional":true,"repeating":true}],"returnKind":"scalar"},
   ],
   functions: [
     ["ARRAYTOTEXT",8,5,4],
@@ -672,5 +673,6 @@ export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {
     ["SINH",6,11,6],
     ["TAN",6,11,6],
     ["TANH",6,11,6],
+    ["GETPIVOTDATA",5,190,4],
   ],
 };

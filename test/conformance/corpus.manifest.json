@@ -2395,7 +2395,7 @@
   "generator": "sheetwrite.conformance.original-evidence",
   "generatorVersion": 1,
   "inventoryPath": "test/conformance/formula-contract.inventory.json",
-  "inventorySha256": "211446f04ccdd9d3bd622684b13467a513c132cf6043112ee8c7515cac8be59d",
+  "inventorySha256": "a0b1d68e37d2ca68963563d15d052f56373a77257319c5923f14a2257d385840",
   "minimums": { "formula": 2000, "mutation": 250, "workbook": 100 },
   "operationShapesSha256": "2b320198d9e2405b31886c79c0deec004efb6aa78a28964b144f3ae965704be1",
   "protocol": 1,
