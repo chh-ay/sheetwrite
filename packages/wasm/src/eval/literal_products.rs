@@ -2,7 +2,8 @@
 //!
 //! The accumulator path materialises every argument as a list of `Value`s
 //! (two 100,000-row ranges allocate about 10 MB) and then multiplies them.
-//! When every argument is a range of dense literals with the same shape, this
+//! When every argument is written as a range (`A1:A9`, not a lone cell, whose
+//! text the accumulator coerces) of dense literals with one shape, this
 //! kernel multiplies the stored payloads directly. It follows the accumulator
 //! path's rules: text, booleans and blanks in a range count as zero, a
 //! non-finite number reads as `#NUM!`, text missing from the pool as `#REF!`,
@@ -10,7 +11,7 @@
 //! running total, decides the result. Items are visited in the same row-major
 //! order, so the total is the same.
 
-use super::matrix::range_from_ast;
+use super::matrix::written_range;
 use super::range_reader::{LiteralColumns, RangeReader};
 
 use crate::calc::Ast;
@@ -44,7 +45,7 @@ impl CellStore {
         let mut shape = None;
 
         for arg in args {
-            let reader = RangeReader::new(self, range_from_ast(arg, sheet)?, depth).ok()?;
+            let reader = RangeReader::new(self, written_range(arg, sheet)?, depth).ok()?;
             if *shape.get_or_insert(reader.shape()) != reader.shape() {
                 return None;
             }
@@ -145,6 +146,9 @@ mod tests {
             format!("=SUMPRODUCT(F1:F{last},F1:F{last})"),
             format!("=SUMPRODUCT(D1:E{last})"),
             format!("=SUMPRODUCT(A1:A{last},C1:C{half})"),
+            // A lone cell is a scalar argument: its numeric text counts.
+            "=SUMPRODUCT(A1,F1)".to_owned(),
+            "=SUMPRODUCT(A1,C1)".to_owned(),
         ]
     }
 
@@ -174,10 +178,11 @@ mod tests {
         KERNEL_RESULTS.with(|calls| calls.set(0));
         let scanned = results(true);
 
-        // Every formula but the mismatched shapes takes the kernel.
+        // Every formula but the mismatched shapes and the two with lone cells
+        // takes the kernel.
         assert_eq!(
             KERNEL_RESULTS.with(std::cell::Cell::get),
-            formulas().len() - 1
+            formulas().len() - 3
         );
         for ((source, accumulated), scanned) in formulas().iter().zip(&accumulated).zip(&scanned) {
             assert_eq!(accumulated, scanned, "{source}");
