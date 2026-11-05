@@ -360,6 +360,11 @@ describe("Grid editing (Layer 3)", () => {
         }),
       );
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
+    } finally {
+      grid.destroy();
+    }
+  });
+
   it("applies the store's view rules: whole rows only, and no commit for an unchanged view", () => {
     const workbook = makeWorkbook(5);
     const store = new SheetwriteStore(workbook, makeColumnarData(5));
