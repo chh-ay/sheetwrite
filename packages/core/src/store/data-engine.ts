@@ -104,7 +104,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { DataModel, MeasureStatus, RelationshipStatus } from "../types/data-model.js";
+import type { DataModel, RelationshipStatus } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -1802,23 +1802,6 @@ export class StoreDataEngine {
     const record = this.wasm.relationshipStatus?.(id);
     if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
     return relationshipStatusOf(record);
-  }
-
-  /**
-   * Checks a measure from the saved model: its home table and its formula
-   * syntax, with the engine's parser. References are checked where the
-   * measure is calculated, so a pivot cell shows those errors.
-   */
-  getMeasureStatus(id: string): MeasureStatus {
-    const measure = this.workbook.dataModel?.measures?.find((candidate) => candidate.id === id);
-    if (!measure) return { status: "unavailable" };
-
-    const tableExists = this.workbook.sheets.some((sheet) =>
-      sheet.tables?.some((table) => table.id === measure.table),
-    );
-    if (!tableExists) return { status: "missingTable" };
-    if (getEngine().checkFormulaSyntax(measure.formula) !== undefined) return { status: "syntax" };
-    return { status: "ok" };
   }
 
   /**

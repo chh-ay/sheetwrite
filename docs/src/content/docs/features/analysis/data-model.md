@@ -201,3 +201,7 @@ grid.setPivot({
 | `getMeasureStatus(id)` | `missingTable` when the home table is gone, `syntax` when the formula does not parse, otherwise `ok`; `unavailable` for an unknown ID. Checked on every engine; reference errors show in the pivot cells. |
 
 `setMeasure` and `removeMeasure` are document operations: each change is one undo step, and it is saved, synchronized and restored from version history. Two concurrent data model changes conflict. XLSX export keeps measures and the pivots that use them in Sheetwrite metadata, because Excel keeps measures in its data model part.
+
+## XLSX files
+
+Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model, so Excel opens the file without relationships and shows no output for a pivot over related tables. See [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/#excel-data-model).

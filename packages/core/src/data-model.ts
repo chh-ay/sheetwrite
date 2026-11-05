@@ -297,41 +297,31 @@ export function findRelationship(
   return model?.relationships.find((candidate) => candidate.id === id);
 }
 
+/** Whether `name` can name a measure: not blank, and no `[` or `]`. */
+function isMeasureName(name: unknown): name is string {
+  return isBoundedId(name, MAX_REFERENCE_ID_LENGTH) && name.trim() !== "" && !/[[\]]/u.test(name);
+}
+
 /** Shape checks for a saved measure; formula parsing belongs to Rust. */
 export function validateMeasureShape(
   value: unknown,
   path: string,
   issues: DataModelIssueSink,
 ): void {
-  if (!isPlainRecord(value)) {
-    issues.push({ path, code: "invalid-value", message: "Measure must be an object" });
-    return;
-  }
-
-  for (const key of ["id", "name", "table"]) {
-    const member = ownValue(value, key);
-    if (
-      !isBoundedId(member, MAX_REFERENCE_ID_LENGTH) ||
-      (key === "name" && (member.trim().length === 0 || /[[\]]/u.test(member)))
-    ) {
-      issues.push({
-        path: `${path}.${key}`,
-        code: "invalid-value",
-        message: "Invalid measure identity",
-      });
-    }
-  }
-
-  const formula = ownValue(value, "formula");
-  if (
-    typeof formula !== "string" ||
-    !formula.startsWith("=") ||
-    formula.length > MAX_MEASURE_FORMULA_LENGTH
-  ) {
+  const formula = isPlainRecord(value) ? ownValue(value, "formula") : undefined;
+  const valid =
+    isPlainRecord(value) &&
+    isBoundedId(ownValue(value, "id"), MAX_REFERENCE_ID_LENGTH) &&
+    isBoundedId(ownValue(value, "table"), MAX_REFERENCE_ID_LENGTH) &&
+    isMeasureName(ownValue(value, "name")) &&
+    typeof formula === "string" &&
+    formula.startsWith("=") &&
+    formula.length <= MAX_MEASURE_FORMULA_LENGTH;
+  if (!valid) {
     issues.push({
-      path: `${path}.formula`,
+      path,
       code: "invalid-value",
-      message: "Invalid measure formula",
+      message: "Invalid measure",
     });
   }
 }
@@ -342,25 +332,34 @@ function validateMeasures(value: unknown, path: string, issues: DataModelIssueSi
     return;
   }
 
-  const ids = new Set<string>();
-  const names = new Set<string>();
+  const keys = new Set<string>();
   value.forEach((measure, index) => {
-    const shapeIssues: DataModelIssue[] = [];
-    validateMeasureShape(measure, `${path}[${index}]`, shapeIssues);
-    issues.push(...shapeIssues);
-    if (shapeIssues.length > 0) return;
+    const itemPath = `${path}[${index}]`;
+    const before = keys.size;
+    validateMeasureShape(measure, itemPath, issues);
+    if (!isPlainRecord(measure)) return;
 
-    const { id, name } = measure as Measure;
-    if (ids.has(id) || names.has(name.toLowerCase())) {
-      issues.push({
-        path: `${path}[${index}]`,
-        code: "duplicate-id",
-        message: "Duplicate measure identity",
-      });
+    // IDs and case-folded names share one set; the prefixes keep them apart.
+    keys.add(`id:${String(ownValue(measure, "id"))}`);
+    keys.add(`name:${String(ownValue(measure, "name")).toLowerCase()}`);
+    if (keys.size !== before + 2) {
+      issues.push({ path: itemPath, code: "duplicate-id", message: "Duplicate measure" });
     }
-    ids.add(id);
-    names.add(name.toLowerCase());
   });
+}
+
+/** The measure with `id`, if the model has one. */
+export function findMeasure(model: DataModel | undefined, id: string): Measure | undefined {
+  return model?.measures?.find((measure) => measure.id === id);
+}
+
+/** The table with `id` among the workbook's sheets. */
+export function findTable(sheets: readonly Sheet[], id: string) {
+  for (const sheet of sheets) {
+    const table = sheet.tables?.find((candidate) => candidate.id === id);
+    if (table) return table;
+  }
+  return undefined;
 }
 
 /** A detached copy containing only the measure's defined properties. */
@@ -370,10 +369,10 @@ export function cloneMeasure(measure: Measure): Measure {
 
 /** Insert a measure, or replace the one with its ID in place. */
 export function withMeasure(model: DataModel | undefined, measure: Measure): DataModel {
-  const measures = (model?.measures ?? []).map(cloneMeasure);
-  const index = measures.findIndex((candidate) => candidate.id === measure.id);
-  if (index < 0) measures.push(cloneMeasure(measure));
-  else measures[index] = cloneMeasure(measure);
+  const measures = (model?.measures ?? []).map((candidate) =>
+    cloneMeasure(candidate.id === measure.id ? measure : candidate),
+  );
+  if (!findMeasure(model, measure.id)) measures.push(cloneMeasure(measure));
   return { relationships: cloneRelationships(model), measures };
 }
 
@@ -393,17 +392,13 @@ export function validateMeasureAdmission(
   issues: DataModelIssueSink,
 ): void {
   validateMeasures(withMeasure(model, measure).measures, "dataModel.measures", issues);
-  const table = sheets
-    .flatMap((sheet) => sheet.tables ?? [])
-    .find((table) => table.id === measure.table);
-  if (
-    !table ||
-    table.columns.some((column) => column.name.toLowerCase() === measure.name.toLowerCase())
-  ) {
+  const name = measure.name.toLowerCase();
+  const table = findTable(sheets, measure.table);
+  if (!table || table.columns.some((column) => column.name.toLowerCase() === name)) {
     issues.push({
       path: "measure.table",
       code: "missing-reference",
-      message: "Measure needs a home table and a distinct name",
+      message: "Invalid measure table",
     });
   }
 }

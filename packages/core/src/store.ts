@@ -1,6 +1,12 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
-import { cloneMeasure, cloneRelationship, cloneRelationships } from "./data-model.js";
+import {
+  cloneMeasure,
+  cloneRelationship,
+  cloneRelationships,
+  findMeasure,
+  findTable,
+} from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -13,7 +19,13 @@ import {
   type TransactionResourceValidationResult,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
-import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
+import {
+  engineFailedError,
+  engineGeneration,
+  getEngine,
+  isEngineTrap,
+  stopEngine,
+} from "./engine.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
@@ -407,9 +419,18 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches: [{ op: "removeMeasure", id }] }, "api");
   }
 
-  /** Check a measure in the full engine, or report `unavailable`. */
+  /**
+   * Checks a measure from the saved model on every engine: its home table,
+   * then its formula syntax with the engine's parser. References are
+   * checked where the measure is calculated, so pivot cells show those.
+   */
   getMeasureStatus(id: string): MeasureStatus {
-    return this.engine.getMeasureStatus(id);
+    const workbook = this.engine.getWorkbook();
+    const measure = findMeasure(workbook.dataModel, id);
+    if (!measure) return { status: "unavailable" };
+    if (!findTable(workbook.sheets, measure.table)) return { status: "missingTable" };
+    if (getEngine().checkFormulaSyntax(measure.formula) !== undefined) return { status: "syntax" };
+    return { status: "ok" };
   }
 
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {

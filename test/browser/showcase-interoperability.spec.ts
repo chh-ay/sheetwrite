@@ -2,7 +2,6 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import compatibilityResults from "../../docs/src/generated/compatibility-results.json" with { type: "json" };
 import type { Grid } from "../../packages/core/src/types.js";
 import fixtureManifest from "../../packages/xlsx/test/fixtures/manifest.json" with { type: "json" };
 import { siteUrl } from "./playwright.config.js";
@@ -25,6 +24,30 @@ const HOSTILE_FIXTURE_IDS = [
 interface BootErrors {
   console: string[];
   page: string[];
+}
+
+/** Totals of the checked compatibility results file. */
+interface CompatibilityTestSet {
+  totalTests: number;
+  formulaTests: number;
+  editSequenceTests: number;
+  workbookTests: number;
+  localPassed: number;
+  unsupported: number;
+  reviewedResults: number;
+  checksum: string;
+}
+
+/** Fetches the checked results file the page serves behind "Open exact generated JSON". */
+async function servedCompatibilityTestSet(page: Page): Promise<CompatibilityTestSet> {
+  const href = await page
+    .locator("a", { hasText: "Open exact generated JSON" })
+    .getAttribute("href");
+  if (href === null) throw new Error("The compatibility results link has no href");
+  const response = await page.request.get(new URL(href, page.url()).href);
+  expect(response.ok()).toBe(true);
+  const results = (await response.json()) as { testSet: CompatibilityTestSet };
+  return results.testSet;
 }
 
 function collectErrors(page: Page): BootErrors {
@@ -111,19 +134,9 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(boundaryStatus).toHaveText("Supported · Evaluated");
   await expect(evaluatedBoundary).toHaveAccessibleName(/Supported · Evaluated/u);
 
-  // The summary renders the checked results file; take the expected numbers from it.
-  const { testSet } = compatibilityResults as unknown as {
-    testSet: {
-      totalTests: number;
-      formulaTests: number;
-      editSequenceTests: number;
-      workbookTests: number;
-      localPassed: number;
-      unsupported: number;
-      reviewedResults: number;
-      checksum: string;
-    };
-  };
+  // The summary renders the checked results file; take the expected numbers
+  // from the copy the page links to.
+  const testSet = await servedCompatibilityTestSet(page);
   const supported = testSet.totalTests - testSet.unsupported;
   expect(testSet.localPassed).toBeLessThanOrEqual(supported);
   const summary = page.getByTestId("compatibility-results-summary");
