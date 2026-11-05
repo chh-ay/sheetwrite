@@ -3,7 +3,7 @@ title: "Engineering functions"
 description: "Every engineering formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 53 functions of the engineering family. Taxonomy/source: [Engineering functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 54 functions of the engineering family. Taxonomy/source: [Engineering functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -65,6 +65,7 @@ This page lists the 53 functions of the engineering family. Taxonomy/source: [En
 <tr data-formula-name="BESSELJ" data-engine="full"><td><code>BESSELJ</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
 <tr data-formula-name="BESSELK" data-engine="full"><td><code>BESSELK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
 <tr data-formula-name="BESSELY" data-engine="full"><td><code>BESSELY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-bessel">Signature: <code>bessel</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
+<tr data-formula-name="CONVERT" data-engine="full"><td><code>CONVERT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-convert">Signature: <code>convert</code></a><br /><a href="#semantics-analysis-engineering">Semantics: <code>analysis-engineering</code></a><br /><a href="#dialect-analysis-engineering">Dialect: <code>analysis-engineering</code></a><br /><a href="#implementation-analysis-engineering">Implementation: <code>analysis-engineering</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -216,6 +217,18 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-convert"><summary>Signature: convert</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `fromUnit` | yes | none | `scalar`, `reference` | `once` |
+| `toUnit` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -244,7 +257,7 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. IMSUM and IMPRODUCT skip blank cells in a range. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8.
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. IMSUM and IMPRODUCT skip blank cells in a range. BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8. CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits.
 
 </details>
 
@@ -255,7 +268,7 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/engineering.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/engineering.rs)<br />[`packages/wasm/src/eval/analysis/complex.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/complex.rs)<br />[`packages/wasm/src/eval/analysis/bessel.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/bessel.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/engineering.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/engineering.rs)<br />[`packages/wasm/src/eval/analysis/complex.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/complex.rs)<br />[`packages/wasm/src/eval/analysis/bessel.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/bessel.rs)<br />[`packages/wasm/src/eval/analysis/units.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/units.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
 

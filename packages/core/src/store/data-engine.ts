@@ -2127,6 +2127,19 @@ export class StoreDataEngine {
     };
   }
 
+  /** Excel's current region around a data cell: the block bounded by empty rows and columns. */
+  currentRegion(addr: CellAddress): Range | null {
+    const handle = this.handles.get(addr.sheet);
+    if (handle === undefined) return null;
+
+    const [top, left, bottom, right] = this.wasm.currentRegion(handle, addr.row, addr.col);
+    if (top === undefined || left === undefined || bottom === undefined || right === undefined) {
+      return null;
+    }
+
+    return { sheet: addr.sheet, start: { row: top, col: left }, end: { row: bottom, col: right } };
+  }
+
   /**
    * The plan that sorts the data rows of `range` by `keys`: a `permuteRows`
    * operation, no change, or Excel's refusal. Rows that are hidden or

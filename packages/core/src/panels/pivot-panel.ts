@@ -100,10 +100,19 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
    */
   const distinctValues = (pivot: PivotDefinition, field: number): CellScalar[] => {
     const tables = grid.store.getWorkbook().sheets.flatMap((candidate) => candidate.tables ?? []);
-    const range = sourceDataRange(pivot.source, tables);
+    const modelField = "model" in pivot.source ? pivot.source.model.fields[field] : undefined;
+    const source = modelField ? { table: modelField.table } : pivot.source;
+    const range = sourceDataRange(source, tables);
     if (range === null) return [];
-    const seen = new Set<CellScalar>();
-    const col = range.start.col + field;
+    const offset = modelField
+      ? (tables
+          .find((table) => table.id === modelField.table)
+          ?.columns.findIndex((column) => column.id === modelField.column) ?? -1)
+      : field;
+    if (offset < 0) return [];
+    // Related fields can be blank because a fact key has no matching row.
+    const seen = new Set<CellScalar>(modelField ? [null] : []);
+    const col = range.start.col + offset;
     for (let row = range.start.row; row <= range.end.row; row++) {
       seen.add(grid.store.getCell({ sheet: range.sheet, row, col }).resolved);
       if (seen.size > MAX_FILTER_VALUES) break;
