@@ -500,9 +500,18 @@
       "entryPoint": "./history",
       "exports": [
         "DEFAULT_HISTORY_LIMITS",
+        "HISTORY_DIFF_NONE",
         "HistoryArchive",
         "HistoryArchiveOptions",
         "HistoryCommit",
+        "HistoryDiffCell",
+        "HistoryDiffCells",
+        "HistoryDiffCursor",
+        "HistoryDiffDetail",
+        "HistoryDiffFlag",
+        "HistoryDiffPage",
+        "HistoryDiffRequest",
+        "HistoryDiffSheet",
         "HistoryError",
         "HistoryErrorCode",
         "HistoryGetRequest",
@@ -524,6 +533,7 @@
         "HistoryStorageUsage",
         "HistoryStoredRecord",
         "HistoryVersion",
+        "MAX_HISTORY_DIFF_ENTRIES",
         "MemoryHistoryStorage"
       ]
     },
