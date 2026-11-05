@@ -236,8 +236,8 @@ impl SearchState {
     }
 }
 
-/// Searches `list` with the plain scan's rules. With `state`, the second and
-/// later searches of the pass use the index where it proves the same answer.
+/// Searches `list` with the plain scan's rules. With `state`, the search uses
+/// the pass's index where it proves the same answer.
 pub(super) fn find_match(
     list: &ListView<'_>,
     key: &Value,
