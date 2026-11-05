@@ -1,0 +1,93 @@
+---
+title: Data model
+description: "Relate workbook tables with one-to-many relationships that are saved in the workbook, undone and synchronized."
+---
+
+Every workbook table is a table of the data model. A relationship links two tables with one key column on each side:
+
+- `from` is the many side, the foreign key. Many `from` rows can have the same key.
+- `to` is the one side, the key. Each non-blank key is unique in its column.
+
+The names follow Excel's `x15:modelRelationship`.
+
+```ts compile title="Relate orders to customers"
+import { initSheetwrite, SheetwriteStore, type WorkbookSnapshot } from "@sheetwrite/core";
+
+await initSheetwrite();
+
+const snapshot: WorkbookSnapshot = {
+  schemaVersion: 1,
+  workbook: { activeSheet: "data" },
+  sheets: [
+    {
+      id: "data",
+      name: "Data",
+      order: 0,
+      rowCount: 10,
+      columns: ["A", "B", "C", "D"].map((key) => ({
+        key,
+        header: key,
+        width: 100,
+        type: "text" as const,
+      })),
+      tables: [
+        {
+          id: "orders",
+          name: "Orders",
+          range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 4, col: 1 } },
+          columns: [
+            { id: "customer", name: "Customer" },
+            { id: "amount", name: "Amount" },
+          ],
+          headerRow: true,
+          totalsRow: false,
+        },
+        {
+          id: "customers",
+          name: "Customers",
+          range: { sheet: "data", start: { row: 0, col: 2 }, end: { row: 3, col: 3 } },
+          columns: [
+            { id: "id", name: "ID" },
+            { id: "region", name: "Region" },
+          ],
+          headerRow: true,
+          totalsRow: false,
+        },
+      ],
+      cells: [],
+    },
+  ],
+};
+
+const store = SheetwriteStore.fromSnapshot(snapshot);
+store.setRelationship({
+  id: "orders-customers",
+  from: { table: "orders", column: "customer" },
+  to: { table: "customers", column: "id" },
+});
+// The snapshot now holds `workbook.dataModel.relationships`.
+const saved = store.exportSnapshot().workbook.dataModel?.relationships ?? [];
+if (saved.length !== 1) throw new Error("The relationship was not saved");
+store.dispose();
+```
+
+## Rules
+
+A relationship refers to tables and columns by their stable IDs, so renames, column moves and row or column edits keep it. A new relationship is refused when:
+
+- a table or a column does not exist,
+- both sides are the same table,
+- another relationship already joins the same two tables,
+- the relationships would form a cycle when direction is ignored. So two related tables always have exactly one path between them.
+
+Removing a table or a column keeps the relationships that refer to it, and undo restores a working model.
+
+## Undo and collaboration
+
+`setRelationship` and `removeRelationship` are document operations. Each change is one undo step, and it is saved and synchronized like other workbook metadata. Two concurrent relationship changes conflict, because the rules apply to the whole model. A pending relationship also conflicts with a concurrent change to one of its tables, or with the removal of a sheet.
+
+| Store method | Result |
+| --- | --- |
+| `getRelationships()` | Copies of the saved relationships |
+| `setRelationship(relationship)` | Inserts it, or replaces the one with its ID |
+| `removeRelationship(id)` | Removes it |
