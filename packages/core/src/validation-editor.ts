@@ -1,4 +1,5 @@
 import type { EditNavigate, EditRect } from "./editor.js";
+import { menuKeyTarget } from "./menu-keys.js";
 import type { CellScalar } from "./types/cell.js";
 import type { DataValidationRule } from "./types/document.js";
 import type { Theme } from "./types/render.js";
@@ -145,10 +146,8 @@ export class ValidationEditor {
   }
 
   private readonly onListKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === "ArrowDown") this.setActive(this.activeIndex + 1);
-    else if (event.key === "ArrowUp") this.setActive(this.activeIndex - 1);
-    else if (event.key === "Home") this.setActive(0);
-    else if (event.key === "End") this.setActive(this.values.length - 1);
+    const next = menuKeyTarget(event.key, this.activeIndex, this.values.length);
+    if (next !== null) this.setActive(next);
     else if (event.key === "Enter") this.commitList(this.activeIndex, "down");
     else if (event.key === "Tab")
       this.commitList(this.activeIndex, event.shiftKey ? "left" : "right");

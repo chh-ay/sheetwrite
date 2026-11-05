@@ -5,6 +5,7 @@
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import { iconNode } from "../icons/resolve.js";
+import { TWO_AXIS_STEPS, menuKeyTarget } from "../menu-keys.js";
 import type {
   ChartDefinition,
   ChartKind,
@@ -140,17 +141,11 @@ function renderChartPanel(
   kinds.addEventListener("keydown", (event) => {
     const index = kindButtons.findIndex((button) => button === event.target);
     if (index === -1) return;
-    const count = kindButtons.length;
-    const moves: Record<string, number> = {
-      ArrowRight: (index + 1) % count,
-      ArrowDown: (index + 1) % count,
-      ArrowLeft: (index - 1 + count) % count,
-      ArrowUp: (index - 1 + count) % count,
-      Home: 0,
-      End: count - 1,
-    };
-    const next = moves[event.key];
-    const kind = next === undefined ? undefined : CHART_KINDS[next]?.kind;
+    const next = menuKeyTarget(event.key, index, kindButtons.length, {
+      steps: TWO_AXIS_STEPS,
+      wrap: true,
+    });
+    const kind = next === null ? undefined : CHART_KINDS[next]?.kind;
     if (kind === undefined) return;
     event.preventDefault();
     selectKind(kind);

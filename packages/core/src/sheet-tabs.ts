@@ -1,3 +1,5 @@
+import { HORIZONTAL_STEPS, type MenuKeyOptions, menuKeyTarget } from "./menu-keys.js";
+import { type PopupPlacement, popupPosition } from "./popup-placement.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";
@@ -61,6 +63,12 @@ let nextErrorId = 0;
 // per-grid id: the browser keeps a parsed copy of each different selector text
 // for the page, so an id selector would keep one entry for every grid created.
 const TAB_MENU_SELECTOR = ".sheetwrite-tab-menu";
+/** The sheet menu opens under its trigger, flush with it. */
+const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
+/** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
+const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
+/** Arrow keys move along the tab strip and stop at its ends. */
+const TAB_STRIP_KEYS: MenuKeyOptions = { steps: HORIZONTAL_STEPS, wrap: false };
 
 function createTabIcon(pathData: string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -649,13 +657,13 @@ export class SheetTabs {
       choices.hidden = false;
       if (typeof choices.showPopover === "function") {
         choices.showPopover();
-        const triggerRect = trigger.getBoundingClientRect();
-        const choicesRect = choices.getBoundingClientRect();
-        choices.style.left = `${Math.max(
-          4,
-          Math.min(triggerRect.left, window.innerWidth - choicesRect.width - 4),
-        )}px`;
-        choices.style.top = `${Math.max(4, triggerRect.top - choicesRect.height - 4)}px`;
+        const { left, top } = popupPosition(
+          trigger.getBoundingClientRect(),
+          choices.getBoundingClientRect(),
+          CHOICES_PLACEMENT,
+        );
+        choices.style.left = `${left}px`;
+        choices.style.top = `${top}px`;
       }
 
       trigger.setAttribute("aria-expanded", "true");
@@ -787,10 +795,7 @@ export class SheetTabs {
     if (!trigger) return;
     const triggerRect = trigger.getBoundingClientRect();
     this.menuAnchor = { left: triggerRect.left, top: triggerRect.top };
-    const menuRect = menu.getBoundingClientRect();
-    const left = Math.max(0, Math.min(triggerRect.left, window.innerWidth - menuRect.width));
-    const below = triggerRect.bottom + menuRect.height <= window.innerHeight;
-    const top = below ? triggerRect.bottom : Math.max(0, triggerRect.top - menuRect.height);
+    const { left, top } = popupPosition(triggerRect, menu.getBoundingClientRect(), MENU_PLACEMENT);
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
   }
@@ -896,12 +901,7 @@ export class SheetTabs {
             `${TAB_MENU_SELECTOR} [role="menuitem"]`,
           ),
         ];
-        const current = items.indexOf(active);
-        let next: number | null = null;
-        if (event.key === "ArrowDown") next = current + 1;
-        else if (event.key === "ArrowUp") next = current - 1;
-        else if (event.key === "Home") next = 0;
-        else if (event.key === "End") next = items.length - 1;
+        const next = menuKeyTarget(event.key, items.indexOf(active), items.length);
         if (next !== null) {
           event.preventDefault();
           event.stopPropagation();
@@ -985,12 +985,8 @@ export class SheetTabs {
       }
     }
 
-    let next: number;
-    if (event.key === "ArrowLeft") next = Math.max(0, current - 1);
-    else if (event.key === "ArrowRight") next = Math.min(this.buttons.length - 1, current + 1);
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = this.buttons.length - 1;
-    else return;
+    const next = menuKeyTarget(event.key, current, this.buttons.length, TAB_STRIP_KEYS);
+    if (next === null) return;
 
     event.preventDefault();
     const target = this.buttons[next];

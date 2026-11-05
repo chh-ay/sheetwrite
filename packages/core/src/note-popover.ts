@@ -1,3 +1,4 @@
+import { POPUP_VIEWPORT_MARGIN } from "./popup-placement.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
@@ -9,7 +10,6 @@ export const NOTE_HOVER_DELAY_MS = 400;
 const CARD_GAP = 4;
 
 /** Closest the card comes to a window edge. */
-const VIEWPORT_MARGIN = 8;
 
 /** One cell in both coordinate spaces: view for geometry, data for the note. */
 export interface NoteCell {
@@ -193,14 +193,14 @@ export class NotePopover {
     const rect = this.deps.cellRect(cell);
 
     const right = rect.right + CARD_GAP;
-    const fitsRight = right + origin.width <= window.innerWidth - VIEWPORT_MARGIN;
+    const fitsRight = right + origin.width <= window.innerWidth - POPUP_VIEWPORT_MARGIN;
     const left = fitsRight ? right : rect.left - CARD_GAP - origin.width;
 
-    const fitsBelow = rect.top + origin.height <= window.innerHeight - VIEWPORT_MARGIN;
+    const fitsBelow = rect.top + origin.height <= window.innerHeight - POPUP_VIEWPORT_MARGIN;
     const top = fitsBelow ? rect.top : rect.bottom - origin.height;
 
-    surface.style.left = `${Math.max(VIEWPORT_MARGIN, left) - origin.left}px`;
-    surface.style.top = `${Math.max(VIEWPORT_MARGIN, top) - origin.top}px`;
+    surface.style.left = `${Math.max(POPUP_VIEWPORT_MARGIN, left) - origin.left}px`;
+    surface.style.top = `${Math.max(POPUP_VIEWPORT_MARGIN, top) - origin.top}px`;
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {

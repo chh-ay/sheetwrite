@@ -4,6 +4,7 @@
 
 import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
+import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-keys.js";
 import { Scope } from "../scope.js";
 import type {
   CommandFlags,
@@ -451,15 +452,11 @@ export class CommandToolbar {
     const current = stops.indexOf(focused);
     if (current === -1) return;
 
-    const last = stops.length - 1;
-    const targets: Record<string, number> = {
-      ArrowRight: Math.min(last, current + 1),
-      ArrowLeft: Math.max(0, current - 1),
-      Home: 0,
-      End: last,
-    };
-    const next = targets[event.key];
-    if (next === undefined) return;
+    const next = menuKeyTarget(event.key, current, stops.length, {
+      steps: HORIZONTAL_STEPS,
+      wrap: false,
+    });
+    if (next === null) return;
 
     event.preventDefault();
     stops[next]?.focus();

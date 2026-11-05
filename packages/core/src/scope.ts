@@ -94,19 +94,43 @@ export class Scope {
     this.controller.abort(reason);
     const disposers = [...this.disposers];
     this.disposers.clear();
-    let failure: unknown;
-    let failed = false;
+    const failures = new FirstFailure();
     for (let index = disposers.length - 1; index >= 0; index--) {
-      try {
-        disposers[index]?.();
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
+      const disposer = disposers[index];
+      if (disposer) failures.run(disposer);
     }
-    if (failed) throw failure;
+    failures.rethrow();
+  }
+}
+
+/**
+ * Runs cleanup steps that must all run even when one throws, and keeps the
+ * first error for `rethrow` after the last step.
+ */
+export class FirstFailure {
+  private failure: unknown;
+  private failed = false;
+
+  /** Whether a step has failed. */
+  get hasFailed(): boolean {
+    return this.failed;
+  }
+
+  /** Run `step`, keeping its error when it is the first one. */
+  run(step: () => void): void {
+    try {
+      step();
+    } catch (error) {
+      if (this.failed) return;
+
+      this.failure = error;
+      this.failed = true;
+    }
+  }
+
+  /** Throw the first kept error, if any step failed. */
+  rethrow(): void {
+    if (this.failed) throw this.failure;
   }
 }
 

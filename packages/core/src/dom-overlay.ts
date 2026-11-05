@@ -1,11 +1,14 @@
 import {
   intersectingMerges,
+  MERGE_KEY_STRIDE,
   type MergeRect,
   type PreparedMergeIndex,
   prepareMergeIndex,
 } from "./canvas-paint.js";
+import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { SheetwriteError } from "./errors.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
+import { FirstFailure } from "./scope.js";
 import type { CellScalar, CellStyle } from "./types/cell.js";
 import type {
   CellPaintContext,
@@ -17,8 +20,6 @@ import type {
 } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
-const MERGE_KEY_STRIDE = 0x100000;
-const EMPTY_STYLE: CellStyle = {};
 const INTERACTIVE_SELECTOR =
   "button,input,select,textarea,a[href],[contenteditable]:not([contenteditable='false']),[tabindex]:not([tabindex='-1'])";
 const ACCESSIBLE_SELECTOR = `${INTERACTIVE_SELECTOR},[role],[aria-label],[aria-labelledby],[aria-description],[aria-describedby]`;
@@ -99,20 +100,12 @@ export class DomOverlay {
 
   setRenderers(renderers: ReadonlyMap<string, CellRenderer>): void {
     this.renderers = renderers;
-    let failure: unknown;
-    let failed = false;
+    const failures = new FirstFailure();
     for (const entry of this.entries.values()) {
       if (renderers.get(entry.rendererName) === entry.renderer) continue;
-      try {
-        this.removeEntry(entry, true);
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
+      failures.run(() => this.removeEntry(entry, true));
     }
-    if (failed) throw failure;
+    failures.rethrow();
   }
 
   paint(
@@ -124,7 +117,8 @@ export class DomOverlay {
     this.frameView = view;
     this.framePanes = null;
     this.frameAnchorViews = anchorViews;
-    try {
+    const failures = new FirstFailure();
+    failures.run(() => {
       this.populateMergeMap(view);
       this.paintView(view, {
         x: 0,
@@ -134,11 +128,8 @@ export class DomOverlay {
         scrollTop: viewport.scrollTop,
         scrollLeft: viewport.scrollLeft,
       });
-    } catch (error) {
-      this.finishFrame(error, true);
-      return;
-    }
-    this.finishFrame(undefined, false);
+    });
+    this.finishFrame(failures);
   }
 
   paintPanes(
@@ -149,7 +140,8 @@ export class DomOverlay {
     this.frameView = null;
     this.framePanes = panes;
     this.frameAnchorViews = anchorViews;
-    try {
+    const failures = new FirstFailure();
+    failures.run(() => {
       for (const pane of panes) this.populateMergeMap(pane.view);
       for (const pane of panes) {
         this.paintView(pane.view, {
@@ -158,11 +150,8 @@ export class DomOverlay {
           scrollLeft: pane.scrollLeft,
         });
       }
-    } catch (error) {
-      this.finishFrame(error, true);
-      return;
-    }
-    this.finishFrame(undefined, false);
+    });
+    this.finishFrame(failures);
   }
 
   reset(): void {
@@ -172,21 +161,15 @@ export class DomOverlay {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    let failure: unknown;
-    let failed = false;
-    try {
-      this.removeAllEntries(false);
-    } catch (error) {
-      failure = error;
-      failed = true;
-    }
+    const failures = new FirstFailure();
+    failures.run(() => this.removeAllEntries(false));
     this.entries.clear();
     this.clearFrameSources();
     this.styleTables.length = 0;
     for (const cache of this.styleCaches) cache.clear();
     this.element.removeEventListener("keydown", this.onKeyDown);
     this.element.remove();
-    if (failed) throw failure;
+    failures.rethrow();
   }
 
   private beginFrame(): boolean {
@@ -202,20 +185,12 @@ export class DomOverlay {
   }
 
   private endFrame(removeCurrentEntries: boolean): void {
-    let failure: unknown;
-    let failed = false;
+    const failures = new FirstFailure();
     for (const entry of this.entries.values()) {
       if (!removeCurrentEntries && entry.frame === this.frame) continue;
-      try {
-        this.removeEntry(entry, true);
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
+      failures.run(() => this.removeEntry(entry, true));
     }
-    if (failed) throw failure;
+    failures.rethrow();
   }
 
   private populateMergeMap(view: VisibleWindowView): void {
@@ -490,17 +465,12 @@ export class DomOverlay {
     return -1;
   }
 
-  private finishFrame(failure: unknown, failed: boolean): void {
-    try {
-      this.endFrame(failed);
-    } catch (error) {
-      if (!failed) {
-        failure = error;
-        failed = true;
-      }
-    }
+  /** End the frame; a failed paint also removes the entries it placed. */
+  private finishFrame(failures: FirstFailure): void {
+    const paintFailed = failures.hasFailed;
+    failures.run(() => this.endFrame(paintFailed));
     this.clearFrameSources();
-    if (failed) throw failure;
+    failures.rethrow();
   }
 
   private clearFrameSources(): void {
@@ -611,28 +581,13 @@ export class DomOverlay {
       this.claimRendererNode(next);
       const previous = entry.node;
       const hadFocus = previous.contains(document.activeElement);
-      let failure: unknown;
-      let failed = false;
-      try {
-        entry.renderer.destroy?.(previous);
-      } catch (error) {
-        failure = error;
-        failed = true;
-      }
+      const failures = new FirstFailure();
+      failures.run(() => entry.renderer.destroy?.(previous));
       this.ownedNodes.delete(previous);
       entry.bounds.replaceChildren(next);
       entry.node = next;
-      if (hadFocus) {
-        try {
-          this.focusHost();
-        } catch (error) {
-          if (!failed) {
-            failure = error;
-            failed = true;
-          }
-        }
-      }
-      if (failed) throw failure;
+      if (hadFocus) failures.run(() => this.focusHost());
+      failures.rethrow();
       this.syncSemantics(entry);
     }
     // A legacy renderer whose node was not rebuilt keeps the semantics the last
@@ -685,45 +640,22 @@ export class DomOverlay {
 
   private removeEntry(entry: DomEntry, restoreFocus: boolean): void {
     const hadFocus = entry.node.contains(document.activeElement);
-    let failure: unknown;
-    let failed = false;
-    try {
-      entry.renderer.destroy?.(entry.node);
-    } catch (error) {
-      failure = error;
-      failed = true;
-    }
+    const failures = new FirstFailure();
+    failures.run(() => entry.renderer.destroy?.(entry.node));
     this.ownedNodes.delete(entry.node);
     entry.node.remove();
     entry.clip.remove();
     this.entries.delete(entry.key);
-    if (restoreFocus && hadFocus) {
-      try {
-        this.focusHost();
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
-    }
-    if (failed) throw failure;
+    if (restoreFocus && hadFocus) failures.run(() => this.focusHost());
+    failures.rethrow();
   }
 
   private removeAllEntries(restoreFocus: boolean): void {
-    let failure: unknown;
-    let failed = false;
+    const failures = new FirstFailure();
     for (const entry of this.entries.values()) {
-      try {
-        this.removeEntry(entry, restoreFocus);
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
+      failures.run(() => this.removeEntry(entry, restoreFocus));
     }
-    if (failed) throw failure;
+    failures.rethrow();
   }
 
   private claimRendererNode(node: HTMLElement): void {

@@ -3,9 +3,13 @@
 // list of its own, as in Excel. Every surface shares the same dismissal,
 // placement and focus-return rules.
 
-const VIEWPORT_MARGIN = 8;
-/** Space between a popup and its trigger, so the two never read as one surface. */
-const TRIGGER_GAP = 4;
+import { TWO_AXIS_STEPS, type MenuKeyOptions, menuKeyTarget } from "../menu-keys.js";
+import { type PopupPlacement, popupPosition } from "../popup-placement.js";
+
+/** Popups open under their trigger, with a gap so the two never read as one surface. */
+const POPUP_PLACEMENT: PopupPlacement = { side: "below", gap: 4 };
+/** Arrow keys move through a popup's items in either direction and wrap at the ends. */
+const POPUP_KEYS: MenuKeyOptions = { steps: TWO_AXIS_STEPS, wrap: true };
 
 /** Elements arrow keys move between inside an open popup. */
 const NAVIGABLE =
@@ -165,12 +169,7 @@ export class RibbonPopup {
     surface.style.left = "0px";
     surface.style.top = "0px";
     const origin = surface.getBoundingClientRect();
-    const maxLeft = window.innerWidth - origin.width - VIEWPORT_MARGIN;
-    const below = anchor.bottom + TRIGGER_GAP;
-    const above = anchor.top - origin.height - TRIGGER_GAP;
-    const fitsBelow = below + origin.height <= window.innerHeight - VIEWPORT_MARGIN;
-    const left = Math.max(VIEWPORT_MARGIN, Math.min(anchor.left, maxLeft));
-    const top = Math.max(VIEWPORT_MARGIN, fitsBelow || above < 0 ? below : above);
+    const { left, top } = popupPosition(anchor, origin, POPUP_PLACEMENT);
     surface.style.left = `${left - origin.left}px`;
     surface.style.top = `${top - origin.top}px`;
   }
@@ -243,22 +242,16 @@ export class RibbonPopup {
       return;
     }
 
-    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
-    const edge = event.key === "Home" || event.key === "End";
-    if (step === undefined && !edge) return;
     // Text fields keep their own caret keys.
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       return;
     }
 
     const items = [...surface.querySelectorAll<HTMLElement>(NAVIGABLE)];
-    if (items.length === 0) return;
     const current = items.findIndex((element) => element === document.activeElement);
-    let next: number;
-    if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = items.length - 1;
-    else if (current === -1) next = step === 1 ? 0 : items.length - 1;
-    else next = (current + (step ?? 0) + items.length) % items.length;
+    const next = menuKeyTarget(event.key, current, items.length, POPUP_KEYS);
+    if (next === null) return;
+
     event.preventDefault();
     const target = items[next];
     if (target !== undefined) focusInSurface(surface, target);

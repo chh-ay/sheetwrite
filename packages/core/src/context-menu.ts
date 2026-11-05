@@ -2,6 +2,7 @@ import { type ActionFeedback, actionFeedbackFor } from "./action-feedback.js";
 import type { IconName } from "./icons/icon-names.js";
 import { iconNode } from "./icons/resolve.js";
 import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
+import { menuKeyTarget } from "./menu-keys.js";
 import { pivotAt } from "./panels/panel-loader.js";
 import type {
   ContextMenuActionName,
@@ -619,10 +620,6 @@ export class ContextMenu {
     const active = document.activeElement;
     const index = rows.findIndex((row) => row === active);
     const level = this.levelOf(menu);
-    const focusAt = (next: number): void => {
-      rows[(next + rows.length) % rows.length]?.focus({ preventScroll: true });
-    };
-
     const backToParent = (): void => {
       const parentRow = this.submenus[level - 1]?.parentRow;
       this.closeSubmenusFrom(level - 1);
@@ -630,22 +627,6 @@ export class ContextMenu {
     };
 
     switch (event.key) {
-      case "ArrowDown":
-        focusAt(index + 1);
-        break;
-
-      case "ArrowUp":
-        focusAt(index < 0 ? -1 : index - 1);
-        break;
-
-      case "Home":
-        focusAt(0);
-        break;
-
-      case "End":
-        focusAt(-1);
-        break;
-
       case "Enter":
       case " ":
         if (active instanceof HTMLElement && rows.includes(active)) active.click();
@@ -671,8 +652,12 @@ export class ContextMenu {
         this.close();
         break;
 
-      default:
-        return;
+      default: {
+        const next = menuKeyTarget(event.key, index, rows.length);
+        if (next === null) return;
+
+        rows[next]?.focus({ preventScroll: true });
+      }
     }
 
     // The grid under the menu must not also move its selection.

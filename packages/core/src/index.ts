@@ -7,7 +7,7 @@ export {
   parseCurrencyInput,
 } from "./cell-input.js";
 
-export { isCellFontFamily } from "./cell-style-fields.js";
+export { isCellFontFamily, sanitizeCellStyle } from "./cell-style-fields.js";
 
 export {
   openChartViews,
@@ -148,7 +148,6 @@ export {
   type ResolvedHyperlinkTarget,
   resolveHyperlinkTarget,
   sanitizeCellHyperlink,
-  sanitizeHyperlinkStyle,
 } from "./hyperlink.js";
 
 export { ICON_NAMES, type IconName } from "./icons/icon-names.js";

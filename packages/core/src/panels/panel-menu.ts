@@ -1,3 +1,4 @@
+import { menuKeyTarget } from "../menu-keys.js";
 // A menu button for panel rows: the keyboard path for what drag and drop
 // does. The menu opens below its button inside the panel, so the panel's
 // scrolling and clipping apply to it.
@@ -64,14 +65,8 @@ export function menuButton(
   const onMenuKeydown = (event: KeyboardEvent): void => {
     const list = entries();
     const current = list.findIndex((entry) => entry === document.activeElement);
-    const moves: Record<string, number> = {
-      ArrowDown: (current + 1) % list.length,
-      ArrowUp: (current - 1 + list.length) % list.length,
-      Home: 0,
-      End: list.length - 1,
-    };
-    const next = moves[event.key];
-    if (next !== undefined && list.length > 0) {
+    const next = menuKeyTarget(event.key, current, list.length);
+    if (next !== null) {
       event.preventDefault();
       list[next]?.focus();
     } else if (event.key === "Escape" || event.key === "Tab") {
