@@ -3,14 +3,22 @@ import {
   type MatchedEngineResult,
   validateMatchedEngineResult,
 } from "../bench/src/matched-engine-bench.js";
-import { benchScaleFigure } from "./bench-figures.js";
 import {
   allMeasurements,
   formatBytes,
   formatCaptureTime,
   provenanceList,
+  readableId,
   shortHash,
 } from "./evidence-format.js";
+import {
+  captureNote,
+  FASTEST_TO_P95,
+  fastestToP95,
+  type MachineEvidence,
+  machineGroups,
+  perfFigure,
+} from "./perf-figures.js";
 
 export function validateFullEngineArtifact(
   value: Record<string, unknown>,
@@ -36,7 +44,7 @@ export function validateMatchedEngineArtifact(
 }
 
 /** The full-only workloads, engine sizes and cold start; detail for the section. */
-function analysisDetail(full: FullEngineResult): string[] {
+function analysisDetail(machines: readonly MachineEvidence<FullEngineResult>[]): string[] {
   return [
     "#### Analysis workloads",
     "",
@@ -44,13 +52,24 @@ function analysisDetail(full: FullEngineResult): string[] {
     "",
     "LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.",
     "",
-    ...benchScaleFigure(
-      "analysis workload",
-      full.analysis.map((row) => ({
-        label: row.id,
-        entries: [{ sizeLabel: "1,000 formulas", median: row.stat.median, p95: row.stat.p95 }],
-      })),
-    ),
+    perfFigure({
+      id: "formula-analysis",
+      title: "Median first recompute of 1,000 formulas",
+      unit: "ms",
+      scale: "log",
+      rowHeader: "Analysis workload",
+      spreadLabel: FASTEST_TO_P95,
+      groups: machineGroups(
+        machines,
+        (capture) =>
+          capture.analysis.map((row) => ({
+            label: readableId(row.id),
+            id: row.id,
+            bars: [{ label: "", role: "measured", stat: fastestToP95(row.stat) }],
+          })),
+        (capture) => captureNote(capture.meta),
+      ),
+    }),
     "",
     "Brotli size uses quality 11 on the WASM file only. It is not the full package transfer size. The raw artifacts retain cold-initialization samples; those samples do not establish that one engine initializes faster.",
     "",
@@ -72,7 +91,8 @@ const REPRODUCE = [
 /** Shared functions use the same code. Publish coverage and size, not a speed race. */
 export function renderFullEngineEvidence(
   full: FullEngineResult,
-  matched?: MatchedEngineResult,
+  matched: MatchedEngineResult | undefined,
+  machines: readonly MachineEvidence<FullEngineResult>[],
 ): string {
   validateFullEngineResult(full);
   if (matched !== undefined) {
@@ -100,7 +120,7 @@ export function renderFullEngineEvidence(
     "[Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/features/formulas/analysis-formulas/)",
     "",
     ...allMeasurements([
-      ...analysisDetail(full),
+      ...analysisDetail(machines),
       "",
       ...provenanceList([
         ["Analysis capture", `${formatCaptureTime(full.meta.timestamp)} UTC`],

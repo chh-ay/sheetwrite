@@ -24,6 +24,7 @@ import { IncompleteDataError, SheetwriteStore, toCsv } from "@sheetwrite/core";
 import interactionResults from "../../../../bench/results/interaction-results.json";
 import pagedResults from "../../../../bench/results/paged-results.json";
 import landingBench from "../../generated/landing-bench.json";
+import type { SpeedupMachine } from "../../lib/speedup-figure.js";
 
 export const FEED_SHEET = "scale" satisfies SheetId;
 export const SCALE_ROWS = 1_000_000;
@@ -693,4 +694,6 @@ export const COMPARISON_EVIDENCE = {
   capture: landingBench.capture,
   heroStats: landingBench.heroStats,
   sizes: landingBench.sizes,
+  // The JSON import types `machine` as a string; the generator writes only known machines.
+  machines: landingBench.machines as readonly SpeedupMachine[],
 } as const;

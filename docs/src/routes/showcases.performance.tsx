@@ -18,11 +18,13 @@ import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
+import { PerfBars } from "../components/PerfBars.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { errorText } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
+import { speedupFigure } from "../lib/speedup-figure.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import { ScaleFlightDeck } from "../showcases/ScaleFlight.js";
 import {
@@ -81,26 +83,6 @@ const LANDMARKS = [
   { label: "100%", ratio: 1 },
 ] as const;
 const SCALE_OVERSCAN = 4;
-const COMPARISON_LOG_MAX_EXPONENT = COMPARISON_EVIDENCE.available
-  ? Math.max(
-      1,
-      Math.ceil(
-        Math.log10(
-          Math.max(...COMPARISON_EVIDENCE.sizes.map((size) => Math.max(size.medianRatio, 1))),
-        ),
-      ),
-    )
-  : 1;
-const COMPARISON_LOG_TICKS = Array.from(
-  { length: COMPARISON_LOG_MAX_EXPONENT + 1 },
-  (_, exponent) => 10 ** exponent,
-);
-
-function comparisonLogPercent(ratio: number): number {
-  if (!Number.isFinite(ratio) || ratio <= 1) return 0;
-  return Math.min(100, (Math.log10(ratio) / COMPARISON_LOG_MAX_EXPONENT) * 100);
-}
-
 interface VisibleWindow {
   firstRow: number;
   lastRow: number;
@@ -1599,43 +1581,7 @@ function EvidenceSection({ workbench }: Readonly<{ workbench: PerformanceWorkben
       <div className="sw-sp-proof-layout">
         {COMPARISON_EVIDENCE.available && (
           <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
-            <header>
-              <p>Scenario median</p>
-              <strong>
-                {COMPARISON_EVIDENCE.sizes[COMPARISON_EVIDENCE.sizes.length - 1]?.medianRatio}×
-              </strong>
-              <span>at one million rows</span>
-            </header>
-            <div aria-hidden="true" className="sw-sp-scale-curve__axis">
-              <span />
-              <div>
-                {COMPARISON_LOG_TICKS.map((tick) => (
-                  <span key={tick}>{tick.toLocaleString()}×</span>
-                ))}
-              </div>
-              <span>log₁₀</span>
-            </div>
-            <ol aria-label="Median comparison ratio by row count, logarithmic scale">
-              {COMPARISON_EVIDENCE.sizes.map((size) => (
-                <li key={size.size}>
-                  <span>{size.size.toLocaleString()}</span>
-                  <span className="sw-sp-scale-curve__track">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: `${comparisonLogPercent(size.medianRatio)}%`,
-                      }}
-                    />
-                  </span>
-                  <strong>{size.medianRatio.toFixed(1)}×</strong>
-                </li>
-              ))}
-            </ol>
-            <p>
-              Log₁₀ axis: 1× is the parity baseline; farther right means a larger measured ratio.
-              Exact ratios remain labeled. {COMPARISON_EVIDENCE.sizes.at(-1)?.comparedScenarios}{" "}
-              matched scenarios at the largest capture size.
-            </p>
+            <PerfBars figure={speedupFigure("showcase-speedup", COMPARISON_EVIDENCE.machines)} />
           </article>
         )}
 

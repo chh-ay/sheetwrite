@@ -23,6 +23,8 @@ import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
+import { renderPerfBars } from "./src/lib/perf-bars.ts";
+import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
@@ -164,42 +166,26 @@ function hydrateFormulaReference() {
   };
 }
 
-/** Draw release reductions from the displayed value, so labels and bars cannot drift. */
-function visualizeReleaseResults() {
+/**
+ * Release-note comparisons (`<perf-compare>` blocks) become the shared
+ * performance bars before raw HTML is parsed, so release notes and the
+ * Performance pages draw the same figure.
+ */
+function renderPerfCompares() {
   return (tree: HastNode): void => {
+    let figures = 0;
     const visit = (node: HastNode): void => {
-      const delta =
-        node.tagName === "li"
-          ? node.children?.find((child) =>
-              String(child.properties?.className ?? "")
-                .split(/[ ,]+/)
-                .includes("sw-results__delta"),
-            )
-          : undefined;
-      if (delta !== undefined) {
-        const label = textOf(delta).trim();
-        const percent = /^(\d+(?:\.\d+)?)(?:–(\d+(?:\.\d+)?))?% (?:faster|less)$/.exec(label);
-        const ratio = /^([\d,]+(?:\.\d+)?)× faster$/.exec(label);
-        const low = percent
-          ? Number(percent[1])
-          : ratio
-            ? (1 - 1 / Number(ratio[1]?.replaceAll(",", ""))) * 100
-            : undefined;
-        const high = percent ? Number(percent[2] ?? percent[1]) : low;
-        if (low !== undefined && high !== undefined) {
-          node.children?.push({
-            type: "element",
-            tagName: "span",
-            properties: {
-              className: ["sw-results__bar"],
-              ariaHidden: "true",
-              style: `--result-min:${low}%;--result-max:${high}%`,
-            },
-            children: [],
-          });
+      for (const child of node.children ?? []) {
+        if (child.type === "raw" && isPerfCompare(child.value ?? "")) {
+          figures += 1;
+          child.value = renderPerfBars(
+            parsePerfCompare(child.value ?? "", `perf-compare-${figures}`),
+            (name) => inlineIcon(name),
+          );
+        } else {
+          visit(child);
         }
       }
-      node.children?.forEach(visit);
     };
     visit(tree);
   };
@@ -444,6 +430,7 @@ export default defineConfig({
               }),
             },
           ],
+          renderPerfCompares,
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
           renderGridResults,
@@ -452,7 +439,6 @@ export default defineConfig({
             { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
           ],
           hydrateFormulaReference,
-          visualizeReleaseResults,
           dedupeCodePopovers,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,

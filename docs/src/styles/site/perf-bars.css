@@ -1,0 +1,460 @@
+/* Performance bars (docs/src/lib/perf-bars.ts): the one figure for measured
+   and compared performance on every page. Each machine group draws its own
+   axis; a comparison row puts the base bar above the measured bar and names
+   the verdict in words, with an arrow, never by colour alone. */
+
+.perf-bars {
+  --perf-series: 8.5rem;
+  --perf-value: 7.5rem;
+  --perf-gap: var(--sw-space-4);
+  --perf-track: 0.875rem;
+  --perf-base: var(--sw-fg-muted);
+  --perf-measured: var(--sw-icon-accent);
+  --perf-whisker: var(--sw-fg-strong);
+  --perf-gridline: var(--sw-border);
+
+  container: perf-bars / inline-size;
+  margin: var(--sw-space-8) 0;
+  padding: var(--sw-space-5) var(--sw-space-6) var(--sw-space-4);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-bars__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sw-space-2) var(--sw-space-6);
+  margin-bottom: var(--sw-space-4);
+}
+
+.sw-prose .perf-bars p {
+  margin: 0;
+}
+
+.perf-bars__title {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-body);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.perf-bars__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.perf-bars__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+}
+
+.perf-bars__key i {
+  display: inline-block;
+  width: 1.25rem;
+  height: 0.625rem;
+  border-radius: 2px;
+}
+
+.perf-bars__key[data-key="base"] i {
+  background: var(--perf-base);
+}
+
+.perf-bars__key[data-key="measured"] i {
+  background: var(--perf-measured);
+}
+
+/* The whisker swatch draws the band as it appears on a bar: a line with end caps. */
+.perf-bars__key[data-key="spread"] i {
+  border-inline: 2px solid var(--perf-whisker);
+  border-radius: 0;
+  background: linear-gradient(var(--perf-whisker), var(--perf-whisker)) center / 100% 2px no-repeat;
+}
+
+/* ---- Machine groups ---- */
+
+.perf-bars__group + .perf-bars__group {
+  margin-top: var(--sw-space-5);
+  padding-top: var(--sw-space-5);
+  border-top: 1px solid var(--sw-border-strong);
+}
+
+.perf-bars__group-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-1) var(--sw-space-2);
+  margin-bottom: var(--sw-space-3);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.perf-bars__group-title .sw-icon {
+  color: var(--sw-fg-muted);
+}
+
+.perf-bars__group-title strong {
+  font-weight: 650;
+}
+
+.perf-bars__group-note {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+/* ---- Axis: the same three columns as a bar, ticks over the track column ---- */
+
+.perf-bars__axis,
+.perf-bars__bar {
+  display: grid;
+  grid-template-columns: var(--perf-series) minmax(0, 1fr) var(--perf-value);
+  grid-template-areas: "series track value";
+  align-items: center;
+  column-gap: var(--perf-gap);
+}
+
+.perf-bars__axis {
+  grid-template-areas:
+    "title title title"
+    ". scale .";
+  row-gap: var(--sw-space-1);
+  padding-bottom: var(--sw-space-2);
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.perf-bars__axis-title {
+  grid-area: title;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.perf-bars__scale {
+  position: relative;
+  grid-area: scale;
+  height: 1.25rem;
+}
+
+.perf-bars__tick {
+  position: absolute;
+  bottom: 0;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.perf-bars__tick[data-edge="start"] {
+  transform: none;
+}
+
+.perf-bars__tick[data-edge="end"] {
+  transform: translateX(-100%);
+}
+
+/* ---- Rows ---- */
+
+.sw-prose .perf-bars__rows,
+.perf-bars__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .perf-bars__row,
+.perf-bars__row {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  margin: 0;
+  padding: var(--sw-space-3) 0;
+}
+
+.perf-bars__row + .perf-bars__row {
+  border-top: 1px solid var(--sw-border);
+}
+
+.perf-bars__row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sw-space-1) var(--sw-space-3);
+}
+
+.perf-bars__label {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.perf-bars__detail {
+  display: block;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  font-weight: 400;
+}
+
+/* The verdict names the direction in words and with an arrow; colour repeats it. */
+.perf-bars__verdict {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  padding: 0.125rem var(--sw-space-3) 0.125rem var(--sw-space-2);
+  border: 1px solid currentcolor;
+  border-radius: var(--sw-radius-pill);
+  font-size: var(--sw-text-caption);
+  line-height: 1.4;
+}
+
+.perf-bars__verdict strong {
+  font-weight: 650;
+}
+
+.perf-bars__verdict[data-verdict="better"] {
+  border-color: color-mix(in srgb, var(--sw-success) 45%, transparent);
+  background: var(--sw-success-soft);
+  color: var(--sw-success);
+}
+
+.perf-bars__verdict[data-verdict="worse"] {
+  border-color: color-mix(in srgb, var(--sw-danger) 45%, transparent);
+  background: var(--sw-danger-soft);
+  color: var(--sw-danger);
+}
+
+.perf-bars__verdict[data-verdict="noise"],
+.perf-bars__verdict[data-verdict="missing"] {
+  border-color: var(--sw-border-strong);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+}
+
+.perf-bars__change {
+  font-family: var(--sw-font-mono);
+  font-weight: 500;
+}
+
+/* ---- Bars ---- */
+
+.perf-bars__series {
+  grid-area: series;
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perf-bars__bar[data-role="measured"] .perf-bars__series {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.perf-bars__track {
+  position: relative;
+  grid-area: track;
+  height: var(--perf-track);
+  border-radius: var(--sw-radius-xs);
+  background:
+    repeating-linear-gradient(
+      to right,
+      transparent 0 calc(100% / var(--perf-steps, 4) - 1px),
+      var(--perf-gridline) calc(100% / var(--perf-steps, 4) - 1px) calc(100% / var(--perf-steps, 4))
+    ),
+    var(--sw-surface-2);
+}
+
+.perf-bars__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--sw-radius-xs);
+  background: var(--perf-base);
+}
+
+.perf-bars__bar[data-role="measured"] .perf-bars__fill {
+  background: var(--perf-measured);
+}
+
+/* The spread band: a line with end caps from the low to the high end. */
+.perf-bars__spread {
+  position: absolute;
+  top: 50%;
+  height: calc(var(--perf-track) + 0.375rem);
+  min-width: 3px;
+  border-inline: 2px solid var(--perf-whisker);
+  background: linear-gradient(var(--perf-whisker), var(--perf-whisker)) center / 100% 2px no-repeat;
+  transform: translateY(-50%);
+}
+
+/* Single-series figures need no series column: the track starts under the label. */
+.perf-bars[data-series="none"] .perf-bars__bar {
+  grid-template-columns: minmax(0, 1fr) var(--perf-value);
+  grid-template-areas: "track value";
+}
+
+.perf-bars[data-series="none"] .perf-bars__axis {
+  grid-template-columns: minmax(0, 1fr) var(--perf-value);
+  grid-template-areas:
+    "title title"
+    "scale .";
+}
+
+.perf-bars[data-series="none"] .perf-bars__series {
+  display: none;
+}
+
+.perf-bars__value {
+  grid-area: value;
+  color: var(--sw-fg-muted);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-text-caption);
+  line-height: 1.3;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.perf-bars__value b {
+  display: block;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.perf-bars__value small {
+  font-size: var(--sw-text-eyebrow);
+}
+
+.perf-bars__missing {
+  grid-column: track / value;
+  color: var(--sw-warning);
+  font-size: var(--sw-text-caption);
+  font-weight: 600;
+}
+
+/* ---- Table view ---- */
+
+.perf-bars__table {
+  margin-top: var(--sw-space-3);
+  padding-top: var(--sw-space-3);
+  border-top: 1px solid var(--sw-border);
+}
+
+.perf-bars__table > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.perf-bars__table > summary:hover {
+  text-decoration: underline;
+}
+
+.perf-bars__table-frame {
+  margin-top: var(--sw-space-3);
+  overflow-x: auto;
+}
+
+.sw-prose .perf-bars__table table,
+.perf-bars__table table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: var(--sw-text-caption);
+}
+
+.perf-bars__table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.perf-bars__table th,
+.perf-bars__table td {
+  padding: var(--sw-space-1-5) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.perf-bars__table thead th {
+  color: var(--sw-fg-muted);
+  font-weight: 600;
+}
+
+.perf-bars__table th[scope="colgroup"] {
+  padding-top: var(--sw-space-3);
+  color: var(--sw-fg-strong);
+}
+
+.perf-bars__table td {
+  font-family: var(--sw-font-mono);
+}
+
+.perf-bars__caption {
+  margin-top: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+
+/* ---- Narrow: the series and value share a line above a full-width track ---- */
+
+@container perf-bars (max-width: 36rem) {
+  .perf-bars__bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "series value"
+      "track track";
+    row-gap: var(--sw-space-1);
+  }
+
+  .perf-bars__axis {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "scale";
+  }
+
+  .perf-bars__value b,
+  .perf-bars__value small {
+    display: inline;
+  }
+
+  .perf-bars__value small {
+    margin-left: var(--sw-space-1-5);
+  }
+
+  .perf-bars__missing {
+    grid-column: 1 / -1;
+  }
+
+  /* Seven or more ticks crowd a phone axis: keep every other label. */
+  .perf-bars__axis:is([data-ticks="7"], [data-ticks="8"], [data-ticks="9"])
+    .perf-bars__tick:nth-child(even):not([data-edge]) {
+    visibility: hidden;
+  }
+}
+
+@media (max-width: 40rem) {
+  .perf-bars {
+    margin-inline: calc(var(--sw-space-2) * -1);
+    padding: var(--sw-space-4);
+  }
+}
