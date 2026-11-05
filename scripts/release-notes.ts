@@ -1,6 +1,6 @@
 import { RELEASES, releaseHref } from "../docs/src/lib/releases.js";
 import { LLMS_SITE_BASE } from "./docs-llms.js";
-import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
+import { PUBLISHABLE_PACKAGE_ORDER, publishableIndex } from "./workspace-tooling.js";
 
 /**
  * GitHub release notes for one Sheetwrite version, built from the CHANGELOG
@@ -160,7 +160,7 @@ function releaseNotesRank(name: string): number {
   if (preferred !== -1) return preferred;
 
   // A new package goes after the known ones, in publication order.
-  const published = PUBLISHABLE_PACKAGE_ORDER.indexOf(name as never);
+  const published = publishableIndex(name);
   return (
     RELEASE_NOTES_PACKAGE_ORDER.length +
     (published === -1 ? PUBLISHABLE_PACKAGE_ORDER.length : published)

@@ -1,8 +1,18 @@
 import { describe, expect, it } from "bun:test";
 
+import { SheetRegistry } from "../src/store/sheet-registry.js";
 import { StoreViewState } from "../src/store/view-state.js";
 import type { RecomputingCellStore } from "../src/store/wasm-contract.js";
 import type { Workbook } from "../src/types.js";
+
+function sheetRegistry(
+  document: Workbook,
+  handles: ReadonlyArray<[string, number]>,
+): SheetRegistry {
+  const sheets = new SheetRegistry(document);
+  for (const [sheet, handle] of handles) sheets.handles.set(sheet, handle);
+  return sheets;
+}
 
 function workbook(rowCount: number): Workbook {
   return {
@@ -32,7 +42,7 @@ function sortedView(
   const wasm = {
     sortRowsMulti: () => order,
   } as unknown as RecomputingCellStore;
-  const view = new StoreViewState(wasm, document, new Map([["s1", 0]]));
+  const view = new StoreViewState(wasm, sheetRegistry(document, [["s1", 0]]));
   view.metadataChanged("s1");
   return {
     workbook: document,
@@ -91,7 +101,10 @@ describe("StoreViewState packed inverse index", () => {
     const sheet = document.sheets[0]!;
     sheet.sortKeys = [];
     sheet.rowGroups = [{ start: 2, end: 4, collapsed: true }];
-    const view = new StoreViewState({} as RecomputingCellStore, document, new Map([["s1", 0]]));
+    const view = new StoreViewState(
+      {} as RecomputingCellStore,
+      sheetRegistry(document, [["s1", 0]]),
+    );
     view.metadataChanged("s1");
 
     expect(Array.from(view.order("s1") ?? [])).toEqual([0, 1, 5]);
@@ -119,8 +132,7 @@ describe("StoreViewState packed inverse index", () => {
     } as unknown as RecomputingCellStore;
     const view = new StoreViewState(
       wasm,
-      document,
-      new Map([
+      sheetRegistry(document, [
         ["s1", 0],
         ["s2", 1],
       ]),

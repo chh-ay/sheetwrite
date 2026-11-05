@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "297340c2c7d9ef938dbf2d61a6bc1ea7d417ac5da562df44dcd2b3057a0e32b7",
+  "sha256": "a081553a548c01a649363122325ede284f7000f4a40a2a48aa15b9b6f0c87555",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -514,9 +514,18 @@
       "entryPoint": "./history",
       "exports": [
         "DEFAULT_HISTORY_LIMITS",
+        "HISTORY_DIFF_NONE",
         "HistoryArchive",
         "HistoryArchiveOptions",
         "HistoryCommit",
+        "HistoryDiffCell",
+        "HistoryDiffCells",
+        "HistoryDiffCursor",
+        "HistoryDiffDetail",
+        "HistoryDiffFlag",
+        "HistoryDiffPage",
+        "HistoryDiffRequest",
+        "HistoryDiffSheet",
         "HistoryError",
         "HistoryErrorCode",
         "HistoryGetRequest",
@@ -538,6 +547,7 @@
         "HistoryStorageUsage",
         "HistoryStoredRecord",
         "HistoryVersion",
+        "MAX_HISTORY_DIFF_ENTRIES",
         "MemoryHistoryStorage"
       ]
     },

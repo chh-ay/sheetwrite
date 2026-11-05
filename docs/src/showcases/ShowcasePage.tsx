@@ -8,6 +8,10 @@ import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 
 import "../styles/workbench-stage.css";
+import { ANALYTICS_ROWS } from "./scenarios/analytics.js";
+import { BUSINESS_ROWS } from "./scenarios/business.js";
+import { ENGINE_ROWS } from "./scenarios/engine.js";
+import { OFFLINE_ROWS } from "./scenarios/offline.js";
 
 export interface ShowcaseProof {
   detail: string;
@@ -42,8 +46,9 @@ export function ShowcasePage({
   const activeIndex = SHOWCASE_NAVIGATION.findIndex(
     (item) => item.href.replaceAll("/", "") === active,
   );
-  const activeItem = SHOWCASE_NAVIGATION[activeIndex] ?? SHOWCASE_NAVIGATION[0]!;
-  const nextItem = SHOWCASE_NAVIGATION[(activeIndex + 1) % SHOWCASE_NAVIGATION.length]!;
+  const activeItem = SHOWCASE_NAVIGATION[activeIndex] ?? SHOWCASE_NAVIGATION[0];
+  const nextItem =
+    SHOWCASE_NAVIGATION[(activeIndex + 1) % SHOWCASE_NAVIGATION.length] ?? SHOWCASE_NAVIGATION[0];
 
   return (
     <div className="sw-showcase-frame">
@@ -58,12 +63,7 @@ export function ShowcasePage({
             { label: "Adapter", value: activeItem.label },
             {
               label: "Scenario",
-              value:
-                active === "vue"
-                  ? "500 purchase orders"
-                  : active === "svelte"
-                    ? "240 field tickets"
-                    : "100,000 accounts",
+              value: scenarioLabel(active),
             },
             {
               label: "Owns",
@@ -139,4 +139,13 @@ export function ShowcasePage({
       </main>
     </div>
   );
+}
+
+/** The dataset each adapter page loads, sized from its scenario constant. */
+function scenarioLabel(active: ShowcasePageProps["active"]): string {
+  if (active === "vue") return `${BUSINESS_ROWS.toLocaleString("en-US")} purchase orders`;
+  if (active === "svelte") return `${OFFLINE_ROWS.toLocaleString("en-US")} field tickets`;
+  if (active === "react") return `${ANALYTICS_ROWS.toLocaleString("en-US")} accounts`;
+
+  return `${ENGINE_ROWS.toLocaleString("en-US")} accounts`;
 }

@@ -3,7 +3,7 @@ title: "Statistical functions"
 description: "Every statistical formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 126 functions of the statistical family. Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 142 functions of the statistical family. Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -138,6 +138,22 @@ This page lists the 126 functions of the statistical family. Taxonomy/source: [S
 <tr data-formula-name="VARP" data-engine="full"><td><code>VARP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-analysis-compatibility">Dialect: <code>analysis-compatibility</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
 <tr data-formula-name="WEIBULL" data-engine="full"><td><code>WEIBULL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-weibull-dist">Signature: <code>weibull-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-compatibility">Implementation: <code>analysis-compatibility</code></a></details></td></tr>
 <tr data-formula-name="ZTEST" data-engine="full"><td><code>ZTEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-z-test">Signature: <code>z-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="AVERAGEA" data-engine="default"><td><code>AVERAGEA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MAXA" data-engine="default"><td><code>MAXA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MINA" data-engine="default"><td><code>MINA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="STDEVA" data-engine="default"><td><code>STDEVA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="STDEVPA" data-engine="default"><td><code>STDEVPA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="VARA" data-engine="default"><td><code>VARA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="VARPA" data-engine="default"><td><code>VARPA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate-counted">Semantics: <code>aggregate-counted</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CHISQ.TEST" data-engine="full"><td><code>CHISQ.TEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-chi-test">Signature: <code>chi-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="F.TEST" data-engine="full"><td><code>F.TEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="T.TEST" data-engine="full"><td><code>T.TEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-t-test">Signature: <code>t-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="Z.TEST" data-engine="full"><td><code>Z.TEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-z-test">Signature: <code>z-test</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-hypothesis">Dialect: <code>analysis-hypothesis</code></a><br /><a href="#implementation-analysis-hypothesis">Implementation: <code>analysis-hypothesis</code></a></details></td></tr>
+<tr data-formula-name="GAMMALN.PRECISE" data-engine="full"><td><code>GAMMALN.PRECISE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="BINOM.INV" data-engine="full"><td><code>BINOM.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binom-inverse">Signature: <code>binom-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-discrete">Implementation: <code>analysis-discrete</code></a></details></td></tr>
+<tr data-formula-name="HYPGEOM.DIST" data-engine="full"><td><code>HYPGEOM.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-hypgeom-dist">Signature: <code>hypgeom-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-discrete">Implementation: <code>analysis-discrete</code></a></details></td></tr>
+<tr data-formula-name="NEGBINOM.DIST" data-engine="full"><td><code>NEGBINOM.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-negbinom-dist">Signature: <code>negbinom-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-discrete">Implementation: <code>analysis-discrete</code></a></details></td></tr>
+<tr data-formula-name="BINOM.DIST.RANGE" data-engine="full"><td><code>BINOM.DIST.RANGE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binom-dist-range">Signature: <code>binom-dist-range</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-discrete">Implementation: <code>analysis-discrete</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -742,6 +758,46 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-hypgeom-dist"><summary>Signature: hypgeom-dist</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `sampleS` | yes | none | `scalar`, `reference` | `once` |
+| `numberSample` | yes | none | `scalar`, `reference` | `once` |
+| `populationS` | yes | none | `scalar`, `reference` | `once` |
+| `numberPop` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-negbinom-dist"><summary>Signature: negbinom-dist</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `numberF` | yes | none | `scalar`, `reference` | `once` |
+| `numberS` | yes | none | `scalar`, `reference` | `once` |
+| `probabilityS` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+</details>
+
+<details id="signature-binom-dist-range"><summary>Signature: binom-dist-range</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `trials` | yes | none | `scalar`, `reference` | `once` |
+| `probabilityS` | yes | none | `scalar`, `reference` | `once` |
+| `numberS` | yes | none | `scalar`, `reference` | `once` |
+| `numberS2` | no | none | `scalar`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -816,6 +872,20 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 </details>
 
+<details id="semantics-aggregate-counted"><summary>Semantics: aggregate-counted</summary>
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: scalar |
+| coercion | blank: ignored<br />text: function-defined<br />boolean: number<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+</details>
+
 ## Dialect profiles
 
 <details id="dialect-excel-documented"><summary>Dialect: excel-documented</summary>
@@ -874,7 +944,7 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding.
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. CHISQ.TEST, CHITEST and paired T.TEST and TTEST skip pairs where either value is not a number. Type 3 of T.TEST and TTEST uses Welch's degrees of freedom without rounding.
 
 </details>
 
@@ -897,7 +967,7 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/math.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math.rs)<br />[`packages/wasm/src/eval/math/trigonometry.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/trigonometry.rs)<br />[`packages/wasm/src/eval/math/numerals.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/numerals.rs)<br />[`packages/wasm/src/eval/statistics.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/statistics.rs)<br />[`packages/wasm/src/eval/lookup.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/lookup.rs)<br />[`packages/wasm/src/eval/array.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/array.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 
@@ -941,7 +1011,7 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/compatibility.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/compatibility.rs)<br />[`packages/wasm/src/eval/analysis/distributions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/distributions.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/compatibility.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/compatibility.rs)<br />[`packages/wasm/src/eval/analysis/distributions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/distributions.rs)<br />[`packages/wasm/src/eval/analysis/discrete.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/discrete.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
 
@@ -953,6 +1023,17 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/hypothesis.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/hypothesis.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
+
+</details>
+
+<details id="implementation-analysis-discrete"><summary>Implementation: analysis-discrete</summary>
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/discrete.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/analysis/discrete.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/scripts/formula-contract.test.ts) |
 

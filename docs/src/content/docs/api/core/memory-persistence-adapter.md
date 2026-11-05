@@ -8,7 +8,7 @@ description: "MemoryPersistenceAdapter class in @sheetwrite/core: Executable dat
 Executable database-neutral reference adapter for tests, demos, and local workflows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L112"><code>packages/core/src/persistence.ts#L112</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L115"><code>packages/core/src/persistence.ts#L115</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

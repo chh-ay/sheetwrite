@@ -390,3 +390,65 @@ it("evaluates a measure in each pivot cell like the flattened rows of that cell"
     destroy();
   }
 });
+
+it("adds a related table's column to a table pivot from the field list, as one undo step", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  const data = input.sheets[0];
+  if (data === undefined) throw new Error("the fixture needs its data sheet");
+  data.rowCount = 20;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const press = (target: Element | null | undefined) => {
+    if (target == null) throw new Error("missing control");
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  };
+  const runMenu = (button: string, entry: string) => {
+    press(host.querySelector(`[aria-label="${button}"]`));
+    press(
+      [...host.querySelectorAll<HTMLElement>('.sheetwrite-panel-menu [role="menuitem"]')].find(
+        (candidate) => candidate.textContent === entry,
+      ),
+    );
+  };
+  const pivot: PivotDefinition = {
+    id: "orders",
+    name: "Orders",
+    source: { table: "orders" },
+    anchor: { row: 6, col: 0 },
+    rows: [],
+    columns: [],
+    values: [{ field: 0, aggregation: "COUNTA" }],
+  };
+  try {
+    expect(grid.setPivot(pivot, "data").status).toBe("applied");
+    (await loadPanels(grid)).openPivotPanel(grid, "data", "orders");
+    expect(host.querySelector(".sheetwrite-panel")?.textContent).toContain("Related: Customers");
+
+    runMenu("Customers › ID field actions", "Add to Rows");
+    const added = grid.getPivots("data")[0];
+    expect(added?.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "customer" },
+          { table: "customers", column: "id" },
+        ],
+      },
+    });
+    expect(added?.rows).toEqual([1]);
+    expect(grid.getPivotResult("data", "orders")?.status).toBe("ok");
+    // The column moves from the related section to the pivot's own fields, named with its table.
+    const panelText = host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+    expect(panelText.includes("Related: Customers")).toBe(false);
+    expect(panelText.includes("Customers › ID")).toBe(true);
+
+    grid.undo();
+    expect(grid.getPivots("data")[0]).toEqual(pivot);
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
+  }
+});

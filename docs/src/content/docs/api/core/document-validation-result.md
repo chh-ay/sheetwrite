@@ -8,7 +8,7 @@ description: "DocumentValidationResult type in @sheetwrite/core: Success or stru
 Success or structured errors returned by document validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L447"><code>packages/core/src/document-protocol.ts#L447</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/document-protocol.ts#L449"><code>packages/core/src/document-protocol.ts#L449</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
