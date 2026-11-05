@@ -7,6 +7,7 @@ The full engine adds these function families:
 | Family | Examples |
 | --- | --- |
 | Distributions | `NORM.DIST`, `T.INV.2T`, `CHISQ.DIST.RT`, `BINOM.DIST`, `GAMMA.INV` |
+| Excel 2007 compatibility | `STDEV`, `VAR`, `NORMDIST`, `TDIST`, `TTEST` |
 | Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `FORECAST.LINEAR` |
 | Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
 | Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT` |

@@ -18,38 +18,41 @@ use super::EvalPass;
 
 /// The functions that Excel lets read a 3-D reference.
 fn accepts_sheet_span(func: Func) -> bool {
-    matches!(
-        func,
+    match func {
         Func::Sum
-            | Func::Avg
-            | Func::Count
-            | Func::CountA
-            | Func::Max
-            | Func::Min
-            | Func::Product
-            | Func::StdevS
-            | Func::StdevP
-            | Func::VarS
-            | Func::VarP
-    )
+        | Func::Avg
+        | Func::Count
+        | Func::CountA
+        | Func::Max
+        | Func::Min
+        | Func::Product
+        | Func::StdevS
+        | Func::StdevP
+        | Func::VarS
+        | Func::VarP => true,
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) => super::analysis::accepts_sheet_span(id),
+        _ => false,
+    }
 }
 
 /// The functions that read a union as one list of values. Functions that pair
 /// cells by position, such as SUMPRODUCT and CORREL, need one range, so a
 /// union there is `#VALUE!`, as in Excel.
 fn accepts_union(func: Func) -> bool {
-    accepts_sheet_span(func)
-        || matches!(
-            func,
-            Func::Small
-                | Func::Large
-                | Func::RankEq
-                | Func::Median
-                | Func::ModeSngl
-                | Func::PercentileInc
-                | Func::QuartileInc
-                | Func::GeoMean
-        )
+    match func {
+        Func::Small
+        | Func::Large
+        | Func::RankEq
+        | Func::Median
+        | Func::ModeSngl
+        | Func::PercentileInc
+        | Func::QuartileInc
+        | Func::GeoMean => true,
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) => super::analysis::accepts_union(id),
+        _ => accepts_sheet_span(func),
+    }
 }
 
 impl CellStore {
