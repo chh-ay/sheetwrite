@@ -1,0 +1,151 @@
+/**
+ * Page-wide behaviour of rendered code blocks, installed once by the root
+ * route and kept across client-side navigations.
+ *
+ * - A code block wider than its column becomes a focusable region, so a
+ *   keyboard can scroll it.
+ * - Code hover popovers load on demand: their runtime and Floating UI stay out
+ *   of the first load. They load when the browser is idle, or as soon as the
+ *   pointer or keyboard focus reaches a code block, whichever comes first. A
+ *   trigger hovered or focused before they are ready opens once they are.
+ */
+
+import type * as CodePopovers from "./code-popovers.js";
+
+const CODE_BLOCK_SELECTOR = ".expressive-code pre";
+const CODE_FRAME_SELECTOR = ".expressive-code";
+const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
+/** The latest the popover runtime loads when the browser never goes idle. */
+const IDLE_LOAD_TIMEOUT_MS = 2000;
+
+let uninstallEnhancements: (() => void) | null = null;
+
+/** A code block that scrolls sideways is a focusable region, so keyboards can scroll it. */
+function synchronizeCodeBlockFocus(pre: HTMLPreElement): void {
+  if (pre.scrollWidth > pre.clientWidth) {
+    pre.tabIndex = 0;
+    pre.setAttribute("role", "region");
+  } else {
+    pre.removeAttribute("tabindex");
+    pre.removeAttribute("role");
+  }
+}
+
+function observeCodeBlocks(root: ParentNode, observer: ResizeObserver): void {
+  for (const pre of root.querySelectorAll<HTMLPreElement>(CODE_BLOCK_SELECTOR)) {
+    observer.observe(pre);
+    synchronizeCodeBlockFocus(pre);
+  }
+}
+
+function unobserveCodeBlocks(root: Element, observer: ResizeObserver): void {
+  if (root.matches(CODE_BLOCK_SELECTOR)) observer.unobserve(root);
+  for (const pre of root.querySelectorAll(CODE_BLOCK_SELECTOR)) observer.unobserve(pre);
+}
+
+function installCodeBlockFocus(): () => void {
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.target instanceof HTMLPreElement) synchronizeCodeBlockFocus(entry.target);
+    }
+  });
+  observeCodeBlocks(document, resizeObserver);
+
+  const mutationObserver = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element) observeCodeBlocks(node, resizeObserver);
+      }
+      // A route change removes code blocks; stop watching their size so the
+      // observer does not keep them alive.
+      for (const node of record.removedNodes) {
+        if (node instanceof Element) unobserveCodeBlocks(node, resizeObserver);
+      }
+    }
+  });
+  mutationObserver.observe(document.body, { childList: true, subtree: true });
+
+  return () => {
+    mutationObserver.disconnect();
+    resizeObserver.disconnect();
+  };
+}
+
+/** Runs `task` when the browser is idle; returns the cancel. */
+function whenIdle(task: () => void): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(task, { timeout: IDLE_LOAD_TIMEOUT_MS });
+    return () => window.cancelIdleCallback(handle);
+  }
+  const handle = window.setTimeout(task, IDLE_LOAD_TIMEOUT_MS);
+  return () => window.clearTimeout(handle);
+}
+
+/**
+ * Loads the popover runtime on the first approach to a code block or when
+ * the browser is idle, then leaves every later event to its own listeners.
+ */
+function installPopoversOnDemand(): () => void {
+  let isStopped = false;
+  let uninstallPopovers: (() => void) | undefined;
+  let runtime: Promise<typeof CodePopovers> | undefined;
+  let cancelIdleLoad: () => void = () => {};
+
+  const stopWaiting = (): void => {
+    cancelIdleLoad();
+    document.removeEventListener("pointerover", handleApproach);
+    document.removeEventListener("focusin", handleApproach);
+  };
+
+  const load = (): Promise<typeof CodePopovers> => {
+    runtime ??= import("./code-popovers.js").then((popovers) => {
+      stopWaiting();
+      if (!isStopped) uninstallPopovers = popovers.installCodePopovers();
+      return popovers;
+    });
+    return runtime;
+  };
+
+  // The runtime's own listeners miss an interaction that arrived while it loaded.
+  const replay = (trigger: HTMLElement): void => {
+    void load().then((popovers) => {
+      const isStillWanted = trigger.matches(":hover") || trigger === document.activeElement;
+      if (!isStopped && isStillWanted) popovers.openCodePopover(trigger);
+    });
+  };
+
+  function handleApproach(event: Event): void {
+    if (!(event.target instanceof Element) || event.target.closest(CODE_FRAME_SELECTOR) === null) {
+      return;
+    }
+    const trigger = event.target.closest<HTMLElement>(TRIGGER_SELECTOR);
+    if (trigger === null) void load();
+    else replay(trigger);
+  }
+
+  document.addEventListener("pointerover", handleApproach);
+  document.addEventListener("focusin", handleApproach);
+  cancelIdleLoad = whenIdle(() => void load());
+
+  return () => {
+    isStopped = true;
+    stopWaiting();
+    uninstallPopovers?.();
+  };
+}
+
+/**
+ * Installs the page-wide code behaviour. Returns the uninstaller; a second
+ * call while installed is a no-op that returns a no-op.
+ */
+export function initializeCodeEnhancements(): () => void {
+  if (uninstallEnhancements !== null) return () => {};
+  const uninstallCodeBlockFocus = installCodeBlockFocus();
+  const uninstallPopovers = installPopoversOnDemand();
+  uninstallEnhancements = () => {
+    uninstallPopovers();
+    uninstallCodeBlockFocus();
+    uninstallEnhancements = null;
+  };
+  return uninstallEnhancements;
+}

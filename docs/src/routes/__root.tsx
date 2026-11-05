@@ -13,7 +13,7 @@ import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
-import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
+import { initializeCodeEnhancements } from "../lib/code-enhancements.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import { SITE_URL } from "../lib/seo.js";

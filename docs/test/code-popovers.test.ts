@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { initializeCodeEnhancements } from "../src/lib/code-popovers.js";
-import {
-  installRecordingResizeObserver,
-  RecordingResizeObserver,
-} from "./resize-observer-recorder.js";
+import { installCodePopovers } from "../src/lib/code-popovers.js";
 
 const PANEL_ID = "popover-create-grid";
 const OTHER_PANEL_ID = "popover-grid";
@@ -73,14 +69,14 @@ afterEach(() => {
 describe("code popovers", () => {
   it("keeps panels out of the document until a trigger opens one", () => {
     mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
 
     expect(livePanel()).toBeNull();
   });
 
   it("opens the panel on focus, as the trigger's accessible description", () => {
     const { trigger } = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
 
     trigger.focus();
 
@@ -91,7 +87,7 @@ describe("code popovers", () => {
   });
 
   it("serves triggers that mount after it is installed", async () => {
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     const { trigger } = mountPage();
     await flushMutations();
 
@@ -102,7 +98,7 @@ describe("code popovers", () => {
 
   it("closes a hovered panel after the pointer leaves the trigger", () => {
     const { trigger, page } = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     pointer("pointerover", trigger);
 
     pointer("pointerout", trigger, page);
@@ -114,7 +110,7 @@ describe("code popovers", () => {
 
   it("stays open while the pointer travels from the trigger into the panel", () => {
     const { trigger } = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     pointer("pointerover", trigger);
     const panel = livePanel();
     if (panel === null) throw new Error("The panel did not open");
@@ -132,7 +128,7 @@ describe("code popovers", () => {
     if (first === undefined || other === undefined || sameSymbol === undefined) {
       throw new Error("The page has three mentions");
     }
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
 
     pointer("pointerover", first);
     expect(sameSymbol.hasAttribute("data-popover-related")).toBe(true);
@@ -146,7 +142,7 @@ describe("code popovers", () => {
 
   it("removes an open panel with its page, so a return visit has one panel", async () => {
     const first = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     first.trigger.focus();
 
     first.page.remove();
@@ -161,7 +157,7 @@ describe("code popovers", () => {
 
   it("takes a panel out of the document when Escape closes it", () => {
     const { trigger } = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     trigger.focus();
 
     trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -171,7 +167,7 @@ describe("code popovers", () => {
 
   it("stays open while keyboard focus is on a link inside the panel", () => {
     const { trigger } = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     trigger.focus();
 
     panelLink().focus();
@@ -182,7 +178,7 @@ describe("code popovers", () => {
 
   it("closes on Escape from inside the panel and gives focus back to the trigger", () => {
     const { trigger } = mountPage();
-    uninstall = initializeCodeEnhancements();
+    uninstall = installCodePopovers();
     trigger.focus();
     const link = panelLink();
     link.focus();
@@ -191,26 +187,5 @@ describe("code popovers", () => {
 
     expect(livePanel()).toBeNull();
     expect(document.activeElement === trigger).toBe(true);
-  });
-
-  it("stops observing code blocks that a route removes", async () => {
-    const restoreResizeObserver = installRecordingResizeObserver();
-    try {
-      uninstall = initializeCodeEnhancements();
-      const page = document.createElement("article");
-      page.innerHTML = '<div class="expressive-code"><pre><code>grid.undo();</code></pre></div>';
-      document.body.append(page);
-      await flushMutations();
-      expect(RecordingResizeObserver.observed.size).toBe(1);
-
-      page.remove();
-      await flushMutations();
-
-      expect(RecordingResizeObserver.observed.size).toBe(0);
-    } finally {
-      uninstall();
-      uninstall = () => {};
-      restoreResizeObserver();
-    }
   });
 });

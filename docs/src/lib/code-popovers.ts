@@ -1,5 +1,5 @@
 /**
- * Code hover popovers for every rendered code block.
+ * Code hover popovers: the runtime `code-enhancements.ts` loads on demand.
  *
  * The build renders each distinct panel once per document into an inert
  * `<template class="sw-code-popover-store">` (see `dedupe-code-popovers.ts`),
@@ -14,7 +14,6 @@ import { autoUpdate, computePosition, flip, offset, shift, size } from "@floatin
 
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
 const STORE_SELECTOR = "template.sw-code-popover-store";
-const CODE_BLOCK_SELECTOR = ".expressive-code pre";
 /** The sticky site header; panels never open underneath it. */
 const HEADER_SELECTOR = ".sw-header";
 /** Marks the trigger whose panel is open. */
@@ -35,6 +34,8 @@ interface OpenPopover {
   panel: HTMLElement;
   related: readonly HTMLElement[];
   stopPositioning: () => void;
+  /** Closes the panel when a route change takes its trigger out of the page. */
+  detachWatcher: MutationObserver;
 }
 
 /** Panels cloned from a store; a store that leaves with its page takes its panels along. */
@@ -94,9 +95,10 @@ function closePopover(): void {
   cancelScheduledClose();
   if (activePopover === null) return;
 
-  const { trigger, panel, related, stopPositioning } = activePopover;
+  const { trigger, panel, related, stopPositioning, detachWatcher } = activePopover;
   activePopover = null;
   stopPositioning();
+  detachWatcher.disconnect();
   panel.remove();
   trigger.removeAttribute(OPEN_ATTRIBUTE);
   for (const mention of related) mention.removeAttribute(RELATED_ATTRIBUTE);
@@ -163,7 +165,8 @@ async function positionPopover(trigger: HTMLElement, panel: HTMLElement): Promis
   Object.assign(panel.style, { left: `${x}px`, top: `${y}px` });
 }
 
-function openPopover(trigger: HTMLElement): void {
+/** Opens the panel of `trigger`, closing any other open panel. */
+export function openCodePopover(trigger: HTMLElement): void {
   cancelScheduledClose();
   if (activePopover?.trigger === trigger) return;
   const panelId = trigger.dataset.swCodePopoverTrigger;
@@ -177,12 +180,17 @@ function openPopover(trigger: HTMLElement): void {
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
   const related = relatedTriggers(trigger, panelId);
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
+  const detachWatcher = new MutationObserver(() => {
+    if (!trigger.isConnected) closePopover();
+  });
+  detachWatcher.observe(document.body, { childList: true, subtree: true });
   activePopover = {
     trigger,
     panel,
     related,
     // Positions synchronously in microtasks, so the first painted frame is placed.
     stopPositioning: autoUpdate(trigger, panel, () => void positionPopover(trigger, panel)),
+    detachWatcher,
   };
 }
 
@@ -192,7 +200,7 @@ function handlePointerOver(event: PointerEvent): void {
     return;
   }
   const trigger = closestElement(event.target, TRIGGER_SELECTOR);
-  if (trigger !== null) openPopover(trigger);
+  if (trigger !== null) openCodePopover(trigger);
 }
 
 function handlePointerOut(event: PointerEvent): void {
@@ -206,7 +214,7 @@ function handleFocusIn(event: FocusEvent): void {
     return;
   }
   const trigger = closestElement(event.target, TRIGGER_SELECTOR);
-  if (trigger !== null && trigger !== triggerRefocusing) openPopover(trigger);
+  if (trigger !== null && trigger !== triggerRefocusing) openCodePopover(trigger);
 }
 
 function handleFocusOut(event: FocusEvent): void {
@@ -227,11 +235,17 @@ function handleKeyDown(event: KeyboardEvent): void {
 function handleClick(event: MouseEvent): void {
   if (!window.matchMedia("(hover: none)").matches) return;
   const trigger = closestElement(event.target, TRIGGER_SELECTOR);
-  if (trigger !== null) openPopover(trigger);
+  if (trigger !== null) openCodePopover(trigger);
   else if (!isInsideActivePopover(event.target)) closePopover();
 }
 
-function installPopoverListeners(): () => void {
+/**
+ * Installs the document listeners that open, keep and close every code hover
+ * panel. Returns the uninstaller, which also closes an open panel; a second
+ * call while installed is a no-op that returns a no-op.
+ */
+export function installCodePopovers(): () => void {
+  if (uninstallListeners !== null) return () => {};
   const listeners = [
     ["pointerover", handlePointerOver],
     ["pointerout", handlePointerOut],
@@ -243,75 +257,12 @@ function installPopoverListeners(): () => void {
   for (const [type, listener] of listeners) {
     document.addEventListener(type, listener as EventListener);
   }
-  return () => {
+  uninstallListeners = () => {
+    closePopover();
     for (const [type, listener] of listeners) {
       document.removeEventListener(type, listener as EventListener);
     }
-  };
-}
-
-/** A code block that scrolls sideways is a focusable region, so keyboards can scroll it. */
-function synchronizeCodeBlockFocus(pre: HTMLPreElement): void {
-  if (pre.scrollWidth > pre.clientWidth) {
-    pre.tabIndex = 0;
-    pre.setAttribute("role", "region");
-  } else {
-    pre.removeAttribute("tabindex");
-    pre.removeAttribute("role");
-  }
-}
-
-function observeCodeBlocks(root: ParentNode, observer: ResizeObserver): void {
-  for (const pre of root.querySelectorAll<HTMLPreElement>(CODE_BLOCK_SELECTOR)) {
-    observer.observe(pre);
-    synchronizeCodeBlockFocus(pre);
-  }
-}
-
-function unobserveCodeBlocks(root: Element, observer: ResizeObserver): void {
-  if (root.matches(CODE_BLOCK_SELECTOR)) observer.unobserve(root);
-  for (const pre of root.querySelectorAll(CODE_BLOCK_SELECTOR)) observer.unobserve(pre);
-}
-
-/**
- * Installs the page-wide code behavior: hover popovers through one set of
- * document listeners, and keyboard scrolling for code blocks wider than
- * their column. Returns the uninstaller; a second call while installed is a
- * no-op that returns a no-op.
- */
-export function initializeCodeEnhancements(): () => void {
-  if (uninstallListeners !== null) return () => {};
-  uninstallListeners = installPopoverListeners();
-
-  const resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      if (entry.target instanceof HTMLPreElement) synchronizeCodeBlockFocus(entry.target);
-    }
-  });
-  observeCodeBlocks(document, resizeObserver);
-
-  const mutationObserver = new MutationObserver((records) => {
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof Element) observeCodeBlocks(node, resizeObserver);
-      }
-      // A route change removes code blocks; stop watching their size so the
-      // observer does not keep them alive.
-      for (const node of record.removedNodes) {
-        if (node instanceof Element) unobserveCodeBlocks(node, resizeObserver);
-      }
-    }
-    // The open panel lives in `document.body`, outside the removed page, so
-    // close it when its trigger leaves the page.
-    if (activePopover !== null && !activePopover.trigger.isConnected) closePopover();
-  });
-  mutationObserver.observe(document.body, { childList: true, subtree: true });
-
-  return () => {
-    closePopover();
-    uninstallListeners?.();
     uninstallListeners = null;
-    mutationObserver.disconnect();
-    resizeObserver.disconnect();
   };
+  return uninstallListeners;
 }
