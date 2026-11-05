@@ -11,20 +11,24 @@
 //!
 //! As in Excel, relative references in a name's formula are relative to cell
 //! A1, and a formula at C5 that uses the name reads them two columns right
-//! and four rows down. An expansion with no relative or table reference is
-//! the same for every cell of one sheet, so those formulas share it.
+//! and four rows down.
+//!
+//! A name whose expansion is the same for every cell and every sheet is
+//! resolved once, when formulas are refreshed, and every formula that uses it
+//! shares that one resolved definition. A single unqualified reference takes
+//! the sheet of the formula when the formula binds to the name. Any other
+//! name is expanded for the cell that binds to it.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use rustc_hash::FxHashMap;
 use wasm_bindgen::prelude::*;
 
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
     invalidate_sheet_refs, parse, rename_sheet_refs, resolve_named_ranges, resolve_structured_refs,
     serialize, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef,
-    NamedRangeRef,
+    NamedRangeRef, RangeFlags, RefFlags,
 };
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
@@ -57,9 +61,11 @@ pub(super) struct Definition {
     /// Whether the expansion depends on the cell that uses the name: a
     /// relative reference or a table reference makes it so.
     positional: bool,
-    /// Only non-positional expansions are shared, by the sheet that uses
-    /// this definition. The definition owns and invalidates its own cache.
-    shared: RefCell<FxHashMap<u32, NameTarget>>,
+    /// The one resolved definition that every formula binds to, when the
+    /// expansion is the same for every cell and sheet. A reference target
+    /// whose sheet is [`NO_SHEET`] takes the formula's sheet at bind.
+    /// `resolve_name_definitions` sets it whenever formulas are refreshed.
+    resolved: Option<NameTarget>,
 }
 
 impl Definition {
@@ -89,9 +95,14 @@ pub(crate) struct NamePlacement {
     /// itself unresolved differs where that name is not being expanded, so
     /// it is not reused.
     lowest_cut: Cell<usize>,
+    /// Whether the expansion in progress reads a name that some sheet
+    /// defines in its own scope, so it reads differently on that sheet. Only
+    /// set while definitions are resolved for every sheet.
+    sheet_bound: Cell<bool>,
     /// Expansions for this cell that depend on it, by name key, so a name
-    /// used many times in one formula is expanded once.
-    placed: RefCell<FxHashMap<String, NameTarget>>,
+    /// used many times in one formula is expanded once. A formula uses few
+    /// names, so a list is searched.
+    placed: RefCell<Vec<(String, NameTarget)>>,
 }
 
 impl NamePlacement {
@@ -102,8 +113,17 @@ impl NamePlacement {
             expanding: RefCell::new(Vec::new()),
             positional: Cell::new(false),
             lowest_cut: Cell::new(usize::MAX),
-            placed: RefCell::new(FxHashMap::default()),
+            sheet_bound: Cell::new(false),
+            placed: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Start one definition: forget what the previous one found.
+    fn restart(&self) {
+        self.positional.set(false);
+        self.lowest_cut.set(usize::MAX);
+        self.sheet_bound.set(false);
+        self.placed.borrow_mut().clear();
     }
 }
 
@@ -133,7 +153,7 @@ impl CellStore {
             source: source.to_string(),
             positional: is_positional(&ast),
             ast,
-            shared: RefCell::default(),
+            resolved: None,
         };
         self.defined_names
             .insert(key, DefinedName::Formula(Box::new(definition)));
@@ -186,6 +206,9 @@ impl CellStore {
         placement: &NamePlacement,
     ) -> Option<NameTarget> {
         let mut key = workbook_name_key(name);
+        if formula_sheet == NO_SHEET {
+            key = self.note_sheet_scoped(key, placement);
+        }
         for scope in [Some(formula_sheet), None] {
             let scoped = (scope, key);
             match self.defined_names.get(&scoped) {
@@ -198,6 +221,20 @@ impl CellStore {
             key = scoped.1;
         }
         None
+    }
+
+    /// Mark the definition being resolved for every sheet as depending on
+    /// the sheet when some sheet defines `key` in its own scope. Returns `key`.
+    fn note_sheet_scoped(&self, key: String, placement: &NamePlacement) -> String {
+        let mut scoped = (None, key);
+        for (sheet, _) in (0u32..).zip(&self.sheet_names) {
+            scoped.0 = Some(sheet);
+            if self.defined_names.contains_key(&scoped) {
+                placement.sheet_bound.set(true);
+                break;
+            }
+        }
+        scoped.1
     }
 
     /// Cell formulas and expanded name definitions use one resolver closure
@@ -231,12 +268,20 @@ impl CellStore {
             }
             expanding.len()
         };
-        if let Some(target) = placement.placed.borrow().get(&key) {
+        if let Some((_, target)) = placement
+            .placed
+            .borrow()
+            .iter()
+            .find(|(placed, _)| *placed == key)
+        {
             placement.positional.set(true);
             return Some(target.clone());
         }
-        if let Some(target) = definition.shared.borrow().get(&formula_sheet) {
-            return Some(target.clone());
+        if let Some(target) = &definition.resolved {
+            return Some(match target {
+                NameTarget::Range(range) => place_range(range.clone(), formula_sheet, depth),
+                _ => target.clone(),
+            });
         }
 
         let outer_positional = placement.positional.replace(definition.positional);
@@ -263,20 +308,54 @@ impl CellStore {
         placement.lowest_cut.set(outer_cut.min(cut));
 
         let target = match reference_target(&ast, &definition.name, scope, formula_sheet) {
-            Some(range) => NameTarget::Range(range),
+            Some(range) => place_range(range, formula_sheet, depth),
             None => NameTarget::Formula(Rc::new(bounded_expansion(&definition.name, ast))),
         };
-        if cut >= depth {
-            if positional {
-                placement.placed.borrow_mut().insert(key, target.clone());
-            } else {
-                definition
-                    .shared
-                    .borrow_mut()
-                    .insert(formula_sheet, target.clone());
-            }
+        if positional && cut >= depth {
+            placement.placed.borrow_mut().push((key, target.clone()));
         }
         Some(target)
+    }
+
+    /// Resolve every name definition once, for every formula that uses it.
+    /// A definition whose expansion depends on the cell or the sheet that
+    /// uses it is left unresolved and is expanded where it is used.
+    pub(super) fn resolve_name_definitions(&mut self) {
+        let mut keys = Vec::new();
+        for (key, definition) in &mut self.defined_names {
+            if let DefinedName::Formula(definition) = definition {
+                definition.resolved = None;
+                keys.push(key.clone());
+            }
+        }
+
+        let placement = NamePlacement::new(0, 0);
+        for key in keys {
+            let resolved = self.resolve_definition(&key, &placement);
+            if let Some(DefinedName::Formula(definition)) = self.defined_names.get_mut(&key) {
+                definition.resolved = resolved;
+            }
+        }
+    }
+
+    /// The expansion of one definition for every sheet, or nothing when it
+    /// depends on the cell or the sheet that uses it. A sheet's own name is
+    /// only used on that sheet, so it resolves as that sheet's.
+    fn resolve_definition(&self, key: &NameKey, placement: &NamePlacement) -> Option<NameTarget> {
+        let Some(DefinedName::Formula(definition)) = self.defined_names.get(key) else {
+            return None;
+        };
+        if definition.positional {
+            return None;
+        }
+
+        placement.restart();
+        let formula_sheet = key.0.unwrap_or(NO_SHEET);
+        let target = self.expand(definition, key.clone(), formula_sheet, placement)?;
+        let shared = !placement.positional.get()
+            && !placement.sheet_bound.get()
+            && placement.lowest_cut.get() == usize::MAX;
+        shared.then_some(target)
     }
 
     /// The LAMBDA that `name` holds, expanded for the formula being
@@ -290,16 +369,7 @@ impl CellStore {
         let (row, col) = crate::eval::current_formula_origin().unwrap_or((0, 0));
         match self.name_target(name, sheet as u32, &NamePlacement::new(row, col))? {
             NameTarget::Formula(formula) => Some(formula),
-            NameTarget::Range(_) => None,
-        }
-    }
-
-    /// Forget every shared expansion; the caller re-resolves every formula.
-    pub(super) fn forget_name_expansions(&self) {
-        for definition in self.defined_names.values() {
-            if let DefinedName::Formula(definition) = definition {
-                definition.shared.borrow_mut().clear();
-            }
+            NameTarget::Range(_) | NameTarget::Reference(_) => None,
         }
     }
 
@@ -370,20 +440,17 @@ impl CellStore {
             metadata.add_payload(definition.name.len(), definition.name.capacity());
             metadata.add_payload(definition.source.len(), definition.source.capacity());
             definition.ast.heap_memory_stats(metadata);
-            let shared = definition.shared.borrow();
-            metadata.add_hash_table::<u32, NameTarget>(shared.len(), shared.capacity());
-            for target in shared.values() {
-                match target {
-                    NameTarget::Range(range) => {
-                        metadata.add_payload(range.name.len(), range.name.capacity());
-                    }
-                    NameTarget::Formula(expansion) => {
-                        let bytes = std::mem::size_of::<NamedFormulaRef>();
-                        metadata.add_payload(bytes, bytes);
-                        metadata.add_payload(expansion.name.len(), expansion.name.capacity());
-                        expansion.expression.heap_memory_stats(metadata);
-                    }
+            match &definition.resolved {
+                Some(NameTarget::Range(range)) => {
+                    metadata.add_payload(range.name.len(), range.name.capacity());
                 }
+                Some(NameTarget::Formula(expansion)) => {
+                    let bytes = std::mem::size_of::<NamedFormulaRef>();
+                    metadata.add_payload(bytes, bytes);
+                    metadata.add_payload(expansion.name.len(), expansion.name.capacity());
+                    expansion.expression.heap_memory_stats(metadata);
+                }
+                Some(NameTarget::Reference(_)) | None => {}
             }
         }
     }
@@ -419,12 +486,44 @@ impl CellStore {
             source,
             positional: is_positional(&ast),
             ast,
-            shared: RefCell::default(),
+            resolved: None,
         };
         self.defined_names
             .insert(key, DefinedName::Formula(Box::new(definition)));
         Ok(())
     }
+}
+
+/// A name's single reference for a formula on `formula_sheet`. A reference
+/// with no sheet takes the formula's sheet. While a definition is resolved for
+/// every sheet, it keeps no sheet at the top of that definition, which takes
+/// the sheet at bind, and stays a plain reference inside it, which reads the
+/// sheet of the formula that evaluates it.
+fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTarget {
+    if range.sheet != NO_SHEET {
+        return NameTarget::Range(range);
+    }
+    if formula_sheet == NO_SHEET && depth > 0 {
+        let absolute = RefFlags {
+            row_abs: true,
+            col_abs: true,
+        };
+        return NameTarget::Reference(Ast::Range(
+            range.row_start,
+            range.col_start,
+            range.row_end,
+            range.col_end,
+            RangeFlags {
+                start: absolute,
+                end: absolute,
+            },
+        ));
+    }
+
+    NameTarget::Range(NamedRangeRef {
+        sheet: formula_sheet,
+        ..range
+    })
 }
 
 /// The expansion of `name`, or a `#NUM!` in its place when it is larger than

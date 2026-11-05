@@ -5507,6 +5507,32 @@
         }
       ],
       "returns": "array"
+    },
+    "pivot-data": {
+      "arguments": [
+        {
+          "name": "dataField",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "pivotTable",
+          "required": true,
+          "default": null,
+          "accepts": ["reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fieldAndItem",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "paired"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -6972,6 +6998,15 @@
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
       ]
+    },
+    "analysis-pivot-data": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in @sheetwrite/formulas. Items name row and column fields only; the fields named on each axis must be its outer levels.",
+        "An item list in braces, report filter fields and OLAP item names are not supported and give #REF!."
+      ]
     }
   },
   "implementationProfiles": {
@@ -7464,6 +7499,28 @@
       "evidence": {
         "status": "source-linked",
         "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-pivot-data": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/pivot_data.rs",
+          "packages/wasm/src/pivot.rs",
+          "packages/wasm/src/store/pivots.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/store/tests.rs"]
       }
     }
   },
@@ -13504,6 +13561,18 @@
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "GETPIVOTDATA",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "pivot-data",
+      "semantics": "information",
+      "dialects": "analysis-pivot-data",
+      "implementation": "analysis-pivot-data",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     }
   ],

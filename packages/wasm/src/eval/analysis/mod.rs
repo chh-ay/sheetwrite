@@ -19,6 +19,7 @@ pub(crate) use groupby::grouping;
 pub(crate) mod lambda;
 pub(super) mod math;
 mod matrices;
+mod pivot_data;
 pub(crate) mod regex_patterns;
 mod regression;
 mod reshape;
@@ -259,6 +260,13 @@ const FAMILIES: &[Family] = &[
         }),
     },
     Family {
+        names: pivot_data::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(pivot_data::evaluate_ast),
+        array: None,
+    },
+    Family {
         names: lambda::NAMES,
         reference_cells: &[],
         evaluate: None,
@@ -318,6 +326,8 @@ const fn known_id(input: &str) -> u16 {
 
 pub(crate) const AGGREGATE_ID: u16 = known_id("AGGREGATE");
 pub(crate) const LAMBDA_ID: u16 = known_id("LAMBDA");
+/// `GETPIVOTDATA` is volatile: it reads pivot output through no reference.
+pub(crate) const GETPIVOTDATA_ID: u16 = known_id("GETPIVOTDATA");
 pub(crate) const PERCENTILE_EXC_ID: u16 = known_id("PERCENTILE.EXC");
 pub(crate) const QUARTILE_EXC_ID: u16 = known_id("QUARTILE.EXC");
 
