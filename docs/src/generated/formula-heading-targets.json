@@ -200,6 +200,7 @@
   "signature-complex-power": "/docs/reference/formula-functions/engineering/#signature-complex-power",
   "signature-complex-variadic": "/docs/reference/formula-functions/engineering/#signature-complex-variadic",
   "signature-bessel": "/docs/reference/formula-functions/engineering/#signature-bessel",
+  "signature-convert": "/docs/reference/formula-functions/engineering/#signature-convert",
   "semantics-analysis-engineering": "/docs/reference/formula-functions/engineering/#semantics-analysis-engineering",
   "dialect-analysis-engineering": "/docs/reference/formula-functions/engineering/#dialect-analysis-engineering",
   "implementation-analysis-engineering": "/docs/reference/formula-functions/engineering/#implementation-analysis-engineering",
