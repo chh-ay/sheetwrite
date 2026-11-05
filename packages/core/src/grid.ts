@@ -2931,12 +2931,15 @@ export class GridImpl implements Grid {
       input.name,
       this.store.getWorkbook().sheets.map((sheet) => sheet.name),
     );
+    // A dashboard has no rows or columns.
+    const dashboard = input.kind === "dashboard";
     const snapshot: SheetSnapshot = {
       id,
       name: name.name,
       order: this.store.getWorkbook().sheets.length,
-      rowCount: input.rowCount ?? 100,
-      columns,
+      ...(dashboard ? { kind: "dashboard", dashboard: { items: [] } } : {}),
+      rowCount: dashboard ? 0 : (input.rowCount ?? 100),
+      columns: dashboard ? [] : columns,
       cells: [],
     };
     const result = this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
