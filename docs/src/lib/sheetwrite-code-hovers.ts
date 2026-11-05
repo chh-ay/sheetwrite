@@ -405,7 +405,10 @@ function remapThroughInjection(
   const lines = originalSource.split("\n");
   const remapped: SheetwriteTypeHover[] = [];
   for (const hover of hovers) {
-    const position = injection.toOriginal({ line: hover.line, character: hover.character });
+    const position = injection.toOriginal({
+      line: hover.line,
+      character: hover.character,
+    });
     if (position === null) continue;
     const line = lines[position.line];
     if (
@@ -543,8 +546,6 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
           {
             id: this.popoverId,
             role: "tooltip",
-            hidden: true,
-            ariaHidden: "true",
             dataSwCodePopoverPanel: "",
             // Popover text is preview chrome; indexing it lets giant embedded
             // declarations (e.g. Grid) hijack search rankings on every page.
@@ -576,7 +577,10 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
                             "code.sw-code-popover__example",
                             structuredClone(
                               this.rendered.examples?.get(value) ?? [
-                                { type: "text" as const, value: exampleCode(value) },
+                                {
+                                  type: "text" as const,
+                                  value: exampleCode(value),
+                                },
                               ],
                             ),
                           ),
@@ -592,7 +596,9 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
                               ? [
                                   h(
                                     "a.sw-code-popover__tag-link",
-                                    { href: this.rendered.seeRoutes.get(value) },
+                                    {
+                                      href: this.rendered.seeRoutes.get(value),
+                                    },
                                     cleanDocumentation(value),
                                   ),
                                 ]
@@ -649,7 +655,12 @@ export function collectReferenceLinks(
       const start = match.index;
       const before = start > 0 ? text[start - 1] : "";
       if (before === "." || before === '"' || before === "'") continue;
-      links.push({ line: lineIndex, columnStart: start, columnEnd: start + name.length, route });
+      links.push({
+        line: lineIndex,
+        columnStart: start,
+        columnEnd: start + name.length,
+        route,
+      });
     }
   }
   return links;
@@ -687,7 +698,10 @@ class SheetwriteReferenceLinkAnnotation extends ExpressiveCodeAnnotation {
 }
 
 export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
-  const analyzer = new SheetwriteTypeEngine({ cwd: options.cwd, fsMap: options.fsMap });
+  const analyzer = new SheetwriteTypeEngine({
+    cwd: options.cwd,
+    fsMap: options.fsMap,
+  });
   let signatureRenderer: ExpressiveCode | undefined;
   let referenceRoutes: ReadonlyMap<string, string> | undefined;
   let memberReferences: ReadonlyMap<string, MemberReference> | undefined;
