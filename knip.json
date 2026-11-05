@@ -7,6 +7,8 @@
         "src/index.ts",
         "src/adapter.ts",
         "src/functions.ts",
+        "src/history-archive.ts",
+        "src/history-indexeddb.ts",
         "src/indexeddb.ts",
         "src/shell.ts",
         "src/testing.ts",
