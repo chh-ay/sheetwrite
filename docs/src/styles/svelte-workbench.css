@@ -74,7 +74,7 @@
   flex: none;
   padding-inline: var(--sw-space-1);
   color: var(--sw-fg-muted);
-  font: 500 var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) var(--sw-font-mono);
 }
 
 .sw-svw-collaborators {
@@ -87,7 +87,7 @@
 
 .sw-svw-collaborators > span {
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
   white-space: nowrap;
 }
 
@@ -108,10 +108,10 @@
   align-items: center;
   padding-inline: var(--sw-space-2);
   border: 1px solid color-mix(in srgb, var(--sw-svw-peer) 38%, var(--sw-border));
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   background: color-mix(in srgb, var(--sw-svw-peer) 10%, var(--sw-surface-1));
   color: var(--sw-fg);
-  font: 600 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
   white-space: nowrap;
 }
 
@@ -157,8 +157,8 @@
 
 .sw-svw-gridstage > header strong {
   color: var(--sw-fg-strong);
-  font: 700 var(--sw-text-caption) / 1 var(--sw-font-mono);
-  letter-spacing: 0.08em;
+  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -167,7 +167,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--sw-fg-muted);
-  font: 500 var(--sw-text-small) / 1.3 var(--sw-font-body);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1.3 var(--sw-font-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -231,8 +231,8 @@
 
 .sw-svw-mission__eyebrow {
   color: var(--sw-accent-strong);
-  font: 700 var(--sw-text-caption) / 1 var(--sw-font-mono);
-  letter-spacing: 0.08em;
+  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
 }
 
 .sw-svw-mission[data-state="offline"] .sw-svw-mission__eyebrow,
@@ -247,7 +247,7 @@
 
 .sw-svw-mission__eyebrow span:last-child {
   color: var(--sw-fg-muted);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
   letter-spacing: 0;
   white-space: nowrap;
 }
@@ -259,13 +259,13 @@
 }
 
 .sw-svw-mission h3 {
-  font: 650 var(--sw-text-body) / 1.25 var(--sw-font-display);
-  letter-spacing: -0.01em;
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.25 var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-heading);
 }
 
 .sw-svw-mission > strong {
   color: var(--sw-fg);
-  font: 650 var(--sw-text-small) / 1.4 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.4 var(--sw-font-body);
 }
 
 .sw-svw-mission > p,
@@ -290,7 +290,7 @@
   border-radius: var(--sw-radius-md);
   background: var(--sw-surface-2);
   color: var(--sw-fg);
-  font: 650 var(--sw-text-small) / 1 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -339,18 +339,18 @@
 /* ---- Durable outbox ----------------------------------------------------- */
 
 .sw-svw-sectionhead h3 {
-  font: 700 var(--sw-text-caption) / 1 var(--sw-font-mono);
-  letter-spacing: 0.08em;
+  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .sw-svw-sectionhead > span {
   min-width: 1.5rem;
   padding: calc(var(--sw-space-1) / 2) var(--sw-space-1);
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   background: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-1));
   color: var(--sw-accent-strong);
-  font: 700 var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
   text-align: center;
 }
 
@@ -396,7 +396,7 @@
 .sw-svw-outbox li code {
   overflow-wrap: anywhere;
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-text-small) / 1.35 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.35 var(--sw-font-mono);
 }
 
 .sw-svw-outbox li[data-status="conflicted"] code {
@@ -466,12 +466,12 @@
 
 .sw-svw-conflict > strong {
   color: var(--sw-fg);
-  font: 650 var(--sw-text-small) / 1.45 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.45 var(--sw-font-body);
 }
 
 .sw-svw-conflict strong code {
   color: var(--sw-accent-strong);
-  font: 650 var(--sw-text-small) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-small) var(--sw-font-mono);
 }
 
 .sw-svw-conflict ul {
@@ -517,7 +517,7 @@
   gap: var(--sw-space-2);
   min-height: 2rem;
   color: var(--sw-fg);
-  font: 650 var(--sw-text-small) / 1.35 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.35 var(--sw-font-body);
   cursor: pointer;
   list-style: none;
 }
@@ -529,7 +529,7 @@
 .sw-svw-tools summary::after {
   content: "+";
   color: var(--sw-accent-strong);
-  font: 600 1.25rem / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1 var(--sw-font-mono);
 }
 
 .sw-svw-tools[open] summary::after {
