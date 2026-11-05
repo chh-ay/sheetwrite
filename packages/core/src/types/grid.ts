@@ -188,7 +188,12 @@ export interface GridActions {
   clearFormat(): void;
   merge(): void;
   unmerge(): void;
+  /** Quick sort of the cells around the focus cell by its column (`Grid.sortBy`). */
   sort(ascending: boolean): void;
+  /** Sort the displayed rows by the focus column without moving cells. */
+  sortView(ascending: boolean): void;
+  /** Open the Sort panel: several keys, a header row, and a view-only option. */
+  customSort(): void;
   insertRowAbove(): void;
   insertRowBelow(): void;
   deleteRow(): void;
@@ -394,6 +399,10 @@ export type ContextMenuActionName =
   | "showAllColumns"
   | "autoFitColumn"
   | "clearFilter"
+  | "sortAscending"
+  | "sortDescending"
+  | "sortViewAscending"
+  | "sortViewDescending"
   | "exportCsv"
   | "exportXlsx"
   | "editNote"
@@ -901,21 +910,22 @@ export interface Grid {
    */
   aggregate(col: number, op: AggregateOp): number;
   /**
-   * Sort the displayed rows by a column (does not mutate stored data).
+   * Excel's quick sort by column `col`: sort the cells of the table body
+   * that holds the focus cell, or else of the selected range, or else of the
+   * current region around the focus cell. A first row of text over other
+   * values stays as a header.
    *
    * @example
    * ```ts
    * import type { Grid } from "@sheetwrite/core";
    *
-   * function showLargestFirst(grid: Grid) {
+   * function largestFirst(grid: Grid) {
    *   grid.sortBy(1, false);
    * }
    * ```
-   * @see Grid.clearView
+   * @see Grid.sortRange
    */
   sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
-  /** Multi-key sort of the displayed rows (first key primary; stable). */
-  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult;
   /**
    * Filter the displayed rows to those whose column text contains `needle`.
    *
@@ -935,8 +945,46 @@ export interface Grid {
    * and compose with the active sort and hidden rows.
    */
   setColumnFilter(col: number, filter: ColumnFilter | null): void;
-  /** Persisted multi-key sort of the active sheet. */
-  setSort(keys: readonly SortKey[]): ApplyTransactionResult;
+  /**
+   * Sort the displayed rows of the active sheet by `keys` (first key primary;
+   * stable) without moving any cell; an empty list clears the view sort. The
+   * keys are saved with the sheet and export to XLSX as `sortState`.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function showLargestFirst(grid: Grid) {
+   *   grid.setViewSort([{ col: 1, ascending: false }]);
+   * }
+   * ```
+   * @see Grid.clearView
+   */
+  setViewSort(keys: readonly SortKey[]): ApplyTransactionResult;
+  /**
+   * Sort the cells of `range` in place, as Excel's Sort does: one undoable
+   * change that collaborators receive as one transaction. With `hasHeader`
+   * the first row stays. Merged cells of different sizes reject the sort and
+   * emit `mutation-rejected`.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function sortOrders(grid: Grid) {
+   *   grid.sortRange(
+   *     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+   *     [{ col: 2, ascending: false }],
+   *     { hasHeader: true },
+   *   );
+   * }
+   * ```
+   */
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options?: { hasHeader?: boolean },
+  ): ApplyTransactionResult;
   /** Active column filters on the active sheet, keyed by column index. */
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
   /**

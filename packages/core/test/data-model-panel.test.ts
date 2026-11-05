@@ -104,6 +104,8 @@ it("shows the Data Tools commands once the workbook has tables to manage and rel
   addTable(table("customers", 3, ["id", "region"]));
   await Promise.resolve();
   expect(shown()).toEqual({ manage: true, relate: true });
+  // The short label keeps Excel's command name as its tooltip.
+  expect(control("Data Model")?.title).toBe("Manage Data Model");
 });
 
 it("creates, edits and deletes a relationship as single undo steps", async () => {

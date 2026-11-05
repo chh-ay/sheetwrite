@@ -401,7 +401,7 @@ function sortFilterRefusal(): ResourceScenarioResult {
   Bun.gc(true);
   const before = gridSnapshot(grid, operation, "before");
   const started = performance.now();
-  grid.setSort([{ col: 0, ascending: true }]);
+  grid.setViewSort([{ col: 0, ascending: true }]);
   grid.setColumnFilter(0, { kind: "contains", text: "blocked" });
   let refusal = "";
   try {

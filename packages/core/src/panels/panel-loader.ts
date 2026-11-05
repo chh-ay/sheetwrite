@@ -19,6 +19,7 @@ import type {
   openExplainPanel,
   openNamePanel,
   openPivotPanel,
+  openSortPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
 
@@ -32,6 +33,7 @@ interface PanelController {
   openExplainPanel: typeof openExplainPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
+  openSortPanel: typeof openSortPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }
 
@@ -139,6 +141,11 @@ export function showNameManager(grid: Grid): void {
 
 export function showDefineName(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid, true));
+}
+
+/** Data › Custom Sort: open the Sort panel, loading the panels on first use. */
+export function showSortPanel(grid: Grid): void {
+  requestPanel(grid, (controller) => controller.openSortPanel(grid));
 }
 
 /** The focus cell of a selection; whole rows and columns are never inside a pivot. */

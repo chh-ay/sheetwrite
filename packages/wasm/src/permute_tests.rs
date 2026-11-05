@@ -236,3 +236,16 @@ fn row_order_targets_invert_the_order_and_reject_other_lists() {
     assert!(store.row_order_targets(&[0, 0]).is_empty());
     assert!(store.row_order_targets(&[1, 2]).is_empty());
 }
+
+#[test]
+fn the_current_region_is_bounded_by_empty_rows_and_columns() {
+    let (mut store, sheet) = sheet();
+    store.set_number(sheet, 1, 1, 1.0, 0);
+    store.set_number(sheet, 2, 1, 2.0, 0);
+    store.set_number(sheet, 3, 2, 3.0, 0);
+    store.set_number(sheet, 5, 0, 9.0, 0);
+
+    assert_eq!(store.current_region(sheet, 1, 1), [1, 1, 3, 2]);
+    assert_eq!(store.current_region(sheet, 5, 0), [5, 0, 5, 0]);
+    assert!(store.current_region(sheet, ROWS, 0).is_empty());
+}

@@ -158,8 +158,19 @@ const VISIBILITY_ITEMS: readonly RibbonMenuItem[] = [
 const SORT_ITEMS: readonly RibbonMenuItem[] = [
   item("Sort A to Z", (grid) => grid.actions.sort(true), "sortAsc"),
   item("Sort Z to A", (grid) => grid.actions.sort(false), "sortDesc"),
+  item("Custom Sort…", (grid) => grid.actions.customSort(), "sortCustom"),
+  item("Sort View A to Z", (grid) => grid.actions.sortView(true), "sortView"),
+  item("Sort View Z to A", (grid) => grid.actions.sortView(false), "sortView"),
   item("Clear Filter", (grid) => grid.actions.clearFilter(), "clearFilter"),
 ];
+
+/** Sort the view only; the two orders share the glyph, so each names its own ID. */
+const viewSortButton = (label: string, id: string, ascending: boolean): RibbonButtonSpec => ({
+  ...button(label, "sortView", (grid) => grid.actions.sortView(ascending), "edit", {
+    flags: SORT,
+  }),
+  id,
+});
 
 const fontFamily: RibbonComboSpec = {
   kind: "combo",
@@ -711,6 +722,12 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             large: true,
             flags: SORT,
           }),
+          button("Custom Sort", "sortCustom", (grid) => grid.actions.customSort(), "edit", {
+            large: true,
+            flags: SORT,
+          }),
+          viewSortButton("Sort View A to Z", "sortViewAsc", true),
+          viewSortButton("Sort View Z to A", "sortViewDesc", false),
           button("Clear Filter", "clearFilter", (grid) => grid.actions.clearFilter()),
         ],
       },
@@ -721,8 +738,10 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            // Excel's "Manage Data Model" wraps to three lines under a large glyph.
+            // Excel's "Manage Data Model" wraps to three lines under a large
+            // glyph, so the label is short and the tooltip keeps Excel's name.
             ...button("Data Model", "dataModel", openDataModel, "view", { large: true }),
+            description: "Manage Data Model",
             available: (grid) => workbookTableCount(grid) > 0,
           },
           {
