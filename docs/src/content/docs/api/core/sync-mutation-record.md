@@ -8,7 +8,7 @@ description: "SyncMutationRecord interface in @sheetwrite/core: Pending commit p
 Pending commit paired with its current synchronization status.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L118"><code>packages/core/src/types/transaction.ts#L118</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L130"><code>packages/core/src/types/transaction.ts#L130</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -19,9 +19,10 @@ Pending commit paired with its current synchronization status.
 <a href="#sync-mutation-record-operations"><code>operations</code></a>
 <a href="#sync-mutation-record-version-operation-counts"><code>versionOperationCounts</code></a>
 <a href="#sync-mutation-record-author-id"><code>authorId</code></a>
+<a href="#sync-mutation-record-restore"><code>restore</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -94,6 +95,17 @@ readonly authorId?: string;
 `SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
 before it records history. At most `maxMutationIdBytes` UTF-8 bytes.</p>
 </details>
+
+<details class="api-member" id="sync-mutation-record-restore" data-pagefind-weight="1">
+<summary><code>restore</code> <span class="api-member-summary">Present when the commit restores a history version.</span></summary>
+
+```ts generated
+readonly restore?: RestoreProvenance;
+```
+
+<p class="api-member-doc">Present when the commit restores a history version. A restore is never
+rebased: a conflicting restore makes the client reload and restore again.</p>
+</details>
 </div>
 
 ## Declaration
@@ -110,6 +122,7 @@ export interface SyncMutationRecord {
   readonly operations: readonly DocumentOp[];
   readonly versionOperationCounts?: readonly number[];
   readonly authorId?: string;
+  readonly restore?: RestoreProvenance;
 }
 ```
 

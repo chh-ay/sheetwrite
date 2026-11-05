@@ -8,7 +8,7 @@ description: "SyncProtocolErrorCode type in @sheetwrite/core: Stable category id
 Stable category identifying which synchronization protocol bound was violated.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L188"><code>packages/core/src/sync.ts#L188</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L190"><code>packages/core/src/sync.ts#L190</code></a></dd></div>
 </dl>
 
 ## Declaration

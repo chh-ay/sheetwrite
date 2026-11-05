@@ -9,7 +9,7 @@ Security and durability defaults bound hostile remote versions, recovery
 buffers, acknowledgement memory, and the offline pending queue independently.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L163"><code>packages/core/src/sync.ts#L163</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L165"><code>packages/core/src/sync.ts#L165</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "CommentMutationRequest interface in @sheetwrite/core: Versioned co
 Versioned comment mutation submitted to a host adapter.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L464"><code>packages/core/src/collaboration.ts#L464</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L290"><code>packages/core/src/collaboration.ts#L290</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

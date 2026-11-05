@@ -15,6 +15,8 @@ The full engine adds these function families:
 | Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE` |
 | Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET` |
 | Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ` |
+| Bessel functions | `BESSELJ`, `BESSELY`, `BESSELI`, `BESSELK` |
+| Complex numbers | `COMPLEX`, `IMSUM`, `IMPRODUCT`, `IMABS`, `IMEXP`, `IMSQRT` |
 | Engineering | `DEC2HEX`, `HEX2DEC`, `BITAND`, `BITLSHIFT`, `ERF`, `GESTEP` |
 | Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
 | LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `MAKEARRAY` |

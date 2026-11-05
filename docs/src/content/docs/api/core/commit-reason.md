@@ -33,6 +33,7 @@ export type CommitReason =
   | "sort"
   | "undo"
   | "redo"
+  | "restore"
   | "api";
 ```
 
