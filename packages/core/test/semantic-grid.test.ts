@@ -393,7 +393,7 @@ describe("custom editor canonical lifecycle", () => {
         },
       };
       const grid = new GridImpl(host, { workbook, editors: { pending: editor } }, store);
-      if (viewChange === "clearView") grid.sortBy(1, false);
+      if (viewChange === "clearView") grid.setViewSort([{ col: 1, ascending: false }]);
       grid.beginEdit(0, 0);
       const originalDataRow = viewChange === "clearView" ? 2 : 0;
       const otherDataRow = viewChange === "clearView" ? 0 : 2;
@@ -407,7 +407,7 @@ describe("custom editor canonical lifecycle", () => {
 
       if (viewChange === "clearView") grid.clearView();
       else if (viewChange === "filter") grid.filterBy(0, "Customer 0");
-      else grid.sortBy(1, false);
+      else grid.setViewSort([{ col: 1, ascending: false }]);
       const expectedViewRow = viewChange === "filter" ? 0 : 2;
       expect(contexts.at(-1)?.address).toEqual({
         sheet: "s1",
@@ -459,7 +459,7 @@ describe("custom editor canonical lifecycle", () => {
         const store = new SheetwriteStore(workbook, makeColumnarData(3));
         const host = mountHost();
         const grid = new GridImpl(host, { workbook }, store);
-        if (viewChange !== "sort") grid.sortBy(1, false);
+        if (viewChange !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
         grid.beginEdit(0, 0);
         const selector =
           editorKind === "stock"
@@ -475,7 +475,7 @@ describe("custom editor canonical lifecycle", () => {
 
         if (viewChange === "clearView") grid.clearView();
         else if (viewChange === "filter") grid.filterBy(0, "Customer 2");
-        else grid.sortBy(1, false);
+        else grid.setViewSort([{ col: 1, ascending: false }]);
         expect(host.querySelector(selector)).toBe(editor);
         editor.dispatchEvent(
           new KeyboardEvent("keydown", {

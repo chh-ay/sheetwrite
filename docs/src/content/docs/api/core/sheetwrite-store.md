@@ -94,9 +94,8 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-set-pivot"><code>setPivot</code></a>
 <a href="#sheetwrite-store-set-protection-resolver"><code>setProtectionResolver</code></a>
 <a href="#sheetwrite-store-set-relationship"><code>setRelationship</code></a>
+<a href="#sheetwrite-store-set-view-sort"><code>setViewSort</code></a>
 <a href="#sheetwrite-store-show-rows"><code>showRows</code></a>
-<a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
-<a href="#sheetwrite-store-sort-by-multi"><code>sortByMulti</code></a>
 <a href="#sheetwrite-store-sort-range"><code>sortRange</code></a>
 <a href="#sheetwrite-store-ungroup-rows"><code>ungroupRows</code></a>
 <a href="#sheetwrite-store-view-row-count"><code>viewRowCount</code></a>
@@ -105,7 +104,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>70</span>
+## Members <span class="api-count" data-pagefind-ignore>69</span>
 
 <div class="api-member-list">
 
@@ -705,29 +704,35 @@ exist, at most one relationship may join two tables, and relationships
 must not form a cycle; otherwise the result is a no-op.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-set-view-sort" data-pagefind-weight="1">
+<summary><code>setViewSort</code> <span class="api-member-summary">Sort the displayed rows of a sheet by keys (first key primary; stable) without moving any cell; an empty list clears the view sort.</span></summary>
+
+```ts generated
+setViewSort: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult;
+```
+
+Sort the displayed rows of a sheet by `keys` (first key primary; stable)
+without moving any cell; an empty list clears the view sort. The keys
+are saved in the sheet and export to XLSX as `sortState`. To move the
+cells, as Excel's Sort does, use `sortRange`.
+
+### Examples
+
+```ts compile
+import type { SheetwriteStore } from "@sheetwrite/core";
+
+function showLargestFirst(store: SheetwriteStore) {
+  return store.setViewSort("s1", [{ col: 2, ascending: false }]);
+}
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-show-rows" data-pagefind-weight="1">
 <summary><code>showRows</code></summary>
 
 ```ts generated
 showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-store-sort-by" data-pagefind-weight="1">
-<summary><code>sortBy</code></summary>
-
-```ts generated
-sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult;
-```
-
-</details>
-
-<details class="api-member" id="sheetwrite-store-sort-by-multi" data-pagefind-weight="1">
-<summary><code>sortByMulti</code></summary>
-
-```ts generated
-sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult;
 ```
 
 </details>
@@ -974,18 +979,13 @@ class SheetwriteStore implements Store {
   setRelationship: (
     relationship: TableRelationship,
   ) => ApplyTransactionResult;
+  setViewSort: (
+    sheet: SheetId,
+    keys: readonly SortKey[],
+  ) => ApplyTransactionResult;
   showRows: (
     sheet: SheetId,
     rows?: readonly number[],
-  ) => ApplyTransactionResult;
-  sortBy: (
-    sheet: SheetId,
-    col: number,
-    ascending: boolean,
-  ) => ApplyTransactionResult;
-  sortByMulti: (
-    sheet: SheetId,
-    keys: readonly SortKey[],
   ) => ApplyTransactionResult;
   sortRange: (
     range: Range,

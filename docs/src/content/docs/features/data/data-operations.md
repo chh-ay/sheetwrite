@@ -9,7 +9,7 @@ const total = grid.aggregate(1, "sum");
 console.log(total); // 195 for Ada: 120 and Lin: 75
 ```
 
-<div class="sw-grid-result" data-caption="Descending Total: stored row data stays in its original order">
+<div class="sw-grid-result" data-caption="Descending Total: the rows move, as in Excel">
 
 | Ada | 120 |
 | --- | --- |
@@ -56,9 +56,19 @@ permutation/subset and the renderer reads through it.
 
 ## Sort cells in place
 
-`store.sortRange` sorts the cells of a range as Excel's Sort does. The cells
-move to their new rows in one undoable transaction that collaborators receive
-as one change, so formulas, charts and other sheets read the sorted values.
+`grid.sortRange` and `store.sortRange` sort the cells of a range as Excel's
+Sort does. The cells move to their new rows in one undoable transaction that
+collaborators receive as one change, so formulas, charts and other sheets read
+the sorted values. Use `grid.sortRange` in an app with a grid, so the sort joins
+the grid's undo history.
+
+The Sort A to Z and Sort Z to A commands (ribbon, toolbar and the column
+context menu) and `grid.sortBy(col, ascending)` run Excel's quick sort: they sort
+the table body that holds the focus cell, or else the selected range, or else
+the current region around the focus cell (the block bounded by empty rows and
+columns). A first row of text over numbers, logical values or blanks stays as a
+header. Data › Custom Sort opens the Sort panel: a range, a header row, up to 64
+sort levels, and "Sort view only".
 
 ```ts compile title="Sort a range by its third column"
 import type { SheetwriteStore } from "@sheetwrite/core";
@@ -86,11 +96,12 @@ function sortByRevenue(store: SheetwriteStore) {
 
 ## Display views
 
-The simple shorthands are still available:
+A view sort orders the displayed rows without moving any cell. It is saved
+with the sheet and exports to XLSX as `sortState`. The Sort panel calls it
+"Sort view only".
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
-grid.sortBy(4);            // sort by column 4, ascending
-grid.sortBy(4, false);     // descending
+grid.setViewSort([{ col: 4, ascending: false }]); // display largest first
 grid.filterBy(3, "Tokyo"); // keep rows whose column-3 text contains "Tokyo"
 grid.clearView();          // clear sort/filter state only
 ```
@@ -106,7 +117,7 @@ to each other. A descending sort reverses this order, but blank cells are last
 in both directions. Rows with equal keys keep their order.
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
-grid.sortByMulti([
+grid.setViewSort([
   { col: 4, ascending: false }, // primary key
   { col: 0, ascending: true },  // tie-breaker
 ]);
@@ -124,8 +135,9 @@ grid.setGroupCollapsed(10, true);
 
 | Method | Signature | Effect |
 | --- | --- | --- |
-| `sortBy` | `sortBy(col: number, ascending = true): void` | Reorder displayed rows by one column. |
-| `sortByMulti` | `sortByMulti(keys: readonly SortKey[]): void` | Stable multi-key sort; first key is primary. |
+| `sortBy` | `sortBy(col: number, ascending = true): ApplyTransactionResult` | Quick sort in place: the table body, selected range or current region around the focus cell. |
+| `sortRange` | `sortRange(range, keys, { hasHeader? }): ApplyTransactionResult` | Sort the cells of a range in place by several keys. |
+| `setViewSort` | `setViewSort(keys: readonly SortKey[]): ApplyTransactionResult` | Stable multi-key view sort; first key is primary. Cells keep their rows. |
 | `filterBy` | `filterBy(col: number, needle: string): void` | Shorthand for a case-insensitive `contains` column filter. |
 | `setColumnFilter` | `setColumnFilter(col: number, filter: ColumnFilter \| null): void` | Set or clear one column filter. |
 | `getColumnFilters` | `getColumnFilters(): ReadonlyMap<number, ColumnFilter>` | Current active column filters. |

@@ -146,6 +146,44 @@ impl CellStore {
     pub fn row_order_targets(&self, order: &[u32]) -> Vec<u32> {
         order_targets(order).unwrap_or_default()
     }
+
+    /// Excel's current region around a cell, as `[top, left, bottom, right]`:
+    /// the smallest rectangle that holds the cell and is bounded by empty rows
+    /// and columns (cells that touch it at a corner count). The quick sort
+    /// sorts this region. Empty for a cell outside the sheet.
+    #[wasm_bindgen(js_name = currentRegion)]
+    pub fn current_region(&self, sheet: usize, row: usize, col: usize) -> Vec<u32> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        let rows = data.cells.row_count();
+        let cols = data.cells.n_cols();
+        if row >= rows || col >= cols {
+            return Vec::new();
+        }
+
+        let occupied = |r: usize, c: usize| data.cells.kind_at(data.cells.idx(r, c)) != KIND_EMPTY;
+        let mut region = Region {
+            top: row,
+            left: col,
+            bottom: row,
+            right: col,
+        };
+
+        // Rows grow first and columns after, so a tall region checks each
+        // full-height column once per round instead of once per added row.
+        loop {
+            let grew_rows = grow_rows(&mut region, rows, cols, &occupied);
+            let grew_cols = grow_columns(&mut region, rows, cols, &occupied);
+            if !grew_rows && !grew_cols {
+                break;
+            }
+        }
+
+        [region.top, region.left, region.bottom, region.right]
+            .map(|edge| edge as u32)
+            .to_vec()
+    }
 }
 
 impl CellStore {
@@ -268,4 +306,56 @@ impl CellStore {
             ),
         }
     }
+}
+
+/// A rectangle of cells, inclusive on every edge.
+struct Region {
+    top: usize,
+    left: usize,
+    bottom: usize,
+    right: usize,
+}
+
+/// Add the rows above and below `region` while they hold a cell next to it.
+fn grow_rows(
+    region: &mut Region,
+    rows: usize,
+    cols: usize,
+    occupied: &impl Fn(usize, usize) -> bool,
+) -> bool {
+    let mut grew = false;
+    let left = region.left.saturating_sub(1);
+    let right = (region.right + 1).min(cols - 1);
+
+    while region.top > 0 && (left..=right).any(|c| occupied(region.top - 1, c)) {
+        region.top -= 1;
+        grew = true;
+    }
+    while region.bottom + 1 < rows && (left..=right).any(|c| occupied(region.bottom + 1, c)) {
+        region.bottom += 1;
+        grew = true;
+    }
+    grew
+}
+
+/// Add the columns left and right of `region` while they hold a cell next to it.
+fn grow_columns(
+    region: &mut Region,
+    rows: usize,
+    cols: usize,
+    occupied: &impl Fn(usize, usize) -> bool,
+) -> bool {
+    let mut grew = false;
+    let top = region.top.saturating_sub(1);
+    let bottom = (region.bottom + 1).min(rows - 1);
+
+    while region.left > 0 && (top..=bottom).any(|r| occupied(r, region.left - 1)) {
+        region.left -= 1;
+        grew = true;
+    }
+    while region.right + 1 < cols && (top..=bottom).any(|r| occupied(r, region.right + 1)) {
+        region.right += 1;
+        grew = true;
+    }
+    grew
 }

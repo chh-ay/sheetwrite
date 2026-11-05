@@ -49,7 +49,7 @@ describe("store data ops", () => {
     const store = new SheetwriteStore(workbook());
     setNumbers(store, [30, 10, 50, 20, 40]);
 
-    store.sortBy("s", 0, true);
+    store.setViewSort("s", [{ col: 0, ascending: true }]);
     expect(Array.from(store.getVisibleWindow("s", { start: 0, end: 5 }, [0]).values)).toEqual([
       10, 20, 30, 40, 50,
     ]);

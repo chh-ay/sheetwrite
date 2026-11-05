@@ -160,7 +160,7 @@ scenario (render bench).
 | Ingest | first-load cost | `new SheetwriteStore(workbook, columnar)` | `new Handsontable(el, { data, … })` |
 | Window read | the per-frame render read | `store.getVisibleWindow(50×5)` | `hot.getData(r1,c1,r2,c2)` over the same range |
 | Edit ×1000 | interactive typing | 1000 `applyTransaction` set patches | 1000 `setDataAtCell` (in `suspendRender`/`resumeRender`) |
-| Sort | column sort | `store.sortBy(amount)` (WASM) | `columnSorting` plugin |
+| Sort | column sort | `store.setViewSort` (WASM) | `columnSorting` plugin |
 | Filter | text filter | `store.filterBy(city, "Tokyo")` (WASM) | `filters` plugin (`contains`) |
 | Aggregate | column math | `store.aggregate(amount, "sum")` (WASM) | plain-JS sum over `getSourceDataAtCol` |
 
