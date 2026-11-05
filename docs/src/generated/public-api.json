@@ -536,7 +536,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L213",
+              "source": "src/types/transaction.ts#L253",
               "jsDocTags": [],
               "documentation": "One committed cell edit, carrying enough to roll back.",
               "memberDocs": []
@@ -844,7 +844,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L222",
+              "source": "src/types/transaction.ts#L262",
               "jsDocTags": [],
               "documentation": "Payload of the `change` event; flows OUT for API submission/reconcile.",
               "memberDocs": [
@@ -1362,6 +1362,18 @@
               "memberDocs": []
             },
             {
+              "name": "CommitJournal",
+              "kind": "interface",
+              "signature": "export interface CommitJournal { record(commit: CommittedTransaction, capture: () => WorkbookSnapshot): Promise<void>; }",
+              "owners": [
+                "src/types/transaction.ts"
+              ],
+              "source": "src/types/transaction.ts#L178",
+              "jsDocTags": [],
+              "documentation": "Durable record of committed transactions, written as part of the commit:\nwhen `record` rejects, the authority does not publish or acknowledge the\ncommit. `capture` returns the committed document after the transaction and\nis called only when the journal needs a checkpoint. `HistoryArchive` from\n`@sheetwrite/core/history` implements this interface.",
+              "memberDocs": []
+            },
+            {
               "name": "CommitReason",
               "kind": "type",
               "signature": "export type CommitReason = | \"edit-blur\" | \"edit-enter\" | \"edit-tab\" | \"edit-programmatic\" | \"paste\" | \"cut\" | \"clear\" | \"fill\" | \"structure\" | \"style\" | \"replace\" | \"undo\" | \"redo\" | \"api\";",
@@ -1372,6 +1384,43 @@
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
+            },
+            {
+              "name": "CommittedTransaction",
+              "kind": "interface",
+              "signature": "export interface CommittedTransaction { baseRevision: number; revision: number; mutationId: string; authorId: string; time: number; operations: readonly DocumentOp[]; }",
+              "owners": [
+                "src/types/transaction.ts"
+              ],
+              "source": "src/types/transaction.ts#L156",
+              "jsDocTags": [],
+              "documentation": "One transaction as the document authority committed it: its revisions, its\nauthor and its time. History archives record these, never optimistic edits.",
+              "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person who made the change, at most 256 code units."
+                },
+                {
+                  "name": "baseRevision",
+                  "documentation": "Revision the transaction applies to."
+                },
+                {
+                  "name": "mutationId",
+                  "documentation": "Stable mutation ID of the commit, at most 256 code units."
+                },
+                {
+                  "name": "operations",
+                  "documentation": "The committed document operations, in order."
+                },
+                {
+                  "name": "revision",
+                  "documentation": "Revision after the transaction; an atomic batch advances up to 16 revisions."
+                },
+                {
+                  "name": "time",
+                  "documentation": "Commit time in milliseconds since the epoch; never before the previous commit."
+                }
+              ]
             },
             {
               "name": "ConditionalFormatPredicate",
@@ -1537,7 +1586,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L64",
+              "source": "src/persistence.ts#L69",
               "jsDocTags": [],
               "documentation": "Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes\nthe hydrated store just like one created through `createGrid`.",
               "memberDocs": []
@@ -2929,7 +2978,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L208",
+              "source": "src/types/transaction.ts#L248",
               "jsDocTags": [],
               "documentation": "An undoable transaction submitted through a Grid.\n\nGrid transactions deliberately have no epoch: optimistic reconciliation is\na low-level Store concern, while Grid commits are normal host-driven edits\nthat participate in read-only policy and undo/redo history.",
               "memberDocs": []
@@ -3293,17 +3342,21 @@
             {
               "name": "MemoryPersistenceAdapter",
               "kind": "class",
-              "signature": "class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }",
+              "signature": "class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; recordHistory: (documentId: string, journal: CommitJournal) => void }",
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L107",
+              "source": "src/persistence.ts#L112",
               "jsDocTags": [],
               "documentation": "Executable database-neutral reference adapter for tests, demos, and local workflows.",
               "memberDocs": [
                 {
                   "name": "commitBatch",
                   "documentation": "Validate every member version against the default sync limits, apply the\nmembers in order to one scratch store, and publish all of them only when\nevery member applied."
+                },
+                {
+                  "name": "recordHistory",
+                  "documentation": "Record every later commit of `documentId` in `journal`, as part of the\ncommit: if the journal rejects, the commit is not applied, published or\nacknowledged, and the client keeps it pending. While a journal is\nattached, a commit without `authorId` is rejected. The journal must\nalready describe the current version, for example a `HistoryArchive`\ninitialized with the loaded snapshot."
                 }
               ]
             },
@@ -3500,7 +3553,7 @@
             {
               "name": "PendingCommit",
               "kind": "interface",
-              "signature": "export interface PendingCommit { documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }",
+              "signature": "export interface PendingCommit { documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; readonly authorId?: string; }",
               "owners": [
                 "src/types/transaction.ts"
               ],
@@ -3508,6 +3561,10 @@
               "jsDocTags": [],
               "documentation": "Immutable local operation batch awaiting a host acknowledgement.",
               "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person who made the change, from\n`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it\nbefore it records history. At most `maxMutationIdBytes` UTF-8 bytes."
+                },
                 {
                   "name": "versionOperationCounts",
                   "documentation": "Present only when the operations are too large for one server version.\nEach entry is the operation count of one consecutive version of an atomic\nbatch, in order; the counts add up to `operations.length`. A server\napplies and publishes all of these versions, or none of them."
@@ -3563,7 +3620,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L177",
+              "source": "src/types/transaction.ts#L217",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3579,14 +3636,18 @@
             {
               "name": "PersistenceBatchCommitRequest",
               "kind": "interface",
-              "signature": "export interface PersistenceBatchCommitRequest { readonly versionOperationCounts: readonly number[]; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; signal?: AbortSignal; }",
+              "signature": "export interface PersistenceBatchCommitRequest { readonly versionOperationCounts: readonly number[]; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly authorId?: string; signal?: AbortSignal; }",
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L143",
+              "source": "src/types/transaction.ts#L183",
               "jsDocTags": [],
               "documentation": "Cancellable commit of one atomic batch that spans several server versions.",
               "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person who made the change, from\n`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it\nbefore it records history. At most `maxMutationIdBytes` UTF-8 bytes."
+                },
                 {
                   "name": "versionOperationCounts",
                   "documentation": "Present only when the operations are too large for one server version.\nEach entry is the operation count of one consecutive version of an atomic\nbatch, in order; the counts add up to `operations.length`. A server\napplies and publishes all of these versions, or none of them."
@@ -3596,14 +3657,18 @@
             {
               "name": "PersistenceCommitRequest",
               "kind": "interface",
-              "signature": "export interface PersistenceCommitRequest { signal?: AbortSignal; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }",
+              "signature": "export interface PersistenceCommitRequest { signal?: AbortSignal; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; readonly authorId?: string; }",
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L138",
+              "source": "src/types/transaction.ts#L148",
               "jsDocTags": [],
               "documentation": "Cancellable pending commit submitted to a persistence adapter.",
               "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person who made the change, from\n`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it\nbefore it records history. At most `maxMutationIdBytes` UTF-8 bytes."
+                },
                 {
                   "name": "versionOperationCounts",
                   "documentation": "Present only when the operations are too large for one server version.\nEach entry is the operation count of one consecutive version of an atomic\nbatch, in order; the counts add up to `operations.length`. A server\napplies and publishes all of these versions, or none of them."
@@ -3617,7 +3682,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L151",
+              "source": "src/types/transaction.ts#L191",
               "jsDocTags": [],
               "documentation": "Applied, duplicate, or conflict acknowledgement from persistence. `applied`\nconfirms the submitted operations unchanged; normalization must conflict.",
               "memberDocs": []
@@ -3629,7 +3694,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L51",
+              "source": "src/persistence.ts#L56",
               "jsDocTags": [],
               "documentation": "Typed failure raised by persistence and synchronization flows.",
               "memberDocs": []
@@ -3641,7 +3706,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L43",
+              "source": "src/persistence.ts#L48",
               "jsDocTags": [],
               "documentation": "Stable category for a persistence failure.",
               "memberDocs": []
@@ -4121,7 +4186,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L194",
+              "source": "src/types/transaction.ts#L234",
               "jsDocTags": [],
               "documentation": "Host subscription contract for ordered versioned operations. Sources that\ncan pause intake should await the listener promise to preserve backpressure.",
               "memberDocs": []
@@ -5467,7 +5532,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L37",
+              "source": "src/persistence.ts#L42",
               "jsDocTags": [],
               "documentation": "Grid creation options accepted when hydrating a validated snapshot.",
               "memberDocs": []
@@ -5744,7 +5809,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L294",
+              "source": "src/sync.ts#L301",
               "jsDocTags": [],
               "documentation": "Outcome of `SyncCoordinator.recoverConflict`.",
               "memberDocs": []
@@ -5756,7 +5821,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L279",
+              "source": "src/sync.ts#L286",
               "jsDocTags": [],
               "documentation": "Why a conflict cannot be recovered in place; the host reloads the document instead.",
               "memberDocs": []
@@ -5780,7 +5845,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L345",
+              "source": "src/sync.ts#L352",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5820,7 +5885,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L249",
+              "source": "src/sync.ts#L256",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -5893,7 +5958,7 @@
             {
               "name": "SyncCoordinatorOptions",
               "kind": "interface",
-              "signature": "export interface SyncCoordinatorOptions { documentId: string; serverVersion: number; createMutationId?: () => string; pendingStorage?: PendingCommitStorage; initialConnection?: \"offline\" | \"online\"; recoverVersionGap?: ( request: SyncVersionGapRequest, ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>; limits?: Partial<SyncCoordinatorLimits>; }",
+              "signature": "export interface SyncCoordinatorOptions { documentId: string; serverVersion: number; createMutationId?: () => string; pendingStorage?: PendingCommitStorage; initialConnection?: \"offline\" | \"online\"; authorId?: string; recoverVersionGap?: ( request: SyncVersionGapRequest, ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>; limits?: Partial<SyncCoordinatorLimits>; }",
               "owners": [
                 "src/sync.ts"
               ],
@@ -5901,6 +5966,10 @@
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person editing through this grid. Each new pending\ncommit carries it to the authority, which records it in history. Restored\ncommits keep the author they were made with. At most `maxMutationIdBytes`\nUTF-8 bytes."
+                },
                 {
                   "name": "limits",
                   "documentation": "Positive safe-integer overrides merged over `DEFAULT_SYNC_COORDINATOR_LIMITS`."
@@ -5914,14 +5983,18 @@
             {
               "name": "SyncMutationRecord",
               "kind": "interface",
-              "signature": "export interface SyncMutationRecord { status: SyncMutationStatus; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }",
+              "signature": "export interface SyncMutationRecord { status: SyncMutationStatus; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; readonly authorId?: string; }",
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L112",
+              "source": "src/types/transaction.ts#L118",
               "jsDocTags": [],
               "documentation": "Pending commit paired with its current synchronization status.",
               "memberDocs": [
+                {
+                  "name": "authorId",
+                  "documentation": "Authenticated ID of the person who made the change, from\n`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it\nbefore it records history. At most `maxMutationIdBytes` UTF-8 bytes."
+                },
                 {
                   "name": "versionOperationCounts",
                   "documentation": "Present only when the operations are too large for one server version.\nEach entry is the operation count of one consecutive version of an atomic\nbatch, in order; the counts add up to `operations.length`. A server\napplies and publishes all of these versions, or none of them."
@@ -5935,7 +6008,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L104",
+              "source": "src/types/transaction.ts#L110",
               "jsDocTags": [],
               "documentation": "Lifecycle state of one local mutation in the synchronization queue.",
               "memberDocs": []
@@ -6519,7 +6592,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L117",
+              "source": "src/types/transaction.ts#L123",
               "jsDocTags": [],
               "documentation": "Position of one server version inside an atomic multi-version batch.",
               "memberDocs": [
@@ -6548,17 +6621,25 @@
             {
               "name": "VersionedOperation",
               "kind": "interface",
-              "signature": "export interface VersionedOperation { version: number; readonly operations: readonly DocumentOp[]; clientMutationId?: string; batch?: VersionBatchMember; }",
+              "signature": "export interface VersionedOperation { version: number; readonly operations: readonly DocumentOp[]; clientMutationId?: string; batch?: VersionBatchMember; authorId?: string; committedAt?: number; }",
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L125",
+              "source": "src/types/transaction.ts#L131",
               "jsDocTags": [],
               "documentation": "Remote document operations paired with a contiguous server version.",
               "memberDocs": [
                 {
+                  "name": "authorId",
+                  "documentation": "Author the authority recorded for this version; every batch member carries the same one."
+                },
+                {
                   "name": "batch",
                   "documentation": "Present when this version is one member of an atomic batch. Every member\ncarries the same `clientMutationId` and `count`. Receivers apply the batch\nonly after its last member arrives."
+                },
+                {
+                  "name": "committedAt",
+                  "documentation": "Authority commit time, in milliseconds since the epoch."
                 }
               ]
             },
@@ -8150,7 +8231,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L102",
+              "source": "src/indexeddb.ts#L105",
               "jsDocTags": [],
               "documentation": "Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;\nthe package's root entrypoint never evaluates IndexedDB globals.",
               "memberDocs": [
@@ -8489,11 +8570,11 @@
             {
               "name": "HistoryArchive",
               "kind": "class",
-              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
+              "signature": "class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }",
               "owners": [
                 "src/history-archive.ts"
               ],
-              "source": "src/history-archive.ts#L403",
+              "source": "src/history-archive.ts#L402",
               "jsDocTags": [],
               "documentation": "Opt-in archive of named and automatic versions for one document. It stores\ncontent-addressed checkpoints plus the committed transactions since each\none, through a host `HistoryStorageAdapter`. A grid that never imports this\nmodule has no history state.\n\nCalls that change the archive run one at a time. Each publishes atomically,\nso a failure or abort leaves the last durable version readable.",
               "memberDocs": [
@@ -8542,47 +8623,10 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L194",
+              "source": "src/version-history/types.ts#L178",
               "jsDocTags": [],
               "documentation": "Host-controlled archive configuration. No history is created until explicitly opened.",
               "memberDocs": []
-            },
-            {
-              "name": "HistoryCommit",
-              "kind": "interface",
-              "signature": "export interface HistoryCommit { baseRevision: number; revision: number; mutationId: string; authorId: string; time: number; operations: readonly DocumentOp[]; }",
-              "owners": [
-                "src/version-history/types.ts"
-              ],
-              "source": "src/version-history/types.ts#L36",
-              "jsDocTags": [],
-              "documentation": "One committed transaction, confirmed by the document authority; never an optimistic local edit.",
-              "memberDocs": [
-                {
-                  "name": "authorId",
-                  "documentation": "Authenticated ID of the person who made the change, at most 256 code units."
-                },
-                {
-                  "name": "baseRevision",
-                  "documentation": "Revision the transaction applies to; equals the archive head."
-                },
-                {
-                  "name": "mutationId",
-                  "documentation": "Stable mutation ID from the commit, at most 256 code units."
-                },
-                {
-                  "name": "operations",
-                  "documentation": "The committed document operations, in order."
-                },
-                {
-                  "name": "revision",
-                  "documentation": "Revision after the transaction; an atomic batch can advance up to 16 revisions."
-                },
-                {
-                  "name": "time",
-                  "documentation": "Commit time in milliseconds since the epoch; never before the previous commit."
-                }
-              ]
             },
             {
               "name": "HistoryError",
@@ -8615,7 +8659,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L144",
+              "source": "src/version-history/types.ts#L128",
               "jsDocTags": [],
               "documentation": "Fetch metadata or a bounded immutable payload; leased reads renew their lease.",
               "memberDocs": []
@@ -8627,7 +8671,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L84",
+              "source": "src/version-history/types.ts#L68",
               "jsDocTags": [],
               "documentation": "Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters.",
               "memberDocs": [
@@ -8733,7 +8777,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L170",
+              "source": "src/version-history/types.ts#L154",
               "jsDocTags": [],
               "documentation": "Metadata-only response in newest-first order.",
               "memberDocs": []
@@ -8745,7 +8789,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L160",
+              "source": "src/version-history/types.ts#L144",
               "jsDocTags": [],
               "documentation": "Bounded metadata-only page. Cursors are scoped to a manifest generation.",
               "memberDocs": []
@@ -8757,7 +8801,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L111",
+              "source": "src/version-history/types.ts#L95",
               "jsDocTags": [],
               "documentation": "Archive state, read without fetching any payload.",
               "memberDocs": [
@@ -8774,7 +8818,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L134",
+              "source": "src/version-history/types.ts#L118",
               "jsDocTags": [],
               "documentation": "Acquire or release a five-minute renewable reader lease through the storage seam.",
               "memberDocs": []
@@ -8786,7 +8830,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L178",
+              "source": "src/version-history/types.ts#L162",
               "jsDocTags": [],
               "documentation": "Retention removes automatic markers, or one explicitly selected named marker.",
               "memberDocs": []
@@ -8798,7 +8842,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L125",
+              "source": "src/version-history/types.ts#L109",
               "jsDocTags": [],
               "documentation": "Atomically publish immutable records and a new head or version marker.",
               "memberDocs": []
@@ -8810,7 +8854,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L141",
+              "source": "src/version-history/types.ts#L125",
               "jsDocTags": [],
               "documentation": "A storage write either publishes one complete revision or manages a reader lease.",
               "memberDocs": []
@@ -8822,7 +8866,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L152",
+              "source": "src/version-history/types.ts#L136",
               "jsDocTags": [],
               "documentation": "Metadata for one immutable record; listings never return payload bytes.",
               "memberDocs": []
@@ -8834,7 +8878,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L201",
+              "source": "src/version-history/types.ts#L185",
               "jsDocTags": [],
               "documentation": "Snapshot provider invoked only when a checkpoint is due. Must describe the committed head.",
               "memberDocs": []
@@ -8846,7 +8890,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L186",
+              "source": "src/version-history/types.ts#L170",
               "jsDocTags": [],
               "documentation": "Atomic storage seam for local databases and host-owned history backends.",
               "memberDocs": []
@@ -8858,7 +8902,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L118",
+              "source": "src/version-history/types.ts#L102",
               "jsDocTags": [],
               "documentation": "Common document identity, ceilings, and cancellation for adapter calls.",
               "memberDocs": []
@@ -8870,7 +8914,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L103",
+              "source": "src/version-history/types.ts#L87",
               "jsDocTags": [],
               "documentation": "Retained storage of one document, including headers and index entries.",
               "memberDocs": []
@@ -8882,7 +8926,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L69",
+              "source": "src/version-history/types.ts#L53",
               "jsDocTags": [],
               "documentation": "Immutable, content-addressed history payload and the records it refers to.",
               "memberDocs": [
@@ -8911,7 +8955,7 @@
               "owners": [
                 "src/version-history/types.ts"
               ],
-              "source": "src/version-history/types.ts#L52",
+              "source": "src/version-history/types.ts#L36",
               "jsDocTags": [],
               "documentation": "A durable marker at one archived revision.",
               "memberDocs": [

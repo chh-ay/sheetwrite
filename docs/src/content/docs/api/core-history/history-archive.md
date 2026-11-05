@@ -14,7 +14,7 @@ Calls that change the archive run one at a time. Each publishes atomically,
 so a failure or abort leaves the last durable version readable.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L403"><code>packages/core/src/history-archive.ts#L403</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L402"><code>packages/core/src/history-archive.ts#L402</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -97,7 +97,7 @@ alive while a concurrent prune runs; the lease is released on every exit.</p>
 <summary><code>record</code> <span class="api-member-summary">Append one committed transaction.</span></summary>
 
 ```ts generated
-record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>;
+record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>;
 ```
 
 <p class="api-member-doc">Append one committed transaction. `capture` runs only when a checkpoint is
@@ -158,7 +158,7 @@ class HistoryArchive {
     signal?: AbortSignal,
   ) => Promise<WorkbookSnapshot>;
   record: (
-    commit: HistoryCommit,
+    commit: CommittedTransaction,
     capture?: HistorySnapshotProvider,
     signal?: AbortSignal,
   ) => Promise<void>;

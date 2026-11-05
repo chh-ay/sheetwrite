@@ -11,7 +11,7 @@ Immutable local operation batch awaiting a host acknowledgement.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L89"><code>packages/core/src/types/transaction.ts#L89</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -63,6 +63,18 @@ Each entry is the operation count of one consecutive version of an atomic
 batch, in order; the counts add up to `operations.length`. A server
 applies and publishes all of these versions, or none of them.</p>
 </details>
+
+<details class="api-member" id="pending-commit-author-id" data-pagefind-weight="1">
+<summary><code>authorId</code> <span class="api-member-summary">Authenticated ID of the person who made the change, from SyncCoordinatorOptions.authorId.</span></summary>
+
+```ts generated
+readonly authorId?: string;
+```
+
+<p class="api-member-doc">Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.</p>
+</details>
 </div>
 
 ## Declaration
@@ -77,6 +89,7 @@ export interface PendingCommit {
   clientMutationId: string;
   readonly operations: readonly DocumentOp[];
   readonly versionOperationCounts?: readonly number[];
+  readonly authorId?: string;
 }
 ```
 

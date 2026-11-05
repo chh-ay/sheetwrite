@@ -102,6 +102,7 @@ export interface WorkbookSnapshot {
 <p class="api-consumers-label">Public exports naming <code>WorkbookSnapshot</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/commit-journal/"><code>CommitJournal</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/document-validation-result/"><code>DocumentValidationResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/from-xlsx-workbook/"><code>fromXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/from-xlsx-workbook-file/"><code>fromXlsxWorkbookFile</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -113,7 +114,6 @@ export interface WorkbookSnapshot {
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/sync-coordinator-event/"><code>SyncCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 9 more</li>
+<li class="api-consumer-more">and 10 more</li>
 </ul>
 </div>
