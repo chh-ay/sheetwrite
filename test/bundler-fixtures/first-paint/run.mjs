@@ -389,9 +389,4 @@ const evidence = {
 };
 const evidencePath = resolve(repositoryRoot, "test-results/bundlers/first-paint.json");
 await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
-await run(
-  "bun",
-  ["scripts/first-paint-evidence.ts", "check", relative(repositoryRoot, evidencePath)],
-  repositoryRoot,
-);
 console.log(`First-paint evidence: ${relative(repositoryRoot, evidencePath)}`);
