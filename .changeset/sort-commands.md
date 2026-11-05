@@ -13,6 +13,8 @@ Sort commands rewrite the cells, as Excel does; the view sort stays as an option
 
 Breaking changes:
 
-- `grid.sortBy(col, ascending)` now sorts the cells in place. For the earlier display-only sort, use `grid.setViewSort([{ col, ascending }])`.
-- Removed `store.sortBy` and `store.sortByMulti`; use `store.setViewSort(sheet, keys)`.
-- Removed `grid.setSort` and `grid.sortByMulti`; use `grid.setViewSort(keys)`.
+- Changed: `grid.sortBy(col, ascending)` now sorts the cells in place; for the display-only sort, use `grid.setViewSort([{ col, ascending }])` instead.
+- Removed: `store.sortBy(sheet, col, ascending)`; use `store.setViewSort(sheet, [{ col, ascending }])` instead.
+- Removed: `store.sortByMulti(sheet, keys)`; use `store.setViewSort(sheet, keys)` instead.
+- Removed: `grid.setSort(keys)`; use `grid.setViewSort(keys)` instead.
+- Removed: `grid.sortByMulti(keys)`; use `grid.setViewSort(keys)` instead.
