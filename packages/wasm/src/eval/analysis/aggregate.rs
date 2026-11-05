@@ -80,7 +80,7 @@ pub(crate) fn evaluate_ast(
         store,
         sheet,
         pass,
-        depth: depth + 1,
+        depth,
     };
     match aggregate(args, &mut context) {
         Ok(value) => value,
@@ -92,12 +92,14 @@ struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
     pass: &'a mut EvalPass<'p>,
+    /// Depth of the AGGREGATE call; its arguments evaluate one level deeper.
     depth: usize,
 }
 
 impl Context<'_, '_> {
     fn scalar(&mut self, ast: &Ast) -> Value {
-        self.store.eval_ast(ast, self.sheet, self.pass, self.depth)
+        self.store
+            .eval_ast(ast, self.sheet, self.pass, self.depth + 1)
     }
 
     fn code(&mut self, ast: Option<&Ast>, default: i64) -> Result<i64, FormulaError> {
@@ -109,7 +111,7 @@ impl Context<'_, '_> {
 
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
         self.store
-            .eval_matrix_arg(ast, self.sheet, self.pass, self.depth)
+            .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
     }
 }
 
