@@ -536,11 +536,22 @@ export class SheetwriteStore implements Store {
     return this.engine.aggregate(sheet, col, op);
   }
 
-  sortBy(sheet: SheetId, col: number, ascending: boolean): ApplyTransactionResult {
-    return this.sortByMulti(sheet, [{ col, ascending }]);
-  }
-
-  sortByMulti(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
+  /**
+   * Sort the displayed rows of a sheet by `keys` (first key primary; stable)
+   * without moving any cell; an empty list clears the view sort. The keys
+   * are saved in the sheet and export to XLSX as `sortState`. To move the
+   * cells, as Excel's Sort does, use `sortRange`.
+   *
+   * @example
+   * ```ts
+   * import type { SheetwriteStore } from "@sheetwrite/core";
+   *
+   * function showLargestFirst(store: SheetwriteStore) {
+   *   return store.setViewSort("s1", [{ col: 2, ascending: false }]);
+   * }
+   * ```
+   */
+  setViewSort(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
     if (keys.length > 0) this.requireCompleteQuery(sheet);
     return this.applyTransaction(
       {

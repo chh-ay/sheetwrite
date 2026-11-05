@@ -32,6 +32,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-columns-fully-loaded"><code>columnsFullyLoaded</code></a>
 <a href="#cell-store-commit-sources"><code>commitSources</code></a>
 <a href="#cell-store-compact-string-storage"><code>compactStringStorage</code></a>
+<a href="#cell-store-current-region"><code>currentRegion</code></a>
 <a href="#cell-store-data-edge"><code>dataEdge</code></a>
 <a href="#cell-store-data-edge-ordered"><code>dataEdgeOrdered</code></a>
 <a href="#cell-store-distinct-values"><code>distinctValues</code></a>
@@ -114,7 +115,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>100</span>
+## Members <span class="api-count" data-pagefind-ignore>101</span>
 
 <div class="api-member-list">
 
@@ -317,6 +318,19 @@ compactStringStorage: () => void;
 
 <p class="api-member-doc">Reclaim unreachable text and release growth slack at a transaction barrier.
 Raw pool IDs must be discarded when `stringPoolEpoch` changes.</p>
+</details>
+
+<details class="api-member" id="cell-store-current-region" data-pagefind-weight="1">
+<summary><code>currentRegion</code> <span class="api-member-summary">Excel's current region around a cell, as [top, left, bottom, right]: the smallest rectangle that holds the cell and is bounded by empty rows and columns (cells that touch it at a corner count).</span></summary>
+
+```ts generated
+currentRegion: (sheet: number, row: number, col: number) => Uint32Array;
+```
+
+<p class="api-member-doc">Excel's current region around a cell, as `[top, left, bottom, right]`:
+the smallest rectangle that holds the cell and is bounded by empty rows
+and columns (cells that touch it at a corner count). The quick sort
+sorts this region. Empty for a cell outside the sheet.</p>
 </details>
 
 <details class="api-member" id="cell-store-data-edge" data-pagefind-weight="1">
@@ -1277,6 +1291,7 @@ class CellStore {
   ) => boolean;
   commitSources: () => void;
   compactStringStorage: () => void;
+  currentRegion: (sheet: number, row: number, col: number) => Uint32Array;
   dataEdge: (
     sheet: number,
     row: number,

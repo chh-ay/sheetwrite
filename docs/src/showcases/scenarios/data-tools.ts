@@ -367,7 +367,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       if (!grid) return;
       switch (action) {
         case "sort":
-          grid.sortByMulti([
+          grid.setViewSort([
             { col: COLUMN.region, ascending: true },
             { col: COLUMN.units, ascending: false },
           ]);

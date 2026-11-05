@@ -90,7 +90,7 @@ describe("SUBTOTAL over hidden rows", () => {
       expect(manual?.length).toBe(2_000);
       expect(filtered?.length).toBe(0);
 
-      store.sortBy("s1", 1, false);
+      store.setViewSort("s1", [{ col: 1, ascending: false }]);
       expect(setHiddenRows).toHaveBeenCalledTimes(1);
       // Rows 1, 3 and 5 are visible; 0.5 + 20.5 + 40.5 are hidden.
       expect(subtotals(store)).toEqual([153, 91.5]);

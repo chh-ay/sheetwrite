@@ -4160,6 +4160,32 @@
         }
       ],
       "returns": "scalar"
+    },
+    "convert": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fromUnit",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "toUnit",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5552,7 +5578,8 @@
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "IMSUM and IMPRODUCT skip blank cells in a range.",
-        "BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8."
+        "BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8.",
+        "CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits."
       ]
     }
   },
@@ -5945,7 +5972,8 @@
         "paths": [
           "packages/wasm/src/eval/analysis/engineering.rs",
           "packages/wasm/src/eval/analysis/complex.rs",
-          "packages/wasm/src/eval/analysis/bessel.rs"
+          "packages/wasm/src/eval/analysis/bessel.rs",
+          "packages/wasm/src/eval/analysis/units.rs"
         ]
       },
       "assist": {
@@ -10785,6 +10813,18 @@
       "family": "engineering",
       "contractStatus": "supported",
       "signature": "bessel",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CONVERT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "convert",
       "semantics": "analysis-engineering",
       "dialects": "analysis-engineering",
       "implementation": "analysis-engineering",

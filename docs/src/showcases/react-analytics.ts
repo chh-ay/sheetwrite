@@ -232,7 +232,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     (grid: Grid): void => {
       marketFilter(grid, market);
       segmentFilter(grid, segment);
-      if (ranked) grid.sortBy(ANALYTICS_COLUMNS.arr, false);
+      if (ranked) grid.setViewSort([{ col: ANALYTICS_COLUMNS.arr, ascending: false }]);
       if (query.trim().length > 0) {
         const result = grid.search(query.trim());
         setMatches(result);
@@ -405,7 +405,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   const rankByArr = useCallback((): void => {
     const grid = gridRef.current;
     if (!grid) return;
-    grid.sortBy(ANALYTICS_COLUMNS.arr, false);
+    grid.setViewSort([{ col: ANALYTICS_COLUMNS.arr, ascending: false }]);
     setRanked(true);
     refreshKpis(grid, market);
     record("Ranked by ARR, high to low");

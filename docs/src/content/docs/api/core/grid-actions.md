@@ -37,6 +37,8 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-merge"><code>merge</code></a>
 <a href="#grid-actions-unmerge"><code>unmerge</code></a>
 <a href="#grid-actions-sort"><code>sort</code></a>
+<a href="#grid-actions-sort-view"><code>sortView</code></a>
+<a href="#grid-actions-custom-sort"><code>customSort</code></a>
 <a href="#grid-actions-insert-row-above"><code>insertRowAbove</code></a>
 <a href="#grid-actions-insert-row-below"><code>insertRowBelow</code></a>
 <a href="#grid-actions-delete-row"><code>deleteRow</code></a>
@@ -65,7 +67,7 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-redo"><code>redo</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>51</span>
+## Members <span class="api-count" data-pagefind-ignore>53</span>
 
 <div class="api-member-list">
 
@@ -293,10 +295,28 @@ unmerge(): void;
 </details>
 
 <details class="api-member" id="grid-actions-sort" data-pagefind-weight="1">
-<summary><code>sort</code></summary>
+<summary><code>sort</code> <span class="api-member-summary">Quick sort of the cells around the focus cell by its column (Grid.sortBy).</span></summary>
 
 ```ts generated
 sort(ascending: boolean): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-actions-sort-view" data-pagefind-weight="1">
+<summary><code>sortView</code> <span class="api-member-summary">Sort the displayed rows by the focus column without moving cells.</span></summary>
+
+```ts generated
+sortView(ascending: boolean): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-actions-custom-sort" data-pagefind-weight="1">
+<summary><code>customSort</code> <span class="api-member-summary">Open the Sort panel: several keys, a header row, and a view-only option.</span></summary>
+
+```ts generated
+customSort(): void;
 ```
 
 </details>
@@ -582,6 +602,8 @@ export interface GridActions {
   merge(): void;
   unmerge(): void;
   sort(ascending: boolean): void;
+  sortView(ascending: boolean): void;
+  customSort(): void;
   insertRowAbove(): void;
   insertRowBelow(): void;
   deleteRow(): void;

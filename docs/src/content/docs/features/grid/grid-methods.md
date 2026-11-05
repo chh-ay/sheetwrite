@@ -8,7 +8,7 @@ description: "The imperative Grid handle that createGrid returns, grouped by tas
 ```ts prelude="core" partial="requires an initialized grid with the item and cost rows described below" title="Drive the grid from code"
 const sheet = grid.getActiveSheet();
 grid.setSelection({ kind: "cell", addr: { sheet, row: 0, col: 1 } });
-grid.sortBy(1, false);  // display-only sort, largest first
+grid.setViewSort([{ col: 1, ascending: false }]); // display largest first
 grid.setFrozen(1);      // pin the first view row
 grid.setZoom(1.25);
 console.log(grid.getZoom()); // 1.25
@@ -34,7 +34,7 @@ This API excerpt needs an initialized grid with a text item column and a numeric
 ```ts prelude="core" partial="requires surrounding host state" title="Drive the grid from code"
 const sheet = grid.getActiveSheet();
 grid.setSelection({ kind: "cell", addr: { sheet, row: 0, col: 1 } });
-grid.sortBy(1, false);  // display-only sort, largest first
+grid.setViewSort([{ col: 1, ascending: false }]); // display largest first
 grid.setFrozen(1);      // pin the first view row
 grid.setZoom(1.25);
 console.log(grid.getZoom()); // 1.25
@@ -61,7 +61,7 @@ interface Grid {
   defineCellRenderer(name: string, renderer: CellRenderer): void;
   aggregate(col: number, op: AggregateOp): number;
   sortBy(col: number, ascending?: boolean): void;
-  sortByMulti(keys: readonly SortKey[]): void;
+  setViewSort(keys: readonly SortKey[]): void;
   filterBy(col: number, needle: string): void;
   setColumnFilter(col: number, filter: ColumnFilter | null): void;
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
@@ -158,7 +158,8 @@ interface Grid {
 | Method | Purpose |
 | --- | --- |
 | [`aggregate(col, op)`](/docs/api/core/grid/#grid-aggregate) | Column aggregate (returns a number); see [Data operations](/docs/features/data/data-operations/#aggregate). |
-| [`sortBy(col, ascending?)`](/docs/api/core/grid/#grid-sort-by) / `sortByMulti(keys)` | Non-mutating display sorts; see [Data operations](/docs/features/data/data-operations/#display-views). |
+| [`sortBy(col, ascending?)`](/docs/api/core/grid/#grid-sort-by) / `sortRange(range, keys, options?)` | Sort cells in place, as Excel does; see [Data operations](/docs/features/data/data-operations/#sort-cells-in-place). |
+| `setViewSort(keys)` | Display-only sort; see [Data operations](/docs/features/data/data-operations/#display-views). |
 | [`filterBy(col, needle)`](/docs/api/core/grid/#grid-filter-by) / `setColumnFilter(col, filter)` / `getColumnFilters()` | Column filters that compose with sort, hidden rows, and row groups. `setColumnFilter(col, null)` removes one. |
 | [`distinctValues(col, limit?)`](/docs/api/core/grid/#grid-distinct-values) | First-seen distinct values for building filter menus. |
 | [`hideRows(rows)`](/docs/api/core/grid/#grid-hide-rows) / `showRows(rows?)` / `hiddenRows()` | Explicit row visibility separate from sort/filter state. |

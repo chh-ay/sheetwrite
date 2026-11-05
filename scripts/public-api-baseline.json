@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "ebe202f6fde1b66687487d5a46071f584e987ca51e9d8c1293c716c6b92bd298",
+  "sha256": "0467224793590cac22b5ce74928cfa56d798f917d2e7658d2ba04bb7833c38a5",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -187,6 +187,11 @@
         "PivotSource",
         "PivotSourceField",
         "PivotValueField",
+        "PowerQueryCodec",
+        "PowerQueryExport",
+        "PowerQueryImport",
+        "PowerQueryLoss",
+        "PowerQueryUnsupported",
         "PresenceActor",
         "PresenceCoordinator",
         "PresenceCoordinatorEvent",
@@ -212,6 +217,13 @@
         "ResolvedHyperlinkTarget",
         "ResourceOwnerBytes",
         "RestoreProvenance",
+        "RevisionAdapter",
+        "RevisionCoordinator",
+        "RevisionCoordinatorEvent",
+        "RevisionCoordinatorOptions",
+        "RevisionRestoreRequest",
+        "RevisionRestoreResponse",
+        "RevisionSummary",
         "RibbonConfig",
         "RibbonMode",
         "RowBridge",
@@ -625,6 +637,7 @@
         "QuerySource",
         "QueryStep",
         "createQuerySession",
+        "loadPowerQueryCodec",
         "loadQueryEngine"
       ]
     },

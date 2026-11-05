@@ -253,6 +253,14 @@
       "column": 3,
       "row": 6
     },
+    "sortCustom": {
+      "column": 4,
+      "row": 6
+    },
+    "sortView": {
+      "column": 5,
+      "row": 6
+    },
     "chart": {
       "column": 0,
       "row": 7

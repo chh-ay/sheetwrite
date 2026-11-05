@@ -71,6 +71,16 @@ if (saved.length !== 1) throw new Error("The relationship was not saved");
 store.dispose();
 ```
 
+## Data model panel
+
+In the ribbon, **Data › Data Tools › Data Model** and **Relationships** open the data model panel. Data Model appears when the workbook has a table, and Relationships when it has two. The panel loads on first use.
+
+- **Tables** lists each table with its column and data-row counts.
+- **Relationships** lists each relationship as `Data[Key] → Lookup[Key]` with its key status, and **Edit** and **Delete** buttons.
+- The form picks the data table and its key column (the many side), and the lookup table and its key column (the one side).
+
+Each save and delete is one undo step. As Excel's Create Relationship dialog does, the panel does not keep a relationship whose lookup keys repeat or whose key types differ; it shows the reason instead. The API keeps such a relationship, because cells can change later.
+
 ## Rules
 
 A relationship refers to tables and columns by their stable IDs, so renames, column moves and row or column edits keep it. A new relationship is refused when:
@@ -104,3 +114,37 @@ The full engine checks the key values each time `getRelationshipStatus` is calle
 | `typeMismatch` | The key at `row` on side `from` or `to` is a boolean, an error on the one side, or a number among text keys (or text among numbers). |
 | `duplicateKey` | Two one-side rows hold equal keys. `rows` are their data-row offsets. |
 | `unavailable` | The default engine checks no keys, or no relationship has this ID. |
+
+## Pivots across related tables
+
+A model source names a base table (the many side) and the fields to read. Each field is a table and column ID. A field's table must be the base table or a table the base reaches through many-to-one relationships. Field `i` in `rows`, `columns`, `values` and `filters` is `model.fields[i]`.
+
+```ts prelude="core" partial="requires a full-engine grid with the tables and relationship above" title="Amount by customer region"
+grid.setPivot({
+  id: "by-region",
+  name: "By region",
+  source: {
+    model: {
+      table: "orders",
+      fields: [
+        { table: "customers", column: "region" },
+        { table: "orders", column: "amount" },
+      ],
+    },
+  },
+  anchor: { row: 0, col: 0 },
+  rows: [0],
+  columns: [],
+  values: [{ field: 1, aggregation: "SUM" }],
+});
+```
+
+The result equals a pivot over the table you get by looking up each related column for every base row:
+
+| Case | Related value |
+| --- | --- |
+| The key matches one row | That row's cell |
+| The key matches no row, or is blank | Blank |
+| The many-side key is an error | That error |
+
+A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.

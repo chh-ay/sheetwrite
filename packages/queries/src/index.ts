@@ -1,4 +1,4 @@
-import type { Grid } from "@sheetwrite/core";
+import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
 
 import type { SyncInitInput } from "../pkg/sheetwrite_queries.js";
 import { connect } from "./connect.js";
@@ -79,7 +79,7 @@ export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise
  *
  * @example
  * ```ts
- * import type { Grid } from "@sheetwrite/core";
+ * import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
  * import { createQuerySession } from "@sheetwrite/queries";
  *
  * async function refreshSales(grid: Grid) {
@@ -99,4 +99,31 @@ export async function createQuerySession(
   options: QuerySessionOptions & QueryEngineOptions,
 ): Promise<QuerySession> {
   return connect(grid, options, await loadQueryEngine(options));
+}
+
+/**
+ * Loads the Power Query codec for XLSX import and export. It translates saved
+ * queries to M and reads imported M as text; it never evaluates M.
+ *
+ * @example
+ * ```ts
+ * import type { WorkbookSnapshot } from "@sheetwrite/core";
+ * import { loadPowerQueryCodec } from "@sheetwrite/queries";
+ *
+ * async function exportedM(snapshot: WorkbookSnapshot) {
+ *   const codec = await loadPowerQueryCodec();
+ *   return codec.encode(snapshot.workbook.queries ?? []).section;
+ * }
+ * ```
+ */
+export async function loadPowerQueryCodec(
+  options: QueryEngineOptions = {},
+): Promise<PowerQueryCodec> {
+  const [wasm, { createPowerQueryCodec }] = await Promise.all([
+    import("../pkg/sheetwrite_queries.js"),
+    import("./power-query.js"),
+  ]);
+  await wasm.default(options.wasm === undefined ? undefined : { module_or_path: options.wasm });
+
+  return createPowerQueryCodec(wasm);
 }
