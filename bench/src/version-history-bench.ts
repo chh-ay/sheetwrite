@@ -118,7 +118,6 @@ async function compressedBundle(entrypoint: string) {
     target: "browser",
     minify: true,
     external: ["@sheetwrite/wasm"],
-    write: false,
   });
   if (!result.success) throw new AggregateError(result.logs, "History bundle probe failed");
   const output = result.outputs[0];
