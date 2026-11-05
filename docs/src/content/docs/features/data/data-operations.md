@@ -144,6 +144,35 @@ console.log(grid.getZoom());
 scrolls. `setZoom(z)` clamps to `0.5`-`2` and scales painted row/column geometry
 and fonts; workbook widths/heights remain in base units.
 
+## Headless columnar queries
+
+Use `@sheetwrite/queries` to parse host-provided CSV or JSON and run saved step
+lists in Rust. It is separate from worksheet display views and does not edit a
+workbook. Importing the package loads no query WASM; the explicit load call does.
+
+```ts compile title="Shape host-provided data in Rust"
+import { loadQueryEngine } from "@sheetwrite/queries";
+
+const engine = await loadQueryEngine();
+const source = engine.parse(
+  new TextEncoder().encode('[{"Total":120},{"Total":75}]'),
+  { format: "json", columns: [{ id: "total", name: "Total", type: "number" }] },
+);
+
+const output = engine.execute(source, [
+  { kind: "filter", predicate: { kind: "compare", column: "total", op: "gte", value: 100 } },
+]);
+```
+
+The engine supports filter, select, rename, change type, join, group, and
+unpivot. Joins use sorted flat row indexes; grouping folds adjacent key runs.
+Typed output columns keep null and error bitsets, with separate sparse error
+codes. No step runs on JavaScript row objects.
+
+The host owns source fetching and credentials. These entry points accept bytes
+or typed batches; they never fetch a URL. See the
+[query package reference](/docs/api/queries/) for the full interface.
+
 ## See also
 
 - [Interaction](/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.

@@ -96,6 +96,9 @@ jobs:
       - name: Rust dependency audit
         working-directory: packages/wasm
         run: cargo audit
+      - name: Query dependency audit
+        working-directory: packages/queries/engine
+        run: cargo audit
       - name: Rust lint
         run: bun run lint:rust
       - name: Lint
@@ -189,6 +192,7 @@ jobs:
           bun run test:unit
           cargo test --manifest-path packages/wasm/Cargo.toml
           cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
+          cargo test --manifest-path packages/queries/engine/Cargo.toml
       - name: Type checks, public API and committed generated docs
         run: |
           bun run typecheck
