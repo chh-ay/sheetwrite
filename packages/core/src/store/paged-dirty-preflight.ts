@@ -15,7 +15,7 @@ import {
   normalizedRange,
   patchSheetId,
 } from "./ranges.js";
-import { SheetRegistry } from "./sheet-registry.js";
+import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 export interface PagedDirtyPreflightStats {

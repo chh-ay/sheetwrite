@@ -5,7 +5,7 @@ import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
-import { SheetRegistry } from "./sheet-registry.js";
+import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import { KIND_NUMBER, KIND_STRING, KIND_BOOL } from "./wire-tags.js";
 

@@ -5,7 +5,7 @@ import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell
 import type { SheetId } from "../types/coordinates.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import { utf8ByteLength } from "../utf8.js";
-import { SheetRegistry } from "./sheet-registry.js";
+import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import {
   KIND_BOOL,
