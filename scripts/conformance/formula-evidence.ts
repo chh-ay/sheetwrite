@@ -190,6 +190,7 @@ export const AUTHORED_ASSERTIONS: Readonly<Record<string, readonly [string, stri
   ISREF: ["ISREF(A1)", "NOT(ISREF(1))"],
   SHEET: ["SHEET()=1", "SHEET(A1)=1"],
   SHEETS: ["SHEETS()>=1", "SHEETS(A1)=1"],
+  INFO: ['INFO("recalc")="Automatic"', 'INFO("numfile")>=1'],
 };
 
 export function authoredAssertions(name: string): readonly [string, string] {

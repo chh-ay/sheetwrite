@@ -3977,6 +3977,18 @@
         }
       ],
       "returns": "scalar"
+    },
+    "info-type": {
+      "arguments": [
+        {
+          "name": "typeText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5316,6 +5328,14 @@
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
       ]
+    },
+    "excel-info": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "INFO returns #N/A for \"directory\", \"origin\", \"osversion\", \"release\" and \"system\", which describe the desktop program and its window. \"numfile\" is the number of sheets and \"recalc\" is \"Automatic\"."
+      ]
     }
   },
   "implementationProfiles": {
@@ -5783,24 +5803,6 @@
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",
-      "implementation": {
-        "status": "missing",
-        "paths": []
-      },
-      "evidence": {
-        "status": "registration-tested",
-        "paths": ["scripts/formula-contract.test.ts"]
-      },
-      "version": 1
-    },
-    {
-      "id": "host-environment",
-      "title": "Host environment functions",
-      "status": "unsupported",
-      "scope": "INFO reports the operating system, folder and memory of the program that runs Excel. Formula evaluation does not read the host environment, so the result would not be the same in every browser and server.",
-      "examples": ["INFO"],
-      "source": "microsoft-excel-functions",
-      "section": "Information functions",
       "implementation": {
         "status": "missing",
         "paths": []
@@ -9997,6 +9999,18 @@
       "signature": "sheets-reference",
       "semantics": "information",
       "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "INFO",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "info-type",
+      "semantics": "information",
+      "dialects": "excel-info",
       "implementation": "implemented-reference-information",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1

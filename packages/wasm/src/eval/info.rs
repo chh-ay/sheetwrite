@@ -42,6 +42,10 @@ impl CellStore {
                 [value] => Ok(Value::Bool(self.is_reference(value, sheet, pass, depth))),
                 _ => Err(FormulaError::Value),
             },
+            Func::Info => match args {
+                [type_text] => self.environment_info(type_text, sheet, pass, depth),
+                _ => Err(FormulaError::Value),
+            },
             Func::Sheet => self.sheet_number(args, sheet, pass, depth),
             Func::Sheets => self.sheet_count(args, sheet, pass, depth),
             _ => unreachable!("eval_info_func handles only the information functions"),
@@ -300,6 +304,35 @@ impl CellStore {
         };
 
         Ok(Value::number(count as f64))
+    }
+
+    /// INFO(type_text), for the types that do not depend on the program
+    /// that runs the workbook: "numfile" is the number of sheets and
+    /// "recalc" is "Automatic", since the engine always recalculates.
+    /// "memavail", "memused" and "totmem" are `#N/A`, as in current Excel.
+    /// "directory", "origin", "osversion", "release" and "system" describe
+    /// the desktop program and its window, so they are `#N/A` here. Other
+    /// text is `#VALUE!`.
+    fn environment_info(
+        &self,
+        type_text: &Ast,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        let kind = match self.eval_ast(type_text, sheet, pass, depth + 1) {
+            Value::Error(error) => return Err(error),
+            Value::Text(text) => text.to_ascii_lowercase(),
+            _ => return Err(FormulaError::Value),
+        };
+
+        match kind.as_str() {
+            "numfile" => Ok(Value::number(self.tab_order().len() as f64)),
+            "recalc" => Ok(Value::text("Automatic")),
+            "directory" | "origin" | "osversion" | "release" | "system" | "memavail"
+            | "memused" | "totmem" => Err(FormulaError::Na),
+            _ => Err(FormulaError::Value),
+        }
     }
 }
 

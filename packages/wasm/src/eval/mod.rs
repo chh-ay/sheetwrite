@@ -1843,6 +1843,7 @@ impl CellStore {
             | Func::Hyperlink
             | Func::Cell
             | Func::ErrorType
+            | Func::Info
             | Func::IsNonText
             | Func::IsRef
             | Func::Sheet

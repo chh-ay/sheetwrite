@@ -218,6 +218,7 @@ pub enum Func {
     Indirect,
     Areas,
     ErrorType,
+    Info,
     IsEven,
     IsNonText,
     IsOdd,
@@ -370,6 +371,7 @@ define_function_registry! {
         Find => "FIND";
         Hour => "HOUR";
         IfNa => "IFNA";
+        Info => "INFO";
         Ipmt => "IPMT";
         IsNa => "ISNA";
         Left => "LEFT";

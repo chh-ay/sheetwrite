@@ -10,7 +10,7 @@ const SCHEMA_PATH = "test/conformance/formula-contract.schema.json";
 const ANALYSIS_PATH = "packages/wasm/src/eval/analysis";
 const REQUIRED_TARGET_HASH = "3efef696839478b92b59a004537f9ede7fa803f9749042bb830b664086495e80";
 const UNSUPPORTED_CATEGORY_HASH =
-  "a8d998aa08375782b66453e3492bd8a0322dd321d1e887199c67a2459091bb99";
+  "84d65b931bb56e52b65e22bc98ec22caa51c309e4481e5d87acd0740bc58c29c";
 const FORMULA_NAME = /^[A-Z][A-Z0-9.]*$/;
 const _ID = /^[a-z][a-z0-9-]*$/;
 

@@ -129,6 +129,11 @@ fn information_functions_follow_the_microsoft_examples() {
         ("=SHEETS()", "2"),
         ("=SHEETS(Data!A1)", "1"),
         ("=SHEETS(Report:Data!A1)", "2"),
+        ("=INFO(\"numfile\")", "2"),
+        ("=INFO(\"RECALC\")", "Automatic"),
+        ("=INFO(\"osversion\")", "#N/A"),
+        ("=INFO(\"memavail\")", "#N/A"),
+        ("=INFO(\"colour\")", "#VALUE!"),
     ]);
 }
 
