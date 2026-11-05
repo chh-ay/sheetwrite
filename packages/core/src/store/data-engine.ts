@@ -73,7 +73,12 @@ import {
   type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { restoreBlockFacts } from "../restore-block.js";
-import { type PermuteRowsOperation, ROW_ORDER_ENCODING } from "../row-order.js";
+import {
+  decodeRowOrder,
+  encodeRowOrder,
+  type PermuteRowsOperation,
+  ROW_ORDER_ENCODING,
+} from "../row-order.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -2041,16 +2046,16 @@ export class StoreDataEngine {
   permuteRowsLosses(patch: PermuteRowsOperation): CellAddress[] {
     const bounds = normalizedRange(patch.range);
     const handle = this.handles.get(bounds.sheet);
-    if (handle === undefined) return [];
+    const order = decodeRowOrder(patch);
+    if (handle === undefined || !order) return [];
 
     const cols = bounds.end.col - bounds.start.col + 1;
     const offsets = this.wasm.permuteRowsLosses(
       handle,
       bounds.start.row,
       bounds.start.col,
-      bounds.end.row - bounds.start.row + 1,
       cols,
-      patch.order,
+      order,
     );
     return Array.from(offsets, (offset) => ({
       sheet: bounds.sheet,
@@ -2061,16 +2066,16 @@ export class StoreDataEngine {
 
   /** The operation that moves every row of `patch` back, or `null` for an invalid order. */
   invertedPermutation(patch: PermuteRowsOperation): PermuteRowsOperation | null {
-    const { range } = patch;
-    const rows = Math.abs(range.end.row - range.start.row) + 1;
-    const order = this.wasm.invertRowOrder(patch.order, rows);
-    if (order === undefined) return null;
+    const order = decodeRowOrder(patch);
+    const inverse = order ? this.wasm.rowOrderTargets(order) : null;
+    if (!order || !inverse || inverse.length !== order.length) return null;
 
+    const { range } = patch;
     return {
       op: "permuteRows",
       range: { ...range, start: { ...range.start }, end: { ...range.end } },
       encoding: ROW_ORDER_ENCODING,
-      order,
+      order: encodeRowOrder(inverse),
     };
   }
 
@@ -2105,16 +2110,19 @@ export class StoreDataEngine {
     const starts = this.visibleRecordStarts(bounds.sheet, dataStart, bounds.end.row, height);
     if (starts.length < 2) return { kind: "unchanged" };
 
-    const order = this.wasm.sortRangeOrder(
+    const sorted = this.wasm.sortRowsMulti(
       this.handleOf(bounds.sheet),
-      dataStart,
-      bounds.end.row - dataStart + 1,
-      height,
       Uint32Array.from(keys, (key) => key.col),
       Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0)),
       starts,
     );
-    if (order === undefined) return { kind: "unchanged" };
+    const order = new Uint32Array(bounds.end.row - dataStart + 1);
+    for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
+    for (const [position, target] of starts.entries()) {
+      const source = sorted[position] ?? target;
+      for (let row = 0; row < height; row++)
+        order[target - dataStart + row] = source - dataStart + row;
+    }
 
     return {
       kind: "move",
@@ -2126,7 +2134,7 @@ export class StoreDataEngine {
           end: { row: bounds.end.row, col: bounds.end.col },
         },
         encoding: ROW_ORDER_ENCODING,
-        order,
+        order: encodeRowOrder(order),
       },
     };
   }
@@ -3831,8 +3839,9 @@ export class StoreDataEngine {
     const bounds = normalizedRange(patch.range);
     const sheet = this.sheetMeta(bounds.sheet);
     const rows = bounds.end.row - bounds.start.row + 1;
+    const order = decodeRowOrder(patch);
     if (
-      patch.encoding !== ROW_ORDER_ENCODING ||
+      !order ||
       bounds.start.row < 0 ||
       bounds.start.col < 0 ||
       bounds.end.row >= sheet.rowCount ||
@@ -3841,8 +3850,8 @@ export class StoreDataEngine {
       return false;
     }
 
-    const targets = this.wasm.rowOrderTargets(patch.order, rows);
-    if (!targets) return false;
+    const targets = this.wasm.rowOrderTargets(order);
+    if (targets.length !== rows) return false;
 
     const move = { bounds, targets };
     const merges = permutedMerges(sheet.merges ?? [], move);
@@ -3858,9 +3867,8 @@ export class StoreDataEngine {
       this.handleOf(bounds.sheet),
       bounds.start.row,
       bounds.start.col,
-      rows,
       cols,
-      patch.order,
+      order,
     );
     if (status !== 0) return false;
 

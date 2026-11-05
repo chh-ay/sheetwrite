@@ -2,7 +2,6 @@
 //! follow Excel's sort rules and spill ranges move only as a whole.
 
 use crate::permute::PERMUTE_PARTIAL_SPILL;
-use crate::row_order::{decode_row_order, encode_row_order};
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK};
 use crate::types::{KIND_BOOL, KIND_EMPTY};
 
@@ -17,8 +16,6 @@ fn sheet() -> (CellStore, usize) {
     (store, sheet)
 }
 
-/// Move rows by `order`, given as `u32` values; the engine takes the base64
-/// text of a `permuteRows` operation.
 fn permute(
     store: &mut CellStore,
     sheet: usize,
@@ -27,18 +24,11 @@ fn permute(
     cols: usize,
     order: &[u32],
 ) -> u32 {
-    store.permute_rows(
-        sheet,
-        start_row,
-        start_col,
-        order.len(),
-        cols,
-        &encode_row_order(order),
-    )
+    store.permute_rows(sheet, start_row, start_col, cols, order)
 }
 
 fn losses(store: &CellStore, sheet: usize, cols: usize, order: &[u32]) -> Vec<u32> {
-    store.permute_rows_losses(sheet, 0, 0, order.len(), cols, &encode_row_order(order))
+    store.permute_rows_losses(sheet, 0, 0, cols, order)
 }
 
 fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
@@ -171,10 +161,6 @@ fn an_order_that_is_not_a_permutation_changes_nothing() {
     assert_eq!(permute(&mut store, sheet, 0, 0, 1, &[1, 1]), BLOCK_INVALID);
     assert_eq!(permute(&mut store, sheet, 0, 0, 1, &[0, 2]), BLOCK_INVALID);
     assert_eq!(
-        store.permute_rows(sheet, 0, 0, 2, 1, "not base64"),
-        BLOCK_INVALID
-    );
-    assert_eq!(
         permute(&mut store, sheet, ROWS - 1, 0, 1, &[1, 0]),
         BLOCK_INVALID
     );
@@ -238,42 +224,15 @@ fn losses_name_the_formulas_that_the_inverse_cannot_restore() {
     store.set_formula(sheet, 2, 0, "=B3", 0);
 
     assert_eq!(losses(&store, sheet, 2, &[1, 2, 0]), [2]);
-    assert!(store
-        .permute_rows_losses(sheet, 0, 0, 3, 2, "AAAA")
-        .is_empty());
+    assert!(losses(&store, sheet, 2, &[0, 0, 1]).is_empty());
 }
 
 #[test]
-fn the_row_order_text_round_trips_and_rejects_non_permutations() {
-    for order in [vec![0], vec![1, 0], vec![2, 0, 1], vec![3, 1, 0, 2]] {
-        let text = encode_row_order(&order);
-        assert_eq!(decode_row_order(&text, order.len()), Some(order));
-    }
-
-    assert_eq!(decode_row_order(&encode_row_order(&[0, 0]), 2), None);
-    assert_eq!(decode_row_order(&encode_row_order(&[1, 0]), 3), None);
+fn row_order_targets_invert_the_order_and_reject_other_lists() {
     let (store, _) = sheet();
-    assert_eq!(
-        store.invert_row_order_text(&encode_row_order(&[2, 0, 1]), 3),
-        Some(encode_row_order(&[1, 2, 0]))
-    );
-}
 
-#[test]
-fn the_sort_order_moves_records_and_keeps_rows_outside_them() {
-    let (mut store, sheet) = sheet();
-    for (row, value) in [9.0, 3.0, 2.0, 0.0, 1.0, 0.0].into_iter().enumerate() {
-        store.set_number(sheet, row, 0, value, 0);
-    }
-
-    let records = store.sort_range_order(sheet, 1, 4, 2, &[0], &[1], &[1, 3]);
-    assert_eq!(records, Some(encode_row_order(&[2, 3, 0, 1])));
-
-    let hidden_second = store.sort_range_order(sheet, 0, 3, 1, &[0], &[1], &[0, 2]);
-    assert_eq!(hidden_second, Some(encode_row_order(&[2, 1, 0])));
-
-    assert_eq!(
-        store.sort_range_order(sheet, 1, 4, 2, &[0], &[1], &[1, 4]),
-        None
-    );
+    assert_eq!(store.row_order_targets(&[2, 0, 1]), [1, 2, 0]);
+    assert_eq!(store.row_order_targets(&[0]), [0]);
+    assert!(store.row_order_targets(&[0, 0]).is_empty());
+    assert!(store.row_order_targets(&[1, 2]).is_empty());
 }
