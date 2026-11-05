@@ -1,11 +1,18 @@
-import type { CellScalar, DocumentOp, Grid, PivotDefinition, Workbook } from "@sheetwrite/core";
+import {
+  colToA1,
+  type CellScalar,
+  type DocumentOp,
+  type Grid,
+  type PivotDefinition,
+  type Workbook,
+} from "@sheetwrite/core";
 
 import type { LiveScenario } from "../use-live-scenario.js";
 import { createListeners, mountShowcaseShell, requireApplied } from "./showcase-shell.js";
 
 // The functions showcase: one sheet per function family that 0.7.0 adds to
 // the full engine. Each sheet holds inputs in column B and, beside them, the
-// function, its formula (read back with FORMULATEXT) and its live result. A
+// function, its live result and its formula (read back with FORMULATEXT). A
 // reader edits an input and every formula that reads it recalculates.
 
 interface FamilyInput {
@@ -178,8 +185,8 @@ export const FUNCTION_NAMES: readonly string[] = FAMILIES.flatMap((family) =>
 
 const INPUT_COL = 1;
 const NAME_COL = 3;
-const FORMULA_TEXT_COL = 4;
-const RESULT_COL = 5;
+const RESULT_COL = 4;
+const FORMULA_TEXT_COL = 5;
 /** The Lookup sheet's small region table and the pivot GETPIVOTDATA reads. */
 const PIVOT_SOURCE_COL = 7;
 const PIVOT_ANCHOR_COL = 10;
@@ -204,7 +211,7 @@ const formula = (sheet: string, row: number, col: number, src: string): Document
 function familyOperations(family: FunctionFamily): DocumentOp[] {
   const sheet = family.id;
   const operations: DocumentOp[] = [
-    ...["Input", "Value", "", "Function", "Formula", "Result"].map((header, col) =>
+    ...["Input", "Value", "", "Function", "Result", "Formula"].map((header, col) =>
       literal(sheet, 0, col, header),
     ),
   ];
@@ -216,7 +223,7 @@ function familyOperations(family: FunctionFamily): DocumentOp[] {
   });
   family.formulas.forEach((entry, index) => {
     const row = index + 1;
-    const resultCell = `F${row + 1}`;
+    const resultCell = `${colToA1(RESULT_COL)}${row + 1}`;
     operations.push(
       literal(sheet, row, NAME_COL, entry.name),
       formula(sheet, row, FORMULA_TEXT_COL, `=FORMULATEXT(${resultCell})`),
@@ -255,7 +262,7 @@ function lookupPivot(): PivotDefinition {
 }
 
 function functionsWorkbook(): Workbook {
-  const widths = [128, 152, 24, 136, 296, 152, 24, 96, 96, 24, 112, 112];
+  const widths = [128, 152, 24, 136, 152, 296, 24, 96, 96, 24, 112, 112];
   return {
     activeSheet: FAMILIES[0].id,
     sheets: FAMILIES.map((family) => ({

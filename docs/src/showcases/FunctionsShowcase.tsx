@@ -138,7 +138,7 @@ export default function FunctionsShowcase() {
       task={
         <>
           Pick a family of Excel functions that 0.7.0 adds, change an input, and watch each result
-          recalculate. Column E reads every formula back with <code>FORMULATEXT</code>.
+          recalculate. Column F reads every formula back with <code>FORMULATEXT</code>.
         </>
       }
       title="New Excel functions, calculated live"

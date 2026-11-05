@@ -6,7 +6,7 @@ await initSheetwrite(undefined, formulas);
 const grid = createGrid(host, { workbook });
 
 // A formula is a cell value; the result is read back after the recalculation
-const result = { sheet: "engineering", row: 4, col: 5 };
+const result = { sheet: "engineering", row: 4, col: 4 };
 grid.applyTransaction({
   patches: [{ op: "set", addr: result, value: { kind: "formula", src: '=CONVERT(B3,"km","mi")' } }],
 });

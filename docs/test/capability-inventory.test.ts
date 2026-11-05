@@ -47,6 +47,7 @@ const REQUIRED_CAPABILITY_IDS = [
   "data.sort-in-place",
   "data.saved-queries",
   "modeling.data-model",
+  "modeling.dashboards",
   "persistence.version-history",
   "formulas.excel-function-families",
   "data.validation-rules",
