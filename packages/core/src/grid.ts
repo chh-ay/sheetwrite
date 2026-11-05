@@ -51,7 +51,7 @@ import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hy
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
-import { nextSheetName } from "./name-key.js";
+import { sheetNameKey } from "./name-key.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
@@ -1527,6 +1527,13 @@ export class GridImpl implements Grid {
     return this.viewportEl.clientHeight;
   }
 
+  private nextDefaultSheetName(): string {
+    const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
+    let number = this.store.getWorkbook().sheets.length + 1;
+    while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
+    return `Sheet ${number}`;
+  }
+
   private buildTabBar(): void {
     const bar = document.createElement("div");
     bar.className = "sheetwrite-tabbar";
@@ -1543,7 +1550,7 @@ export class GridImpl implements Grid {
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
       onAdd: () => {
-        const result = this.addSheet({ name: nextSheetName(this.store.getWorkbook().sheets) });
+        const result = this.addSheet({ name: this.nextDefaultSheetName() });
         if (result.status === "applied") this.setActiveSheet(result.sheet);
         return result;
       },

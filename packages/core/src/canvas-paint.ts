@@ -7,7 +7,7 @@ import type {
   CellStyle,
   CellVerticalAlign,
 } from "./types/cell.js";
-import type { CellRenderer, PanePaint, RenderLayout, Theme, Viewport } from "./types/render.js";
+import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
 const CELL_PAD = 6;
@@ -467,7 +467,7 @@ export function blitVerticalScroll(
 }
 
 /** Solid lines on the freeze boundaries, drawn over the pane seams (Sheets-style). */
-function paintFreezeDivider(
+export function paintFreezeDivider(
   ctx: Ctx,
   theme: Theme,
   viewport: { width: number; height: number },
@@ -1201,86 +1201,4 @@ export function getMergeIndexResourceStatsForTest(): MergeIndexResourceStats {
 
 export function resetMergeIndexResourceStatsForTest(): void {
   mergeResourceStats = [0, 0];
-}
-
-/**
- * A canvas and the settings it paints with, kept between frames. The
- * main-thread renderer and the paint worker each own one; `lastViewport`
- * and `lastDpr` let the next frame blit the scrolled body.
- */
-export interface PaintTarget<TCanvas extends HTMLCanvasElement | OffscreenCanvas> {
-  canvas: TCanvas | null;
-  ctx: Ctx | null;
-  layout: RenderLayout | null;
-  theme: Theme | null;
-  viewport: Viewport;
-  dpr: number;
-  renderers: ReadonlyMap<string, CellRenderer>;
-  lastViewport: Viewport | null;
-  lastDpr: number;
-}
-
-/**
- * Paint one unfrozen frame, reusing the scrolled body of the last frame where
- * `blitVerticalScroll` can. Returns false when the target is not ready.
- */
-export function paintTargetFrame<TCanvas extends HTMLCanvasElement | OffscreenCanvas>(
-  target: PaintTarget<TCanvas>,
-  view: VisibleWindowView,
-): boolean {
-  const { ctx, canvas, layout, theme, viewport, dpr } = target;
-  if (!ctx || !canvas || !layout || !theme) return false;
-
-  viewport.scrollTop = Math.round(viewport.scrollTop * dpr) / dpr;
-  viewport.scrollLeft = Math.round(viewport.scrollLeft * dpr) / dpr;
-  const damage = blitVerticalScroll(
-    ctx,
-    canvas,
-    theme,
-    target.lastViewport,
-    viewport,
-    dpr,
-    target.lastDpr,
-  );
-  paintFrame(ctx, view, layout, theme, viewport, dpr, target.renderers, damage);
-  target.lastViewport = { ...viewport };
-  target.lastDpr = dpr;
-  return true;
-}
-
-/**
- * Paint one frame as clipped frozen panes, then the freeze divider. Pane
- * boundaries break the single body shift that a blit assumes, so pane
- * frames never blit and the next frame repaints in full.
- */
-export function paintTargetPanes<
-  TCanvas extends HTMLCanvasElement | OffscreenCanvas,
-  TPane extends Omit<PanePaint, "view">,
->(
-  target: PaintTarget<TCanvas>,
-  panes: readonly TPane[],
-  viewOf: (pane: TPane) => VisibleWindowView | undefined,
-  divider: { x: number | null; y: number | null },
-): boolean {
-  const { ctx, canvas, layout, theme, viewport, dpr } = target;
-  if (!ctx || !canvas || !layout || !theme) return false;
-
-  target.lastViewport = null;
-  for (const pane of panes) {
-    const view = viewOf(pane);
-    if (!view) continue;
-
-    const paneViewport: Viewport = {
-      scrollTop: pane.scrollTop,
-      scrollLeft: pane.scrollLeft,
-      width: viewport.width,
-      height: viewport.height,
-      rowTops: pane.rowTops,
-      rowHeights: pane.rowHeights,
-    };
-    paintFrame(ctx, view, layout, theme, paneViewport, dpr, target.renderers, undefined, pane.clip);
-  }
-
-  paintFreezeDivider(ctx, theme, viewport, dpr, divider);
-  return true;
 }

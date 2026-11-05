@@ -2,7 +2,7 @@
 // from the main thread and paints off-thread via the shared `paintFrame`, so a
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
-import { type PaintTarget, paintTargetFrame, paintTargetPanes } from "./canvas-paint.js";
+import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
 import { KIND_NUMBER, KIND_STRING, NO_STRING } from "./store/wire-tags.js";
 import type { CellScalar } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
@@ -98,10 +98,18 @@ const NO_RENDERERS: ReadonlyMap<string, CellRenderer> = new Map();
  */
 const STRING_CACHE_CAP = 65_536;
 
-interface WorkerRuntimeState extends PaintTarget<OffscreenCanvas> {
+interface WorkerRuntimeState {
   stringCache: Map<number, string>;
   stringPoolEpoch: number | undefined;
   valuesScratch: CellScalar[];
+  canvas: OffscreenCanvas | null;
+  ctx: OffscreenCanvasRenderingContext2D | null;
+  layout: RenderLayout | null;
+  theme: Theme | null;
+  viewport: Viewport;
+  dpr: number;
+  lastViewport: Viewport | null;
+  lastDpr: number;
 }
 
 function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): VisibleWindowView {
@@ -183,6 +191,68 @@ function releaseSharedPackedView(msg: SharedPackedMessage): void {
   Atomics.store(new Int32Array(msg.shared.buffer, 0, 2), 0, 0);
 }
 
+function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean {
+  if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
+  const round = Math.round;
+  state.viewport.scrollTop = round(state.viewport.scrollTop * state.dpr) / state.dpr;
+  state.viewport.scrollLeft = round(state.viewport.scrollLeft * state.dpr) / state.dpr;
+  const damage = blitVerticalScroll(
+    state.ctx,
+    state.canvas,
+    state.theme,
+    state.lastViewport,
+    state.viewport,
+    state.dpr,
+    state.lastDpr,
+  );
+  paintFrame(
+    state.ctx,
+    view,
+    state.layout,
+    state.theme,
+    state.viewport,
+    state.dpr,
+    NO_RENDERERS,
+    damage,
+  );
+  state.lastViewport = { ...state.viewport };
+  state.lastDpr = state.dpr;
+  return true;
+}
+
+/** Paint one frame as clipped frozen panes; pane frames never blit. */
+function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean {
+  if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
+  state.lastViewport = null;
+
+  for (const pane of msg.panes) {
+    const view = pane.packed ? unpackPackedView(pane.packed, state) : pane.view;
+    if (!view) continue;
+    const paneViewport: Viewport = {
+      scrollTop: pane.scrollTop,
+      scrollLeft: pane.scrollLeft,
+      width: state.viewport.width,
+      height: state.viewport.height,
+      rowTops: pane.rowTops,
+      rowHeights: pane.rowHeights,
+    };
+    paintFrame(
+      state.ctx,
+      view,
+      state.layout,
+      state.theme,
+      paneViewport,
+      state.dpr,
+      NO_RENDERERS,
+      undefined,
+      pane.clip,
+    );
+  }
+
+  paintFreezeDivider(state.ctx, state.theme, state.viewport, state.dpr, msg.divider);
+  return true;
+}
+
 /** Lifecycle and frame acknowledgements posted back to the sender. */
 export type WorkerAcknowledgement =
   | { type: "ready" }
@@ -207,7 +277,6 @@ export function createWorkerMessageHandler(
     theme: null,
     viewport: { scrollTop: 0, scrollLeft: 0, width: 0, height: 0 },
     dpr: 1,
-    renderers: NO_RENDERERS,
     lastViewport: null,
     lastDpr: 1,
   };
@@ -278,28 +347,21 @@ export function createWorkerMessageHandler(
         break;
 
       case "paint":
-        acknowledgeFrame(paintTargetFrame(state, msg.view));
+        acknowledgeFrame(paintView(state, msg.view));
         break;
 
       case "paintPacked":
-        acknowledgeFrame(paintTargetFrame(state, unpackPackedView(msg, state)));
+        acknowledgeFrame(paintView(state, unpackPackedView(msg, state)));
         break;
 
       case "paintPanes":
-        acknowledgeFrame(
-          paintTargetPanes(
-            state,
-            msg.panes,
-            (pane) => (pane.packed ? unpackPackedView(pane.packed, state) : pane.view),
-            msg.divider,
-          ),
-        );
+        acknowledgeFrame(paintPanesFrame(state, msg));
         break;
 
       case "paintPackedShared": {
         let painted = false;
         try {
-          painted = paintTargetFrame(state, unpackSharedPackedView(msg, state));
+          painted = paintView(state, unpackSharedPackedView(msg, state));
         } finally {
           releaseSharedPackedView(msg);
         }

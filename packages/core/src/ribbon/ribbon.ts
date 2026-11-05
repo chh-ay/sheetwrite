@@ -5,7 +5,6 @@
 // the element; the ribbon never positions itself.
 
 import { iconNode } from "../icons/resolve.js";
-import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-surface.js";
 import { onQueryCommandsChange } from "../query-commands.js";
 import { Scope } from "../scope.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
@@ -475,11 +474,15 @@ export class Ribbon {
     if (index === -1) return;
     // Arrows and Home/End move among the tabs shown now, wrapping at the ends.
     const shown = this.tabs.flatMap((tab, tabIndex) => (tab.hidden ? [] : [tabIndex]));
-    const position = menuKeyTarget(event.key, shown.indexOf(index), shown.length, {
-      steps: HORIZONTAL_STEPS,
-      wrap: true,
-    });
-    const next = position === null ? undefined : shown[position];
+    const position = shown.indexOf(index);
+    const count = shown.length;
+    const targets: Record<string, number | undefined> = {
+      ArrowRight: shown[(position + 1) % count],
+      ArrowLeft: shown[(position + count - 1) % count],
+      Home: shown[0],
+      End: shown[count - 1],
+    };
+    const next = targets[event.key];
     if (next === undefined) return;
     event.preventDefault();
     this.selectTab(next, true);

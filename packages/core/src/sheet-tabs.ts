@@ -1,10 +1,4 @@
-import {
-  HORIZONTAL_STEPS,
-  type MenuKeyOptions,
-  menuKeyTarget,
-  type PopupPlacement,
-  popupPosition,
-} from "./menu-surface.js";
+import { type PopupPlacement, popupPosition } from "./menu-surface.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";
@@ -72,8 +66,6 @@ const TAB_MENU_SELECTOR = ".sheetwrite-tab-menu";
 const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
 /** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
 const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
-/** Arrow keys move along the tab strip and stop at its ends. */
-const TAB_STRIP_KEYS: MenuKeyOptions = { steps: HORIZONTAL_STEPS, wrap: false };
 
 function createTabIcon(pathData: string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -903,7 +895,12 @@ export class SheetTabs {
             `${TAB_MENU_SELECTOR} [role="menuitem"]`,
           ),
         ];
-        const next = menuKeyTarget(event.key, items.indexOf(active), items.length);
+        const current = items.indexOf(active);
+        let next: number | null = null;
+        if (event.key === "ArrowDown") next = current + 1;
+        else if (event.key === "ArrowUp") next = current - 1;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = items.length - 1;
         if (next !== null) {
           event.preventDefault();
           event.stopPropagation();
@@ -987,8 +984,12 @@ export class SheetTabs {
       }
     }
 
-    const next = menuKeyTarget(event.key, current, this.buttons.length, TAB_STRIP_KEYS);
-    if (next === null) return;
+    let next: number;
+    if (event.key === "ArrowLeft") next = Math.max(0, current - 1);
+    else if (event.key === "ArrowRight") next = Math.min(this.buttons.length - 1, current + 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = this.buttons.length - 1;
+    else return;
 
     event.preventDefault();
     const target = this.buttons[next];
