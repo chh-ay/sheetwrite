@@ -434,7 +434,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L117",
+              "source": "src/types/document.ts#L118",
               "jsDocTags": [],
               "documentation": "Workbook calculation options, mirroring Excel's \"Enable iterative calculation\".\nA workbook without this record uses the defaults.",
               "memberDocs": [
@@ -495,7 +495,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L388",
+              "source": "src/types/document.ts#L391",
               "jsDocTags": [],
               "documentation": "Sparse row-major cells bounded by one rectangular block.",
               "memberDocs": []
@@ -682,7 +682,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L240",
+              "source": "src/types/document.ts#L243",
               "jsDocTags": [],
               "documentation": "Serializable plain-text note anchored to a cell.",
               "memberDocs": []
@@ -1200,7 +1200,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L99",
+              "source": "src/types/document.ts#L100",
               "jsDocTags": [],
               "documentation": "One column's filter predicate. All active column filters AND together;\nmatching is against the cell's resolved value (text or number).",
               "memberDocs": []
@@ -1368,7 +1368,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L253",
+              "source": "src/types/document.ts#L256",
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
@@ -1549,7 +1549,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1089",
+              "source": "src/row-bridge.ts#L1094",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1580,6 +1580,23 @@
               "jsDocTags": [],
               "documentation": "Datasource cell value with optional cell-specific styling.",
               "memberDocs": []
+            },
+            {
+              "name": "DataModel",
+              "kind": "interface",
+              "signature": "export interface DataModel { relationships: TableRelationship[]; }",
+              "owners": [
+                "src/types/data-model.ts"
+              ],
+              "source": "src/types/data-model.ts#L32",
+              "jsDocTags": [],
+              "documentation": "The workbook's data model. Every workbook table is a model table.",
+              "memberDocs": [
+                {
+                  "name": "relationships",
+                  "documentation": "Relationships; at most one joins a pair of tables, and they form no cycle."
+                }
+              ]
             },
             {
               "name": "DataSource",
@@ -1728,7 +1745,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L185",
+              "source": "src/types/document.ts#L188",
               "jsDocTags": [],
               "documentation": "Native comparison semantics for numeric, date-serial, and text-length validation.\nInterval operands are inclusive; `notBetween` accepts values outside that interval.",
               "memberDocs": []
@@ -1740,7 +1757,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L204",
+              "source": "src/types/document.ts#L207",
               "jsDocTags": [],
               "documentation": "Serializable condition enforced by a data-validation rule.\n\n`min` and `max` remain inclusive legacy bounds. Use `comparison` when the\noperator itself is significant; comparison and legacy bounds are mutually exclusive.",
               "memberDocs": []
@@ -1752,7 +1769,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L222",
+              "source": "src/types/document.ts#L225",
               "jsDocTags": [],
               "documentation": "One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.",
               "memberDocs": []
@@ -1800,7 +1817,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L62",
+              "source": "src/document-protocol.ts#L63",
               "jsDocTags": [],
               "documentation": "Excel's convergence threshold for a new workbook.",
               "memberDocs": []
@@ -1812,7 +1829,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L59",
+              "source": "src/document-protocol.ts#L60",
               "jsDocTags": [],
               "documentation": "Excel's iteration count for a new workbook.",
               "memberDocs": []
@@ -1824,7 +1841,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L378",
+              "source": "src/document-protocol.ts#L379",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1860,7 +1877,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L113",
+              "source": "src/document-protocol.ts#L114",
               "jsDocTags": [],
               "documentation": "Inclusive defaults for every atomic document transaction accepted by a\nStore or Grid. The count bounds object-heavy validation and dispatch; the\nexact UTF-8 JSON size bounds hostile or accidentally oversized payloads.",
               "memberDocs": []
@@ -2002,11 +2019,11 @@
             {
               "name": "DocumentOp",
               "kind": "type",
-              "signature": "export type DocumentOp = | { op: \"set\"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: \"setRange\"; range: Range; cells: SnapshotCell[] } | { op: \"setBlock\"; range: Range; block: PackedCellBlock } | { op: \"restoreBlock\"; range: Range; encoding: \"deflate-json-v1\"; decodedBytes: number; data: string; } | { op: \"setRangeStyle\"; range: Range; style: Partial<CellStyle> | null } | { op: \"clearRange\"; range: Range; contents?: boolean; style?: boolean } | { op: \"permuteRows\"; range: Range; encoding: \"u32le-base64-v1\"; order: string } | { op: \"addRows\"; sheet: SheetId; at: number; count: number } | { op: \"removeRows\"; sheet: SheetId; at: number; count: number } | { op: \"moveRows\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"addColumns\"; sheet: SheetId; at: number; columns: Column[] } | { op: \"removeColumns\"; sheet: SheetId; at: number; count: number } | { op: \"moveColumns\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"setColumn\"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: \"setRowMeta\"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: \"addMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"removeMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"addSheet\"; sheet: SheetSnapshot } | { op: \"removeSheet\"; sheet: SheetId } | { op: \"renameSheet\"; sheet: SheetId; name: string } | { op: \"moveSheet\"; sheet: SheetId; to: number } | { op: \"setSheetVisibility\"; sheet: SheetId; visibility: SheetVisibility } | { op: \"addTable\"; table: WorkbookTable } | { op: \"updateTable\"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: \"removeTable\"; sheet: SheetId; tableId: string } | { op: \"setSheetMeta\"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: \"setValidationRule\"; sheet: SheetId; rule: DataValidationRule } | { op: \"removeValidationRule\"; sheet: SheetId; id: string } | { op: \"setHyperlink\"; sheet: SheetId; hyperlink: CellHyperlink } | { op: \"removeHyperlink\"; sheet: SheetId; id: string } | { op: \"setProtectedRange\"; sheet: SheetId; protectedRange: ProtectedRange } | { op: \"removeProtectedRange\"; sheet: SheetId; id: string } | { op: \"setNote\"; addr: CellAddress; text: string | null } | { op: \"setNamedRange\"; namedRange: NamedRangeSnapshot } | { op: \"removeNamedRange\"; name: string; scope?: SheetId } | { op: \"setCalculation\"; calculation: CalculationSettings } | { op: \"setChart\"; sheet: SheetId; chart: ChartDefinition } | { op: \"removeChart\"; sheet: SheetId; id: string } | { op: \"setPivot\"; sheet: SheetId; pivot: PivotDefinition } | { op: \"removePivot\"; sheet: SheetId; id: string };",
+              "signature": "export type DocumentOp = | { op: \"set\"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: \"setRange\"; range: Range; cells: SnapshotCell[] } | { op: \"setBlock\"; range: Range; block: PackedCellBlock } | { op: \"restoreBlock\"; range: Range; encoding: \"deflate-json-v1\"; decodedBytes: number; data: string; } | { op: \"setRangeStyle\"; range: Range; style: Partial<CellStyle> | null } | { op: \"clearRange\"; range: Range; contents?: boolean; style?: boolean } | { op: \"permuteRows\"; range: Range; encoding: \"u32le-base64-v1\"; order: string } | { op: \"addRows\"; sheet: SheetId; at: number; count: number } | { op: \"removeRows\"; sheet: SheetId; at: number; count: number } | { op: \"moveRows\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"addColumns\"; sheet: SheetId; at: number; columns: Column[] } | { op: \"removeColumns\"; sheet: SheetId; at: number; count: number } | { op: \"moveColumns\"; sheet: SheetId; from: number; count: number; to: number } | { op: \"setColumn\"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: \"setRowMeta\"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: \"addMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"removeMerge\"; sheet: SheetId; merge: MergeRange } | { op: \"addSheet\"; sheet: SheetSnapshot } | { op: \"removeSheet\"; sheet: SheetId } | { op: \"renameSheet\"; sheet: SheetId; name: string } | { op: \"moveSheet\"; sheet: SheetId; to: number } | { op: \"setSheetVisibility\"; sheet: SheetId; visibility: SheetVisibility } | { op: \"addTable\"; table: WorkbookTable } | { op: \"updateTable\"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: \"removeTable\"; sheet: SheetId; tableId: string } | { op: \"setSheetMeta\"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: \"setValidationRule\"; sheet: SheetId; rule: DataValidationRule } | { op: \"removeValidationRule\"; sheet: SheetId; id: string } | { op: \"setHyperlink\"; sheet: SheetId; hyperlink: CellHyperlink } | { op: \"removeHyperlink\"; sheet: SheetId; id: string } | { op: \"setProtectedRange\"; sheet: SheetId; protectedRange: ProtectedRange } | { op: \"removeProtectedRange\"; sheet: SheetId; id: string } | { op: \"setNote\"; addr: CellAddress; text: string | null } | { op: \"setNamedRange\"; namedRange: NamedRangeSnapshot } | { op: \"removeNamedRange\"; name: string; scope?: SheetId } | { op: \"setCalculation\"; calculation: CalculationSettings } | { op: \"setRelationship\"; relationship: TableRelationship } | { op: \"removeRelationship\"; id: string } | { op: \"setChart\"; sheet: SheetId; chart: ChartDefinition } | { op: \"removeChart\"; sheet: SheetId; id: string } | { op: \"setPivot\"; sheet: SheetId; pivot: PivotDefinition } | { op: \"removePivot\"; sheet: SheetId; id: string };",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L490",
+              "source": "src/types/document.ts#L495",
               "jsDocTags": [],
               "documentation": "Exhaustive serializable operation union for workbook mutations.",
               "memberDocs": []
@@ -2018,7 +2035,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3706",
+              "source": "src/document-protocol.ts#L3708",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -2042,7 +2059,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L426",
+              "source": "src/document-protocol.ts#L427",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -2054,7 +2071,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L441",
+              "source": "src/document-protocol.ts#L442",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -3001,7 +3018,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L401",
+              "source": "src/store/data-engine.ts#L442",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3268,7 +3285,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L65",
+              "source": "src/document-protocol.ts#L66",
               "jsDocTags": [],
               "documentation": "Largest iteration count Excel accepts.",
               "memberDocs": []
@@ -3326,7 +3343,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L295",
+              "source": "src/types/document.ts#L298",
               "jsDocTags": [],
               "documentation": "Structured warning or rejection produced while applying an operation.",
               "memberDocs": []
@@ -3338,7 +3355,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L246",
+              "source": "src/types/document.ts#L249",
               "jsDocTags": [],
               "documentation": "Atomic or partial handling for locally denied operations.",
               "memberDocs": []
@@ -3350,7 +3367,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L152",
+              "source": "src/types/document.ts#L155",
               "jsDocTags": [],
               "documentation": "A defined name: a workbook-global or sheet-scoped name that formulas use.\nIt refers to one rectangular range, or holds a formula such as a constant,\nan expression or a `LAMBDA`.",
               "memberDocs": []
@@ -3398,7 +3415,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L377",
+              "source": "src/types/document.ts#L380",
               "jsDocTags": [],
               "documentation": "Dense row-major mutation payload. Primitive arrays keep large paste/fill\noperations JSON-safe without allocating one operation object per cell.\nFormula/reference tuples are sparse exceptions keyed by row-major offset.",
               "memberDocs": []
@@ -3952,7 +3969,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L232",
+              "source": "src/types/document.ts#L235",
               "jsDocTags": [],
               "documentation": "Serializable client UX policy. A host resolver decides whether a local mutation may proceed.",
               "memberDocs": []
@@ -3964,7 +3981,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L276",
+              "source": "src/types/document.ts#L279",
               "jsDocTags": [],
               "documentation": "Local operation and protected-range context supplied to the host policy.",
               "memberDocs": []
@@ -3976,7 +3993,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L283",
+              "source": "src/types/document.ts#L286",
               "jsDocTags": [],
               "documentation": "Host-owned client UX permission callback for protected mutations.",
               "memberDocs": []
@@ -4063,6 +4080,18 @@
               "source": "src/reference.ts#L6",
               "jsDocTags": [],
               "documentation": "Sentinel shown for a reference that participates in a cycle.",
+              "memberDocs": []
+            },
+            {
+              "name": "RelationshipStatus",
+              "kind": "type",
+              "signature": "export type RelationshipStatus = | { status: \"ok\"; unmatched: number } | { status: \"missingTable\" } | { status: \"missingColumn\" } | { status: \"typeMismatch\"; side: \"from\" | \"to\"; row: number } | { status: \"duplicateKey\"; rows: [number, number] } | { status: \"unavailable\" };",
+              "owners": [
+                "src/types/data-model.ts"
+              ],
+              "source": "src/types/data-model.ts#L50",
+              "jsDocTags": [],
+              "documentation": "Whether the keys of a relationship resolve, checked from the current cell\nvalues. Rows are data-row offsets in their table, header row excluded.\n\n- `ok`: every non-blank one-side key is unique; `unmatched` counts the\n  non-blank many-side keys that match no one-side row.\n- `missingTable`, `missingColumn`: a table or column was removed.\n- `typeMismatch`: the key at `row` on `side` is a boolean, an error on the\n  one side, or not the same kind (number or text) as the other keys.\n- `duplicateKey`: two one-side rows hold equal keys (text without case).\n- `unavailable`: the loaded engine does not check keys (the default\n  engine), or no relationship has this ID.",
               "memberDocs": []
             },
             {
@@ -4197,7 +4226,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L140",
+              "source": "src/document-protocol.ts#L141",
               "jsDocTags": [],
               "documentation": "Validate and merge transaction ceiling overrides without retaining the\ncaller-owned object. Every ceiling is an inclusive non-negative safe integer.",
               "memberDocs": []
@@ -4352,7 +4381,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L401",
+              "source": "src/row-bridge.ts#L402",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -4417,7 +4446,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L171",
+              "source": "src/row-bridge.ts#L172",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -4441,7 +4470,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L214",
+              "source": "src/row-bridge.ts#L215",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -4453,7 +4482,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L150",
+              "source": "src/row-bridge.ts#L151",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -4485,7 +4514,7 @@
             {
               "name": "RowBridgeMetadataDelta",
               "kind": "interface",
-              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\" | \"calculation\" | \"chart\" | \"pivot\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
+              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\" | \"calculation\" | \"relationship\" | \"chart\" | \"pivot\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
               "owners": [
                 "src/row-bridge.ts"
               ],
@@ -4538,7 +4567,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L207",
+              "source": "src/row-bridge.ts#L208",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -4562,7 +4591,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L192",
+              "source": "src/row-bridge.ts#L193",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -4583,7 +4612,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L183",
+              "source": "src/row-bridge.ts#L184",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -4619,7 +4648,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1097",
+              "source": "src/row-bridge.ts#L1102",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -4631,7 +4660,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L163",
+              "source": "src/row-bridge.ts#L164",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -4655,7 +4684,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L107",
+              "source": "src/types/document.ts#L108",
               "jsDocTags": [],
               "documentation": "A collapsible row group (data-row range, end-inclusive), Sheets-style.",
               "memberDocs": []
@@ -4667,7 +4696,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L360",
+              "source": "src/types/document.ts#L363",
               "jsDocTags": [],
               "documentation": "Persistent display and grouping metadata for one document row.",
               "memberDocs": []
@@ -4913,7 +4942,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L43",
+              "source": "src/types/document.ts#L44",
               "jsDocTags": [],
               "documentation": "Workbook sheet schema used when creating a live grid.",
               "memberDocs": [
@@ -5022,7 +5051,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L286",
+              "source": "src/types/document.ts#L289",
               "jsDocTags": [],
               "documentation": "Stable lifecycle rejection codes suitable for inline sheet-management UI.",
               "memberDocs": []
@@ -5046,7 +5075,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L18",
+              "source": "src/types/document.ts#L19",
               "jsDocTags": [],
               "documentation": "Stable reason codes returned by worksheet-name validation.",
               "memberDocs": []
@@ -5070,7 +5099,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L26",
+              "source": "src/types/document.ts#L27",
               "jsDocTags": [],
               "documentation": "Successful canonical name or an actionable validation failure.",
               "memberDocs": []
@@ -5082,7 +5111,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L397",
+              "source": "src/types/document.ts#L400",
               "jsDocTags": [],
               "documentation": "Serializable complete state for one workbook sheet.",
               "memberDocs": [
@@ -5107,7 +5136,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L40",
+              "source": "src/types/document.ts#L41",
               "jsDocTags": [],
               "documentation": "Native worksheet visibility preserved across workbook snapshots and tab rendering.",
               "memberDocs": []
@@ -5257,11 +5286,11 @@
             {
               "name": "SheetwriteStore",
               "kind": "class",
-              "signature": "class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }",
+              "signature": "class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => ApplyTransactionResult; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => ApplyTransactionResult; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getFormula: (addr: CellAddress) => string | null; getFormulaMatrixResourcePeak: () => TransientResourcePeak; getPagedStats: (sheet: SheetId) => PagedStoreStats; getPivotFields: (sheet: SheetId, id: string) => PivotSourceField[]; getPivotResult: (sheet: SheetId, id: string) => PivotResultView | null; getPivots: (sheet?: SheetId) => PivotDefinition[]; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getRelationshipStatus: (id: string) => RelationshipStatus; getRelationships: () => TableRelationship[]; getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot; getSpillAnchor: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => ApplyTransactionResult; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult; removeRelationship: (id: string) => ApplyTransactionResult; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; replaceSnapshot: (snapshot: WorkbookSnapshot) => void; resetFormulaMatrixResourcePeak: () => void; resetRangeMutationAllocationStats: () => void; resetRuntimeResourceAccounting: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => ApplyTransactionResult; setDetailedChangeCapture: (enabled: boolean) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => ApplyTransactionResult; setPivot: (pivot: PivotDefinition, sheet?: SheetId) => ApplyTransactionResult; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; setRelationship: (relationship: TableRelationship) => ApplyTransactionResult; showRows: (sheet: SheetId, rows?: readonly number[]) => ApplyTransactionResult; sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionResult; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult; sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult; ungroupRows: (sheet: SheetId, start: number, end: number) => ApplyTransactionResult; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T; static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore }",
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L153",
+              "source": "src/store.ts#L155",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5325,6 +5354,14 @@
                   "documentation": "Plain-reference target at `addr`, or null when the cell is not a ref."
                 },
                 {
+                  "name": "getRelationships",
+                  "documentation": "Clones of the workbook's table relationships; readable without the engine."
+                },
+                {
+                  "name": "getRelationshipStatus",
+                  "documentation": "Whether the keys of the relationship with `id` resolve, checked now from\nthe cell values. The default engine checks no keys and reports\n`unavailable`, as it does for an unknown ID."
+                },
+                {
                   "name": "getSpillAnchor",
                   "documentation": "Owning dynamic-array formula cell, or null when `addr` is not spilled."
                 },
@@ -5345,6 +5382,10 @@
                   "documentation": "Remove a pivot; `sheet` defaults to the sheet that holds it."
                 },
                 {
+                  "name": "removeRelationship",
+                  "documentation": "Remove the relationship with `id`."
+                },
+                {
                   "name": "replaceSnapshot",
                   "documentation": "Replace only after a separate store has validated and hydrated every sheet."
                 },
@@ -5359,6 +5400,10 @@
                 {
                   "name": "setProtectionResolver",
                   "documentation": "Configure host-owned protected-range permissions. The resolver is synchronous\nso every local mutation ingress shares one atomic commit barrier."
+                },
+                {
+                  "name": "setRelationship",
+                  "documentation": "Insert a relationship, or replace the one with its ID. Both columns must\nexist, at most one relationship may join two tables, and relationships\nmust not form a cycle; otherwise the result is a no-op."
                 },
                 {
                   "name": "sortRange",
@@ -5377,7 +5422,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L83",
+              "source": "src/store.ts#L85",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -5430,7 +5475,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L366",
+              "source": "src/types/document.ts#L369",
               "jsDocTags": [],
               "documentation": "Serializable cell value and optional style inside a snapshot block.",
               "memberDocs": []
@@ -5454,7 +5499,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L404",
+              "source": "src/document-protocol.ts#L405",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -5466,7 +5511,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L360",
+              "source": "src/document-protocol.ts#L361",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -5507,7 +5552,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L357",
+              "source": "src/document-protocol.ts#L358",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -5519,7 +5564,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L449",
+              "source": "src/document-protocol.ts#L450",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": [
@@ -5536,7 +5581,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L396",
+              "source": "src/document-protocol.ts#L397",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -5557,7 +5602,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L90",
+              "source": "src/types/document.ts#L91",
               "jsDocTags": [],
               "documentation": "One key of a multi-column sort, applied in array order (first = primary).",
               "memberDocs": []
@@ -5695,7 +5740,7 @@
               "owners": [
                 "src/charts-live.ts"
               ],
-              "source": "src/charts-live.ts#L542",
+              "source": "src/charts-live.ts#L547",
               "jsDocTags": [],
               "documentation": "Listen for commits that change any chart's `ChartView`. Edited rectangles are\nmatched against an index of series ranges, so edits outside every series\nrange cost no chart work. Charts that read formulas, references or spills\nalso change on any commit that changes cell values. Returns an unsubscribe\nfunction; the index is dropped with the last listener.",
               "memberDocs": []
@@ -6034,6 +6079,52 @@
               "memberDocs": []
             },
             {
+              "name": "TableColumnRef",
+              "kind": "interface",
+              "signature": "export interface TableColumnRef { table: WorkbookTableId; column: string; }",
+              "owners": [
+                "src/types/data-model.ts"
+              ],
+              "source": "src/types/data-model.ts#L7",
+              "jsDocTags": [],
+              "documentation": "One column of a workbook table, by stable IDs that survive renames and moves.",
+              "memberDocs": [
+                {
+                  "name": "column",
+                  "documentation": "Stable `WorkbookTableColumn.id`."
+                },
+                {
+                  "name": "table",
+                  "documentation": "Stable `WorkbookTable.id`."
+                }
+              ]
+            },
+            {
+              "name": "TableRelationship",
+              "kind": "interface",
+              "signature": "export interface TableRelationship { id: string; from: TableColumnRef; to: TableColumnRef; }",
+              "owners": [
+                "src/types/data-model.ts"
+              ],
+              "source": "src/types/data-model.ts#L22",
+              "jsDocTags": [],
+              "documentation": "One-to-many link between two workbook tables with a single key column on\neach side. Each `from` row matches at most one `to` row.\n\nThe names follow `x15:modelRelationship`: `from` is the foreign-key (many)\nside and `to` is the primary-key (one) side. A relationship whose table or\ncolumn was removed stays saved, so undoing the removal restores it.",
+              "memberDocs": [
+                {
+                  "name": "from",
+                  "documentation": "Many side: the foreign-key column."
+                },
+                {
+                  "name": "id",
+                  "documentation": "Stable identity, unique in the workbook."
+                },
+                {
+                  "name": "to",
+                  "documentation": "One side: the key column, whose non-blank values must be unique."
+                }
+              ]
+            },
+            {
               "name": "Theme",
               "kind": "interface",
               "signature": "export interface Theme { font: string; bg: string; fg: string; gridLine: string; headerBg: string; headerFg: string; selection: string; selectionBorder: string; rowHeight: number; headerHeight: number; rowHeaderWidth: number; searchMatch: string; searchActiveMatch: string; highlight: string; }",
@@ -6340,7 +6431,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L120",
+              "source": "src/document-protocol.ts#L121",
               "jsDocTags": [],
               "documentation": "Successful byte/count inspection or one structured transaction rejection.",
               "memberDocs": []
@@ -6376,7 +6467,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L165",
+              "source": "src/document-protocol.ts#L166",
               "jsDocTags": [],
               "documentation": "Incrementally validate the operation count and exact encoded payload size\nwithout constructing a JSON string. Compact operation ranges are measured by\ntheir serialized fields; their logical cell area is deliberately irrelevant.",
               "memberDocs": []
@@ -6388,7 +6479,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3666",
+              "source": "src/document-protocol.ts#L3668",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -6412,7 +6503,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L179",
+              "source": "src/types/document.ts#L182",
               "jsDocTags": [],
               "documentation": "Reject-or-warn policy attached to a data-validation rule.",
               "memberDocs": []
@@ -6603,11 +6694,11 @@
             {
               "name": "Workbook",
               "kind": "interface",
-              "signature": "export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; }",
+              "signature": "export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L127",
+              "source": "src/types/document.ts#L128",
               "jsDocTags": [],
               "documentation": "Live workbook schema containing ordered sheets and the active sheet ID.",
               "memberDocs": [
@@ -6618,6 +6709,10 @@
                 {
                   "name": "calculation",
                   "documentation": "Iterative calculation options; absent means the defaults."
+                },
+                {
+                  "name": "dataModel",
+                  "documentation": "Relationships between workbook tables; absent means none."
                 },
                 {
                   "name": "namedRanges",
@@ -6640,7 +6735,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L56",
+              "source": "src/document-protocol.ts#L57",
               "jsDocTags": [],
               "documentation": "Current workbook snapshot schema version accepted by Sheetwrite.",
               "memberDocs": []
@@ -6648,11 +6743,11 @@
             {
               "name": "WorkbookSnapshot",
               "kind": "interface",
-              "signature": "export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; }; sheets: SheetSnapshot[]; }",
+              "signature": "export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; }; sheets: SheetSnapshot[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L474",
+              "source": "src/types/document.ts#L477",
               "jsDocTags": [],
               "documentation": "Schema-versioned serializable workbook document.",
               "memberDocs": []
@@ -6960,7 +7055,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L440",
+              "source": "src/types/document.ts#L443",
               "jsDocTags": [],
               "documentation": "What an opaque graph reads; any change to it drops the graph on save.",
               "memberDocs": [
@@ -6985,7 +7080,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L451",
+              "source": "src/types/document.ts#L454",
               "jsDocTags": [],
               "documentation": "One relationship from the package, workbook, or a sheet to a retained part graph.",
               "memberDocs": [
@@ -7014,7 +7109,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L429",
+              "source": "src/types/document.ts#L432",
               "jsDocTags": [],
               "documentation": "One retained OOXML part, kept as its original compressed ZIP payload so a\nsave copies it without inflating or recompressing. Runtime copies are frozen.",
               "memberDocs": [
@@ -7031,7 +7126,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L466",
+              "source": "src/types/document.ts#L469",
               "jsDocTags": [],
               "documentation": "Bounded, frozen record of the OOXML parts Sheetwrite does not model.",
               "memberDocs": [
@@ -7199,7 +7294,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1089",
+              "source": "src/row-bridge.ts#L1094",
               "jsDocTags": [
                 "example",
                 "see"
@@ -7583,7 +7678,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L401",
+              "source": "src/row-bridge.ts#L402",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -7648,7 +7743,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L171",
+              "source": "src/row-bridge.ts#L172",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -7672,7 +7767,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L214",
+              "source": "src/row-bridge.ts#L215",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -7684,7 +7779,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L150",
+              "source": "src/row-bridge.ts#L151",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -7716,7 +7811,7 @@
             {
               "name": "RowBridgeMetadataDelta",
               "kind": "interface",
-              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\" | \"calculation\" | \"chart\" | \"pivot\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
+              "signature": "export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: \"metadata\"; readonly metadata: | \"column\" | \"row\" | \"sheet\" | \"merge\" | \"table\" | \"validation\" | \"hyperlink\" | \"protected-range\" | \"note\" | \"named-range\" | \"calculation\" | \"relationship\" | \"chart\" | \"pivot\"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }",
               "owners": [
                 "src/row-bridge.ts"
               ],
@@ -7769,7 +7864,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L207",
+              "source": "src/row-bridge.ts#L208",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -7793,7 +7888,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L192",
+              "source": "src/row-bridge.ts#L193",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -7814,7 +7909,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L183",
+              "source": "src/row-bridge.ts#L184",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -7850,7 +7945,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1097",
+              "source": "src/row-bridge.ts#L1102",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -7862,7 +7957,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L163",
+              "source": "src/row-bridge.ts#L164",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -8809,7 +8904,7 @@
             {
               "name": "CellStore",
               "kind": "class",
-              "signature": "class CellStore { acknowledgeRevision: (revision: bigint) => void; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number; addRows: (sheet: number, at: number, count: number) => boolean; addSheet: (n_cols: number, row_count: number) => number; admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; aggregate: (sheet: number, col: number, op: number) => number; beginMutation: () => bigint; beginPageLoad: () => void; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; captureReferences: (sheet: number, max_entries: number) => SourceSnapshot | undefined; captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: number) => SourceSnapshot | undefined; captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined; cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean; commitSources: () => void; compactStringStorage: () => void; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; exportMemoryState: () => Uint8Array; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaMatrixResourceStats: () => Float64Array; formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot; insertCols: (sheet: number, at: number, count: number) => boolean; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; memoryStats: () => Float64Array; moveNamedFormulaSource: (source: string, sheet: number, columns: boolean, from: number, count: number, to: number) => string | undefined; namedFormulaSource: (name: string, scope: number) => string | undefined; pagedDirtyCoordinates: (sheet: number) => Float64Array; pagedStats: (sheet: number) => Float64Array; permuteRows: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => number; permuteRowsLosses: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => Uint32Array; persistedCellData: (sheet: number) => Float64Array; pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void; pinViewportBands: (sheet: number, bands: Uint32Array) => void; pivotFields: (sheet: number, index: number) => PivotFields; pivotStatus: (sheet: number) => Uint32Array; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; referenceTarget: (sheet: number, row: number, col: number) => Uint32Array | undefined; referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array | undefined; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => boolean; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => boolean; removeSheet: (sheet: number) => boolean; removeTable: (id: string) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetFormulaMatrixResourceStats: () => void; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setHiddenRows: (sheet: number, manual: Uint32Array, filtered: Uint32Array) => boolean; setHostFunction: (name: string, callback: Function | null | undefined, volatile: boolean, recalculate: boolean) => boolean; setIterativeCalculation: (enabled: boolean, max_iterations: number, max_change: number) => boolean; setNamedFormula: (name: string, scope: number, source: string) => boolean; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setPivots: (sheet: number, numbers: Float64Array, strings: string[]) => boolean; setSheetName: (sheet: number, id: string, name: string) => void; setSheetOrder: (order: Uint32Array) => boolean; setSparseBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, offsets: Uint32Array, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setSpillBlockers: (sheet: number, bounds: Uint32Array) => boolean; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean; sheetSpanFormulaCells: (sheet: number) => Uint32Array; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; spillAnchorCol: (sheet: number, row: number, col: number) => number; spillAnchorRow: (sheet: number, row: number, col: number) => number; spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint8Array; stringPoolEpoch: () => number; wasmCommittedBytes: () => number; static importMemoryState: (bytes: Uint8Array) => CellStore }",
+              "signature": "class CellStore { acknowledgeRevision: (revision: bigint) => void; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number; addRows: (sheet: number, at: number, count: number) => boolean; addSheet: (n_cols: number, row_count: number) => number; admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; aggregate: (sheet: number, col: number, op: number) => number; beginMutation: () => bigint; beginPageLoad: () => void; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; captureReferences: (sheet: number, max_entries: number) => SourceSnapshot | undefined; captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: number) => SourceSnapshot | undefined; captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined; cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean; commitSources: () => void; compactStringStorage: () => void; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; exportMemoryState: () => Uint8Array; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaMatrixResourceStats: () => Float64Array; formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot; insertCols: (sheet: number, at: number, count: number) => boolean; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; memoryStats: () => Float64Array; moveNamedFormulaSource: (source: string, sheet: number, columns: boolean, from: number, count: number, to: number) => string | undefined; namedFormulaSource: (name: string, scope: number) => string | undefined; pagedDirtyCoordinates: (sheet: number) => Float64Array; pagedStats: (sheet: number) => Float64Array; permuteRows: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => number; permuteRowsLosses: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => Uint32Array; persistedCellData: (sheet: number) => Float64Array; pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void; pinViewportBands: (sheet: number, bands: Uint32Array) => void; pivotFields: (sheet: number, index: number) => PivotFields; pivotStatus: (sheet: number) => Uint32Array; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; referenceTarget: (sheet: number, row: number, col: number) => Uint32Array | undefined; referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array | undefined; relationshipStatus: (id: string) => Uint32Array; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => boolean; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => boolean; removeSheet: (sheet: number) => boolean; removeTable: (id: string) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetFormulaMatrixResourceStats: () => void; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setHiddenRows: (sheet: number, manual: Uint32Array, filtered: Uint32Array) => boolean; setHostFunction: (name: string, callback: Function | null | undefined, volatile: boolean, recalculate: boolean) => boolean; setIterativeCalculation: (enabled: boolean, max_iterations: number, max_change: number) => boolean; setNamedFormula: (name: string, scope: number, source: string) => boolean; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setPivots: (sheet: number, numbers: Float64Array, strings: string[]) => boolean; setRelationships: (strings: string[]) => boolean; setSheetName: (sheet: number, id: string, name: string) => void; setSheetOrder: (order: Uint32Array) => boolean; setSparseBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, offsets: Uint32Array, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number; setSpillBlockers: (sheet: number, bounds: Uint32Array) => boolean; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean; sheetSpanFormulaCells: (sheet: number) => Uint32Array; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; spillAnchorCol: (sheet: number, row: number, col: number) => number; spillAnchorRow: (sheet: number, row: number, col: number) => number; spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => Uint8Array; stringPoolEpoch: () => number; wasmCommittedBytes: () => number; static importMemoryState: (bytes: Uint8Array) => CellStore }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -8974,6 +9069,10 @@
                   "documentation": "Return packed `[source_sheet, source_row, source_col, ...]` references\ntargeting one sheet, bounded before crossing into the host."
                 },
                 {
+                  "name": "relationshipStatus",
+                  "documentation": "`[code, firstRow, secondRow, unmatched]` for the relationship with\n`id`, or an empty array for an unknown ID. Codes: 0 ok, 1 missing\ntable, 2 missing column, 3 and 4 a key of the wrong kind on the one\nor the many side (`firstRow`), 5 a duplicate one-side key (both\nrows). Rows are data-row offsets in their table. `unmatched` counts\nthe non-blank many-side keys that match no one-side row. The keys\nare checked now, from the settled cell values."
+                },
+                {
                   "name": "remapRangeStyles",
                   "documentation": "Remap styles over a rectangle using parallel old/new id tables."
                 },
@@ -9046,6 +9145,10 @@
                   "documentation": "Replaces every pivot anchored on `sheet` with the packed definitions,\nconcatenated per pivot: `[id, sourceKind (0 range, 1 table,\n2 invalid), sourceSheet | tableId, r0, c0, r1, c1, anchorRow,\nanchorCol, nRows, ...rowFields, nCols, ...colFields, nValues,\n...(field, aggregation, name | -1), nFilters, ...(field, nValues,\n...(kind, payload)), nSort, ...(axis, field, descending), flags]`.\nText slots index `strings`. A pivot whose definition did not change\nkeeps its cache. Output appears at the next recalculation. Returns\n`false`, changing nothing, for a malformed payload or a dead sheet."
                 },
                 {
+                  "name": "setRelationships",
+                  "documentation": "Replaces every relationship with the packed definitions: five strings\neach, `[id, fromTable, fromColumn, toTable, toColumn]`, by stable\ntable and column IDs. Returns `false`, changing nothing, for a\nmalformed payload."
+                },
+                {
                   "name": "setSheetOrder",
                   "documentation": "Set the workbook tab order: every live sheet handle exactly once.\n3-D references such as `Sheet1:Sheet3!A1` span the tabs between their\nendpoints, so formulas whose span changed are re-placed, their\ndependencies patched, and their results recomputed. Rejects an order\nthat omits, repeats or adds a handle."
                 },
@@ -9082,7 +9185,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L619",
+              "source": "pkg/sheetwrite_wasm.d.ts#L636",
               "jsDocTags": [],
               "documentation": "The first syntax error in formula text, or `undefined` when the engine's\nparser reads the whole formula. A leading `=` is optional, as for a cell.",
               "memberDocs": []
@@ -9094,7 +9197,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L625",
+              "source": "pkg/sheetwrite_wasm.d.ts#L642",
               "jsDocTags": [],
               "documentation": "Convert a workbook's formula sources in one JavaScript-to-WASM call.\nThe consumed input vector can release each source as its result is produced.",
               "memberDocs": []
@@ -9118,7 +9221,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L495",
+              "source": "pkg/sheetwrite_wasm.d.ts#L512",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -9155,7 +9258,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L631",
+              "source": "pkg/sheetwrite_wasm.d.ts#L648",
               "jsDocTags": [],
               "documentation": "Remove only identifier prefixes. Quoted text, sheet names and structured\nreferences are not function or parameter names and must remain unchanged.",
               "memberDocs": []
@@ -9167,7 +9270,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L517",
+              "source": "pkg/sheetwrite_wasm.d.ts#L534",
               "jsDocTags": [],
               "documentation": "The first syntax error of a formula, as the engine's parser finds it.",
               "memberDocs": [
@@ -9192,7 +9295,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L652",
+              "source": "pkg/sheetwrite_wasm.d.ts#L669",
               "jsDocTags": [],
               "documentation": "The tokens of formula text: four `u32` per token, `kind`, `from` and `to`\n(UTF-16 offsets into `src`) and `space` (1 when whitespace comes before the\ntoken). A leading `=` is not a token. The lexer never stops at an error:\ntext it cannot read is a bad token, and an open quote or bracket runs to\nthe end of the text.\n\n`kind` is 0 number, 1 text, 2 `TRUE` or `FALSE` as a value, 3 error\nconstant, 4 name (a function, reference, defined name, table or sheet),\n5 quoted sheet name, 6 table reference in brackets, 7 operator, 8 `:`,\n9 `!`, 10 `#`, 11 `,`, 12 `;`, 13 `(`, 14 `)`, 15 `{`, 16 `}`, 17 bad text.",
               "memberDocs": []
@@ -9204,7 +9307,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L638",
+              "source": "pkg/sheetwrite_wasm.d.ts#L655",
               "jsDocTags": [],
               "documentation": "Write future-function, local-binding and spill spellings for OOXML formulas.\nThis is lexical: unknown future functions and incomplete formulas still\nround-trip without a parse/serialize pass changing their source text.",
               "memberDocs": []
@@ -9216,7 +9319,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L657",
+              "source": "pkg/sheetwrite_wasm.d.ts#L674",
               "jsDocTags": [],
               "documentation": "Names accepted by the full engine, including aliases.",
               "memberDocs": []
@@ -9228,7 +9331,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L679",
+              "source": "pkg/sheetwrite_wasm.d.ts#L696",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -9236,11 +9339,11 @@
             {
               "name": "InitOutput",
               "kind": "interface",
-              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellsnapshot_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_formulasyntaxerror_free: (a: number, b: number) => void; readonly __wbg_pivotfields_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellsnapshot_kinds: (a: number) => [number, number]; readonly cellsnapshot_numbers: (a: number) => [number, number]; readonly cellsnapshot_strings: (a: number) => [number, number]; readonly cellsnapshot_styles: (a: number) => [number, number]; readonly cellsnapshot_textIndex: (a: number) => [number, number]; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => number; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellSnapshots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_commitSources: (a: number) => void; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_exportMemoryState: (a: number) => [number, number]; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_importMemoryState: (a: any) => number; readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => number; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_loadedSpans: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_moveNamedFormulaSource: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_namedFormulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_permuteRowsLosses: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void; readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void; readonly cellstore_pivotFields: (a: number, b: number, c: number) => number; readonly cellstore_pivotStatus: (a: number, b: number) => [number, number]; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setHiddenRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setHostFunction: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setIterativeCalculation: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setNamedFormula: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setPivots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number]; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_stringPoolEpoch: (a: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly checkFormulaSyntax: (a: number, b: number) => number; readonly convertXlsxFormulas: (a: number, b: number, c: number) => [number, number]; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly formulaFromXlsx: (a: number, b: number) => [number, number]; readonly formulaToXlsx: (a: number, b: number) => [number, number]; readonly formulaTokens: (a: number, b: number) => [number, number]; readonly formulasyntaxerror_from: (a: number) => number; readonly formulasyntaxerror_incomplete: (a: number) => number; readonly formulasyntaxerror_message: (a: number) => [number, number]; readonly formulasyntaxerror_to: (a: number) => number; readonly functionNames: () => [number, number]; readonly moveFormulaAxis: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly pivotfields_names: (a: number) => [number, number]; readonly pivotfields_types: (a: number) => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number]; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly shiftFormulaAxis: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly translateFormula: (a: number, b: number, c: number, d: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_stringPoolEpoch: (a: number) => number; readonly windowview_takePacked: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __externref_table_alloc: () => number; readonly __wbindgen_start: () => void; }",
+              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellsnapshot_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_formulasyntaxerror_free: (a: number, b: number) => void; readonly __wbg_pivotfields_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellsnapshot_kinds: (a: number) => [number, number]; readonly cellsnapshot_numbers: (a: number) => [number, number]; readonly cellsnapshot_strings: (a: number) => [number, number]; readonly cellsnapshot_styles: (a: number) => [number, number]; readonly cellsnapshot_textIndex: (a: number) => [number, number]; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => number; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellSnapshots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_commitSources: (a: number) => void; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_exportMemoryState: (a: number) => [number, number]; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_importMemoryState: (a: any) => number; readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => number; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_loadedSpans: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_moveNamedFormulaSource: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_namedFormulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_permuteRowsLosses: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void; readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void; readonly cellstore_pivotFields: (a: number, b: number, c: number) => number; readonly cellstore_pivotStatus: (a: number, b: number) => [number, number]; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_relationshipStatus: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnBlockPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setHiddenRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setHostFunction: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setIterativeCalculation: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setNamedFormula: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setPivots: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_setRelationships: (a: number, b: number, c: number) => number; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number]; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_stringPoolEpoch: (a: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly checkFormulaSyntax: (a: number, b: number) => number; readonly convertXlsxFormulas: (a: number, b: number, c: number) => [number, number]; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly formulaFromXlsx: (a: number, b: number) => [number, number]; readonly formulaToXlsx: (a: number, b: number) => [number, number]; readonly formulaTokens: (a: number, b: number) => [number, number]; readonly formulasyntaxerror_from: (a: number) => number; readonly formulasyntaxerror_incomplete: (a: number) => number; readonly formulasyntaxerror_message: (a: number) => [number, number]; readonly formulasyntaxerror_to: (a: number) => number; readonly functionNames: () => [number, number]; readonly moveFormulaAxis: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly pivotfields_names: (a: number) => [number, number]; readonly pivotfields_types: (a: number) => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number]; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly shiftFormulaAxis: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly translateFormula: (a: number, b: number, c: number, d: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_stringPoolEpoch: (a: number) => number; readonly windowview_takePacked: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __externref_table_alloc: () => number; readonly __wbindgen_start: () => void; }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L681",
+              "source": "pkg/sheetwrite_wasm.d.ts#L698",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -9252,7 +9355,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L858",
+              "source": "pkg/sheetwrite_wasm.d.ts#L877",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -9294,7 +9397,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L663",
+              "source": "pkg/sheetwrite_wasm.d.ts#L680",
               "jsDocTags": [],
               "documentation": "Follow `count` rows or columns moved from `from` to `to` on the formula's\nown sheet; `to` is the first index of the moved block after the move.",
               "memberDocs": []
@@ -9306,7 +9409,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L540",
+              "source": "pkg/sheetwrite_wasm.d.ts#L557",
               "jsDocTags": [],
               "documentation": "The names and types of a pivot's source fields, for the field list.",
               "memberDocs": [
@@ -9327,7 +9430,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L561",
+              "source": "pkg/sheetwrite_wasm.d.ts#L578",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -9344,7 +9447,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L670",
+              "source": "pkg/sheetwrite_wasm.d.ts#L687",
               "jsDocTags": [],
               "documentation": "Follow `delta` rows or columns inserted (positive) or deleted (negative)\nat `at` on the formula's own sheet. A range loses its deleted rows or\ncolumns and becomes `#REF!` only when none are left.",
               "memberDocs": []
@@ -9356,7 +9459,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L583",
+              "source": "pkg/sheetwrite_wasm.d.ts#L600",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -9368,7 +9471,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L848",
+              "source": "pkg/sheetwrite_wasm.d.ts#L867",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -9380,7 +9483,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L677",
+              "source": "pkg/sheetwrite_wasm.d.ts#L694",
               "jsDocTags": [],
               "documentation": "Move the relative references of a copied formula by the distance from\nits source cell to its target cell. Absolute parts stay; a reference\nmoved off the sheet becomes `#REF!`.",
               "memberDocs": []
@@ -9392,7 +9495,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L597",
+              "source": "pkg/sheetwrite_wasm.d.ts#L614",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [
@@ -9411,6 +9514,266 @@
         {
           "subpath": "./wasm",
           "target": "./pkg/sheetwrite_wasm_bg.wasm",
+          "kind": "asset",
+          "classification": "asset",
+          "exports": []
+        }
+      ]
+    },
+    {
+      "name": "@sheetwrite/queries",
+      "entryPoints": [
+        {
+          "subpath": ".",
+          "target": "./dist/index.d.ts",
+          "source": "src/index.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "loadQueryEngine",
+              "kind": "function",
+              "signature": "(options?: QueryEngineOptions): Promise<QueryEngine>",
+              "owners": [
+                "src/index.ts"
+              ],
+              "source": "src/index.ts#L48",
+              "jsDocTags": [
+                "example"
+              ],
+              "documentation": "Importing this package loads no WASM; only this explicit call loads query execution.\n@example\n```ts\nimport { loadQueryEngine } from \"@sheetwrite/queries\";\n\nasync function selectLargeTotals() {\n  const engine = await loadQueryEngine();\n  const source = engine.parse(\n    new TextEncoder().encode('[{\"Total\":120},{\"Total\":75}]'),\n    { format: \"json\", columns: [{ id: \"total\", name: \"Total\", type: \"number\" }] },\n  );\n\n  return engine.execute(source, [\n    { kind: \"filter\", predicate: { kind: \"compare\", column: \"total\", op: \"gte\", value: 100 } },\n  ]);\n}\n```",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryAggregate",
+              "kind": "interface",
+              "signature": "export interface QueryAggregate { readonly id: string; readonly name: string; readonly op: \"countRows\" | \"count\" | \"sum\" | \"average\" | \"min\" | \"max\"; readonly column?: string; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L69",
+              "jsDocTags": [],
+              "documentation": "Column is required except for countRows; numeric aggregates ignore nulls.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryBatch",
+              "kind": "interface",
+              "signature": "export interface QueryBatch { readonly rowCount: number; readonly columns: readonly QueryColumn[]; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L144",
+              "jsDocTags": [],
+              "documentation": "Equal-length columns with a u32 row count; returned buffers are owned by the caller.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryColumn",
+              "kind": "type",
+              "signature": "export type QueryColumn = ColumnState & ( | { readonly type: \"number\"; readonly values: Float64Array } | { readonly type: \"logical\"; readonly values: Uint8Array } | { readonly type: \"text\"; readonly bytes: Uint8Array; readonly offsets: Uint32Array } | { readonly type: \"date\"; readonly values: Int32Array } | { readonly type: \"dateTime\"; readonly values: BigInt64Array } | ({ readonly type: \"mixed\" } & QueryMixedLanes) );",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L133",
+              "jsDocTags": [],
+              "documentation": "Typed host buffers; validity and sparse error lanes preserve null/error distinctions.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryColumnSpec",
+              "kind": "interface",
+              "signature": "export interface QueryColumnSpec { readonly id: string; readonly name: string; readonly type: QueryColumnType; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L5",
+              "jsDocTags": [],
+              "documentation": "Stable identity is separate from the field name used by source records.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryColumnType",
+              "kind": "type",
+              "signature": "export type QueryColumnType = \"number\" | \"logical\" | \"text\" | \"date\" | \"dateTime\" | \"mixed\";",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L2",
+              "jsDocTags": [],
+              "documentation": "Physical column types; mixed columns use compact typed payload lanes.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryDiagnostic",
+              "kind": "interface",
+              "signature": "export interface QueryDiagnostic { readonly code: string; readonly step: number | null; readonly column: string | null; readonly row: number | null; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L22",
+              "jsDocTags": [],
+              "documentation": "A stable failure code and optional coordinates, without source values or credentials.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryEngine",
+              "kind": "interface",
+              "signature": "export interface QueryEngine { parse(bytes: Uint8Array, source: QuerySource, limits?: Partial<QueryLimits>): QueryBatch; execute( source: QueryBatch, steps: readonly QueryStep[], inputs?: readonly QueryInput[], limits?: Partial<QueryLimits>, ): QueryBatch; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L156",
+              "jsDocTags": [],
+              "documentation": "Rust performs parsing and every step; this interface does no source fetching.",
+              "memberDocs": [
+                {
+                  "name": "execute",
+                  "documentation": "Execute an ordered plan; cell errors stay in the typed output buffers."
+                },
+                {
+                  "name": "parse",
+                  "documentation": "Parse host-provided bytes; fatal failures throw QueryError."
+                }
+              ]
+            },
+            {
+              "name": "QueryEngineOptions",
+              "kind": "interface",
+              "signature": "export interface QueryEngineOptions { readonly wasm?: SyncInitInput; }",
+              "owners": [
+                "src/index.ts"
+              ],
+              "source": "src/index.ts#L23",
+              "jsDocTags": [],
+              "documentation": "Hosts can provide the compiled artifact instead of using browser artifact loading.",
+              "memberDocs": [
+                {
+                  "name": "wasm",
+                  "documentation": "Compiled module or artifact bytes, as accepted by the generated bindings."
+                }
+              ]
+            },
+            {
+              "name": "QueryError",
+              "kind": "class",
+              "signature": "class QueryError extends SheetwriteError { constructor(diagnostic: QueryDiagnostic); code: \"invalid-argument\" | \"resource-limit\"; diagnostic: QueryDiagnostic; name: \"QueryError\" }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L8",
+              "jsDocTags": [],
+              "documentation": "Fatal source or plan failure; cell-level errors stay in the returned column lanes.",
+              "memberDocs": [
+                {
+                  "name": "new",
+                  "documentation": "Diagnostic codes remain stable even when their human-readable context changes."
+                }
+              ]
+            },
+            {
+              "name": "QueryInput",
+              "kind": "interface",
+              "signature": "export interface QueryInput { readonly id: string; readonly batch: QueryBatch; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L150",
+              "jsDocTags": [],
+              "documentation": "One execution-local named input, consumed by join steps without a result cache.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryJoinKind",
+              "kind": "type",
+              "signature": "export type QueryJoinKind = | \"inner\" | \"left\" | \"right\" | \"full\" | \"leftSemi\" | \"rightSemi\" | \"leftAnti\" | \"rightAnti\";",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L58",
+              "jsDocTags": [],
+              "documentation": "Join kinds retain duplicate matches and match null keys to null keys.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryLimits",
+              "kind": "interface",
+              "signature": "export interface QueryLimits { readonly maxRows: number; readonly maxCells: number; readonly maxSourceBytes: number; readonly maxOutputBytes: number; readonly maxSteps: number; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L12",
+              "jsDocTags": [],
+              "documentation": "Per-execution ceilings; expanding operations reject output before allocation.",
+              "memberDocs": [
+                {
+                  "name": "maxOutputBytes",
+                  "documentation": "Conservative cell payload budget across all columns, checked before each append."
+                }
+              ]
+            },
+            {
+              "name": "QueryMixedLanes",
+              "kind": "interface",
+              "signature": "export interface QueryMixedLanes { readonly tags: Uint8Array; readonly indexes: Uint32Array; readonly numbers: Float64Array; readonly logical: Uint8Array; readonly text: Uint8Array; readonly offsets: Uint32Array; readonly dates: Int32Array; readonly dateTimes: BigInt64Array; }",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L119",
+              "jsDocTags": [],
+              "documentation": "The tag selects a compact lane; indexes address that lane or the error-code pool.",
+              "memberDocs": [
+                {
+                  "name": "indexes",
+                  "documentation": "Index in the typed lane selected by the row's tag."
+                },
+                {
+                  "name": "tags",
+                  "documentation": "0 = null, 1 = number, 2 = logical, 3 = text, 4 = date, 5 = dateTime, 6 = error."
+                }
+              ]
+            },
+            {
+              "name": "QueryPredicate",
+              "kind": "type",
+              "signature": "export type QueryPredicate = | { readonly kind: \"compare\"; readonly column: string; readonly op: \"eq\" | \"neq\" | \"lt\" | \"lte\" | \"gt\" | \"gte\"; readonly value: string | number | boolean | null; } | { readonly kind: \"isNull\"; readonly column: string } | { readonly kind: \"contains\"; readonly column: string; readonly text: string } | { readonly kind: \"and\" | \"or\"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: \"not\"; readonly predicate: QueryPredicate };",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L45",
+              "jsDocTags": [],
+              "documentation": "Data-only predicate trees use M null logic; only logical true selects a row.",
+              "memberDocs": []
+            },
+            {
+              "name": "QuerySource",
+              "kind": "type",
+              "signature": "export type QuerySource = | { readonly format: \"json\"; readonly columns: readonly QueryColumnSpec[]; readonly path?: readonly string[]; } | { readonly format: \"csv\"; readonly columns: readonly QueryColumnSpec[]; readonly delimiter?: number; readonly headers?: boolean; readonly emptyIsNull?: boolean; };",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L30",
+              "jsDocTags": [],
+              "documentation": "Host-owned UTF-8 bytes are parsed against an explicit schema, without type guessing.",
+              "memberDocs": []
+            },
+            {
+              "name": "QueryStep",
+              "kind": "type",
+              "signature": "export type QueryStep = | { readonly kind: \"filter\"; readonly predicate: QueryPredicate } | { readonly kind: \"select\"; readonly columns: readonly string[] } | { readonly kind: \"rename\"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: \"changeType\"; readonly column: string; readonly type: QueryColumnType; readonly onError: \"error\" | \"null\"; } | { readonly kind: \"join\"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: \"group\"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: \"unpivot\"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };",
+              "owners": [
+                "src/types.ts"
+              ],
+              "source": "src/types.ts#L77",
+              "jsDocTags": [],
+              "documentation": "Saved step order is execution order; each column reference is a stable identity.",
+              "memberDocs": []
+            }
+          ]
+        },
+        {
+          "subpath": "./wasm",
+          "target": "./pkg/sheetwrite_queries_bg.wasm",
           "kind": "asset",
           "classification": "asset",
           "exports": []

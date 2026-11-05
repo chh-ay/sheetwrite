@@ -142,6 +142,7 @@ export interface RowBridgeMetadataDelta<
     | "note"
     | "named-range"
     | "calculation"
+    | "relationship"
     | "chart"
     | "pivot";
 }
@@ -1033,6 +1034,10 @@ export class RowBridge<
 
       case "setCalculation":
         return [this.metadata(transaction, operation, "calculation", null)];
+
+      case "setRelationship":
+      case "removeRelationship":
+        return [this.metadata(transaction, operation, "relationship", null)];
 
       case "setChart":
       case "removeChart":

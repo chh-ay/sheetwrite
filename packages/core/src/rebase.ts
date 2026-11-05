@@ -584,6 +584,8 @@ function transformDirectTarget(
     case "removeNamedRange":
     case "removeTable":
     case "setCalculation":
+    case "setRelationship":
+    case "removeRelationship":
     case "removeChart":
     case "removePivot":
       return null;
@@ -876,7 +878,9 @@ function lifecycleConflict(
   if (remote.op === "removeSheet") {
     if (
       operationTouchesSheet(local, remote.sheet, restoreBlock) ||
-      operationContainsFormula(local, restoreBlock)
+      operationContainsFormula(local, restoreBlock) ||
+      // The removed sheet may hold a table that the relationship names.
+      local.op === "setRelationship"
     ) {
       return {
         code: "sheet-removed",
@@ -885,6 +889,18 @@ function lifecycleConflict(
     }
 
     return null;
+  }
+
+  if (
+    local.op === "setRelationship" &&
+    (remote.op === "removeTable" || remote.op === "updateTable") &&
+    (local.relationship.from.table === remote.tableId ||
+      local.relationship.to.table === remote.tableId)
+  ) {
+    return {
+      code: "overlapping-edit",
+      message: "A pending relationship names a table that a concurrent edit removed or changed",
+    };
   }
 
   if (remote.op === "addSheet" && local.op === "addSheet" && local.sheet.id === remote.sheet.id) {
@@ -1135,6 +1151,12 @@ function operationIdentity(operation: DocumentOp): string {
     // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
     case "setCalculation":
       return "calculation";
+
+    // The model is checked as a whole (no cycle, one relationship per pair of
+    // tables), so any two concurrent relationship changes conflict.
+    case "setRelationship":
+    case "removeRelationship":
+      return "data-model";
 
     case "setPivot":
       return `pivot:${operation.pivot.id}`;

@@ -27,6 +27,12 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
 
     /** Full engine only: source fields of the pivot at `index` in the sheet's payload. */
     pivotFields?(sheet: number, index: number): PivotFieldList;
+
+    /** Full engine only: replace every relationship; five IDs each (`setRelationships`). */
+    setRelationships?(strings: string[]): boolean;
+
+    /** Full engine only: `[code, firstRow, secondRow, unmatched]`, empty for an unknown ID. */
+    relationshipStatus?(id: string): Uint32Array;
   };
 
 /** Source fields reported by the full engine; free after reading. */

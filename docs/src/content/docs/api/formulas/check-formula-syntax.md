@@ -9,7 +9,7 @@ The first syntax error in formula text, or `undefined` when the engine's
 parser reads the whole formula. A leading `=` is optional, as for a cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L619"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L619</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L636"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L636</code></a></dd></div>
 </dl>
 
 ## Declaration

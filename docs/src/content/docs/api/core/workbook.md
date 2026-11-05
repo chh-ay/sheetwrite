@@ -8,10 +8,10 @@ description: "Workbook interface in @sheetwrite/core: Live workbook schema conta
 Live workbook schema containing ordered sheets and the active sheet ID.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L127"><code>packages/core/src/types/document.ts#L127</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L128"><code>packages/core/src/types/document.ts#L128</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -59,6 +59,15 @@ calculation?: CalculationSettings;
 ```
 
 </details>
+
+<details class="api-member" id="workbook-data-model" data-pagefind-weight="1">
+<summary><code>dataModel</code> <span class="api-member-summary">Relationships between workbook tables; absent means none.</span></summary>
+
+```ts generated
+dataModel?: DataModel;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -73,6 +82,7 @@ export interface Workbook {
   namedRanges?: NamedRangeSnapshot[];
   xlsxSource?: XlsxSourceSnapshot;
   calculation?: CalculationSettings;
+  dataModel?: DataModel;
 }
 ```
 
@@ -87,6 +97,7 @@ export interface Workbook {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

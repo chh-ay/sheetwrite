@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/formulas: Result of module ini
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L681"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L681</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/formulas/pkg/sheetwrite_wasm.d.ts#L698"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L698</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -91,6 +91,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-recompute-volatile"><code>cellstore_recomputeVolatile</code></a>
 <a href="#init-output-cellstore-reference-target"><code>cellstore_referenceTarget</code></a>
 <a href="#init-output-cellstore-references-targeting"><code>cellstore_referencesTargeting</code></a>
+<a href="#init-output-cellstore-relationship-status"><code>cellstore_relationshipStatus</code></a>
 <a href="#init-output-cellstore-remap-range-styles"><code>cellstore_remapRangeStyles</code></a>
 <a href="#init-output-cellstore-remove-cols"><code>cellstore_removeCols</code></a>
 <a href="#init-output-cellstore-remove-named-range"><code>cellstore_removeNamedRange</code></a>
@@ -118,6 +119,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
 <a href="#init-output-cellstore-set-pivots"><code>cellstore_setPivots</code></a>
+<a href="#init-output-cellstore-set-relationships"><code>cellstore_setRelationships</code></a>
 <a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
 <a href="#init-output-cellstore-set-sheet-order"><code>cellstore_setSheetOrder</code></a>
 <a href="#init-output-cellstore-set-sparse-block"><code>cellstore_setSparseBlock</code></a>
@@ -178,7 +180,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>164</span>
+## Members <span class="api-count" data-pagefind-ignore>166</span>
 
 <div class="api-member-list">
 
@@ -893,6 +895,15 @@ readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [nu
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-relationship-status" data-pagefind-weight="1">
+<summary><code>cellstore_relationshipStatus</code></summary>
+
+```ts generated
+readonly cellstore_relationshipStatus: (a: number, b: number, c: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-remap-range-styles" data-pagefind-weight="1">
 <summary><code>cellstore_remapRangeStyles</code></summary>
 
@@ -1132,6 +1143,15 @@ readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: nu
 
 ```ts generated
 readonly cellstore_setPivots: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-relationships" data-pagefind-weight="1">
+<summary><code>cellstore_setRelationships</code></summary>
+
+```ts generated
+readonly cellstore_setRelationships: (a: number, b: number, c: number) => number;
 ```
 
 </details>
@@ -2009,6 +2029,11 @@ export interface InitOutput {
     b: number,
     c: number,
   ) => [number, number];
+  readonly cellstore_relationshipStatus: (
+    a: number,
+    b: number,
+    c: number,
+  ) => [number, number];
   readonly cellstore_remapRangeStyles: (
     a: number,
     b: number,
@@ -2237,6 +2262,11 @@ export interface InitOutput {
     d: number,
     e: number,
     f: number,
+  ) => number;
+  readonly cellstore_setRelationships: (
+    a: number,
+    b: number,
+    c: number,
   ) => number;
   readonly cellstore_setSheetName: (
     a: number,

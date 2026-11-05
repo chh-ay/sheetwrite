@@ -102,6 +102,13 @@ for (const marker of [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER]) {
   }
 }
 
+// The fixture creates no grid, so it needs no store. Lazy modules that import
+// the store make webpack keep the store's helpers in shared startup modules.
+const STORE_MARKER = "Encoded JSON exceeds the";
+if (mainCode.includes(STORE_MARKER)) {
+  throw new Error("Store helpers are in webpack's main.js; a lazy module imports the store");
+}
+
 const assets = publicFiles.map((file) => {
   const kind = file.endsWith(".js") ? "javascript" : file.endsWith(".css") ? "css" : "wasm";
   let owner;
