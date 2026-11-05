@@ -793,6 +793,8 @@ impl Ast {
             Ast::LetSlot { expression, .. } => test(expression),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { .. } => false,
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => false,
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)
