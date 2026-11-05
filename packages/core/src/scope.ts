@@ -207,3 +207,17 @@ export function isAbortError(error: unknown): boolean {
 }
 
 function noop(): void {}
+
+/** Delay that stands in for one animation frame where the host has none. */
+const FRAME_FALLBACK_MS = 16;
+
+/** Runs `callback` on the next animation frame, or after 16 ms without one; returns its canceller. */
+export function scheduleFrame(callback: () => void): () => void {
+  if (globalThis.requestAnimationFrame !== undefined) {
+    const frame = requestAnimationFrame(callback);
+    return () => cancelAnimationFrame(frame);
+  }
+
+  const timer = setTimeout(callback, FRAME_FALLBACK_MS);
+  return () => clearTimeout(timer);
+}

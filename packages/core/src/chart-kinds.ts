@@ -10,6 +10,12 @@ export interface ChartKindEntry {
   readonly icon: IconName;
 }
 
+/** Name of a chart kind as screen readers and a chart's plain frame say it, such as "Column chart". */
+export function chartKindName(kind: ChartKind): string {
+  const label = CHART_KINDS.find((entry) => entry.kind === kind)?.label ?? kind;
+  return `${label} chart`;
+}
+
 /** Every chart kind, in the order the ribbon menu and the kind picker list them. */
 export const CHART_KINDS: readonly ChartKindEntry[] = [
   { kind: "column", label: "Column", icon: "chartColumn" },

@@ -1,11 +1,6 @@
 import { cellA1, shiftA1Refs } from "./a1.js";
 import { parseCellInput } from "./cell-input.js";
-import {
-  isCellFontFamily,
-  isCellNumberFormat,
-  isCellVerticalAlign,
-  sanitizeCellStyle,
-} from "./cell-style-fields.js";
+import { isCellFontFamily, isCellVerticalAlign, sanitizeCellStyle } from "./cell-style-fields.js";
 import {
   type ClipboardCell,
   type ClipboardSnapshot,

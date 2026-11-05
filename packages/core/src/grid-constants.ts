@@ -5,7 +5,7 @@ export const ZOOM_MAX = 2;
 export const CELL_TEXT_HORIZONTAL_PADDING = 12;
 /** Fill-handle pointer tolerance on each axis, in CSS pixels. */
 export const FILL_HANDLE_HIT_RADIUS = 5;
-/** Estimated text width per UTF-16 code unit when no canvas context is available. */
-export const FALLBACK_CHARACTER_WIDTH = 8;
+/** ID of the one sheet of a workbook built from adapter rows; row bridges default to it. */
+export const DEFAULT_SHEET_ID = "sheet1";
 /** Default maximum number of distinct values read for filters and pivots. */
 export const DEFAULT_DISTINCT_VALUES_LIMIT = 1000;

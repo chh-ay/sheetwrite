@@ -64,6 +64,7 @@ export {
   type GridControllerHandlers,
 } from "./grid-controller.js";
 
+import { DEFAULT_SHEET_ID } from "./grid-constants.js";
 import { createGridController, type GridController } from "./grid-controller.js";
 
 /** Classification of adapter options as live-updatable or reset-sensitive. */
@@ -506,7 +507,7 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
     for (const column of columns) dataColumns[column.key]![rowIndex] = row[column.key] ?? null;
   }
 
-  const sheetId = "sheet1";
+  const sheetId = DEFAULT_SHEET_ID;
   return {
     workbook: {
       activeSheet: sheetId,

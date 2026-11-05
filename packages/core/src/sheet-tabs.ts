@@ -156,8 +156,7 @@ export class SheetTabs {
   /** Reconciles the controlled workbook records while preserving transient focus/editor state by ID. */
   update(sheets: readonly SheetTabRecord[], activeId: SheetId): void {
     if (this.destroyed) return;
-    this.removeMenuDismissListeners();
-    this.menuSheetId = null;
+    this.clearMenuState();
 
     const oldVisible = this.visibleSheets();
     const oldFocusIndex = oldVisible.findIndex(({ sheet }) => sheet.id === this.focusedId);
@@ -205,8 +204,7 @@ export class SheetTabs {
     if (readOnly) {
       this.editing = null;
       this.feedback = null;
-      this.removeMenuDismissListeners();
-      this.menuSheetId = null;
+      this.clearMenuState();
     }
     this.render(hadFocus);
   }
@@ -218,7 +216,7 @@ export class SheetTabs {
     this.rendering = true;
     this.host.removeEventListener("keydown", this.onKeydown);
     this.host.removeEventListener("focusout", this.onFocusOut);
-    this.removeMenuDismissListeners();
+    this.clearMenuState();
     this.unhideDismiss?.();
     this.unhideDismiss = null;
     this.host.replaceChildren();
@@ -231,7 +229,6 @@ export class SheetTabs {
     this.moveIndexes = [];
     this.editing = null;
     this.feedback = null;
-    this.menuSheetId = null;
     this.focusedId = null;
     this.draggedId = null;
   }

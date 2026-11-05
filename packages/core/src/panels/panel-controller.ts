@@ -5,7 +5,7 @@
 // (`openLazyPanel`). Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
-import { sheetNameKey } from "../name-key.js";
+import { nextSheetName } from "../name-key.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot } from "../types/document.js";
@@ -272,17 +272,13 @@ export function insertPivot(grid: Grid, destination: PivotDestination): string |
 function pivotSheet(
   sheets: readonly { readonly id: SheetId; readonly name: string }[],
 ): SheetSnapshot {
-  const names = new Set(sheets.map((sheet) => sheetNameKey(sheet.name)));
-  let number = sheets.length + 1;
-  while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
-
   const ids = new Set(sheets.map((sheet) => sheet.id));
   let suffix = sheets.length + 1;
   while (ids.has(`sheet-${suffix}`)) suffix += 1;
 
   return {
     id: `sheet-${suffix}`,
-    name: `Sheet ${number}`,
+    name: nextSheetName(sheets),
     order: sheets.length,
     rowCount: NEW_SHEET_ROWS,
     columns: Array.from({ length: NEW_SHEET_COLUMNS }, (_, col) => ({
