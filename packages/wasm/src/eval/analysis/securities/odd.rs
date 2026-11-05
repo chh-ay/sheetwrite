@@ -53,7 +53,7 @@ pub(super) fn first_period(values: &FuncAccumulator, is_yield: bool) -> NumberRe
     }
 
     solve(
-        |annual_yield| quote - bond.price(annual_yield),
+        &|annual_yield| quote - bond.price(annual_yield),
         bond.yield_guess(quote),
     )
 }
@@ -70,14 +70,8 @@ impl FirstPeriodBond {
     /// Excel needs the first coupon date on the schedule that steps back
     /// from maturity.
     fn is_on_maturity_schedule(&self) -> bool {
-        let is_month_end = self.maturity.is_last_day_of_month();
-        let mut date = self.maturity.add_months(-self.months(), is_month_end);
-
-        while date > self.first_coupon {
-            date = date.add_months(-self.months(), is_month_end);
-        }
-
-        date == self.first_coupon
+        Coupons::find(self.first_coupon, self.maturity, self.frequency).previous
+            == self.first_coupon
     }
 
     /// A first guess for the yield, from the simple-interest return.

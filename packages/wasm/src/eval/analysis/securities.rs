@@ -104,12 +104,14 @@ fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     }
 }
 
+#[inline(never)]
 fn date_arg(values: &FuncAccumulator, index: usize) -> Result<Date, FormulaError> {
     Date::from_serial(number_arg(values, index, None)?)
 }
 
 /// Reads a truncated `frequency`: 1 (annual), 2 (semiannual) or 4
 /// (quarterly). Any other value is `#NUM!`.
+#[inline(never)]
 fn frequency_arg(values: &FuncAccumulator, index: usize) -> NumberResult {
     let frequency = number_arg(values, index, None)?.trunc();
 
@@ -118,11 +120,13 @@ fn frequency_arg(values: &FuncAccumulator, index: usize) -> NumberResult {
     Ok(frequency)
 }
 
+#[inline(never)]
 fn basis_arg(values: &FuncAccumulator, index: usize) -> Result<Basis, FormulaError> {
     Basis::from_number(number_arg(values, index, Some(0.0))?)
 }
 
 /// COUPDAYBS, COUPDAYS, COUPDAYSNC, COUPNCD, COUPNUM and COUPPCD.
+#[inline(never)]
 fn coupon(name: &str, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 3, 4)?;
 
@@ -147,6 +151,7 @@ fn coupon(name: &str, values: &FuncAccumulator) -> NumberResult {
 
 /// ACCRINT(issue, first_interest, settlement, rate, par, frequency,
 /// [basis], [calc_method]).
+#[inline(never)]
 fn accrued_interest(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 6, 8)?;
 
@@ -266,6 +271,7 @@ impl Schedule {
 }
 
 /// ACCRINTM(issue, settlement, rate, par, [basis]).
+#[inline(never)]
 fn accrued_at_maturity(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 4, 5)?;
 
@@ -331,6 +337,7 @@ impl Bond {
     }
 
     /// The clean price per 100 for an annual yield, as PRICE defines it.
+    #[inline(never)]
     fn price(&self, annual_yield: f64) -> f64 {
         let coupon = self.coupon();
         let accrued = coupon * self.accrued_days / self.period_days;
@@ -354,6 +361,7 @@ impl Bond {
 }
 
 /// PRICE(settlement, maturity, rate, yld, redemption, frequency, [basis]).
+#[inline(never)]
 fn price(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 6, 7)?;
 
@@ -367,6 +375,7 @@ fn price(values: &FuncAccumulator) -> NumberResult {
 /// YIELD(settlement, maturity, rate, pr, redemption, frequency, [basis]).
 /// With one coupon left the yield has a closed form; otherwise Newton's
 /// method solves PRICE for the yield.
+#[inline(never)]
 fn bond_yield(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 6, 7)?;
 
@@ -382,11 +391,15 @@ fn bond_yield(values: &FuncAccumulator) -> NumberResult {
         return Ok(growth * bond.frequency / bond.remaining_share());
     }
 
-    solve(|annual_yield| bond.price(annual_yield) - price, YIELD_GUESS)
+    solve(
+        &|annual_yield| bond.price(annual_yield) - price,
+        YIELD_GUESS,
+    )
 }
 
 /// DURATION and MDURATION(settlement, maturity, coupon, yld, frequency,
 /// [basis]): the Macaulay duration, and the modified duration.
+#[inline(never)]
 fn duration(values: &FuncAccumulator, is_modified: bool) -> NumberResult {
     require_arity(values, 5, 6)?;
 
@@ -428,6 +441,7 @@ fn duration(values: &FuncAccumulator, is_modified: bool) -> NumberResult {
 
 /// DISC, INTRATE, PRICEDISC, RECEIVED and YIELDDISC(settlement, maturity,
 /// first, second, [basis]): securities that pay no coupon.
+#[inline(never)]
 fn discounted(name: &str, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 4, 5)?;
 
@@ -458,6 +472,7 @@ fn discounted(name: &str, values: &FuncAccumulator) -> NumberResult {
 
 /// PRICEMAT and YIELDMAT(settlement, maturity, issue, rate, yld or pr,
 /// [basis]): securities that pay all interest at maturity.
+#[inline(never)]
 fn interest_at_maturity(values: &FuncAccumulator, is_price: bool) -> NumberResult {
     require_arity(values, 5, 6)?;
 
@@ -496,6 +511,7 @@ fn interest_at_maturity(values: &FuncAccumulator, is_price: bool) -> NumberResul
 
 /// TBILLEQ, TBILLPRICE and TBILLYIELD(settlement, maturity, discount or
 /// pr). Maturity must be at most one year after settlement.
+#[inline(never)]
 fn treasury_bill(name: &str, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 3, 3)?;
 
@@ -557,14 +573,14 @@ fn sign(number: f64) -> i8 {
 /// root with another sign than the guess is not taken, and a bracket
 /// search with bisection runs instead, so the root nearest a positive
 /// guess wins.
-fn solve(function: impl Fn(f64) -> f64, guess: f64) -> NumberResult {
-    match newton(&function, guess) {
+fn solve(function: &dyn Fn(f64) -> f64, guess: f64) -> NumberResult {
+    match newton(function, guess) {
         Some(root) if sign(root) == sign(guess) => Ok(root),
-        _ => bisect(&function, guess),
+        _ => bisect(function, guess),
     }
 }
 
-fn newton(function: &impl Fn(f64) -> f64, guess: f64) -> Option<f64> {
+fn newton(function: &dyn Fn(f64) -> f64, guess: f64) -> Option<f64> {
     let mut rate = guess;
 
     for _ in 0..SOLVER_MAX_ITERATIONS {
@@ -586,7 +602,7 @@ fn newton(function: &impl Fn(f64) -> f64, guess: f64) -> Option<f64> {
     None
 }
 
-fn bisect(function: &impl Fn(f64) -> f64, guess: f64) -> NumberResult {
+fn bisect(function: &dyn Fn(f64) -> f64, guess: f64) -> NumberResult {
     ensure(guess > LOWEST_RATE)?;
 
     let floor = LOWEST_RATE + SOLVER_TOLERANCE;

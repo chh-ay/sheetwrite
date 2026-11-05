@@ -107,6 +107,7 @@ pub(crate) struct Date {
 impl Date {
     /// Reads a date serial. Excel truncates the time of day. A serial that
     /// is not a date is `#VALUE!`, as the function pages say.
+    #[inline(never)]
     pub(crate) fn from_serial(serial: f64) -> Result<Self, FormulaError> {
         let serial = serial.trunc();
 
@@ -120,6 +121,7 @@ impl Date {
     }
 
     /// The date serial, or NaN for a date after the last Excel date.
+    #[inline(never)]
     pub(crate) fn serial(self) -> f64 {
         date_serial(self.year, self.month, self.day).unwrap_or(f64::NAN)
     }
