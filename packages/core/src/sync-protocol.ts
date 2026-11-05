@@ -150,57 +150,6 @@ const LIMIT_KEYS: Record<keyof SyncCoordinatorLimits, true> = {
   maxBatchBytes: true,
 };
 
-const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
-  set: true,
-  setRange: true,
-  setBlock: true,
-  restoreBlock: true,
-  setRangeStyle: true,
-  clearRange: true,
-  permuteRows: true,
-  addRows: true,
-  removeRows: true,
-  moveRows: true,
-  addColumns: true,
-  removeColumns: true,
-  moveColumns: true,
-  setColumn: true,
-  setRowMeta: true,
-  addMerge: true,
-  removeMerge: true,
-  addSheet: true,
-  removeSheet: true,
-  renameSheet: true,
-  moveSheet: true,
-  setSheetVisibility: true,
-  setSheetMeta: true,
-  addTable: true,
-  updateTable: true,
-  removeTable: true,
-  setValidationRule: true,
-  removeValidationRule: true,
-  setHyperlink: true,
-  removeHyperlink: true,
-  setProtectedRange: true,
-  removeProtectedRange: true,
-  setNote: true,
-  setNamedRange: true,
-  removeNamedRange: true,
-  setCalculation: true,
-  setRelationship: true,
-  removeRelationship: true,
-  setMeasure: true,
-  removeMeasure: true,
-  setQuery: true,
-  removeQuery: true,
-  setChart: true,
-  removeChart: true,
-  setPivot: true,
-  removePivot: true,
-  setDashboardItem: true,
-  removeDashboardItem: true,
-};
-
 export function assertPendingCommit(
   commit: PendingCommit,
   documentId: string,
@@ -367,11 +316,7 @@ function assertOperationResources(
   const encodedBytes = jsonEncodedByteLength(value, maxEncodedBytes);
   for (let index = 0; index < value.length; index++) {
     const operation = value[index];
-    const record = assertPlainRecord(operation, "Each document operation must be a plain object");
-    const kind = ownDataValue(record, "op");
-    if (typeof kind !== "string" || !Object.hasOwn(DOCUMENT_OPERATION_KINDS, kind)) {
-      throw new SyncProtocolError("invalid-operations", "Document operation kind is invalid");
-    }
+    assertPlainRecord(operation, "Each document operation must be a plain object");
     const errors = validateDocumentOperationShape(operation, `operations[${index}]`);
     if (errors.length > 0) {
       const error = errors[0]!;

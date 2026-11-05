@@ -253,3 +253,58 @@ describe("saved query collaboration", () => {
     }
   });
 });
+
+describe("kept Power Query members on a retained graph", () => {
+  const snapshotWith = (unsupportedQueries: unknown): unknown => ({
+    schemaVersion: 1,
+    workbook: {
+      ...workbook(),
+      xlsxSource: {
+        parts: [
+          {
+            name: "customXml/item1.xml",
+            contentType: "application/xml",
+            method: 0,
+            crc32: 0,
+            uncompressedSize: 0,
+            data: "",
+          },
+        ],
+        graphs: [
+          {
+            owner: "workbook",
+            type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+            target: "customXml/item1.xml",
+            queries: "0123456789abcdef",
+            unsupportedQueries,
+            parts: ["customXml/item1.xml"],
+            dependencies: [],
+          },
+        ],
+      },
+    },
+    sheets: [],
+  });
+  const paths = (input: unknown): string[] => {
+    const result = validateWorkbookSnapshot(input);
+    return result.ok ? [] : result.errors.map((error) => error.path);
+  };
+  const path = "workbook.xlsxSource.graphs[0].unsupportedQueries";
+
+  it("accepts bounded member names and reasons, and rejects anything past the caps", () => {
+    expect(paths(snapshotWith([{ member: "Budget", reason: "schema" }]))).not.toContain(path);
+    expect(paths(snapshotWith("Budget"))).toContain(path);
+    expect(paths(snapshotWith([{ member: "Budget" }]))).toContain(`${path}[0].reason`);
+    expect(paths(snapshotWith([{ member: "Budget", reason: "x".repeat(65) }]))).toContain(
+      `${path}[0].reason`,
+    );
+    expect(paths(snapshotWith([{ member: "m".repeat(1025), reason: "schema" }]))).toContain(
+      `${path}[0].member`,
+    );
+    const many = Array.from({ length: 257 }, (_, index) => ({
+      member: `M${index}`,
+      reason: "schema",
+    }));
+    expect(paths(snapshotWith(many))).toContain(path);
+  });
+});

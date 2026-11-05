@@ -194,6 +194,23 @@ for (const key of [...defaultInitialChunks, ...chromeVisited]) {
   }
 }
 
+// The Queries & Connections panel is a dynamic entry of its own as well.
+const QUERY_PANEL_MARKER = "Kept from the file";
+const queryPanelKeys = Object.keys(manifest).filter(
+  (key) => manifest[key].isDynamicEntry && manifest[key].src?.endsWith("panels/query-panel.js"),
+);
+if (queryPanelKeys.length !== 1) {
+  throw new Error(`Expected one lazy Vite query panel chunk, got ${queryPanelKeys.length}`);
+}
+if (!(await chunkSource(queryPanelKeys[0])).includes(QUERY_PANEL_MARKER)) {
+  throw new Error("The lazy Vite query panel chunk does not contain the query panel");
+}
+for (const key of [...defaultInitialChunks, ...chromeVisited]) {
+  if (key !== queryPanelKeys[0] && (await chunkSource(key)).includes(QUERY_PANEL_MARKER)) {
+    throw new Error(`The query panel is also in ${manifest[key].file}`);
+  }
+}
+
 const emitted = await walk(root);
 const publicFiles = emitted
   .map((path) => relative(root, path).replaceAll("\\", "/"))

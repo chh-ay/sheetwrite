@@ -80,6 +80,20 @@ if (lifecycleInitialUrls.has(sortPanelUrl) || attributionInitialUrls.has(sortPan
 if (sortPanelChunk.code.includes(PANEL_MARKER)) {
   throw new Error("The Sort panel shares a Next.js chunk with the other side panels");
 }
+// The Queries & Connections panel is a separate lazy chunk in the same way.
+const QUERY_PANEL_MARKER = "Kept from the file";
+const queryPanelChunks = [];
+for (const path of selected.filter((file) => file.endsWith(".js"))) {
+  if ((await readFile(path, "utf8")).includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(path);
+}
+if (queryPanelChunks.length !== 1) {
+  throw new Error(`Expected one lazy Next.js query panel chunk, got ${queryPanelChunks.length}`);
+}
+const queryPanelUrl = relative(nextRoot, queryPanelChunks[0]).replaceAll("\\", "/");
+if (lifecycleInitialUrls.has(queryPanelUrl) || attributionInitialUrls.has(queryPanelUrl)) {
+  throw new Error(`The query panel is in the initial Next.js chunk ${queryPanelUrl}`);
+}
+
 const attributionAssetFiles = selected
   .map((path) => relative(nextRoot, path).replaceAll("\\", "/"))
   .filter((path) => path.endsWith(".js") && attributionInitialUrls.has(path));

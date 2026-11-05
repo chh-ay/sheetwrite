@@ -69,7 +69,6 @@ export class PagedDirtyPreflight {
 
   private noteRangeMutationFfi(operation: RuntimeResourceOperation | null): void {
     this.stats.ffiCalls += 1;
-    this.stats.maxTransferredArrayLength = Math.max(this.stats.maxTransferredArrayLength, 0);
     this.boundaryAccounting.record(operation ?? "edit", "js-to-wasm", 0, "scalar");
   }
 

@@ -47,11 +47,7 @@ interface CapturedClipboard extends ClipboardSnapshot {
   clearPatches: DocumentOp[];
 }
 
-interface ClipboardEnvelope {
-  token: string;
-  snapshot: ClipboardSnapshot;
-}
-
+/** A copied snapshot and the in-memory token that proves a paste came from it. */
 interface TrustedClipboard {
   token: string;
   snapshot: ClipboardSnapshot;
@@ -131,7 +127,7 @@ function clipboardJson(snapshot: ClipboardSnapshot, token: string): string {
   });
 }
 
-function parseClipboardJson(text: string): ClipboardEnvelope | null {
+function parseClipboardJson(text: string): TrustedClipboard | null {
   try {
     const value = JSON.parse(text) as {
       version?: unknown;

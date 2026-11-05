@@ -930,9 +930,17 @@ impl CellStore {
     /// that read changed output, round by round, until nothing changes.
     pub(crate) fn settle_pivots(&mut self) {
         for _ in 0..MAX_SETTLE_ROUNDS {
-            let changed = self.update_pivots();
+            let mut changed = self.update_pivots();
             if changed.is_empty() {
                 return;
+            }
+            // GETPIVOTDATA reads pivot output without a reference to the
+            // cell it reads, so it is volatile: changed output recomputes
+            // the volatile formulas of every sheet.
+            for (sheet, data) in self.sheets.iter().enumerate() {
+                if data.formulas.has_volatile() && !changed.contains(&sheet) {
+                    changed.push(sheet);
+                }
             }
             self.recompute_formulas(&changed);
         }
@@ -1323,6 +1331,33 @@ impl CellStore {
                 pivot.pending.rebuild = true;
             }
         }
+    }
+
+    /// `GETPIVOTDATA`: the value cell of the installed pivot whose output
+    /// holds `cell` on `sheet`, for `data_field` and the field and item
+    /// pairs. No pivot there is `#REF!`.
+    pub(crate) fn pivot_data(
+        &self,
+        sheet: usize,
+        cell: CellKey,
+        data_field: &str,
+        items: &[(String, Value)],
+    ) -> Result<Value, FormulaError> {
+        let pivot = self
+            .pivots
+            .as_deref()
+            .and_then(|registry| registry.sheets.get(&sheet))
+            .and_then(|pivots| {
+                pivots.iter().find(|pivot| {
+                    pivot.error.is_none()
+                        && pivot.attempt.is_some_and(|attempt| attempt.contains(cell))
+                })
+            })
+            .ok_or(FormulaError::Ref)?;
+        let (Some(cache), Some(layout)) = (&pivot.cache, &pivot.layout) else {
+            return Err(FormulaError::Ref);
+        };
+        cache.data_value(layout, data_field, items)
     }
 
     /// Aggregate updates of pivot `index` on `sheet` since its cache was

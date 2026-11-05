@@ -244,6 +244,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "XlsxSourceGraph",
       "XlsxSourcePart",
       "XlsxSourceSnapshot",
+      "XlsxUnsupportedQuery",
     ],
   },
   transaction: {
