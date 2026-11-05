@@ -175,3 +175,48 @@ export function ShowcaseSection({ id, title, children }: ShowcaseSectionProps) {
     </section>
   );
 }
+
+/** One label and live value in a {@link ShowcaseReadout}. */
+export interface ShowcaseReadoutItem {
+  readonly label: string;
+  readonly value: ReactNode;
+}
+
+/** A live label → value list for the side panel, such as timings or the current selection. */
+export function ShowcaseReadout({ items }: { readonly items: readonly ShowcaseReadoutItem[] }) {
+  return (
+    <dl className="sw-showcase__readout">
+      {items.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Tone of a {@link ShowcaseStatus}. */
+export type ShowcaseStatusTone = "ok" | "warn" | "error" | "neutral";
+
+const STATUS_BADGE_TONE: Readonly<Record<ShowcaseStatusTone, string | undefined>> = {
+  ok: "accent",
+  warn: "warning",
+  error: "danger",
+  neutral: undefined,
+};
+
+/** A short status badge, announced politely when it changes. */
+export function ShowcaseStatus({
+  tone,
+  children,
+}: {
+  readonly tone: ShowcaseStatusTone;
+  readonly children: ReactNode;
+}) {
+  return (
+    <span aria-live="polite" className="sw-badge" data-tone={STATUS_BADGE_TONE[tone]} role="status">
+      {children}
+    </span>
+  );
+}
