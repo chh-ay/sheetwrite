@@ -3,9 +3,9 @@
 //! AGGREGATE, which Excel skips so that a subtotal is not counted twice.
 
 use crate::calc::{Ast, Func};
+use crate::formula_slots::FormulaStore;
 use crate::row_visibility::SkippedRows;
 use crate::sheet::SheetData;
-use crate::types::FormulaEntry;
 
 /// Whether `ast` calls SUBTOTAL or AGGREGATE anywhere.
 pub(crate) fn ast_calls_subtotal(ast: &Ast) -> bool {
@@ -43,11 +43,17 @@ impl SkippedCells {
     }
 
     #[inline(never)]
-    pub(crate) fn skips_cell(self, sheet: &SheetData, row: u32, col: u32) -> bool {
+    pub(crate) fn skips_cell(
+        self,
+        sheet: &SheetData,
+        row: u32,
+        col: u32,
+        slots: &FormulaStore,
+    ) -> bool {
         self.nested_subtotals
             && sheet
                 .formulas
-                .get((row, col))
-                .is_some_and(FormulaEntry::calls_subtotal)
+                .id((row, col))
+                .is_some_and(|id| slots.is_subtotal(id))
     }
 }

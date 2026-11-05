@@ -1,12 +1,14 @@
 //! Optional function families for the complete analysis engine.
 
 mod aggregate;
+mod compatibility;
 mod database;
 mod dates;
 mod descriptive;
 mod distributions;
 mod finance;
 mod groupby;
+mod hypothesis;
 pub(crate) use groupby::grouping;
 pub(crate) mod lambda;
 pub(super) mod math;
@@ -104,6 +106,20 @@ const FAMILIES: &[Family] = &[
         names: distributions::NAMES,
         reference_cells: &[],
         evaluate: Some(distributions::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: compatibility::NAMES,
+        reference_cells: compatibility::REFERENCE_CELLS,
+        evaluate: Some(compatibility::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: hypothesis::NAMES,
+        reference_cells: &[],
+        evaluate: Some(hypothesis::evaluate),
         evaluate_ast: None,
         array: None,
     },
@@ -275,6 +291,16 @@ pub(super) fn evaluate_scalar(name: &str, values: &FuncAccumulator) -> EvalResul
 
 pub(super) fn treats_cell_as_reference(name: &str) -> bool {
     family(name).is_some_and(|family| family.reference_cells.contains(&name))
+}
+
+/// Whether the function reads every sheet of a 3-D reference.
+pub(crate) fn accepts_sheet_span(id: u16) -> bool {
+    compatibility::SHEET_SPAN_READERS.contains(&name(id))
+}
+
+/// Whether the function reads a union as one list of values.
+pub(crate) fn accepts_union(id: u16) -> bool {
+    compatibility::UNION_READERS.contains(&name(id))
 }
 
 /// Returns the positions `0..count` in stable sorted order.
