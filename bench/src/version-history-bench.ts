@@ -280,11 +280,18 @@ async function restoreMs(
 
 /**
  * First page (1,000 changes) of the diff from the start to the previous
- * version, and the heap that stays after the samples: a closed diff keeps none.
+ * version. `firstUse` is the memory that stays after the first diff loads the
+ * kernel and compiles its code; `afterSamples` is measured after the timed
+ * diffs, so its difference from `firstUse` is what closed diffs keep.
  */
 async function diffMs(archive: HistoryArchive, from: string, to: string) {
   await collectGarbage();
   const before = observation();
+
+  await archive.diffVersions({ from, to });
+  await collectGarbage();
+  const firstUse = observation();
+
   const samples: number[] = [];
   let changes = 0;
 
@@ -297,9 +304,9 @@ async function diffMs(archive: HistoryArchive, from: string, to: string) {
   }
 
   await collectGarbage();
-  const after = observation();
+  const afterSamples = observation();
 
-  return { firstPageMs: median(samples), changes, before, after };
+  return { firstPageMs: median(samples), changes, before, firstUse, afterSamples };
 }
 
 /**
