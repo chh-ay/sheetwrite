@@ -521,35 +521,32 @@ impl ExactIndex {
     /// scan order must decide.
     fn build(list: &ListView<'_>) -> Option<Self> {
         let mut numbers = Vec::new();
-        let mut folded = Vec::new();
+        let mut texts = Vec::new();
         for position in 0..list.len() {
             match list.entry(position) {
                 Entry::Error(_) => return None,
                 Entry::Number(number) if number.is_nan() => return None,
                 Entry::Number(number) => numbers.push(number_value(number)),
-                Entry::Text(text) if !text.is_empty() => folded.push(text.to_lowercase()),
+                Entry::Text(text) if !text.is_empty() => texts.push(fold_case(text)),
                 _ => {}
             }
         }
+        numbers.sort_unstable();
+        numbers.dedup();
+        texts.sort_unstable();
+        texts.dedup();
 
-        let mut distinct_numbers = numbers.clone();
-        distinct_numbers.sort_unstable();
-        distinct_numbers.dedup();
-        let mut distinct_texts = folded.clone();
-        distinct_texts.sort_unstable();
-        distinct_texts.dedup();
-
+        let mut folded = String::new();
         let mut index = Self {
             blank: None,
             empty_text: None,
             false_bool: None,
             true_bool: None,
-            number_bounds: vec![(u32::MAX, 0); distinct_numbers.len()],
-            numbers: distinct_numbers,
-            texts: vec![u32::MAX; distinct_texts.len()],
-            text_bounds: vec![(u32::MAX, 0); distinct_texts.len()],
+            number_bounds: vec![(u32::MAX, 0); numbers.len()],
+            numbers,
+            texts: vec![u32::MAX; texts.len()],
+            text_bounds: vec![(u32::MAX, 0); texts.len()],
         };
-        let (mut next_number, mut next_text) = (0, 0);
         for position in 0..list.len() {
             let at = position as u32;
             match list.entry(position) {
@@ -557,15 +554,14 @@ impl ExactIndex {
                 Entry::Text("") => widen(&mut index.empty_text, at),
                 Entry::Bool(false) => widen(&mut index.false_bool, at),
                 Entry::Bool(true) => widen(&mut index.true_bool, at),
-                Entry::Number(_) => {
-                    let rank = index.numbers.binary_search(&numbers[next_number]).ok()?;
-                    next_number += 1;
+                Entry::Number(number) => {
+                    let rank = index.numbers.binary_search(&number_value(number)).ok()?;
                     let bounds = &mut index.number_bounds[rank];
                     *bounds = (bounds.0.min(at), at);
                 }
-                Entry::Text(_) => {
-                    let rank = distinct_texts.binary_search(&folded[next_text]).ok()?;
-                    next_text += 1;
+                Entry::Text(text) => {
+                    fold_case_into(text, &mut folded);
+                    let rank = texts.binary_search(&folded).ok()?;
                     if index.texts[rank] == u32::MAX {
                         index.texts[rank] = at;
                     }
@@ -646,6 +642,25 @@ impl ExactIndex {
         stats.add_vec::<Bounds>(self.number_bounds.len(), self.number_bounds.capacity());
         stats.add_vec::<u32>(self.texts.len(), self.texts.capacity());
         stats.add_vec::<Bounds>(self.text_bounds.len(), self.text_bounds.capacity());
+    }
+}
+
+/// Case-folded text, with the fast path for ASCII. Folded texts compare by
+/// bytes in the order `compare_text_case_insensitive` gives their sources.
+fn fold_case(text: &str) -> String {
+    let mut folded = String::new();
+    fold_case_into(text, &mut folded);
+    folded
+}
+
+/// [`fold_case`] into a reused buffer.
+fn fold_case_into(text: &str, folded: &mut String) {
+    folded.clear();
+    if text.is_ascii() {
+        folded.push_str(text);
+        folded.make_ascii_lowercase();
+    } else {
+        folded.push_str(&text.to_lowercase());
     }
 }
 
