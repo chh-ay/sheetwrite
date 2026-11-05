@@ -73,6 +73,11 @@
       "title": "Database",
       "source": "microsoft-excel-functions",
       "section": "Database functions"
+    },
+    "engineering": {
+      "title": "Engineering",
+      "source": "microsoft-excel-functions",
+      "section": "Engineering functions"
     }
   },
   "signatureProfiles": {
@@ -3953,6 +3958,32 @@
         }
       ],
       "returns": "scalar"
+    },
+    "convert": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fromUnit",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "toUnit",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5125,6 +5156,51 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-engineering": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -5291,6 +5367,15 @@
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
+      ]
+    },
+    "analysis-engineering": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits."
       ]
     }
   },
@@ -5663,6 +5748,24 @@
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/hypothesis.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-engineering": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/units.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -9868,6 +9971,18 @@
       "semantics": "analysis-descriptive",
       "dialects": "analysis-hypothesis",
       "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CONVERT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "convert",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }

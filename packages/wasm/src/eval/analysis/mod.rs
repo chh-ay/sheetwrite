@@ -16,6 +16,7 @@ mod matrices;
 mod regression;
 mod reshape;
 mod text;
+mod units;
 
 use crate::calc::Ast;
 use crate::store::CellStore;
@@ -120,6 +121,13 @@ const FAMILIES: &[Family] = &[
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: units::NAMES,
+        reference_cells: &[],
+        evaluate: Some(units::evaluate),
         evaluate_ast: None,
         array: None,
     },

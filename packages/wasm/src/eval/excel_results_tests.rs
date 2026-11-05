@@ -86,6 +86,14 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn convert_reads_cells() {
+    assert_results(&[
+        ("=CONVERT(Data!A1,\"m\",\"cm\")", "100"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn legacy_statistics_names_read_references_as_their_successors() {
     assert_results(&[
         ("=STDEV(Data!A1:A3)", "1"),
