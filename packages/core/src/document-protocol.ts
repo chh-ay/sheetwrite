@@ -34,6 +34,7 @@ import {
 } from "./pivot.js";
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { ROW_ORDER_ENCODING } from "./row-order.js";
+import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -2649,6 +2650,14 @@ export function validateDocumentOperationShape(
       requireString(operation, "id", path, errors, true);
       break;
 
+    case "setQuery":
+      validateSavedQueryShape(ownValue(operation, "query"), `${path}.query`, errors);
+      break;
+
+    case "removeQuery":
+      requireString(operation, "id", path, errors, true);
+      break;
+
     case "setChart":
       validateOperationSheetId(operation, path, errors);
       validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
@@ -3176,6 +3185,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const dataModel = ownValue(workbook, "dataModel");
     if (dataModel !== undefined) {
       validateDataModelShape(dataModel, "workbook.dataModel", errors);
+    }
+
+    const queries = ownValue(workbook, "queries");
+    if (queries !== undefined) {
+      validateSavedQueriesShape(queries, "workbook.queries", errors);
     }
   }
 
@@ -3770,6 +3784,12 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "removeRelationship":
       return `relationship:${operation.id}`;
+
+    case "setQuery":
+      return `query:${operation.query.id}`;
+
+    case "removeQuery":
+      return `query:${operation.id}`;
 
     default: {
       const exhaustive: never = operation;
