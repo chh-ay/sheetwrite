@@ -8,6 +8,7 @@ import { isDashboard } from "../dashboard.js";
 import type { IconName } from "../icons/icon-names.js";
 import { iconNode } from "../icons/resolve.js";
 import { isKeyboardAction } from "../keymap.js";
+import { selectionCell } from "../selection.js";
 import type { Grid, GridCommandName, GridCommandState, IconOverrides } from "../types/grid.js";
 import {
   EDIT_STATE_COMMAND,
@@ -23,7 +24,7 @@ import {
   type RibbonPlacementSpec,
 } from "./command-spec.js";
 import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
-import { focusAddress, steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
+import { steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
 import { focusInSurface, type RibbonPopup, showInSurface } from "./ribbon-popup.js";
 
 /**
@@ -484,7 +485,7 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   trigger.setAttribute("aria-haspopup", "dialog");
   trigger.setAttribute("aria-expanded", "false");
   trigger.addEventListener("click", () => {
-    const cell = focusAddress(context.grid);
+    const cell = selectionCell(context.grid.getSelection());
     if (cell === null) return;
 
     const form = document.createElement("form");

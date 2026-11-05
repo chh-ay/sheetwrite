@@ -7,6 +7,7 @@
 // tab, group and glyph planned for each 0.7 feature are on the Toolbar and
 // ribbon docs page, so features that land separately still form one layout.
 
+import { actionFeedbackFor } from "../action-feedback.js";
 import { CHART_KINDS } from "../chart-kinds.js";
 import {
   ACCOUNTING_FORMAT,
@@ -31,9 +32,10 @@ import {
   showFormulaExplanation,
   showNameManager,
 } from "../panels/panel-loader.js";
+import { queryCommandsOf, queryRefreshRunning, toggleQueryRefresh } from "../query-commands.js";
+import { selectionCell } from "../selection.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
-import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, CommandFlags, Grid, GridCommandName } from "../types/grid.js";
 import { xlsxImportCommand } from "../workbook-io.js";
 import type {
@@ -59,16 +61,6 @@ const EXCEL_THEME_FILL = "#ffff00";
 const PERCENT_SCALE = 100;
 const MAX_FONT_SIZE_PT = 409;
 
-/** The cell link and note forms act on: a single cell, or a range's anchor. */
-export function focusAddress(grid: Grid): CellAddress | null {
-  const selection = grid.getSelection();
-  if (selection?.kind === "cell") return selection.addr;
-  if (selection?.kind === "range") {
-    return { sheet: selection.range.sheet, ...selection.range.start };
-  }
-  return null;
-}
-
 /** Inclusive data-row spans of the selection, for row grouping. */
 function selectedRowSpans(grid: Grid): Array<[number, number]> {
   const selection = grid.getSelection();
@@ -88,6 +80,38 @@ function selectedRowSpans(grid: Grid): Array<[number, number]> {
 
 function rowSpan(a: number, b: number): [number, number] {
   return [Math.min(a, b), Math.max(a, b)];
+}
+
+/**
+ * Data › Get Data and Queries & Connections. The opener lives in this lazy
+ * ribbon chunk rather than the panel loader, so grids without queries carry
+ * none of it.
+ */
+function showQueryPanel(grid: Grid, create: boolean): void {
+  void loadPanels(grid).then((controller) => controller.openQueryPanel(grid, create));
+}
+
+/** The query commands show only while a query session is connected to the grid. */
+// They stay enabled in a read-only grid: the grid rejects the write and the
+// rejection message is shown, because no command state reports read-only alone.
+const queriesConnected = (grid: Grid): boolean => queryCommandsOf(grid) !== undefined;
+
+const QUERIES_REFRESHED = "Queries refreshed.";
+const QUERIES_REFRESHING = "Refreshing queries. Select Refresh All again to cancel.";
+
+/** Data › Refresh All: one refresh of every output table; a second press cancels it. */
+function refreshAllQueries(grid: Grid): void {
+  const feedback = actionFeedbackFor(grid);
+  if (queryRefreshRunning(grid)) {
+    // The running refresh reports its own cancellation.
+    void toggleQueryRefresh(grid, null);
+    return;
+  }
+
+  feedback?.show(QUERIES_REFRESHING);
+  void toggleQueryRefresh(grid, null).then((outcome) =>
+    feedback?.show(outcome ?? QUERIES_REFRESHED),
+  );
 }
 
 const button = (
@@ -354,7 +378,7 @@ function hostFunctions(grid: Grid): readonly FormulaFunctionMetadata[] {
  * same coordinates the formula bar edits with.
  */
 function startFormula(grid: Grid, name: string): void {
-  const cell = focusAddress(grid);
+  const cell = selectionCell(grid.getSelection());
   if (cell !== null) grid.beginEdit(cell.row, cell.col, `=${name}(`);
 }
 
@@ -726,8 +750,51 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Data",
-    reduceOrder: ["export", "showHide", "outline", "dataTools", "sortFilter"],
+    reduceOrder: [
+      "export",
+      "showHide",
+      "outline",
+      "dataTools",
+      "queries",
+      "getTransform",
+      "sortFilter",
+    ],
     groups: [
+      {
+        id: "getTransform",
+        label: "Get & Transform Data",
+        icon: "getData",
+        layout: "flow",
+        controls: [
+          {
+            ...button("Get Data", "getData", (grid) => showQueryPanel(grid, true), "view", {
+              large: true,
+            }),
+            available: queriesConnected,
+          },
+        ],
+      },
+      {
+        id: "queries",
+        label: "Queries & Connections",
+        icon: "queries",
+        layout: "flow",
+        controls: [
+          {
+            ...button("Refresh All", "refreshAll", refreshAllQueries, "view", { large: true }),
+            available: queriesConnected,
+          },
+          {
+            ...button(
+              "Queries & Connections",
+              "queries",
+              (grid) => showQueryPanel(grid, false),
+              "view",
+            ),
+            available: queriesConnected,
+          },
+        ],
+      },
       {
         id: "sortFilter",
         label: "Sort & Filter",

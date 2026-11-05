@@ -131,6 +131,8 @@ One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes
 
 A1 cells (`A1`, `$B12`, `AA$3`), rectangular ranges (`A1:B3`), whole columns and rows (`A:C`, `$2:$5`), and cross-sheet references (`Sales!E2`, `'Sales 2026'!E2:E10`, `Sales!E:E`) are supported. A reference must be inside column `XFD` and row 1048576; a token past them, such as `XYZ1`, is a name. A whole column or row reads only the cells that the sheet has, and a row or column edit keeps it whole. Numbers can have an exponent, such as `1E3` or `1.5E-3`. Absolute markers affect fill/structural rewriting; they do not change evaluation.
 
+References to other workbooks use Excel's forms: `[Budget.xlsx]Annual!C10`, `[Budget.xlsx]Annual!C10:C25`, `'[Budget 2024.xlsx]Annual Plan'!C10` and `'C:\Reports\[Budget.xlsx]Annual'!C10`. The formula text stays as written, a fill moves relative references, and row, column and sheet edits in this workbook do not change them. Sheetwrite does not open the other workbook, so these references show `#REF!` ([#226](https://github.com/chh-ay/sheetwrite/issues/226)). XLSX import still keeps formulas with external links as text.
+
 Named ranges are document operations and snapshot metadata:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
@@ -234,7 +236,7 @@ Cells inside a spilled range and host-linked reference cells hold no formula. A 
 
 ## Unsupported categories
 
-Formula evaluation performs no network request and runs no custom JavaScript. `RANDARRAY`, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
+Formula evaluation performs no network request and runs no custom JavaScript. `RANDARRAY`, network functions, external/live-data providers, values from external workbooks, and cube/OLAP functions are unsupported. Examples include `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
 Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. The generated [unsupported-category ledger](/docs/reference/formula-functions/#unsupported-categories) is derived from the versioned inventory.
 

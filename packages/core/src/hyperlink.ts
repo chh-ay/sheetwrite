@@ -1,4 +1,4 @@
-import { isCellFontFamily, isCellVerticalAlign } from "./cell-style-fields.js";
+import { sanitizeCellStyle } from "./cell-style-fields.js";
 import { SheetwriteError } from "./errors.js";
 import {
   dataProperties,
@@ -6,7 +6,7 @@ import {
   NUL_CHARACTER,
   sanitizeRange,
 } from "./plain-data.js";
-import type { CellBorder, CellHyperlink, CellStyle, HyperlinkTarget } from "./types/cell.js";
+import type { CellHyperlink, HyperlinkTarget } from "./types/cell.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { Workbook } from "./types/document.js";
 
@@ -21,22 +21,6 @@ export const MAX_HYPERLINK_DISPLAY_LENGTH = 32_767;
 
 const ENCODED_CONTROL_CHARACTERS = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/iu;
 
-const STYLE_KEYS = new Set([
-  "bold",
-  "italic",
-  "underline",
-  "strikethrough",
-  "fontSize",
-  "fontFamily",
-  "color",
-  "backgroundColor",
-  "align",
-  "verticalAlign",
-  "wrap",
-  "border",
-]);
-const BORDER_SIDES = new Set(["all", "top", "right", "bottom", "left"]);
-const BORDER_KEYS = new Set(["color", "width", "style"]);
 const HYPERLINK_KEYS = new Set(["id", "range", "target", "display", "style"]);
 const TARGET_KEYS = new Set(["kind", "url", "range"]);
 
@@ -80,97 +64,6 @@ export function isValidHyperlinkId(id: string): boolean {
   );
 }
 
-function sanitizeColor(value: unknown): string | undefined | null {
-  if (value === undefined) return undefined;
-  return typeof value === "string" && /^#[0-9a-f]{6}$/iu.test(value) ? value : null;
-}
-
-function sanitizeBorder(value: unknown): CellBorder | null {
-  const border = dataProperties(value, BORDER_KEYS);
-  if (!border) return null;
-  const color = sanitizeColor(border.color);
-  if (color === null) return null;
-  if (
-    border.width !== undefined &&
-    (typeof border.width !== "number" ||
-      !Number.isFinite(border.width) ||
-      border.width < 0 ||
-      border.width > 64)
-  ) {
-    return null;
-  }
-  if (
-    border.style !== undefined &&
-    border.style !== "solid" &&
-    border.style !== "dashed" &&
-    border.style !== "dotted"
-  ) {
-    return null;
-  }
-  return {
-    ...(color !== undefined ? { color } : {}),
-    ...(border.width !== undefined ? { width: border.width } : {}),
-    ...(border.style !== undefined ? { style: border.style } : {}),
-  };
-}
-
-/** Convert an untrusted style into one bounded, plain renderer-safe value. */
-export function sanitizeHyperlinkStyle(value: unknown): CellStyle | null {
-  const style = dataProperties(value, STYLE_KEYS);
-  if (!style) return null;
-  const result: CellStyle = {};
-  for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"] as const) {
-    const candidate = style[key];
-    if (candidate !== undefined && typeof candidate !== "boolean") return null;
-    if (candidate !== undefined) result[key] = candidate;
-  }
-  if (
-    style.fontSize !== undefined &&
-    (typeof style.fontSize !== "number" ||
-      !Number.isFinite(style.fontSize) ||
-      style.fontSize < 0 ||
-      style.fontSize > 1_024)
-  ) {
-    return null;
-  }
-  if (style.fontSize !== undefined) result.fontSize = style.fontSize;
-  const color = sanitizeColor(style.color);
-  const backgroundColor = sanitizeColor(style.backgroundColor);
-  if (color === null || backgroundColor === null) return null;
-  if (color !== undefined) result.color = color;
-  if (backgroundColor !== undefined) result.backgroundColor = backgroundColor;
-  if (
-    style.align !== undefined &&
-    style.align !== "left" &&
-    style.align !== "center" &&
-    style.align !== "right"
-  ) {
-    return null;
-  }
-  if (style.align !== undefined) result.align = style.align;
-  if (style.fontFamily !== undefined) {
-    if (typeof style.fontFamily !== "string" || !isCellFontFamily(style.fontFamily)) return null;
-    result.fontFamily = style.fontFamily;
-  }
-  if (style.verticalAlign !== undefined) {
-    if (!isCellVerticalAlign(style.verticalAlign)) return null;
-    result.verticalAlign = style.verticalAlign;
-  }
-  if (style.border !== undefined) {
-    const borders = dataProperties(style.border, BORDER_SIDES);
-    if (!borders) return null;
-    const resultBorders: NonNullable<CellStyle["border"]> = {};
-    for (const side of ["all", "top", "right", "bottom", "left"] as const) {
-      if (borders[side] === undefined) continue;
-      const border = sanitizeBorder(borders[side]);
-      if (!border) return null;
-      resultBorders[side] = border;
-    }
-    result.border = resultBorders;
-  }
-  return result;
-}
-
 function sanitizeTarget(value: unknown): HyperlinkTarget | null {
   const target = dataProperties(value, TARGET_KEYS);
   if (!target) return null;
@@ -199,7 +92,7 @@ export function sanitizeCellHyperlink(value: unknown): CellHyperlink | null {
   ) {
     return null;
   }
-  const style = link.style === undefined ? undefined : sanitizeHyperlinkStyle(link.style);
+  const style = link.style === undefined ? undefined : sanitizeCellStyle(link.style);
   if (style === null) return null;
   return {
     id: link.id,

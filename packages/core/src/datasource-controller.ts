@@ -1053,7 +1053,7 @@ export class DatasourceController {
         this.clearOwned(activeRequest);
       })
       .catch((error: unknown) => {
-        if (!this.canReport(activeRequest, generation)) return;
+        if (!this.canHydrate(activeRequest, generation)) return;
         this.clearOwned(activeRequest);
         this.visibleWaitStarted.discard(
           activeRequest.columns,
@@ -1170,10 +1170,6 @@ export class DatasourceController {
       generation === this.generation &&
       !request.controller.signal.aborted
     );
-  }
-
-  private canReport(request: ActiveRequest, generation: number): boolean {
-    return this.canHydrate(request, generation);
   }
 
   private requeuePartial(request: ActiveRequest, attempt: number): void {

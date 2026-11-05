@@ -70,15 +70,6 @@ export class CustomEditorController {
     return this.active !== null;
   }
 
-  get editingCell(): { row: number; col: number } | null {
-    const address = this.active?.state.viewAddress;
-    return address ? { row: address.row, col: address.col } : null;
-  }
-
-  get editingAddress(): Readonly<CellAddress> | null {
-    return this.active?.state.address ?? null;
-  }
-
   begin(options: BeginCustomEditorOptions): void {
     this.cancel(false);
 

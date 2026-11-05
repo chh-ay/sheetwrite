@@ -293,6 +293,16 @@ describe("createNameBox", () => {
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 2 } });
     expect(input.value).toBe("C5");
 
+    // Several ranges show the cell of the last one, where Excel keeps the active cell.
+    grid.setSelection({
+      kind: "multi",
+      ranges: [
+        { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+        { sheet: "s1", start: { row: 3, col: 3 }, end: { row: 4, col: 4 } },
+      ],
+    });
+    expect(input.value).toBe("D4");
+
     input.value = "b3";
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });

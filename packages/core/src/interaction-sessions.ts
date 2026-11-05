@@ -1,13 +1,13 @@
 import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
-import { cellDisplayText, cellScalarToText, parseCellInput } from "./cell-input.js";
+import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
-import { FILL_HANDLE_HIT_RADIUS, FALLBACK_CHARACTER_WIDTH } from "./grid-constants.js";
+import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
-import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
+import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -76,8 +76,8 @@ interface InteractionDependencies {
   /** Top content-Y and height of a row (for row-boundary hit-testing). */
   rowTop: (row: number) => number;
   rowHeight: (row: number) => number;
-  /** Current vertical render window, for event-driven autofit measurement. */
-  visibleRowWindow: () => { start: number; end: number };
+  /** Fit the widths of `cols` to their contents, as the grid's `autoFitColumns` does. */
+  autoFitColumns: (cols: readonly number[]) => void;
   /** Live column-resize preview: set the width and re-lay-out without committing. */
   previewColumnWidth: (col: number, width: number) => void;
   previewRowHeight: (row: number, height: number) => void;
@@ -140,8 +140,6 @@ export class InteractionSessions {
   private dragCancel: ((ev: PointerEvent) => void) | null = null;
   /** Pointer that owns the active drag; other pointers' events are ignored. */
   private activePointerId: number | null = null;
-  /** Detached 2D context for autofit text measurement; lazily created. */
-  private measureCtx: CanvasRenderingContext2D | null = null;
 
   constructor(deps: InteractionDependencies) {
     this.deps = deps;
@@ -486,11 +484,6 @@ export class InteractionSessions {
     return { x: r.x + r.w, y };
   }
 
-  /** Drop the text measurement context; the next autofit creates it again. */
-  trimMemory(): void {
-    this.measureCtx = null;
-  }
-
   destroy(): void {
     this.cancelPointer();
     this.cancelEditor();
@@ -662,7 +655,7 @@ export class InteractionSessions {
     const resize = this.deps.readOnly() ? null : this.resizeAt(e);
     if (resize && resize.kind === "col") {
       e.preventDefault();
-      this.autofitColumn(resize.index);
+      this.deps.autoFitColumns([resize.index]);
       return;
     }
     const cell = this.cellAtPointer(e.clientX, e.clientY);
@@ -769,53 +762,6 @@ export class InteractionSessions {
       );
     };
     this.attachDrag(e, move, up, cancel);
-  }
-
-  private autofitColumn(col: number): void {
-    const column = this.deps.sheet().columns[col];
-    if (!column) return;
-
-    const win = this.deps.visibleRowWindow();
-    const view = this.deps.store.getVisibleWindow(this.deps.activeSheet(), win, [col]);
-    const values = view.values;
-    const texts: string[] = [];
-    for (let i = 0; i < values.length; i++) {
-      const value = values[i] ?? null;
-      const cellFormat = view.styles[view.styleIds[i] ?? 0]?.numberFormat;
-      texts.push(
-        cellDisplayText(
-          value,
-          cellFormat ?? column.cellStyle?.numberFormat ?? column.numberFormat,
-          column.numberLocale,
-        ),
-      );
-    }
-
-    const width = autofitColumnWidth((text) => this.measureText(text), texts, column.header);
-    this.deps.commit(
-      [
-        {
-          op: "setColumn",
-          sheet: this.deps.activeSheet(),
-          col,
-          // measureText ran under the zoomed font; persist base units.
-          patch: { width: Math.max(MIN_COLUMN_WIDTH, Math.round(width / this.deps.zoom())) },
-        },
-      ],
-      "structure",
-    );
-  }
-
-  private measureText(text: string): number {
-    if (!this.measureCtx) {
-      const canvas = document.createElement("canvas");
-      this.measureCtx = canvas.getContext("2d");
-    }
-
-    const ctx = this.measureCtx;
-    if (!ctx) return text.length * FALLBACK_CHARACTER_WIDTH;
-    ctx.font = this.deps.theme().font;
-    return ctx.measureText(text).width;
   }
 
   /** Runs a host command bound to this key combination; true when one ran. */

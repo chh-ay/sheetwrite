@@ -94,19 +94,43 @@ export class Scope {
     this.controller.abort(reason);
     const disposers = [...this.disposers];
     this.disposers.clear();
-    let failure: unknown;
-    let failed = false;
+    const failures = new FirstFailure();
     for (let index = disposers.length - 1; index >= 0; index--) {
-      try {
-        disposers[index]?.();
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
+      const disposer = disposers[index];
+      if (disposer) failures.run(disposer);
     }
-    if (failed) throw failure;
+    failures.rethrow();
+  }
+}
+
+/**
+ * Runs cleanup steps that must all run even when one throws, and keeps the
+ * first error for `rethrow` after the last step.
+ */
+export class FirstFailure {
+  private failure: unknown;
+  private failed = false;
+
+  /** Whether a step has failed. */
+  get hasFailed(): boolean {
+    return this.failed;
+  }
+
+  /** Run `step`, keeping its error when it is the first one. */
+  run(step: () => void): void {
+    try {
+      step();
+    } catch (error) {
+      if (this.failed) return;
+
+      this.failure = error;
+      this.failed = true;
+    }
+  }
+
+  /** Throw the first kept error, if any step failed. */
+  rethrow(): void {
+    if (this.failed) throw this.failure;
   }
 }
 
@@ -183,3 +207,17 @@ export function isAbortError(error: unknown): boolean {
 }
 
 function noop(): void {}
+
+/** Delay that stands in for one animation frame where the host has none. */
+const FRAME_FALLBACK_MS = 16;
+
+/** Runs `callback` on the next animation frame, or after 16 ms without one; returns its canceller. */
+export function scheduleFrame(callback: () => void): () => void {
+  if (globalThis.requestAnimationFrame !== undefined) {
+    const frame = requestAnimationFrame(callback);
+    return () => cancelAnimationFrame(frame);
+  }
+
+  const timer = setTimeout(callback, FRAME_FALLBACK_MS);
+  return () => clearTimeout(timer);
+}

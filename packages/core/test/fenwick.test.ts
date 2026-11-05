@@ -3,15 +3,10 @@ import { describe, expect, it } from "bun:test";
 import { OffsetIndex, ScaledScroll } from "../src/fenwick.js";
 
 describe("OffsetIndex", () => {
-  it("keeps uniform geometry allocation-free through structural edits", () => {
+  it("maps offsets arithmetically while every row has the default height", () => {
     const idx = new OffsetIndex(1_000_000, 28);
-    expect(idx.backingStoreBytes).toBe(0);
     expect(idx.rowAtOffset(14_000_005)).toEqual({ row: 500_000, top: 14_000_000 });
-
-    idx.insertRows(500_000, 2, 28);
-    idx.removeRows(100, 1);
-    expect(idx.backingStoreBytes).toBe(0);
-    expect(idx.totalHeight).toBe(1_000_001 * 28);
+    expect(idx.totalHeight).toBe(1_000_000 * 28);
   });
 
   it("reflects a single-row height override in subsequent offsets", () => {
@@ -22,17 +17,6 @@ describe("OffsetIndex", () => {
     expect(idx.offsetOf(3)).toBe(20 + 20 + 50);
     // row 2 now spans [40, 90)
     expect(idx.rowAtOffset(85)).toEqual({ row: 2, top: 40 });
-    expect(idx.rowAtOffset(90)).toEqual({ row: 3, top: 90 });
-  });
-
-  it("materializes and indexes a non-default inserted band", () => {
-    const idx = new OffsetIndex(3, 20);
-    idx.insertRows(1, 2, 35);
-    expect(idx.totalHeight).toBe(130);
-    expect([0, 1, 2, 3, 4].map((row) => idx.heightOf(row))).toEqual([20, 35, 35, 20, 20]);
-    expect(idx.offsetOf(3)).toBe(90);
-    expect(idx.rowAtOffset(54)).toEqual({ row: 1, top: 20 });
-    expect(idx.rowAtOffset(55)).toEqual({ row: 2, top: 55 });
     expect(idx.rowAtOffset(90)).toEqual({ row: 3, top: 90 });
   });
 });

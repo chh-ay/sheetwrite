@@ -14,7 +14,7 @@ import { referenceColor } from "../formula-colors.js";
 import { storeFunctions } from "../functions/registry.js";
 import { signature } from "../functions/signature.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
-import { selectionFocus } from "../shell/grid-binding.js";
+import { selectionCell } from "../selection.js";
 import type { Grid, GridPanel } from "../types/grid.js";
 import { panelSection, rebuildPanel } from "./panel-dom.js";
 
@@ -150,7 +150,7 @@ function buildExplanation(
   grid: Grid,
   functions: readonly FormulaFunctionMetadata[],
 ): void {
-  const focus = selectionFocus(grid.getSelection());
+  const focus = selectionCell(grid.getSelection());
   const input = focus === null ? null : grid.getCellInput(focus.row, focus.col);
   const text = input?.text ?? "";
   if (input === null || !text.startsWith("=")) {
