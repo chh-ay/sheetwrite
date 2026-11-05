@@ -14,7 +14,7 @@ Calls that change the archive run one at a time. Each publishes atomically,
 so a failure or abort leaves the last durable version readable.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L403"><code>packages/core/src/history-archive.ts#L403</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L440"><code>packages/core/src/history-archive.ts#L440</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -25,12 +25,13 @@ so a failure or abort leaves the last durable version readable.
 <a href="#history-archive-prune"><code>prune</code></a>
 <a href="#history-archive-read-version"><code>readVersion</code></a>
 <a href="#history-archive-record"><code>record</code></a>
+<a href="#history-archive-restore-version"><code>restoreVersion</code></a>
 <a href="#history-archive-save-version"><code>saveVersion</code></a>
 <a href="#history-archive-storage-usage"><code>storageUsage</code></a>
 <a href="#history-archive-open"><code>open</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>10</span>
+## Members <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-member-list">
 
@@ -97,12 +98,31 @@ alive while a concurrent prune runs; the lease is released on every exit.</p>
 <summary><code>record</code> <span class="api-member-summary">Append one committed transaction.</span></summary>
 
 ```ts generated
-record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>;
+record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>;
 ```
 
 <p class="api-member-doc">Append one committed transaction. `capture` runs only when a checkpoint is
 due and must return the committed document at `commit.revision`. An
 automatic version is made after `automaticIntervalMs` of active time.</p>
+</details>
+
+<details class="api-member" id="history-archive-restore-version" data-pagefind-weight="1">
+<summary><code>restoreVersion</code> <span class="api-member-summary">Restore one version, or one sheet or range of it, on grid as one undoable transaction.</span></summary>
+
+```ts generated
+restoreVersion: (grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions) => Promise<ApplyTransactionResult>;
+```
+
+<p class="api-member-doc">Restore one version, or one sheet or range of it, on `grid` as one undoable
+transaction. The version is rebuilt in a private engine instance and
+compared with the grid's current document; the difference is committed as
+one atomic restore, which `SyncCoordinator` sends as one transaction that
+is never rebased.
+
+With `options.sync`, the coordinator must be online with no pending or
+conflicted commits. A change to the grid while the version is read, or a
+scope that cuts a merged cell or hyperlink, rejects before anything changes.
+See the restore section of the persistence guide for what each scope covers.</p>
 </details>
 
 <details class="api-member" id="history-archive-save-version" data-pagefind-weight="1">
@@ -158,10 +178,16 @@ class HistoryArchive {
     signal?: AbortSignal,
   ) => Promise<WorkbookSnapshot>;
   record: (
-    commit: HistoryCommit,
+    commit: CommittedTransaction,
     capture?: HistorySnapshotProvider,
     signal?: AbortSignal,
   ) => Promise<void>;
+  restoreVersion: (
+    grid: Grid,
+    id: string,
+    scope: HistoryRestoreScope,
+    options?: HistoryRestoreOptions,
+  ) => Promise<ApplyTransactionResult>;
   saveVersion: (
     name: string,
     authorId: string,

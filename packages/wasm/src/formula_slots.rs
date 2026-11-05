@@ -1,7 +1,7 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
 use crate::memory::{StoreMemoryStats, FORMULAS};
-use crate::types::{AbsCellKey, CellKey, EvalResult, FormulaEntry};
+use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, FormulaError};
 
 const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
@@ -10,8 +10,29 @@ const SLOT_CAPACITY_SLACK: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
 
+/// Below this many slots, location growth takes several steps at once.
+const DOUBLING_SLOT_LIMIT: usize = 4096;
+
 // One membership word of ids per page bounds moves of occupied entry storage.
 const SLOT_PAGE_LEN: usize = BITS_PER_WORD;
+
+/// The location capacity after `len` slots fill it. Every capacity is a step
+/// of one eighth from the last, so a large store keeps the same bounded
+/// slack. A small store takes several steps at once, until its capacity at
+/// least doubles, so loading copies the array a few times instead of tens.
+fn location_capacity_after(len: usize) -> usize {
+    let target = if len < DOUBLING_SLOT_LIMIT {
+        len.saturating_mul(2).max(SLOT_PAGE_LEN)
+    } else {
+        len + 1
+    };
+
+    let mut capacity = len;
+    while capacity < target {
+        capacity = capacity.saturating_add((capacity / SLOT_GROWTH_DIVISOR).max(MIN_SLOT_GROWTH));
+    }
+    capacity
+}
 
 /// Stable workbook identity; moving a cell changes its location, not this id.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -263,7 +284,16 @@ impl FormulaStore {
             self.grow_slot_family(location, entry)?
         };
 
-        self.track(id);
+        // A new or reused slot has no flag bits: retiring a slot clears them.
+        if let Some(entry) = self.get(id) {
+            let (volatile, subtotal) = (entry.volatile(), entry.calls_subtotal());
+            if volatile {
+                self.volatile.insert(id);
+            }
+            if subtotal {
+                self.subtotals.insert(id);
+            }
+        }
         Some(id)
     }
 
@@ -288,8 +318,7 @@ impl FormulaStore {
         Some(id)
     }
 
-    // Most source writes replace a live formula or reuse a slot.
-    #[cold]
+    /// Loading grows the store by one slot per new formula.
     #[inline(never)]
     fn grow_slot_family(&mut self, location: AbsCellKey, entry: FormulaEntry) -> Option<FormulaId> {
         let index = self.locations.len();
@@ -302,14 +331,23 @@ impl FormulaStore {
             if self.entries.capacity() == 0 {
                 self.entries.reserve_exact(MIN_SLOT_GROWTH);
             }
-            self.entries.push(Vec::with_capacity(MIN_SLOT_GROWTH));
+
+            // A small workbook grows its only page entry by entry. A workbook
+            // that filled a page reserves each later page once, so loading
+            // does not move entries through repeated page growth.
+            let capacity = if self.entries.is_empty() {
+                MIN_SLOT_GROWTH
+            } else {
+                SLOT_PAGE_LEN
+            };
+            self.entries.push(Vec::with_capacity(capacity));
         }
 
         let page = self.entries.last_mut()?;
         page.push(FormulaSlot::Occupied(entry));
         if index == self.locations.capacity() {
-            let growth = (index / SLOT_GROWTH_DIVISOR).max(MIN_SLOT_GROWTH);
-            self.locations.reserve_exact(growth);
+            self.locations
+                .reserve_exact(location_capacity_after(index) - index);
         }
         self.locations.push(location);
         Some(FormulaId(id))
@@ -530,6 +568,45 @@ pub(crate) struct FormulaResults {
     count: usize,
     /// Active calls are separate from results so back edges do not recurse.
     pub(crate) visiting: FormulaBits,
+    range_sums: RangeSums,
+}
+
+/// The sums of single-range `SUM` formulas in one pass, by range group id.
+/// Formulas over the same literal-only range read one ordered scan, so each
+/// gets the same additions in the same order. A range with formula or spill
+/// cells is not kept: its values can change within the pass.
+///
+/// `slots` maps a group to its entry and is valid only where `sums` holds that
+/// group, so a pass clears only `sums`.
+#[derive(Default)]
+struct RangeSums {
+    slots: Vec<u32>,
+    sums: Vec<(u32, Result<f64, FormulaError>)>,
+    /// The range of the last shared sum read or stored. Readers of one range
+    /// usually evaluate in a row, so they skip the group lookup.
+    last: Option<(CellRange, Result<f64, FormulaError>)>,
+}
+
+impl RangeSums {
+    fn get(&self, group: usize) -> Option<Result<f64, FormulaError>> {
+        let slot = *self.slots.get(group)? as usize;
+        self.sums
+            .get(slot)
+            .filter(|&&(stored, _)| stored as usize == group)
+            .map(|&(_, sum)| sum)
+    }
+
+    fn insert(&mut self, group: usize, groups: usize, sum: Result<f64, FormulaError>) {
+        if self.slots.len() != groups {
+            self.slots.resize(groups, 0);
+            self.slots.shrink_to_fit();
+        }
+        let Some(slot) = self.slots.get_mut(group) else {
+            return;
+        };
+        *slot = self.sums.len() as u32;
+        self.sums.push((group as u32, sum));
+    }
 }
 
 impl FormulaResults {
@@ -607,6 +684,40 @@ impl FormulaResults {
         self.count
     }
 
+    /// The shared sum of `range` when it was the last range shared.
+    #[inline]
+    pub(crate) fn last_range_sum(&self, range: CellRange) -> Option<Result<f64, FormulaError>> {
+        self.range_sums
+            .last
+            .filter(|&(last, _)| last == range)
+            .map(|(_, sum)| sum)
+    }
+
+    /// The shared sum of range group `group` in this pass, which becomes the
+    /// last shared range.
+    pub(crate) fn range_sum(
+        &mut self,
+        range: CellRange,
+        group: usize,
+    ) -> Option<Result<f64, FormulaError>> {
+        let sum = self.range_sums.get(group)?;
+        self.range_sums.last = Some((range, sum));
+        Some(sum)
+    }
+
+    /// Shares the sum of a literal-only range group for the rest of the pass;
+    /// `groups` is the index's group count.
+    pub(crate) fn share_range_sum(
+        &mut self,
+        range: CellRange,
+        group: usize,
+        groups: usize,
+        sum: Result<f64, FormulaError>,
+    ) {
+        self.range_sums.insert(group, groups, sum);
+        self.range_sums.last = Some((range, sum));
+    }
+
     /// Clear touched positions so a small edit does not scan all slots.
     pub(crate) fn clear(&mut self) {
         for id in self.used.drain(..) {
@@ -616,6 +727,8 @@ impl FormulaResults {
             self.visiting.remove(id);
         }
         self.values.clear();
+        self.range_sums.sums.clear();
+        self.range_sums.last = None;
         self.count = 0;
     }
 
@@ -631,6 +744,9 @@ impl FormulaResults {
         if self.used.capacity() > SLOT_PAGE_LEN {
             self.used = Vec::new();
         }
+        if self.range_sums.sums.capacity() > SLOT_PAGE_LEN {
+            self.range_sums.sums = Vec::new();
+        }
 
         // Reuse primary pass storage, never formula values or selected ids.
         work.clear();
@@ -645,5 +761,13 @@ impl FormulaResults {
         formulas.add_vec::<FormulaId>(self.used.len(), self.used.capacity());
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
+        formulas.add_vec::<u32>(
+            self.range_sums.slots.len(),
+            self.range_sums.slots.capacity(),
+        );
+        formulas.add_vec::<(u32, Result<f64, FormulaError>)>(
+            self.range_sums.sums.len(),
+            self.range_sums.sums.capacity(),
+        );
     }
 }

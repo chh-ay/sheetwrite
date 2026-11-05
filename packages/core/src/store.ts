@@ -527,11 +527,22 @@ export class SheetwriteStore implements Store {
     return this.engine.aggregate(sheet, col, op);
   }
 
-  sortBy(sheet: SheetId, col: number, ascending: boolean): ApplyTransactionResult {
-    return this.sortByMulti(sheet, [{ col, ascending }]);
-  }
-
-  sortByMulti(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
+  /**
+   * Sort the displayed rows of a sheet by `keys` (first key primary; stable)
+   * without moving any cell; an empty list clears the view sort. The keys
+   * are saved in the sheet and export to XLSX as `sortState`. To move the
+   * cells, as Excel's Sort does, use `sortRange`.
+   *
+   * @example
+   * ```ts
+   * import type { SheetwriteStore } from "@sheetwrite/core";
+   *
+   * function showLargestFirst(store: SheetwriteStore) {
+   *   return store.setViewSort("s1", [{ col: 2, ascending: false }]);
+   * }
+   * ```
+   */
+  setViewSort(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
     if (keys.length > 0) this.requireCompleteQuery(sheet);
     return this.applyTransaction(
       {
@@ -545,6 +556,52 @@ export class SheetwriteStore implements Store {
       },
       "structure",
     );
+  }
+
+  /**
+   * Sort the rows of `range` in place, as Excel's Sort does: cells move with
+   * their row in one undoable transaction, and formulas follow Excel's
+   * rules for sorted rows. Hidden and filtered-out rows keep their place.
+   * With `hasHeader`, the first row of `range` stays. A sort that would
+   * move part of a merged cell or spill range is rejected.
+   *
+   * @example
+   * ```ts
+   * import type { SheetwriteStore } from "@sheetwrite/core";
+   *
+   * function sortByRevenue(store: SheetwriteStore) {
+   *   return store.sortRange(
+   *     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+   *     [{ col: 2, ascending: false }],
+   *     { hasHeader: true },
+   *   );
+   * }
+   * ```
+   */
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options: { hasHeader?: boolean } = {},
+  ): ApplyTransactionResult {
+    this.requireCompleteQuery(range.sheet);
+    const plan = this.engine.sortRangePlan(range, keys, options.hasHeader ?? false);
+    if (plan.kind === "unchanged") return { status: "noop", epoch: this.epoch, reason: "empty" };
+    if (plan.kind === "refused") {
+      return {
+        status: "rejected",
+        epoch: this.epoch,
+        issues: [
+          {
+            kind: "invalid-operation",
+            severity: "error",
+            operationIndex: 0,
+            message: plan.message,
+          },
+        ],
+      };
+    }
+
+    return this.applyTransaction({ patches: [plan.operation] }, "sort");
   }
 
   setColumnFilter(

@@ -1,0 +1,303 @@
+import { beforeAll, describe, expect, test } from "bun:test";
+
+import type {
+  PowerQueryCodec,
+  SavedQuery,
+  WorkbookSnapshot,
+  XlsxWorkbookWarning,
+} from "@sheetwrite/core";
+import { sheetwriteWorkbookBackend as backend } from "@sheetwrite/xlsx";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+
+import { loadPowerQueryCodec } from "../src/node.js";
+
+let codec: PowerQueryCodec;
+
+beforeAll(async () => {
+  codec = await loadPowerQueryCodec();
+});
+
+const sales: SavedQuery = {
+  id: "sales",
+  name: "Sales",
+  source: {
+    kind: "csv",
+    sourceId: "feed",
+    locator: "https://example.test/sales.csv",
+    columns: [
+      { id: "region", name: "Region", type: "text" },
+      { id: "total", name: "Total", type: "number" },
+    ],
+  },
+  steps: [{ kind: "filter", predicate: { kind: "compare", column: "total", op: "gt", value: 0 } }],
+  output: { table: "sales-table", tableName: "Sales", anchor: { sheet: "s1", row: 0, col: 0 } },
+};
+
+function snapshot(queries: SavedQuery[] = [sales]): WorkbookSnapshot {
+  return {
+    schemaVersion: 1,
+    workbook: { activeSheet: "s1", ...(queries.length ? { queries } : {}) },
+    sheets: [
+      {
+        id: "s1",
+        name: "Data",
+        order: 0,
+        rowCount: 4,
+        columns: [
+          { key: "a", header: "A", width: 80, type: "text" },
+          { key: "b", header: "B", width: 80, type: "number" },
+        ],
+        tables: [
+          {
+            id: "sales-table",
+            name: "Sales",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
+            columns: [
+              { id: "region", name: "Region" },
+              { id: "total", name: "Total" },
+            ],
+            headerRow: true,
+            totalsRow: false,
+          },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: 3,
+            colCount: 2,
+            cells: [
+              { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "Region" } },
+              { rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "Total" } },
+              { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "North" } },
+              { rowOffset: 1, colOffset: 1, value: { kind: "literal", value: 5 } },
+              { rowOffset: 2, colOffset: 0, value: { kind: "literal", value: "South" } },
+              { rowOffset: 2, colOffset: 1, value: { kind: "literal", value: 7 } },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+type Warnings = XlsxWorkbookWarning[];
+
+function options(warnings: Warnings, withCodec: boolean) {
+  return {
+    onWarning: (warning: XlsxWorkbookWarning) => warnings.push(warning),
+    ...(withCodec ? { powerQuery: codec } : {}),
+  };
+}
+
+/** The decoded Section1.m of a written DataMashup item ([MS-QDEFF] 2.2). */
+function sectionOf(files: Record<string, Uint8Array>): string | undefined {
+  for (const [name, bytes] of Object.entries(files)) {
+    if (!/^customXml\/item\d+\.xml$/u.test(name)) continue;
+
+    const match = /<DataMashup[^>]*>([^<]+)<\/DataMashup>/u.exec(strFromU8(bytes));
+    if (!match?.[1]) continue;
+
+    const binary = Uint8Array.from(atob(match[1]), (character) => character.charCodeAt(0));
+    const length = new DataView(binary.buffer).getUint32(4, true);
+    const parts = unzipSync(binary.subarray(8, 8 + length));
+    const section = parts["Formulas/Section1.m"];
+    return section ? strFromU8(section) : undefined;
+  }
+
+  return undefined;
+}
+
+describe("Power Query export", () => {
+  test("writes the mashup, a connection and a query table for each output", async () => {
+    const warnings: Warnings = [];
+    const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), options(warnings, true)));
+
+    expect(sectionOf(files)).toBe(codec.encode([sales]).section);
+    expect(strFromU8(files["xl/connections.xml"] ?? new Uint8Array())).toContain("Location=Sales;");
+    expect(strFromU8(files["xl/tables/table1.xml"] ?? new Uint8Array())).toContain(
+      'tableType="queryTable"',
+    );
+    expect(Object.keys(files)).toContain("xl/queryTables/queryTable1.xml");
+    expect(
+      warnings.filter((warning) => warning.code === "query-loss").map((warning) => warning.message),
+    ).toEqual(["Query sales differs in Excel: conversion-culture"]);
+  });
+
+  test("keeps an unchanged mashup byte-for-byte and its table binding on the next save", async () => {
+    const first = await backend.toXlsxWorkbook(snapshot(), options([], true));
+    const imported = await backend.fromXlsxWorkbook(first, options([], true));
+    const second = unzipSync(await backend.toXlsxWorkbook(imported, options([], true)));
+    const original = unzipSync(first);
+    const item =
+      Object.keys(original).find((name) => /^customXml\/item\d+\.xml$/u.test(name)) ?? "";
+
+    expect(second[item]).toEqual(original[item]);
+    expect(second["xl/connections.xml"]).toEqual(original["xl/connections.xml"]);
+    expect(strFromU8(second["xl/tables/table1.xml"] ?? new Uint8Array())).toContain(
+      'tableType="queryTable"',
+    );
+  });
+
+  test("writes values only and reports it when no codec is given", async () => {
+    const warnings: Warnings = [];
+    const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), options(warnings, false)));
+
+    expect(sectionOf(files)).toBeUndefined();
+    expect(files["xl/connections.xml"]).toBeUndefined();
+    expect(warnings).toContainEqual(expect.objectContaining({ code: "query-loss" }));
+  });
+});
+
+describe("Power Query import", () => {
+  test("restores exact definitions written by Sheetwrite, with or without a codec", async () => {
+    const file = await backend.toXlsxWorkbook(snapshot(), options([], true));
+
+    for (const withCodec of [true, false]) {
+      const imported = await backend.fromXlsxWorkbook(file, options([], withCodec));
+      expect(imported.workbook.queries).toEqual([sales]);
+    }
+  });
+
+  test("reads Excel-style M through the codec and binds outputs by FillTarget", async () => {
+    const section = `section Section1;
+
+shared Orders = let
+    Source = Excel.CurrentWorkbook(){[Name="Input"]}[Content],
+    Typed = Table.TransformColumnTypes(Source,{{"Region", type text}, {"Total", Int64.Type}}),
+    Kept = Table.SelectRows(Typed, each [Total] > 1)
+in
+    Kept;
+
+shared Files = Folder.Files("C:\\data");
+`;
+    const warnings: Warnings = [];
+    const file = withMashup(
+      await backend.toXlsxWorkbook(snapshot([]), options([], false)),
+      section,
+      "Orders",
+      "Sales",
+    );
+    const imported = await backend.fromXlsxWorkbook(file, options(warnings, true));
+
+    expect(imported.workbook.queries).toEqual([
+      {
+        id: "Orders",
+        name: "Orders",
+        source: {
+          kind: "host",
+          sourceId: "Input",
+          columns: [
+            { id: "Region", name: "Region", type: "text" },
+            { id: "Total", name: "Total", type: "number" },
+          ],
+        },
+        steps: [
+          { kind: "filter", predicate: { kind: "compare", column: "Total", op: "gt", value: 1 } },
+        ],
+        output: {
+          table: expect.any(String),
+          tableName: "Sales",
+          anchor: { sheet: expect.any(String), row: 0, col: 0 },
+        },
+      },
+    ]);
+    expect(warnings.map((warning) => warning.message)).toContainEqual(
+      expect.stringContaining("Power Query member Files was kept as M text"),
+    );
+  });
+});
+
+describe("retained Power Query parts without a codec", () => {
+  test("are written back byte-for-byte while the saved queries are unchanged", async () => {
+    const section = 'section Section1;\n\nshared Files = Folder.Files("C:\\\\data");\n';
+    const original = withMashup(
+      await backend.toXlsxWorkbook(snapshot([]), options([], false)),
+      section,
+      "Files",
+      "Sales",
+    );
+    const imported = await backend.fromXlsxWorkbook(original, options([], false));
+    const exported = unzipSync(await backend.toXlsxWorkbook(imported, options([], false)));
+
+    expect(imported.workbook.queries).toBeUndefined();
+    expect(exported["customXml/item1.xml"]).toEqual(unzipSync(original)["customXml/item1.xml"]);
+  });
+
+  test("are dropped and reported when the saved queries changed since import", async () => {
+    const section = 'section Section1;\n\nshared Files = Folder.Files("C:\\\\data");\n';
+    const original = withMashup(
+      await backend.toXlsxWorkbook(snapshot([]), options([], false)),
+      section,
+      "Files",
+      "Sales",
+    );
+    const imported = await backend.fromXlsxWorkbook(original, options([], false));
+    imported.workbook.queries = [sales];
+
+    const warnings: Warnings = [];
+    const exported = unzipSync(await backend.toXlsxWorkbook(imported, options(warnings, false)));
+
+    expect(sectionOf(exported)).toBeUndefined();
+    expect(warnings).toContainEqual(
+      expect.objectContaining({
+        code: "query-loss",
+        message: expect.stringContaining("saved queries changed"),
+      }),
+    );
+  });
+});
+
+/**
+ * Adds a DataMashup item built from [MS-QDEFF]: version 0, then length-prefixed
+ * Package Parts (OPC with Formulas/Section1.m), Permissions, Metadata and a
+ * one-byte null Permission Bindings stream.
+ */
+function withMashup(file: Uint8Array, section: string, member: string, table: string): Uint8Array {
+  const files = unzipSync(file);
+  const u32 = (value: number): Uint8Array => {
+    const bytes = new Uint8Array(4);
+    new DataView(bytes.buffer).setUint32(0, value, true);
+    return bytes;
+  };
+  const join = (parts: Uint8Array[]): Uint8Array => {
+    const output = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+    let offset = 0;
+    for (const part of parts) {
+      output.set(part, offset);
+      offset += part.length;
+    }
+    return output;
+  };
+  const prefixed = (bytes: Uint8Array) => join([u32(bytes.length), bytes]);
+  const parts = zipSync({
+    "[Content_Types].xml": strToU8(
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="m" ContentType="text/plain"/><Default Extension="xml" ContentType="text/xml"/></Types>',
+    ),
+    "Config/Package.xml": strToU8(
+      "<Package><Version>2.21.0.0</Version><MinVersion>2.21.0.0</MinVersion><Culture>en-US</Culture></Package>",
+    ),
+    "Formulas/Section1.m": strToU8(section),
+  });
+  const metadataXml = strToU8(
+    `<LocalPackageMetadataFile><Items><Item><ItemLocation><ItemType>Formula</ItemType><ItemPath>Section1/${member}</ItemPath></ItemLocation><StableEntries><Entry Type="FillEnabled" Value="l1"/><Entry Type="FillTarget" Value="s${table}"/></StableEntries></Item></Items></LocalPackageMetadataFile>`,
+  );
+  const binary = join([
+    u32(0),
+    prefixed(parts),
+    prefixed(strToU8("<PermissionList/>")),
+    prefixed(join([u32(0), prefixed(metadataXml), u32(0)])),
+    prefixed(Uint8Array.of(0)),
+  ]);
+  const item = `<?xml version="1.0" encoding="utf-8"?><DataMashup xmlns="http://schemas.microsoft.com/DataMashup">${btoa(String.fromCharCode(...binary))}</DataMashup>`;
+
+  files["customXml/item1.xml"] = strToU8(item);
+  const rels = strFromU8(files["xl/_rels/workbook.xml.rels"] ?? new Uint8Array());
+  files["xl/_rels/workbook.xml.rels"] = strToU8(
+    rels.replace(
+      "</Relationships>",
+      '<Relationship Id="rIdMashup" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/></Relationships>',
+    ),
+  );
+  return zipSync(files);
+}

@@ -8,10 +8,10 @@ description: "DocumentOp type in @sheetwrite/core: Exhaustive serializable opera
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L493"><code>packages/core/src/types/document.ts#L493</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L508"><code>packages/core/src/types/document.ts#L508</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>41</span>
+## Variants <span class="api-count" data-pagefind-ignore>44</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -72,6 +72,18 @@ Exhaustive serializable operation union for workbook mutations.
   range: Range;
   contents?: boolean;
   style?: boolean;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "permuteRows";
+  range: Range;
+  encoding: "u32le-base64-v1";
+  order: string;
 }
 ```
 
@@ -365,6 +377,20 @@ Exhaustive serializable operation union for workbook mutations.
 <div class="api-variant">
 
 ```ts generated
+{ op: "setQuery"; query: SavedQuery }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeQuery"; id: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
 { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
 ```
 
@@ -432,6 +458,12 @@ export type DocumentOp =
       range: Range;
       contents?: boolean;
       style?: boolean;
+    }
+  | {
+      op: "permuteRows";
+      range: Range;
+      encoding: "u32le-base64-v1";
+      order: string;
     }
   | {
       op: "addRows";
@@ -600,6 +632,14 @@ export type DocumentOp =
       id: string;
     }
   | {
+      op: "setQuery";
+      query: SavedQuery;
+    }
+  | {
+      op: "removeQuery";
+      id: string;
+    }
+  | {
       op: "setChart";
       sheet: SheetId;
       chart: ChartDefinition;
@@ -642,6 +682,7 @@ export type DocumentOp =
 <p class="api-consumers-label">Public exports naming <code>DocumentOp</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/committed-transaction/"><code>CommittedTransaction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/document-op-target/"><code>documentOpTarget</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/document-rebase-result/"><code>DocumentRebaseResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -653,7 +694,6 @@ export type DocumentOp =
 <li><a href="/docs/api/core/rebase-document-operations/"><code>rebaseDocumentOperations</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge/"><code>RowBridge</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-clear-delta/"><code>RowBridgeClearDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/row-bridge-fill-delta/"><code>RowBridgeFillDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li class="api-consumer-more">and 32 more</li>
 </ul>
 </div>

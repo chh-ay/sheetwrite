@@ -6,6 +6,7 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
   WorkbookTableXmlElement,
+  WorkbookTable,
 } from "@sheetwrite/core";
 import {
   colToA1,
@@ -22,6 +23,12 @@ import { DRAWING_REL } from "./chart-xml.js";
 import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
+import {
+  QUERY_TABLE_CONTENT,
+  QUERY_TABLE_REL,
+  type QueryTableBinding,
+  queryTableXml,
+} from "./query-table.js";
 import {
   assertResource,
   boundedErrorText,
@@ -70,6 +77,12 @@ interface SheetWriteResult {
   readonly tables: {
     readonly part: string;
     readonly xml: Uint8Array;
+    /** The table's queryTable part and its relationships, when a saved query fills it. */
+    readonly queryTable?: {
+      readonly part: string;
+      readonly xml: Uint8Array;
+      readonly rels: Uint8Array;
+    };
   }[];
 }
 
@@ -107,6 +120,8 @@ export interface WorkbookWriteHook {
    */
   appendCharts?(sheet: SheetSnapshot, charts: readonly DrawingChart[]): boolean;
   parts?(): Iterable<ZipPart>;
+  /** Connection of the saved query that fills `table`, if it is written as a query table. */
+  queryTable?(table: WorkbookTable): QueryTableBinding | undefined;
 }
 
 function quotedSheet(name: string): string {
@@ -547,12 +562,13 @@ function tableXml(
   sheetName: string,
   context: XlsxCodecContext,
   styles: StylesRegistry,
+  queryTable: boolean,
 ): Uint8Array {
   const ref = `${colToA1(table.range.start.col)}${table.range.start.row + 1}:${colToA1(table.range.end.col)}${table.range.end.row + 1}`;
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
-    `<table xmlns="${MAIN_NS}" id="${nativeId}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}" headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
+    `<table xmlns="${MAIN_NS}" id="${nativeId}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}"${queryTable ? ' tableType="queryTable"' : ""} headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
   );
   const warnRuleLoss = (message: string): void => {
     emitWarning(context, { code: "unsupported-feature", message, sheet: sheetName });
@@ -565,7 +581,7 @@ function tableXml(
       column.totalsRowFormula !== undefined &&
       formulaContainsExternalReference(column.totalsRowFormula.text);
     xml.append(
-      `<tableColumn id="${index + 1}" name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !externalTotals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
+      `<tableColumn id="${index + 1}"${queryTable ? ` queryTableFieldId="${index + 1}"` : ""} name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !externalTotals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
     );
     for (const formula of [column.calculatedColumnFormula, column.totalsRowFormula]) {
       if (!formula) continue;
@@ -963,9 +979,28 @@ function* writeSheet(
       type: TABLE_REL,
       target: `../tables/table${nativeId}.xml`,
     });
+    const binding = hook?.queryTable?.(table);
     return {
       part: `xl/tables/table${nativeId}.xml`,
-      xml: tableXml(table, nativeId, sheet.name, context, styles),
+      xml: tableXml(table, nativeId, sheet.name, context, styles, binding !== undefined),
+      ...(binding
+        ? {
+            queryTable: {
+              part: `xl/queryTables/queryTable${nativeId}.xml`,
+              xml: queryTableXml(table, nativeId, binding),
+              rels: relationshipsXml(
+                [
+                  {
+                    id: "rId1",
+                    type: QUERY_TABLE_REL,
+                    target: `../queryTables/queryTable${nativeId}.xml`,
+                  },
+                ],
+                context,
+              ),
+            },
+          }
+        : {}),
     };
   });
   if (tables.length > 0) {
@@ -1188,6 +1223,12 @@ function* writeWorkbookParts(
     for (const table of result.tables) {
       yield { name: table.part, data: table.xml };
       overrides.push({ part: table.part, contentType: TABLE_CONTENT });
+      if (table.queryTable) {
+        const rels = table.part.replace(/^xl\/tables\//u, "xl/tables/_rels/") + ".rels";
+        yield { name: rels, data: table.queryTable.rels };
+        yield { name: table.queryTable.part, data: table.queryTable.xml };
+        overrides.push({ part: table.queryTable.part, contentType: QUERY_TABLE_CONTENT });
+      }
     }
     nextTableId += result.tables.length;
     for (const part of result.chartParts ?? []) yield part;

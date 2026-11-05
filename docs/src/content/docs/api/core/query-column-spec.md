@@ -1,43 +1,43 @@
 ---
-title: "RevisionCoordinatorOptions | @sheetwrite/core"
-description: "RevisionCoordinatorOptions interface in @sheetwrite/core: Document identity and version options for revision coordination."
+title: "QueryColumnSpec | @sheetwrite/core"
+description: "QueryColumnSpec interface in @sheetwrite/core: Stable identity is separate from the field name used by source records."
 ---
-<!-- api-export:@sheetwrite/core|.|RevisionCoordinatorOptions -->
+<!-- api-export:@sheetwrite/core|.|QueryColumnSpec -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Document identity and version options for revision coordination.
+Stable identity is separate from the field name used by source records.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L282"><code>packages/core/src/collaboration.ts#L282</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/query.ts#L11"><code>packages/core/src/types/query.ts#L11</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="revision-coordinator-options-document-id" data-pagefind-weight="1">
-<summary><code>documentId</code></summary>
+<details class="api-member" id="query-column-spec-id" data-pagefind-weight="1">
+<summary><code>id</code></summary>
 
 ```ts generated
-documentId: string;
+readonly id: string;
 ```
 
 </details>
 
-<details class="api-member" id="revision-coordinator-options-server-version" data-pagefind-weight="1">
-<summary><code>serverVersion</code></summary>
+<details class="api-member" id="query-column-spec-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
 
 ```ts generated
-serverVersion: number;
+readonly name: string;
 ```
 
 </details>
 
-<details class="api-member" id="revision-coordinator-options-migrate-snapshot" data-pagefind-weight="1">
-<summary><code>migrateSnapshot</code></summary>
+<details class="api-member" id="query-column-spec-type" data-pagefind-weight="1">
+<summary><code>type</code></summary>
 
 ```ts generated
-migrateSnapshot?: (snapshot: unknown) => unknown;
+readonly type: QueryColumnType;
 ```
 
 </details>
@@ -49,10 +49,10 @@ migrateSnapshot?: (snapshot: unknown) => unknown;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface RevisionCoordinatorOptions {
-  documentId: string;
-  serverVersion: number;
-  migrateSnapshot?: (snapshot: unknown) => unknown;
+export interface QueryColumnSpec {
+  readonly id: string;
+  readonly name: string;
+  readonly type: QueryColumnType;
 }
 ```
 
@@ -74,9 +74,10 @@ export interface RevisionCoordinatorOptions {
 <li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 
-<p class="api-consumers-label">Public exports naming <code>RevisionCoordinatorOptions</code></p>
+<p class="api-consumers-label">Public exports naming <code>QueryColumnSpec</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/revision-coordinator/"><code>RevisionCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/saved-query-source/"><code>SavedQuerySource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/queries/query-source/"><code>QuerySource</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

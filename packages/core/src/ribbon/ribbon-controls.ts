@@ -115,12 +115,13 @@ function commandButton(
   return button;
 }
 
-/** The tooltip: the label, and the shortcut when the grid binds one to the command. */
+/** The tooltip: the description or label, and the shortcut when the grid binds one to the command. */
 function commandTitle(spec: RibbonButtonSpec, grid: Grid): string {
-  if (!isKeyboardAction(spec.id)) return spec.label;
+  const text = spec.description ?? spec.label;
+  if (!isKeyboardAction(spec.id)) return text;
 
   const shortcut = grid.getShortcutLabel(spec.id);
-  return shortcut === "" ? spec.label : `${spec.label} (${shortcut})`;
+  return shortcut === "" ? text : `${text} (${shortcut})`;
 }
 
 function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonControlView {

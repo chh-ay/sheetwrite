@@ -166,12 +166,12 @@ describe("search highlights follow the active view", () => {
     // rank is ROW_COUNT - row, so ascending view order starts at data row 39:
     // view row v holds data row 39 - v, and every even view row is a match.
     // Match order is data-row order, which the reversed view paints last-first.
-    grid.sortBy(2, true);
+    grid.setViewSort([{ col: 2, ascending: true }]);
     grid.refresh();
     expect(topsOf(host)).toEqual([368, 312, 256, 200, 144, 88, 32]);
 
     // A second sort of the same length restores the identity view.
-    grid.sortBy(2, false);
+    grid.setViewSort([{ col: 2, ascending: false }]);
     grid.refresh();
     expect(topsOf(host)).toEqual(TOP_MATCH_TOPS);
     grid.destroy();

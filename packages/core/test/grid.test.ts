@@ -1320,7 +1320,7 @@ describe("Grid auto-fit", () => {
     if (!sheet) throw new Error("expected the fixture sheet");
 
     // A descending sort by amount shows data row 0 at view row 4.
-    grid.sortBy(1, false);
+    grid.setViewSort([{ col: 1, ascending: false }]);
     expect(grid.getCellInput(4, 0)?.address.row).toBe(0);
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 0 } });
     grid.actions.autoFitRows();
@@ -1379,8 +1379,8 @@ describe("transactional document metadata", () => {
     const store = new SheetwriteStore(workbook, makeColumnarData(4));
     const grid = new GridImpl(mountHost(), { workbook }, store);
     try {
-      expect(grid.sortBy(1, false)).toMatchObject({ status: "applied" });
-      expect(grid.sortByMulti([{ col: 1, ascending: true }])).toMatchObject({ status: "applied" });
+      expect(grid.setViewSort([{ col: 1, ascending: false }])).toMatchObject({ status: "applied" });
+      expect(grid.setViewSort([{ col: 1, ascending: true }])).toMatchObject({ status: "applied" });
       expect(store.dataRowAt("s1", 0)).toBe(0);
     } finally {
       grid.destroy();

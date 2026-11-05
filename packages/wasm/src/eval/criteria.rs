@@ -83,6 +83,36 @@ impl Criterion {
             None => self.op == CmpOp::Ne,
         }
     }
+
+    /// Counts the matches among numbers given as their `f64` bits, with the
+    /// result of [`Self::matches`] on each number. `None` when the criterion
+    /// is not a plain number: text and wildcard criteria need each cell's
+    /// value.
+    pub(super) fn count_numbers(&self, numbers: &[u64]) -> Option<usize> {
+        let Value::Number(threshold) = self.operand else {
+            return None;
+        };
+        if self.wildcard.is_some() {
+            return None;
+        }
+
+        // One loop per operator keeps the operator match out of the loop.
+        Some(match self.op {
+            CmpOp::Eq => count_numbers_where(numbers, |number| number == threshold),
+            CmpOp::Ne => count_numbers_where(numbers, |number| number != threshold),
+            CmpOp::Lt => count_numbers_where(numbers, |number| number < threshold),
+            CmpOp::Le => count_numbers_where(numbers, |number| number <= threshold),
+            CmpOp::Gt => count_numbers_where(numbers, |number| number > threshold),
+            CmpOp::Ge => count_numbers_where(numbers, |number| number >= threshold),
+        })
+    }
+}
+
+fn count_numbers_where(numbers: &[u64], matches: impl Fn(f64) -> bool) -> usize {
+    numbers
+        .iter()
+        .filter(|&&bits| matches(f64::from_bits(bits)))
+        .count()
 }
 
 /// The sum range of SUMIF and AVERAGEIF. Excel reads as many rows and columns

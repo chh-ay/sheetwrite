@@ -98,7 +98,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   pivot: {
     source: "packages/core/src/types/pivot.ts",
-    dependencies: ["cell", "coordinates", "table"],
+    dependencies: ["cell", "coordinates", "data-model", "table"],
     exports: [
       "PivotAggregation",
       "PivotDefinition",
@@ -110,6 +110,26 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "PivotSource",
       "PivotSourceField",
       "PivotValueField",
+    ],
+  },
+  query: {
+    source: "packages/core/src/types/query.ts",
+    dependencies: ["coordinates", "table"],
+    exports: [
+      "PowerQueryCodec",
+      "PowerQueryExport",
+      "PowerQueryImport",
+      "PowerQueryLoss",
+      "PowerQueryUnsupported",
+      "QueryAggregate",
+      "QueryColumnSpec",
+      "QueryColumnType",
+      "QueryJoinKind",
+      "QueryPredicate",
+      "QueryStep",
+      "SavedQuery",
+      "SavedQueryOutput",
+      "SavedQuerySource",
     ],
   },
   cell: {
@@ -152,7 +172,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "chart", "coordinates", "data-model", "pivot", "table"],
+    dependencies: ["cell", "chart", "coordinates", "data-model", "pivot", "query", "table"],
     exports: [
       "AddSheetInput",
       "CalculationSettings",
@@ -197,6 +217,8 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ApplyTransactionResult",
       "CellChange",
       "ChangeEvent",
+      "CommitJournal",
+      "CommittedTransaction",
       "GridTransaction",
       "OperationSource",
       "PendingCommit",
@@ -206,6 +228,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "PersistenceCommitResponse",
       "RemoteOperationOptions",
       "RemoteOperationSource",
+      "RestoreProvenance",
       "SyncMutationRecord",
       "SyncMutationStatus",
       "Transaction",

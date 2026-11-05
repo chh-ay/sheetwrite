@@ -1616,7 +1616,15 @@ pub(crate) struct DenseSourceRun<'a> {
     payloads: &'a [u64],
 }
 
-impl DenseSourceRun<'_> {
+impl<'a> DenseSourceRun<'a> {
+    /// The raw kind bytes and payloads of the whole grid, of equal length. A
+    /// literal's raw kind is its kind; a calculated slot carries the
+    /// calculated bit, so a fold can classify a cell from its kind byte.
+    #[inline]
+    pub(crate) fn raw(&self) -> (&'a [u8], &'a [u64]) {
+        (self.kinds, &self.payloads[..self.kinds.len()])
+    }
+
     /// The literal source at `index`, or `None` for empty and formula cells.
     /// Only empty and formula sources carry the calculated bit, so a literal
     /// kind is recognised from the raw byte without masking it first.
