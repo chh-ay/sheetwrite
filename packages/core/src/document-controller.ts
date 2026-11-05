@@ -32,6 +32,7 @@ import {
   encodeMeasuredRestoreBlock,
   estimateRestoreBlockBytes,
 } from "./restore-block.js";
+import { cloneQuery, findQuery } from "./saved-query.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import {
@@ -944,6 +945,18 @@ export class DocumentController {
         return previous
           ? [{ op: "setRelationship", relationship: cloneRelationship(previous) }]
           : [];
+      }
+
+      case "setQuery": {
+        const previous = findQuery(this.options.store.getWorkbook().queries, patch.query.id);
+        return previous
+          ? [{ op: "setQuery", query: cloneQuery(previous) }]
+          : [{ op: "removeQuery", id: patch.query.id }];
+      }
+
+      case "removeQuery": {
+        const previous = findQuery(this.options.store.getWorkbook().queries, patch.id);
+        return previous ? [{ op: "setQuery", query: cloneQuery(previous) }] : [];
       }
 
       case "setPivot": {

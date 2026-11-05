@@ -65,6 +65,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/query.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/render.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
