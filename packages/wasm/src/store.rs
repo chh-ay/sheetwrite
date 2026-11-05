@@ -3837,7 +3837,7 @@ impl CellStore {
     }
 
     fn refresh_named_formula_entries(&mut self) {
-        self.forget_name_expansions();
+        self.resolve_name_definitions();
         for formula_sheet in 0..self.sheets.len() {
             if !self
                 .sheet_alive

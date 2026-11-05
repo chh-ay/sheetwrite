@@ -15,7 +15,7 @@ import {
 } from "../docs/src/showcases/compatibility.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
-import { readConformanceManifest } from "./conformance/generate.js";
+import { generateConformanceEvidence, readFormulaInventory } from "./conformance/generate.js";
 import { runOffline } from "./conformance/offline.js";
 import { repositoryRoot } from "./docs-shared.js";
 import { html } from "./evidence-format.js";
@@ -26,17 +26,17 @@ export function compatibilityResults(): Promise<CompatibilityResults> {
   compatibilityResultsPromise ??= (async () => {
     const testDirectory = join(repositoryRoot, "test/conformance");
     const paths = {
-      manifest: join(testDirectory, "corpus.manifest.json"),
       inventory: join(testDirectory, "formula-contract.inventory.json"),
       captures: join(repositoryRoot, "scripts/conformance/captures"),
     };
-    const [corpus, manifest, packageJson] = await Promise.all([
-      loadCorpus(join(testDirectory, "corpus.json"), paths),
-      readConformanceManifest(paths.manifest),
+    const [corpus, inventory, packageJson] = await Promise.all([
+      loadCorpus(undefined, paths),
+      readFormulaInventory(paths.inventory),
       readFile(join(repositoryRoot, "packages/core/package.json"), "utf8").then(
         (content) => JSON.parse(content) as { version: string },
       ),
     ]);
+    const { manifest } = generateConformanceEvidence(inventory);
     const offline = await runOffline(corpus, paths);
     return buildCompatibilityResults({
       corpus,

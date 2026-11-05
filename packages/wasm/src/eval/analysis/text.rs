@@ -1,6 +1,5 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
 use crate::formula_slots::{FormulaResults, FormulaWork};
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use regex_lite::{Captures, Regex, RegexBuilder};
@@ -30,18 +29,6 @@ const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 const MAX_MATCH_WORK: usize = 2_000_000;
 const MAX_REGEX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_DECIMALS: i64 = 127;
-const REGEX_CACHE_CAPACITY: usize = 4;
-
-struct CachedRegex {
-    pattern: String,
-    insensitive: bool,
-    regex: Rc<Regex>,
-}
-
-thread_local! {
-    // Bound compiled-pattern memory without synchronizing independent evaluations.
-    static REGEX_CACHE: RefCell<Vec<CachedRegex>> = const { RefCell::new(Vec::new()) };
-}
 
 struct Context<'a, 'p> {
     store: &'a CellStore,
@@ -404,38 +391,30 @@ fn needs_unicode_case(pattern: &str, insensitive: bool) -> bool {
                 .any(|escape| pattern.contains(escape)))
 }
 
-fn compile_regex(pattern: &str, insensitive: bool) -> Result<Rc<Regex>, FormulaError> {
-    REGEX_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some(index) = cache
-            .iter()
-            .position(|entry| entry.insensitive == insensitive && entry.pattern == pattern)
-        {
-            let entry = cache.remove(index);
-            let regex = Rc::clone(&entry.regex);
-            cache.push(entry);
-            return Ok(regex);
-        }
-        if needs_unicode_case(pattern, insensitive) {
-            return Err(FormulaError::Value);
-        }
-        let regex = Rc::new(
-            RegexBuilder::new(pattern)
-                .case_insensitive(insensitive)
-                .size_limit(MAX_REGEX_BYTES)
-                .build()
-                .map_err(|_| FormulaError::Value)?,
-        );
-        if cache.len() == REGEX_CACHE_CAPACITY {
-            cache.remove(0);
-        }
-        cache.push(CachedRegex {
-            pattern: pattern.to_owned(),
-            insensitive,
-            regex: Rc::clone(&regex),
-        });
-        Ok(regex)
-    })
+/// The compiled program for `pattern`. Formulas in one recalculation that use
+/// the same pattern and case mode share one program, which the pass drops when
+/// it ends, so no regex memory outlives the recalculation.
+fn compile_regex(
+    results: &mut FormulaResults,
+    pattern: &str,
+    insensitive: bool,
+) -> Result<Rc<Regex>, FormulaError> {
+    if let Some(regex) = results.pass_regex(pattern, insensitive) {
+        return Ok(regex);
+    }
+
+    if needs_unicode_case(pattern, insensitive) {
+        return Err(FormulaError::Value);
+    }
+
+    let regex = RegexBuilder::new(pattern)
+        .case_insensitive(insensitive)
+        .size_limit(MAX_REGEX_BYTES)
+        .build()
+        .map_err(|_| FormulaError::Value)?;
+    let regex = Rc::new(regex);
+    results.share_regex(pattern, insensitive, Rc::clone(&regex));
+    Ok(regex)
 }
 
 fn append_text(output: &mut String, text: &str) -> Result<(), FormulaError> {
@@ -491,7 +470,7 @@ fn regex_scalar(
     let text = context.text(args, 0, "")?;
     let pattern = context.text(args, 1, "")?;
     let insensitive = mode(context, args, if name == "REGEXREPLACE" { 4 } else { 2 })?;
-    let regex = compile_regex(&pattern, insensitive)?;
+    let regex = compile_regex(context.pass.results, &pattern, insensitive)?;
     if name == "REGEXTEST" {
         return Ok(Value::Bool(regex.is_match(&text)));
     }
@@ -525,7 +504,7 @@ fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, Fo
         return Err(FormulaError::Value);
     }
     let insensitive = mode(context, args, 3)?;
-    let regex = compile_regex(&pattern, insensitive)?;
+    let regex = compile_regex(context.pass.results, &pattern, insensitive)?;
     let mut values = Vec::new();
     if return_mode == 1.0 {
         for matched in regex.find_iter(&text) {
@@ -661,20 +640,28 @@ pub(super) fn evaluate_matrix(
         _ => Err(FormulaError::Value),
     }
 }
+/// The shape of `name`'s result. It evaluates in a workspace of its own, which
+/// borrows the pass's compiled regex programs so that sizing a spill and
+/// evaluating it compile each pattern once.
 pub(super) fn shape(
     store: &CellStore,
     name: &str,
     args: &[Ast],
     sheet: usize,
+    outer: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let affected = FormulaWork::default();
     let mut results = FormulaResults::default();
+    results.swap_regexes(outer.results);
 
     let mut pass = EvalPass {
         affected: &affected,
         results: &mut results,
     };
-    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0)?;
+    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
+
+    results.swap_regexes(outer.results);
+    let matrix = matrix?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
 pub(super) fn bound(
@@ -682,8 +669,9 @@ pub(super) fn bound(
     name: &str,
     args: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, args, sheet).map(|shape| shape.2)
+    shape(store, name, args, sheet, pass).map(|shape| shape.2)
 }
 
 #[cfg(test)]
@@ -845,6 +833,190 @@ mod tests {
         }
         assert_eq!(store.get_cell(sheet, 2, 2).kind(), 0);
         assert_eq!(store.get_cell(sheet, 4, 2).kind(), 0);
+    }
+
+    /// Six patterns read from cells, each in both case modes, give every
+    /// formula its own result, and an edited pattern recalculates each
+    /// REGEX function and the wildcard criteria that read the same text.
+    #[test]
+    fn regex_and_wildcard_results_follow_their_own_patterns() {
+        // https://support.microsoft.com/en-us/excel/functions/regextest-function
+        // https://support.microsoft.com/en-us/excel/functions/countif-function
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        let patterns = ["^a", "^b", "c$", "[0-9]+", "^AB", "x?y"];
+        for (row, pattern) in patterns.into_iter().enumerate() {
+            store.set_string(sheet, row, 0, pattern, 0);
+            store.set_formula(
+                sheet,
+                row,
+                1,
+                &format!("=VALUETOTEXT(REGEXTEST(\"ab12c\",A{}))", row + 1),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                2,
+                &format!("=VALUETOTEXT(REGEXTEST(\"ab12c\",A{},1))", row + 1),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                3,
+                &format!("=REGEXREPLACE(\"ab12c\",A{},\"-\",,1)", row + 1),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                4,
+                &format!("=IFNA(REGEXEXTRACT(\"ab12c\",A{},0,1),\"none\")", row + 1),
+                0,
+            );
+        }
+        store.set_formula(sheet, 6, 0, r#"=COUNTIF(A1:A6,"^?")"#, 0);
+        store.set_formula(sheet, 7, 0, r#"=COUNTIF(A1:A6,"*$")"#, 0);
+        store.recompute(sheet);
+
+        let expected = [
+            ["TRUE", "TRUE", "-b12c", "a"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+            ["TRUE", "TRUE", "ab12-", "c"],
+            ["TRUE", "TRUE", "ab-c", "12"],
+            ["FALSE", "TRUE", "-12c", "ab"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+        ];
+        assert_rows(&store, sheet, &expected);
+        assert_eq!(store.get_cell(sheet, 6, 0).num(), 2.0);
+        assert_eq!(store.get_cell(sheet, 7, 0).num(), 1.0);
+
+        store.set_string(sheet, 1, 0, "B1", 0);
+        store.set_string(sheet, 2, 0, "^c", 0);
+        store.recompute(sheet);
+
+        let edited = [
+            ["TRUE", "TRUE", "-b12c", "a"],
+            ["FALSE", "TRUE", "a-2c", "b1"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+            ["TRUE", "TRUE", "ab-c", "12"],
+            ["FALSE", "TRUE", "-12c", "ab"],
+            ["FALSE", "FALSE", "ab12c", "none"],
+        ];
+        assert_rows(&store, sheet, &edited);
+        assert_eq!(store.get_cell(sheet, 6, 0).num(), 2.0);
+        assert_eq!(store.get_cell(sheet, 7, 0).num(), 0.0);
+    }
+
+    /// Rows alternate between patterns that differ only in case, and between
+    /// case modes, so each formula in a row of formulas compiles a pattern
+    /// other than its neighbor's and still gets its own result.
+    #[test]
+    fn alternating_patterns_and_case_modes_keep_each_row_result() {
+        // https://support.microsoft.com/en-us/excel/functions/regexreplace-function
+        const ROWS: usize = 40;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, ROWS);
+        for row in 0..ROWS {
+            let pattern = if row % 2 == 0 { "ab" } else { "AB" };
+            let insensitive = row % 4 >= 2;
+            store.set_string(sheet, row, 0, &format!("xab{row}AB"), 0);
+            store.set_formula(
+                sheet,
+                row,
+                1,
+                &format!(
+                    "=REGEXREPLACE(A{},\"{pattern}\",\"-\",,{})",
+                    row + 1,
+                    u8::from(insensitive)
+                ),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                2,
+                &format!("=VALUETOTEXT(REGEXTEST(A{},\"^x{pattern}\"))", row + 1),
+                0,
+            );
+        }
+        store.recompute(sheet);
+
+        for row in 0..ROWS {
+            let replaced = match (row % 2 == 0, row % 4 >= 2) {
+                (_, true) => format!("x-{row}-"),
+                (true, false) => format!("x-{row}AB"),
+                (false, false) => format!("xab{row}-"),
+            };
+            let starts = if row % 2 == 0 { "TRUE" } else { "FALSE" };
+            assert_eq!(
+                store.get_cell(sheet, row, 1).string(),
+                Some(replaced),
+                "row {row}"
+            );
+            assert_eq!(
+                store.get_cell(sheet, row, 2).string().as_deref(),
+                Some(starts),
+                "row {row}"
+            );
+        }
+    }
+
+    /// Rows cycle through more patterns than one recalculation keeps, so
+    /// patterns are replaced while the pass runs, and spilling REGEXEXTRACT
+    /// anchors are sized and evaluated with the same programs.
+    #[test]
+    fn more_patterns_than_a_pass_keeps_give_each_row_its_own_match() {
+        // https://support.microsoft.com/en-us/excel/functions/regexextract-function
+        const ROWS: usize = 30;
+        const LETTERS: [char; 6] = ['a', 'b', 'c', 'd', 'e', 'f'];
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, ROWS);
+        store.set_string(sheet, 0, 0, "aabbbccccdddddeeeeeefffffff", 0);
+        for row in 0..ROWS {
+            let letter = LETTERS[row % LETTERS.len()];
+            store.set_formula(
+                sheet,
+                row,
+                1,
+                &format!("=REGEXEXTRACT($A$1,\"{letter}+\")"),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                2,
+                &format!("=REGEXEXTRACT($A$1,\"{letter}+\",1)"),
+                0,
+            );
+        }
+        store.recompute(sheet);
+
+        for row in 0..ROWS {
+            let letter = LETTERS[row % LETTERS.len()];
+            let run = letter.to_string().repeat(row % LETTERS.len() + 2);
+            for column in [1, 2] {
+                assert_eq!(
+                    store.get_cell(sheet, row, column).string().as_deref(),
+                    Some(run.as_str()),
+                    "row {row}, column {column}"
+                );
+            }
+        }
+    }
+
+    fn assert_rows(store: &CellStore, sheet: usize, rows: &[[&str; 4]]) {
+        for (row, columns) in rows.iter().enumerate() {
+            for (offset, expected) in columns.iter().enumerate() {
+                assert_eq!(
+                    store.get_cell(sheet, row, offset + 1).string().as_deref(),
+                    Some(*expected),
+                    "row {row}, column {}",
+                    offset + 1
+                );
+            }
+        }
     }
 
     #[test]

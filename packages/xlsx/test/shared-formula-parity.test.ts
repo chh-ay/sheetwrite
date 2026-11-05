@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { fileURLToPath } from "node:url";
 
 import { initSheetwrite, shiftA1Refs } from "@sheetwrite/core";
 
+import { generatedConformanceEvidence } from "../../../scripts/conformance/generate.js";
 import { translateSharedFormula } from "../src/shared-formula.js";
 
 /**
@@ -9,13 +11,11 @@ import { translateSharedFormula } from "../src/shared-formula.js";
  * works before `initSheetwrite()`. Its rule must give the engine's copy result
  * (`translateFormula`, which paste and fill use) for every formula.
  */
-interface CorpusCase {
-  readonly formula?: string;
-}
-
-const corpus = (await Bun.file(
-  new URL("../../../test/conformance/corpus.json", import.meta.url),
-).json()) as { readonly cases: readonly CorpusCase[] };
+const { corpus } = await generatedConformanceEvidence(
+  fileURLToPath(
+    new URL("../../../test/conformance/formula-contract.inventory.json", import.meta.url),
+  ),
+);
 
 /** Reference shapes that the conformance corpus does not cover on its own. */
 const REFERENCE_SHAPES = [

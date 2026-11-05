@@ -247,9 +247,10 @@ fn source_shape(
     store: &CellStore,
     expression: &Ast,
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     if ast_produces_array(expression) {
-        store.matrix_shape(expression, sheet)
+        store.matrix_shape(expression, sheet, pass)
     } else {
         Ok((1, 1, 1))
     }
@@ -259,10 +260,11 @@ pub(crate) fn shape(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let _budget = CallBudget::enter()?;
     let (rows, cols) = match name {
-        CALL => return store.matrix_shape(&call_body(arguments)?, sheet),
+        CALL => return store.matrix_shape(&call_body(arguments)?, sheet, pass),
         "MAKEARRAY" => {
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
@@ -270,14 +272,14 @@ pub(crate) fn shape(
             let affected = FormulaWork::default();
             let mut results = FormulaResults::default();
 
-            let mut pass = EvalPass {
+            let mut dimensions = EvalPass {
                 affected: &affected,
                 results: &mut results,
             };
             let mut context = Context {
                 store,
                 sheet,
-                pass: &mut pass,
+                pass: &mut dimensions,
                 depth: 0,
             };
             (
@@ -289,21 +291,21 @@ pub(crate) fn shape(
             if arguments.len() < 2 {
                 return Err(FormulaError::Value);
             }
-            let (rows, cols, _) = source_shape(store, &arguments[0], sheet)?;
+            let (rows, cols, _) = source_shape(store, &arguments[0], sheet, pass)?;
             (rows, cols)
         }
         "SCAN" => {
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
             }
-            let (rows, cols, _) = source_shape(store, &arguments[1], sheet)?;
+            let (rows, cols, _) = source_shape(store, &arguments[1], sheet, pass)?;
             (rows, cols)
         }
         "BYROW" | "BYCOL" => {
             if arguments.len() != 2 {
                 return Err(FormulaError::Value);
             }
-            let (rows, cols, _) = source_shape(store, &arguments[0], sheet)?;
+            let (rows, cols, _) = source_shape(store, &arguments[0], sheet, pass)?;
             if name == "BYROW" {
                 (rows, 1)
             } else {
@@ -320,8 +322,9 @@ pub(crate) fn bound(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
+    pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, arguments, sheet).map(|(_, _, cells)| cells)
+    shape(store, name, arguments, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 struct Context<'a, 'p> {

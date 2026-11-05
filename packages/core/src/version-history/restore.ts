@@ -1,3 +1,4 @@
+import { isDashboard } from "../dashboard.js";
 import { DEFAULT_CALCULATION_SETTINGS } from "../document-protocol.js";
 import type { SheetwriteStore } from "../store.js";
 import { storeEngine } from "../store/engine-registry.js";
@@ -340,6 +341,35 @@ function keyedObjects<T extends { id: string }>(
 }
 
 /**
+ * Bring a dashboard to its historical items and pivots in place. It has no
+ * cells, rows, columns or sheet formats to restore.
+ */
+function planDashboardInPlace(current: Sheet, historical: SheetSnapshot, plan: RestorePlan): void {
+  const id = current.id;
+
+  keyedObjects(
+    current.pivots ?? [],
+    historical.pivots ?? [],
+    (pivotId) => ({ op: "removePivot", sheet: id, id: pivotId }),
+    (pivot) => ({ op: "setPivot", sheet: id, pivot }),
+    plan,
+  );
+
+  keyedObjects(
+    current.dashboard?.items ?? [],
+    historical.dashboard?.items ?? [],
+    (itemId) => ({ op: "removeDashboardItem", sheet: id, id: itemId }),
+    (item) => ({ op: "setDashboardItem", sheet: id, item }),
+    plan,
+  );
+
+  const visibility = historical.visibility ?? "visible";
+  if ((current.visibility ?? "visible") !== visibility) {
+    plan.visibility.push({ op: "setSheetVisibility", sheet: id, visibility });
+  }
+}
+
+/**
  * Bring an existing sheet to its historical state in place, keeping its ID,
  * so formulas on other sheets keep their references. Rows and columns change
  * only at the end.
@@ -351,6 +381,17 @@ function planSheetInPlace(
   plan: RestorePlan,
 ): void {
   const id = current.id;
+
+  // A sheet keeps its kind for its whole life, so only a removed and re-added sheet can differ.
+  if (isDashboard(current) !== isDashboard(historical)) {
+    throw invalidScope(
+      `Sheet ${current.name} changed between a worksheet and a dashboard since this version`,
+    );
+  }
+  if (isDashboard(current)) {
+    planDashboardInPlace(current, historical, plan);
+    return;
+  }
 
   for (const merge of current.merges ?? []) {
     plan.removals.push({ op: "removeMerge", sheet: id, merge });

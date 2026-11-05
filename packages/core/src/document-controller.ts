@@ -5,6 +5,7 @@ import {
   splitOversizedBlocks,
 } from "./atomic-batch.js";
 import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
+import { findDashboardItem } from "./dashboard.js";
 import { cloneMeasure, cloneRelationship, findMeasure, findRelationship } from "./data-model.js";
 import {
   type AdmittedTransactionResources,
@@ -954,6 +955,18 @@ export class DocumentController {
           (pivot) => ({ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(pivot) }),
           patch.op === "setPivot" ? { op: "removePivot", sheet: patch.sheet, id } : null,
         );
+      }
+
+      case "setDashboardItem":
+      case "removeDashboardItem": {
+        const id = patch.op === "setDashboardItem" ? patch.item.id : patch.id;
+        const previous = findDashboardItem(this.sheetById(patch.sheet), id);
+        if (previous) {
+          return [{ op: "setDashboardItem", sheet: patch.sheet, item: structuredClone(previous) }];
+        }
+        return patch.op === "setDashboardItem"
+          ? [{ op: "removeDashboardItem", sheet: patch.sheet, id }]
+          : [];
       }
     }
   }

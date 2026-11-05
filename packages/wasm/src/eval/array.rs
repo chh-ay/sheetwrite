@@ -153,6 +153,7 @@ impl CellStore {
         &self,
         ast: &Ast,
         formula_sheet: usize,
+        pass: &mut EvalPass<'_>,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
             // The shape is known only after evaluation, so the pending loop
@@ -162,7 +163,7 @@ impl CellStore {
                 if ast_produces_array(ast) =>
             {
                 Some(
-                    self.matrix_shape(ast, formula_sheet)
+                    self.matrix_shape(ast, formula_sheet, pass)
                         .map(|shape| shape.2)
                         .or_else(|error| {
                             // An operator over a runtime reference gets its
@@ -182,7 +183,7 @@ impl CellStore {
             Ast::Func(Func::AnchorArray, args) => {
                 let range = self.spill_reference(args, formula_sheet);
                 Some(
-                    self.matrix_shape(&range, formula_sheet)
+                    self.matrix_shape(&range, formula_sheet, pass)
                         .map(|(_, _, cells)| cells),
                 )
             }
@@ -195,7 +196,7 @@ impl CellStore {
                 ast_produces_array(ast).then(|| {
                     runtime_reference_bound(
                         ast,
-                        super::analysis::lambda::bound(self, name, args, formula_sheet),
+                        super::analysis::lambda::bound(self, name, args, formula_sheet, pass),
                     )
                 })
             }
@@ -208,7 +209,7 @@ impl CellStore {
                 }
                 Some(runtime_reference_bound(
                     ast,
-                    (hooks.bound)(self, name, args, formula_sheet),
+                    (hooks.bound)(self, name, args, formula_sheet, pass),
                 ))
             }
             Ast::Range(..)
@@ -217,18 +218,22 @@ impl CellStore {
             | Ast::Structured(..)
             | Ast::Func(Func::Intersect, _)
             | Ast::Array { .. } => Some(
-                self.matrix_shape(ast, formula_sheet)
+                self.matrix_shape(ast, formula_sheet, pass)
                     .map(|(_, _, cells)| cells),
             ),
-            Ast::LetSlot { expression, .. } => self.dynamic_array_bound(expression, formula_sheet),
-            Ast::NamedFormula(named) => self.dynamic_array_bound(&named.expression, formula_sheet),
+            Ast::LetSlot { expression, .. } => {
+                self.dynamic_array_bound(expression, formula_sheet, pass)
+            }
+            Ast::NamedFormula(named) => {
+                self.dynamic_array_bound(&named.expression, formula_sheet, pass)
+            }
             // The selection is at most the whole area; an area that has no
             // shape before evaluation is charged at the spill limit.
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => Some(Ok(self
-                .matrix_shape(&args[0], formula_sheet)
+                .matrix_shape(&args[0], formula_sheet, pass)
                 .map_or(SPILL_MAX_CELLS, |(_, _, cells)| cells))),
             Ast::Func(Func::Let, args) => match expand_let_ast(args) {
-                Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet),
+                Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet, pass),
                 Err(_) => None,
             },
             Ast::Func(Func::Filter | Func::Sort | Func::Unique | Func::TrimRange, args) => {
@@ -236,7 +241,7 @@ impl CellStore {
                     return Some(Err(FormulaError::Value));
                 };
                 Some(
-                    self.matrix_shape(source, formula_sheet)
+                    self.matrix_shape(source, formula_sheet, pass)
                         .map(|(_, _, cells)| cells),
                 )
             }
@@ -244,13 +249,13 @@ impl CellStore {
                 let Some(source) = args.first() else {
                     return Some(Err(FormulaError::Value));
                 };
-                Some(match self.matrix_shape(ast, formula_sheet) {
+                Some(match self.matrix_shape(ast, formula_sheet, pass) {
                     Ok((_, _, cells)) => Ok(cells),
-                    Err(shape_error) if self.matrix_shape(source, formula_sheet).is_ok() => {
+                    Err(shape_error) if self.matrix_shape(source, formula_sheet, pass).is_ok() => {
                         Err(shape_error)
                     }
                     Err(shape_error) => self
-                        .dynamic_array_bound(source, formula_sheet)
+                        .dynamic_array_bound(source, formula_sheet, pass)
                         .unwrap_or(Err(shape_error)),
                 })
             }
@@ -258,12 +263,13 @@ impl CellStore {
                 let Some(source) = args.first() else {
                     return Some(Err(FormulaError::Value));
                 };
-                Some(match self.matrix_shape(ast, formula_sheet) {
+                Some(match self.matrix_shape(ast, formula_sheet, pass) {
                     Ok((_, _, cells)) => Ok(cells),
-                    Err(shape_error) if self.matrix_shape(source, formula_sheet).is_ok() => {
+                    Err(shape_error) if self.matrix_shape(source, formula_sheet, pass).is_ok() => {
                         Err(shape_error)
                     }
-                    Err(shape_error) => match self.dynamic_array_bound(source, formula_sheet) {
+                    Err(shape_error) => match self.dynamic_array_bound(source, formula_sheet, pass)
+                    {
                         Some(Ok(_)) => Ok(SPILL_MAX_CELLS),
                         Some(Err(error)) => Err(error),
                         None => Err(shape_error),
@@ -288,11 +294,11 @@ impl CellStore {
                     if index <= 0 || index as usize >= args.len() {
                         return Some(Err(FormulaError::Value));
                     }
-                    return self.dynamic_array_bound(&args[index as usize], formula_sheet);
+                    return self.dynamic_array_bound(&args[index as usize], formula_sheet, pass);
                 }
                 let mut bound = None;
                 for choice in &args[1..] {
-                    if let Some(Ok(cells)) = self.dynamic_array_bound(choice, formula_sheet) {
+                    if let Some(Ok(cells)) = self.dynamic_array_bound(choice, formula_sheet, pass) {
                         bound = Some(bound.map_or(cells, |current: usize| current.max(cells)));
                     }
                 }
@@ -350,7 +356,7 @@ impl CellStore {
             Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet)
                 .and_then(|_| self.eval_matrix_arg(ast, sheet, pass, depth + 1)),
             Ast::Array { values, .. } => self
-                .matrix_shape(ast, sheet)
+                .matrix_shape(ast, sheet, pass)
                 .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
             Ast::LetSlot { expression, .. } => {
                 return self.eval_dynamic_array(expression, sheet, pass, depth)
@@ -414,20 +420,31 @@ impl CellStore {
         }
     }
 
+    /// The shape of an array expression before it is evaluated. `pass` is the
+    /// pass that asks; the full engine's shape hooks share its compiled regex
+    /// programs, and the default engine only passes it on.
+    #[cfg_attr(
+        not(feature = "analysis"),
+        allow(
+            clippy::only_used_in_recursion,
+            reason = "only full-engine hooks read the pass"
+        )
+    )]
     pub(super) fn matrix_shape(
         &self,
         ast: &Ast,
         formula_sheet: usize,
+        pass: &mut EvalPass<'_>,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
                 let (left_rows, left_cols, _) = if ast_produces_array(left) {
-                    self.matrix_shape(left, formula_sheet)?
+                    self.matrix_shape(left, formula_sheet, pass)?
                 } else {
                     (1, 1, 1)
                 };
                 let (right_rows, right_cols, _) = if ast_produces_array(right) {
-                    self.matrix_shape(right, formula_sheet)?
+                    self.matrix_shape(right, formula_sheet, pass)?
                 } else {
                     (1, 1, 1)
                 };
@@ -436,11 +453,14 @@ impl CellStore {
                 return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                return self.matrix_shape(inner, formula_sheet);
+                return self.matrix_shape(inner, formula_sheet, pass);
             }
             Ast::Func(Func::AnchorArray, args) => {
-                return self
-                    .matrix_shape(&self.spill_reference(args, formula_sheet), formula_sheet);
+                return self.matrix_shape(
+                    &self.spill_reference(args, formula_sheet),
+                    formula_sheet,
+                    pass,
+                );
             }
             Ast::InvalidRef => return Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
@@ -453,7 +473,7 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-                return super::analysis::lambda::shape(self, name, args, formula_sheet);
+                return super::analysis::lambda::shape(self, name, args, formula_sheet, pass);
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
@@ -464,7 +484,7 @@ impl CellStore {
                 if !(hooks.produces_array)(name, args) {
                     return Err(FormulaError::Value);
                 }
-                let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet)?;
+                let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet, pass)?;
                 let validated = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
                 if cells != validated {
                     return Err(FormulaError::Value);
@@ -473,16 +493,20 @@ impl CellStore {
             }
             Ast::Func(Func::Let, args) => {
                 let (expanded, _) = expand_let_ast(args)?;
-                return self.matrix_shape(&expanded, formula_sheet);
+                return self.matrix_shape(&expanded, formula_sheet, pass);
             }
             Ast::Func(Func::Filter | Func::Sort | Func::Unique, args) => {
-                return self.matrix_shape(args.first().ok_or(FormulaError::Value)?, formula_sheet);
+                return self.matrix_shape(
+                    args.first().ok_or(FormulaError::Value)?,
+                    formula_sheet,
+                    pass,
+                );
             }
             Ast::LetSlot { expression, .. } => {
-                return self.matrix_shape(expression, formula_sheet);
+                return self.matrix_shape(expression, formula_sheet, pass);
             }
             Ast::NamedFormula(named) => {
-                return self.matrix_shape(&named.expression, formula_sheet);
+                return self.matrix_shape(&named.expression, formula_sheet, pass);
             }
             Ast::Array { cols, values } => {
                 let cols = *cols as usize;
@@ -490,14 +514,17 @@ impl CellStore {
                 return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
             Ast::Func(Func::Transpose, args) => {
-                let (rows, cols, cells) =
-                    self.matrix_shape(args.first().ok_or(FormulaError::Value)?, formula_sheet)?;
+                let (rows, cols, cells) = self.matrix_shape(
+                    args.first().ok_or(FormulaError::Value)?,
+                    formula_sheet,
+                    pass,
+                )?;
                 return Ok((cols, rows, cells));
             }
             Ast::Func(Func::Sequence, args) => return sequence_shape(args),
             Ast::Func(Func::Take | Func::Drop, args) => {
                 let source = args.first().ok_or(FormulaError::Value)?;
-                let (rows, cols, _) = self.matrix_shape(source, formula_sheet)?;
+                let (rows, cols, _) = self.matrix_shape(source, formula_sheet, pass)?;
                 let drop = matches!(ast, Ast::Func(Func::Drop, _));
                 let output_rows = static_integer(optional_ast(args, 1))
                     .map_or(Ok(rows), |requested| {
@@ -515,7 +542,7 @@ impl CellStore {
             }
             Ast::Func(Func::ChooseCols | Func::ChooseRows, args) => {
                 let source = args.first().ok_or(FormulaError::Value)?;
-                let (rows, cols, _) = self.matrix_shape(source, formula_sheet)?;
+                let (rows, cols, _) = self.matrix_shape(source, formula_sheet, pass)?;
                 if args.len() < 2 {
                     return Err(FormulaError::Value);
                 }
@@ -587,8 +614,8 @@ impl CellStore {
         if !(2..=3).contains(&args.len()) {
             return Err(FormulaError::Value);
         }
-        let (array_rows, array_cols, array_cells) = self.matrix_shape(&args[0], sheet)?;
-        let (_, _, include_cells) = self.matrix_shape(&args[1], sheet)?;
+        let (array_rows, array_cols, array_cells) = self.matrix_shape(&args[0], sheet, pass)?;
+        let (_, _, include_cells) = self.matrix_shape(&args[1], sheet, pass)?;
         let selected_bound = array_rows.max(array_cols);
         let extra = include_cells
             .checked_mul(size_of::<Value>())
@@ -667,7 +694,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(args, 3, false, sheet, pass, depth + 1)?;
-        let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet)?;
+        let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
         let item_count = if by_col { array_cols } else { array_rows };
         let extra = item_count
             .checked_mul(size_of::<usize>())
@@ -762,7 +789,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(args, 1, false, sheet, pass, depth + 1)?;
-        let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet)?;
+        let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
         let item_count = if by_col { array_cols } else { array_rows };
         const UNIQUE_ITEM_BYTES: usize = 64;
         let extra = item_count

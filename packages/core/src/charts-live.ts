@@ -479,6 +479,11 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       // A definition writes no cell; a refresh writes cells through ordinary range ops.
       return;
 
+    case "setDashboardItem":
+    case "removeDashboardItem":
+      // A dashboard has no cells for a chart to read.
+      return;
+
     default: {
       const unhandled: never = patch;
       return unhandled;
