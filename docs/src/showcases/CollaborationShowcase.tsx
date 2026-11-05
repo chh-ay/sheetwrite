@@ -201,11 +201,10 @@ let nextMutation = 1;
 
 /**
  * Client state and lifetime for the collaboration showcase: both clients,
- * the server, the durable outboxes and every drill the page can run.
+ * the in-page server, the durable outboxes, recovery and the page logs.
  */
 function useCollaborationClients() {
   const action = useAction();
-  const chaosAction = useAction();
   const hostRefs: Record<ClientKey, React.RefObject<HTMLDivElement | null>> = {
     a: useRef<HTMLDivElement>(null),
     b: useRef<HTMLDivElement>(null),
@@ -242,10 +241,6 @@ function useCollaborationClients() {
   });
   const [serverLog, setServerLog] = useState<Array<LogEntry & { status: string }>>([]);
   const [serverVersion, setServerVersion] = useState(0);
-  const [chaos, setChaos] = useState<ChaosReport | null>(null);
-  const [batchReport, setBatchReport] = useState<BatchReport | null>(null);
-  const [restoreRunning, setRestoreRunning] = useState(false);
-  const chaosRunRef = useRef(0);
   const flashesRef = useRef<Record<ClientKey, Map<string, HighlightRange & { until: number }>>>({
     a: new Map(),
     b: new Map(),
@@ -737,282 +732,12 @@ function useCollaborationClients() {
     readClient(key);
   };
 
-  /**
-   * A seconds-long storm: both clients edit their own rows while connections
-   * drop, reconnect, and broadcasts arrive out of order. Then both clients
-   * reconnect and the page compares their Grids cell by cell.
-   */
-  const runChaos = async () => {
-    const run = chaosRunRef.current + 1;
-    chaosRunRef.current = run;
-    const stillRunning = () =>
-      chaosRunRef.current === run && clientsRef.current.a !== null && clientsRef.current.b !== null;
-    const report: ChaosReport = {
-      phase: "storm",
-      edits: 0,
-      disconnects: 0,
-      reorders: 0,
-      mismatches: 0,
-      cells: 0,
-      ms: 0,
-    };
-    let started = performance.now();
-    let publishedAt = 0;
-    const publish = (force = true) => {
-      const now = performance.now();
-      if (!force && now - publishedAt < CHAOS_PUBLISH_MS) return;
-      publishedAt = now;
-      setChaos({ ...report, ms: now - started });
-    };
-    // Publishing first replaces any earlier verdict and keeps the button
-    // disabled while the clients leave the usage document of the batch drill.
-    publish();
-    try {
-      if (!(await showDocument("forecast"))) {
-        report.phase = "timed-out";
-        publish();
-        return;
-      }
-      started = performance.now();
-      // Read after the switch: a remount brings both clients back online.
-      const offline: Record<ClientKey, boolean> = {
-        a: clientsRef.current.a?.link.connected === false,
-        b: clientsRef.current.b?.link.connected === false,
-      };
-      // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
-      // every edit and every synced arrival is visible while the storm runs.
-      for (const key of CLIENT_KEYS) {
-        showRows(key, CHAOS_VIEW_ROWS);
-        shownRowsRef.current[key] = visibleRows(key);
-      }
-      // Seeded per run, so a run's fault sequence can be reproduced exactly.
-      const random = seededRandom(run);
-
-      while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
-        const key: ClientKey = random() < 0.5 ? "a" : "b";
-        const runtime = clientsRef.current[key];
-        // A recovering client is being remounted and accepts no new edits.
-        if (!runtime || recoveringRef.current[key]) {
-          await delay(CHAOS_TICK_MS);
-          continue;
-        }
-        const roll = random();
-        if (roll < 0.1) {
-          offline[key] = !offline[key];
-          if (offline[key]) report.disconnects += 1;
-          toggleOnline(key, !offline[key]);
-        } else if (roll < 0.18 && !offline[key]) {
-          holdNextBroadcast(key);
-          report.reorders += 1;
-        } else {
-          // Edit a row the reader can see in this analyst's Grid when one exists.
-          const owned = CHAOS_ROWS[key];
-          const view = shownRowsRef.current[key];
-          const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
-          const rows = onScreen.length > 0 ? onScreen : owned;
-          const row = rows[Math.floor(random() * rows.length)];
-          if (row === undefined) throw new Error("The analyst has no forecast rows.");
-          const addr = { sheet: "plan", row, col: 2 };
-          const outcome = runtime.grid.applyTransaction({
-            patches: [
-              {
-                op: "set",
-                addr,
-                value: { kind: "literal", value: 10_000 + Math.floor(random() * 71) * 1_000 },
-              },
-            ],
-          });
-          if (outcome.status === "applied") report.edits += 1;
-        }
-        publish(false);
-        await delay(CHAOS_TICK_MS);
-      }
-
-      report.phase = "settling";
-      publish();
-      for (const key of CLIENT_KEYS) {
-        if (offline[key]) toggleOnline(key, true);
-        releaseHeld(key);
-      }
-      // Wait until both queues drain, no conflict recovery is still running, and
-      // both clients sit at the server head: a client stuck on a version gap has
-      // nothing queued but has not caught up.
-      const settleBy = performance.now() + CHAOS_DRAIN_MS;
-      const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
-      const idle = () =>
-        CLIENT_KEYS.every(
-          (key) =>
-            (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
-            !recoveringRef.current[key] &&
-            clientsRef.current[key]?.sync.serverVersion === head(),
-        );
-      while (stillRunning() && performance.now() < settleBy && !idle()) {
-        for (const key of CLIENT_KEYS) releaseHeld(key);
-        await delay(CHAOS_TICK_MS);
-      }
-      await delay(CHAOS_TICK_MS * 4);
-      if (!stillRunning()) return;
-      if (!idle()) {
-        // Never call a still-moving state converged.
-        report.phase = "timed-out";
-        publish();
-        return;
-      }
-      const a = clientsRef.current.a?.grid;
-      const b = clientsRef.current.b?.grid;
-      if (!a || !b || !stillRunning()) return;
-      let mismatches = 0;
-      let cells = 0;
-      for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
-        for (let col = 0; col < COLLABORATION_WORKBOOK_COLUMNS; col++) {
-          const addr = { sheet: "plan", row, col };
-          cells += 1;
-          if (a.store.getCell(addr).resolved !== b.store.getCell(addr).resolved) mismatches += 1;
-        }
-      }
-      report.cells = cells;
-      report.mismatches = mismatches;
-      report.phase = mismatches === 0 ? "converged" : "diverged";
-      publish();
-    } finally {
-      if (stillRunning()) {
-        if (report.phase === "storm" || report.phase === "settling") {
-          report.phase = "timed-out";
-          publish();
-        }
-        for (const key of CLIENT_KEYS) {
-          toggleOnline(key, true);
-          releaseHeld(key);
-        }
-      }
-    }
-  };
-
   const clientsBusy = () =>
     CLIENT_KEYS.some(
       (key) =>
         (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) > 0 ||
         recoveringRef.current[key],
     );
-
-  /**
-   * 0.5.0 atomic batch: clear 100,000 metered-usage cells on Ana's client,
-   * then undo it once. The restore is far above one server version, so the
-   * engine splits it into one atomic multi-version batch; Bram applies every
-   * version in a single transaction or none of them.
-   */
-  const restoreUsage = () => {
-    const started = performance.now();
-    setRestoreRunning(true);
-    setBatchReport(null);
-    drillRef.current = true;
-    void (async () => {
-      try {
-        if (!(await showDocument("usage"))) {
-          pushClientLog(
-            "a",
-            "warn",
-            "Restore drill stopped: the clients could not open the usage document.",
-          );
-          return;
-        }
-        const restorer = clientsRef.current.a;
-        const peer = clientsRef.current.b;
-        const server = serversRef.current.usage;
-        if (!restorer || !peer || !server) return;
-        const settleBy = performance.now() + CHAOS_SETTLE_MS;
-        while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
-        if (clientsBusy()) {
-          pushClientLog("a", "warn", "Restore drill stopped: a client still has queued work.");
-          return;
-        }
-        const totalBefore = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-        await restorer.sync.flush();
-        const cleared = restorer.grid.applyTransaction({
-          patches: [{ op: "clearRange", range: USAGE_RANGE, contents: true }],
-        });
-        if (cleared.status !== "applied") {
-          pushClientLog("a", "error", `Usage clear was ${cleared.status}.`);
-          return;
-        }
-        await restorer.sync.flush();
-        await waitForPeerHead(peer, restorer.sync.serverVersion);
-        // The batch window starts here: only the batch may touch Bram's Grid.
-        let versions = 0;
-        let pieces = 0;
-        let operationBytes = 0;
-        let peerChanges = 0;
-        const stopServer = server.observeCommits((record) => {
-          if (record.batchVersions && record.batchVersions > 1) versions = record.batchVersions;
-        });
-        const stopPeer = peer.grid.on("change", (event) => {
-          if (event.source === "remote") peerChanges += 1;
-        });
-        const stopUndo = restorer.grid.on("change", (event) => {
-          if (event.commitReason !== "undo") return;
-          pieces += event.transaction.patches.length;
-          operationBytes += new TextEncoder().encode(
-            JSON.stringify(event.transaction.patches),
-          ).length;
-        });
-        try {
-          restorer.grid.undo();
-          await restorer.sync.flush();
-          const reachedHead = await waitForPeerHead(peer, restorer.sync.serverVersion);
-          const totalAfter = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-          const peerTotal = Number(peer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-          const passed =
-            versions > 1 &&
-            pieces > 1 &&
-            totalAfter === totalBefore &&
-            peerTotal === totalBefore &&
-            peerChanges === 1 &&
-            reachedHead;
-          setBatchReport({
-            versions,
-            pieces,
-            operationBytes,
-            peerChanges,
-            totalBefore,
-            totalAfter,
-            peerTotal,
-            ms: performance.now() - started,
-            passed,
-          });
-          pushClientLog(
-            "a",
-            passed ? "commit" : "warn",
-            passed
-              ? `Undo committed ${versions} versions of one atomic batch; Bram applied the batch once (${peerChanges} transaction).`
-              : "The batch drill did not meet every check.",
-          );
-        } finally {
-          stopServer();
-          stopPeer();
-          stopUndo();
-        }
-      } catch (error) {
-        pushClientLog("a", "error", errorText(error));
-      } finally {
-        drillRef.current = false;
-        setRestoreRunning(false);
-      }
-    })();
-  };
-
-  /** Waits until one client is at the given server version with nothing queued. */
-  const waitForPeerHead = async (peer: ClientRuntime, version: number): Promise<boolean> => {
-    const deadline = performance.now() + CHAOS_SETTLE_MS;
-    const atHead = () =>
-      peer.sync.serverVersion >= version && peer.sync.pendingCommits().length === 0;
-    while (performance.now() < deadline && !atHead()) await delay(CHAOS_TICK_MS);
-    return atHead();
-  };
-
-  const loseNextAck = (key: ClientKey) => {
-    clientsRef.current[key]?.link.dropNextAcknowledgement();
-    pushClientLog(key, "info", "The next acknowledgement (and its echo) will be lost in transit");
-  };
 
   const retryPending = (key: ClientKey) => {
     const runtime = clientsRef.current[key];
@@ -1026,39 +751,6 @@ function useCollaborationClients() {
     void runtime.sync.retry(head.clientMutationId).catch(() => {});
   };
 
-  const holdNextBroadcast = (key: ClientKey) => {
-    clientsRef.current[key]?.link.holdNextBroadcast();
-    pushClientLog(key, "info", "The next inbound broadcast will be held back (delivery reordered)");
-  };
-
-  const releaseHeld = (key: ClientKey) => {
-    clientsRef.current[key]?.link.releaseHeldBroadcasts();
-  };
-
-  const serverEdit = () => {
-    void action.run(
-      async () => {
-        if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
-        const server = serversRef.current.forecast;
-        if (!server) return;
-        const runtime = clientsRef.current.a ?? clientsRef.current.b;
-        const addr = { sheet: "plan", row: 4, col: 2 };
-        const current = runtime?.grid.store.getCell(addr).resolved;
-        const forecast =
-          typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
-        await server.commitServerOperations(DOCUMENT_ID.forecast, [
-          { op: "set", addr, value: { kind: "literal", value: forecast } },
-        ]);
-      },
-      () => "Cannot commit the server edit. Try again.",
-    );
-  };
-
-  /**
-   * Documented host recovery. Recover on the live Grid when the missed server
-   * versions touch other cells; otherwise rebase, clear stale durable ids,
-   * remount, and resubmit.
-   */
   const recoverClient = async (key: ClientKey, response: ConflictResponse) => {
     if (recoveringRef.current[key]) return;
     recoveringRef.current[key] = true;
@@ -1215,14 +907,8 @@ function useCollaborationClients() {
   return {
     atHead,
     action,
-    chaosAction,
     status,
-    batchReport,
     statusDetail,
-    chaos,
-    restoreRunning,
-    runChaos,
-    restoreUsage,
     views,
     serverVersion,
     clientsAtHead,
@@ -1233,19 +919,373 @@ function useCollaborationClients() {
     toggleOnline,
     challengePhase,
     challengeCopy,
-    loseNextAck,
     retryPending,
-    holdNextBroadcast,
-    releaseHeld,
-    serverEdit,
     resetDemo,
+    serversRef,
+    clientsRef,
+    drillRef,
+    recoveringRef,
+    shownRowsRef,
+    visibleRows,
+    showRows,
+    pushClientLog,
+    showDocument,
+    clientsBusy,
   };
 }
 
-type CollaborationClients = ReturnType<typeof useCollaborationClients>;
+type CollaborationClientState = ReturnType<typeof useCollaborationClients>;
+
+/**
+ * Fault drills run against live clients: the chaos run, the bulk restore and
+ * the lost-acknowledgement, held-broadcast and server-edit steps.
+ */
+function useCollaborationDrills(clients: CollaborationClientState) {
+  const {
+    action,
+    serversRef,
+    clientsRef,
+    drillRef,
+    recoveringRef,
+    shownRowsRef,
+    visibleRows,
+    showRows,
+    pushClientLog,
+    showDocument,
+    toggleOnline,
+    clientsBusy,
+  } = clients;
+
+  const chaosAction = useAction();
+  const [chaos, setChaos] = useState<ChaosReport | null>(null);
+  const [batchReport, setBatchReport] = useState<BatchReport | null>(null);
+  const [restoreRunning, setRestoreRunning] = useState(false);
+  const chaosRunRef = useRef(0);
+
+  /**
+   * A seconds-long storm: both clients edit their own rows while connections
+   * drop, reconnect, and broadcasts arrive out of order. Then both clients
+   * reconnect and the page compares their Grids cell by cell.
+   */
+  const runChaos = async () => {
+    const run = chaosRunRef.current + 1;
+    chaosRunRef.current = run;
+    const stillRunning = () =>
+      chaosRunRef.current === run && clientsRef.current.a !== null && clientsRef.current.b !== null;
+    const report: ChaosReport = {
+      phase: "storm",
+      edits: 0,
+      disconnects: 0,
+      reorders: 0,
+      mismatches: 0,
+      cells: 0,
+      ms: 0,
+    };
+    let started = performance.now();
+    let publishedAt = 0;
+    const publish = (force = true) => {
+      const now = performance.now();
+      if (!force && now - publishedAt < CHAOS_PUBLISH_MS) return;
+      publishedAt = now;
+      setChaos({ ...report, ms: now - started });
+    };
+    // Publishing first replaces any earlier verdict and keeps the button
+    // disabled while the clients leave the usage document of the batch drill.
+    publish();
+    try {
+      if (!(await showDocument("forecast"))) {
+        report.phase = "timed-out";
+        publish();
+        return;
+      }
+      started = performance.now();
+      // Read after the switch: a remount brings both clients back online.
+      const offline: Record<ClientKey, boolean> = {
+        a: clientsRef.current.a?.link.connected === false,
+        b: clientsRef.current.b?.link.connected === false,
+      };
+      // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
+      // every edit and every synced arrival is visible while the storm runs.
+      for (const key of CLIENT_KEYS) {
+        showRows(key, CHAOS_VIEW_ROWS);
+        shownRowsRef.current[key] = visibleRows(key);
+      }
+      // Seeded per run, so a run's fault sequence can be reproduced exactly.
+      const random = seededRandom(run);
+
+      while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
+        const key: ClientKey = random() < 0.5 ? "a" : "b";
+        const runtime = clientsRef.current[key];
+        // A recovering client is being remounted and accepts no new edits.
+        if (!runtime || recoveringRef.current[key]) {
+          await delay(CHAOS_TICK_MS);
+          continue;
+        }
+        const roll = random();
+        if (roll < 0.1) {
+          offline[key] = !offline[key];
+          if (offline[key]) report.disconnects += 1;
+          toggleOnline(key, !offline[key]);
+        } else if (roll < 0.18 && !offline[key]) {
+          holdNextBroadcast(key);
+          report.reorders += 1;
+        } else {
+          // Edit a row the reader can see in this analyst's Grid when one exists.
+          const owned = CHAOS_ROWS[key];
+          const view = shownRowsRef.current[key];
+          const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
+          const rows = onScreen.length > 0 ? onScreen : owned;
+          const row = rows[Math.floor(random() * rows.length)];
+          if (row === undefined) throw new Error("The analyst has no forecast rows.");
+          const addr = { sheet: "plan", row, col: 2 };
+          const outcome = runtime.grid.applyTransaction({
+            patches: [
+              {
+                op: "set",
+                addr,
+                value: { kind: "literal", value: 10_000 + Math.floor(random() * 71) * 1_000 },
+              },
+            ],
+          });
+          if (outcome.status === "applied") report.edits += 1;
+        }
+        publish(false);
+        await delay(CHAOS_TICK_MS);
+      }
+
+      report.phase = "settling";
+      publish();
+      for (const key of CLIENT_KEYS) {
+        if (offline[key]) toggleOnline(key, true);
+        releaseHeld(key);
+      }
+      // Wait until both queues drain, no conflict recovery is still running, and
+      // both clients sit at the server head: a client stuck on a version gap has
+      // nothing queued but has not caught up.
+      const settleBy = performance.now() + CHAOS_DRAIN_MS;
+      const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
+      const idle = () =>
+        CLIENT_KEYS.every(
+          (key) =>
+            (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
+            !recoveringRef.current[key] &&
+            clientsRef.current[key]?.sync.serverVersion === head(),
+        );
+      while (stillRunning() && performance.now() < settleBy && !idle()) {
+        for (const key of CLIENT_KEYS) releaseHeld(key);
+        await delay(CHAOS_TICK_MS);
+      }
+      await delay(CHAOS_TICK_MS * 4);
+      if (!stillRunning()) return;
+      if (!idle()) {
+        // Never call a still-moving state converged.
+        report.phase = "timed-out";
+        publish();
+        return;
+      }
+      const a = clientsRef.current.a?.grid;
+      const b = clientsRef.current.b?.grid;
+      if (!a || !b || !stillRunning()) return;
+      let mismatches = 0;
+      let cells = 0;
+      for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
+        for (let col = 0; col < COLLABORATION_WORKBOOK_COLUMNS; col++) {
+          const addr = { sheet: "plan", row, col };
+          cells += 1;
+          if (a.store.getCell(addr).resolved !== b.store.getCell(addr).resolved) mismatches += 1;
+        }
+      }
+      report.cells = cells;
+      report.mismatches = mismatches;
+      report.phase = mismatches === 0 ? "converged" : "diverged";
+      publish();
+    } finally {
+      if (stillRunning()) {
+        if (report.phase === "storm" || report.phase === "settling") {
+          report.phase = "timed-out";
+          publish();
+        }
+        for (const key of CLIENT_KEYS) {
+          toggleOnline(key, true);
+          releaseHeld(key);
+        }
+      }
+    }
+  };
+
+  /**
+   * 0.5.0 atomic batch: clear 100,000 metered-usage cells on Ana's client,
+   * then undo it once. The restore is far above one server version, so the
+   * engine splits it into one atomic multi-version batch; Bram applies every
+   * version in a single transaction or none of them.
+   */
+  const restoreUsage = () => {
+    const started = performance.now();
+    setRestoreRunning(true);
+    setBatchReport(null);
+    drillRef.current = true;
+    void (async () => {
+      try {
+        if (!(await showDocument("usage"))) {
+          pushClientLog(
+            "a",
+            "warn",
+            "Restore drill stopped: the clients could not open the usage document.",
+          );
+          return;
+        }
+        const restorer = clientsRef.current.a;
+        const peer = clientsRef.current.b;
+        const server = serversRef.current.usage;
+        if (!restorer || !peer || !server) return;
+        const settleBy = performance.now() + CHAOS_SETTLE_MS;
+        while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
+        if (clientsBusy()) {
+          pushClientLog("a", "warn", "Restore drill stopped: a client still has queued work.");
+          return;
+        }
+        const totalBefore = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+        await restorer.sync.flush();
+        const cleared = restorer.grid.applyTransaction({
+          patches: [{ op: "clearRange", range: USAGE_RANGE, contents: true }],
+        });
+        if (cleared.status !== "applied") {
+          pushClientLog("a", "error", `Usage clear was ${cleared.status}.`);
+          return;
+        }
+        await restorer.sync.flush();
+        await waitForPeerHead(peer, restorer.sync.serverVersion);
+        // The batch window starts here: only the batch may touch Bram's Grid.
+        let versions = 0;
+        let pieces = 0;
+        let operationBytes = 0;
+        let peerChanges = 0;
+        const stopServer = server.observeCommits((record) => {
+          if (record.batchVersions && record.batchVersions > 1) versions = record.batchVersions;
+        });
+        const stopPeer = peer.grid.on("change", (event) => {
+          if (event.source === "remote") peerChanges += 1;
+        });
+        const stopUndo = restorer.grid.on("change", (event) => {
+          if (event.commitReason !== "undo") return;
+          pieces += event.transaction.patches.length;
+          operationBytes += new TextEncoder().encode(
+            JSON.stringify(event.transaction.patches),
+          ).length;
+        });
+        try {
+          restorer.grid.undo();
+          await restorer.sync.flush();
+          const reachedHead = await waitForPeerHead(peer, restorer.sync.serverVersion);
+          const totalAfter = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const peerTotal = Number(peer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const passed =
+            versions > 1 &&
+            pieces > 1 &&
+            totalAfter === totalBefore &&
+            peerTotal === totalBefore &&
+            peerChanges === 1 &&
+            reachedHead;
+          setBatchReport({
+            versions,
+            pieces,
+            operationBytes,
+            peerChanges,
+            totalBefore,
+            totalAfter,
+            peerTotal,
+            ms: performance.now() - started,
+            passed,
+          });
+          pushClientLog(
+            "a",
+            passed ? "commit" : "warn",
+            passed
+              ? `Undo committed ${versions} versions of one atomic batch; Bram applied the batch once (${peerChanges} transaction).`
+              : "The batch drill did not meet every check.",
+          );
+        } finally {
+          stopServer();
+          stopPeer();
+          stopUndo();
+        }
+      } catch (error) {
+        pushClientLog("a", "error", errorText(error));
+      } finally {
+        drillRef.current = false;
+        setRestoreRunning(false);
+      }
+    })();
+  };
+
+  /** Waits until one client is at the given server version with nothing queued. */
+  const waitForPeerHead = async (peer: ClientRuntime, version: number): Promise<boolean> => {
+    const deadline = performance.now() + CHAOS_SETTLE_MS;
+    const atHead = () =>
+      peer.sync.serverVersion >= version && peer.sync.pendingCommits().length === 0;
+    while (performance.now() < deadline && !atHead()) await delay(CHAOS_TICK_MS);
+    return atHead();
+  };
+
+  const loseNextAck = (key: ClientKey) => {
+    clientsRef.current[key]?.link.dropNextAcknowledgement();
+    pushClientLog(key, "info", "The next acknowledgement (and its echo) will be lost in transit");
+  };
+
+  const holdNextBroadcast = (key: ClientKey) => {
+    clientsRef.current[key]?.link.holdNextBroadcast();
+    pushClientLog(key, "info", "The next inbound broadcast will be held back (delivery reordered)");
+  };
+
+  const releaseHeld = (key: ClientKey) => {
+    clientsRef.current[key]?.link.releaseHeldBroadcasts();
+  };
+
+  const serverEdit = () => {
+    void action.run(
+      async () => {
+        if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
+        const server = serversRef.current.forecast;
+        if (!server) return;
+        const runtime = clientsRef.current.a ?? clientsRef.current.b;
+        const addr = { sheet: "plan", row: 4, col: 2 };
+        const current = runtime?.grid.store.getCell(addr).resolved;
+        const forecast =
+          typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
+        await server.commitServerOperations(DOCUMENT_ID.forecast, [
+          { op: "set", addr, value: { kind: "literal", value: forecast } },
+        ]);
+      },
+      () => "Cannot commit the server edit. Try again.",
+    );
+  };
+
+  /**
+   * Documented host recovery. Recover on the live Grid when the missed server
+   * versions touch other cells; otherwise rebase, clear stale durable ids,
+   * remount, and resubmit.
+   */
+
+  return {
+    chaosAction,
+    chaos,
+    batchReport,
+    restoreRunning,
+    runChaos,
+    restoreUsage,
+    loseNextAck,
+    holdNextBroadcast,
+    releaseHeld,
+    serverEdit,
+  };
+}
+
+type CollaborationClients = CollaborationClientState & ReturnType<typeof useCollaborationDrills>;
 
 export default function CollaborationShowcase() {
-  const workbench = useCollaborationClients();
+  const clients = useCollaborationClients();
+  const drills = useCollaborationDrills(clients);
+  const workbench = { ...clients, ...drills };
   const { action, chaosAction, status, batchReport } = workbench;
 
   return (
