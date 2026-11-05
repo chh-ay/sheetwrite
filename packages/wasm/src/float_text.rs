@@ -11,7 +11,7 @@
 //! Every result comes from exact integer arithmetic: the number is
 //! `mantissa × 2^binary_exponent`, and scaling it by `10^places` gives an
 //! integer part (the truncated digits) and a remainder that decides the
-//! rounding. Magnitudes from about `1e-15` to `1e19` fit in 128-bit integers;
+//! rounding. Magnitudes from about `1e-11` to `1e19` fit in 128-bit integers;
 //! the rest use a small fixed-width big integer.
 
 use std::cmp::Ordering;
@@ -31,21 +31,20 @@ const EXPONENT_BIAS: i32 = 1075;
 /// every binary exponent of a double, give or take one.
 const LOG10_2_NUMERATOR: i32 = 78_913;
 const LOG10_2_SHIFT: u32 = 18;
-/// Remainders and gaps are doubled or quadrupled, so 128-bit values stay
-/// below this bound.
-const SMALL_LIMIT: u128 = 1 << 125;
+/// Remainders and gaps are doubled or quadrupled, so 128-bit values keep
+/// this many spare high bits.
+const SMALL_HEADROOM_BITS: u32 = 3;
+/// Doubles below `2^53` that have no fraction are exactly their integer.
+const EXACT_INTEGER_LIMIT: f64 = (1u64 << f64::MANTISSA_DIGITS) as f64;
 /// Big integer width: the largest value, the denominator `2^1074` of a
 /// subnormal number at a few fixed decimals times the division shift, stays
 /// below 1,150 bits.
 const BIG_LIMBS: usize = 40;
 /// The truncated digits fit in 64 bits, one quotient bit per division step.
 const QUOTIENT_BITS: u32 = 64;
-/// Zeros between the decimal point and the first digit of the smallest
-/// subnormal number, `5e-324`.
-const SUBNORMAL_LEADING_ZEROS: usize = 323;
-/// The longest number text: `-0.`, the leading zeros of the smallest
-/// subnormal number, and its digits.
-const TEXT_CAPACITY: usize = "-0.".len() + SUBNORMAL_LEADING_ZEROS + MAX_DIGITS as usize;
+/// Number texts up to this length stay on the stack: every number from
+/// about `1e-12` to `1e30` with its sign. Longer texts move to the heap.
+const SHORT_TEXT_CAPACITY: usize = 32;
 /// The most decimals `fixed_text` writes: a number with a fraction is below
 /// 2^52, so its scaled digits stay below 2^64.
 #[cfg(feature = "analysis")]
@@ -84,7 +83,8 @@ impl Digits {
 /// digits, half to even on the exact binary value: the digits that
 /// `format!("{:.*e}", count - 1, number)` writes.
 pub(crate) fn rounded_digits(number: f64, count: u32) -> Digits {
-    let scaled = Scaled::of(number, count);
+    let binary = Binary::of(number);
+    let scaled = Scaled::of(&binary, count, binary.exponent_guess());
     let digits = scaled.digits + u64::from(rounds_up(scaled.half, scaled.digits));
     Digits::new(digits, count, scaled.exponent)
 }
@@ -164,6 +164,15 @@ fn push_ascii(text: &mut String, digits: &[u8]) {
 /// finite, not zero), and of those the closest, halfway rounding up: the
 /// digits that `f64::to_string` writes.
 pub(crate) fn shortest_digits(number: f64) -> Digits {
+    // A whole number below 2^53 differs from every other number of as few
+    // digits by at least 1, more than the gap to its neighbours: its digits
+    // are its shortest form.
+    if number < EXACT_INTEGER_LIMIT && number.fract() == 0.0 {
+        let integer = number as u64;
+        let exponent = integer.ilog10();
+        return Digits::new(integer, exponent + 1, exponent as i32);
+    }
+
     // Around a normal number the gap between doubles is under a quarter of a
     // 15-digit step, so a shorter form that reads back is the 15-digit one
     // without its trailing zeros. A subnormal number has fewer significant
@@ -173,8 +182,11 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
     } else {
         1
     };
+    let binary = Binary::of(number);
+    let mut exponent = binary.exponent_guess();
     for count in first_count..=MAX_DIGITS {
-        let scaled = Scaled::of(number, count);
+        let scaled = Scaled::of(&binary, count, exponent);
+        exponent = scaled.exponent;
         let round_up = match (scaled.below_fits, scaled.above_fits) {
             (true, true) => scaled.half != Ordering::Less,
             (below, above) if below || above => above,
@@ -185,18 +197,21 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
     unreachable!("17 significant digits read back as every double")
 }
 
-/// Text of a number as `f64::to_string` writes it, on the stack: plain
-/// decimal notation with the shortest digits, `-` for a negative number or
-/// zero, `inf` and `NaN`.
-pub(crate) struct NumberText {
-    bytes: [u8; TEXT_CAPACITY],
-    len: usize,
+/// Text of a number as `f64::to_string` writes it: plain decimal notation
+/// with the shortest digits, `-` for a negative number or zero, `inf` and
+/// `NaN`. A short text stays on the stack.
+pub(crate) enum NumberText {
+    Short {
+        bytes: [u8; SHORT_TEXT_CAPACITY],
+        len: usize,
+    },
+    Long(String),
 }
 
 impl NumberText {
     pub(crate) fn of(number: f64) -> Self {
-        let mut text = Self {
-            bytes: [0; TEXT_CAPACITY],
+        let mut text = Self::Short {
+            bytes: [0; SHORT_TEXT_CAPACITY],
             len: 0,
         };
 
@@ -218,7 +233,10 @@ impl NumberText {
     }
 
     pub(crate) fn as_str(&self) -> &str {
-        std::str::from_utf8(&self.bytes[..self.len]).expect("number text is ASCII")
+        match self {
+            Self::Short { bytes, len } => ascii(&bytes[..*len]),
+            Self::Long(text) => text,
+        }
     }
 
     /// `0.000ddd`, `dd.ddd` or `ddd000`, by where the decimal point falls.
@@ -244,17 +262,36 @@ impl NumberText {
         }
     }
 
-    fn push(&mut self, bytes: &[u8]) {
-        let end = self.len + bytes.len();
-        self.bytes[self.len..end].copy_from_slice(bytes);
-        self.len = end;
+    /// Appends ASCII bytes, moving the text to the heap when it outgrows the
+    /// stack buffer.
+    fn push(&mut self, more: &[u8]) {
+        match self {
+            Self::Short { bytes, len } if *len + more.len() <= SHORT_TEXT_CAPACITY => {
+                bytes[*len..*len + more.len()].copy_from_slice(more);
+                *len += more.len();
+            }
+            Self::Short { bytes, len } => {
+                let mut text = String::from(ascii(&bytes[..*len]));
+                text.push_str(ascii(more));
+                *self = Self::Long(text);
+            }
+            Self::Long(text) => text.push_str(ascii(more)),
+        }
     }
 
     fn push_zeros(&mut self, count: usize) {
-        let end = self.len + count;
-        self.bytes[self.len..end].fill(b'0');
-        self.len = end;
+        const ZEROS: [u8; SHORT_TEXT_CAPACITY] = [b'0'; SHORT_TEXT_CAPACITY];
+        let mut left = count;
+        while left > 0 {
+            let chunk = left.min(ZEROS.len());
+            self.push(&ZEROS[..chunk]);
+            left -= chunk;
+        }
     }
+}
+
+fn ascii(bytes: &[u8]) -> &str {
+    std::str::from_utf8(bytes).expect("number text is ASCII")
 }
 
 /// Writes the decimal digits of `value` at the end of `text` and returns them.
@@ -318,17 +355,23 @@ impl Binary {
             inclusive: mantissa % 2 == 0,
         }
     }
+
+    /// The power of ten of the first digit, `floor(log2 × log10(2))`, which
+    /// is the right one or one too small.
+    fn exponent_guess(&self) -> i32 {
+        let binary_log =
+            (u64::BITS - 1 - self.mantissa.leading_zeros()) as i32 + self.binary_exponent;
+        (binary_log * LOG10_2_NUMERATOR) >> LOG10_2_SHIFT
+    }
 }
 
 impl Scaled {
-    fn of(number: f64, count: u32) -> Self {
-        let binary = Binary::of(number);
-        let binary_log =
-            (u64::BITS - 1 - binary.mantissa.leading_zeros()) as i32 + binary.binary_exponent;
-        let mut exponent = (binary_log * LOG10_2_NUMERATOR) >> LOG10_2_SHIFT;
+    /// `exponent` is a guess for the power of ten of the number's first
+    /// digit; the scaling corrects it.
+    fn of(binary: &Binary, count: u32, mut exponent: i32) -> Self {
         loop {
             let places = count as i32 - 1 - exponent;
-            let (digits, comparisons) = scale(&binary, places);
+            let (digits, comparisons) = scale(binary, places);
             if digits >= u128::from(10u64.pow(count)) {
                 exponent += 1;
             } else if digits < u128::from(10u64.pow(count - 1)) {
@@ -385,20 +428,15 @@ fn scale(binary: &Binary, places: i32) -> Scale {
 }
 
 /// The 128-bit path: a power-of-two denominator, or a numerator and
-/// denominator below 2^64.
+/// denominator below 2^64. Powers of five up to `5^27` fit 64 bits, so the
+/// only wide multiplication is the mantissa times one of them.
 fn scale_small(binary: &Binary, places: i32) -> Option<Scale> {
     let powers = Powers::of(binary, places);
-    let power = |fives: u32, twos: u32| {
-        5u128
-            .checked_pow(fives)?
-            .checked_mul(1u128.checked_shl(twos)?)
-            .filter(|&value| value < SMALL_LIMIT)
-    };
-    let gap = power(powers.fives_up, powers.twos_up)?;
-    let denominator = power(powers.fives_down, powers.twos_down)?;
-    let numerator = gap
-        .checked_mul(u128::from(binary.mantissa))
-        .filter(|&value| value < SMALL_LIMIT)?;
+    let fives_up = u128::from(5u64.checked_pow(powers.fives_up)?);
+    let fives_down = u128::from(5u64.checked_pow(powers.fives_down)?);
+    let gap = shifted(fives_up, powers.twos_up)?;
+    let denominator = shifted(fives_down, powers.twos_down)?;
+    let numerator = shifted(fives_up * u128::from(binary.mantissa), powers.twos_up)?;
 
     let (digits, remainder) = if powers.fives_down == 0 {
         (numerator >> powers.twos_down, numerator & (denominator - 1))
@@ -422,6 +460,12 @@ fn scale_small(binary: &Binary, places: i32) -> Option<Scale> {
         digits,
         [twice.cmp(&denominator), below.cmp(&gap), above.cmp(&gap)],
     ))
+}
+
+/// `value << shift`, when the result keeps `SMALL_HEADROOM_BITS` spare high
+/// bits.
+fn shifted(value: u128, shift: u32) -> Option<u128> {
+    (value.leading_zeros() >= shift.saturating_add(SMALL_HEADROOM_BITS)).then(|| value << shift)
 }
 
 /// The big-integer path for magnitudes outside the 128-bit range. The
