@@ -39,3 +39,39 @@
   color: var(--sw-fg);
   font: var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
 }
+
+/* Changed cells of a compare: address, before → after, and the author. */
+.sw-feature-changes {
+  display: grid;
+  gap: var(--sw-space-1);
+  max-height: calc(var(--sw-control-height) * 6);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-feature-changes > li {
+  display: grid;
+  grid-template-columns: 3.5em minmax(0, 1fr) auto;
+  gap: var(--sw-space-2);
+  align-items: baseline;
+  padding: var(--sw-space-1-5) 0;
+  border-bottom: var(--sw-border-width) dashed var(--sw-border);
+}
+
+.sw-feature-changes code {
+  color: var(--sw-accent-strong);
+  font-family: var(--sw-font-mono);
+}
+
+.sw-feature-changes span {
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-feature-changes small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}

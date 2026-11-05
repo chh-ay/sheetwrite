@@ -27,7 +27,8 @@ export type CapabilityOwnerId =
   | "analysis"
   | "sort"
   | "queries"
-  | "data-model";
+  | "data-model"
+  | "version-history";
 
 export type CapabilityArea =
   | "editing"
@@ -241,6 +242,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.data-model.tsx",
     responsibility:
       "Relationships between workbook tables, key checks, pivots over fields of related tables, measures, GETPIVOTDATA over a model pivot, and the Relationships panel.",
+    kind: "capability",
+  },
+  {
+    id: "version-history",
+    label: "Version history",
+    href: "/showcases/version-history/",
+    routeFile: "docs/src/routes/showcases.version-history.tsx",
+    responsibility:
+      "History archives journaled by the document authority: named versions, authors, compare with the current document, restore of a range or a sheet, and the Version History panel.",
     kind: "capability",
   },
 ];
@@ -619,6 +629,27 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/data-model.ts"],
     boundary:
       "Key checks and model pivots run in the full engine; Excel's data model binary is not written, so Excel opens an exported file without relationships.",
+  },
+  {
+    id: "persistence.version-history",
+    title: "Version history",
+    area: "persistence",
+    primary: "version-history",
+    secondary: [
+      {
+        owner: "collaboration",
+        reason: "Collaboration shows the sync protocol whose commits the archive records.",
+      },
+    ],
+    interaction:
+      "Edit as yourself and as a second author, save a version, compare the approved version with the current document by author, then restore a range and the sheet.",
+    scope: "browser",
+    accessibility:
+      "Labeled buttons; versions and changed cells are text lists with the author of each.",
+    testPath: "test/browser/showcase-version-history.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/version-history.ts"],
+    boundary:
+      "The page's authority and archive live in memory; a real host keeps commits and the journal in one database transaction.",
   },
   {
     id: "workflow.ribbon",

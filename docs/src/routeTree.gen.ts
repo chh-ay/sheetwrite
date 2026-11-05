@@ -32,6 +32,7 @@ import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.per
 import { Route as ShowcasesQueriesRouteImport } from './routes/showcases.queries'
 import { Route as ShowcasesSortRouteImport } from './routes/showcases.sort'
 import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
+import { Route as ShowcasesVersionHistoryRouteImport } from './routes/showcases.version-history'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
 import { Route as TestGridMemoryRouteImport } from './routes/test.grid-memory'
@@ -157,6 +158,11 @@ const ShowcasesSpreadsheetRoute = ShowcasesSpreadsheetRouteImport.update({
   path: '/showcases/spreadsheet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesVersionHistoryRoute = ShowcasesVersionHistoryRouteImport.update({
+  id: '/showcases/version-history',
+  path: '/showcases/version-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestCollaborationRoute = TestCollaborationRouteImport.update({
   id: '/test/collaboration',
   path: '/test/collaboration',
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/showcases/queries': typeof ShowcasesQueriesRoute
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
+  '/showcases/version-history': typeof ShowcasesVersionHistoryRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
@@ -254,6 +261,7 @@ export interface FileRoutesByTo {
   '/showcases/queries': typeof ShowcasesQueriesRoute
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
+  '/showcases/version-history': typeof ShowcasesVersionHistoryRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
@@ -288,6 +296,7 @@ export interface FileRoutesById {
   '/showcases/queries': typeof ShowcasesQueriesRoute
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
+  '/showcases/version-history': typeof ShowcasesVersionHistoryRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/showcases/queries'
     | '/showcases/sort'
     | '/showcases/spreadsheet'
+    | '/showcases/version-history'
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/grid-memory'
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/showcases/queries'
     | '/showcases/sort'
     | '/showcases/spreadsheet'
+    | '/showcases/version-history'
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/grid-memory'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/showcases/queries'
     | '/showcases/sort'
     | '/showcases/spreadsheet'
+    | '/showcases/version-history'
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/grid-memory'
@@ -423,6 +435,7 @@ export interface RootRouteChildren {
   ShowcasesQueriesRoute: typeof ShowcasesQueriesRoute
   ShowcasesSortRoute: typeof ShowcasesSortRoute
   ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
+  ShowcasesVersionHistoryRoute: typeof ShowcasesVersionHistoryRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
   TestFormulasEngineRoute: typeof TestFormulasEngineRoute
   TestGridMemoryRoute: typeof TestGridMemoryRoute
@@ -598,6 +611,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShowcasesSpreadsheetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/version-history': {
+      id: '/showcases/version-history'
+      path: '/showcases/version-history'
+      fullPath: '/showcases/version-history'
+      preLoaderRoute: typeof ShowcasesVersionHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/test/collaboration': {
       id: '/test/collaboration'
       path: '/test/collaboration'
@@ -679,6 +699,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesQueriesRoute: ShowcasesQueriesRoute,
   ShowcasesSortRoute: ShowcasesSortRoute,
   ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
+  ShowcasesVersionHistoryRoute: ShowcasesVersionHistoryRoute,
   TestCollaborationRoute: TestCollaborationRoute,
   TestFormulasEngineRoute: TestFormulasEngineRoute,
   TestGridMemoryRoute: TestGridMemoryRoute,

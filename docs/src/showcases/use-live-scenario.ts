@@ -24,8 +24,9 @@ export interface LiveScenarioState<Snapshot, Scenario> {
  * Create the scenario in the host element on mount, follow its snapshot, and
  * dispose it on unmount. Pass a module-level `create`, so it stays the same.
  */
-export function useLiveScenario<Snapshot, Scenario extends LiveScenario<Snapshot>>(
-  create: (host: HTMLElement) => Scenario,
+export function useLiveScenario<Snapshot, Scenario>(
+  // The intersection lets TypeScript infer `Snapshot` from the scenario type.
+  create: (host: HTMLElement) => Scenario & LiveScenario<Snapshot>,
 ): LiveScenarioState<Snapshot, Scenario> {
   const hostRef = useRef<HTMLDivElement>(null);
   const [scenario, setScenario] = useState<Scenario | null>(null);
