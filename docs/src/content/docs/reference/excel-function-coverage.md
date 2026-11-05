@@ -5,7 +5,7 @@ description: "Every function in the pinned Microsoft Excel catalog, with full an
 
 This table covers **520 distinct Excel function names** from [Microsoft's category catalog](https://support.microsoft.com/en-us/excel/excel-functions-by-category), updated 2026-06-25 and retrieved 2026-10-30. It includes compatibility names and add-in functions. It is a pinned catalog, not a claim to cover functions Microsoft adds after that date.
 
-The full engine has **250 supported**, **93 partly supported**, and **177 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
+The full engine has **276 supported**, **93 partly supported**, and **151 not supported** names in this catalog. Aliases count as separate Excel names. Functions outside the catalog remain in the [function contract](/docs/reference/formula-functions/).
 
 ## How to read the table
 
@@ -135,7 +135,7 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 | [`BITOR`](https://support.microsoft.com/en-us/excel/functions/bitor-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BITRSHIFT`](https://support.microsoft.com/en-us/excel/functions/bitrshift-function) | Not supported | Not supported | Not registered in either engine. |
 | [`BITXOR`](https://support.microsoft.com/en-us/excel/functions/bitxor-function) | Not supported | Not supported | Not registered in either engine. |
-| [`COMPLEX`](https://support.microsoft.com/en-us/excel/functions/complex-function) | Not supported | Not supported | Not registered in either engine. |
+| [`COMPLEX`](https://support.microsoft.com/en-us/excel/functions/complex-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
 | [`CONVERT`](https://support.microsoft.com/en-us/excel/functions/convert-function) | Not supported | Not supported | Not registered in either engine. |
 | [`DEC2BIN`](https://support.microsoft.com/en-us/excel/functions/dec2bin-function) | Not supported | Not supported | Not registered in either engine. |
 | [`DEC2HEX`](https://support.microsoft.com/en-us/excel/functions/dec2hex-function) | Not supported | Not supported | Not registered in either engine. |
@@ -149,31 +149,31 @@ The full engine has **250 supported**, **93 partly supported**, and **177 not su
 | [`HEX2BIN`](https://support.microsoft.com/en-us/excel/functions/hex2bin-function) | Not supported | Not supported | Not registered in either engine. |
 | [`HEX2DEC`](https://support.microsoft.com/en-us/excel/functions/hex2dec-function) | Not supported | Not supported | Not registered in either engine. |
 | [`HEX2OCT`](https://support.microsoft.com/en-us/excel/functions/hex2oct-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMABS`](https://support.microsoft.com/en-us/excel/functions/imabs-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMAGINARY`](https://support.microsoft.com/en-us/excel/functions/imaginary-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMARGUMENT`](https://support.microsoft.com/en-us/excel/functions/imargument-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMCONJUGATE`](https://support.microsoft.com/en-us/excel/functions/imconjugate-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMCOS`](https://support.microsoft.com/en-us/excel/functions/imcos-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMCOSH`](https://support.microsoft.com/en-us/excel/functions/imcosh-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMCOT`](https://support.microsoft.com/en-us/excel/functions/imcot-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMCSC`](https://support.microsoft.com/en-us/excel/functions/imcsc-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMCSCH`](https://support.microsoft.com/en-us/excel/functions/imcsch-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMDIV`](https://support.microsoft.com/en-us/excel/functions/imdiv-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMEXP`](https://support.microsoft.com/en-us/excel/functions/imexp-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMLN`](https://support.microsoft.com/en-us/excel/functions/imln-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMLOG10`](https://support.microsoft.com/en-us/excel/functions/imlog10-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMLOG2`](https://support.microsoft.com/en-us/excel/functions/imlog2-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMPOWER`](https://support.microsoft.com/en-us/excel/functions/impower-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMPRODUCT`](https://support.microsoft.com/en-us/excel/functions/improduct-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMREAL`](https://support.microsoft.com/en-us/excel/functions/imreal-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSEC`](https://support.microsoft.com/en-us/excel/functions/imsec-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSECH`](https://support.microsoft.com/en-us/excel/functions/imsech-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSIN`](https://support.microsoft.com/en-us/excel/functions/imsin-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSINH`](https://support.microsoft.com/en-us/excel/functions/imsinh-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSQRT`](https://support.microsoft.com/en-us/excel/functions/imsqrt-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSUB`](https://support.microsoft.com/en-us/excel/functions/imsub-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMSUM`](https://support.microsoft.com/en-us/excel/functions/imsum-function) | Not supported | Not supported | Not registered in either engine. |
-| [`IMTAN`](https://support.microsoft.com/en-us/excel/functions/imtan-function) | Not supported | Not supported | Not registered in either engine. |
+| [`IMABS`](https://support.microsoft.com/en-us/excel/functions/imabs-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMAGINARY`](https://support.microsoft.com/en-us/excel/functions/imaginary-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMARGUMENT`](https://support.microsoft.com/en-us/excel/functions/imargument-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMCONJUGATE`](https://support.microsoft.com/en-us/excel/functions/imconjugate-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMCOS`](https://support.microsoft.com/en-us/excel/functions/imcos-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMCOSH`](https://support.microsoft.com/en-us/excel/functions/imcosh-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMCOT`](https://support.microsoft.com/en-us/excel/functions/imcot-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMCSC`](https://support.microsoft.com/en-us/excel/functions/imcsc-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMCSCH`](https://support.microsoft.com/en-us/excel/functions/imcsch-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMDIV`](https://support.microsoft.com/en-us/excel/functions/imdiv-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMEXP`](https://support.microsoft.com/en-us/excel/functions/imexp-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMLN`](https://support.microsoft.com/en-us/excel/functions/imln-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMLOG10`](https://support.microsoft.com/en-us/excel/functions/imlog10-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMLOG2`](https://support.microsoft.com/en-us/excel/functions/imlog2-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMPOWER`](https://support.microsoft.com/en-us/excel/functions/impower-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMPRODUCT`](https://support.microsoft.com/en-us/excel/functions/improduct-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMREAL`](https://support.microsoft.com/en-us/excel/functions/imreal-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSEC`](https://support.microsoft.com/en-us/excel/functions/imsec-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSECH`](https://support.microsoft.com/en-us/excel/functions/imsech-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSIN`](https://support.microsoft.com/en-us/excel/functions/imsin-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSINH`](https://support.microsoft.com/en-us/excel/functions/imsinh-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSQRT`](https://support.microsoft.com/en-us/excel/functions/imsqrt-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSUB`](https://support.microsoft.com/en-us/excel/functions/imsub-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMSUM`](https://support.microsoft.com/en-us/excel/functions/imsum-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
+| [`IMTAN`](https://support.microsoft.com/en-us/excel/functions/imtan-function) | Supported | Not supported | Lite engine: not registered. IMSUM and IMPRODUCT skip blank cells in a range. [Contract](/docs/reference/formula-functions/engineering/) |
 | [`OCT2BIN`](https://support.microsoft.com/en-us/excel/functions/oct2bin-function) | Not supported | Not supported | Not registered in either engine. |
 | [`OCT2DEC`](https://support.microsoft.com/en-us/excel/functions/oct2dec-function) | Not supported | Not supported | Not registered in either engine. |
 | [`OCT2HEX`](https://support.microsoft.com/en-us/excel/functions/oct2hex-function) | Not supported | Not supported | Not registered in either engine. |
