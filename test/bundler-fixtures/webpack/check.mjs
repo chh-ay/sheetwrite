@@ -42,11 +42,15 @@ const PANEL_MARKER = "sheetwrite-panel-section";
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
+const IMPORT_MARKER = "Import XLSX";
+const SUMMARY_MARKER = "numericCount";
+const REPLACEMENT_MARKER = "Disconnect collaboration before import";
 const chromeChunks = [];
 const panelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const workers = [];
+const documentChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
@@ -56,6 +60,10 @@ for (const file of lazyChunks) {
     chromeChunks.push(file);
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
+  else if (
+    [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
+  )
+    documentChunks.push(file);
   else workers.push(file);
 }
 if (workers.length !== 1)
@@ -88,6 +96,11 @@ if (mainCode.includes(FIND_MARKER)) {
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
 }
+for (const marker of [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER]) {
+  if (mainCode.includes(marker)) {
+    throw new Error(`A cold document operation is in webpack's main.js: ${marker}`);
+  }
+}
 
 const assets = publicFiles.map((file) => {
   const kind = file.endsWith(".js") ? "javascript" : file.endsWith(".css") ? "css" : "wasm";
@@ -100,7 +113,7 @@ const assets = publicFiles.map((file) => {
     owner = "worker-async";
     roles = ["worker-async"];
   } else if (
-    [chromeChunks, panelChunks, functionTableChunks, findChunks].some((chunks) =>
+    [chromeChunks, panelChunks, functionTableChunks, findChunks, documentChunks].some((chunks) =>
       chunks.includes(file),
     )
   ) {

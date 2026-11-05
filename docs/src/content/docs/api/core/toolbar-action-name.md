@@ -8,7 +8,7 @@ description: "ToolbarActionName type in @sheetwrite/core: Built-in action names 
 Built-in action names accepted by custom toolbar items.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L243"><code>packages/core/src/types/grid.ts#L243</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/grid.ts#L245"><code>packages/core/src/types/grid.ts#L245</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -38,6 +38,7 @@ export type ToolbarActionName =
   | "sortDesc"
   | "exportCsv"
   | "exportXlsx"
+  | "importXlsx"
   | "undo"
   | "redo"
   | "separator";

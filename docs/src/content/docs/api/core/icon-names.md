@@ -104,6 +104,7 @@ const ICON_NAMES: readonly [
   "kpiCard",
   "versionHistory",
   "saveVersion",
+  "importXlsx",
 ]
 ```
 

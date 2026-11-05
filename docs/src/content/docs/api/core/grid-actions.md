@@ -57,6 +57,7 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-clear-contents"><code>clearContents</code></a>
 <a href="#grid-actions-export-csv"><code>exportCsv</code></a>
 <a href="#grid-actions-export-xlsx"><code>exportXlsx</code></a>
+<a href="#grid-actions-import-xlsx"><code>importXlsx</code></a>
 <a href="#grid-actions-edit-note"><code>editNote</code></a>
 <a href="#grid-actions-delete-note"><code>deleteNote</code></a>
 <a href="#grid-actions-show-pivot-fields"><code>showPivotFields</code></a>
@@ -64,7 +65,7 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 <a href="#grid-actions-redo"><code>redo</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>50</span>
+## Members <span class="api-count" data-pagefind-ignore>51</span>
 
 <div class="api-member-list">
 
@@ -486,6 +487,15 @@ exportXlsx(filename?: string): Promise<void>;
 rejects; a failure emits `export-error`.</p>
 </details>
 
+<details class="api-member" id="grid-actions-import-xlsx" data-pagefind-weight="1">
+<summary><code>importXlsx</code> <span class="api-member-summary">Pick an XLSX file and replace the open document.</span></summary>
+
+```ts generated
+importXlsx(): Promise<void>;
+```
+
+</details>
+
 <details class="api-member" id="grid-actions-edit-note" data-pagefind-weight="1">
 <summary><code>editNote</code> <span class="api-member-summary">Open the note editor on the focus cell, with its note or empty for a new one.</span></summary>
 
@@ -592,6 +602,7 @@ export interface GridActions {
   clearContents(): void;
   exportCsv(filename?: string): void;
   exportXlsx(filename?: string): Promise<void>;
+  importXlsx(): Promise<void>;
   editNote(): void;
   deleteNote(): void;
   showPivotFields(): void;

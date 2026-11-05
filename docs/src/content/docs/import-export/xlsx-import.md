@@ -3,6 +3,53 @@ title: XLSX import
 description: Import workbook snapshots or rectangular tables with explicit fidelity warnings.
 ---
 
+## Open a file from the ribbon
+
+Register the optional backend before creating a grid with `config: { ribbon: true }`.
+Choose **File › Import XLSX**, then choose an `.xlsx` file in the browser's file
+picker. The File tab is hidden when no workbook backend is registered. Use the
+ribbon's arrow-key navigation and Enter or Space to open the picker; the command
+has the accessible name **Import XLSX**.
+
+Import replaces the whole workbook, not the current selection. It keeps the grid,
+its chrome, host configuration and event subscriptions. The imported workbook
+opens on its saved active sheet with a fresh selection and scroll position.
+Successful import clears undo and redo. Import itself cannot be undone, like
+Excel's Open command. Save or export the old document first if you need it later.
+
+If parsing, validation or cancellation fails, the old document and history stay
+intact. A new import aborts the previous import. Destroying the grid also aborts
+import. The command and picker live in lazy chrome. Document replacement loads
+on first import; core does not load the XLSX codec unless the host registers it.
+
+## Replace a document through the API
+
+```ts compile title="Open an XLSX file in the current grid"
+import { fromXlsxWorkbookFile, type Grid } from "@sheetwrite/core";
+import "@sheetwrite/xlsx/register";
+
+declare const grid: Grid;
+declare const file: File;
+await grid.importWorkbook((signal) => fromXlsxWorkbookFile(file, { signal }));
+```
+
+Pass a snapshot directly with `await grid.importWorkbook(snapshot)`. For async
+readers, pass a loader that receives an `AbortSignal`. Forward that signal to the
+reader so a newer import can stop parsing. You can also pass a host signal as the
+second argument: `{ signal: controller.signal }`. Late results from cancelled
+loaders never replace the current document.
+
+The grid validates and hydrates a separate store before it replaces the live
+document. On success it releases the previous document's engine storage, undo
+resources, read caches, search results and rich clipboard state.
+
+Import needs an editable grid-owned store with no datasource. Grids with injected
+stores or datasources reject import because the host owns those lifetimes.
+Import is also blocked while a collaboration session is attached, even while
+offline or reconnecting. Disconnect that session first. Use a new collaboration
+session and document identity for the imported workbook; import is not broadcast
+as a transaction to the old session.
+
 ```ts prelude="core" partial="bytes is an ArrayBuffer or Uint8Array from an XLSX file" title="Open a workbook"
 import { fromXlsxWorkbook, SheetwriteStore } from "@sheetwrite/core";
 import "@sheetwrite/xlsx/register";

@@ -30,7 +30,11 @@ import {
   StoreDataEngine,
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
-import { forgetLiveStoreEngine, registerStoreEngine } from "./store/engine-registry.js";
+import {
+  forgetLiveStoreEngine,
+  registerStoreEngine,
+  replaceStoreEngine,
+} from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
 import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
@@ -70,7 +74,7 @@ import type {
   TransactionApplicationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
-import { admitStoreXlsxSource } from "./xlsx-source.js";
+import { admitStoreXlsxSource, replaceStoreXlsxSource } from "./xlsx-source.js";
 
 export type { CompactRangeHistory, RangeMutationAllocationStats };
 export { IncompleteDataError };
@@ -147,7 +151,7 @@ function isSnapshotAllocationFailure(error: unknown): boolean {
  * @see createGrid
  */
 export class SheetwriteStore implements Store {
-  private readonly dataEngine: StoreDataEngine;
+  private dataEngine: StoreDataEngine;
 
   /**
    * Every store call reaches the engine through here, so one check refuses
@@ -163,7 +167,7 @@ export class SheetwriteStore implements Store {
   private detailedChangeCapture = false;
   private protectionResolver: ProtectionResolver | undefined;
   private mutationPolicy: MutationPolicyMode;
-  private readonly policy: StoreMutationPolicy;
+  private policy: StoreMutationPolicy;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private documentId?: string;
   private documentVersion?: number;
@@ -171,7 +175,7 @@ export class SheetwriteStore implements Store {
   private readonly generation = engineGeneration();
 
   constructor(
-    private readonly workbook: Workbook,
+    private workbook: Workbook,
     data?: ColumnarData,
     options: SheetwriteStoreOptions = {},
   ) {
@@ -256,6 +260,31 @@ export class SheetwriteStore implements Store {
       }
       throw error;
     }
+  }
+
+  /** Replace only after a separate store has validated and hydrated every sheet. */
+  replaceSnapshot(snapshot: WorkbookSnapshot): void {
+    this.assertEngineRunning();
+
+    const replacement = SheetwriteStore.fromSnapshot(snapshot, {
+      protectionResolver: this.protectionResolver,
+      mutationPolicy: this.mutationPolicy,
+      transactionResourceLimits: this.transactionResourceLimits,
+    });
+
+    const previous = this.engine;
+    replaceStoreEngine(this, replacement);
+    this.dataEngine = replacement.dataEngine;
+    this.workbook = replacement.workbook;
+    this.documentId = replacement.documentId;
+    this.documentVersion = replacement.documentVersion;
+    this.epoch += 1;
+    this.policy = new StoreMutationPolicy(this.workbook, (sheet) =>
+      this.engine.pivotOutputs(sheet),
+    );
+    replaceStoreXlsxSource(this, replacement);
+
+    previous.dispose();
   }
 
   setProtectionResolver(

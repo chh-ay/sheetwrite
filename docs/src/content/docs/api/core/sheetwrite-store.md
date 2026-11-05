@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L149"><code>packages/core/src/store.ts#L149</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L153"><code>packages/core/src/store.ts#L153</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -78,6 +78,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-remove-pivot"><code>removePivot</code></a>
 <a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
 <a href="#sheetwrite-store-rename-sheet-formula-identity"><code>renameSheetFormulaIdentity</code></a>
+<a href="#sheetwrite-store-replace-snapshot"><code>replaceSnapshot</code></a>
 <a href="#sheetwrite-store-reset-formula-matrix-resource-peak"><code>resetFormulaMatrixResourcePeak</code></a>
 <a href="#sheetwrite-store-reset-range-mutation-allocation-stats"><code>resetRangeMutationAllocationStats</code></a>
 <a href="#sheetwrite-store-reset-runtime-resource-accounting"><code>resetRuntimeResourceAccounting</code></a>
@@ -99,7 +100,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>64</span>
+## Members <span class="api-count" data-pagefind-ignore>65</span>
 
 <div class="api-member-list">
 
@@ -544,6 +545,15 @@ renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-replace-snapshot" data-pagefind-weight="1">
+<summary><code>replaceSnapshot</code> <span class="api-member-summary">Replace only after a separate store has validated and hydrated every sheet.</span></summary>
+
+```ts generated
+replaceSnapshot: (snapshot: WorkbookSnapshot) => void;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-reset-formula-matrix-resource-peak" data-pagefind-weight="1">
 <summary><code>resetFormulaMatrixResourcePeak</code></summary>
 
@@ -840,6 +850,7 @@ class SheetwriteStore implements Store {
   removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
   renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
+  replaceSnapshot: (snapshot: WorkbookSnapshot) => void;
   resetFormulaMatrixResourcePeak: () => void;
   resetRangeMutationAllocationStats: () => void;
   resetRuntimeResourceAccounting: () => void;

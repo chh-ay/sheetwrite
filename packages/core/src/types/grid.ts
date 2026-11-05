@@ -218,6 +218,8 @@ export interface GridActions {
    * rejects; a failure emits `export-error`.
    */
   exportXlsx(filename?: string): Promise<void>;
+  /** Pick an XLSX file and replace the open document. */
+  importXlsx(): Promise<void>;
   /**
    * Open the note editor on the focus cell, with its note or empty for a new
    * one. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does
@@ -262,6 +264,7 @@ export type ToolbarActionName =
   | "sortDesc"
   | "exportCsv"
   | "exportXlsx"
+  | "importXlsx"
   | "undo"
   | "redo"
   | "separator";
@@ -1011,6 +1014,16 @@ export interface Grid {
    * @see toXlsxWorkbook
    */
   exportXlsx(filename: string): Promise<void>;
+  /**
+   * Replace the document without recreating the grid or chrome. A new import
+   * aborts the previous loader. Failure keeps the document and history; success
+   * clears undo and redo. Import is not undoable, like Excel Open.
+   * Injected stores, datasource grids and attached collaboration sessions reject.
+   */
+  importWorkbook(
+    source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
+    options?: { signal?: AbortSignal },
+  ): Promise<void>;
   /** Find cells matching `query`; highlights matches, emits `search`, returns the result. */
   search(query: string, opts?: SearchOptions): SearchResult;
   /** Move the active match to the next match and scroll it into view. */

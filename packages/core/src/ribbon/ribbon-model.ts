@@ -35,6 +35,7 @@ import { storeEngine } from "../store/engine-registry.js";
 import type { ChartKind } from "../types/chart.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, CommandFlags, Grid, GridCommandName } from "../types/grid.js";
+import { xlsxImportCommand } from "../workbook-io.js";
 import type {
   RibbonAvailability,
   RibbonButtonSpec,
@@ -373,6 +374,19 @@ export function steppedZoom(zoom: number, direction: 1 | -1): number {
  * Full and compact layouts render these same live controls.
  */
 export const RIBBON_TABS: readonly RibbonTabSpec[] = [
+  {
+    label: "File",
+    reduceOrder: ["import"],
+    groups: [
+      {
+        id: "import",
+        label: "Import",
+        icon: "importXlsx",
+        layout: "flow",
+        controls: [xlsxImportCommand],
+      },
+    ],
+  },
   {
     label: "Home",
     reduceOrder: ["editing", "cells", "number", "alignment", "clipboard", "font", "undo"],

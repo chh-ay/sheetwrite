@@ -34,6 +34,16 @@ export function registerStoreEngine(
   finalized.register(engine, ref);
 }
 
+/** Transfer a hydrated engine without adding it twice to the live-engine set. */
+export function replaceStoreEngine(store: object, replacement: object): void {
+  const engine = ENGINES.get(replacement);
+  const generation = GENERATIONS.get(replacement);
+  if (!engine || generation === undefined) throw new Error("Unregistered replacement store");
+  forgetLiveStoreEngine(store);
+  ENGINES.set(store, engine);
+  GENERATIONS.set(store, generation);
+}
+
 /** Engine generation of a registered store; `undefined` for any other object. */
 export function storeGeneration(store: object): number | undefined {
   return GENERATIONS.get(store);

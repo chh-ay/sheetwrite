@@ -133,8 +133,8 @@ it("keeps only tabs in the tablist and the layout buttons beside it", async () =
   if (tablist === null) throw new Error("no ribbon tablist");
 
   const roles = [...tablist.children].map((child) => child.getAttribute("role"));
-  // Formulas is in the list but hidden while the store has no host functions.
-  expect(roles).toEqual(["tab", "tab", "tab", "tab", "tab"]);
+  // Unavailable feature tabs stay hidden, but only tabs belong to this list.
+  expect(new Set(roles)).toEqual(new Set(["tab"]));
   for (const label of ["Compact ribbon", "Collapse the ribbon"]) {
     const button = control(label);
     expect(tablist.contains(button), label).toBe(false);

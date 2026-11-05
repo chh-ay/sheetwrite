@@ -1,14 +1,14 @@
 ---
 title: "fromXlsxWorkbookFile | @sheetwrite/core"
-description: "fromXlsxWorkbookFile function in @sheetwrite/core: Import a seekable File/Blob without first buffering the compressed workbook."
+description: "fromXlsxWorkbookFile function in @sheetwrite/core: Import a File/Blob. The built-in backend reads it without buffering the compressed workbook."
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxWorkbookFile -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Import a seekable File/Blob without first buffering the compressed workbook.
+Import a File/Blob. The built-in backend reads it without buffering the compressed workbook.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/export.ts#L756"><code>packages/core/src/export.ts#L756</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L440"><code>packages/core/src/xlsx-bridge.ts#L440</code></a></dd></div>
 </dl>
 
 ## Declaration
