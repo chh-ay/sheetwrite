@@ -13928,7 +13928,7 @@ confirms the submitted operations unchanged; normalization must conflict.
 class PersistenceError extends SheetwriteError { constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions); code: PersistenceErrorCode; name: "PersistenceError" }
 ```
 
-Typed failure raised by persistence and synchronization flows.
+Typed failure of `createGridFromSnapshot` and `MemoryPersistenceAdapter`.
 
 ##### `PersistenceErrorCode` — type
 

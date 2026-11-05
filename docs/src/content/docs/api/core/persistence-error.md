@@ -1,11 +1,11 @@
 ---
 title: "PersistenceError | @sheetwrite/core"
-description: "PersistenceError class in @sheetwrite/core: Typed failure raised by persistence and synchronization flows."
+description: "PersistenceError class in @sheetwrite/core: Typed failure of createGridFromSnapshot and MemoryPersistenceAdapter."
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceError -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
-Typed failure raised by persistence and synchronization flows.
+Typed failure of `createGridFromSnapshot` and `MemoryPersistenceAdapter`.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L56"><code>packages/core/src/persistence.ts#L56</code></a></dd></div>

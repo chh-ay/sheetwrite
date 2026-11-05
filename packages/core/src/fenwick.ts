@@ -54,6 +54,11 @@ export class OffsetIndex {
     return this.total;
   }
 
+  /** Bytes reserved by the optional dense typed-array backing stores. */
+  get backingStoreBytes(): number {
+    return (this.heights?.byteLength ?? 0) + (this.tree?.byteLength ?? 0);
+  }
+
   heightOf(row: number): number {
     return this.heights?.[row] ?? this.defaultHeight;
   }

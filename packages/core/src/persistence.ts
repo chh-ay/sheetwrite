@@ -52,7 +52,7 @@ export type PersistenceErrorCode =
   | "not-found"
   | "commit-rejected";
 
-/** Typed failure raised by persistence and synchronization flows. */
+/** Typed failure of `createGridFromSnapshot` and `MemoryPersistenceAdapter`. */
 export class PersistenceError extends SheetwriteError {
   override readonly name = "PersistenceError";
   declare readonly code: PersistenceErrorCode;

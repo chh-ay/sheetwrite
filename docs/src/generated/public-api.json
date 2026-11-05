@@ -2088,7 +2088,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3732",
+              "source": "src/document-protocol.ts#L3724",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -3083,7 +3083,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L449",
+              "source": "src/store/data-engine.ts#L444",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3724,7 +3724,7 @@
               ],
               "source": "src/persistence.ts#L56",
               "jsDocTags": [],
-              "documentation": "Typed failure raised by persistence and synchronization flows.",
+              "documentation": "Typed failure of `createGridFromSnapshot` and `MemoryPersistenceAdapter`.",
               "memberDocs": []
             },
             {
@@ -5386,7 +5386,7 @@
               "owners": [
                 "src/clipboard-controller.ts"
               ],
-              "source": "src/clipboard-controller.ts#L61",
+              "source": "src/clipboard-controller.ts#L57",
               "jsDocTags": [],
               "documentation": "Private-format MIME type used for rich Sheetwrite clipboard payloads.",
               "memberDocs": []
@@ -6733,7 +6733,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3692",
+              "source": "src/document-protocol.ts#L3684",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -9863,7 +9863,7 @@
               "owners": [
                 "src/worker.ts"
               ],
-              "source": "src/worker.ts#L269",
+              "source": "src/worker.ts#L267",
               "jsDocTags": [],
               "documentation": "Build the worker-side protocol handler. Keeping the mutable render state\ninside the returned closure lets tests exercise the real message contract\nwithout booting a browser Worker.",
               "memberDocs": []
@@ -9875,7 +9875,7 @@
               "owners": [
                 "src/worker.ts"
               ],
-              "source": "src/worker.ts#L259",
+              "source": "src/worker.ts#L257",
               "jsDocTags": [],
               "documentation": "Lifecycle and frame acknowledgements posted back to the sender.",
               "memberDocs": []

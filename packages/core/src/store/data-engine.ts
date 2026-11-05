@@ -189,11 +189,6 @@ import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
-/**
- * Cell kinds cross the WASM boundary in bulk paths here.
- * Shared tags keep these encodings aligned with window reads
- * and the paint worker.
- */
 import {
   KIND_BOOL,
   KIND_FORMULA,
