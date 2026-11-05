@@ -569,6 +569,18 @@ pub(crate) struct FormulaResults {
     /// Active calls are separate from results so back edges do not recurse.
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
+    #[cfg(feature = "analysis")]
+    last_regex: Option<PassRegex>,
+}
+
+/// The last regex pattern this pass compiled, with its case mode. Formulas
+/// that use one pattern usually evaluate in a row, so they share one compiled
+/// program; it is dropped when the pass ends.
+#[cfg(feature = "analysis")]
+struct PassRegex {
+    pattern: String,
+    insensitive: bool,
+    regex: std::rc::Rc<regex_lite::Regex>,
 }
 
 /// The sums of single-range `SUM` formulas in one pass, by range group id.
@@ -718,6 +730,35 @@ impl FormulaResults {
         self.range_sums.last = Some((range, sum));
     }
 
+    /// The program this pass last compiled for `pattern` in this case mode.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn last_regex(
+        &self,
+        pattern: &str,
+        insensitive: bool,
+    ) -> Option<std::rc::Rc<regex_lite::Regex>> {
+        self.last_regex
+            .as_ref()
+            .filter(|last| last.insensitive == insensitive && last.pattern == pattern)
+            .map(|last| std::rc::Rc::clone(&last.regex))
+    }
+
+    /// Keeps `regex` for later formulas of this pass that use the same
+    /// pattern, in place of the program kept before it.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn share_regex(
+        &mut self,
+        pattern: &str,
+        insensitive: bool,
+        regex: std::rc::Rc<regex_lite::Regex>,
+    ) {
+        self.last_regex = Some(PassRegex {
+            pattern: pattern.to_owned(),
+            insensitive,
+            regex,
+        });
+    }
+
     /// Clear touched positions so a small edit does not scan all slots.
     pub(crate) fn clear(&mut self) {
         for id in self.used.drain(..) {
@@ -729,6 +770,10 @@ impl FormulaResults {
         self.values.clear();
         self.range_sums.sums.clear();
         self.range_sums.last = None;
+        #[cfg(feature = "analysis")]
+        {
+            self.last_regex = None;
+        }
         self.count = 0;
     }
 

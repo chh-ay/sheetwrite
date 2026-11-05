@@ -1,5 +1,6 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
 use crate::formula_slots::{FormulaResults, FormulaWork};
+use std::rc::Rc;
 
 use regex_lite::{Captures, Regex, RegexBuilder};
 
@@ -390,18 +391,30 @@ fn needs_unicode_case(pattern: &str, insensitive: bool) -> bool {
                 .any(|escape| pattern.contains(escape)))
 }
 
-/// Compiles `pattern` for one call. The compiled program lives only as long
-/// as the call, so no regex memory outlives the formula that needs it.
-fn compile_regex(pattern: &str, insensitive: bool) -> Result<Regex, FormulaError> {
+/// The compiled program for `pattern`. Formulas in one recalculation that use
+/// the same pattern and case mode in a row share one program, which the pass
+/// drops when it ends, so no regex memory outlives the recalculation.
+fn compile_regex(
+    results: &mut FormulaResults,
+    pattern: &str,
+    insensitive: bool,
+) -> Result<Rc<Regex>, FormulaError> {
+    if let Some(regex) = results.last_regex(pattern, insensitive) {
+        return Ok(regex);
+    }
+
     if needs_unicode_case(pattern, insensitive) {
         return Err(FormulaError::Value);
     }
 
-    RegexBuilder::new(pattern)
+    let regex = RegexBuilder::new(pattern)
         .case_insensitive(insensitive)
         .size_limit(MAX_REGEX_BYTES)
         .build()
-        .map_err(|_| FormulaError::Value)
+        .map_err(|_| FormulaError::Value)?;
+    let regex = Rc::new(regex);
+    results.share_regex(pattern, insensitive, Rc::clone(&regex));
+    Ok(regex)
 }
 
 fn append_text(output: &mut String, text: &str) -> Result<(), FormulaError> {
@@ -457,7 +470,7 @@ fn regex_scalar(
     let text = context.text(args, 0, "")?;
     let pattern = context.text(args, 1, "")?;
     let insensitive = mode(context, args, if name == "REGEXREPLACE" { 4 } else { 2 })?;
-    let regex = compile_regex(&pattern, insensitive)?;
+    let regex = compile_regex(context.pass.results, &pattern, insensitive)?;
     if name == "REGEXTEST" {
         return Ok(Value::Bool(regex.is_match(&text)));
     }
@@ -491,7 +504,7 @@ fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, Fo
         return Err(FormulaError::Value);
     }
     let insensitive = mode(context, args, 3)?;
-    let regex = compile_regex(&pattern, insensitive)?;
+    let regex = compile_regex(context.pass.results, &pattern, insensitive)?;
     let mut values = Vec::new();
     if return_mode == 1.0 {
         for matched in regex.find_iter(&text) {
@@ -885,6 +898,60 @@ mod tests {
         assert_rows(&store, sheet, &edited);
         assert_eq!(store.get_cell(sheet, 6, 0).num(), 2.0);
         assert_eq!(store.get_cell(sheet, 7, 0).num(), 0.0);
+    }
+
+    /// Rows alternate between patterns that differ only in case, and between
+    /// case modes, so each formula in a row of formulas compiles a pattern
+    /// other than its neighbor's and still gets its own result.
+    #[test]
+    fn alternating_patterns_and_case_modes_keep_each_row_result() {
+        // https://support.microsoft.com/en-us/excel/functions/regexreplace-function
+        const ROWS: usize = 40;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, ROWS);
+        for row in 0..ROWS {
+            let pattern = if row % 2 == 0 { "ab" } else { "AB" };
+            let insensitive = row % 4 >= 2;
+            store.set_string(sheet, row, 0, &format!("xab{row}AB"), 0);
+            store.set_formula(
+                sheet,
+                row,
+                1,
+                &format!(
+                    "=REGEXREPLACE(A{},\"{pattern}\",\"-\",,{})",
+                    row + 1,
+                    u8::from(insensitive)
+                ),
+                0,
+            );
+            store.set_formula(
+                sheet,
+                row,
+                2,
+                &format!("=VALUETOTEXT(REGEXTEST(A{},\"^x{pattern}\"))", row + 1),
+                0,
+            );
+        }
+        store.recompute(sheet);
+
+        for row in 0..ROWS {
+            let replaced = match (row % 2 == 0, row % 4 >= 2) {
+                (_, true) => format!("x-{row}-"),
+                (true, false) => format!("x-{row}AB"),
+                (false, false) => format!("xab{row}-"),
+            };
+            let starts = if row % 2 == 0 { "TRUE" } else { "FALSE" };
+            assert_eq!(
+                store.get_cell(sheet, row, 1).string(),
+                Some(replaced),
+                "row {row}"
+            );
+            assert_eq!(
+                store.get_cell(sheet, row, 2).string().as_deref(),
+                Some(starts),
+                "row {row}"
+            );
+        }
     }
 
     fn assert_rows(store: &CellStore, sheet: usize, rows: &[[&str; 4]]) {
