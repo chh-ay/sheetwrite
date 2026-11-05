@@ -117,7 +117,7 @@ describe("formula capability contract", () => {
       functions: 352,
       requiredSupported: 100,
       unsupportedCategories: 6,
-      parserSpellings: 175,
+      parserSpellings: 165,
       assistSpellings: 355,
       formulasSpellings: 355,
     });

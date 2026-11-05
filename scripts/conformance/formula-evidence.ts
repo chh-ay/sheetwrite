@@ -183,16 +183,6 @@ export const AUTHORED_ASSERTIONS: Readonly<Record<string, readonly [string, stri
   RATE: ["ABS(RATE(1,0,-100,110)-0.1)<0.0000001", "RATE(1,0,-100,120)>0"],
   IPMT: ["IPMT(0,1,10,1000)=0", "IPMT(0,2,10,1000)=0"],
   PPMT: ["PPMT(0,1,10,1000)=-100", "PPMT(0,2,10,1000)=-100"],
-  LENB: ['LENB("abc")=3', 'LENB("")=0'],
-  LEFTB: ['LEFTB("abc",2)="ab"', 'LEFTB("xyz",1)="x"'],
-  RIGHTB: ['RIGHTB("abc",2)="bc"', 'RIGHTB("xyz",1)="z"'],
-  MIDB: ['MIDB("abcd",2,2)="bc"', 'MIDB("abcd",4,1)="d"'],
-  REPLACEB: ['REPLACEB("abc",2,1,"x")="axc"', 'REPLACEB("abc",1,2,"z")="zc"'],
-  FINDB: ['FINDB("b","abc")=2', 'FINDB("A","aA")=2'],
-  SEARCHB: ['SEARCHB("B","abc")=2', 'SEARCHB("a*","abc")=1'],
-  ASC: ['ASC("ＡＢＣ")="ABC"', 'ASC("abc")="abc"'],
-  DBCS: ['DBCS("ABC")="ＡＢＣ"', 'DBCS("ＡＢＣ")="ＡＢＣ"'],
-  BAHTTEXT: ['BAHTTEXT(0)="ศูนย์บาทถ้วน"', 'BAHTTEXT(1234)="หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน"'],
 };
 
 export function authoredAssertions(name: string): readonly [string, string] {

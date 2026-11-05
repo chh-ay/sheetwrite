@@ -5298,7 +5298,16 @@
       "googleSheets": "unverified",
       "openFormula": "unverified",
       "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "LENB, LEFTB, RIGHTB, MIDB, REPLACEB, FINDB and SEARCHB count one byte per character, as Excel does when the default editing language is not a double-byte language. Excel counts two bytes for a double-byte character only when such a language is the default."
+      ]
+    },
+    "analysis-text-width": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
       ]
     }
   },
@@ -5328,13 +5337,7 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": [
-          "packages/wasm/src/eval/mod.rs",
-          "packages/wasm/src/eval/functions.rs",
-          "packages/wasm/src/eval/text.rs",
-          "packages/wasm/src/eval/text/width.rs",
-          "packages/wasm/src/eval/text/baht.rs"
-        ]
+        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -5677,6 +5680,28 @@
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/hypothesis.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-bytes": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/bytes.rs",
+          "packages/wasm/src/eval/analysis/bytes/width.rs",
+          "packages/wasm/src/eval/analysis/bytes/baht.rs"
+        ]
       },
       "assist": {
         "status": "implemented",
@@ -9911,8 +9936,8 @@
       "signature": "unary-value",
       "semantics": "text",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9923,8 +9948,8 @@
       "signature": "left-right",
       "semantics": "text",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9935,8 +9960,8 @@
       "signature": "left-right",
       "semantics": "text",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9947,8 +9972,8 @@
       "signature": "mid",
       "semantics": "text",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9959,8 +9984,8 @@
       "signature": "replace",
       "semantics": "text-sensitive",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9971,8 +9996,8 @@
       "signature": "find-search",
       "semantics": "text-sensitive",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9983,8 +10008,8 @@
       "signature": "find-search",
       "semantics": "text-search",
       "dialects": "excel-single-byte",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -9994,9 +10019,9 @@
       "contractStatus": "supported",
       "signature": "unary-value",
       "semantics": "text",
-      "dialects": "excel-documented",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -10006,9 +10031,9 @@
       "contractStatus": "supported",
       "signature": "unary-value",
       "semantics": "text",
-      "dialects": "excel-documented",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -10018,9 +10043,9 @@
       "contractStatus": "supported",
       "signature": "unary-number",
       "semantics": "text",
-      "dialects": "excel-documented",
-      "implementation": "implemented-assisted",
-      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
       "version": 1
     }
   ],

@@ -217,16 +217,6 @@ pub enum Func {
     Offset,
     Indirect,
     Areas,
-    Asc,
-    BahtText,
-    Dbcs,
-    FindB,
-    LeftB,
-    LenB,
-    MidB,
-    ReplaceB,
-    RightB,
-    SearchB,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -339,7 +329,6 @@ define_function_registry! {
         Pv => "PV";
         Abs => "ABS";
         And => "AND";
-        Asc => "ASC";
         Avg => "AVG";
         Day => "DAY";
         Exp => "EXP";
@@ -369,7 +358,6 @@ define_function_registry! {
         Code => "CODE";
         Date => "DATE";
         Days => "DAYS";
-        Dbcs => "DBCS";
         Drop => "DROP";
         Even => "EVEN";
         Find => "FIND";
@@ -378,8 +366,6 @@ define_function_registry! {
         Ipmt => "IPMT";
         IsNa => "ISNA";
         Left => "LEFT";
-        LenB => "LENB";
-        MidB => "MIDB";
         Ppmt => "PPMT";
         Rand => "RAND";
         Rate => "RATE";
@@ -401,12 +387,10 @@ define_function_registry! {
         EDate => "EDATE";
         Exact => "EXACT";
         False => "FALSE";
-        FindB => "FINDB";
         Floor => "FLOOR";
         Index => "INDEX";
         IsErr => "ISERR";
         Large => "LARGE";
-        LeftB => "LEFTB";
         Log10 => "LOG10";
         Lower => "LOWER";
         Match => "MATCH";
@@ -436,7 +420,6 @@ define_function_registry! {
         MRound => "MROUND";
         Offset => "OFFSET";
         Proper => "PROPER";
-        RightB => "RIGHTB";
         Search => "SEARCH";
         Second => "SECOND";
         SumIfs => "SUMIFS";
@@ -458,7 +441,6 @@ define_function_registry! {
         RankEq => "RANK.EQ";
         Replace => "REPLACE";
         RoundUp => "ROUNDUP";
-        SearchB => "SEARCHB";
         StdevP => "STDEV.P";
         StdevS => "STDEV.S";
         UniChar => "UNICHAR";
@@ -468,12 +450,10 @@ define_function_registry! {
         WeekNum => "WEEKNUM";
         Workday => "WORKDAY";
         XLookup => "XLOOKUP";
-        BahtText => "BAHTTEXT";
         CountIfs => "COUNTIFS";
         Indirect => "INDIRECT";
         IsNumber => "ISNUMBER";
         Quotient => "QUOTIENT";
-        ReplaceB => "REPLACEB";
         Sequence => "SEQUENCE";
         Subtotal => "SUBTOTAL";
         TextJoin => "TEXTJOIN";

@@ -99,6 +99,7 @@ fn legacy_statistics_names_read_references_as_their_successors() {
 
 /// The byte functions count one byte per character; ASC and DBCS change
 /// character width; BAHTTEXT shows the example of its Microsoft page.
+#[cfg(feature = "analysis")]
 #[test]
 fn byte_width_and_baht_functions_read_cells() {
     assert_results(&[

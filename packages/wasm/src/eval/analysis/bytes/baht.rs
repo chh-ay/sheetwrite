@@ -2,7 +2,7 @@
 
 use crate::types::{EvalResult, Value};
 
-use super::super::functions::{number_arg, require_arity, FuncAccumulator};
+use super::super::super::functions::{number_arg, require_arity, FuncAccumulator};
 
 const DIGITS: [&str; 10] = [
     "ศูนย์",

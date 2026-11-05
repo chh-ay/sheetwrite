@@ -1,6 +1,7 @@
 //! Optional function families for the complete analysis engine.
 
 mod aggregate;
+mod bytes;
 mod compatibility;
 mod database;
 mod dates;
@@ -120,6 +121,13 @@ const FAMILIES: &[Family] = &[
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bytes::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bytes::evaluate),
         evaluate_ast: None,
         array: None,
     },
