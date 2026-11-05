@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 interface ProcessOutput {
   stdout: string;
@@ -39,4 +40,12 @@ export async function captureProcess(
 
 export async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T;
+}
+
+/** Writes `content` unless `path` already holds it, so watchers and build caches stay quiet. */
+export async function writeIfChanged(path: string, content: string): Promise<void> {
+  const current = await readFile(path, "utf8").catch(() => undefined);
+  if (current === content) return;
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content);
 }

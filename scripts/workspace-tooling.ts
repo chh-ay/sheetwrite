@@ -58,15 +58,24 @@ export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PUBLISHABLE_PACKA
   (name) => packageNode(name, "typecheck"),
 );
 
-export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
+/**
+ * Files generated from repository sources instead of committed: the core
+ * function table and the docs pages and data. Docs generation reads built
+ * package declarations, so these run after the package build.
+ */
+const GENERATED_SOURCE_NODES: readonly CommandNode[] = [
+  {
+    id: "generate:function-metadata",
+    command: ["bun", "run", "--filter", "@sheetwrite/core", "generate"],
+  },
   {
     id: "generate:docs",
     command: ["bun", "run", "docs:generate"],
   },
-  {
-    id: "check:docs",
-    command: ["bun", "run", "docs:check"],
-  },
+];
+
+/** The docs build checks the docs, then generates them and builds the site. */
+export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
   {
     id: "build:@sheetwrite/docs-start",
     command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "build"],
@@ -113,8 +122,9 @@ export const TYPECHECK_NODES: readonly CommandNode[] = [
  * The test lists below own every repository test path. `test:tooling` (CI
  * preflight), `test:unit` (CI unit job) and `verify-ci` all run these nodes, so
  * a suite added here runs everywhere. Tooling suites run before any package is
- * built; unit suites run against built package outputs, so a suite that loads
- * the engine (directly or through `docs/src/lib`) belongs there.
+ * built; unit suites run against built package outputs and generated files, so
+ * a suite that loads the engine or generated docs data (directly or through
+ * `docs/src/lib`) belongs there.
  * `workspace-tooling.test.ts` rejects a `scripts/*.test.ts` file that is in
  * neither list or in both.
  */
@@ -166,10 +176,14 @@ const TOOLING_TESTS: CommandNode = {
   command: ["bun", "test", ...TOOLING_TEST_PATHS],
 };
 
-const UNIT_TESTS: CommandNode = {
-  id: "test:unit",
-  command: ["bun", "test", ...UNIT_TEST_PATHS],
-};
+/** Unit suites import generated files, so they generate them first. */
+const UNIT_TEST_NODES: readonly CommandNode[] = [
+  ...GENERATED_SOURCE_NODES,
+  {
+    id: "test:unit",
+    command: ["bun", "test", ...UNIT_TEST_PATHS],
+  },
+];
 
 const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
   TOOLING_TESTS,
@@ -226,7 +240,7 @@ const POST_BUILD_QUALITY_NODES: readonly CommandNode[] = [
     id: "lint",
     command: ["bun", "run", "lint"],
   },
-  UNIT_TESTS,
+  ...UNIT_TEST_NODES,
   ...EXAMPLE_BUILD_NODES,
   {
     id: "verify:node-esm",
@@ -384,7 +398,7 @@ function nodesForMode(mode: string): readonly CommandNode[] {
     case "test-tooling":
       return [TOOLING_TESTS];
     case "test-unit":
-      return [UNIT_TESTS];
+      return UNIT_TEST_NODES;
     case "typecheck-packages":
       return PACKAGE_TYPECHECK_NODES;
     case "typecheck-examples":
