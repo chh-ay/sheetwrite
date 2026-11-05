@@ -14,10 +14,6 @@ use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT};
 
-// Wide criteria ranges can coexist in one formula. Cap each paged reader's
-// scratch cache instead of multiplying a full CellRun by workbook width.
-const MAX_CACHED_COLUMN_RUNS: usize = 64;
-
 /// A one-pass cursor over a rectangle of cells in row-major order.
 pub(crate) struct RangeReader<'a> {
     store: &'a CellStore,
@@ -33,11 +29,10 @@ pub(crate) struct RangeReader<'a> {
     col_end: usize,
     depth: usize,
 
-    // Paged criteria folds deliver row-major values while reusing each source
-    // page across rows. Dense sources are already resident contiguous slices
-    // and never need this width-sized cache.
-    column_runs: Vec<Option<CellRun<'a>>>,
-    shared_run: Option<CellRun<'a>>,
+    /// Page-tile cursor: the first row after the current row band of source
+    /// pages. Entering a band records one access per column page; cells inside
+    /// it index the page directory directly.
+    tile_end_row: usize,
 }
 
 impl<'a> RangeReader<'a> {
@@ -85,8 +80,7 @@ impl<'a> RangeReader<'a> {
             col_start,
             col_end,
             depth,
-            column_runs: Vec::new(),
-            shared_run: None,
+            tile_end_row: 0,
         })
     }
 
@@ -135,7 +129,7 @@ impl<'a> RangeReader<'a> {
                 self.dense_value_at(self.row, self.col, pass)
             }
         } else {
-            let run = self.run_at(index);
+            let run = self.paged_run_at(index);
             if !run.is_loaded(index) {
                 return Err(FormulaError::Loading);
             }
@@ -181,32 +175,15 @@ impl<'a> RangeReader<'a> {
         }
     }
 
-    fn run_at(&mut self, index: usize) -> CellRun<'a> {
-        // Runs end at column boundaries, so only a multi-row, multi-column walk
-        // needs one cached run per column.
-        let shares_run = self.col_start == self.col_end
-            || self.row_start == self.row_end
-            || self.col_end - self.col_start + 1 > MAX_CACHED_COLUMN_RUNS;
-        let cached = if shares_run {
-            &mut self.shared_run
-        } else {
-            if self.column_runs.is_empty() {
-                self.column_runs
-                    .resize(self.col_end - self.col_start + 1, None);
-            }
-
-            &mut self.column_runs[self.col - self.col_start]
-        };
-
-        match *cached {
-            Some(run) if run.contains(index) => run,
-            _ => {
-                let column_end = self.data.cells.idx(self.row_end, self.col) + 1;
-                let run = self.data.cells.run(index, column_end);
-                *cached = Some(run);
-                run
-            }
+    fn paged_run_at(&mut self, index: usize) -> CellRun<'a> {
+        if self.row >= self.tile_end_row {
+            self.data
+                .cells
+                .touch_tile(self.row, self.col_start, self.col_end);
+            self.tile_end_row = self.data.cells.next_page_row(self.row);
         }
+
+        self.data.cells.tile_run(index, index + 1)
     }
 }
 
@@ -256,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn dense_wide_streams_need_no_per_column_run_allocation() {
+    fn dense_wide_streams_read_every_column() {
         const COLUMNS: usize = 4096;
         const ROWS: usize = 2;
         let mut store = CellStore::new();
@@ -284,16 +261,11 @@ mod tests {
         }
         assert_eq!(count, ROWS * COLUMNS);
         assert_eq!(sum, 16.0);
-        assert_eq!(
-            reader.column_runs.capacity(),
-            0,
-            "dense streams must not allocate a page cache proportional to width"
-        );
     }
 
     #[test]
-    fn wide_paged_streams_bound_cache_and_preserve_loading() {
-        const COLUMNS: usize = super::MAX_CACHED_COLUMN_RUNS + 1;
+    fn wide_paged_streams_preserve_loading() {
+        const COLUMNS: usize = 65;
         const ROWS: usize = 2;
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(COLUMNS + 1, ROWS, ROWS, 0, ROWS * COLUMNS);
@@ -323,7 +295,6 @@ mod tests {
         }
         assert_eq!(count, ROWS * COLUMNS);
         assert_eq!(sum, 16.0);
-        assert!(reader.column_runs.capacity() <= super::MAX_CACHED_COLUMN_RUNS);
 
         // Extending the same multirow walk into one unknown column must still
         // stop at its first unloaded cell, not report a cached blank.
@@ -333,7 +304,6 @@ mod tests {
             assert!(reader.next(&mut pass).unwrap().is_some());
         }
         assert!(matches!(reader.next(&mut pass), Err(FormulaError::Loading)));
-        assert!(reader.column_runs.capacity() <= super::MAX_CACHED_COLUMN_RUNS);
     }
 
     fn streamed_values_allowing_errors(
