@@ -46,8 +46,9 @@ selects fields. The schema is explicit: parsing does not sample rows or guess ty
 
 CSV follows RFC 4180. Records end at LF, CRLF, or CR, and empty lines are
 skipped. A quoted field can contain delimiters, line breaks, and doubled quotes.
-Only a delimiter or a record end can follow its closing quote. Every record must
-have as many fields as the first record.
+Only a delimiter or a record end can follow its closing quote. As in Power Query's
+`Csv.Document` with declared columns, a record with fewer fields has null in the
+missing columns, and extra fields are ignored.
 
 A `QueryBatch` has `rowCount` and ordered `columns`. Each column has a stable
 `id`, a display/source `name`, a validity bitset, and typed payload lanes:
