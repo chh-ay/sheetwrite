@@ -14,23 +14,25 @@ Calls that change the archive run one at a time. Each publishes atomically,
 so a failure or abort leaves the last durable version readable.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L403"><code>packages/core/src/history-archive.ts#L403</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/history-archive.ts#L515"><code>packages/core/src/history-archive.ts#L515</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
 <a href="#history-archive-constructor"><code>constructor</code></a>
 <a href="#history-archive-delete-version"><code>deleteVersion</code></a>
+<a href="#history-archive-diff-versions"><code>diffVersions</code></a>
 <a href="#history-archive-initialize"><code>initialize</code></a>
 <a href="#history-archive-list-versions"><code>listVersions</code></a>
 <a href="#history-archive-prune"><code>prune</code></a>
 <a href="#history-archive-read-version"><code>readVersion</code></a>
 <a href="#history-archive-record"><code>record</code></a>
+<a href="#history-archive-restore-version"><code>restoreVersion</code></a>
 <a href="#history-archive-save-version"><code>saveVersion</code></a>
 <a href="#history-archive-storage-usage"><code>storageUsage</code></a>
 <a href="#history-archive-open"><code>open</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>10</span>
+## Members <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-member-list">
 
@@ -50,6 +52,25 @@ constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, man
 deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>;
 ```
 
+</details>
+
+<details class="api-member" id="history-archive-diff-versions" data-pagefind-weight="1">
+<summary><code>diffVersions</code> <span class="api-member-summary">One page of the difference between two retained versions: the cells that changed, with before and after and who wrote them; sheets added, removed or changed outside their cells; and workbook fields that changed.</span></summary>
+
+```ts generated
+diffVersions: (request: HistoryDiffRequest) => Promise<HistoryDiffPage>;
+```
+
+<p class="api-member-doc">One page of the difference between two retained versions: the cells that
+changed, with before and after and who wrote them; sheets added, removed
+or changed outside their cells; and workbook fields that changed.
+
+Both versions are rebuilt in private engine instances and compared in
+bounded windows by the history diff kernel, a separate WASM module that
+loads on the first diff. Rows and columns are aligned through the
+structural operations of the log, so an inserted row does not make the
+rows below it changed. Nothing is kept between pages: pass `cursor` to
+continue, and each page rebuilds the versions again.</p>
 </details>
 
 <details class="api-member" id="history-archive-initialize" data-pagefind-weight="1">
@@ -97,12 +118,31 @@ alive while a concurrent prune runs; the lease is released on every exit.</p>
 <summary><code>record</code> <span class="api-member-summary">Append one committed transaction.</span></summary>
 
 ```ts generated
-record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>;
+record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>;
 ```
 
 <p class="api-member-doc">Append one committed transaction. `capture` runs only when a checkpoint is
 due and must return the committed document at `commit.revision`. An
 automatic version is made after `automaticIntervalMs` of active time.</p>
+</details>
+
+<details class="api-member" id="history-archive-restore-version" data-pagefind-weight="1">
+<summary><code>restoreVersion</code> <span class="api-member-summary">Restore one version, or one sheet or range of it, on grid as one undoable transaction.</span></summary>
+
+```ts generated
+restoreVersion: (grid: Grid, id: string, scope: HistoryRestoreScope, options?: HistoryRestoreOptions) => Promise<ApplyTransactionResult>;
+```
+
+<p class="api-member-doc">Restore one version, or one sheet or range of it, on `grid` as one undoable
+transaction. The version is rebuilt in a private engine instance and
+compared with the grid's current document; the difference is committed as
+one atomic restore, which `SyncCoordinator` sends as one transaction that
+is never rebased.
+
+With `options.sync`, the coordinator must be online with no pending or
+conflicted commits. A change to the grid while the version is read, or a
+scope that cuts a merged cell or hyperlink, rejects before anything changes.
+See the restore section of the persistence guide for what each scope covers.</p>
 </details>
 
 <details class="api-member" id="history-archive-save-version" data-pagefind-weight="1">
@@ -146,6 +186,7 @@ class HistoryArchive {
     manifest: HistoryManifest,
   );
   deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>;
+  diffVersions: (request: HistoryDiffRequest) => Promise<HistoryDiffPage>;
   initialize: (
     snapshot: WorkbookSnapshot,
     time: number,
@@ -158,10 +199,16 @@ class HistoryArchive {
     signal?: AbortSignal,
   ) => Promise<WorkbookSnapshot>;
   record: (
-    commit: HistoryCommit,
+    commit: CommittedTransaction,
     capture?: HistorySnapshotProvider,
     signal?: AbortSignal,
   ) => Promise<void>;
+  restoreVersion: (
+    grid: Grid,
+    id: string,
+    scope: HistoryRestoreScope,
+    options?: HistoryRestoreOptions,
+  ) => Promise<ApplyTransactionResult>;
   saveVersion: (
     name: string,
     authorId: string,

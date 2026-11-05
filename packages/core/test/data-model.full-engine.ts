@@ -4,8 +4,20 @@ import { beforeAll, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";
 
-import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
-import type { TableRelationship, WorkbookSnapshot } from "../src/index.js";
+import {
+  createGridFromSnapshot,
+  initSheetwrite,
+  releaseEngineMemory,
+  SheetwriteStore,
+} from "../src/index.js";
+import type {
+  DocumentOp,
+  PivotDefinition,
+  TableRelationship,
+  WorkbookSnapshot,
+} from "../src/index.js";
+import { loadPanels } from "../src/panels/panel-loader.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
   await initSheetwrite(undefined, formulas);
@@ -98,5 +110,261 @@ it("checks keys from the current cells and keeps checking after a memory release
     expect(store.getRelationshipStatus(relationship.id)).toEqual({ status: "unavailable" });
   } finally {
     store.dispose();
+  }
+});
+
+it("refuses a relationship in the panel while its lookup keys repeat", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  delete input.workbook.dataModel;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const press = (target: Element | null) => {
+    if (target === null) throw new Error("missing control");
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  };
+  const panelText = () => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+  const setId = (value: string) =>
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "data", row: 3, col: 2 }, value: { kind: "literal", value } },
+      ],
+    });
+  try {
+    expect(setId("c1").status).toBe("applied");
+    (await loadPanels(grid)).openDataModelPanel(grid);
+    const save = host.querySelector('[data-focus-key="save-relationship"]');
+
+    // Orders is the data table and Customers the lookup table; each has one key column.
+    const [dataTable, , lookupTable] = host.querySelectorAll<HTMLSelectElement>(
+      ".sheetwrite-panel select",
+    );
+    if (dataTable === undefined || lookupTable === undefined) throw new Error("missing pickers");
+    for (const [picker, value] of [
+      [dataTable, "orders"],
+      [lookupTable, "customers"],
+    ] as const) {
+      picker.value = value;
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    press(save);
+    expect(grid.store.getWorkbook().dataModel).toBeUndefined();
+    expect(panelText()).toContain("The lookup table repeats a key in rows 1 and 3.");
+
+    expect(setId("C3").status).toBe("applied");
+    press(save);
+    expect(grid.store.getWorkbook().dataModel?.relationships).toHaveLength(1);
+    expect(panelText()).toContain("1 keys match no row and show as blank.");
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
+  }
+});
+
+it("keeps model pivot results equal to a flattened range through edits, undo and transfer", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  const data = input.sheets[0];
+  const orders = data?.tables?.find((table) => table.id === "orders");
+  const block = data?.cells[0];
+  if (!data || !orders || !block) throw new Error("the fixture needs orders and cells");
+  data.columns = ["A", "B", "C", "D", "E", "F"].map((key) => ({
+    key,
+    header: key,
+    width: 80,
+    type: "text",
+  }));
+  orders.range.end.col = 1;
+  orders.columns.push({ id: "amount", name: "Amount" });
+  block.colCount = 6;
+  block.cells.push(text(0, 1, "Amount"), text(0, 4, "ID"), text(0, 5, "Amount"));
+  block.cells.push(text(1, 4, "C1"), text(2, 4, "C2"));
+  for (let row = 1; row <= 4; row++) {
+    for (const col of [1, 5]) {
+      block.cells.push({ rowOffset: row, colOffset: col, value: { kind: "literal", value: row } });
+    }
+  }
+  input.sheets.push({
+    id: "report",
+    name: "Report",
+    order: 1,
+    rowCount: 30,
+    columns: data.columns.map((column) => ({ ...column })),
+    cells: [],
+  });
+  input.workbook.activeSheet = "report";
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const pivot: PivotDefinition = {
+    id: "related",
+    name: "Related",
+    anchor: { row: 0, col: 0 },
+    source: {
+      model: {
+        table: "orders",
+        fields: [
+          { table: "customers", column: "id" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    },
+    rows: [0],
+    columns: [],
+    values: [{ field: 1, aggregation: "SUM" }],
+  };
+  const compare = () => {
+    const actual = grid.getPivotResult("report", "related");
+    const flat = grid.getPivotResult("report", "flat");
+    expect(actual?.status).toBe("ok");
+    expect(actual?.cells).toEqual(flat?.cells);
+    expect(actual?.rows).toBe(flat?.rows);
+    expect(actual?.cols).toBe(flat?.cols);
+  };
+  try {
+    expect(grid.setPivot(pivot).status).toBe("applied");
+    expect(
+      grid.setPivot({
+        ...pivot,
+        id: "flat",
+        name: "Flat",
+        anchor: { row: 15, col: 0 },
+        source: { range: { sheet: "data", start: { row: 0, col: 4 }, end: { row: 4, col: 5 } } },
+      }).status,
+    ).toBe("applied");
+    compare();
+
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "data", row: 1, col: 2 },
+            value: { kind: "literal", value: "C9" },
+          },
+          {
+            op: "set",
+            addr: { sheet: "data", row: 1, col: 4 },
+            value: { kind: "literal", value: null },
+          },
+          {
+            op: "set",
+            addr: { sheet: "data", row: 4, col: 4 },
+            value: { kind: "literal", value: "C9" },
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+    compare();
+    grid.undo();
+    compare();
+    grid.redo();
+    compare();
+
+    expect(
+      grid.applyTransaction({ patches: [{ op: "removeRelationship", id: relationship.id }] })
+        .status,
+    ).toBe("applied");
+    expect(grid.getPivotResult("report", "related")?.error).toBe("#REF!");
+    grid.undo();
+    compare();
+
+    expect(
+      grid.applyTransaction({
+        patches: [{ op: "removeTable", sheet: "data", tableId: "customers" }],
+      }).status,
+    ).toBe("applied");
+    expect(grid.getPivotResult("report", "related")?.error).toBe("#REF!");
+    grid.undo();
+    compare();
+
+    for (const patch of [
+      { op: "addRows", sheet: "data", at: 2, count: 1 },
+      {
+        op: "addColumns",
+        sheet: "data",
+        at: 1,
+        columns: [{ key: "inserted", header: "", type: "text", width: 80 }],
+      },
+    ] satisfies DocumentOp[]) {
+      expect(grid.applyTransaction({ patches: [patch] }).status).toBe("applied");
+      compare();
+      grid.undo();
+      compare();
+    }
+
+    await releaseEngineMemory();
+    compare();
+    expect(grid.getPivots().find((definition) => definition.id === "related")?.source).toEqual(
+      pivot.source,
+    );
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
+  }
+});
+
+it("adds a related table's column to a table pivot from the field list, as one undo step", async () => {
+  const restore = installCanvasTestStubs();
+  const input = snapshot();
+  const data = input.sheets[0];
+  if (data === undefined) throw new Error("the fixture needs its data sheet");
+  data.rowCount = 20;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = createGridFromSnapshot(host, input);
+  const press = (target: Element | null | undefined) => {
+    if (target == null) throw new Error("missing control");
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  };
+  const runMenu = (button: string, entry: string) => {
+    press(host.querySelector(`[aria-label="${button}"]`));
+    press(
+      [...host.querySelectorAll<HTMLElement>('.sheetwrite-panel-menu [role="menuitem"]')].find(
+        (candidate) => candidate.textContent === entry,
+      ),
+    );
+  };
+  const pivot: PivotDefinition = {
+    id: "orders",
+    name: "Orders",
+    source: { table: "orders" },
+    anchor: { row: 6, col: 0 },
+    rows: [],
+    columns: [],
+    values: [{ field: 0, aggregation: "COUNTA" }],
+  };
+  try {
+    expect(grid.setPivot(pivot, "data").status).toBe("applied");
+    (await loadPanels(grid)).openPivotPanel(grid, "data", "orders");
+    expect(host.querySelector(".sheetwrite-panel")?.textContent).toContain("Related: Customers");
+
+    runMenu("Customers › ID field actions", "Add to Rows");
+    const added = grid.getPivots("data")[0];
+    expect(added?.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "customer" },
+          { table: "customers", column: "id" },
+        ],
+      },
+    });
+    expect(added?.rows).toEqual([1]);
+    expect(grid.getPivotResult("data", "orders")?.status).toBe("ok");
+    // The column moves from the related section to the pivot's own fields, named with its table.
+    const panelText = host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+    expect(panelText.includes("Related: Customers")).toBe(false);
+    expect(panelText.includes("Customers › ID")).toBe(true);
+
+    grid.undo();
+    expect(grid.getPivots("data")[0]).toEqual(pivot);
+  } finally {
+    grid.destroy();
+    host.remove();
+    restore();
   }
 });

@@ -8,7 +8,7 @@ use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 use super::value::{aggregate_number, bool_from_value, number_from_value, text_from_value};
 use super::{date, financial, math, statistics, text};
 
-const MAX_FUNCTION_ARGS: usize = 254;
+pub(super) const MAX_FUNCTION_ARGS: usize = 254;
 
 #[derive(Debug)]
 pub(super) struct FuncValue {
@@ -230,7 +230,34 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal => math_family(func, values),
+        | Func::Subtotal
+        | Func::CeilingPrecise
+        | Func::FloorPrecise
+        | Func::IsoCeiling => math_family(func, values),
+        Func::Sin
+        | Func::Cos
+        | Func::Tan
+        | Func::Cot
+        | Func::Csc
+        | Func::Sec
+        | Func::Asin
+        | Func::Acos
+        | Func::Atan
+        | Func::Atan2
+        | Func::Acot
+        | Func::Sinh
+        | Func::Cosh
+        | Func::Tanh
+        | Func::Coth
+        | Func::Csch
+        | Func::Sech
+        | Func::Asinh
+        | Func::Acosh
+        | Func::Atanh
+        | Func::Acoth
+        | Func::Degrees
+        | Func::Radians => trigonometry_family(func, values),
+        Func::Roman | Func::Arabic | Func::Base | Func::Decimal => numeral_family(func, values),
         Func::Len
         | Func::Left
         | Func::Right
@@ -320,6 +347,16 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
 #[inline(never)]
 fn math_family(func: Func, values: &FuncAccumulator) -> EvalResult {
     math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+}
+
+#[inline(never)]
+fn trigonometry_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    math::trigonometry::apply(func, values)
+}
+
+#[inline(never)]
+fn numeral_family(func: Func, values: &FuncAccumulator) -> EvalResult {
+    math::numerals::apply(func, values)
 }
 
 #[inline(never)]
@@ -454,6 +491,44 @@ impl ReductionFold {
                     self.max = self.max.max(number);
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// [`Self::push`] for a finite number, without building a value.
+    #[inline]
+    pub(super) fn push_number(&mut self, number: f64) -> Result<(), FormulaError> {
+        if self.cells >= RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.cells += 1;
+        match self.kind {
+            ReductionKind::Count | ReductionKind::CountA => self.count += 1,
+            _ => {
+                self.count += 1;
+                self.sum += number;
+                self.min = self.min.min(number);
+                self.max = self.max.max(number);
+            }
+        }
+        Ok(())
+    }
+
+    /// [`Self::push`] for an empty cell, which only counts toward the limit.
+    #[inline]
+    pub(super) fn push_blank(&mut self) -> Result<(), FormulaError> {
+        if self.cells >= RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.cells += 1;
+        Ok(())
+    }
+
+    /// Fails like the accumulator does before it reads `cells` more values:
+    /// the whole argument must fit under the cell limit.
+    pub(super) fn reserve(&self, cells: u64) -> Result<(), FormulaError> {
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
         }
         Ok(())
     }

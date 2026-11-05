@@ -117,8 +117,10 @@ impl Default for DirtyState {
 }
 
 // Bound a scalar insert or delete's shifts to one small row band, not a column.
-const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
+// The exact-reader index uses the same bands, so a topology patch is as local.
+pub(crate) const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
 const FORMULA_INDEX_INITIAL_CAPACITY: usize = 1;
+const FULL_PAGE_CELLS: usize = FORMULA_INDEX_PAGE_ROWS as usize;
 
 struct FormulaPage {
     band: u32,
@@ -133,7 +135,7 @@ struct FormulaColumn {
 /// Contiguous bands and full pages hold each key at its own offset. Check that
 /// slot first, so a dense column needs no binary search on the pass hot path.
 #[inline]
-fn offset_or_search<T>(
+pub(crate) fn offset_or_search<T>(
     items: &[T],
     key: u32,
     offset: u32,
@@ -143,7 +145,24 @@ fn offset_or_search<T>(
     if items.get(offset).is_some_and(|item| key_of(item) == key) {
         return Some(offset);
     }
+
+    // Loads look up each new address before it is added; past the end is a miss.
+    if items.last().is_none_or(|item| key_of(item) < key) {
+        return None;
+    }
     items.binary_search_by_key(&key, key_of).ok()
+}
+
+/// Loads write in address order, so the end of a sorted list is checked before
+/// a binary search. `Err` is the insert position, as for a binary search.
+#[inline]
+fn insert_position<T>(items: &[T], key: u32, key_of: impl Fn(&T) -> u32) -> Result<usize, usize> {
+    match items.last().map(&key_of) {
+        None => Err(0),
+        Some(last) if last < key => Err(items.len()),
+        Some(last) if last == key => Ok(items.len() - 1),
+        Some(_) => items.binary_search_by_key(&key, key_of),
+    }
 }
 
 struct FormulaAddresses<'a> {
@@ -314,10 +333,7 @@ impl SheetFormulas {
 
     #[inline(never)]
     fn index_id(&mut self, key: CellKey, id: FormulaId) {
-        let column = match self
-            .columns
-            .binary_search_by_key(&key.1, |column| column.col)
-        {
+        let column = match insert_position(&self.columns, key.1, |column| column.col) {
             Ok(column) => column,
             Err(column) => {
                 if self.columns.get(column..).is_none() {
@@ -341,17 +357,31 @@ impl SheetFormulas {
         };
         let pages = &mut column.pages;
         let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
-        let page = match pages.binary_search_by_key(&band, |page| page.band) {
+        let page = match insert_position(pages, band, |page| page.band) {
             Ok(page) => page,
             Err(page) => {
                 if pages.get(page..).is_none() {
                     return;
                 }
+
+                // A full page before this band means a dense column: reserve
+                // the whole band once instead of growing it from one cell.
+                let dense = page
+                    .checked_sub(1)
+                    .and_then(|previous| pages.get(previous))
+                    .is_some_and(|previous| {
+                        previous.band + 1 == band && previous.cells.len() == FULL_PAGE_CELLS
+                    });
+                let capacity = if dense {
+                    FULL_PAGE_CELLS
+                } else {
+                    FORMULA_INDEX_INITIAL_CAPACITY
+                };
                 pages.insert(
                     page,
                     FormulaPage {
                         band,
-                        cells: Vec::with_capacity(FORMULA_INDEX_INITIAL_CAPACITY),
+                        cells: Vec::with_capacity(capacity),
                     },
                 );
                 page
@@ -361,7 +391,7 @@ impl SheetFormulas {
             return;
         };
         let cells = &mut page.cells;
-        let Err(offset) = cells.binary_search_by_key(&key.0, |&(row, _)| row) else {
+        let Err(offset) = insert_position(cells, key.0, |&(row, _)| row) else {
             return;
         };
         if cells.get(offset..).is_none() {
@@ -387,13 +417,16 @@ impl SheetFormulas {
         self.replace(key, None, 0, slots);
     }
 
+    /// Returns the replaced entry and the id of the changed formula: the id of
+    /// the entry now stored, or the retired id of a removed one. The caller
+    /// then needs no other address lookup.
     fn replace(
         &mut self,
         key: CellKey,
         entry: Option<FormulaEntry>,
         sheet: usize,
         slots: &mut FormulaStore,
-    ) -> Option<FormulaEntry> {
+    ) -> (Option<FormulaEntry>, Option<FormulaId>) {
         match (self.id(key), entry) {
             (Some(id), Some(entry)) => {
                 self.volatile_count -= usize::from(slots.is_volatile(id));
@@ -401,40 +434,50 @@ impl SheetFormulas {
                 let previous = slots.replace(id, entry);
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
-                previous
+                (previous, Some(id))
             }
-            (Some(id), None) => {
-                let column = self
-                    .columns
-                    .binary_search_by_key(&key.1, |column| column.col)
-                    .ok()?;
-                let pages = &mut self.columns.get_mut(column)?.pages;
-                let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
-                let page = pages.binary_search_by_key(&band, |page| page.band).ok()?;
-                let cells = &mut pages.get_mut(page)?.cells;
-                let offset = cells.binary_search_by_key(&key.0, |&(row, _)| row).ok()?;
-                cells.get(offset)?;
-                self.volatile_count -= usize::from(slots.is_volatile(id));
-                self.subtotal_count -= usize::from(slots.is_subtotal(id));
-                cells.remove(offset);
-                if cells.is_empty() {
-                    pages.remove(page);
-                }
-                if pages.is_empty() {
-                    self.columns.remove(column);
-                }
-                self.count -= 1;
-                slots.retire(id)
-            }
+            (Some(id), None) => (self.remove_id(key, id, slots), Some(id)),
             (None, Some(entry)) => {
-                let id = slots.allocate(AbsCellKey::from_local(sheet, key), entry)?;
+                let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), entry) else {
+                    return (None, None);
+                };
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
                 self.index_id(key, id);
-                None
+                (None, Some(id))
             }
-            (None, None) => None,
+            (None, None) => (None, None),
         }
+    }
+
+    /// Drops `id` from the address index at `key` and retires its slot.
+    fn remove_id(
+        &mut self,
+        key: CellKey,
+        id: FormulaId,
+        slots: &mut FormulaStore,
+    ) -> Option<FormulaEntry> {
+        let column = self
+            .columns
+            .binary_search_by_key(&key.1, |column| column.col)
+            .ok()?;
+        let pages = &mut self.columns.get_mut(column)?.pages;
+        let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
+        let page = pages.binary_search_by_key(&band, |page| page.band).ok()?;
+        let cells = &mut pages.get_mut(page)?.cells;
+        let offset = cells.binary_search_by_key(&key.0, |&(row, _)| row).ok()?;
+        cells.get(offset)?;
+        self.volatile_count -= usize::from(slots.is_volatile(id));
+        self.subtotal_count -= usize::from(slots.is_subtotal(id));
+        cells.remove(offset);
+        if cells.is_empty() {
+            pages.remove(page);
+        }
+        if pages.is_empty() {
+            self.columns.remove(column);
+        }
+        self.count -= 1;
+        slots.retire(id)
     }
 
     /// Refresh source metadata without replacing surviving ids.
@@ -805,29 +848,30 @@ impl FormulaGraph {
         entry: Option<FormulaEntry>,
     ) {
         let stores_formula = entry.is_some();
-        let previous = formulas.replace(key, entry, sheet, slots);
-        // A literal written over a literal is the bulk-load case: skip the
-        // lookup of an entry that cannot exist.
+        let (previous, changed) = formulas.replace(key, entry, sheet, slots);
+        // A literal written over a literal is the bulk-load case: the index
+        // has no change to record.
         if !stores_formula && previous.is_none() {
             return;
         }
 
-        let next = if stores_formula {
-            formulas.get(key, slots)
-        } else {
-            None
+        let Some(id) = changed else {
+            return;
         };
-        self.record_replacement(AbsCellKey::from_local(sheet, key), previous, next);
-        // Pending graph edits own read sets and cell addresses, not slot ids.
-        // No pass can overlap this mutable source edit, so reuse is now safe.
+
+        // A removed formula's retired slot holds no entry, so `next` is `None`.
+        let next = slots.get(id);
+        self.record_replacement(id, previous, next);
+        // A reused id is safe in the pending queue: that queue keeps the first
+        // reads recorded for an id and reads the current entry when applied.
         slots.release_retired();
     }
 
     /// The index half of [`Self::replace_entry`] for callers that changed the
-    /// entries themselves; `next` is the entry now stored at `formula`.
+    /// entries themselves; `next` is the entry now stored for `formula`.
     pub(crate) fn record_replacement(
         &mut self,
-        formula: AbsCellKey,
+        formula: FormulaId,
         previous: Option<FormulaEntry>,
         next: Option<&FormulaEntry>,
     ) {

@@ -38,5 +38,9 @@
   {
     "label": "Database",
     "href": "/docs/reference/formula-functions/database/"
+  },
+  {
+    "label": "Engineering",
+    "href": "/docs/reference/formula-functions/engineering/"
   }
 ]

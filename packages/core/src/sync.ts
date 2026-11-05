@@ -19,6 +19,7 @@ import {
   type SheetwriteErrorContext,
 } from "./errors.js";
 import { type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
+import { restoreProvenanceOf } from "./restore-commit.js";
 import {
   type GridTransactionAdmissionDecision,
   registerGridTransactionAdmission,
@@ -34,6 +35,7 @@ import type {
   PersistenceAdapter,
   PersistenceCommitResponse,
   RemoteOperationSource,
+  RestoreProvenance,
   SyncMutationRecord,
   SyncMutationStatus,
   VersionBatchMember,
@@ -235,6 +237,13 @@ export interface SyncCoordinatorOptions {
   pendingStorage?: PendingCommitStorage;
   initialConnection?: "offline" | "online";
   /**
+   * Authenticated ID of the person editing through this grid. Each new pending
+   * commit carries it to the authority, which records it in history. Restored
+   * commits keep the author they were made with. At most `maxMutationIdBytes`
+   * UTF-8 bytes.
+   */
+  authorId?: string;
+  /**
    * Optional host recovery hook. Return the missing ordered operations, or a
    * snapshot for the host to remount before calling `resumeAfterReload`.
    */
@@ -288,7 +297,9 @@ export type SyncConflictReloadReason =
   /** A pending mutation of this client is already in the server history. */
   | "own-mutation"
   /** The grid did not apply a missed server version. */
-  | "rejected";
+  | "rejected"
+  /** A pending commit restores a history version; a restore is never rebased. */
+  | "restore";
 
 /** Outcome of `SyncCoordinator.recoverConflict`. */
 export type SyncConflictRecovery =
@@ -394,6 +405,7 @@ export class SyncCoordinator {
     this.limits = resolveLimits(options.limits);
     assertDocumentId(options.documentId);
     assertVersion(options.serverVersion, "serverVersion");
+    if (options.authorId !== undefined) assertAuthorId(options.authorId, this.limits);
 
     this.version = options.serverVersion;
     this.connection = options.initialConnection ?? "online";
@@ -606,6 +618,8 @@ export class SyncCoordinator {
         baseVersion: record.baseVersion,
         clientMutationId: record.clientMutationId,
         operations: record.operations,
+        ...(record.authorId !== undefined ? { authorId: record.authorId } : {}),
+        ...(record.restore !== undefined ? { restore: { ...record.restore } } : {}),
         signal: controller.signal,
       };
 
@@ -844,6 +858,8 @@ export class SyncCoordinator {
             ? { clientMutationId: inspected.clientMutationId }
             : {}),
           ...(inspected.batch !== undefined ? { batch: { ...inspected.batch } } : {}),
+          ...(inspected.authorId !== undefined ? { authorId: inspected.authorId } : {}),
+          ...(inspected.committedAt !== undefined ? { committedAt: inspected.committedAt } : {}),
         },
         bytes: inspected.bytes,
       };
@@ -924,6 +940,12 @@ export class SyncCoordinator {
     const conflict = this.outstandingConflict;
     if (!conflict) return { status: "no-conflict" };
     const { response, appliedVersion } = conflict;
+
+    // A restore was planned against the version it conflicted with; the user
+    // previews and restores again on the reloaded document.
+    if (this.queue.toArray().some((record) => record.restore !== undefined)) {
+      return { status: "reload-required", reason: "restore" };
+    }
     const reload = (
       reason: SyncConflictReloadReason,
       rebaseConflict?: RebaseConflict,
@@ -1018,6 +1040,8 @@ export class SyncCoordinator {
         ...(record.versionOperationCounts
           ? { versionOperationCounts: record.versionOperationCounts }
           : {}),
+        ...(record.authorId !== undefined ? { authorId: record.authorId } : {}),
+        ...(record.restore !== undefined ? { restore: record.restore } : {}),
       };
       const versions = serverVersionsOf(record);
       for (let index = 0; index < versions; index++) baseVersion = incrementVersion(baseVersion);
@@ -1143,11 +1167,13 @@ export class SyncCoordinator {
 
     const reservedVersions = this.versionOperationCounts(sizes, encodedBytes)?.length ?? 1;
     assertVersion(this.version + this.queue.versionCount + reservedVersions, "pending version");
+    const restore = restoreProvenanceOf(operations);
     const reservation: LocalPendingReservation = {
       status: "reserved",
       clientMutationId: "",
       operationCount: operations.length,
       encodedBytes,
+      ...(restore !== undefined ? { restore } : {}),
     };
 
     this.localReservations.push(reservation);
@@ -1234,6 +1260,8 @@ export class SyncCoordinator {
         clientMutationId: reservation.clientMutationId,
         operations,
         ...(versionOperationCounts ? { versionOperationCounts } : {}),
+        ...(this.options.authorId !== undefined ? { authorId: this.options.authorId } : {}),
+        ...(reservation.restore !== undefined ? { restore: reservation.restore } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
 
@@ -1733,7 +1761,8 @@ export class SyncCoordinator {
         : assembly !== undefined &&
           member.index === assembly.members.length &&
           member.count === assembly.count &&
-          operation.clientMutationId === assembly.clientMutationId);
+          operation.clientMutationId === assembly.clientMutationId &&
+          operation.authorId === assembly.authorId);
     if (!continuesBatch) {
       const startVersion = assembly?.members[0]?.version ?? operation.version;
       this.batchAssembly = undefined;
@@ -1754,6 +1783,7 @@ export class SyncCoordinator {
       ...(operation.clientMutationId !== undefined
         ? { clientMutationId: operation.clientMutationId }
         : {}),
+      ...(operation.authorId !== undefined ? { authorId: operation.authorId } : {}),
     };
 
     if (next.bytes + input.bytes > this.limits.maxBatchBytes) {
@@ -2038,12 +2068,16 @@ interface LocalPendingReservation {
   appliedOperations?: readonly DocumentOp[];
   appliedEncodedBytes?: number;
   appliedVersionOperationCounts?: readonly number[];
+  /** Restore provenance of the reserved operations, if they restore a history version. */
+  restore?: RestoreProvenance;
   storageRevision?: bigint;
 }
 
 /** Contiguous members of one remote atomic batch received so far. */
 interface BatchAssembly {
   clientMutationId?: string;
+  /** Every member of one batch names the same author. */
+  authorId?: string;
   count: number;
   members: VersionedOperation[];
   /** Encoded operation bytes of the members, bounded by `maxBatchBytes`. */
@@ -2219,6 +2253,8 @@ interface InspectedVersionedOperation {
   operations: readonly DocumentOp[];
   clientMutationId?: string;
   batch?: VersionBatchMember;
+  authorId?: string;
+  committedAt?: number;
   bytes: number;
 }
 
@@ -2247,6 +2283,7 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   restoreBlock: true,
   setRangeStyle: true,
   clearRange: true,
+  permuteRows: true,
   addRows: true,
   removeRows: true,
   moveRows: true,
@@ -2278,6 +2315,8 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   setCalculation: true,
   setRelationship: true,
   removeRelationship: true,
+  setQuery: true,
+  removeQuery: true,
   setChart: true,
   removeChart: true,
   setPivot: true,
@@ -2299,6 +2338,10 @@ function assertPendingCommit(
 
   assertVersion(ownDataValue(record, "baseVersion"), "pending baseVersion");
   assertMutationId(ownDataValue(record, "clientMutationId"), limits);
+  const authorId = optionalOwnDataValue(record, "authorId");
+  if (authorId !== undefined) assertAuthorId(authorId, limits);
+  const restore = optionalOwnDataValue(record, "restore");
+  if (restore !== undefined) assertRestoreProvenance(restore, limits);
   const operations = ownDataValue(record, "operations");
   const bytes = assertOperationResources(
     operations,
@@ -2396,6 +2439,35 @@ function assertMutationId(
   }
 }
 
+function assertAuthorId(
+  value: unknown,
+  limits: Readonly<SyncCoordinatorLimits>,
+): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    utf8ByteLength(value, limits.maxMutationIdBytes) > limits.maxMutationIdBytes
+  ) {
+    throw new SyncProtocolError(
+      "invalid-id",
+      `authorId must be nonempty and at most ${limits.maxMutationIdBytes} UTF-8 bytes`,
+    );
+  }
+}
+
+function assertRestoreProvenance(
+  value: unknown,
+  limits: Readonly<SyncCoordinatorLimits>,
+): asserts value is RestoreProvenance {
+  const record = assertPlainRecord(value, "Restore provenance must be a plain object");
+  const scope = ownDataValue(record, "scope");
+  if (scope !== "workbook" && scope !== "sheet" && scope !== "range") {
+    throw new SyncProtocolError("invalid-id", "Restore scope must be workbook, sheet or range");
+  }
+
+  assertAuthorId(ownDataValue(record, "versionId"), limits);
+}
+
 function assertOperations(value: unknown, limits: Readonly<SyncCoordinatorLimits>): number {
   return assertOperationResources(
     value,
@@ -2451,11 +2523,20 @@ function inspectVersionedOperation(
   if (mutationId !== undefined) assertMutationId(mutationId, limits);
   const batchValue = optionalOwnDataValue(record, "batch");
   const batch = batchValue === undefined ? undefined : assertBatchMember(batchValue, limits);
+
+  const authorId = optionalOwnDataValue(record, "authorId");
+  if (authorId !== undefined) assertAuthorId(authorId, limits);
+
+  const committedAt = optionalOwnDataValue(record, "committedAt");
+  if (committedAt !== undefined) assertVersion(committedAt, "committedAt");
+
   return {
     version,
     operations: operations as readonly DocumentOp[],
     ...(mutationId !== undefined ? { clientMutationId: mutationId } : {}),
     ...(batch !== undefined ? { batch } : {}),
+    ...(authorId !== undefined ? { authorId } : {}),
+    ...(committedAt !== undefined ? { committedAt } : {}),
     bytes,
   };
 }
@@ -2731,6 +2812,8 @@ function clonePendingCommit(commit: PendingCommit): PendingCommit {
     ...(commit.versionOperationCounts
       ? { versionOperationCounts: [...commit.versionOperationCounts] }
       : {}),
+    ...(commit.authorId !== undefined ? { authorId: commit.authorId } : {}),
+    ...(commit.restore !== undefined ? { restore: { ...commit.restore } } : {}),
   };
 }
 
@@ -2771,6 +2854,8 @@ function cloneVersionedOperation(operation: VersionedOperation): VersionedOperat
     operations: cloneJsonValue(operation.operations),
     ...(operation.clientMutationId ? { clientMutationId: operation.clientMutationId } : {}),
     ...(operation.batch ? { batch: { ...operation.batch } } : {}),
+    ...(operation.authorId !== undefined ? { authorId: operation.authorId } : {}),
+    ...(operation.committedAt !== undefined ? { committedAt: operation.committedAt } : {}),
   };
 }
 

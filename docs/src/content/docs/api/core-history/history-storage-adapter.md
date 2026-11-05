@@ -8,7 +8,7 @@ description: "HistoryStorageAdapter interface in @sheetwrite/core/history: Atomi
 Atomic storage seam for local databases and host-owned history backends.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L186"><code>packages/core/src/version-history/types.ts#L186</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L177"><code>packages/core/src/version-history/types.ts#L177</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

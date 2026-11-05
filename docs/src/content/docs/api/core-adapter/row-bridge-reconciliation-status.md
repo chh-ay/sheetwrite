@@ -8,7 +8,7 @@ description: "RowBridgeReconciliationStatus type in @sheetwrite/core/adapter: Re
 Reconciliation status for a canonical transaction response.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/row-bridge.ts#L184"><code>packages/core/src/row-bridge.ts#L184</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/row-bridge.ts#L185"><code>packages/core/src/row-bridge.ts#L185</code></a></dd></div>
 </dl>
 
 ## Declaration

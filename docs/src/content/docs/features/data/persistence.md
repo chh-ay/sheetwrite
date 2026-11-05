@@ -87,11 +87,13 @@ Open an archive with a stable `documentId` and storage adapter. Call `initialize
 once with a fully loaded, committed `WorkbookSnapshot` and its creation time.
 On restart, `HistoryArchive.open` reads only the durable recorder cursor.
 
-Pass each **committed**, ordered transaction to `record`. A `HistoryCommit` carries
+Pass each **committed**, ordered transaction to `record`. A `CommittedTransaction` carries
 `baseRevision`, `revision`, `mutationId`, `authorId`, `time`, and `operations`.
 Do not record optimistic grid change events. The document authority must confirm
-the revision and author first. A local persistence adapter can be the authority
-for a standalone workbook. This module does not replace `SyncCoordinator` or the
+the revision and author first. `HistoryArchive` implements `CommitJournal`, so the
+reference `MemoryPersistenceAdapter.recordHistory` can record each commit as part of
+it; see [Authors and version history](/docs/features/collaboration/#authors-and-version-history)
+for the server contract. This module does not replace `SyncCoordinator` or the
 durable pending queue.
 
 The second argument to `record` is a snapshot provider. It runs only when a
@@ -106,6 +108,7 @@ needs its confirmed persistence revision attached by the host.
 | `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
 | `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
 | `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
+| `diffVersions({ from, to, cursor?, maxEntries?, signal?, kernel? })` | One page of the changes between two versions; see [Compare versions](#compare-versions). |
 | `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
 | `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
 | `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |
@@ -118,7 +121,9 @@ blocks. Content IDs include the schema, encoding, references, and compressed
 payload. Unchanged pages are shared across checkpoints. SHA-256 verification and
 bounded inflate run before replay.
 
-An automatic marker is made after five active minutes with committed edits.
+An automatic marker is made after five active minutes with committed edits. Each
+marker keeps the checkpoints made since the marker before it, so the log between two
+retained versions stays readable for a diff.
 A checkpoint is due after 30 active minutes, 1,000 transactions, or 2 MiB of log.
 No history timer or workbook-sized version cache runs in the background.
 
@@ -158,9 +163,72 @@ storage; the IndexedDB adapter uses atomic database transactions and closes its
 database connection after each request.
 
 `HistoryError` extends `SheetwriteError`. Its stable codes distinguish invalid
-history, generation conflicts, capacity, missing records, integrity, unavailable
-storage, blocked database open, and transaction failures. An abort rejects with
+history, an invalid restore scope, generation conflicts, capacity, missing records,
+integrity, unavailable storage, blocked database open, and transaction failures. An abort rejects with
 the caller's `signal.reason`. It never publishes a partial marker.
+
+### Restore a version
+
+`archive.restoreVersion(grid, versionId, scope, { sync, signal })` brings back part or
+all of a version on a live grid as **one undoable change**: one undo step, one `change`
+event with `commitReason: "restore"`, and, with `sync`, one synchronized transaction.
+The version is rebuilt in a separate engine instance. Sheet and workbook settings are
+compared and only the changed ones are written; the cells of the scope are cleared and
+written again from the version. All of it uses ordinary document operations, so the
+undo step and the synchronized transaction grow with the size of the scope.
+
+| Scope | Restores | Keeps current |
+| --- | --- | --- |
+| `{ kind: "workbook" }` | Every sheet (re-creating removed sheets with their IDs and removing later ones), sheet order, names, table relationships, calculation options | Retained OOXML parts (`xlsxSource`), as undo does |
+| `{ kind: "sheet", sheet }` | That sheet's name, size, columns, cells, styles, notes, merges, rules, hyperlinks, protected ranges, row metadata, frozen panes, tables, charts and pivots; a removed sheet comes back with its ID | Other sheets, workbook names |
+| `{ kind: "range", range }` | Values, formulas, styles, notes, and merged cells and hyperlinks inside the range | Sheet size, rules, tables, charts, pivots, everything outside the range |
+
+A sheet keeps its ID, so formulas on other sheets keep their references. When a
+sheet was smaller in the version, its last rows or columns are deleted: as with a
+manual delete, a reference into those rows becomes `#REF!`, and undoing the restore
+brings the rows and the references back. A range restore rejects with `invalid-scope`
+when the range cuts a merged cell or hyperlink, now or in the version; the message
+names the object's rows and columns, so the user can widen the range.
+
+In a shared document, pass the grid's `SyncCoordinator`. The restore needs it online
+with no pending or conflicted commits, and rejects with `conflict` if the document
+changes while the version is read. A restore commit is never rebased; see
+[Restoring versions](/docs/features/collaboration/#restoring-versions).
+
+### Compare versions
+
+`archive.diffVersions({ from, to })` returns one page of the changes from an earlier
+version to a later one. Both versions are rebuilt in private engine instances and
+compared in windows of at most 65,536 cells by a small, history-only WASM kernel
+(`@sheetwrite/wasm/history`, about 17 KB gzip). The kernel has no formula engine. It
+loads the first time a diff runs, so a grid that never compares versions downloads
+nothing for it. Pass `kernel` to load its WASM from a URL your bundler emitted for
+`@sheetwrite/wasm/history/wasm`.
+
+| Page field | Contents |
+| --- | --- |
+| `cells` | Changed cells as typed columns: `sheet` (index into `sheetIds`), `row`, `col`, `beforeRow`, `beforeCol`, `flags` and `author` (index into `authors`). |
+| `details` | Before and after of each changed cell (value, formula source, style) and every person who wrote it between the versions. |
+| `sheets` | Sheets that were added, removed, or changed outside their cells, with the changed fields (for example `name`, `rowCount` or `merges`) and the last person who changed them. |
+| `workbook` | Workbook fields that changed, such as `namedRanges` or `calculation`. |
+| `cursor` | Present when more changes follow. Pass it back to read the next page. |
+
+`flags` combines the `HistoryDiffFlag` bits `value`, `formula`, `style`, `added` and
+`removed`. Sources are compared, not calculated values: a formula whose result changed
+but whose source did not is not a change. Styles are compared by content.
+
+Rows and columns are aligned through the structural operations of the log, so an
+inserted, removed or moved row does not make the rows below it changed. `beforeRow` and
+`beforeCol` give the position of a cell in the earlier version, or `HISTORY_DIFF_NONE`
+on a row or column that was added. A sorted range (`permuteRows`) is compared by
+position, so its moved cells show as changed. Each change names the last person whose
+logged write reached the cell; the write follows the cell through inserted and removed
+rows. When a change is older than the retained log, or a version between the two was
+deleted, `author` is `HISTORY_DIFF_NONE` and `logComplete` is `false`.
+
+A page holds at most 1,000 changes (`maxEntries`). Nothing is kept between pages: each
+request rebuilds both versions and continues from `cursor`, so a closed or aborted diff
+holds no memory.
 
 ## Large undo
 

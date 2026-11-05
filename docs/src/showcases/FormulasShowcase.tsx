@@ -53,7 +53,7 @@ export default function FormulasShowcase() {
   const [state, setState] = useState<GridState>("loading");
   const [error, setError] = useState("");
   const [activeSheet, setActiveSheet] = useState<string>(ANALYSIS_SHEET_ID);
-  const [selected, setSelected] = useState<FormulaPanel["id"]>(FORMULA_PANELS[0]!.id);
+  const [selected, setSelected] = useState<FormulaPanel["id"]>(FORMULA_PANELS[0].id);
   // The writes that put back the cells the promotion changed. The page holds
   // them, not Grid history, because a later edit (such as a playground formula)
   // would otherwise be the one that `grid.undo()` removes.
@@ -116,7 +116,7 @@ export default function FormulasShowcase() {
         ms: performance.now() - started,
       });
       grid.setActiveSheet(ANALYSIS_SHEET_ID);
-      const first = FORMULA_PANELS[0]!;
+      const first = FORMULA_PANELS[0];
       grid.setSelection({
         kind: "cell",
         addr: { sheet: ANALYSIS_SHEET_ID, row: first.row, col: first.col },
@@ -224,7 +224,7 @@ export default function FormulasShowcase() {
     setActiveSheet(sheet);
   };
 
-  const panel = FORMULA_PANELS.find((candidate) => candidate.id === selected) ?? FORMULA_PANELS[0]!;
+  const panel = FORMULA_PANELS.find((candidate) => candidate.id === selected) ?? FORMULA_PANELS[0];
   const families = useMemo(
     () => [...new Set(FORMULA_PANELS.flatMap((candidate) => candidate.families))],
     [],

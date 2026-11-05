@@ -22,6 +22,18 @@ pub fn translate_formula(source: &str, row_delta: i32, col_delta: i32) -> String
     })
 }
 
+/// Adjust a formula whose row a sort moves by `row_delta`, as Excel does: the
+/// relative row parts of references without a sheet name move with the row,
+/// so a reference to the same row stays on that row. Absolute parts, columns
+/// and references with a sheet name, also of the formula's own sheet, stay.
+pub(crate) fn sort_formula(source: &str, row_delta: i32) -> String {
+    rewrite_references(source, |reference, qualified| {
+        if !qualified {
+            translate_relative_refs(reference, i64::from(row_delta), 0);
+        }
+    })
+}
+
 /// Follow `delta` rows or columns inserted (positive) or deleted (negative)
 /// at `at` on the formula's own sheet. A range loses its deleted rows or
 /// columns and becomes `#REF!` only when none are left.

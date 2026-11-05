@@ -8,10 +8,21 @@ description: "PersistenceBatchCommitRequest interface in @sheetwrite/core: Cance
 Cancellable commit of one atomic batch that spans several server versions.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L143"><code>packages/core/src/types/transaction.ts#L143</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L197"><code>packages/core/src/types/transaction.ts#L197</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#persistence-batch-commit-request-version-operation-counts"><code>versionOperationCounts</code></a>
+<a href="#persistence-batch-commit-request-document-id"><code>documentId</code></a>
+<a href="#persistence-batch-commit-request-base-version"><code>baseVersion</code></a>
+<a href="#persistence-batch-commit-request-client-mutation-id"><code>clientMutationId</code></a>
+<a href="#persistence-batch-commit-request-operations"><code>operations</code></a>
+<a href="#persistence-batch-commit-request-author-id"><code>authorId</code></a>
+<a href="#persistence-batch-commit-request-restore"><code>restore</code></a>
+<a href="#persistence-batch-commit-request-signal"><code>signal</code></a>
+</nav>
+
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -64,6 +75,29 @@ readonly operations: readonly DocumentOp[];
 
 </details>
 
+<details class="api-member" id="persistence-batch-commit-request-author-id" data-pagefind-weight="1">
+<summary><code>authorId</code> <span class="api-member-summary">Authenticated ID of the person who made the change, from SyncCoordinatorOptions.authorId.</span></summary>
+
+```ts generated
+readonly authorId?: string;
+```
+
+<p class="api-member-doc">Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.</p>
+</details>
+
+<details class="api-member" id="persistence-batch-commit-request-restore" data-pagefind-weight="1">
+<summary><code>restore</code> <span class="api-member-summary">Present when the commit restores a history version.</span></summary>
+
+```ts generated
+readonly restore?: RestoreProvenance;
+```
+
+<p class="api-member-doc">Present when the commit restores a history version. A restore is never
+rebased: a conflicting restore makes the client reload and restore again.</p>
+</details>
+
 <details class="api-member" id="persistence-batch-commit-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
 
@@ -86,6 +120,8 @@ export interface PersistenceBatchCommitRequest {
   baseVersion: number;
   clientMutationId: string;
   readonly operations: readonly DocumentOp[];
+  readonly authorId?: string;
+  readonly restore?: RestoreProvenance;
   signal?: AbortSignal;
 }
 ```

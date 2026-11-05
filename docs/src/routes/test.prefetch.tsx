@@ -130,7 +130,7 @@ function rows(start: number, end: number, columns: readonly DataSourceColumnBand
 function percentile(values: readonly number[], quantile: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.max(0, Math.ceil(sorted.length * quantile) - 1)]!;
+  return sorted[Math.max(0, Math.ceil(sorted.length * quantile) - 1)] ?? 0;
 }
 
 function installControlledAnimationFrames(): () => void {
@@ -171,7 +171,7 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
   let peakActiveRequests = 0;
 
   try {
-    grid = createGrid(host, {
+    const mounted = createGrid(host, {
       workbook: traceWorkbook(),
       datasource: {
         capabilities: { protocol: 2, columns: "windowed" },
@@ -205,7 +205,8 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
       config: { toolbar: false, tabs: false },
       theme: { rowHeight: ROW_HEIGHT, headerHeight: 28, rowHeaderWidth: 48 },
     });
-    const store = grid.store as SheetwriteStore;
+    grid = mounted;
+    const store = mounted.store as SheetwriteStore;
     const scroller = host.querySelector<HTMLElement>(".sheetwrite-scroller");
     if (!scroller) throw new Error("Prefetch fixture did not mount its scroller");
     let visible = { start: 0, end: VIEWPORT_ROWS };
@@ -214,7 +215,7 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
     });
     const renderAt = (row: number): boolean => {
       scroller.scrollTop = row * ROW_HEIGHT;
-      grid!.refresh();
+      mounted.refresh();
       peakActiveRequests = Math.max(peakActiveRequests, activeRequests.size);
       return store.isRangeFullyLoaded({
         sheet: "trace",

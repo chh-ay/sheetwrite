@@ -13,6 +13,7 @@ import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 import type { DataModel, TableRelationship } from "./data-model.js";
 import type { PivotDefinition } from "./pivot.js";
+import type { SavedQuery } from "./query.js";
 import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
 
 /** Stable reason codes returned by worksheet-name validation. */
@@ -138,6 +139,8 @@ export interface Workbook {
   calculation?: CalculationSettings;
   /** Relationships between workbook tables; absent means none. */
   dataModel?: DataModel;
+  /** Saved refreshable queries; absent means none. */
+  queries?: SavedQuery[];
 }
 
 export interface AddSheetInput {
@@ -268,8 +271,12 @@ export type CommitReason =
   | "style"
   /** Find-and-replace. */
   | "replace"
+  /** In-place sort that moves the rows of a range. */
+  | "sort"
   | "undo"
   | "redo"
+  /** Restore of a history version. */
+  | "restore"
   /** `store.applyTransaction` from host code / unclassified. */
   | "api";
 
@@ -458,6 +465,12 @@ export interface XlsxSourceGraph {
   readonly target: string;
   /** Pivot cache id written into `<pivotCaches>`. */
   readonly cacheId?: string;
+  /**
+   * 64-bit hex digest of `workbook.queries` at import, for graphs that hold
+   * saved query definitions (the DataMashup and its connections). Any query
+   * change makes the graph stale, so it is dropped.
+   */
+  readonly queries?: string;
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];
@@ -485,6 +498,8 @@ export interface WorkbookSnapshot {
     calculation?: CalculationSettings;
     /** Relationships between workbook tables; omitted when there are none. */
     dataModel?: DataModel;
+    /** Saved refreshable queries; omitted when there are none. */
+    queries?: SavedQuery[];
   };
   sheets: SheetSnapshot[];
 }
@@ -503,6 +518,12 @@ export type DocumentOp =
     }
   | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null }
   | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean }
+  /**
+   * Move the rows of `range` by a permutation, as an in-place sort does. Target
+   * row offset `i` receives the cells of source row offset `order[i]`. `order`
+   * holds one little-endian `u32` per row of `range`, in base64.
+   */
+  | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string }
   | { op: "addRows"; sheet: SheetId; at: number; count: number }
   | { op: "removeRows"; sheet: SheetId; at: number; count: number }
   | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number }
@@ -546,6 +567,10 @@ export type DocumentOp =
   /** Insert or replace the relationship with `relationship.id`. */
   | { op: "setRelationship"; relationship: TableRelationship }
   | { op: "removeRelationship"; id: string }
+  /** Insert or replace the saved query with `query.id`. */
+  | { op: "setQuery"; query: SavedQuery }
+  /** Remove a saved query; its output table and values stay. */
+  | { op: "removeQuery"; id: string }
   | { op: "setChart"; sheet: SheetId; chart: ChartDefinition }
   | { op: "removeChart"; sheet: SheetId; id: string }
 

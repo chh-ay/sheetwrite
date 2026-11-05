@@ -195,7 +195,7 @@ describe("createGridController command-state subscriptions", () => {
         },
       ],
     });
-    grid.sortBy(0, false);
+    grid.setViewSort([{ col: 0, ascending: false }]);
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     expect(grid.getCommandState("bold").activity).toBe("active");
     grid.setSelection({

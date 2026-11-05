@@ -326,10 +326,15 @@ await initSheetwrite(undefined, formulas);
 | Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `KURT`, `FORECAST.LINEAR` |
 | Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
 | Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT`, `DDB` |
+| Securities | `PRICE`, `YIELD`, `ACCRINT`, `COUPNCD`, `DURATION`, `TBILLPRICE` |
 | Dates | `NETWORKDAYS.INTL`, `WORKDAY.INTL`, `DATEDIF`, `ISOWEEKNUM` |
 | Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE`, `ARRAYTOTEXT` |
 | Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET`, `DMAX`, `DSTDEV` |
 | Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ`, `COMBIN` |
+| Unit conversion | `CONVERT` |
+| Bessel functions | `BESSELJ`, `BESSELY`, `BESSELI`, `BESSELK` |
+| Complex numbers | `COMPLEX`, `IMSUM`, `IMPRODUCT`, `IMABS`, `IMEXP`, `IMSQRT` |
+| Engineering | `DEC2HEX`, `HEX2DEC`, `BITAND`, `BITLSHIFT`, `ERF`, `GESTEP` |
 | Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
 | LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `BYCOL`, `MAKEARRAY`, `ISOMITTED` |
 | Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |
