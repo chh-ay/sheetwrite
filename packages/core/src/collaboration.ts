@@ -1,4 +1,6 @@
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
+import { cloneJsonValue } from "./plain-data.js";
+import { cellRange } from "./store/ranges.js";
 import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
 import type { Sheet } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -545,13 +547,7 @@ function selectionRanges(selection: Selection | null, sheet: Sheet): Range[] {
   if (!selection) return [];
   switch (selection.kind) {
     case "cell":
-      return [
-        {
-          sheet: selection.addr.sheet,
-          start: { row: selection.addr.row, col: selection.addr.col },
-          end: { row: selection.addr.row, col: selection.addr.col },
-        },
-      ];
+      return [cellRange(selection.addr)];
     case "range":
       return [cloneJsonValue(selection.range)];
     case "row":
@@ -654,8 +650,4 @@ function validateCommentThread(input: CommentThread, documentId: string): Commen
 
 function cloneCommentThread(thread: CommentThread): CommentThread {
   return cloneJsonValue(thread);
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }

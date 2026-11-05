@@ -809,88 +809,64 @@ export class DocumentController {
         ];
       }
 
-      case "setHyperlink": {
-        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
-          (hyperlink) => hyperlink.id === patch.hyperlink.id,
-        );
-        return previous
-          ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
-          : [{ op: "removeHyperlink", sheet: patch.sheet, id: patch.hyperlink.id }];
-      }
-
+      case "setHyperlink":
       case "removeHyperlink": {
-        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
-          (hyperlink) => hyperlink.id === patch.id,
+        const id = patch.op === "setHyperlink" ? patch.hyperlink.id : patch.id;
+        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find((entry) => entry.id === id);
+        return entryInverse(
+          previous,
+          (hyperlink) => ({
+            op: "setHyperlink",
+            sheet: patch.sheet,
+            hyperlink: cloneCellHyperlink(hyperlink),
+          }),
+          patch.op === "setHyperlink" ? { op: "removeHyperlink", sheet: patch.sheet, id } : null,
         );
-        return previous
-          ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
-          : [];
       }
 
-      case "setChart": {
-        const previous = this.sheetById(patch.sheet)?.charts?.find(
-          (chart) => chart.id === patch.chart.id,
-        );
-        return previous
-          ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
-          : [{ op: "removeChart", sheet: patch.sheet, id: patch.chart.id }];
-      }
-
+      case "setChart":
       case "removeChart": {
-        const previous = this.sheetById(patch.sheet)?.charts?.find(
-          (chart) => chart.id === patch.id,
+        const id = patch.op === "setChart" ? patch.chart.id : patch.id;
+        const previous = this.sheetById(patch.sheet)?.charts?.find((entry) => entry.id === id);
+        return entryInverse(
+          previous,
+          (chart) => ({ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(chart) }),
+          patch.op === "setChart" ? { op: "removeChart", sheet: patch.sheet, id } : null,
         );
-        return previous
-          ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
-          : [];
       }
 
-      case "setValidationRule": {
-        const previous = this.sheetById(patch.sheet)?.validationRules?.find(
-          (rule) => rule.id === patch.rule.id,
-        );
-        return previous
-          ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
-          : [{ op: "removeValidationRule", sheet: patch.sheet, id: patch.rule.id }];
-      }
-
+      case "setValidationRule":
       case "removeValidationRule": {
+        const id = patch.op === "setValidationRule" ? patch.rule.id : patch.id;
         const previous = this.sheetById(patch.sheet)?.validationRules?.find(
-          (rule) => rule.id === patch.id,
+          (entry) => entry.id === id,
         );
-        return previous
-          ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
-          : [];
+        return entryInverse(
+          previous,
+          (rule) => ({ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(rule) }),
+          patch.op === "setValidationRule"
+            ? { op: "removeValidationRule", sheet: patch.sheet, id }
+            : null,
+        );
       }
 
-      case "setProtectedRange": {
-        const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
-          (range) => range.id === patch.protectedRange.id,
-        );
-        return previous
-          ? [
-              {
-                op: "setProtectedRange",
-                sheet: patch.sheet,
-                protectedRange: structuredClone(previous),
-              },
-            ]
-          : [{ op: "removeProtectedRange", sheet: patch.sheet, id: patch.protectedRange.id }];
-      }
-
+      case "setProtectedRange":
       case "removeProtectedRange": {
+        const id = patch.op === "setProtectedRange" ? patch.protectedRange.id : patch.id;
         const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
-          (range) => range.id === patch.id,
+          (entry) => entry.id === id,
         );
-        return previous
-          ? [
-              {
-                op: "setProtectedRange",
-                sheet: patch.sheet,
-                protectedRange: structuredClone(previous),
-              },
-            ]
-          : [];
+        return entryInverse(
+          previous,
+          (protectedRange) => ({
+            op: "setProtectedRange",
+            sheet: patch.sheet,
+            protectedRange: structuredClone(protectedRange),
+          }),
+          patch.op === "setProtectedRange"
+            ? { op: "removeProtectedRange", sheet: patch.sheet, id }
+            : null,
+        );
       }
 
       case "setNote": {
@@ -906,34 +882,19 @@ export class DocumentController {
         ];
       }
 
-      case "setNamedRange": {
-        const previous = this.options.store
-          .getWorkbook()
-          .namedRanges?.find(
-            (range) =>
-              formulaNameKey(range.name) === formulaNameKey(patch.namedRange.name) &&
-              range.scope === patch.namedRange.scope,
-          );
-        return previous
-          ? [{ op: "setNamedRange", namedRange: { ...previous } }]
-          : [
-              {
-                op: "removeNamedRange",
-                name: patch.namedRange.name,
-                scope: patch.namedRange.scope,
-              },
-            ];
-      }
-
+      case "setNamedRange":
       case "removeNamedRange": {
+        const { name, scope } = patch.op === "setNamedRange" ? patch.namedRange : patch;
         const previous = this.options.store
           .getWorkbook()
           .namedRanges?.find(
-            (range) =>
-              formulaNameKey(range.name) === formulaNameKey(patch.name) &&
-              range.scope === patch.scope,
+            (range) => formulaNameKey(range.name) === formulaNameKey(name) && range.scope === scope,
           );
-        return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
+        return entryInverse(
+          previous,
+          (namedRange) => ({ op: "setNamedRange", namedRange: { ...namedRange } }),
+          patch.op === "setNamedRange" ? { op: "removeNamedRange", name, scope } : null,
+        );
       }
 
       case "setCalculation": {
@@ -943,53 +904,45 @@ export class DocumentController {
         return [{ op: "setCalculation", calculation: { ...previous } }];
       }
 
-      case "setRelationship": {
-        const previous = findRelationship(
-          this.options.store.getWorkbook().dataModel,
-          patch.relationship.id,
-        );
-        return previous
-          ? [{ op: "setRelationship", relationship: cloneRelationship(previous) }]
-          : [{ op: "removeRelationship", id: patch.relationship.id }];
-      }
-
+      case "setRelationship":
       case "removeRelationship": {
-        const previous = findRelationship(this.options.store.getWorkbook().dataModel, patch.id);
-        return previous
-          ? [{ op: "setRelationship", relationship: cloneRelationship(previous) }]
-          : [];
+        const id = patch.op === "setRelationship" ? patch.relationship.id : patch.id;
+        const previous = findRelationship(this.options.store.getWorkbook().dataModel, id);
+        return entryInverse(
+          previous,
+          (relationship) => ({
+            op: "setRelationship",
+            relationship: cloneRelationship(relationship),
+          }),
+          patch.op === "setRelationship" ? { op: "removeRelationship", id } : null,
+        );
       }
 
-      case "setQuery": {
-        const previous = findQuery(this.options.store.getWorkbook().queries, patch.query.id);
-        return previous
-          ? [{ op: "setQuery", query: cloneQuery(previous) }]
-          : [{ op: "removeQuery", id: patch.query.id }];
-      }
-
+      case "setQuery":
       case "removeQuery": {
-        const previous = findQuery(this.options.store.getWorkbook().queries, patch.id);
-        return previous ? [{ op: "setQuery", query: cloneQuery(previous) }] : [];
+        const id = patch.op === "setQuery" ? patch.query.id : patch.id;
+        const previous = findQuery(this.options.store.getWorkbook().queries, id);
+        return entryInverse(
+          previous,
+          (query) => ({ op: "setQuery", query: cloneQuery(query) }),
+          patch.op === "setQuery" ? { op: "removeQuery", id } : null,
+        );
       }
 
-      case "setPivot": {
+      case "setPivot":
+      case "removePivot": {
         const sheet = this.sheetById(patch.sheet);
         // A sheet created in this batch is removed by the addSheet inverse,
         // with all its pivots. A later removePivot would target a missing sheet.
         if (!sheet) return [];
-        const previous = sheet.pivots?.find((pivot) => pivot.id === patch.pivot.id);
-        return previous
-          ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
-          : [{ op: "removePivot", sheet: patch.sheet, id: patch.pivot.id }];
-      }
 
-      case "removePivot": {
-        const previous = this.sheetById(patch.sheet)?.pivots?.find(
-          (pivot) => pivot.id === patch.id,
+        const id = patch.op === "setPivot" ? patch.pivot.id : patch.id;
+        const previous = sheet.pivots?.find((pivot) => pivot.id === id);
+        return entryInverse(
+          previous,
+          (pivot) => ({ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(pivot) }),
+          patch.op === "setPivot" ? { op: "removePivot", sheet: patch.sheet, id } : null,
         );
-        return previous
-          ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
-          : [];
       }
     }
   }
@@ -1597,4 +1550,19 @@ function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<
     Reflect.set(previous, key, column[key]);
   }
   return previous;
+}
+
+/**
+ * Inverse of setting or removing one entry of a keyed collection: put back
+ * the entry the edit replaced, or remove the entry a set added. Removing an
+ * entry that did not exist needs no inverse.
+ */
+function entryInverse<T>(
+  previous: T | undefined,
+  restore: (entry: T) => DocumentOp,
+  removeAdded: DocumentOp | null,
+): DocumentOp[] {
+  if (previous !== undefined) return [restore(previous)];
+
+  return removeAdded ? [removeAdded] : [];
 }

@@ -1,4 +1,4 @@
-import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import { preparedHistoryBlock } from "./transaction-preparation.js";
 import type { CellStyle } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
@@ -48,6 +48,28 @@ export function markAtomicBatch<T extends readonly DocumentOp[]>(operations: T):
 
 export function isAtomicBatch(operations: readonly DocumentOp[]): boolean {
   return atomicBatches.has(operations);
+}
+
+/**
+ * Whether `counts` splits `operationCount` operations into the versions of
+ * one atomic batch: an array of 2 to `maxVersions` own entries, each a
+ * positive safe integer, that sum to `operationCount`.
+ */
+export function validVersionOperationCounts(
+  counts: unknown,
+  operationCount: number,
+  maxVersions: number = MAX_ATOMIC_BATCH_VERSIONS,
+): counts is number[] {
+  if (!Array.isArray(counts) || counts.length < 2 || counts.length > maxVersions) return false;
+
+  let total = 0;
+  for (let index = 0; index < counts.length; index++) {
+    const count: unknown = Object.hasOwn(counts, index) ? counts[index] : undefined;
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count <= 0) return false;
+
+    total += count;
+  }
+  return total === operationCount;
 }
 
 /** Aggregate ceilings for a marked batch whose versions each fit `limits`. */
