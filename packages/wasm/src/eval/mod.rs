@@ -27,6 +27,8 @@ mod random;
 mod range_fold;
 mod range_reader;
 mod reference;
+#[cfg(feature = "analysis")]
+pub(crate) mod regex_patterns;
 mod statistics;
 mod subtotal;
 #[cfg(test)]
@@ -1563,6 +1565,8 @@ impl CellStore {
         match ast {
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(pattern) => Value::text(pattern.text()),
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == analysis::lambda::CALL => {
                 analysis::lambda::evaluate(
