@@ -1,12 +1,14 @@
-/** Physical column types; mixed columns use compact typed payload lanes. */
-export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime" | "mixed";
+import type { QueryColumnSpec, QueryStep } from "@sheetwrite/core";
 
-/** Stable identity is separate from the field name used by source records. */
-export interface QueryColumnSpec {
-  readonly id: string;
-  readonly name: string;
-  readonly type: QueryColumnType;
-}
+// Saved workbook queries and headless execution share one step contract.
+export type {
+  QueryAggregate,
+  QueryColumnSpec,
+  QueryColumnType,
+  QueryJoinKind,
+  QueryPredicate,
+  QueryStep,
+} from "@sheetwrite/core";
 
 /** Per-execution ceilings; expanding operations reject output before allocation. */
 export interface QueryLimits {
@@ -39,67 +41,6 @@ export type QuerySource =
       readonly delimiter?: number;
       readonly headers?: boolean;
       readonly emptyIsNull?: boolean;
-    };
-
-/** Data-only predicate trees use M null logic; only logical true selects a row. */
-export type QueryPredicate =
-  | {
-      readonly kind: "compare";
-      readonly column: string;
-      readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte";
-      readonly value: string | number | boolean | null;
-    }
-  | { readonly kind: "isNull"; readonly column: string }
-  | { readonly kind: "contains"; readonly column: string; readonly text: string }
-  | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[] }
-  | { readonly kind: "not"; readonly predicate: QueryPredicate };
-
-/** Join kinds retain duplicate matches and match null keys to null keys. */
-export type QueryJoinKind =
-  | "inner"
-  | "left"
-  | "right"
-  | "full"
-  | "leftSemi"
-  | "rightSemi"
-  | "leftAnti"
-  | "rightAnti";
-
-/** Column is required except for countRows; numeric aggregates ignore nulls. */
-export interface QueryAggregate {
-  readonly id: string;
-  readonly name: string;
-  readonly op: "countRows" | "count" | "sum" | "average" | "min" | "max";
-  readonly column?: string;
-}
-
-/** Saved step order is execution order; each column reference is a stable identity. */
-export type QueryStep =
-  | { readonly kind: "filter"; readonly predicate: QueryPredicate }
-  | { readonly kind: "select"; readonly columns: readonly string[] }
-  | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[] }
-  | {
-      readonly kind: "changeType";
-      readonly column: string;
-      readonly type: QueryColumnType;
-      readonly onError: "error" | "null";
-    }
-  | {
-      readonly kind: "join";
-      readonly input: string;
-      readonly keys: readonly (readonly [left: string, right: string])[];
-      readonly join: QueryJoinKind;
-    }
-  | {
-      readonly kind: "group";
-      readonly keys: readonly string[];
-      readonly aggregates: readonly QueryAggregate[];
-    }
-  | {
-      readonly kind: "unpivot";
-      readonly columns: readonly string[];
-      readonly attribute: { readonly id: string; readonly name: string };
-      readonly value: { readonly id: string; readonly name: string };
     };
 
 interface ColumnState {

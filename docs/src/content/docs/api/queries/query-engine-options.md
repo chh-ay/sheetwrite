@@ -8,7 +8,7 @@ description: "QueryEngineOptions interface in @sheetwrite/queries: Hosts can pro
 Hosts can provide the compiled artifact instead of using browser artifact loading.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/index.ts#L23"><code>packages/queries/src/index.ts#L23</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/index.ts#L39"><code>packages/queries/src/index.ts#L39</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
@@ -50,6 +50,7 @@ export interface QueryEngineOptions {
 <p class="api-consumers-label">Public exports naming <code>QueryEngineOptions</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/queries/create-query-session/"><code>createQuerySession</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 <li><a href="/docs/api/queries/load-query-engine/"><code>loadQueryEngine</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

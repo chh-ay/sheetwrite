@@ -52,30 +52,21 @@ pub fn parse_source(bytes: &[u8], spec: &SourceSpec, limits: &Limits) -> Result<
                 (0..flat_index(columns.len())?).collect()
             };
 
-            // Every record must have the first record's width, as RFC 4180 requires.
-            let mut width = headers.then_some(record.len());
+            // Declared columns fix the width, as in Power Query's Csv.Document: a
+            // record with fewer fields has null in the missing columns, and fields
+            // past the declared columns are ignored.
+            // https://learn.microsoft.com/powerquery-m/csv-document
             let mut rows = 0;
             let mut budget = OutputBudget::new(limits);
 
             while reader.read(&mut record)? {
                 limits.shape(rows + 1, output.len())?;
 
-                if *width.get_or_insert(record.len()) != record.len() {
-                    return Err(Diagnostic::new("csv"));
-                }
-
-                if !*headers && record.len() != output.len() {
-                    return Err(Diagnostic::new("shape"));
-                }
-
                 for (index, column) in output.iter_mut().enumerate() {
-                    let field = record
-                        .field(row_index(*at(&positions, index)?)?)
-                        .ok_or_else(|| Diagnostic::new("shape"))?;
-                    let value = if *empty_is_null && field.is_empty() {
-                        Value::Null
-                    } else {
-                        Value::Text(field)
+                    let value = match record.field(row_index(*at(&positions, index)?)?) {
+                        None => Value::Null,
+                        Some("") if *empty_is_null => Value::Null,
+                        Some(field) => Value::Text(field),
                     };
                     push_converted(column, value, ErrorPolicy::Error, &mut budget)?;
                 }

@@ -584,6 +584,8 @@ function transformDirectTarget(
     case "setCalculation":
     case "setRelationship":
     case "removeRelationship":
+    case "setQuery":
+    case "removeQuery":
     case "removeChart":
     case "removePivot":
       return null;
@@ -1150,6 +1152,12 @@ function operationIdentity(operation: DocumentOp): string {
     case "setRelationship":
     case "removeRelationship":
       return "data-model";
+
+    // Joins and output tables are checked across all queries, so any two
+    // concurrent definition changes conflict.
+    case "setQuery":
+    case "removeQuery":
+      return "queries";
 
     case "setPivot":
       return `pivot:${operation.pivot.id}`;
