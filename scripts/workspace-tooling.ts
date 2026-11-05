@@ -122,8 +122,9 @@ export const TYPECHECK_NODES: readonly CommandNode[] = [
  * The test lists below own every repository test path. `test:tooling` (CI
  * preflight), `test:unit` (CI unit job) and `verify-ci` all run these nodes, so
  * a suite added here runs everywhere. Tooling suites run before any package is
- * built; unit suites run against built package outputs, so a suite that loads
- * the engine (directly or through `docs/src/lib`) belongs there.
+ * built; unit suites run against built package outputs and generated files, so
+ * a suite that loads the engine or generated docs data (directly or through
+ * `docs/src/lib`) belongs there.
  * `workspace-tooling.test.ts` rejects a `scripts/*.test.ts` file that is in
  * neither list or in both.
  */
@@ -145,7 +146,6 @@ export const TOOLING_TEST_PATHS = [
   "scripts/coverage-check.test.ts",
   "scripts/sheetwrite-code-hovers.test.ts",
   "scripts/normalize-sitemap.test.ts",
-  "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
   "scripts/check-local-paths.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
@@ -166,6 +166,7 @@ export const UNIT_TEST_PATHS = [
   "scripts/release-github.test.ts",
   "scripts/docs.test.ts",
   "scripts/docs-llms.test.ts",
+  "scripts/prepare-docs-deployment.test.ts",
   "bench/test",
   "docs/test",
 ] as const;
