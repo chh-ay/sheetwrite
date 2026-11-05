@@ -1685,6 +1685,47 @@ export class StoreDataEngine {
     return history;
   }
 
+  /**
+   * Engine transfer bytes of one rectangle: source kinds, payloads, style IDs,
+   * strings and formula sources, with no JavaScript object per cell. The
+   * history diff kernel reads them; the engine copy is freed before return.
+   */
+  captureRangeTransfer(input: Range): Uint8Array | null {
+    const range = normalizedRange(input);
+    const sheet = this.sheetMeta(range.sheet);
+    if (
+      range.start.row < 0 ||
+      range.start.col < 0 ||
+      range.end.row >= sheet.rowCount ||
+      range.end.col >= sheet.columns.length
+    ) {
+      return null;
+    }
+
+    const handle = this.handleOf(range.sheet);
+    const resource = this.wasm.captureRange(
+      handle,
+      range.start.row,
+      range.start.col,
+      range.end.row - range.start.row + 1,
+      range.end.col - range.start.col + 1,
+    );
+    if (!resource) {
+      return null;
+    }
+
+    try {
+      return resource.exportMemoryState(handle);
+    } finally {
+      resource.free();
+    }
+  }
+
+  /** Style of each store style ID, as stored in cells; ID 0 is the empty style. */
+  styleTable(): readonly CellStyle[] {
+    return this.styles.table;
+  }
+
   getWorkbook(): Workbook {
     return this.workbook;
   }

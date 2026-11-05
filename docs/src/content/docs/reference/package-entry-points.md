@@ -32,6 +32,8 @@ description: "Compiler-backed classification of every publishable Sheetwrite pac
 | `@sheetwrite/vue` | `./dist/index.d.ts` | supported | [Reference](/docs/api/vue/) |
 | `@sheetwrite/vue/styles.css` | `./styles.css` | asset | [Reference](/docs/api/vue-styles-css/) |
 | `@sheetwrite/wasm` | `./loader.d.ts` | internal | [Reference](/docs/api/wasm/) |
+| `@sheetwrite/wasm/history` | `./history.d.ts` | internal | [Reference](/docs/api/wasm-history/) |
+| `@sheetwrite/wasm/history/wasm` | `./pkg-history/sheetwrite_history_bg.wasm` | asset | [Reference](/docs/api/wasm-history-wasm/) |
 | `@sheetwrite/wasm/wasm` | `./pkg/sheetwrite_wasm_bg.wasm` | asset | [Reference](/docs/api/wasm-wasm/) |
 | `@sheetwrite/xlsx` | `./dist/index.d.ts` | supported | [Reference](/docs/api/xlsx/) |
 | `@sheetwrite/xlsx/register` | `./dist/register.d.ts` | supported | [Reference](/docs/api/xlsx-register/) |

@@ -10,7 +10,7 @@ import {
   type ReleaseNotesLinks,
   renderReleaseNotes,
 } from "./release-notes.js";
-import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
+import { publishableIndex } from "./workspace-tooling.js";
 
 export interface PackageReleaseIdentity {
   readonly name: string;
@@ -53,7 +53,7 @@ export function parsePackageReleaseIdentities(
       throw new Error(`${label}[${index}] must contain only name and version`);
     }
     const { name, version } = entry as Record<string, unknown>;
-    const packageIndex = PUBLISHABLE_PACKAGE_ORDER.indexOf(name as never);
+    const packageIndex = publishableIndex(name);
     if (packageIndex === -1) throw new Error(`Unknown publishable package ${String(name)}`);
     if (packageIndex <= previousIndex) throw new Error(`${label} must preserve dependency order`);
     if (typeof version !== "string" || !STABLE_VERSION.test(version)) {

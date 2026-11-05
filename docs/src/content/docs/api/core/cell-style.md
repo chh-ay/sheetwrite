@@ -210,6 +210,6 @@ export interface CellStyle {
 <li><a href="/docs/api/core/resolved-cell/"><code>ResolvedCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sanitize-hyperlink-style/"><code>sanitizeHyperlinkStyle</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/snapshot-cell/"><code>SnapshotCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 10 more</li>
+<li class="api-consumer-more">and 11 more</li>
 </ul>
 </div>

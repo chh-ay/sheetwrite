@@ -1,9 +1,10 @@
 import { DemoRadioGroup, DemoRadioItem } from "./DemoRadioGroup.js";
+import type { RenderingMode } from "./rendering-mode.js";
 
 interface DemoRenderingModeProps {
   label: string;
-  mode: "canvas" | "worker";
-  onModeChange: (mode: "canvas" | "worker") => void;
+  mode: RenderingMode;
+  onModeChange: (mode: RenderingMode) => void;
 }
 
 export function DemoRenderingMode({ label, mode, onModeChange }: DemoRenderingModeProps) {

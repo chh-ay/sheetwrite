@@ -5199,6 +5199,120 @@
         }
       ],
       "returns": "scalar"
+    },
+    "point-angle": {
+      "arguments": [
+        {
+          "name": "xNum",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yNum",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "precise-rounding": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "significance",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "roman": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "form",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "roman-text": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "radix-text": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "radix",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "minLength",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "radix-number": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "radix",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -6622,7 +6736,13 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
+        "paths": [
+          "packages/wasm/src/eval/mod.rs",
+          "packages/wasm/src/eval/functions.rs",
+          "packages/wasm/src/eval/math.rs",
+          "packages/wasm/src/eval/math/trigonometry.rs",
+          "packages/wasm/src/eval/math/numerals.rs"
+        ]
       },
       "assist": {
         "status": "implemented",
@@ -12267,6 +12387,366 @@
       "implementation": "analysis-securities",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ACOS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ACOSH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ACOT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ACOTH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ARABIC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "roman-text",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASIN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASINH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ATAN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ATAN2",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "point-angle",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ATANH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "BASE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "radix-text",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CEILING.PRECISE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "precise-rounding",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COSH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COTH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CSC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CSCH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DECIMAL",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "radix-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DEGREES",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FLOOR.PRECISE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "precise-rounding",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISO.CEILING",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "precise-rounding",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RADIANS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ROMAN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "roman",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SEC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SECH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SIN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SINH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TAN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TANH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
     }
   ],
   "operators": [

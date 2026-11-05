@@ -156,6 +156,20 @@ fn financial_functions_read_cells_text_dates_and_blanks() {
 }
 
 #[test]
+fn trigonometry_and_numeral_functions_read_cells() {
+    assert_results(&[
+        ("=DEGREES(ATAN2(Data!A1,Data!A1))", "45"),
+        ("=SIN(Data!F1)", "0"),
+        ("=COS(Data!F1)", "1"),
+        ("=ROMAN(Data!B3*10+Data!A3)", "CCCIII"),
+        ("=ARABIC(ROMAN(1999,4))", "1999"),
+        ("=BASE(Data!B2,16,4)", "0014"),
+        ("=DECIMAL(\"ff\",Data!A2*8)", "255"),
+        ("=CEILING.PRECISE(-Data!A3-0.5,Data!A2)", "-2"),
+    ]);
+}
+
+#[test]
 fn whole_columns_and_rows_read_the_used_part_of_the_sheet() {
     assert_results(&[
         ("=SUM(C:C)", "15"),

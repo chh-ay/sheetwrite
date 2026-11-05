@@ -106,9 +106,15 @@ interface GridLink {
   disposeRemote?: () => void;
 }
 
-const COLUMN_HEADERS: readonly string[] = createOfflineWorkbook().sheets[0]!.columns.map(
-  (column) => column.header ?? column.key,
-);
+const COLUMN_HEADERS: readonly string[] = offlineColumnHeaders();
+
+/** Header labels of the offline workbook's first sheet. */
+function offlineColumnHeaders(): readonly string[] {
+  const sheet = createOfflineWorkbook().sheets[0];
+  if (!sheet) throw new Error("The offline workbook has no sheet");
+
+  return sheet.columns.map((column) => column.header ?? column.key);
+}
 
 // Content-fit design widths for the dispatch columns. Column widths are fixed
 // at mount, so the mount path widens them proportionally to cover the measured
