@@ -1,6 +1,7 @@
 import { deflateSync, Inflate } from "fflate";
 
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "../errors.js";
+import { SheetwriteError } from "../errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "../json-bytes.js";
 import type { HistoryLimits, HistoryStoredRecord } from "./types.js";
 
 const MIB = 1024 * 1024;

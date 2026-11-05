@@ -360,6 +360,20 @@ describe("Grid editing (Layer 3)", () => {
         }),
       );
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
+  it("applies the store's view rules: whole rows only, and no commit for an unchanged view", () => {
+    const workbook = makeWorkbook(5);
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const reasons: string[] = [];
+    grid.on("change", (event) => reasons.push(event.commitReason));
+    try {
+      grid.hideRows([1.5, 2]);
+      expect(grid.hiddenRows()).toEqual([2]);
+
+      reasons.length = 0;
+      grid.clearView();
+      grid.setColumnFilter(0, null);
+      expect(reasons).toEqual([]);
     } finally {
       grid.destroy();
     }

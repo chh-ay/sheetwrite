@@ -2,6 +2,7 @@ import { colToA1, labelToCol } from "./a1.js";
 import { sanitizeCellStyle } from "./cell-style-fields.js";
 import { SheetwriteError } from "./errors.js";
 import { formulaNameKey } from "./name-key.js";
+import { rangesIntersect } from "./store/ranges.js";
 import type { Sheet } from "./types/document.js";
 import type {
   WorkbookTable,
@@ -450,14 +451,7 @@ export function validWorkbookTable(
     return false;
   }
 
-  return !existing.some((candidate) => {
-    if (candidate.range.sheet !== table.range.sheet) return false;
-    const otherR0 = Math.min(candidate.range.start.row, candidate.range.end.row);
-    const otherR1 = Math.max(candidate.range.start.row, candidate.range.end.row);
-    const otherC0 = Math.min(candidate.range.start.col, candidate.range.end.col);
-    const otherC1 = Math.max(candidate.range.start.col, candidate.range.end.col);
-    return r0 <= otherR1 && r1 >= otherR0 && c0 <= otherC1 && c1 >= otherC0;
-  });
+  return !existing.some((candidate) => rangesIntersect(candidate.range, table.range));
 }
 
 /** Reject an invalid or oversized live workbook before table arrays are copied to WASM. */

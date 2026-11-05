@@ -8,7 +8,7 @@ description: "PersistenceError class in @sheetwrite/core: Typed failure raised b
 Typed failure raised by persistence and synchronization flows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L56"><code>packages/core/src/persistence.ts#L56</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/persistence.ts#L59"><code>packages/core/src/persistence.ts#L59</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

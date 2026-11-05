@@ -133,6 +133,21 @@ fn legacy_statistics_names_read_references_as_their_successors() {
     ]);
 }
 
+/// The byte functions count one byte per character; ASC and DBCS change
+/// character width; BAHTTEXT shows the example of its Microsoft page.
+#[cfg(feature = "analysis")]
+#[test]
+fn byte_width_and_baht_functions_read_cells() {
+    assert_results(&[
+        ("=LENB(Data!D2)", "1"),
+        ("=LEFTB(Data!A3&\"ab\",2)", "3a"),
+        ("=FINDB(\"x\",Data!D2)", "1"),
+        ("=DBCS(Data!D2)", "ｘ"),
+        ("=ASC(DBCS(Data!D2&Data!A1))", "x1"),
+        ("=BAHTTEXT(1234)", "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน"),
+    ]);
+}
+
 /// The examples of the ERROR.TYPE, ISEVEN, ISODD, SHEET and SHEETS pages on
 /// Microsoft Support, and the IS functions page for ISNONTEXT and ISREF.
 #[test]

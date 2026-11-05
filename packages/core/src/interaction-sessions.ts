@@ -10,6 +10,7 @@ import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
+import { rangeContains } from "./store/ranges.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
@@ -332,11 +333,7 @@ export class InteractionSessions {
 
     const validationRule = sheet.validationRules?.find(
       (rule) =>
-        rule.range.sheet === dataAddr.sheet &&
-        dataAddr.row >= Math.min(rule.range.start.row, rule.range.end.row) &&
-        dataAddr.row <= Math.max(rule.range.start.row, rule.range.end.row) &&
-        dataAddr.col >= Math.min(rule.range.start.col, rule.range.end.col) &&
-        dataAddr.col <= Math.max(rule.range.start.col, rule.range.end.col) &&
+        rangeContains(rule.range, dataAddr) &&
         (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
     );
 

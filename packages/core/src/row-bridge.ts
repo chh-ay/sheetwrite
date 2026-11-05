@@ -2,6 +2,7 @@ import { capturedClearCells } from "./clear-capture.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_SHEET_ID } from "./grid-constants.js";
 import { restoreBlockFacts } from "./restore-block.js";
+import { cellRange } from "./store/ranges.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
@@ -300,11 +301,7 @@ function writeDeltaKind(reason: CommitReason): "paste" | "fill" | undefined {
 function operationRange(operation: DocumentOp): Range | null {
   switch (operation.op) {
     case "set":
-      return {
-        sheet: operation.addr.sheet,
-        start: { row: operation.addr.row, col: operation.addr.col },
-        end: { row: operation.addr.row, col: operation.addr.col },
-      };
+      return cellRange(operation.addr);
     case "setRange":
     case "setBlock":
     case "restoreBlock":

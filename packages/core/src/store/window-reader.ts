@@ -1,12 +1,12 @@
 import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
 import { MAX_CONDITIONAL_FORMAT_RULES } from "../conditional-format.js";
-import { unknownSheetError } from "../errors.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
-import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
+import { utf8ByteLength } from "../utf8.js";
+import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import {
   KIND_BOOL,
@@ -200,8 +200,7 @@ export class StoreWindowReader {
 
   constructor(
     private wasm: RecomputingCellStore,
-    private readonly workbook: Workbook,
-    private readonly handles: ReadonlyMap<SheetId, number>,
+    private readonly sheets: SheetRegistry,
     private readonly styles: StyleDictionary,
   ) {}
 
@@ -216,7 +215,7 @@ export class StoreWindowReader {
     cols: readonly number[],
   ): Uint8Array {
     return this.wasm.spillDerivedMask(
-      this.handleOf(sheet),
+      this.sheets.handleOf(sheet),
       rows.start,
       rows.end,
       this.colsU32For(cols),
@@ -229,12 +228,16 @@ export class StoreWindowReader {
     cols: readonly number[],
   ): SourceSnapshot | undefined {
     if (rows.length === 0 || cols.length === 0) return undefined;
-    return this.wasm.captureSourcesForRows(this.handleOf(sheet), rows, this.colsU32For(cols));
+    return this.wasm.captureSourcesForRows(
+      this.sheets.handleOf(sheet),
+      rows,
+      this.colsU32For(cols),
+    );
   }
 
   capturePersistedCells(sheet: SheetId): PersistedCellView {
     const stringPoolEpoch = this.wasm.stringPoolEpoch();
-    const packed = this.wasm.persistedCellData(this.handleOf(sheet));
+    const packed = this.wasm.persistedCellData(this.sheets.handleOf(sheet));
     const coordinates: number[] = [];
     const values: CellScalar[] = [];
     const styles: CellStyle[] = [];
@@ -367,7 +370,7 @@ export class StoreWindowReader {
     order: Uint32Array | undefined,
     applyConditionalRules: boolean,
   ): InstrumentedVisibleWindowView {
-    const handle = this.handleOf(sheet);
+    const handle = this.sheets.handleOf(sheet);
     const isPaged = this.wasm.isPaged(handle);
 
     try {
@@ -387,7 +390,7 @@ export class StoreWindowReader {
     applyConditionalRules: boolean,
     isPaged: boolean,
   ): InstrumentedVisibleWindowView {
-    const handle = this.handleOf(sheet);
+    const handle = this.sheets.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
     const dataRows = order?.subarray(rows.start, Math.min(rows.end, order.length));
     let ffiCalls = 1;
@@ -594,7 +597,7 @@ export class StoreWindowReader {
 
   conditionalRulesChanged(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
-    this.syncConditionalRules(sheet, this.handleOf(sheet));
+    this.syncConditionalRules(sheet, this.sheets.handleOf(sheet));
   }
 
   /**
@@ -612,7 +615,7 @@ export class StoreWindowReader {
     cols: readonly number[],
   ): RectangleSnapshot {
     const view = this.wasm.getWindow(
-      this.handleOf(sheet),
+      this.sheets.handleOf(sheet),
       startRow,
       startRow + rows,
       this.colsU32For(cols),
@@ -792,7 +795,7 @@ export class StoreWindowReader {
   }
 
   private syncConditionalRules(sheet: SheetId, handle: number): number {
-    const rules = this.sheetMeta(sheet).conditionalFormats ?? [];
+    const rules = this.sheets.sheetMeta(sheet).conditionalFormats ?? [];
     const packable = rules
       .filter((rule) => rule.range.sheet === sheet)
       .slice(0, MAX_CONDITIONAL_FORMAT_RULES);
@@ -869,7 +872,7 @@ export class StoreWindowReader {
     styleIds: Uint32Array,
     styles: CellStyle[],
   ): void {
-    const hyperlinks = this.sheetMeta(sheet).hyperlinks ?? [];
+    const hyperlinks = this.sheets.sheetMeta(sheet).hyperlinks ?? [];
     if (hyperlinks.length === 0 || cols.length === 0 || rows.end <= rows.start) return;
 
     const colPositions = new Map<number, number>();
@@ -920,7 +923,7 @@ export class StoreWindowReader {
     styleIds: Uint32Array,
     styles: CellStyle[],
   ): void {
-    const rules = (this.sheetMeta(sheet).conditionalFormats ?? []).filter(
+    const rules = (this.sheets.sheetMeta(sheet).conditionalFormats ?? []).filter(
       (rule) => rule.range.sheet === sheet,
     );
     const mergedIds = new Map<number, number>();
@@ -943,18 +946,6 @@ export class StoreWindowReader {
       }
       styleIds[i] = local;
     }
-  }
-
-  private handleOf(sheet: SheetId): number {
-    const handle = this.handles.get(sheet);
-    if (handle === undefined) throw unknownSheetError(sheet);
-    return handle;
-  }
-
-  private sheetMeta(sheet: SheetId) {
-    const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw unknownSheetError(sheet);
-    return meta;
   }
 }
 
@@ -981,21 +972,4 @@ function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): str
     }
   }
   return signature;
-}
-
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index++) {
-    const code = value.charCodeAt(index);
-    if (code <= 0x7f) bytes += 1;
-    else if (code <= 0x7ff) bytes += 2;
-    else if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4;
-        index += 1;
-      } else bytes += 3;
-    } else bytes += 3;
-  }
-  return bytes;
 }

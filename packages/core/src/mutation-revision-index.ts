@@ -1,3 +1,4 @@
+import { normalizedRange } from "./store/ranges.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 
@@ -53,7 +54,7 @@ export class MutationRevisionIndex {
           this.recordPoint(operation.addr, revision);
           break;
         case "setRange": {
-          const range = normalize(operation.range);
+          const range = normalizedRange(operation.range);
           for (const cell of operation.cells) {
             this.recordPoint(
               {
@@ -69,11 +70,11 @@ export class MutationRevisionIndex {
         case "setBlock":
         case "restoreBlock":
         case "permuteRows":
-          this.rectangles.push({ range: normalize(operation.range), revision });
+          this.rectangles.push({ range: normalizedRange(operation.range), revision });
           break;
         case "clearRange":
           if (operation.contents ?? true) {
-            this.rectangles.push({ range: normalize(operation.range), revision });
+            this.rectangles.push({ range: normalizedRange(operation.range), revision });
           }
           break;
       }
@@ -135,18 +136,4 @@ export class MutationRevisionIndex {
 
 function pointKey(address: CellAddress): string {
   return `${address.sheet}:${address.row}:${address.col}`;
-}
-
-function normalize(range: Range): Range {
-  return {
-    sheet: range.sheet,
-    start: {
-      row: Math.min(range.start.row, range.end.row),
-      col: Math.min(range.start.col, range.end.col),
-    },
-    end: {
-      row: Math.max(range.start.row, range.end.row),
-      col: Math.max(range.start.col, range.end.col),
-    },
-  };
 }
