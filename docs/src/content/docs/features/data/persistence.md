@@ -169,8 +169,10 @@ the caller's `signal.reason`. It never publishes a partial marker.
 `archive.restoreVersion(grid, versionId, scope, { sync, signal })` brings back part or
 all of a version on a live grid as **one undoable change**: one undo step, one `change`
 event with `commitReason: "restore"`, and, with `sync`, one synchronized transaction.
-The version is rebuilt in a separate engine instance and compared with the current
-document; only the differences are written, with ordinary document operations.
+The version is rebuilt in a separate engine instance. Sheet and workbook settings are
+compared and only the changed ones are written; the cells of the scope are cleared and
+written again from the version. All of it uses ordinary document operations, so the
+undo step and the synchronized transaction grow with the size of the scope.
 
 | Scope | Restores | Keeps current |
 | --- | --- | --- |
