@@ -26,6 +26,8 @@ export const CONDITIONAL_FORMULA = 6 as const;
 /** Rule flag bits read by `set_conditional_rules` in packages/wasm/src/window.rs. */
 export const CONDITIONAL_MATCH_CASE = 1 as const;
 export const CONDITIONAL_STOP_IF_TRUE = 2 as const;
+/** JS-only: rules one u32 conditional match mask holds, one bit per rule. */
+export const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 /** JS-only result bits of `syncConditionalRules`; they have no Rust counterpart. */
 export const CONDITIONAL_HAS_RULES = 1 as const;
 export const CONDITIONAL_RULES_UPDATED = 2 as const;

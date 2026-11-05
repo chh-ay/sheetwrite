@@ -1,8 +1,9 @@
+import { CONDITIONAL_MASK_BITS } from "./store/wire-tags.js";
 import type { ConditionalFormatRule } from "./types/cell.js";
 import type { Sheet } from "./types/document.js";
 
 /** Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask. */
-export const MAX_CONDITIONAL_FORMAT_RULES = 32;
+export const MAX_CONDITIONAL_FORMAT_RULES = CONDITIONAL_MASK_BITS;
 
 /** Maximum serialized formula predicate source; parsing/evaluation stays bounded per visible cell. */
 export const MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH = 8_192;

@@ -13524,7 +13524,7 @@ Maximum serialized formula predicate source; parsing/evaluation stays bounded pe
 ##### `MAX_CONDITIONAL_FORMAT_RULES` — variable
 
 ```ts
-32
+number
 ```
 
 Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask.
@@ -14736,13 +14736,15 @@ Complete retained-resource and boundary snapshot for one operation phase.
 
 Sanitize one untrusted clipboard/snapshot value without cloning its object graph.
 
-##### `sanitizeHyperlinkStyle` — function
+##### `sanitizeCellStyle` — function
 
 ```ts
 (value: unknown): CellStyle | null
 ```
 
-Convert an untrusted style into one bounded, plain renderer-safe value.
+A plain, bounded copy of an untrusted cell style, or null when `value` is
+not a plain object of known style fields or any field breaks its rule. The
+same rule guards hyperlinks, table styles and pasted cells.
 
 ##### `SavedQuery` — interface
 

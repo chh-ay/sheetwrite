@@ -1,6 +1,5 @@
 import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
-import { MAX_CONDITIONAL_FORMAT_RULES } from "../conditional-format.js";
 import { unknownSheetError } from "../errors.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
@@ -25,6 +24,7 @@ import {
   CONDITIONAL_STOP_IF_TRUE,
   CONDITIONAL_HAS_RULES,
   CONDITIONAL_RULES_UPDATED,
+  CONDITIONAL_MASK_BITS,
 } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
@@ -795,7 +795,7 @@ export class StoreWindowReader {
     const rules = this.sheetMeta(sheet).conditionalFormats ?? [];
     const packable = rules
       .filter((rule) => rule.range.sheet === sheet)
-      .slice(0, MAX_CONDITIONAL_FORMAT_RULES);
+      .slice(0, CONDITIONAL_MASK_BITS);
     const signature = conditionalRulesSignature(packable);
     if (this.condRulesSynced.get(sheet) === signature) {
       this.conditionalRuleInputBytes = 0;
@@ -934,7 +934,7 @@ export class StoreWindowReader {
       let local = mergedIds.get(comboKey);
       if (local === undefined) {
         let merged = styles[base] ?? {};
-        for (let bit = Math.min(rules.length, MAX_CONDITIONAL_FORMAT_RULES) - 1; bit >= 0; bit--) {
+        for (let bit = Math.min(rules.length, CONDITIONAL_MASK_BITS) - 1; bit >= 0; bit--) {
           if ((fullMask & (1 << bit)) !== 0) merged = { ...merged, ...rules[bit]?.style };
         }
         local = styles.length;

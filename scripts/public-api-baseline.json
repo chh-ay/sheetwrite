@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "0467224793590cac22b5ce74928cfa56d798f917d2e7658d2ba04bb7833c38a5",
+  "sha256": "c5f923a04ea91baec88ab84631cde4085b0e90eecb0f54d69a4cbdc150dd5b9d",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -388,7 +388,7 @@
         "resolveTransactionResourceLimits",
         "rowBridgeTransactionId",
         "sanitizeCellHyperlink",
-        "sanitizeHyperlinkStyle",
+        "sanitizeCellStyle",
         "serialToDate",
         "setChartRendererFactory",
         "setChartViewProviderFactory",
