@@ -358,7 +358,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     // The marker first: it takes over checkpoints that the new head no longer
     // lists, so they keep an owner while the old head lets them go.
     if (request.version) {
-      await this.addVersion(transaction, manifest, request.version);
+      await this.addVersion(transaction, manifest, request.version, request.head ?? manifest.head);
     }
 
     if (request.head) {
@@ -448,6 +448,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     transaction: HistoryStorageTransaction,
     manifest: HistoryManifest,
     version: HistoryVersion,
+    head: HistoryHead | undefined,
   ): Promise<void> {
     const versions = await transaction.versions();
     const duplicate = versions.find((candidate) => candidate.id === version.id);
@@ -461,7 +462,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       return;
     }
 
-    if (!manifest.head || version.revision > manifest.head.revision) {
+    if (!head || version.revision > head.revision) {
       throw new HistoryError("invalid-history", "Version is ahead of the history head");
     }
 
