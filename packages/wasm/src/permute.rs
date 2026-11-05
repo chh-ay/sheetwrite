@@ -11,14 +11,13 @@ use wasm_bindgen::prelude::*;
 
 use crate::formula_rewrite::sort_formula;
 use crate::graph::DirtyRect;
+use crate::row_order::{decode_row_order, encode_row_order, invert_row_order, is_permutation};
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK, BLOCK_RESOURCE_LIMIT};
 use crate::types::{cell_key, AbsCellKey, FormulaEntry, KIND_EMPTY, KIND_FORMULA};
 
 /// Status of a permutation that moves part of a spill range, which Excel
 /// rejects with "You can't change part of an array."
 pub(crate) const PERMUTE_PARTIAL_SPILL: u32 = 4;
-
-const BITS_PER_WORD: usize = 64;
 
 /// The rectangle whose rows a permutation moves.
 #[derive(Clone, Copy)]
@@ -36,32 +35,44 @@ enum MovedSource {
     Reference(AbsCellKey),
 }
 
+/// The rectangle of a `permuteRows` call.
+fn permuted_block(
+    sheet: usize,
+    start_row: usize,
+    start_col: usize,
+    rows: usize,
+    cols: usize,
+) -> PermutedBlock {
+    PermutedBlock {
+        sheet,
+        start_row,
+        start_col,
+        rows,
+        cols,
+    }
+}
+
 #[wasm_bindgen]
 impl CellStore {
-    /// Move the rows of a rectangle: target row offset `i` gets the cells of
-    /// source row offset `order[i]`, for the `cols` columns from `start_col`.
-    /// `order` must be a permutation of `0..order.len()`. Status: `0` success,
-    /// `1` invalid shape, bounds or order, `3` dirty-capacity rejection, `4`
-    /// a spill range that the rectangle moves only in part.
+    /// Move the rows of a rectangle of `rows` × `cols` cells: target row
+    /// offset `i` gets the cells of source row offset `order[i]`. `order` is
+    /// the base64 row order of a `permuteRows` operation. Status: `0`
+    /// success, `1` invalid shape, bounds or order, `3` dirty-capacity
+    /// rejection, `4` a spill range that the rectangle moves only in part.
     #[wasm_bindgen(js_name = permuteRows)]
     pub fn permute_rows(
         &mut self,
         sheet: usize,
         start_row: usize,
         start_col: usize,
+        rows: usize,
         cols: usize,
-        order: &[u32],
+        order: &str,
     ) -> u32 {
-        let block = PermutedBlock {
-            sheet,
-            start_row,
-            start_col,
-            rows: order.len(),
-            cols,
-        };
-        if !self.permutation_fits(block, order) {
+        let block = permuted_block(sheet, start_row, start_col, rows, cols);
+        let Some(order) = self.decoded_order(block, order) else {
             return BLOCK_INVALID;
-        }
+        };
 
         if !self.spills_move_whole(block) {
             return PERMUTE_PARTIAL_SPILL;
@@ -71,19 +82,19 @@ impl CellStore {
         if revision.is_some()
             && !self.sheets[sheet]
                 .cells
-                .can_dirty_rect(start_row, start_col, block.rows, cols)
+                .can_dirty_rect(start_row, start_col, rows, cols)
         {
             return BLOCK_RESOURCE_LIMIT;
         }
 
-        let mut slots = Vec::with_capacity(block.rows);
+        let mut slots = Vec::with_capacity(rows);
         for col in start_col..start_col + cols {
             slots.clear();
-            let sources = self.read_moved_column(block, col, order, &mut slots);
+            let sources = self.read_moved_column(block, col, &order, &mut slots);
             let written = self.replace_range_sources(
                 sheet,
                 (start_row, col),
-                (block.rows, 1),
+                (rows, 1),
                 revision,
                 sources,
                 |row, _| slots[row],
@@ -97,7 +108,7 @@ impl CellStore {
     }
 
     /// Row-major offsets, in the rectangle before the move, of the formula
-    /// cells whose adjusted text the inverse permutation cannot restore: a
+    /// cells whose adjusted text the inverse order cannot restore: a
     /// reference that leaves the sheet becomes `#REF!`. Undo restores these
     /// cells from a capture. An invalid shape or order gives no offsets.
     #[wasm_bindgen(js_name = permuteRowsLosses)]
@@ -106,19 +117,14 @@ impl CellStore {
         sheet: usize,
         start_row: usize,
         start_col: usize,
+        rows: usize,
         cols: usize,
-        order: &[u32],
+        order: &str,
     ) -> Vec<u32> {
-        let block = PermutedBlock {
-            sheet,
-            start_row,
-            start_col,
-            rows: order.len(),
-            cols,
-        };
-        if !self.permutation_fits(block, order) {
+        let block = permuted_block(sheet, start_row, start_col, rows, cols);
+        let Some(order) = self.decoded_order(block, order) else {
             return Vec::new();
-        }
+        };
 
         let mut losses = Vec::new();
         for (target, &source) in order.iter().enumerate() {
@@ -139,15 +145,74 @@ impl CellStore {
         losses.sort_unstable();
         losses
     }
+
+    /// The base64 row order that sorts the records of a range: `starts` are
+    /// the first rows of the records that may move, in sheet order, and each
+    /// record has `height` rows. Records sort by the keys of their first row;
+    /// rows of the range that start no listed record keep their place. `None`
+    /// when the starts or the height do not fit the `rows` rows from
+    /// `data_start`.
+    #[wasm_bindgen(js_name = sortRangeOrder)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
+    pub fn sort_range_order(
+        &self,
+        sheet: usize,
+        data_start: u32,
+        rows: u32,
+        height: u32,
+        cols: &[u32],
+        ascending: &[u8],
+        starts: &[u32],
+    ) -> Option<String> {
+        let fits = height > 0
+            && starts.iter().all(|&start| {
+                start >= data_start
+                    && start
+                        .checked_add(height)
+                        .is_some_and(|end| end <= data_start.saturating_add(rows))
+            });
+        if !fits {
+            return None;
+        }
+
+        let sorted = self.sort_rows_multi(sheet, cols, ascending, starts);
+        if sorted.len() != starts.len() {
+            return None;
+        }
+
+        let mut order: Vec<u32> = (0..rows).collect();
+        for (&target, &source) in starts.iter().zip(&sorted) {
+            for row in 0..height {
+                order[(target - data_start + row) as usize] = source - data_start + row;
+            }
+        }
+        is_permutation(&order).then(|| encode_row_order(&order))
+    }
+
+    /// Where each row of a base64 row order goes: entry `i` is the new row
+    /// offset of source row offset `i`. `None` when the order is not a
+    /// permutation of `rows` rows.
+    #[wasm_bindgen(js_name = rowOrderTargets)]
+    pub fn row_order_targets(&self, order: &str, rows: usize) -> Option<Vec<u32>> {
+        decode_row_order(order, rows).map(|order| invert_row_order(&order))
+    }
+
+    /// The base64 order that moves every row of `order` back, or `None` when
+    /// `order` is not a permutation of `rows` rows.
+    #[wasm_bindgen(js_name = invertRowOrder)]
+    pub fn invert_row_order_text(&self, order: &str, rows: usize) -> Option<String> {
+        decode_row_order(order, rows).map(|order| encode_row_order(&invert_row_order(&order)))
+    }
 }
 
 impl CellStore {
-    /// Whether the rectangle lies on the sheet and `order` names each of its
-    /// rows exactly once.
-    fn permutation_fits(&self, block: PermutedBlock, order: &[u32]) -> bool {
-        let Some(data) = self.sheets.get(block.sheet) else {
-            return false;
-        };
+    /// The decoded order, when the rectangle lies on the sheet and `order`
+    /// is base64 of a permutation of its rows.
+    fn decoded_order(&self, block: PermutedBlock, order: &str) -> Option<Vec<u32>> {
+        let data = self.sheets.get(block.sheet)?;
         let fits = block.rows > 0
             && block.cols > 0
             && i32::try_from(block.rows).is_ok()
@@ -159,7 +224,11 @@ impl CellStore {
                 .start_col
                 .checked_add(block.cols)
                 .is_some_and(|end| end <= data.cells.n_cols());
-        fits && is_permutation(order)
+        if !fits {
+            return None;
+        }
+
+        decode_row_order(order, block.rows)
     }
 
     /// Excel moves a spill range only with its anchor, and only when the
@@ -261,24 +330,4 @@ impl CellStore {
             ),
         }
     }
-}
-
-/// Whether `order` holds each of `0..order.len()` exactly once. One bit per
-/// row marks the rows already seen.
-fn is_permutation(order: &[u32]) -> bool {
-    let mut seen = vec![0u64; order.len().div_ceil(BITS_PER_WORD)];
-    for &row in order {
-        let row = row as usize;
-        if row >= order.len() {
-            return false;
-        }
-
-        let word = row / BITS_PER_WORD;
-        let bit = 1u64 << (row % BITS_PER_WORD);
-        if seen[word] & bit != 0 {
-            return false;
-        }
-        seen[word] |= bit;
-    }
-    true
 }

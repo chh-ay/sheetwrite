@@ -73,14 +73,7 @@ import {
   type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { restoreBlockFacts } from "../restore-block.js";
-import {
-  decodeRowOrder,
-  encodeRowOrder,
-  invertRowOrder,
-  isRowPermutation,
-  type PermuteRowsOperation,
-  ROW_ORDER_ENCODING,
-} from "../row-order.js";
+import { type PermuteRowsOperation, ROW_ORDER_ENCODING } from "../row-order.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -2047,23 +2040,38 @@ export class StoreDataEngine {
    */
   permuteRowsLosses(patch: PermuteRowsOperation): CellAddress[] {
     const bounds = normalizedRange(patch.range);
-    const order = decodeRowOrder(patch);
     const handle = this.handles.get(bounds.sheet);
-    if (!order || handle === undefined) return [];
+    if (handle === undefined) return [];
 
     const cols = bounds.end.col - bounds.start.col + 1;
     const offsets = this.wasm.permuteRowsLosses(
       handle,
       bounds.start.row,
       bounds.start.col,
+      bounds.end.row - bounds.start.row + 1,
       cols,
-      order,
+      patch.order,
     );
     return Array.from(offsets, (offset) => ({
       sheet: bounds.sheet,
       row: bounds.start.row + Math.floor(offset / cols),
       col: bounds.start.col + (offset % cols),
     }));
+  }
+
+  /** The operation that moves every row of `patch` back, or `null` for an invalid order. */
+  invertedPermutation(patch: PermuteRowsOperation): PermuteRowsOperation | null {
+    const { range } = patch;
+    const rows = Math.abs(range.end.row - range.start.row) + 1;
+    const order = this.wasm.invertRowOrder(patch.order, rows);
+    if (order === undefined) return null;
+
+    return {
+      op: "permuteRows",
+      range: { ...range, start: { ...range.start }, end: { ...range.end } },
+      encoding: ROW_ORDER_ENCODING,
+      order,
+    };
   }
 
   /**
@@ -2097,18 +2105,16 @@ export class StoreDataEngine {
     const starts = this.visibleRecordStarts(bounds.sheet, dataStart, bounds.end.row, height);
     if (starts.length < 2) return { kind: "unchanged" };
 
-    const cols = Uint32Array.from(keys, (key) => key.col);
-    const ascending = Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0));
-    const sorted = this.wasm.sortRowsMulti(this.handleOf(bounds.sheet), cols, ascending, starts);
-
-    const order = new Uint32Array(bounds.end.row - dataStart + 1);
-    for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
-    for (const [position, target] of starts.entries()) {
-      const source = sorted[position] ?? target;
-      for (let row = 0; row < height; row++) {
-        order[target - dataStart + row] = source - dataStart + row;
-      }
-    }
+    const order = this.wasm.sortRangeOrder(
+      this.handleOf(bounds.sheet),
+      dataStart,
+      bounds.end.row - dataStart + 1,
+      height,
+      Uint32Array.from(keys, (key) => key.col),
+      Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0)),
+      starts,
+    );
+    if (order === undefined) return { kind: "unchanged" };
 
     return {
       kind: "move",
@@ -2120,7 +2126,7 @@ export class StoreDataEngine {
           end: { row: bounds.end.row, col: bounds.end.col },
         },
         encoding: ROW_ORDER_ENCODING,
-        order: encodeRowOrder(order),
+        order,
       },
     };
   }
@@ -3824,35 +3830,37 @@ export class StoreDataEngine {
   ): boolean {
     const bounds = normalizedRange(patch.range);
     const sheet = this.sheetMeta(bounds.sheet);
-    const order = decodeRowOrder(patch);
+    const rows = bounds.end.row - bounds.start.row + 1;
     if (
+      patch.encoding !== ROW_ORDER_ENCODING ||
       bounds.start.row < 0 ||
       bounds.start.col < 0 ||
       bounds.end.row >= sheet.rowCount ||
-      bounds.end.col >= sheet.columns.length ||
-      !order ||
-      !isRowPermutation(order)
+      bounds.end.col >= sheet.columns.length
     ) {
       return false;
     }
 
-    const move = { bounds, targets: invertRowOrder(order) };
+    const targets = this.wasm.rowOrderTargets(patch.order, rows);
+    if (!targets) return false;
+
+    const move = { bounds, targets };
     const merges = permutedMerges(sheet.merges ?? [], move);
     if (!merges || merges.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
     if (!tablesAllowRowMove(sheet.tables ?? [], bounds)) return false;
 
-    const rows = bounds.end.row - bounds.start.row + 1;
     const cols = bounds.end.col - bounds.start.col + 1;
     const beforeCells =
       changes && captureDetailedChanges ? this.captureBlockBeforeCells(bounds, rows, cols) : null;
 
-    this.noteRangeMutationFfi(order.length);
+    this.noteRangeMutationFfi(rows);
     const status = this.wasm.permuteRows(
       this.handleOf(bounds.sheet),
       bounds.start.row,
       bounds.start.col,
+      rows,
       cols,
-      order,
+      patch.order,
     );
     if (status !== 0) return false;
 

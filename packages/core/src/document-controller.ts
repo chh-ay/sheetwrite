@@ -32,13 +32,7 @@ import {
   encodeMeasuredRestoreBlock,
   estimateRestoreBlockBytes,
 } from "./restore-block.js";
-import {
-  decodeRowOrder,
-  encodeRowOrder,
-  invertRowOrder,
-  type PermuteRowsOperation,
-  ROW_ORDER_ENCODING,
-} from "./row-order.js";
+import type { PermuteRowsOperation } from "./row-order.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import {
@@ -1106,16 +1100,11 @@ export class DocumentController {
    * captured before the sort and restored after the inverse order.
    */
   private inversePermutation(patch: PermuteRowsOperation): DocumentOp[] {
-    const order = decodeRowOrder(patch);
-    if (!order) return [];
+    const engine = storeEngine(this.options.store);
+    const reverse = engine?.invertedPermutation(patch);
+    if (!engine || !reverse) return [];
 
-    const reverse: PermuteRowsOperation = {
-      op: "permuteRows",
-      range: { ...patch.range, start: { ...patch.range.start }, end: { ...patch.range.end } },
-      encoding: ROW_ORDER_ENCODING,
-      order: encodeRowOrder(invertRowOrder(order)),
-    };
-    const losses = storeEngine(this.options.store)?.permuteRowsLosses(patch) ?? [];
+    const losses = engine.permuteRowsLosses(patch);
     return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
   }
 

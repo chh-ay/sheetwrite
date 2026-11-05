@@ -4,7 +4,7 @@ import { DocumentController } from "../src/document-controller.js";
 import { validateDocumentOperationShape } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { rebaseDocumentOperations } from "../src/rebase.js";
-import { encodeRowOrder, ROW_ORDER_ENCODING } from "../src/row-order.js";
+import { ROW_ORDER_ENCODING } from "../src/row-order.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellScalar, DocumentOp, Range } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
@@ -23,12 +23,19 @@ const block = (firstRow: number, lastRow: number, lastCol = 2): Range => ({
   end: { row: lastRow, col: lastCol },
 });
 
+const BYTES_PER_ROW = 4;
+
+/** A `permuteRows` operation; the order is little-endian `u32` values in base64. */
 function permutation(range: Range, order: number[]): DocumentOp {
+  const bytes = new Uint8Array(order.length * BYTES_PER_ROW);
+  const view = new DataView(bytes.buffer);
+  for (const [index, row] of order.entries()) view.setUint32(index * BYTES_PER_ROW, row, true);
+
   return {
     op: "permuteRows",
     range,
     encoding: ROW_ORDER_ENCODING,
-    order: encodeRowOrder(Uint32Array.from(order)),
+    order: Buffer.from(bytes).toString("base64"),
   };
 }
 

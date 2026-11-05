@@ -2,6 +2,7 @@
 //! follow Excel's sort rules and spill ranges move only as a whole.
 
 use crate::permute::PERMUTE_PARTIAL_SPILL;
+use crate::row_order::{decode_row_order, encode_row_order};
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK};
 use crate::types::{KIND_BOOL, KIND_EMPTY};
 
@@ -14,6 +15,30 @@ fn sheet() -> (CellStore, usize) {
     let sheet = store.add_sheet(COLS, ROWS);
     store.set_sheet_name(sheet, "sheet1", "Sheet1");
     (store, sheet)
+}
+
+/// Move rows by `order`, given as `u32` values; the engine takes the base64
+/// text of a `permuteRows` operation.
+fn permute(
+    store: &mut CellStore,
+    sheet: usize,
+    start_row: usize,
+    start_col: usize,
+    cols: usize,
+    order: &[u32],
+) -> u32 {
+    store.permute_rows(
+        sheet,
+        start_row,
+        start_col,
+        order.len(),
+        cols,
+        &encode_row_order(order),
+    )
+}
+
+fn losses(store: &CellStore, sheet: usize, cols: usize, order: &[u32]) -> Vec<u32> {
+    store.permute_rows_losses(sheet, 0, 0, order.len(), cols, &encode_row_order(order))
 }
 
 fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
@@ -40,7 +65,7 @@ fn values_and_styles_move_with_their_row() {
     store.set_string(sheet, 1, 1, "a", 0);
     store.set_bool(sheet, 2, 1, true, 0);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 2, &[1, 2, 0]), BLOCK_OK);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 2, &[1, 2, 0]), BLOCK_OK);
     store.recompute(sheet);
 
     assert_eq!(column(&store, sheet, 0, 3), ["10", "20", "30"]);
@@ -58,7 +83,7 @@ fn formulas_outside_the_range_read_the_sorted_values() {
     store.set_formula(sheet, 0, 3, "=A1*2", 0);
     store.recompute(sheet);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[1, 2, 0]), BLOCK_OK);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 1, &[1, 2, 0]), BLOCK_OK);
     store.recompute(sheet);
 
     assert_eq!(store.formula_source(sheet, 0, 3).as_deref(), Some("=A1*2"));
@@ -76,7 +101,7 @@ fn formulas_in_moved_rows_follow_the_sort_rules() {
     store.set_formula(sheet, 2, 1, "=A2+1", 0);
     store.recompute(sheet);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 2, &[1, 2, 0]), BLOCK_OK);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 2, &[1, 2, 0]), BLOCK_OK);
     store.recompute(sheet);
 
     assert_eq!(
@@ -114,7 +139,7 @@ fn references_keep_their_target() {
     );
     store.recompute(sheet);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[1, 0]), BLOCK_OK);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 1, &[1, 0]), BLOCK_OK);
     store.recompute(sheet);
 
     assert_eq!(
@@ -132,7 +157,7 @@ fn columns_outside_the_rectangle_stay() {
     store.set_string(sheet, 0, 2, "first", 0);
     store.set_string(sheet, 1, 2, "second", 0);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 2, &[1, 0]), BLOCK_OK);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 2, &[1, 0]), BLOCK_OK);
 
     assert_eq!(column(&store, sheet, 2, 2), ["first", "second"]);
 }
@@ -143,14 +168,18 @@ fn an_order_that_is_not_a_permutation_changes_nothing() {
     store.set_number(sheet, 0, 0, 2.0, 0);
     store.set_number(sheet, 1, 0, 1.0, 0);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[1, 1]), BLOCK_INVALID);
-    assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[0, 2]), BLOCK_INVALID);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 1, &[1, 1]), BLOCK_INVALID);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 1, &[0, 2]), BLOCK_INVALID);
     assert_eq!(
-        store.permute_rows(sheet, ROWS - 1, 0, 1, &[1, 0]),
+        store.permute_rows(sheet, 0, 0, 2, 1, "not base64"),
         BLOCK_INVALID
     );
     assert_eq!(
-        store.permute_rows(sheet, 0, COLS, 1, &[1, 0]),
+        permute(&mut store, sheet, ROWS - 1, 0, 1, &[1, 0]),
+        BLOCK_INVALID
+    );
+    assert_eq!(
+        permute(&mut store, sheet, 0, COLS, 1, &[1, 0]),
         BLOCK_INVALID
     );
 
@@ -170,7 +199,7 @@ fn a_spill_over_several_rows_rejects_the_sort() {
     store.recompute(sheet);
 
     assert_eq!(
-        store.permute_rows(sheet, 0, 0, 2, &[1, 2, 0]),
+        permute(&mut store, sheet, 0, 0, 2, &[1, 2, 0]),
         PERMUTE_PARTIAL_SPILL
     );
     assert_eq!(column(&store, sheet, 1, 3), ["3", "1", "2"]);
@@ -183,7 +212,7 @@ fn a_spill_cell_whose_anchor_is_outside_rejects_the_sort() {
     store.recompute(sheet);
 
     assert_eq!(
-        store.permute_rows(sheet, 0, 1, 1, &[1, 0]),
+        permute(&mut store, sheet, 0, 1, 1, &[1, 0]),
         PERMUTE_PARTIAL_SPILL
     );
 }
@@ -195,7 +224,7 @@ fn a_spill_inside_one_row_moves_with_its_anchor() {
     store.set_number(sheet, 1, 0, 1.0, 0);
     store.recompute(sheet);
 
-    assert_eq!(store.permute_rows(sheet, 0, 0, 2, &[1, 0]), BLOCK_OK);
+    assert_eq!(permute(&mut store, sheet, 0, 0, 2, &[1, 0]), BLOCK_OK);
     store.recompute(sheet);
 
     assert_eq!(column(&store, sheet, 0, 2), ["1", "5"]);
@@ -208,8 +237,43 @@ fn losses_name_the_formulas_that_the_inverse_cannot_restore() {
     store.set_formula(sheet, 1, 0, "=A1", 0);
     store.set_formula(sheet, 2, 0, "=B3", 0);
 
-    assert_eq!(store.permute_rows_losses(sheet, 0, 0, 2, &[1, 2, 0]), [2]);
+    assert_eq!(losses(&store, sheet, 2, &[1, 2, 0]), [2]);
     assert!(store
-        .permute_rows_losses(sheet, 0, 0, 2, &[0, 0, 1])
+        .permute_rows_losses(sheet, 0, 0, 3, 2, "AAAA")
         .is_empty());
+}
+
+#[test]
+fn the_row_order_text_round_trips_and_rejects_non_permutations() {
+    for order in [vec![0], vec![1, 0], vec![2, 0, 1], vec![3, 1, 0, 2]] {
+        let text = encode_row_order(&order);
+        assert_eq!(decode_row_order(&text, order.len()), Some(order));
+    }
+
+    assert_eq!(decode_row_order(&encode_row_order(&[0, 0]), 2), None);
+    assert_eq!(decode_row_order(&encode_row_order(&[1, 0]), 3), None);
+    let (store, _) = sheet();
+    assert_eq!(
+        store.invert_row_order_text(&encode_row_order(&[2, 0, 1]), 3),
+        Some(encode_row_order(&[1, 2, 0]))
+    );
+}
+
+#[test]
+fn the_sort_order_moves_records_and_keeps_rows_outside_them() {
+    let (mut store, sheet) = sheet();
+    for (row, value) in [9.0, 3.0, 2.0, 0.0, 1.0, 0.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+
+    let records = store.sort_range_order(sheet, 1, 4, 2, &[0], &[1], &[1, 3]);
+    assert_eq!(records, Some(encode_row_order(&[2, 3, 0, 1])));
+
+    let hidden_second = store.sort_range_order(sheet, 0, 3, 1, &[0], &[1], &[0, 2]);
+    assert_eq!(hidden_second, Some(encode_row_order(&[2, 1, 0])));
+
+    assert_eq!(
+        store.sort_range_order(sheet, 1, 4, 2, &[0], &[1], &[1, 4]),
+        None
+    );
 }
