@@ -55,7 +55,7 @@
         "load-mount-queue-and-acknowledge": "/docs/features/collaboration/#load-mount-queue-and-acknowledge",
         "presence": "/docs/features/collaboration/#presence",
         "remote-operations-and-version-gaps": "/docs/features/collaboration/#remote-operations-and-version-gaps",
-        "revisions": "/docs/features/collaboration/#revisions"
+        "revisions": "/docs/features/collaboration/#restoring-versions"
       }
     },
     "/docs/guides/configuration/": {
@@ -249,10 +249,10 @@
     "SnapshotValidationError",
     "toXlsxWorkbook"
   ],
-  "entryPointCount": 29,
-  "exportCount": 660,
-  "symbolPageCount": 660,
-  "apiSha256": "b934928576318ea6e7128f2e06bf0b0dcd3f67cd66ec40da4b4d6016713f062c",
+  "entryPointCount": 31,
+  "exportCount": 694,
+  "symbolPageCount": 694,
+  "apiSha256": "5675d0a961bfcb4578684a813f819520372a85d67c4a668a01ae69fe9850b0e2",
   "compatibilitySha256": "39dd14155e04fdbb0816f506e1490faecdd3ca08ae72470187d871527fe14245",
-  "formulaContractSha256": "220c680fa8074f303d460d86d68299cbcc29a4deb162ecbc270db62ffe46f25d"
+  "formulaContractSha256": "d37fd1aeaf3dfb1eae514208014b0f92db6afef3ee90bbb97d0b8ea982c10f0b"
 }

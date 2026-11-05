@@ -4,24 +4,23 @@ import { resolve } from "node:path";
 
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
-  ADAPTER_DOC_CONTRACT,
-  adapterContractIssues,
   documentationLinkRoutes,
-  headingAnchors,
-  landingBenchPayload,
-  landingDownloads,
   movedPageIssues,
-  PERFORMANCE_PAGES,
-  parseFences,
-  renderCompatibilityResults,
   renderEntryPage,
   renderSymbolPage,
+  symbolDescription,
+} from "./docs-api.js";
+import { renderCompatibilityResults } from "./docs-compatibility.js";
+import { headingAnchors, parseFences, unresolvedSiteLinks } from "./docs-content-checks.js";
+import {
+  landingBenchPayload,
+  landingDownloads,
+  PERFORMANCE_PAGES,
   runCompletionSummary,
   splitPerformancePages,
-  symbolDescription,
-  unresolvedSiteLinks,
   validateDataArtifact,
-} from "./docs.js";
+} from "./docs-performance.js";
+import { ADAPTER_DOC_CONTRACT, adapterContractIssues } from "./docs.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 

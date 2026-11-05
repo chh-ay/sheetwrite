@@ -89,7 +89,7 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 | Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert, Delete, Format. **Editing**: AutoSum, Clear, Sort & Filter, Find. |
 | Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
 | Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. **Formula Auditing**: Explain Formula. |
-| Data | **Sort & Filter**: Sort A to Z, Sort Z to A, Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
+| Data | **Sort & Filter**: Sort A to Z and Sort Z to A (sort the cells in place, as Excel does), Custom Sort (the Sort panel), Sort View A to Z and Sort View Z to A (sort the view only), Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
@@ -98,9 +98,11 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Explain Formula** opens a side panel that describes the formula in the focus cell: its functions, their arguments, its references and its problems. See [Formula help](/docs/features/formulas/formula-help/#explain-formula).
 
+**Data Model** and **Relationships** (Data › Data Tools) open the [data model](/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
+
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Insert Function and Explain Formula are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model and Relationships are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
@@ -117,7 +119,7 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 | Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)); also refreshes external links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
 | Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
 | Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
-| Data | Data Tools | Manage Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
+| Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
 | Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
 | Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures ([#230](https://github.com/chh-ay/sheetwrite/issues/230)) |
 | Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
@@ -252,7 +254,7 @@ These `GridConfig` fields ([`CommandFlags`](/docs/api/core/command-flags/)) choo
 | `border` | `true` | Borders. |
 | `clearFormat` | `true` | Clear (Clear All, Clear Formats, Clear Contents). |
 | `merge` | `true` | Merge & Center (also Merge Cells and Unmerge Cells). |
-| `sort` | `true` | Sort & Filter, Sort A to Z and Sort Z to A. |
+| `sort` | `true` | Sort & Filter, Sort A to Z, Sort Z to A, Custom Sort, Sort View A to Z and Sort View Z to A. |
 | `export` | `false` | Export CSV and Export XLSX, in the Data tab's Export group. |
 | `ribbon` | `false` | Show the ribbon instead of the toolbar. See [Compact ribbon](#compact-ribbon). |
 

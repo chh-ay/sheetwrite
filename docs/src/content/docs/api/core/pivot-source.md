@@ -11,16 +11,19 @@ Data a pivot summarizes.
   fields, and field `i` is the column `range.start.col + i`.
 - A table source names a workbook table by its stable `WorkbookTable.id`.
   Field `i` is table column `i`; header and totals rows are excluded.
+- A model source has one base table (the many side). Field `i` names
+  `model.fields[i]` by stable table and column IDs. Other tables must be
+  reachable from the base by following many-to-one relationships.
 
 When the source disappears (its sheet, its table, or every source row or
 column is deleted), core sets `invalid: true` and keeps the reference
 unchanged. The engine then shows `#REF!` at the anchor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/pivot.ts#L30"><code>packages/core/src/types/pivot.ts#L30</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/pivot.ts#L34"><code>packages/core/src/types/pivot.ts#L34</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>2</span>
+## Variants <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -34,6 +37,16 @@ unchanged. The engine then shows `#REF!` at the anchor.
 
 ```ts generated
 { table: WorkbookTableId; invalid?: true }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  model: { table: WorkbookTableId; fields: TableColumnRef[] };
+  invalid?: true;
+}
 ```
 
 </div>
@@ -52,6 +65,13 @@ export type PivotSource =
     }
   | {
       table: WorkbookTableId;
+      invalid?: true;
+    }
+  | {
+      model: {
+        table: WorkbookTableId;
+        fields: TableColumnRef[];
+      };
       invalid?: true;
     };
 ```

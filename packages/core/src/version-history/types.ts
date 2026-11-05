@@ -1,4 +1,4 @@
-import type { DocumentOp, WorkbookSnapshot } from "../types/document.js";
+import type { WorkbookSnapshot } from "../types/document.js";
 
 /** Resource and retention ceilings for an opt-in history archive. */
 export interface HistoryLimits {
@@ -32,22 +32,6 @@ export interface HistoryLimits {
   checkpointLogBytes: number;
 }
 
-/** One committed transaction, confirmed by the document authority; never an optimistic local edit. */
-export interface HistoryCommit {
-  /** Revision the transaction applies to; equals the archive head. */
-  baseRevision: number;
-  /** Revision after the transaction; an atomic batch can advance up to 16 revisions. */
-  revision: number;
-  /** Stable mutation ID from the commit, at most 256 code units. */
-  mutationId: string;
-  /** Authenticated ID of the person who made the change, at most 256 code units. */
-  authorId: string;
-  /** Commit time in milliseconds since the epoch; never before the previous commit. */
-  time: number;
-  /** The committed document operations, in order. */
-  operations: readonly DocumentOp[];
-}
-
 /** A durable marker at one archived revision. */
 export interface HistoryVersion {
   /** Content ID of the marker fields. */
@@ -63,6 +47,11 @@ export interface HistoryVersion {
   checkpoint: string;
   /** Transaction envelope IDs applied after the checkpoint, in order. */
   tail: readonly string[];
+  /**
+   * Checkpoints made since the previous marker. The marker keeps them, so the
+   * log between two retained versions stays readable for a diff.
+   */
+  checkpoints: readonly string[];
 }
 
 /** Immutable, content-addressed history payload and the records it refers to. */
@@ -85,6 +74,8 @@ export interface HistoryHead {
   revision: number;
   checkpoint: string;
   tail: readonly string[];
+  /** Checkpoints made since the newest version marker; the next marker takes them over. */
+  checkpoints: readonly string[];
   /** Time of the last archived commit. */
   time: number;
   /** Active editing time since the baseline; idle gaps count as at most one automatic interval. */

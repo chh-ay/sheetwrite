@@ -31,6 +31,8 @@ use crate::types::{
 use crate::window::ConditionalRules;
 
 mod hidden_rows;
+#[cfg(feature = "analysis")]
+mod model_source;
 mod names;
 pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
@@ -220,10 +222,10 @@ impl RangeSnapshot {
     }
 }
 
-const BLOCK_OK: u32 = 0;
-const BLOCK_INVALID: u32 = 1;
+pub(crate) const BLOCK_OK: u32 = 0;
+pub(crate) const BLOCK_INVALID: u32 = 1;
 const BLOCK_SOURCE_INVALID: u32 = 2;
-const BLOCK_RESOURCE_LIMIT: u32 = 3;
+pub(crate) const BLOCK_RESOURCE_LIMIT: u32 = 3;
 
 const MAX_TABLES: usize = 1_024;
 const MAX_TABLE_COLUMNS: usize = 16_384;
@@ -420,7 +422,7 @@ impl CellStore {
         self.mutation_revision
     }
 
-    fn local_dirty_revision(&mut self) -> Option<u64> {
+    pub(crate) fn local_dirty_revision(&mut self) -> Option<u64> {
         if self.loading_page > 0 {
             return None;
         }
@@ -2967,7 +2969,7 @@ impl CellStore {
     /// The rectangle is dirtied and its spills detached once, so readers
     /// outside it keep their calculated values and the per-cell writes skip
     /// both the spill scan and the dirty mark.
-    fn replace_range_sources(
+    pub(crate) fn replace_range_sources(
         &mut self,
         sheet: usize,
         start: (usize, usize),

@@ -55,7 +55,7 @@ import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { attachPanelTriggers, showPivotFields } from "./panels/panel-loader.js";
+import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
@@ -65,6 +65,7 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
+import { registerGridDocument } from "./restore-commit.js";
 import type { CommandToolbar } from "./ribbon/command-toolbar.js";
 import {
   assertRibbonConfig,
@@ -78,6 +79,7 @@ import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
+import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
@@ -114,6 +116,7 @@ import type {
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
+  MutationIssue,
   MutationPolicyMode,
   ProtectedRange,
   ProtectionResolver,
@@ -149,6 +152,7 @@ import type { CellRenderer, Renderer, Theme } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
 import type {
   ApplyTransactionResult,
+  ChangeEvent,
   GridTransaction,
   RemoteOperationOptions,
   TransactionResourceLimits,
@@ -700,6 +704,7 @@ export class GridImpl implements Grid {
       admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
       trustedResourceCallbacks: true,
     });
+    registerGridDocument(this, this.document);
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
     // construction; the input controller consults this on every keydown.
@@ -1095,200 +1100,7 @@ export class GridImpl implements Grid {
 
     if (this.tabBarHeight > 0) this.buildTabBar();
 
-    this.disposeStore = this.store.on("change", (event) => {
-      this.storeEpoch += 1;
-      this.cancelAutoFit();
-      this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
-      this.activeSheetCache = null;
-
-      // Presence learned during this change describes the state after it, which
-      // cannot vouch for cells it just stopped computing (e.g. a removed spill).
-      const presenceKnown = this.sourceSheet === this.activeSheet;
-      const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
-      if (windowChanged) this.windowContentRevision += 1;
-
-      let geometryChanged = false;
-      let shouldRebuildRows = false;
-      let shouldReconcileView = false;
-      let shouldRebuildColumns = false;
-      let shouldApplyLayout = false;
-      let sheetsChanged = false;
-      let shouldResetDatasource = false;
-      const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
-      let sessionActive = this.activeSheet;
-
-      for (const patch of event.transaction.patches) {
-        if ("sheet" in patch && patch.sheet === this.activeSheet) {
-          if (
-            patch.op !== "setValidationRule" &&
-            patch.op !== "removeValidationRule" &&
-            patch.op !== "setHyperlink" &&
-            patch.op !== "removeHyperlink" &&
-            patch.op !== "setProtectedRange" &&
-            patch.op !== "removeProtectedRange" &&
-            patch.op !== "setChart" &&
-            patch.op !== "removeChart"
-          ) {
-            geometryChanged = true;
-          }
-
-          if (
-            patch.op === "setSheetMeta" &&
-            (patch.patch.sortKeys !== undefined ||
-              patch.patch.filters !== undefined ||
-              patch.patch.rowGroups !== undefined)
-          ) {
-            shouldReconcileView = true;
-          } else if (patch.op === "setRowMeta") {
-            const hidden = this.sheet().hiddenRows?.has(patch.row) ?? false;
-            if (hidden !== this.displayedHiddenRows.has(patch.row)) shouldReconcileView = true;
-            if (hidden) this.displayedHiddenRows.add(patch.row);
-            else this.displayedHiddenRows.delete(patch.row);
-          }
-        }
-
-        if (
-          (patch.op === "addRows" ||
-            patch.op === "removeRows" ||
-            patch.op === "moveRows" ||
-            patch.op === "addColumns" ||
-            patch.op === "removeColumns" ||
-            patch.op === "moveColumns") &&
-          patch.sheet === this.activeSheet
-        ) {
-          shouldResetDatasource = true;
-          // Structure edits can clear query state as well as shift columns/rows.
-          // Keep the previous view state: the store has already removed that query.
-          shouldReconcileView ||=
-            this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false);
-        }
-
-        if (
-          "sheet" in patch &&
-          patch.sheet === this.activeSheet &&
-          (patch.op === "addRows" ||
-            patch.op === "removeRows" ||
-            patch.op === "moveRows" ||
-            patch.op === "setRowMeta" ||
-            (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined))
-        ) {
-          shouldRebuildRows = true;
-        } else if (
-          "sheet" in patch &&
-          patch.sheet === this.activeSheet &&
-          (patch.op === "addColumns" ||
-            patch.op === "removeColumns" ||
-            patch.op === "moveColumns" ||
-            (patch.op === "setColumn" && ("width" in patch.patch || "visible" in patch.patch)))
-        ) {
-          shouldRebuildColumns = true;
-        }
-
-        if (
-          "sheet" in patch &&
-          patch.sheet === this.activeSheet &&
-          (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta")
-        ) {
-          shouldApplyLayout = true;
-        }
-
-        if (changesSheetTabs(patch)) sheetsChanged = true;
-
-        if (patch.op === "addSheet") {
-          sessionSheets.splice(patch.sheet.order, 0, {
-            id: patch.sheet.id,
-            visibility: patch.sheet.visibility,
-          });
-        } else if (patch.op === "removeSheet") {
-          const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
-          if (index >= 0) {
-            sessionSheets.splice(index, 1);
-            if (sessionActive === patch.sheet) {
-              sessionActive =
-                visibleSheetNeighbor(sessionSheets, patch.sheet, index) ?? sessionActive;
-            }
-          }
-        } else if (patch.op === "moveSheet") {
-          const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
-          if (index >= 0) {
-            const [sheet] = sessionSheets.splice(index, 1);
-            sessionSheets.splice(patch.to, 0, sheet!);
-          }
-        } else if (patch.op === "setSheetVisibility") {
-          const sheet = sessionSheets.find((candidate) => candidate.id === patch.sheet);
-          if (sheet) {
-            sheet.visibility = patch.visibility;
-            if (sessionActive === patch.sheet && patch.visibility !== "visible") {
-              sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet) ?? sessionActive;
-            }
-          }
-        }
-      }
-
-      const sheets = this.store.getWorkbook().sheets;
-      const reconciled = sheets.find((sheet) => sheet.id === sessionActive);
-      if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
-        sessionActive =
-          sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
-          sessionActive;
-      }
-
-      if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
-      this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
-      this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
-      if (shouldResetDatasource) {
-        this.datasourceController.reset(this.sheet().rowCount);
-        this.mutationRevisions.clear();
-        this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
-      }
-
-      const change = shouldResetDatasource
-        ? "structure"
-        : shouldReconcileView || shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
-          ? "view"
-          : "value";
-      this.interactions.reconcile(change);
-
-      // A note edit holds a data address that a structure change moves; geometry
-      // changes move the shown card away from its cell.
-      if (change === "structure") this.notes.dismiss();
-      else if (change === "view") this.notes.hideCard();
-
-      if (shouldRebuildRows || shouldReconcileView) this.rebuildIndex();
-      if (shouldRebuildColumns) this.rebuildColumnIndex();
-      if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
-      if (geometryChanged) this.readWindows.invalidateData();
-      this.searchController.refreshAfterChange(
-        event.transaction.patches,
-        this.activeSheet,
-        presenceKnown && !this.sheetHasSources,
-      );
-      if (shouldReconcileView) {
-        // Selection uses view-row positions: remote/history permutations must reset
-        // it and scroll just like named actions, before change listeners run.
-        this.selection.clear();
-        this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
-        this.emitSelection();
-        this.scroller.scrollTop = 0;
-        this.readWindows.invalidateData();
-      }
-
-      if (sheetsChanged) this.renderTabs();
-      if (
-        event.transaction.patches.some(
-          (patch) => patch.op === "setNote" && patch.addr.sheet === this.activeSheet,
-        )
-      ) {
-        this.ariaMirror.bumpVersion();
-        this.notes.refresh();
-      }
-
-      // Chart edits, undo and sheet changes all arrive here.
-      this.objectLayer.sync();
-      this.scheduleRender();
-      for (const fn of this.listeners.change) fn(event);
-      this.queueCommandStateChange();
-    });
+    this.disposeStore = this.store.on("change", (event) => this.onStoreChange(event));
 
     this.applyLayout();
     this.scroller.addEventListener("scroll", this.onScroll, {
@@ -1352,6 +1164,188 @@ export class GridImpl implements Grid {
     const sources = engine.captureSheetSources(this.activeSheet);
     this.sheetHasSources =
       !sources || sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
+  }
+
+  /** Bring every grid part up to date with one committed store change. */
+  private onStoreChange(event: ChangeEvent): void {
+    this.storeEpoch += 1;
+    this.cancelAutoFit();
+    this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
+    this.activeSheetCache = null;
+
+    // Presence learned during this change describes the state after it, which
+    // cannot vouch for cells it just stopped computing (e.g. a removed spill).
+    const presenceKnown = this.sourceSheet === this.activeSheet;
+    const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
+    if (windowChanged) this.windowContentRevision += 1;
+
+    const effects = this.classifyPatches(event.transaction.patches);
+    const viewChanged = (effects & VIEW_EFFECTS) !== 0;
+    this.followSessionSheets(event.transaction.patches);
+
+    this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
+    if (effects & RESET_DATASOURCE) {
+      this.datasourceController.reset(this.sheet().rowCount);
+      this.mutationRevisions.clear();
+      this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
+    }
+
+    const change = effects & RESET_DATASOURCE ? "structure" : viewChanged ? "view" : "value";
+    this.interactions.reconcile(change);
+
+    // A note edit holds a data address that a structure change moves; geometry
+    // changes move the shown card away from its cell.
+    if (change === "structure") this.notes.dismiss();
+    else if (change === "view") this.notes.hideCard();
+
+    if (effects & (REBUILD_ROWS | RECONCILE_VIEW)) this.rebuildIndex();
+    if (effects & REBUILD_COLUMNS) this.rebuildColumnIndex();
+    if (effects & (REBUILD_COLUMNS | APPLY_LAYOUT)) this.applyLayout();
+    if (effects & GEOMETRY_CHANGED) this.readWindows.invalidateData();
+    this.searchController.refreshAfterChange(
+      event.transaction.patches,
+      this.activeSheet,
+      presenceKnown && !this.sheetHasSources,
+    );
+
+    if (effects & RECONCILE_VIEW) {
+      // Selection uses view-row positions: remote/history permutations must reset
+      // it and scroll just like named actions, before change listeners run.
+      this.selection.clear();
+      this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
+      this.emitSelection();
+      this.scroller.scrollTop = 0;
+      this.readWindows.invalidateData();
+    }
+
+    if (effects & SHEETS_CHANGED) this.renderTabs();
+    if (
+      event.transaction.patches.some(
+        (patch) => patch.op === "setNote" && patch.addr.sheet === this.activeSheet,
+      )
+    ) {
+      this.ariaMirror.bumpVersion();
+      this.notes.refresh();
+    }
+
+    // Chart edits, undo and sheet changes all arrive here.
+    this.objectLayer.sync();
+    this.scheduleRender();
+    for (const fn of this.listeners.change) fn(event);
+    this.queueCommandStateChange();
+  }
+
+  /**
+   * Effect bits a committed change requires of the active sheet's view. Row metadata
+   * edits also update `displayedHiddenRows`, whose difference from the store
+   * decides whether the view must be rebuilt.
+   */
+  private classifyPatches(patches: readonly DocumentOp[]): number {
+    let effects = 0;
+
+    for (const patch of patches) {
+      if (changesSheetTabs(patch)) effects |= SHEETS_CHANGED;
+      if (!("sheet" in patch) || patch.sheet !== this.activeSheet) continue;
+
+      if (!annotatesSheet(patch)) effects |= GEOMETRY_CHANGED;
+
+      if (
+        patch.op === "setSheetMeta" &&
+        (patch.patch.sortKeys !== undefined ||
+          patch.patch.filters !== undefined ||
+          patch.patch.rowGroups !== undefined)
+      ) {
+        effects |= RECONCILE_VIEW;
+      } else if (patch.op === "setRowMeta") {
+        const hidden = this.sheet().hiddenRows?.has(patch.row) ?? false;
+        if (hidden !== this.displayedHiddenRows.has(patch.row)) effects |= RECONCILE_VIEW;
+        if (hidden) this.displayedHiddenRows.add(patch.row);
+        else this.displayedHiddenRows.delete(patch.row);
+      }
+
+      if (changesSheetStructure(patch)) {
+        effects |= RESET_DATASOURCE;
+        // Structure edits can clear query state as well as shift columns/rows.
+        // Keep the previous view state: the store has already removed that query.
+        if (
+          (effects & RECONCILE_VIEW) === 0 &&
+          (this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false))
+        ) {
+          effects |= RECONCILE_VIEW;
+        }
+      }
+
+      if (
+        patch.op === "addRows" ||
+        patch.op === "removeRows" ||
+        patch.op === "moveRows" ||
+        patch.op === "setRowMeta" ||
+        (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
+      ) {
+        effects |= REBUILD_ROWS;
+      } else if (
+        patch.op === "addColumns" ||
+        patch.op === "removeColumns" ||
+        patch.op === "moveColumns" ||
+        (patch.op === "setColumn" && ("width" in patch.patch || "visible" in patch.patch))
+      ) {
+        effects |= REBUILD_COLUMNS;
+      }
+
+      if (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta") {
+        effects |= APPLY_LAYOUT;
+      }
+    }
+
+    return effects;
+  }
+
+  /**
+   * Replay sheet adds, removals, moves and visibility changes on the session's
+   * sheet list, so the active sheet moves to the neighbour a user would expect.
+   */
+  private followSessionSheets(patches: readonly DocumentOp[]): void {
+    const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
+    let sessionActive = this.activeSheet;
+
+    for (const patch of patches) {
+      if (patch.op === "addSheet") {
+        sessionSheets.splice(patch.sheet.order, 0, {
+          id: patch.sheet.id,
+          visibility: patch.sheet.visibility,
+        });
+      } else if (patch.op === "removeSheet") {
+        const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
+        if (index < 0) continue;
+
+        sessionSheets.splice(index, 1);
+        if (sessionActive === patch.sheet) {
+          sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet, index) ?? sessionActive;
+        }
+      } else if (patch.op === "moveSheet") {
+        const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
+        const [sheet] = index >= 0 ? sessionSheets.splice(index, 1) : [];
+        if (sheet) sessionSheets.splice(patch.to, 0, sheet);
+      } else if (patch.op === "setSheetVisibility") {
+        const sheet = sessionSheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet) continue;
+
+        sheet.visibility = patch.visibility;
+        if (sessionActive === patch.sheet && patch.visibility !== "visible") {
+          sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet) ?? sessionActive;
+        }
+      }
+    }
+
+    const sheets = this.store.getWorkbook().sheets;
+    const reconciled = sheets.find((sheet) => sheet.id === sessionActive);
+    if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
+      sessionActive =
+        sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ?? sessionActive;
+    }
+
+    if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
+    this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
   }
 
   private transactionAffectsWindow(patches: readonly DocumentOp[]): boolean {
@@ -1420,6 +1414,7 @@ export class GridImpl implements Grid {
 
         case "setRangeStyle":
         case "clearRange":
+        case "permuteRows":
           range = patch.range;
           break;
 
@@ -3353,6 +3348,11 @@ export class GridImpl implements Grid {
         const f = this.selection.focusCell;
         if (f) this.sortBy(f.col, ascending);
       },
+      sortView: (ascending) => {
+        const f = this.selection.focusCell;
+        if (f) this.setViewSort([{ col: f.col, ascending }]);
+      },
+      customSort: () => showSortPanel(this),
       insertRowAbove: () => {
         const f = this.selection.focusCell;
         if (f) this.insertRows(this.toDataRow(f.row));
@@ -3701,7 +3701,7 @@ export class GridImpl implements Grid {
   }
 
   sortBy(col: number, ascending = true): ApplyTransactionResult {
-    return this.setSort([{ col, ascending }]);
+    return this.quickSort(col, ascending);
   }
 
   filterBy(col: number, needle: string): void {
@@ -3721,12 +3721,8 @@ export class GridImpl implements Grid {
     );
   }
 
-  sortByMulti(keys: readonly SortKey[]): ApplyTransactionResult {
-    return this.setSort(keys);
-  }
-
-  setSort(keys: readonly SortKey[]): ApplyTransactionResult {
-    const outcome = this.document.commit(
+  setViewSort(keys: readonly SortKey[]): ApplyTransactionResult {
+    return this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -3736,7 +3732,85 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    return outcome;
+  }
+
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options: { hasHeader?: boolean } = {},
+  ): ApplyTransactionResult {
+    const engine = storeEngine(this.store);
+    if (!engine || engine.queryCapability(range.sheet).status !== "complete") {
+      return { status: "noop", epoch: this.storeEpoch, reason: "incomplete-data" };
+    }
+
+    const plan = engine.sortRangePlan(range, keys, options.hasHeader ?? false);
+    if (plan.kind === "unchanged") {
+      return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    }
+    if (plan.kind === "refused") {
+      const issue: MutationIssue = {
+        kind: "invalid-operation",
+        severity: "error",
+        operationIndex: 0,
+        message: plan.message,
+      };
+      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+      return { status: "rejected", epoch: this.storeEpoch, issues: [issue] };
+    }
+
+    return this.document.commit(plan.operations, "sort");
+  }
+
+  /**
+   * Excel's quick sort: sort the table body that holds the focus cell, or
+   * else the selected range, or else the current region around the focus.
+   */
+  private quickSort(col: number, ascending: boolean): ApplyTransactionResult {
+    const focus = this.selection.focusCell;
+    const addr = {
+      sheet: this.activeSheet,
+      row: focus ? this.toDataRow(focus.row) : 0,
+      col,
+    };
+    const target = this.quickSortTarget(addr);
+    if (!target) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+
+    return this.sortRange(target.range, [{ col, ascending }], { hasHeader: target.hasHeader });
+  }
+
+  private quickSortTarget(addr: CellAddress): { range: Range; hasHeader: boolean } | null {
+    const table = this.sheet().tables?.find((candidate) => rangeHolds(candidate.range, addr));
+    if (table) {
+      const { range } = table;
+      const start = { row: range.start.row + (table.headerRow ? 1 : 0), col: range.start.col };
+      const end = { row: range.end.row - (table.totalsRow ? 1 : 0), col: range.end.col };
+      return { range: { sheet: range.sheet, start, end }, hasHeader: false };
+    }
+
+    const range = this.selectedSortRange() ?? currentRegion(this.store, addr);
+    if (!range || !rangeHolds(range, addr)) return null;
+
+    return { range, hasHeader: looksLikeHeader(this.store, range) };
+  }
+
+  /**
+   * The selected rectangle in data rows, when one rectangle of more than one
+   * cell is selected and the rows show in data order. A view sort or filter
+   * scatters the data rows of a view rectangle, so it gives `null`.
+   */
+  private selectedSortRange(): Range | null {
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push(rect));
+    const [rect] = rects;
+    if (rects.length !== 1 || !rect || this.loadable?.hasView(this.activeSheet)) return null;
+    if (rect.r0 === rect.r1 && rect.c0 === rect.c1) return null;
+
+    return {
+      sheet: this.activeSheet,
+      start: { row: rect.r0, col: rect.c0 },
+      end: { row: rect.r1, col: rect.c1 },
+    };
   }
 
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
@@ -4071,4 +4145,59 @@ function sameRibbonConfig(a: GridConfig["ribbon"], b: GridConfig["ribbon"]): boo
   if (typeof a !== "object" || typeof b !== "object") return Object.is(a, b);
 
   return a.mode === b.mode && a.compactWidth === b.compactWidth;
+}
+
+/** Whether `range` holds `addr`; ranges here are normalized. */
+function rangeHolds(range: Range, addr: CellAddress): boolean {
+  return (
+    range.sheet === addr.sheet &&
+    addr.row >= range.start.row &&
+    addr.row <= range.end.row &&
+    addr.col >= range.start.col &&
+    addr.col <= range.end.col
+  );
+}
+
+// Bits of what one committed change requires of the active sheet's view.
+const GEOMETRY_CHANGED = 1;
+const REBUILD_ROWS = 2;
+const RECONCILE_VIEW = 4;
+const REBUILD_COLUMNS = 8;
+const APPLY_LAYOUT = 16;
+const SHEETS_CHANGED = 32;
+const RESET_DATASOURCE = 64;
+
+/** Effects that change which cells the view shows or where they sit. */
+const VIEW_EFFECTS = REBUILD_ROWS | RECONCILE_VIEW | REBUILD_COLUMNS | APPLY_LAYOUT;
+
+/** Validation, hyperlinks, protection and charts sit on a sheet without moving its cells. */
+function annotatesSheet(patch: DocumentOp): boolean {
+  switch (patch.op) {
+    case "setValidationRule":
+    case "removeValidationRule":
+    case "setHyperlink":
+    case "removeHyperlink":
+    case "setProtectedRange":
+    case "removeProtectedRange":
+    case "setChart":
+    case "removeChart":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Row and column inserts, removals and moves shift every cell after them. */
+function changesSheetStructure(patch: DocumentOp): boolean {
+  switch (patch.op) {
+    case "addRows":
+    case "removeRows":
+    case "moveRows":
+    case "addColumns":
+    case "removeColumns":
+    case "moveColumns":
+      return true;
+    default:
+      return false;
+  }
 }

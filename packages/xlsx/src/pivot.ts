@@ -544,6 +544,11 @@ function renderedOutput(
 
 function sourceExists(snapshot: WorkbookSnapshot, pivot: PivotDefinition): boolean {
   const source = pivot.source;
+  if ("model" in source) {
+    return snapshot.sheets.some((sheet) =>
+      sheet.tables?.some((table) => table.id === source.model.table),
+    );
+  }
   if ("table" in source) {
     return snapshot.sheets.some((sheet) =>
       sheet.tables?.some((table) => table.id === source.table),
@@ -710,6 +715,7 @@ function resolveWriteSource(
 ): WriteSource | string {
   const source = pivot.source;
   if (source.invalid) return "its source was deleted";
+  if ("model" in source) return "a model pivot needs an Excel data-model binary";
   if ("table" in source) {
     for (const sheet of snapshot.sheets) {
       const table = sheet.tables?.find((candidate) => candidate.id === source.table);

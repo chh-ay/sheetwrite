@@ -311,6 +311,7 @@ function mayAddComputedSource(patch: DocumentOp): boolean {
     case "setBlock":
       return (patch.block.formulas?.length ?? 0) > 0 || (patch.block.refs?.length ?? 0) > 0;
     case "restoreBlock":
+    case "permuteRows":
       return true;
     default:
       return false;
@@ -336,6 +337,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "setRange":
     case "setBlock":
     case "restoreBlock":
+    case "permuteRows":
     case "clearRange": {
       const range =
         patch.op === "set"
@@ -466,7 +468,13 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
 
     case "setRelationship":
     case "removeRelationship":
-      // A relationship is a link between tables; it writes no cell.
+      // A relationship change can change pivot output read by a chart.
+      context.valuesChanged = true;
+      return;
+
+    case "setQuery":
+    case "removeQuery":
+      // A definition writes no cell; a refresh writes cells through ordinary range ops.
       return;
 
     default: {

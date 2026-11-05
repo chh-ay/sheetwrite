@@ -8,6 +8,9 @@ use super::functions::{integer_arg, number_arg, require_arity, FuncAccumulator};
 use super::number_format::{self, round_decimal, Rounding};
 use super::value::aggregate_number;
 
+pub(super) mod numerals;
+pub(super) mod trigonometry;
+
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Abs => unary(values, |value| Ok(value.abs())),
@@ -95,6 +98,8 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::Lcm => gcd_lcm(values, true),
         Func::Subtotal => subtotal(values),
         Func::IsEven | Func::IsOdd => parity(values, func == Func::IsOdd),
+        Func::CeilingPrecise | Func::IsoCeiling => precise(values, f64::ceil),
+        Func::FloorPrecise => precise(values, f64::floor),
         _ => return None,
     };
     Some(result)
@@ -179,6 +184,28 @@ fn parity(values: &FuncAccumulator, is_odd: bool) -> Value {
     });
 
     result.map_or_else(Value::Error, Value::Bool)
+}
+
+/// CEILING.PRECISE, ISO.CEILING and FLOOR.PRECISE round up or down to a
+/// multiple of the absolute significance, whatever the signs. Significance
+/// defaults to 1, and a zero significance gives 0.
+fn precise(values: &FuncAccumulator, operation: fn(f64) -> f64) -> Value {
+    let result = require_arity(values, 1, 2).and_then(|_| {
+        let number = number_arg(values, 0, None)?;
+        let significance = number_arg(values, 1, Some(1.0))?.abs();
+
+        if significance == 0.0 {
+            return Ok(0.0);
+        }
+
+        let multiples = operation(number_format::significant(number / significance));
+
+        // Adding zero turns a negative zero, such as the ceiling of -0.5,
+        // into 0.
+        finite(number_format::significant(multiples * significance) + 0.0)
+    });
+
+    result.map_or_else(Value::Error, Value::number)
 }
 
 /// The two numeric arguments of a two-argument function.
@@ -804,5 +831,41 @@ mod tests {
             apply(Func::Subtotal, &past_hidden_row_codes).unwrap(),
             Value::Error(FormulaError::Value)
         );
+    }
+
+    /// The examples of the CEILING.PRECISE, ISO.CEILING and FLOOR.PRECISE
+    /// pages, `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
+    #[test]
+    fn precise_rounding_uses_the_absolute_significance() {
+        let cases: &[(Func, &[f64], f64)] = &[
+            (Func::CeilingPrecise, &[4.3], 5.0),
+            (Func::CeilingPrecise, &[-4.3], -4.0),
+            (Func::CeilingPrecise, &[4.3, 2.0], 6.0),
+            (Func::CeilingPrecise, &[4.3, -2.0], 6.0),
+            (Func::CeilingPrecise, &[-4.3, 2.0], -4.0),
+            (Func::CeilingPrecise, &[-4.3, -2.0], -4.0),
+            (Func::IsoCeiling, &[4.3], 5.0),
+            (Func::IsoCeiling, &[-4.3], -4.0),
+            (Func::IsoCeiling, &[4.3, 2.0], 6.0),
+            (Func::IsoCeiling, &[4.3, -2.0], 6.0),
+            (Func::IsoCeiling, &[-4.3, 2.0], -4.0),
+            (Func::IsoCeiling, &[-4.3, -2.0], -4.0),
+            (Func::FloorPrecise, &[-3.2, -1.0], -4.0),
+            (Func::FloorPrecise, &[3.2, 1.0], 3.0),
+            (Func::FloorPrecise, &[-3.2, 1.0], -4.0),
+            (Func::FloorPrecise, &[3.2, -1.0], 3.0),
+            (Func::FloorPrecise, &[3.2], 3.0),
+            (Func::CeilingPrecise, &[4.3, 0.0], 0.0),
+            (Func::CeilingPrecise, &[-0.5], 0.0),
+        ];
+
+        for (func, arguments, expected) in cases {
+            let arguments = arguments
+                .iter()
+                .map(|&value| Value::number(value))
+                .collect();
+
+            assert_eq!(evaluate(*func, arguments), Value::Number(*expected));
+        }
     }
 }

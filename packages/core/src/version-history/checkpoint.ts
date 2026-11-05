@@ -170,12 +170,22 @@ async function writeSheet(
   return record.id;
 }
 
+/** The log of one checkpoint: what a diff reads to follow changes between versions. */
+export interface CheckpointLog {
+  revision: number;
+  /** Transactions from the previous checkpoint up to this one, in order. */
+  transactions: readonly string[];
+  /** The previous checkpoint; it is not a reference, so pruning can remove it. */
+  previous?: string;
+}
+
 /**
  * Store a validated committed snapshot as content-addressed chunks. Chunks
  * whose content did not change since an earlier checkpoint get the same ID, so
  * the adapter keeps one copy. `transactions` are the log entries since the
  * previous checkpoint: the checkpoint refers to them, so who made each change
- * stays retained as long as the checkpoint is.
+ * stays retained as long as the checkpoint is. `previous` names that
+ * checkpoint without keeping it.
  */
 export async function writeCheckpoint(
   input: WorkbookSnapshot,
@@ -183,6 +193,7 @@ export async function writeCheckpoint(
   revision: number,
   limits: Readonly<HistoryLimits>,
   transactions: readonly string[] = [],
+  previous?: string,
 ): Promise<CheckpointWrite> {
   reserveSnapshot(input, limits);
 
@@ -237,6 +248,7 @@ export async function writeCheckpoint(
       workbook: workbook.id,
       sheets,
       transactions,
+      ...(previous !== undefined ? { previous } : {}),
     },
     [...new Set([workbook.id, ...sheets, ...transactions])],
     limits.maxSnapshotBytes,
@@ -483,4 +495,31 @@ export async function readCheckpoint(
   }
 
   return checked.value;
+}
+
+/** Read only the log fields of a checkpoint; its cells are not decoded. */
+export async function readCheckpointLog(
+  id: string,
+  read: HistoryRecordReader,
+  limits: Readonly<HistoryLimits>,
+): Promise<CheckpointLog> {
+  const record = await read(id);
+  const root = await decodeRecord(record, limits);
+  if (record.kind !== "checkpoint" || !object(root)) {
+    throw new HistoryError("integrity", "Invalid history checkpoint manifest");
+  }
+
+  const { revision, transactions, previous } = root;
+  const valid =
+    root.schemaVersion === CHECKPOINT_SCHEMA_VERSION &&
+    integer(revision) &&
+    strings(transactions) &&
+    transactions.every((transaction) => record.references.includes(transaction)) &&
+    (previous === undefined || typeof previous === "string");
+
+  if (!valid) {
+    throw new HistoryError("integrity", "Invalid history checkpoint manifest");
+  }
+
+  return { revision, transactions, ...(previous !== undefined ? { previous } : {}) };
 }

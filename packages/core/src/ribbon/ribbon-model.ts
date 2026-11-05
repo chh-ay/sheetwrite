@@ -158,8 +158,19 @@ const VISIBILITY_ITEMS: readonly RibbonMenuItem[] = [
 const SORT_ITEMS: readonly RibbonMenuItem[] = [
   item("Sort A to Z", (grid) => grid.actions.sort(true), "sortAsc"),
   item("Sort Z to A", (grid) => grid.actions.sort(false), "sortDesc"),
+  item("Custom Sort…", (grid) => grid.actions.customSort(), "sortCustom"),
+  item("Sort View A to Z", (grid) => grid.actions.sortView(true), "sortView"),
+  item("Sort View Z to A", (grid) => grid.actions.sortView(false), "sortView"),
   item("Clear Filter", (grid) => grid.actions.clearFilter(), "clearFilter"),
 ];
+
+/** Sort the view only; the two orders share the glyph, so each names its own ID. */
+const viewSortButton = (label: string, id: string, ascending: boolean): RibbonButtonSpec => ({
+  ...button(label, "sortView", (grid) => grid.actions.sortView(ascending), "edit", {
+    flags: SORT,
+  }),
+  id,
+});
 
 const fontFamily: RibbonComboSpec = {
   kind: "combo",
@@ -296,6 +307,17 @@ const insertChartOf =
   (kind: ChartKind) =>
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
+
+/** Data › Data Tools opens the data model panel; the panel code loads on first use. */
+const openDataModel = async (grid: Grid): Promise<void> =>
+  (await loadPanels(grid)).openDataModelPanel(grid);
+
+/** The data model needs workbook tables: one to manage, two to relate. */
+function workbookTableCount(grid: Grid): number {
+  let count = 0;
+  for (const sheet of grid.store.getWorkbook().sheets) count += sheet.tables?.length ?? 0;
+  return count;
+}
 
 /**
  * Excel's Insert › Charts: the face inserts a column chart, as Excel's
@@ -684,7 +706,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Data",
-    reduceOrder: ["export", "showHide", "outline", "sortFilter"],
+    reduceOrder: ["export", "showHide", "outline", "dataTools", "sortFilter"],
     groups: [
       {
         id: "sortFilter",
@@ -700,7 +722,32 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             large: true,
             flags: SORT,
           }),
+          button("Custom Sort", "sortCustom", (grid) => grid.actions.customSort(), "edit", {
+            large: true,
+            flags: SORT,
+          }),
+          viewSortButton("Sort View A to Z", "sortViewAsc", true),
+          viewSortButton("Sort View Z to A", "sortViewDesc", false),
           button("Clear Filter", "clearFilter", (grid) => grid.actions.clearFilter()),
+        ],
+      },
+      {
+        id: "dataTools",
+        label: "Data Tools",
+        icon: "dataModel",
+        layout: "flow",
+        controls: [
+          {
+            // Excel's "Manage Data Model" wraps to three lines under a large
+            // glyph, so the label is short and the tooltip keeps Excel's name.
+            ...button("Data Model", "dataModel", openDataModel, "view", { large: true }),
+            description: "Manage Data Model",
+            available: (grid) => workbookTableCount(grid) > 0,
+          },
+          {
+            ...button("Relationships", "relationships", openDataModel, "view", { large: true }),
+            available: (grid) => workbookTableCount(grid) > 1,
+          },
         ],
       },
       {

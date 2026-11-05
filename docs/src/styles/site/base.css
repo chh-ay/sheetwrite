@@ -1,0 +1,769 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--sw-surface-0);
+  scroll-padding-top: calc(var(--sw-header-height) + 1.5rem);
+  /* Short and long pages keep the same width, so moving between them does
+     not shift the header, sidebar or text sideways. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--sw-fg);
+  background: var(--sw-surface-0);
+  font-family: var(--sw-font-body);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--sw-accent) 30%, transparent);
+}
+
+/* Scrollbars follow the theme instead of the UA default: Firefox through
+   scrollbar-color (plus a thin viewport bar), WebKit/Safari through the
+   track/thumb pseudos. Both routes read the two custom properties below and
+   resolve them per element, so nested surfaces (showcase viewports, demo
+   panels) retune the pair on their subtree without re-declaring pseudos;
+   class-level scrollbar rules still override the universal selector. Forced
+   colors keeps the UA scrollbar untouched. */
+@media (forced-colors: none) {
+  :root {
+    --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-dim) 55%, transparent);
+    --sw-scrollbar-track: transparent;
+    scrollbar-width: thin;
+  }
+
+  * {
+    scrollbar-color: var(--sw-scrollbar-thumb) var(--sw-scrollbar-track);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--sw-scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--sw-scrollbar-thumb);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--sw-fg-dim) 78%, transparent);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* Focus affordance: a tight radius-following ring, never a detached outline.
+   Keyboard focus stays visible on every control; only the canvas grid host is
+   exempt because its cell selection is the focus affordance. */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
+.sheetwrite:focus-visible {
+  box-shadow: none;
+}
+
+.expressive-code pre:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 40%, transparent);
+}
+
+/* Forced-colors mode removes box shadows, so the focus ring above disappears.
+   There, a real outline in the system highlight color shows focus instead. */
+@media (forced-colors: active) {
+  :focus-visible:not(.sheetwrite) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* Text links get a rounded ring shape so the ring never reads as a bare rectangle. */
+.sw-prose a:focus-visible,
+.sw-document__footer a:focus-visible {
+  border-radius: 0.25rem;
+}
+
+.sw-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sw-brand {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--sw-fg-strong);
+  font: 650 1.05rem / 1 var(--sw-font-display);
+  letter-spacing: -0.025em;
+  text-decoration: none;
+}
+
+.sw-brand svg {
+  width: 1.65rem;
+  height: 1.65rem;
+  fill: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-1));
+  stroke: var(--sw-accent-strong);
+  stroke-width: 1.5;
+}
+
+.sw-skip-link {
+  position: fixed;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 2000;
+  border-radius: 0.45rem;
+  padding: 0.6rem 0.9rem;
+  color: var(--sw-accent-ink);
+  background: var(--sw-accent);
+  font-weight: 700;
+  transform: translateY(-300%);
+}
+
+.sw-skip-link:focus-visible {
+  transform: none;
+}
+
+.sw-icon-button {
+  display: inline-grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.45rem;
+  color: var(--sw-fg-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sw-icon-button:hover {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-2);
+}
+
+.sw-icon-button svg,
+.sw-search-button svg,
+.sw-search-dialog svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
+}
+
+.sw-search-button {
+  display: flex;
+  width: 100%;
+  height: 2.35rem;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.55rem;
+  padding-inline: 0.75rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-0);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sw-search-button:hover {
+  border-color: var(--sw-border-strong);
+  background: var(--sw-surface-2);
+}
+
+/* The global 2px ring hugging the full-width pill reads as a broken border;
+   an accent border with a soft halo matches the input inside the dialog. */
+.sw-search-button:focus-visible {
+  border-color: var(--sw-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
+/* The label shortens with an ellipsis before it can break into two lines. */
+.sw-search-button span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-search-button kbd {
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  padding: 0 0.4rem;
+  color: var(--sw-fg-dim);
+  background: var(--sw-surface-1);
+  font: 600 0.7rem / 1.55 var(--sw-font-mono);
+}
+
+.sw-search-dialog {
+  width: min(43rem, calc(100vw - 2rem));
+  /* The global margin reset removes the UA's dialog centering; restore it
+     as a top-centered command palette. */
+  margin: clamp(2rem, 12vh, 7rem) auto auto;
+  max-height: min(42rem, calc(100vh - 4rem));
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.85rem;
+  padding: 0;
+  color: var(--sw-fg);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow);
+}
+
+.sw-search-dialog::backdrop {
+  background: rgb(4 8 16 / 72%);
+  backdrop-filter: blur(5px);
+}
+
+/* The dialog is the focus context; a ring hugging the borderless input
+   inside it reads as a broken double border. */
+.sw-search-dialog input:focus-visible {
+  box-shadow: none;
+}
+
+.sw-search-dialog form {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-search-dialog label {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.sw-search-dialog input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--sw-fg-strong);
+  background: transparent;
+  font-size: 1rem;
+}
+
+.sw-search-dialog form > button {
+  border: 1px solid var(--sw-border);
+  border-radius: 0.35rem;
+  padding: 0.25rem 0.45rem;
+  color: var(--sw-fg-dim);
+  background: var(--sw-surface-2);
+  font: 600 0.7rem var(--sw-font-mono);
+}
+
+.sw-search-results {
+  display: grid;
+  gap: 0.3rem;
+  overflow: auto;
+  max-height: 32rem;
+  padding: 0.65rem;
+}
+
+.sw-search-results > p {
+  margin: 1rem;
+  color: var(--sw-fg-muted);
+}
+
+.sw-search-results a {
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 0.55rem;
+  padding: 0.75rem;
+  color: var(--sw-fg);
+  text-decoration: none;
+}
+
+.sw-search-results a:hover {
+  background: var(--sw-surface-2);
+}
+
+.sw-search-results a span {
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-search-results a strong {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.sw-search-results a strong code {
+  overflow: hidden;
+  flex: 0 1 auto;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.4rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+  font: 500 0.68rem / 1.5 var(--sw-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pagefind highlights the matched terms; tint, don't shout. */
+.sw-search-results a span mark {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+  border-radius: 0.2rem;
+}
+
+.sw-prose {
+  color: var(--sw-fg);
+}
+
+.sw-prose > :first-child {
+  margin-top: 0;
+}
+
+.sw-prose h1 {
+  display: none;
+}
+
+.sw-prose h2,
+.sw-prose h3,
+.sw-prose h4 {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-display);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+}
+
+.sw-prose h2 {
+  margin: 3.5rem 0 1rem;
+  padding-top: 0.6rem;
+  font-size: 1.65rem;
+  line-height: 1.2;
+}
+
+.sw-prose h3 {
+  margin: 2.4rem 0 0.8rem;
+  font-size: 1.2rem;
+}
+
+.sw-prose p,
+.sw-prose li {
+  max-width: 47rem;
+}
+
+.sw-prose p {
+  margin: 1rem 0;
+}
+
+.sw-prose ol,
+.sw-prose ul {
+  margin: 1rem 0;
+  padding-inline-start: 1.5rem;
+}
+
+.sw-prose ol {
+  list-style: decimal;
+}
+
+.sw-prose ul {
+  list-style: disc;
+}
+
+.sw-prose li {
+  margin-block: 0.35rem;
+}
+
+.sw-prose li::marker {
+  color: var(--sw-fg-dim);
+}
+
+/* Links carry an underline at rest so they never rely on color alone; hover
+   strengthens it so the pointer target is clear. */
+.sw-prose a {
+  color: var(--sw-accent-strong);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--sw-accent) 45%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition:
+    text-decoration-color 140ms ease,
+    text-decoration-thickness 140ms ease;
+}
+
+.sw-prose a:hover {
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
+}
+
+.sw-prose strong {
+  color: var(--sw-fg-strong);
+  font-weight: 680;
+}
+
+/* Inline code is a quiet tint, not a boxed chip: dense API prose has many of
+   them, and borders turn a sentence into a row of buttons. */
+.sw-prose :not(pre) > code {
+  border-radius: 0.32rem;
+  padding: 0.12em 0.36em;
+  color: var(--sw-fg-strong);
+  background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  font: 0.86em var(--sw-font-mono);
+}
+
+/* Linked inline code (entry points, symbol references) must read as a link. */
+.sw-prose a > code {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 10%, transparent);
+}
+
+.sw-prose a:hover > code {
+  background: color-mix(in srgb, var(--sw-accent) 18%, transparent);
+}
+
+/* Markdown tables sit in a scroll frame (added at build time), so short cells
+   keep values and identifiers on one line without widening the page. An edge
+   shadow shows only while more columns sit out of view on that side: the
+   covers scroll with the content, the shadows stay with the frame. */
+.sw-prose .sw-table-frame {
+  margin: 1.75rem -0.75rem 2.25rem;
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
+      no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
+      100% no-repeat scroll;
+  --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
+}
+
+.sw-prose table {
+  display: table;
+  width: 100%;
+  margin: 1.5rem 0 2rem;
+  border-spacing: 0;
+  border-collapse: separate;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Tabular figures line numbers up down a column, but this font also widens the
+   hyphen, so only right-aligned (numeric) columns use them. */
+.sw-prose td[style*="right"],
+.sw-prose th[style*="right"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Framed Markdown tables are open lists: a strong rule under the header and
+   hairlines between rows, with no outer box. */
+.sw-prose .sw-table-frame > table {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.sw-prose th,
+.sw-prose td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--sw-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sw-prose th {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-2);
+  font-weight: 680;
+}
+
+.sw-prose .sw-table-frame th {
+  padding-block: 0.55rem;
+  border-bottom-color: var(--sw-border-strong);
+  color: var(--sw-fg-muted);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Header labels are uppercase, but code names keep their case: they are
+   identifiers, and `pendingCommits` is not `PENDINGCOMMITS`. */
+.sw-prose .sw-table-frame th code {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* A break inside a name, value or range reads as two values. Longer cells
+   (signatures, sentences) wrap at spaces so the prose column stays readable. */
+.sw-prose .sw-table-frame .sw-cell-short,
+.sw-prose .sw-code-token {
+  white-space: nowrap;
+}
+
+.sw-prose tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.sw-prose tbody tr:hover {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.sw-prose tr:last-child td {
+  border-bottom: 0;
+}
+
+.sw-prose blockquote {
+  margin: 1.75rem 0;
+  border-left: 3px solid var(--sw-accent);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.75rem 1.1rem;
+  color: var(--sw-fg);
+  background: color-mix(in srgb, var(--sw-accent) 7%, transparent);
+}
+
+.sw-prose blockquote > :first-child {
+  margin-top: 0;
+}
+
+.sw-prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* The copy control appears with the pointer or keyboard focus, so a page of
+   examples does not carry a column of icons. Touch screens always show it. */
+.sw-prose .expressive-code .copy button {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.sw-prose .expressive-code .frame:hover .copy button,
+.sw-prose .expressive-code .copy button:focus-visible {
+  opacity: 0.8;
+}
+
+.sw-prose .expressive-code .copy button:hover {
+  opacity: 1;
+  background-color: var(--sw-surface-2);
+}
+
+@media (hover: none) {
+  .sw-prose .expressive-code .copy button {
+    opacity: 0.7;
+  }
+}
+
+.sw-tabs {
+  margin: 1.5rem 0 2.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-surface-1);
+}
+
+.sw-tabs__list {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding: 0.45rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-tabs__list button {
+  border: 0;
+  border-radius: 0.42rem;
+  padding: 0.45rem 0.7rem;
+  color: var(--sw-fg-muted);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sw-tabs__list button[aria-selected="true"] {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-3);
+}
+
+.sw-tabs__panel {
+  padding: 0.35rem 1rem 0.5rem;
+}
+
+.sw-architecture {
+  margin: 1.5rem 0 2.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.8rem;
+  padding: 1rem;
+  background: var(--sw-surface-1);
+}
+
+.sw-architecture__flow {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sw-architecture__step > div {
+  display: grid;
+  grid-template-columns: 2rem 10rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.55rem;
+  padding: 0.8rem;
+  background: var(--sw-surface-2);
+}
+
+.sw-architecture__step > span {
+  display: block;
+  color: var(--sw-fg-dim);
+  text-align: center;
+}
+
+.sw-architecture__step div > span {
+  color: var(--sw-accent-strong);
+  font: 600 0.68rem var(--sw-font-mono);
+}
+
+.sw-architecture__step strong {
+  font-family: var(--sw-font-display);
+}
+
+.sw-architecture__step p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+}
+
+.sw-architecture figcaption {
+  margin: 0.8rem 0.25rem 0;
+  color: var(--sw-fg-dim);
+  font-size: 0.74rem;
+}
+
+body .sw-code-popover__tag-link {
+  color: var(--sw-accent-strong);
+  font-weight: 650;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+body .sw-code-popover__tag-link:hover {
+  text-decoration: underline;
+}
+
+/* Reading order first, colophon last: the footer closes the page with where
+   to go next rather than with licence small print. */
+.sw-document__footer {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--sw-border);
+  color: var(--sw-fg-dim);
+  font-size: 0.75rem;
+}
+
+.sw-document__colophon {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+}
+
+.sw-document__footer a {
+  color: var(--sw-fg-muted);
+}
+
+.sw-prose .expressive-code {
+  margin-block: 1.4rem 2rem;
+}
+
+.sw-prose .expressive-code figure.frame {
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  box-shadow: none;
+}
+
+/* The code sits one step below the page surface in both themes, and the title
+   strip shares that surface so the frame reads as one object. */
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header {
+  min-height: 2.4rem;
+  align-items: center;
+  justify-content: flex-start;
+  padding-inline: 1rem;
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-0);
+}
+
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header::before,
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header::after,
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title::after {
+  content: none;
+}
+
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title {
+  position: static;
+  display: inline-flex;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: 650 0.72rem / 1.2 var(--sw-font-body);
+  letter-spacing: 0.01em;
+}
+
+.sw-prose .expressive-code pre {
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: var(--sw-surface-0);
+  font-size: 0.84rem;
+  line-height: 1.7;
+}

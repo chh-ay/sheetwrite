@@ -39,6 +39,10 @@ export function decodeWorkbookSnapshot(
     dataModel: snapshot.workbook.dataModel?.relationships.length
       ? cloneJsonValue(snapshot.workbook.dataModel)
       : undefined,
+    // No queries and an empty list are the same document, so only a non-empty list is kept.
+    queries: snapshot.workbook.queries?.length
+      ? cloneJsonValue(snapshot.workbook.queries)
+      : undefined,
     sheets: snapshot.sheets.map((source) => {
       const rowHeights = new Map<number, number>();
       const hiddenRows = new Set<number>();
@@ -64,6 +68,7 @@ export function decodeWorkbookSnapshot(
         protectedRanges: cloneJsonValue(source.protectedRanges),
         notes: cloneJsonValue(source.notes),
         sortKeys: cloneJsonValue(source.sortKeys),
+        sortState: cloneJsonValue(source.sortState),
         filters: cloneJsonValue(source.filters),
         rowGroups: cloneJsonValue(source.rowGroups),
         tables: cloneJsonValue(source.tables),
@@ -155,6 +160,7 @@ export class StoreSnapshotCodec {
           : {}),
         ...(sheet.notes?.length ? { notes: cloneJsonValue(sheet.notes) } : {}),
         ...(sheet.sortKeys?.length ? { sortKeys: cloneJsonValue(sheet.sortKeys) } : {}),
+        ...(sheet.sortState ? { sortState: cloneJsonValue(sheet.sortState) } : {}),
         ...(sheet.filters?.length ? { filters: cloneJsonValue(sheet.filters) } : {}),
         ...(sheet.rowGroups?.length ? { rowGroups: cloneJsonValue(sheet.rowGroups) } : {}),
         ...(sheet.tables?.length ? { tables: cloneJsonValue(sheet.tables) } : {}),
@@ -188,6 +194,7 @@ export class StoreSnapshotCodec {
         ...(this.workbook.xlsxSource ? { xlsxSource: this.workbook.xlsxSource } : {}),
         ...(this.workbook.calculation ? { calculation: { ...this.workbook.calculation } } : {}),
         ...(this.workbook.dataModel ? { dataModel: cloneJsonValue(this.workbook.dataModel) } : {}),
+        ...(this.workbook.queries ? { queries: cloneJsonValue(this.workbook.queries) } : {}),
       },
       sheets,
     };

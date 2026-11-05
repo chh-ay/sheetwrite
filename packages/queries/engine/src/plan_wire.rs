@@ -83,19 +83,34 @@ pub struct PlanWire<'a> {
     pub offsets: &'a [u32],
 }
 
-struct Cursor<'a> {
+/// Reads typed lanes in order; the Power Query codec reuses it for query lists.
+pub(crate) struct Cursor<'a> {
     codes: &'a [u32],
     position: usize,
     numbers: &'a [f64],
     strings: Vec<String>,
 }
 
-fn definition() -> Diagnostic {
+pub(crate) fn definition() -> Diagnostic {
     Diagnostic::new("definition")
 }
 
-impl Cursor<'_> {
-    fn code(&mut self) -> Result<u32, Diagnostic> {
+impl<'a> Cursor<'a> {
+    pub(crate) fn new(wire: PlanWire<'a>) -> Result<Self, Diagnostic> {
+        Ok(Self {
+            codes: wire.codes,
+            position: 0,
+            numbers: wire.numbers,
+            strings: decode_strings(wire.text, wire.offsets)?,
+        })
+    }
+
+    /// Whether every code was read; a padded lane is a definition failure.
+    pub(crate) fn finished(&self) -> bool {
+        self.position == self.codes.len()
+    }
+
+    pub(crate) fn code(&mut self) -> Result<u32, Diagnostic> {
         let code = *self.codes.get(self.position).ok_or_else(definition)?;
         self.position += 1;
 
@@ -103,7 +118,7 @@ impl Cursor<'_> {
     }
 
     /// Each counted item uses at least one code, so a larger count cannot be valid.
-    fn count(&mut self) -> Result<usize, Diagnostic> {
+    pub(crate) fn count(&mut self) -> Result<usize, Diagnostic> {
         let count = row_index(self.code()?)?;
         if count > self.codes.len() - self.position {
             return Err(definition());
@@ -112,13 +127,13 @@ impl Cursor<'_> {
         Ok(count)
     }
 
-    fn string(&mut self) -> Result<String, Diagnostic> {
+    pub(crate) fn string(&mut self) -> Result<String, Diagnostic> {
         let index = row_index(self.code()?)?;
 
         self.strings.get(index).cloned().ok_or_else(definition)
     }
 
-    fn strings(&mut self) -> Result<Vec<String>, Diagnostic> {
+    pub(crate) fn strings(&mut self) -> Result<Vec<String>, Diagnostic> {
         let count = self.count()?;
 
         (0..count).map(|_| self.string()).collect()
@@ -222,7 +237,7 @@ impl Cursor<'_> {
         })
     }
 
-    fn step(&mut self) -> Result<Step, Diagnostic> {
+    pub(crate) fn step(&mut self) -> Result<Step, Diagnostic> {
         Ok(match self.code()? {
             STEP_FILTER => Step::Filter {
                 predicate: self.predicate(0)?,
@@ -285,28 +300,38 @@ fn aggregate_op(code: u32) -> Result<AggregateOp, Diagnostic> {
     one_based(&AGGREGATE_OPS, code)
 }
 
+impl Cursor<'_> {
+    /// A step count, then that many steps; the count respects the execution step limit.
+    pub(crate) fn steps(&mut self, limits: &Limits) -> Result<Plan, Diagnostic> {
+        let count = self.count()?;
+        if count > limits.max_steps {
+            return Err(Diagnostic::limit());
+        }
+
+        (0..count).map(|_| self.step()).collect()
+    }
+}
+
+impl Cursor<'_> {
+    /// The string-table entry at an index that was already read from the code lane.
+    pub(crate) fn string_at(&self, index: u32) -> Result<String, Diagnostic> {
+        self.strings
+            .get(row_index(index)?)
+            .cloned()
+            .ok_or_else(definition)
+    }
+}
+
 /// Decodes a bounded saved step list; schema-dependent validation happens in execution.
 pub fn decode_plan(wire: PlanWire<'_>, limits: &Limits) -> Result<Plan, Diagnostic> {
     if wire.codes.len() > MAX_PLAN_CODES || wire.numbers.len() > MAX_PLAN_CODES {
         return Err(Diagnostic::limit());
     }
 
-    let mut cursor = Cursor {
-        codes: wire.codes,
-        position: 0,
-        numbers: wire.numbers,
-        strings: decode_strings(wire.text, wire.offsets)?,
-    };
-    let count = cursor.count()?;
-    if count > limits.max_steps {
-        return Err(Diagnostic::limit());
-    }
+    let mut cursor = Cursor::new(wire)?;
+    let plan = cursor.steps(limits)?;
 
-    let plan = (0..count)
-        .map(|_| cursor.step())
-        .collect::<Result<Plan, _>>()?;
-
-    if cursor.position != wire.codes.len() {
+    if !cursor.finished() {
         return Err(definition());
     }
 

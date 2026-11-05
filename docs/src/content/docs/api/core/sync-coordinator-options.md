@@ -8,7 +8,7 @@ description: "SyncCoordinatorOptions interface in @sheetwrite/core: Document, ve
 Document, version, durability, and online options for synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L231"><code>packages/core/src/sync.ts#L231</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/sync.ts#L140"><code>packages/core/src/sync.ts#L140</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -17,11 +17,12 @@ Document, version, durability, and online options for synchronization.
 <a href="#sync-coordinator-options-create-mutation-id"><code>createMutationId</code></a>
 <a href="#sync-coordinator-options-pending-storage"><code>pendingStorage</code></a>
 <a href="#sync-coordinator-options-initial-connection"><code>initialConnection</code></a>
+<a href="#sync-coordinator-options-author-id"><code>authorId</code></a>
 <a href="#sync-coordinator-options-recover-version-gap"><code>recoverVersionGap</code></a>
 <a href="#sync-coordinator-options-limits"><code>limits</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -70,6 +71,19 @@ initialConnection?: "offline" | "online";
 
 </details>
 
+<details class="api-member" id="sync-coordinator-options-author-id" data-pagefind-weight="1">
+<summary><code>authorId</code> <span class="api-member-summary">Authenticated ID of the person editing through this grid.</span></summary>
+
+```ts generated
+authorId?: string;
+```
+
+<p class="api-member-doc">Authenticated ID of the person editing through this grid. Each new pending
+commit carries it to the authority, which records it in history. Restored
+commits keep the author they were made with. At most `maxMutationIdBytes`
+UTF-8 bytes.</p>
+</details>
+
 <details class="api-member" id="sync-coordinator-options-recover-version-gap" data-pagefind-weight="1">
 <summary><code>recoverVersionGap</code> <span class="api-member-summary">Optional host recovery hook.</span></summary>
 
@@ -104,6 +118,7 @@ export interface SyncCoordinatorOptions {
   createMutationId?: () => string;
   pendingStorage?: PendingCommitStorage;
   initialConnection?: "offline" | "online";
+  authorId?: string;
   recoverVersionGap?: (
     request: SyncVersionGapRequest,
   ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;

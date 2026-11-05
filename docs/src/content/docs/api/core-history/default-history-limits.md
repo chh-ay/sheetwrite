@@ -8,7 +8,7 @@ description: "DEFAULT_HISTORY_LIMITS variable in @sheetwrite/core/history: Defau
 Default byte, count, cadence, and retention bounds (decision recorded in #228).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/codec.ts#L70"><code>packages/core/src/version-history/codec.ts#L70</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/codec.ts#L71"><code>packages/core/src/version-history/codec.ts#L71</code></a></dd></div>
 </dl>
 
 ## Declaration

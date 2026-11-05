@@ -29,7 +29,14 @@ fn accepts_sheet_span(func: Func) -> bool {
         | Func::StdevS
         | Func::StdevP
         | Func::VarS
-        | Func::VarP => true,
+        | Func::VarP
+        | Func::AverageA
+        | Func::MaxA
+        | Func::MinA
+        | Func::StdevA
+        | Func::StdevPA
+        | Func::VarA
+        | Func::VarPA => true,
         #[cfg(feature = "analysis")]
         Func::Analysis(id) => super::analysis::accepts_sheet_span(id),
         _ => false,

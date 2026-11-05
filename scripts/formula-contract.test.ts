@@ -114,12 +114,12 @@ describe("formula capability contract", () => {
     const result = await validateFormulaContractRepository(ROOT);
     expect(result.issues).toEqual([]);
     expect(result.summary).toEqual({
-      functions: 350,
+      functions: 482,
       requiredSupported: 100,
       unsupportedCategories: 5,
-      parserSpellings: 173,
-      assistSpellings: 353,
-      formulasSpellings: 353,
+      parserSpellings: 210,
+      assistSpellings: 485,
+      formulasSpellings: 485,
     });
   });
 

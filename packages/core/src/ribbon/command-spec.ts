@@ -48,6 +48,8 @@ export interface RibbonButtonSpec extends CommandIdentity {
   readonly kind: "button";
   readonly label: string;
   readonly icon: IconName;
+  /** Tooltip text when it says more than the label, such as Excel's longer command name. */
+  readonly description?: string;
   readonly run: (grid: Grid) => unknown;
   readonly availability: RibbonAvailability;
   readonly toggle?: boolean;

@@ -88,6 +88,11 @@ a script nobody will run.
   own builds; readable package files keep stack traces and debugging in
   `node_modules` useful. The size report measures the packed files;
   `size-history.json` records published releases, not unreleased measurements.
+- **`size:first-paint` measures; `size:first-paint:check` decides.** Measurement
+  writes `test-results/bundlers/first-paint.json` for the baseline and the
+  fixture-only deferred-loading candidate. The separate check evaluates that
+  saved evidence against the candidate's size and timing thresholds. A rejected
+  candidate does not fail the measurement command.
 - **Package assembly has one owner: `release-artifacts.ts`.** Packed-consumer
   verification, delivery-size measurement, and bundler fixtures use its release
   file selection and manifest policy, even without `--artifacts`. To pack
