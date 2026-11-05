@@ -121,6 +121,12 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
+  "point-angle": "1,1",
+  "precise-rounding": "4.3,2",
+  "radix-number": '"FF",16',
+  "radix-text": "7,2",
+  roman: "499,0",
+  "roman-text": '"LVII"',
   percentile: "A1:A3,0.5",
   "period-payment": "0.1,1,10,1000",
   "pv-fv-pmt": "0.1,10,-100",
@@ -157,6 +163,8 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
 };
 
 const ARGUMENTS_BY_FUNCTION: Record<string, string> = {
+  ACOTH: "2",
+  ATANH: "0.5",
   COUNTBLANK: "A1:A3",
   DATEVALUE: '"2020-01-01"',
   TIMEVALUE: '"12:00"',
