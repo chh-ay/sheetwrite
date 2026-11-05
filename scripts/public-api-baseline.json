@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "3dee9418f0274b3ccf8ef33f8dcdb8554a7836be3aac785b2354762fbb5234e9",
+  "sha256": "6a7a667b81881d944fba6279caafbbbcfe7ddcd01c1881eb32a938ff604b474c",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -187,6 +187,11 @@
         "PivotSource",
         "PivotSourceField",
         "PivotValueField",
+        "PowerQueryCodec",
+        "PowerQueryExport",
+        "PowerQueryImport",
+        "PowerQueryLoss",
+        "PowerQueryUnsupported",
         "PresenceActor",
         "PresenceCoordinator",
         "PresenceCoordinatorEvent",
@@ -629,6 +634,7 @@
         "QuerySource",
         "QueryStep",
         "createQuerySession",
+        "loadPowerQueryCodec",
         "loadQueryEngine"
       ]
     },

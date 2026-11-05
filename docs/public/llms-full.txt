@@ -4562,6 +4562,49 @@ sources load. Growth into non-empty cells, or into another table, is
 - Saved locators are public. A locator with a user name or password is
 rejected, and credentials stay in the host's callback.
 
+## Power Query in XLSX
+
+Pass a Power Query codec to XLSX export and import to write saved queries as
+Power Query M and read them back. `loadPowerQueryCodec` loads the same lazy
+query artifact as the engine.
+
+```ts
+import { type Grid, toXlsxWorkbook } from "@sheetwrite/core";
+import { loadPowerQueryCodec } from "@sheetwrite/queries";
+
+async function saveWithQueries(grid: Grid) {
+  const powerQuery = await loadPowerQueryCodec();
+  return toXlsxWorkbook(grid, {
+    powerQuery,
+    onWarning: (warning) => {
+      if (warning.code === "query-loss") console.warn(warning.message);
+    },
+  });
+}
+```
+
+- Export writes one `Section1` document in a DataMashup part
+([MS-QDEFF](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/27b1dd1e-7de8-45d9-9c84-dfcc7a802e37)).
+Each query with an output table also gets a workbook connection and a query
+table, so Excel shows the table as that query's output. The values are saved
+in the table cells as usual.
+- The M is built only from
+[documented Power Query functions](https://learn.microsoft.com/en-us/powerquery-m/power-query-m-function-reference).
+M does not promise a row order for joins and groups, so the exported M sorts
+by keys and added row positions, which gives Sheetwrite's order. Conversions
+use the `en-US` culture. A host source has no M connector, so it is written
+as an M error with its source ID. Each such difference is a `query-loss`
+warning.
+- Import reads M as text with a bounded parser. It never evaluates M and
+never fetches a source. Supported members become saved queries, bound to
+their output tables by name. Other members stay in the kept DataMashup part
+and are reported with a `query-loss` warning.
+- Files that Sheetwrite wrote also keep the exact definitions in the hidden
+workbook metadata, so identities and host sources come back unchanged.
+- Without a codec, export writes output tables as values. A DataMashup kept
+from import is written back unchanged while `workbook.queries` is unchanged;
+otherwise it is dropped with a `query-loss` warning.
+
 ## See also
 
 - [Interaction](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.
@@ -8252,6 +8295,14 @@ The payload is base64-encoded for JSON-safe persistence: about four thirds of it
 Shared parts such as a pivot and its cache form one graph: they are kept or dropped together.
 
 A drawing that holds both charts that Sheetwrite reads and other objects is split. The charts go to `Sheet.charts`, and the kept drawing keeps only the other anchors. On export, Sheetwrite charts go into the sheet's kept drawing, because a worksheet has only one drawing.
+
+Power Query parts (the `DataMashup` customXml item and `xl/connections.xml`)
+hold saved query definitions. They are kept only while `workbook.queries` is
+unchanged since import. If a query was added, edited or removed, the kept M
+would be stale. Export then drops these parts, writes output tables as values,
+and reports a `query-loss` warning. With a Power Query codec, export writes new
+parts for the current queries instead. See
+[Power Query in XLSX](https://www.sheetwrite.dev/docs/features/data/data-operations/#power-query-in-xlsx).
 
 ## Drops and warnings
 
@@ -13807,6 +13858,63 @@ Members:
 - `field` — Source field index that the value aggregates.
 - `name` — Custom caption; without it the output shows the default caption.
 
+##### `PowerQueryCodec` — interface
+
+```ts
+export interface PowerQueryCodec { encode(queries: readonly SavedQuery[]): PowerQueryExport; decode(section: string): PowerQueryImport; }
+```
+
+Translates saved queries to and from Power Query M. Import reads text only:
+it never evaluates M or fetches a source. `@sheetwrite/queries` provides one.
+
+Members:
+- `decode` — Throws when the text is not a `section Section1;` document.
+
+##### `PowerQueryExport` — interface
+
+```ts
+export interface PowerQueryExport { readonly section: string; readonly members: readonly string[]; readonly losses: readonly PowerQueryLoss[]; }
+```
+
+A `Section1.m` document and the member name each query was written under.
+
+Members:
+- `members` — Section member name for each query, in the order the queries were given.
+
+##### `PowerQueryImport` — interface
+
+```ts
+export interface PowerQueryImport { readonly queries: readonly SavedQuery[]; readonly unsupported: readonly PowerQueryUnsupported[]; }
+```
+
+Queries read from M, without outputs; the XLSX reader binds them to tables.
+
+##### `PowerQueryLoss` — interface
+
+```ts
+export interface PowerQueryLoss { readonly query: string; readonly step: number | null; readonly code: string; }
+```
+
+One place where exported M behaves differently from the Sheetwrite engine.
+
+Members:
+- `code` — Stable code, such as `host-source` or `outer-join-order`.
+- `query` — Saved query identity.
+- `step` — Zero-based step, or null for the source or the query as a whole.
+
+##### `PowerQueryUnsupported` — interface
+
+```ts
+export interface PowerQueryUnsupported { readonly member: string; readonly reason: string; readonly detail: string; readonly text: string; }
+```
+
+An imported section member outside the supported subset, kept as text.
+
+Members:
+- `detail` — The M function or form involved, if known.
+- `reason` — Stable code, such as `syntax`, `source`, `step` or `dependency`.
+- `text` — The member's original text.
+
 ##### `PresenceActor` — interface
 
 ```ts
@@ -15951,7 +16059,7 @@ Members:
 ##### `XlsxSourceGraph` — interface
 
 ```ts
-export interface XlsxSourceGraph { readonly owner: "root" | "workbook" | "sheet"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }
+export interface XlsxSourceGraph { readonly owner: "root" | "workbook" | "sheet"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly queries?: string; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }
 ```
 
 One relationship from the package, workbook, or a sheet to a retained part graph.
@@ -15959,6 +16067,9 @@ One relationship from the package, workbook, or a sheet to a retained part graph
 Members:
 - `cacheId` — Pivot cache id written into `<pivotCaches>`.
 - `parts` — Every retained part reached from `target`, including `.rels` parts.
+- `queries` — 64-bit hex digest of `workbook.queries` at import, for graphs that hold
+saved query definitions (the DataMashup and its connections). Any query
+change makes the graph stale, so it is dropped.
 - `target` — Relationship target part.
 - `type` — OPC relationship type URI.
 
@@ -16014,13 +16125,17 @@ Optional backend contract for complete workbook XLSX interchange.
 ##### `XlsxWorkbookOptions` — interface
 
 ```ts
-export interface XlsxWorkbookOptions { signal?: AbortSignal; maxCells?: number; resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>; onWarning?: (warning: XlsxWorkbookWarning) => void; }
+export interface XlsxWorkbookOptions { signal?: AbortSignal; maxCells?: number; resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>; onWarning?: (warning: XlsxWorkbookWarning) => void; powerQuery?: PowerQueryCodec; }
 ```
 
 Shared options passed to every registered table and workbook XLSX backend.
 
 Members:
 - `maxCells` — Cells accounted by the active conversion path; defaults to 1,000,000.
+- `powerQuery` — Power Query translation for saved queries, such as `loadPowerQueryCodec()`
+from `@sheetwrite/queries`. Without it, import keeps query parts as opaque
+parts, and export writes them back only while `workbook.queries` is
+unchanged since import.
 - `resourceLimits` — Positive overrides for every XLSX resource dimension except `maxCells`.
 - `signal` — Checked before the work and once per ZIP entry, worksheet and chunk of
 cells. After it fires, the call rejects (or the stream errors) with
@@ -16029,7 +16144,7 @@ cells. After it fires, the call rejects (or the stream errors) with
 ##### `XlsxWorkbookWarning` — interface
 
 ```ts
-export interface XlsxWorkbookWarning { code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature" | "external-relationship" | "external-formula" | "format-loss" | "validation-loss" | "invalid-metadata"; message: string; sheet?: string; cell?: string; part?: string; }
+export interface XlsxWorkbookWarning { code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature" | "external-relationship" | "external-formula" | "format-loss" | "validation-loss" | "invalid-metadata" | "query-loss"; message: string; sheet?: string; cell?: string; part?: string; }
 ```
 
 Structured fidelity warning emitted during XLSX conversion.
@@ -17968,7 +18083,7 @@ saved queries of `grid` to the host's `fetchSource`. Workbooks that never
 call it load no query code or WASM.
 @example
 ```ts
-import type { Grid } from "@sheetwrite/core";
+import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
 import { createQuerySession } from "@sheetwrite/queries";
 
 async function refreshSales(grid: Grid) {
@@ -17980,6 +18095,25 @@ async function refreshSales(grid: Grid) {
  });
 
  return session.refreshAll();
+}
+```
+
+##### `loadPowerQueryCodec` — function
+
+```ts
+(options?: QueryEngineOptions): Promise<PowerQueryCodec>
+```
+
+Loads the Power Query codec for XLSX import and export. It translates saved
+queries to M and reads imported M as text; it never evaluates M.
+@example
+```ts
+import type { WorkbookSnapshot } from "@sheetwrite/core";
+import { loadPowerQueryCodec } from "@sheetwrite/queries";
+
+async function exportedM(snapshot: WorkbookSnapshot) {
+ const codec = await loadPowerQueryCodec();
+ return codec.encode(snapshot.workbook.queries ?? []).section;
 }
 ```
 

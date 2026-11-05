@@ -1,5 +1,6 @@
 import type { XlsxWorkbookBackend } from "@sheetwrite/core";
 
+import { withPowerQuery } from "./power-query.js";
 import { admitPreserved, preparePreserved } from "./preservation.js";
 import { readWorkbook } from "./reader.js";
 import { createCodecContext, xlsxFailure } from "./resources.js";
@@ -15,7 +16,11 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
     try {
       const context = createCodecContext("export", options);
       return await writeWorkbook(snapshot, context, (validated) =>
-        preparePreserved(validated, context, exportContext?.sourceTracked === true),
+        withPowerQuery(
+          preparePreserved(validated, context, exportContext?.sourceTracked === true),
+          validated,
+          context,
+        ),
       );
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);
@@ -25,7 +30,11 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
     try {
       const context = createCodecContext("export", options);
       yield* streamWorkbook(snapshot, context, (validated) =>
-        preparePreserved(validated, context, exportContext?.sourceTracked === true),
+        withPowerQuery(
+          preparePreserved(validated, context, exportContext?.sourceTracked === true),
+          validated,
+          context,
+        ),
       );
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);

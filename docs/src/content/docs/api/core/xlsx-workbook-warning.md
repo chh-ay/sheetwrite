@@ -8,7 +8,7 @@ description: "XlsxWorkbookWarning interface in @sheetwrite/core: Structured fide
 Structured fidelity warning emitted during XLSX conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L276"><code>packages/core/src/xlsx-bridge.ts#L276</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/xlsx-bridge.ts#L277"><code>packages/core/src/xlsx-bridge.ts#L277</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -19,7 +19,7 @@ Structured fidelity warning emitted during XLSX conversion.
 <summary><code>code</code></summary>
 
 ```ts generated
-code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature" | "external-relationship" | "external-formula" | "format-loss" | "validation-loss" | "invalid-metadata";
+code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature" | "external-relationship" | "external-formula" | "format-loss" | "validation-loss" | "invalid-metadata" | "query-loss";
 ```
 
 </details>
@@ -78,7 +78,8 @@ export interface XlsxWorkbookWarning {
     | "external-formula"
     | "format-loss"
     | "validation-loss"
-    | "invalid-metadata";
+    | "invalid-metadata"
+    | "query-loss";
   message: string;
   sheet?: string;
   cell?: string;

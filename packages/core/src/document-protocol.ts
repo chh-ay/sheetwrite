@@ -3004,6 +3004,11 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
     }
 
+    const queries = ownValue(graph, "queries");
+    if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
+      invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
+    }
+
     const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
     if (
       !members ||

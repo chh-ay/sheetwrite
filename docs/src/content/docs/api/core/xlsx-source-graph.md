@@ -17,11 +17,12 @@ One relationship from the package, workbook, or a sheet to a retained part graph
 <a href="#xlsx-source-graph-type"><code>type</code></a>
 <a href="#xlsx-source-graph-target"><code>target</code></a>
 <a href="#xlsx-source-graph-cache-id"><code>cacheId</code></a>
+<a href="#xlsx-source-graph-queries"><code>queries</code></a>
 <a href="#xlsx-source-graph-parts"><code>parts</code></a>
 <a href="#xlsx-source-graph-dependencies"><code>dependencies</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -70,6 +71,18 @@ readonly cacheId?: string;
 
 </details>
 
+<details class="api-member" id="xlsx-source-graph-queries" data-pagefind-weight="1">
+<summary><code>queries</code> <span class="api-member-summary">64-bit hex digest of workbook.queries at import, for graphs that hold saved query definitions (the DataMashup and its connections).</span></summary>
+
+```ts generated
+readonly queries?: string;
+```
+
+<p class="api-member-doc">64-bit hex digest of `workbook.queries` at import, for graphs that hold
+saved query definitions (the DataMashup and its connections). Any query
+change makes the graph stale, so it is dropped.</p>
+</details>
+
 <details class="api-member" id="xlsx-source-graph-parts" data-pagefind-weight="1">
 <summary><code>parts</code> <span class="api-member-summary">Every retained part reached from target, including .rels parts.</span></summary>
 
@@ -101,6 +114,7 @@ export interface XlsxSourceGraph {
   readonly type: string;
   readonly target: string;
   readonly cacheId?: string;
+  readonly queries?: string;
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];
 }

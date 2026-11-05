@@ -241,6 +241,49 @@ async function refreshSales(grid: Grid) {
 - Saved locators are public. A locator with a user name or password is
   rejected, and credentials stay in the host's callback.
 
+## Power Query in XLSX
+
+Pass a Power Query codec to XLSX export and import to write saved queries as
+Power Query M and read them back. `loadPowerQueryCodec` loads the same lazy
+query artifact as the engine.
+
+```ts compile title="Keep saved queries in an XLSX file"
+import { type Grid, toXlsxWorkbook } from "@sheetwrite/core";
+import { loadPowerQueryCodec } from "@sheetwrite/queries";
+
+async function saveWithQueries(grid: Grid) {
+  const powerQuery = await loadPowerQueryCodec();
+  return toXlsxWorkbook(grid, {
+    powerQuery,
+    onWarning: (warning) => {
+      if (warning.code === "query-loss") console.warn(warning.message);
+    },
+  });
+}
+```
+
+- Export writes one `Section1` document in a DataMashup part
+  ([MS-QDEFF](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-qdeff/27b1dd1e-7de8-45d9-9c84-dfcc7a802e37)).
+  Each query with an output table also gets a workbook connection and a query
+  table, so Excel shows the table as that query's output. The values are saved
+  in the table cells as usual.
+- The M is built only from
+  [documented Power Query functions](https://learn.microsoft.com/en-us/powerquery-m/power-query-m-function-reference).
+  M does not promise a row order for joins and groups, so the exported M sorts
+  by keys and added row positions, which gives Sheetwrite's order. Conversions
+  use the `en-US` culture. A host source has no M connector, so it is written
+  as an M error with its source ID. Each such difference is a `query-loss`
+  warning.
+- Import reads M as text with a bounded parser. It never evaluates M and
+  never fetches a source. Supported members become saved queries, bound to
+  their output tables by name. Other members stay in the kept DataMashup part
+  and are reported with a `query-loss` warning.
+- Files that Sheetwrite wrote also keep the exact definitions in the hidden
+  workbook metadata, so identities and host sources come back unchanged.
+- Without a codec, export writes output tables as values. A DataMashup kept
+  from import is written back unchanged while `workbook.queries` is unchanged;
+  otherwise it is dropped with a `query-loss` warning.
+
 ## See also
 
 - [Interaction](/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.

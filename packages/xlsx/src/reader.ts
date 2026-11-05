@@ -42,6 +42,7 @@ import { readCharts } from "./chart-read.js";
 import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
+import { readPowerQuery } from "./power-query.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
 import {
   assertResource,
@@ -2593,6 +2594,7 @@ export async function readWorkbook(
       new Set([...modelledPivotParts, ...chartParts.modelled]),
       chartParts.replacements,
     );
+  await readPowerQuery(packageFile, snapshot, metadata?.workbook.queries, context);
   const formulas = await convertWorkbookFormulas(snapshot, "import");
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {

@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>394</dd></div>
+<div><dt>Exports</dt><dd>399</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -114,7 +114,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>175</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>180</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -198,6 +198,11 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/pivot-sort/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotSort</code></span><span class="api-symbol-card__desc">Sort of one axis field by its labels.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pivot-source-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotSourceField</code></span><span class="api-symbol-card__desc">One source field offered by the field list.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/pivot-value-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotValueField</code></span><span class="api-symbol-card__desc">One aggregated value field.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/power-query-codec/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryCodec</code></span><span class="api-symbol-card__desc">Translates saved queries to and from Power Query M.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/power-query-export/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryExport</code></span><span class="api-symbol-card__desc">A Section1.m document and the member name each query was written under.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/power-query-import/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryImport</code></span><span class="api-symbol-card__desc">Queries read from M, without outputs; the XLSX reader binds them to tables.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/power-query-loss/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryLoss</code></span><span class="api-symbol-card__desc">One place where exported M behaves differently from the Sheetwrite engine.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/power-query-unsupported/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PowerQueryUnsupported</code></span><span class="api-symbol-card__desc">An imported section member outside the supported subset, kept as text.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-actor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PresenceActor</code></span><span class="api-symbol-card__desc">Public collaborator identity attached to presence updates.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-coordinator-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PresenceCoordinatorOptions</code></span><span class="api-symbol-card__desc">Identity, privacy, and timing options for presence coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-message/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PresenceMessage</code></span><span class="api-symbol-card__desc">Ephemeral collaborator selection and activity update.</span></a>
