@@ -92,14 +92,12 @@
   text-decoration: none;
 }
 
-/* The sprite's arrow, mirrored to point back to the entry point. */
 .sw-prose .api-backlink::before {
   content: "";
   width: var(--sw-icon-sm);
   height: var(--sw-icon-sm);
   background: currentColor;
-  mask: var(--sw-icon-mask-arrow-right) center / contain no-repeat;
-  transform: scaleX(-1);
+  mask: var(--sw-icon-mask-arrow-left) center / contain no-repeat;
 }
 
 .sw-prose .api-backlink:hover {

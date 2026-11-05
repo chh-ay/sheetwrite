@@ -7,6 +7,11 @@
   min-height: 100vh;
   background: var(--sw-surface-1);
 }
+/* An icon inside a line of text (a link's trailing arrow) sits on the text's
+   centre line instead of its baseline. */
+.sw-docs :is(a, strong, span) > .sw-icon {
+  vertical-align: -0.2em;
+}
 
 /* Release post: date and steps to the newer and older posts, under the title. */
 .sw-release-strip {
@@ -19,6 +24,9 @@
   font-size: var(--sw-text-small);
 }
 .sw-release-strip a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
   color: var(--sw-accent-strong);
   text-decoration: none;
 }

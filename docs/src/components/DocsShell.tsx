@@ -324,12 +324,12 @@ function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
       {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
       {older === undefined ? null : (
         <Link rel="prev" to={releaseHref(older.version)}>
-          ← {older.version}
+          <Icon name="arrow-left" /> {older.version}
         </Link>
       )}
       {newer === undefined ? null : (
         <Link rel="next" to={releaseHref(newer.version)}>
-          {newer.version} →
+          {newer.version} <Icon name="arrow-right" />
         </Link>
       )}
       <Link to={RELEASES_HREF}>All releases</Link>
