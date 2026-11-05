@@ -3,7 +3,7 @@ title: "Dynamic array functions"
 description: "Every dynamic array formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 20 functions of the dynamic array family. Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 21 functions of the dynamic array family. Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -32,6 +32,7 @@ This page lists the 20 functions of the dynamic array family. Taxonomy/source: [
 <tr data-formula-name="GROUPBY" data-engine="full"><td><code>GROUPBY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-groupby-groupby">Signature: <code>groupby-groupby</code></a><br /><a href="#semantics-analysis-groupby">Semantics: <code>analysis-groupby</code></a><br /><a href="#dialect-analysis-groupby">Dialect: <code>analysis-groupby</code></a><br /><a href="#implementation-analysis-groupby">Implementation: <code>analysis-groupby</code></a></details></td></tr>
 <tr data-formula-name="PIVOTBY" data-engine="full"><td><code>PIVOTBY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-groupby-pivotby">Signature: <code>groupby-pivotby</code></a><br /><a href="#semantics-analysis-groupby">Semantics: <code>analysis-groupby</code></a><br /><a href="#dialect-analysis-groupby">Dialect: <code>analysis-groupby</code></a><br /><a href="#implementation-analysis-groupby">Implementation: <code>analysis-groupby</code></a></details></td></tr>
 <tr data-formula-name="PERCENTOF" data-engine="full"><td><code>PERCENTOF</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-groupby-percentof">Signature: <code>groupby-percentof</code></a><br /><a href="#semantics-analysis-groupby">Semantics: <code>analysis-groupby</code></a><br /><a href="#dialect-analysis-groupby">Dialect: <code>analysis-groupby</code></a><br /><a href="#implementation-analysis-groupby">Implementation: <code>analysis-groupby</code></a></details></td></tr>
+<tr data-formula-name="TRIMRANGE" data-engine="default"><td><code>TRIMRANGE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-trim-range">Signature: <code>trim-range</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -231,6 +232,18 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-trim-range"><summary>Signature: trim-range</summary>
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `range` | yes | none | `range`, `array`, `reference` | `once` |
+| `trimRows` | no | 3 | `scalar`, `reference` | `once` |
+| `trimColumns` | no | 3 | `scalar`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -296,7 +309,7 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/math.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math.rs)<br />[`packages/wasm/src/eval/math/trigonometry.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/trigonometry.rs)<br />[`packages/wasm/src/eval/math/numerals.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/numerals.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/math.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math.rs)<br />[`packages/wasm/src/eval/math/trigonometry.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/trigonometry.rs)<br />[`packages/wasm/src/eval/math/numerals.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/numerals.rs)<br />[`packages/wasm/src/eval/statistics.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/statistics.rs)<br />[`packages/wasm/src/eval/lookup.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/lookup.rs)<br />[`packages/wasm/src/eval/array.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/array.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 

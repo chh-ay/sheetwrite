@@ -10,10 +10,11 @@ import {
   type SnapshotResourceLimits,
   SnapshotValidationError,
   takeAdmittedTransactionResources,
+  type TransactionResourceValidationResult,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
 import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
-import { SheetwriteError, unknownSheetError } from "./errors.js";
+import { SheetwriteError } from "./errors.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
@@ -39,6 +40,12 @@ import {
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
 import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
+import {
+  clearViewPatch,
+  columnFilterPatch,
+  rowVisibilityPatches,
+  viewSortPatch,
+} from "./store/view-patches.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -54,6 +61,7 @@ import type {
   ProtectionResolver,
   RowGroup,
   SheetLifecycleIssueCode,
+  SheetSnapshot,
   SortKey,
   Workbook,
   WorkbookSnapshot,
@@ -130,6 +138,13 @@ function isSnapshotAllocationFailure(error: unknown): boolean {
     error instanceof Error &&
     /allocation|capacity|memory|resource limit|out of bounds memory access/i.test(error.message)
   );
+}
+
+/** A local transaction after the mutation policy, with the issues it reported. */
+interface LocalPolicyOutcome {
+  readonly tx: Transaction;
+  readonly warnings: MutationIssue[];
+  readonly rejections: MutationIssue[];
 }
 
 /**
@@ -543,19 +558,8 @@ export class SheetwriteStore implements Store {
    * ```
    */
   setViewSort(sheet: SheetId, keys: readonly SortKey[]): ApplyTransactionResult {
-    if (keys.length > 0) this.requireCompleteQuery(sheet);
-    return this.applyTransaction(
-      {
-        patches: [
-          {
-            op: "setSheetMeta",
-            sheet,
-            patch: { sortKeys: keys.map((key) => ({ ...key })) },
-          },
-        ],
-      },
-      "structure",
-    );
+    if (keys.length > 0) this.engine.requireCompleteQuery(sheet);
+    return this.applyTransaction({ patches: [viewSortPatch(sheet, keys)] }, "structure");
   }
 
   /**
@@ -583,7 +587,7 @@ export class SheetwriteStore implements Store {
     keys: readonly SortKey[],
     options: { hasHeader?: boolean } = {},
   ): ApplyTransactionResult {
-    this.requireCompleteQuery(range.sheet);
+    this.engine.requireCompleteQuery(range.sheet);
     const plan = this.engine.sortRangePlan(range, keys, options.hasHeader ?? false);
     if (plan.kind === "unchanged") return { status: "noop", epoch: this.epoch, reason: "empty" };
     if (plan.kind === "refused") {
@@ -609,19 +613,11 @@ export class SheetwriteStore implements Store {
     col: number,
     filter: ColumnFilter | null,
   ): ApplyTransactionResult {
-    if (filter !== null) this.requireCompleteQuery(sheet);
-    const filters = new Map(this.sheetMeta(sheet).filters ?? []);
-    if (filter === null) {
-      if (!filters.delete(col)) return { status: "noop", epoch: this.epoch, reason: "empty" };
-    } else {
-      filters.set(col, JSON.parse(JSON.stringify(filter)));
-    }
-    return this.applyTransaction(
-      {
-        patches: [{ op: "setSheetMeta", sheet, patch: { filters: [...filters] } }],
-      },
-      "structure",
-    );
+    if (filter !== null) this.engine.requireCompleteQuery(sheet);
+    const patch = columnFilterPatch(this.engine.sheets.sheetMeta(sheet), col, filter);
+    if (!patch) return { status: "noop", epoch: this.epoch, reason: "empty" };
+
+    return this.applyTransaction({ patches: [patch] }, "structure");
   }
 
   filterBy(sheet: SheetId, col: number, needle: string): ApplyTransactionResult {
@@ -637,33 +633,13 @@ export class SheetwriteStore implements Store {
   }
 
   hideRows(sheet: SheetId, rows: readonly number[]): ApplyTransactionResult {
-    const meta = this.sheetMeta(sheet);
-    const patches: DocumentOp[] = [];
-    for (const row of new Set(rows)) {
-      if (!Number.isInteger(row) || row < 0 || row >= meta.rowCount) continue;
-      patches.push({
-        op: "setRowMeta",
-        sheet,
-        row,
-        meta: { height: meta.rowHeights?.get(row), hidden: true },
-      });
-    }
+    const patches = rowVisibilityPatches(this.engine.sheets.sheetMeta(sheet), rows, true);
     return this.applyTransaction({ patches }, "structure");
   }
 
   showRows(sheet: SheetId, rows?: readonly number[]): ApplyTransactionResult {
-    const meta = this.sheetMeta(sheet);
-    const targets = rows ?? [...(meta.hiddenRows ?? [])];
-    const patches: DocumentOp[] = [];
-    for (const row of new Set(targets)) {
-      if (!Number.isInteger(row) || row < 0 || row >= meta.rowCount) continue;
-      patches.push({
-        op: "setRowMeta",
-        sheet,
-        row,
-        meta: { height: meta.rowHeights?.get(row), hidden: false },
-      });
-    }
+    const meta = this.engine.sheets.sheetMeta(sheet);
+    const patches = rowVisibilityPatches(meta, rows ?? [...(meta.hiddenRows ?? [])], false);
     return this.applyTransaction({ patches }, "structure");
   }
 
@@ -672,7 +648,7 @@ export class SheetwriteStore implements Store {
   }
 
   groupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
-    const groups = addRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
+    const groups = addRowGroup(this.engine.sheets.sheetMeta(sheet).rowGroups, start, end);
     return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -680,7 +656,7 @@ export class SheetwriteStore implements Store {
   }
 
   ungroupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
-    const groups = removeRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
+    const groups = removeRowGroup(this.engine.sheets.sheetMeta(sheet).rowGroups, start, end);
     return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -688,7 +664,11 @@ export class SheetwriteStore implements Store {
   }
 
   setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): ApplyTransactionResult {
-    const groups = collapseRowGroup(this.sheetMeta(sheet).rowGroups, start, collapsed);
+    const groups = collapseRowGroup(
+      this.engine.sheets.sheetMeta(sheet).rowGroups,
+      start,
+      collapsed,
+    );
     return this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -720,14 +700,10 @@ export class SheetwriteStore implements Store {
   }
 
   clearView(sheet: SheetId): ApplyTransactionResult {
-    const meta = this.sheetMeta(sheet);
-    if ((meta.sortKeys?.length ?? 0) === 0 && (meta.filters?.length ?? 0) === 0) {
-      return { status: "noop", epoch: this.epoch, reason: "empty" };
-    }
-    return this.applyTransaction(
-      { patches: [{ op: "setSheetMeta", sheet, patch: { sortKeys: [], filters: [] } }] },
-      "structure",
-    );
+    const patch = clearViewPatch(this.engine.sheets.sheetMeta(sheet));
+    if (!patch) return { status: "noop", epoch: this.epoch, reason: "empty" };
+
+    return this.applyTransaction({ patches: [patch] }, "structure");
   }
 
   viewRowCount(sheet: SheetId): number {
@@ -749,123 +725,97 @@ export class SheetwriteStore implements Store {
     this.assertEngineRunning();
     const preparation = new TransactionPreparation(tx.patches);
     try {
-      // A transaction built and measured by an engine layer carries its resource
-      // record; without one, direct callers pay the full payload walk. An
-      // engine-built atomic batch is bounded by the batch ceilings instead.
-      const limits = isAtomicBatch(tx.patches)
-        ? atomicBatchLimits(this.transactionResourceLimits)
-        : this.transactionResourceLimits;
-      const admittedResources = takeAdmittedTransactionResources(tx);
-      const resourceResolution = resolveTransactionResourceValidation(
-        tx.patches,
-        limits,
-        admittedResources,
-      );
-      const resourceValidation = resourceResolution.result;
-      if (!resourceValidation.ok) {
-        return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
+      return this.applyPreparedTransaction(tx, reasonOrOptions, preparation);
+    } catch (error) {
+      // Change listeners run inside this call too: a trap in a listener's
+      // engine read stops the engine the same way.
+      throw this.stopOnTrap(error);
+    } finally {
+      preparation.dispose();
+    }
+  }
+
+  /** Admission, policy, application and notification for one transaction, in that order. */
+  private applyPreparedTransaction(
+    tx: Transaction,
+    reasonOrOptions: CommitReason | TransactionApplicationOptions,
+    preparation: TransactionPreparation,
+  ): ApplyTransactionResult {
+    // A transaction built and measured by an engine layer carries its resource
+    // record; without one, direct callers pay the full payload walk. An
+    // engine-built atomic batch is bounded by the batch ceilings instead.
+    const limits = isAtomicBatch(tx.patches)
+      ? atomicBatchLimits(this.transactionResourceLimits)
+      : this.transactionResourceLimits;
+    const admittedResources = takeAdmittedTransactionResources(tx);
+    const resourceResolution = resolveTransactionResourceValidation(
+      tx.patches,
+      limits,
+      admittedResources,
+    );
+    const rejected = this.admissionRejection(tx, resourceResolution.result);
+    if (rejected) return rejected;
+
+    const options =
+      typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
+    const commitReason = options.commitReason ?? "api";
+    const source = options.source ?? "local";
+    if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
+      return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
+    }
+
+    const policy =
+      source === "local"
+        ? this.applyLocalPolicy(tx, commitReason, limits, preparation)
+        : { tx, warnings: [], rejections: [] };
+    if ("status" in policy) return policy;
+
+    const effectiveTx = policy.tx;
+    if (source === "local" || options.localReplay === true) {
+      const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
+      if (dirtyCapacityIssue) {
+        return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
       }
+    }
 
-      const invalidOperations = this.validateTransactionOperations(tx);
-      if (invalidOperations) return invalidOperations;
-      const options =
-        typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
-      const commitReason = options.commitReason ?? "api";
-      const source = options.source ?? "local";
-      if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
-        return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
-      }
+    if (
+      source === "local" &&
+      effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
+    ) {
+      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
+    }
 
-      let effectiveTx = tx;
-      let policyWarnings: MutationIssue[] = [];
-      let policyRejections: MutationIssue[] = [];
-      if (source === "local") {
-        const policy = this.policy.evaluate(
-          tx.patches,
-          commitReason,
-          this.protectionResolver,
-          this.mutationPolicy,
-        );
-        policyWarnings = policy.warnings;
-        policyRejections = policy.rejections;
-        if (policy.rejections.length > 0 && policy.patches.length === 0) {
-          return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
-        }
+    const hasListeners = this.listeners.size > 0;
+    const effects = this.engine.applyPatches(effectiveTx.patches, {
+      remoteLoad: source === "remote" && options.localReplay !== true,
+      captureChanges: hasListeners,
+      captureDetailedChanges: this.detailedChangeCapture,
+      trustedHistory:
+        admittedResources !== undefined &&
+        resourceResolution.admitted === admittedResources &&
+        !this.protectionResolver,
+      replayPivotSources: source === "remote" || commitReason === "undo" || commitReason === "redo",
+    });
 
-        if (policy.patches.length !== tx.patches.length) {
-          effectiveTx = { ...tx, patches: policy.patches };
-        }
+    if (effects.appliedPatches.length === 0) {
+      return {
+        status: "noop",
+        epoch: this.epoch,
+        reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
+      };
+    }
 
-        if (this.protectionResolver) {
-          preparation.bind(effectiveTx.patches);
-          // Permission callbacks receive live operations and may edit nested
-          // payloads after ingress validation. Do not reuse their measurements.
-          const callbackResources = resolveTransactionResourceValidation(
-            effectiveTx.patches,
-            limits,
-          ).result;
-          if (!callbackResources.ok) {
-            return { status: "rejected", epoch: this.epoch, issues: [callbackResources.issue] };
-          }
+    const xlsxSource = this.workbook.xlsxSource;
+    if (xlsxSource) this.invalidateXlsxGraphs(xlsxSource, effects.appliedPatches);
 
-          const callbackOperations = this.validateTransactionOperations(effectiveTx);
-          if (callbackOperations) return callbackOperations;
-        }
-      }
+    this.epoch += 1;
+    const transaction =
+      effects.appliedPatches.length === effectiveTx.patches.length
+        ? effectiveTx
+        : { ...effectiveTx, patches: effects.appliedPatches };
+    setTransactionStorageRevision(transaction, effects.storageRevision);
 
-      if (source === "local" || options.localReplay === true) {
-        const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
-        if (dirtyCapacityIssue) {
-          return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
-        }
-      }
-
-      if (
-        source === "local" &&
-        effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
-      ) {
-        return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
-      }
-
-      const hasListeners = this.listeners.size > 0;
-      const effects = this.engine.applyPatches(effectiveTx.patches, {
-        remoteLoad: source === "remote" && options.localReplay !== true,
-        captureChanges: hasListeners,
-        captureDetailedChanges: this.detailedChangeCapture,
-        trustedHistory:
-          admittedResources !== undefined &&
-          resourceResolution.admitted === admittedResources &&
-          !this.protectionResolver,
-        replayPivotSources:
-          source === "remote" || commitReason === "undo" || commitReason === "redo",
-      });
-
-      if (effects.appliedPatches.length === 0) {
-        return {
-          status: "noop",
-          epoch: this.epoch,
-          reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
-        };
-      }
-
-      const xlsxSource = this.workbook.xlsxSource;
-      if (xlsxSource) this.invalidateXlsxGraphs(xlsxSource, effects.appliedPatches);
-      this.epoch += 1;
-      const transaction =
-        effects.appliedPatches.length === effectiveTx.patches.length
-          ? effectiveTx
-          : { ...effectiveTx, patches: effects.appliedPatches };
-      setTransactionStorageRevision(transaction, effects.storageRevision);
-      if (!hasListeners) {
-        return {
-          status: "applied",
-          epoch: this.epoch,
-          transaction,
-          ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
-          ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
-        };
-      }
-
+    if (hasListeners) {
       const event: ChangeEvent = {
         transaction,
         changes: effects.changes ?? [],
@@ -875,20 +825,64 @@ export class SheetwriteStore implements Store {
       };
 
       for (const listener of this.listeners) listener(event);
-      return {
-        status: "applied",
-        epoch: this.epoch,
-        transaction,
-        ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
-        ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
-      };
-    } catch (error) {
-      // Change listeners run inside this call too: a trap in a listener's
-      // engine read stops the engine the same way.
-      throw this.stopOnTrap(error);
-    } finally {
-      preparation.dispose();
     }
+
+    return {
+      status: "applied",
+      epoch: this.epoch,
+      transaction,
+      ...(policy.warnings.length > 0 ? { warnings: policy.warnings } : {}),
+      ...(policy.rejections.length > 0 ? { rejections: policy.rejections } : {}),
+    };
+  }
+
+  /** Reject a transaction whose payload exceeds its limits or whose operations cannot apply. */
+  private admissionRejection(
+    tx: Transaction,
+    resources: TransactionResourceValidationResult,
+  ): ApplyTransactionResult | undefined {
+    if (!resources.ok) return { status: "rejected", epoch: this.epoch, issues: [resources.issue] };
+
+    const issue = this.transactionOperationIssue(tx);
+    return issue ? { status: "rejected", epoch: this.epoch, issues: [issue] } : undefined;
+  }
+
+  /**
+   * Run the mutation policy on a local transaction. Permission callbacks
+   * receive live operations and may edit them, so the kept operations are
+   * admitted again afterwards.
+   */
+  private applyLocalPolicy(
+    tx: Transaction,
+    commitReason: CommitReason,
+    limits: Readonly<TransactionResourceLimits>,
+    preparation: TransactionPreparation,
+  ): LocalPolicyOutcome | ApplyTransactionResult {
+    const policy = this.policy.evaluate(
+      tx.patches,
+      commitReason,
+      this.protectionResolver,
+      this.mutationPolicy,
+    );
+    if (policy.rejections.length > 0 && policy.patches.length === 0) {
+      return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
+    }
+
+    const effectiveTx =
+      policy.patches.length === tx.patches.length ? tx : { ...tx, patches: policy.patches };
+    if (this.protectionResolver) {
+      preparation.bind(effectiveTx.patches);
+
+      // Do not reuse measurements taken before the callbacks ran.
+      const callbackResources = resolveTransactionResourceValidation(
+        effectiveTx.patches,
+        limits,
+      ).result;
+      const rejected = this.admissionRejection(effectiveTx, callbackResources);
+      if (rejected) return rejected;
+    }
+
+    return { tx: effectiveTx, warnings: policy.warnings, rejections: policy.rejections };
   }
 
   /**
@@ -1000,7 +994,8 @@ export class SheetwriteStore implements Store {
     return isEngineTrap(error) ? stopEngine(error, this.generation) : error;
   }
 
-  private validateTransactionOperations(tx: Transaction): ApplyTransactionResult | undefined {
+  /** The first operation that is malformed, breaks sheet lifecycle, or names a missing sheet. */
+  private transactionOperationIssue(tx: Transaction): MutationIssue | undefined {
     const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
     for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
       const operationPath = `transaction.patches[${operationIndex}]`;
@@ -1010,150 +1005,136 @@ export class SheetwriteStore implements Store {
       );
       if (unsafeError || !operation) {
         return {
-          status: "rejected",
-          epoch: this.epoch,
-          issues: [
-            {
-              kind: "invalid-operation",
-              severity: "error",
-              operationIndex,
-              message: unsafeError?.message ?? "Operation is missing",
-            },
-          ],
+          kind: "invalid-operation",
+          severity: "error",
+          operationIndex,
+          message: unsafeError?.message ?? "Operation is missing",
         };
       }
 
       const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
       if (lifecycle && !lifecycle.ok) {
         return {
-          status: "rejected",
-          epoch: this.epoch,
-          issues: [
-            {
-              kind: "sheet-lifecycle",
-              severity: "error",
-              code: lifecycle.code,
-              sheet:
-                operation.op === "addSheet"
-                  ? operation.sheet.id
-                  : (patchSheetId(operation) ?? undefined),
-              operationIndex,
-              message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
-            },
-          ],
+          kind: "sheet-lifecycle",
+          severity: "error",
+          code: lifecycle.code,
+          sheet:
+            operation.op === "addSheet"
+              ? operation.sheet.id
+              : (patchSheetId(operation) ?? undefined),
+          operationIndex,
+          message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
         };
       }
 
-      const requiredSheets: SheetId[] = [];
-      if (operation.op === "addSheet") {
-        for (const block of operation.sheet.cells) {
-          for (const cell of block.cells) {
-            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
-          }
-        }
-
-        for (const rule of operation.sheet.conditionalFormats ?? []) {
-          requiredSheets.push(rule.range.sheet);
-        }
-
-        for (const hyperlink of operation.sheet.hyperlinks ?? []) {
-          requiredSheets.push(hyperlink.range.sheet);
-          if (hyperlink.target.kind === "internal") {
-            requiredSheets.push(hyperlink.target.range.sheet);
-          }
-        }
-
-        for (const rule of operation.sheet.validationRules ?? []) {
-          requiredSheets.push(rule.range.sheet);
-        }
-
-        for (const entry of operation.sheet.protectedRanges ?? []) {
-          requiredSheets.push(entry.range.sheet);
-        }
-
-        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
-        for (const chart of operation.sheet.charts ?? []) {
-          for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
-        }
-      } else {
-        const primarySheet = patchSheetId(operation);
-        if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
-
-        if (operation.op === "set" && operation.value.kind === "ref") {
-          requiredSheets.push(operation.value.target.sheet);
-        } else if (operation.op === "setRange") {
-          for (const cell of operation.cells) {
-            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
-          }
-        } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
-          if (operation.op === "restoreBlock") {
-            requiredSheets.push(
-              ...preparedRestore(operation, validateDocumentOperationShape).requiredSheets,
-            );
-          } else {
-            for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
-          }
-        } else if (operation.op === "setNamedRange") {
-          if (operation.namedRange.range) requiredSheets.push(operation.namedRange.range.sheet);
-          if (operation.namedRange.scope !== undefined) {
-            requiredSheets.push(operation.namedRange.scope);
-          }
-        } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
-          requiredSheets.push(operation.scope);
-        } else if (operation.op === "setHyperlink") {
-          requiredSheets.push(operation.hyperlink.range.sheet);
-          if (operation.hyperlink.target.kind === "internal") {
-            requiredSheets.push(operation.hyperlink.target.range.sheet);
-          }
-        } else if (operation.op === "setValidationRule") {
-          requiredSheets.push(operation.rule.range.sheet);
-        } else if (operation.op === "setProtectedRange") {
-          requiredSheets.push(operation.protectedRange.range.sheet);
-        } else if (operation.op === "setSheetMeta") {
-          for (const rule of operation.patch.conditionalFormats ?? []) {
-            requiredSheets.push(rule.range.sheet);
-          }
-        } else if (operation.op === "setChart") {
-          for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
-        } else if (
-          operation.op === "setPivot" &&
-          !operation.pivot.source.invalid &&
-          "range" in operation.pivot.source
-        ) {
-          requiredSheets.push(operation.pivot.source.range.sheet);
-        }
-      }
-
+      const requiredSheets = requiredOperationSheets(operation, lifecycle === null);
       const missingSheet = requiredSheets.find(
         (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
       );
       if (missingSheet !== undefined) {
         return {
-          status: "rejected",
-          epoch: this.epoch,
-          issues: [
-            {
-              kind: "invalid-operation",
-              severity: "error",
-              operationIndex,
-              message: `Sheet ${missingSheet} does not exist`,
-            },
-          ],
+          kind: "invalid-operation",
+          severity: "error",
+          operationIndex,
+          message: `Sheet ${missingSheet} does not exist`,
         };
       }
     }
 
     return undefined;
   }
+}
 
-  private requireCompleteQuery(sheet: SheetId): void {
-    const capability = this.engine.queryCapability(sheet);
-    if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
+/** Every sheet a new sheet's snapshot refers to, which must exist once it is added. */
+function addedSheetReferences(sheet: SheetSnapshot): SheetId[] {
+  const requiredSheets: SheetId[] = [];
+  for (const block of sheet.cells) {
+    for (const cell of block.cells) {
+      if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+    }
   }
 
-  private sheetMeta(sheet: SheetId) {
-    const meta = this.engine.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw unknownSheetError(sheet);
-    return meta;
+  for (const rule of sheet.conditionalFormats ?? []) {
+    requiredSheets.push(rule.range.sheet);
   }
+
+  for (const hyperlink of sheet.hyperlinks ?? []) {
+    requiredSheets.push(hyperlink.range.sheet);
+    if (hyperlink.target.kind === "internal") {
+      requiredSheets.push(hyperlink.target.range.sheet);
+    }
+  }
+
+  for (const rule of sheet.validationRules ?? []) {
+    requiredSheets.push(rule.range.sheet);
+  }
+
+  for (const entry of sheet.protectedRanges ?? []) {
+    requiredSheets.push(entry.range.sheet);
+  }
+
+  for (const note of sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+  for (const chart of sheet.charts ?? []) {
+    for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
+  }
+
+  return requiredSheets;
+}
+
+/**
+ * Sheets an operation reads or writes. The primary sheet is included unless
+ * sheet lifecycle already checked it.
+ */
+function requiredOperationSheets(operation: DocumentOp, includePrimary: boolean): SheetId[] {
+  if (operation.op === "addSheet") return addedSheetReferences(operation.sheet);
+
+  const requiredSheets: SheetId[] = [];
+  const primarySheet = patchSheetId(operation);
+  if (includePrimary && primarySheet !== null) requiredSheets.push(primarySheet);
+
+  if (operation.op === "set" && operation.value.kind === "ref") {
+    requiredSheets.push(operation.value.target.sheet);
+  } else if (operation.op === "setRange") {
+    for (const cell of operation.cells) {
+      if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+    }
+  } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
+    if (operation.op === "restoreBlock") {
+      requiredSheets.push(
+        ...preparedRestore(operation, validateDocumentOperationShape).requiredSheets,
+      );
+    } else {
+      for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+    }
+  } else if (operation.op === "setNamedRange") {
+    if (operation.namedRange.range) requiredSheets.push(operation.namedRange.range.sheet);
+    if (operation.namedRange.scope !== undefined) {
+      requiredSheets.push(operation.namedRange.scope);
+    }
+  } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
+    requiredSheets.push(operation.scope);
+  } else if (operation.op === "setHyperlink") {
+    requiredSheets.push(operation.hyperlink.range.sheet);
+    if (operation.hyperlink.target.kind === "internal") {
+      requiredSheets.push(operation.hyperlink.target.range.sheet);
+    }
+  } else if (operation.op === "setValidationRule") {
+    requiredSheets.push(operation.rule.range.sheet);
+  } else if (operation.op === "setProtectedRange") {
+    requiredSheets.push(operation.protectedRange.range.sheet);
+  } else if (operation.op === "setSheetMeta") {
+    for (const rule of operation.patch.conditionalFormats ?? []) {
+      requiredSheets.push(rule.range.sheet);
+    }
+  } else if (operation.op === "setChart") {
+    for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
+  } else if (
+    operation.op === "setPivot" &&
+    !operation.pivot.source.invalid &&
+    "range" in operation.pivot.source
+  ) {
+    requiredSheets.push(operation.pivot.source.range.sheet);
+  }
+
+  return requiredSheets;
 }
