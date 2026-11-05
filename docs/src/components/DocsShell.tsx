@@ -88,6 +88,7 @@ function LatestReleaseCard({
   onNavigate,
 }: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
   const href = releaseHref(LATEST_RELEASE.version);
+
   return (
     <Link
       aria-current={activeHref === href ? "page" : undefined}
@@ -114,6 +115,7 @@ const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
   const badge = navigationBadge(item, LATEST_RELEASE.version);
   if (badge === undefined) return null;
+
   return (
     <span className="sw-nav-badge" data-badge={badge}>
       {BADGE_TEXT[badge]}
@@ -192,6 +194,7 @@ function NavigationSections({
   onNavigate,
 }: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
   const current = nearestNavigationItem(activeHref);
+
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
@@ -296,6 +299,7 @@ function NavigationDrawer({
 /** Reading order: the neighbours of this page, when it sits in one. */
 function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   if (previous === undefined && next === undefined) return null;
+
   return (
     <nav aria-label="Documentation pages" className="sw-doc-pager">
       {previous === undefined ? (
