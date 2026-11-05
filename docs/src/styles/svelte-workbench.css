@@ -27,11 +27,7 @@
   --sheetwrite-widget-bg: var(--sw-surface-1);
   --sheetwrite-widget-fg: var(--sw-fg);
   --sheetwrite-widget-border: var(--sw-border);
-  --sheetwrite-widget-selection: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    transparent
-  );
+  --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
   --sheetwrite-widget-accent: var(--sw-accent-strong);
   /* The shell bar owns popups (value assist, function list): never clip them. */
   overflow: visible;
@@ -308,11 +304,7 @@
 .sw-svw-mission > button {
   width: 100%;
   margin-top: var(--sw-space-1);
-  border-color: color-mix(
-    in srgb,
-    var(--sw-accent) 52%,
-    var(--sw-border-strong)
-  );
+  border-color: color-mix(in srgb, var(--sw-accent) 52%, var(--sw-border-strong));
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-1));
   color: var(--sw-accent-strong);
 }
@@ -339,12 +331,7 @@
   outline-offset: 2px;
 }
 
-.sw-svw
-  :is(
-    .sw-svw-mission button,
-    .sw-svw-actions button,
-    .sw-svw-conflict button
-  ):disabled {
+.sw-svw :is(.sw-svw-mission button, .sw-svw-actions button, .sw-svw-conflict button):disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

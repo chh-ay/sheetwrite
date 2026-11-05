@@ -603,9 +603,7 @@
   color: var(--sw-danger);
 }
 
-.sw-workbench-stage
-  .sw-vw
-  .sw-workbench-primary[data-tone="danger"]:hover:not(:disabled) {
+.sw-workbench-stage .sw-vw .sw-workbench-primary[data-tone="danger"]:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sw-danger) 20%, var(--sw-surface-1));
 }
 

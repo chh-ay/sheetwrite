@@ -18,16 +18,8 @@
 
 /* Capture vintages differ: a caution tone, not the "validated" accent. */
 .evidence-mixed {
-  border-color: color-mix(
-    in srgb,
-    var(--sw-state-pending) 45%,
-    var(--sw-border)
-  );
-  background: color-mix(
-    in srgb,
-    var(--sw-state-pending) 6%,
-    var(--sw-surface-1)
-  );
+  border-color: color-mix(in srgb, var(--sw-state-pending) 45%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-state-pending) 6%, var(--sw-surface-1));
 }
 
 .error-catalog {
@@ -142,21 +134,13 @@
 }
 
 .compat-result__meta [data-status="supported"] {
-  border-color: color-mix(
-    in srgb,
-    var(--sw-state-resolved) 35%,
-    var(--sw-border)
-  );
+  border-color: color-mix(in srgb, var(--sw-state-resolved) 35%, var(--sw-border));
   color: var(--sw-state-resolved);
 }
 
 .compat-result__meta [data-status="warning"],
 .compat-result__meta [data-status="partial"] {
-  border-color: color-mix(
-    in srgb,
-    var(--sw-state-pending) 35%,
-    var(--sw-border)
-  );
+  border-color: color-mix(in srgb, var(--sw-state-pending) 35%, var(--sw-border));
   color: var(--sw-state-pending);
 }
 
@@ -242,17 +226,14 @@
 }
 
 /* Resource ceilings read as compact records instead of five squeezed prose columns. */
-.sw-prose--resource-limits
-  table:has(> thead > tr > th:nth-child(5):last-child) {
+.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) {
   display: block;
   overflow: visible;
   border: 0;
   background: transparent;
 }
 
-.sw-prose--resource-limits
-  table:has(> thead > tr > th:nth-child(5):last-child)
-  > thead {
+.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > thead {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -262,19 +243,14 @@
   white-space: nowrap;
 }
 
-.sw-prose--resource-limits
-  table:has(> thead > tr > th:nth-child(5):last-child)
-  > tbody {
+.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
   align-items: start;
 }
 
-.sw-prose--resource-limits
-  table:has(> thead > tr > th:nth-child(5):last-child)
-  > tbody
-  > tr {
+.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody > tr {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
@@ -284,11 +260,7 @@
   background: var(--sw-surface-1);
 }
 
-.sw-prose--resource-limits
-  table:has(> thead > tr > th:nth-child(5):last-child)
-  > tbody
-  > tr
-  > td {
+.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody > tr > td {
   display: block;
   min-width: 0;
   border: 0;
@@ -411,26 +383,19 @@
   content: "Override";
 }
 
-.sw-prose--resource-limits
-  table:has(> thead > tr > th:nth-child(5):last-child)
-  code {
+.sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) code {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 52rem) {
-  .sw-prose--resource-limits
-    table:has(> thead > tr > th:nth-child(5):last-child)
-    > tbody {
+  .sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 42rem) {
-  .sw-prose--resource-limits
-    table:has(> thead > tr > th:nth-child(5):last-child)
-    > tbody
-    > tr {
+  .sw-prose--resource-limits table:has(> thead > tr > th:nth-child(5):last-child) > tbody > tr {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1052,8 +1017,7 @@
   height: 0.62rem;
   border-radius: 0.25rem;
   background: var(--sw-surface-2);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--sw-border) 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-border) 55%, transparent);
 }
 
 .bench-bar__track i {
@@ -1223,15 +1187,9 @@
 #bench-size-1000:checked ~ .bench-widget__tabs label[for="bench-size-1000"],
 #bench-size-10000:checked ~ .bench-widget__tabs label[for="bench-size-10000"],
 #bench-size-100000:checked ~ .bench-widget__tabs label[for="bench-size-100000"],
-#bench-size-1000000:checked
-  ~ .bench-widget__tabs
-  label[for="bench-size-1000000"],
-#bench-metric-speed:checked
-  ~ .bench-widget__tabs
-  label[for="bench-metric-speed"],
-#bench-metric-memory:checked
-  ~ .bench-widget__tabs
-  label[for="bench-metric-memory"] {
+#bench-size-1000000:checked ~ .bench-widget__tabs label[for="bench-size-1000000"],
+#bench-metric-speed:checked ~ .bench-widget__tabs label[for="bench-metric-speed"],
+#bench-metric-memory:checked ~ .bench-widget__tabs label[for="bench-metric-memory"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
@@ -1264,26 +1222,13 @@
 }
 
 /* Keyboard focus on the hidden radios surfaces on the active label. */
-#bench-size-1000:focus-visible
-  ~ .bench-widget__tabs
-  label[for="bench-size-1000"],
-#bench-size-10000:focus-visible
-  ~ .bench-widget__tabs
-  label[for="bench-size-10000"],
-#bench-size-100000:focus-visible
-  ~ .bench-widget__tabs
-  label[for="bench-size-100000"],
-#bench-size-1000000:focus-visible
-  ~ .bench-widget__tabs
-  label[for="bench-size-1000000"],
-#bench-metric-speed:focus-visible
-  ~ .bench-widget__tabs
-  label[for="bench-metric-speed"],
-#bench-metric-memory:focus-visible
-  ~ .bench-widget__tabs
-  label[for="bench-metric-memory"] {
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 45%, transparent);
+#bench-size-1000:focus-visible ~ .bench-widget__tabs label[for="bench-size-1000"],
+#bench-size-10000:focus-visible ~ .bench-widget__tabs label[for="bench-size-10000"],
+#bench-size-100000:focus-visible ~ .bench-widget__tabs label[for="bench-size-100000"],
+#bench-size-1000000:focus-visible ~ .bench-widget__tabs label[for="bench-size-1000000"],
+#bench-metric-speed:focus-visible ~ .bench-widget__tabs label[for="bench-metric-speed"],
+#bench-metric-memory:focus-visible ~ .bench-widget__tabs label[for="bench-metric-memory"] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
 }
 
 /* An engine that never finished lays it down honestly. */
@@ -1293,8 +1238,7 @@
 
 .bench-crash {
   padding: 0.1rem 0.6rem;
-  border: 1px dashed
-    color-mix(in srgb, var(--sw-code-number) 55%, var(--sw-border));
+  border: 1px dashed color-mix(in srgb, var(--sw-code-number) 55%, var(--sw-border));
   border-radius: 0.35rem;
   color: var(--sw-code-number);
   font: 600 0.68rem / 1.6 var(--sw-font-mono);
@@ -1311,10 +1255,8 @@
 /* Default widget state (100k / speed) when no radio has been touched yet.
    The generator cannot emit `checked` - hydrated React would treat the
    input as controlled and revert every user toggle. */
-.bench-widget:not(:has(input[name="bench-size"]:checked))
-  label[for="bench-size-100000"],
-.bench-widget:not(:has(input[name="bench-metric"]:checked))
-  label[for="bench-metric-speed"] {
+.bench-widget:not(:has(input[name="bench-size"]:checked)) label[for="bench-size-100000"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked)) label[for="bench-metric-speed"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
@@ -1348,8 +1290,7 @@
 
 #bench-data-1000:checked ~ .bench-widget__tabs label[for="bench-data-1000"],
 #bench-data-10000:checked ~ .bench-widget__tabs label[for="bench-data-10000"],
-.bench-widget--data:not(:has(input[name="bench-data-size"]:checked))
-  label[for="bench-data-10000"] {
+.bench-widget--data:not(:has(input[name="bench-data-size"]:checked)) label[for="bench-data-10000"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }

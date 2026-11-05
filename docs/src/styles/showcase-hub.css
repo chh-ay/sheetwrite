@@ -19,11 +19,7 @@
     linear-gradient(90deg, var(--sw-grid-line) 1px, transparent 1px);
   background-size: 4rem 4rem;
   content: "";
-  mask-image: radial-gradient(
-    ellipse 80% 70% at 50% 0%,
-    #000 30%,
-    transparent 100%
-  );
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 100%);
   pointer-events: none;
 }
 
@@ -206,11 +202,7 @@
 
 .sw-hub-launch {
   --sw-hub-accent: var(--sw-accent);
-  --sw-hub-accent-ink: color-mix(
-    in srgb,
-    var(--sw-hub-accent) 72%,
-    var(--sw-fg-strong)
-  );
+  --sw-hub-accent-ink: color-mix(in srgb, var(--sw-hub-accent) 72%, var(--sw-fg-strong));
 
   display: grid;
   height: 100%;
@@ -261,8 +253,7 @@
   grid-template-rows: auto auto 1fr auto;
   gap: 0.625rem;
   padding: clamp(1.25rem, 2vw, 1.75rem);
-  border-top: 1px solid
-    color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
+  border-top: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
   background: var(--sw-surface-1);
 }
 
@@ -410,10 +401,10 @@
 .sw-hub-commits {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 0.8fr)) minmax(
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 0.8fr)) minmax(0, 1.5fr) minmax(
       0,
-      1.5fr
-    ) minmax(0, 1.3fr);
+      1.3fr
+    );
   align-items: start;
   gap: 0.25rem;
   margin-block: auto;
@@ -809,8 +800,8 @@
 /* The filtered column: a funnel mark drawn as a small accent triangle. */
 .sw-hub-rules__grid i[data-filtered] {
   background:
-    linear-gradient(to bottom right, transparent 50%, var(--sw-hub-accent) 50%)
-      right 2px bottom 2px / 0.5rem 0.5rem no-repeat,
+    linear-gradient(to bottom right, transparent 50%, var(--sw-hub-accent) 50%) right 2px bottom
+      2px / 0.5rem 0.5rem no-repeat,
     color-mix(in srgb, var(--sw-hub-accent) 28%, transparent);
 }
 

@@ -59,11 +59,7 @@
 }
 
 .sw-lp-button:hover {
-  background: color-mix(
-    in srgb,
-    var(--sw-accent-strong) 86%,
-    var(--sw-fg-strong)
-  );
+  background: color-mix(in srgb, var(--sw-accent-strong) 86%, var(--sw-fg-strong));
 }
 
 .sw-lp-button--ghost {

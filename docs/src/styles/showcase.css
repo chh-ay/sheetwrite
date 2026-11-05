@@ -407,8 +407,7 @@
 
   .sw-demo-radio-item:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px
-      color-mix(in srgb, var(--demo-accent) 32%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--demo-accent) 32%, transparent);
   }
 
   .sw-demo-radio-item {
@@ -436,8 +435,7 @@
   .sw-demo-radio-item[data-checked] {
     background: var(--demo-accent);
     color: var(--sw-accent-ink);
-    box-shadow: 0 0.2rem 0.75rem
-      color-mix(in srgb, var(--demo-accent) 18%, transparent);
+    box-shadow: 0 0.2rem 0.75rem color-mix(in srgb, var(--demo-accent) 18%, transparent);
   }
 
   .sw-demo-commandbar button:disabled {
@@ -525,8 +523,7 @@
     display: block;
     margin-block: 0.75rem;
     padding: 0.6rem;
-    border: 1px solid
-      color-mix(in srgb, var(--demo-accent) 22%, var(--sw-border));
+    border: 1px solid color-mix(in srgb, var(--demo-accent) 22%, var(--sw-border));
     border-radius: 0.35rem;
     background: color-mix(in srgb, var(--demo-accent) 6%, transparent);
     color: var(--demo-accent);
@@ -700,9 +697,7 @@
       grid-column: 1 / -1;
     }
 
-    .sw-demo-app[data-framework="react"]
-      .sw-demo-commandbar
-      .sw-demo-select__trigger {
+    .sw-demo-app[data-framework="react"] .sw-demo-commandbar .sw-demo-select__trigger {
       width: 100%;
       min-width: 0;
     }
@@ -905,8 +900,7 @@
     border: 1px solid var(--sw-border);
     border-radius: 1rem;
     background: var(--sw-surface-1);
-    box-shadow: 0 0.75rem 2.5rem
-      color-mix(in srgb, var(--sw-fg-strong) 6%, transparent);
+    box-shadow: 0 0.75rem 2.5rem color-mix(in srgb, var(--sw-fg-strong) 6%, transparent);
   }
 
   .sw-showcase-stage__bar,
@@ -1412,16 +1406,14 @@
 .sw-demo-app :focus-visible:not(.sheetwrite),
 .sw-vanilla-app :focus-visible:not(.sheetwrite) {
   outline: none;
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--demo-accent) 48%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--demo-accent) 48%, transparent);
 }
 
 :is(
   .sw-demo-heading__actions button[data-primary="true"],
   .sw-demo-radio-item[data-checked]
 ):focus-visible {
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent-ink) 58%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent-ink) 58%, transparent);
 }
 
 /* Live showcase workbench: one compact host control row, with framework-tinted
@@ -1440,11 +1432,7 @@
   --sheetwrite-header-fg: var(--sw-accent-strong);
   --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
   --sheetwrite-selection-border: var(--sw-accent);
-  --sheetwrite-search-match: color-mix(
-    in srgb,
-    var(--sw-warning) 25%,
-    transparent
-  );
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
   --sheetwrite-search-active: var(--sw-warning);
   --sheetwrite-highlight: color-mix(in srgb, var(--sw-accent) 20%, transparent);
   --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
@@ -1453,55 +1441,33 @@
   --sheetwrite-widget-muted: var(--sw-fg-muted);
   --sheetwrite-widget-border: var(--sw-border);
   --sheetwrite-widget-accent: var(--sw-accent-strong);
-  --sheetwrite-widget-selection: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    transparent
-  );
+  --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
   --sheetwrite-toolbar-bg: var(--sw-surface-1);
   --sheetwrite-toolbar-fg: var(--sw-fg);
-  --sheetwrite-menu-hover: color-mix(
-    in srgb,
-    var(--sw-accent) 12%,
-    var(--sw-surface-2)
-  );
+  --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
   --sheetwrite-find-shadow: var(--sw-shadow-lg);
   --sheetwrite-menu-shadow: var(--sw-shadow-lg);
   --sheetwrite-assist-bg: var(--sw-surface-2);
   --sheetwrite-assist-fg: var(--sw-fg);
   --sheetwrite-assist-border: var(--sw-border-strong);
-  --sheetwrite-assist-selected: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    var(--sw-surface-2)
-  );
+  --sheetwrite-assist-selected: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-2));
   --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
   --sheetwrite-tab-bg: var(--sw-surface-0);
   --sheetwrite-tab-fg: var(--sw-fg-muted);
   --sheetwrite-tab-border: var(--sw-border);
-  --sheetwrite-tab-hover-bg: color-mix(
-    in srgb,
-    var(--sw-accent) 9%,
-    var(--sw-surface-2)
-  );
-  --sheetwrite-tab-active-bg: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    var(--sw-surface-0)
-  );
+  --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-2));
+  --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-0));
   --sheetwrite-tab-active-fg: var(--sw-accent-strong);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  :is(.sheetwrite-toolbar, .sheetwrite-shell-toolbar) {
+:is(.sw-demo-app, .sw-vanilla-app) :is(.sheetwrite-toolbar, .sheetwrite-shell-toolbar) {
   min-height: 2.125rem;
   padding: var(--sw-space-1) var(--sw-space-2);
   background: var(--sheetwrite-toolbar-bg);
   color: var(--sheetwrite-toolbar-fg);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula) {
+:is(.sw-demo-app, .sw-vanilla-app) :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula) {
   border-color: var(--sw-border);
   background: var(--sw-surface-1);
   color: var(--sw-fg);
@@ -1510,12 +1476,10 @@
 :is(.sw-demo-app, .sw-vanilla-app)
   :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula):focus-visible {
   border-color: var(--sw-accent);
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 42%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 42%, transparent);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  .sheetwrite-shell-namebox[aria-invalid="true"] {
+:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-shell-namebox[aria-invalid="true"] {
   border-color: var(--sw-danger);
   outline: none;
   box-shadow: inset 0 0 0 1px var(--sw-danger);
@@ -1536,9 +1500,7 @@
 }
 
 :is(.sw-demo-app, .sw-vanilla-app)
-  .sheetwrite-context-menu-item:hover:not(
-    .sheetwrite-context-menu-item-disabled
-  ) {
+  .sheetwrite-context-menu-item:hover:not(.sheetwrite-context-menu-item-disabled) {
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
   color: var(--sw-fg-strong);
 }
@@ -1547,8 +1509,7 @@
   color: var(--sw-fg-muted);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  :is(.sheetwrite-tabbar, .sheetwrite-shell-tabs) {
+:is(.sw-demo-app, .sw-vanilla-app) :is(.sheetwrite-tabbar, .sheetwrite-shell-tabs) {
   background: var(--sheetwrite-tab-bg);
   border-color: var(--sheetwrite-tab-border);
 }
@@ -1562,13 +1523,11 @@
     background var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  .sheetwrite-tab:has(+ .sheetwrite-tab-close) {
+:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab:has(+ .sheetwrite-tab-close) {
   padding-inline-end: calc(var(--sw-space-4) * 2);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  .sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
+:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
   background: var(--sheetwrite-tab-hover-bg);
   color: var(--sw-fg);
 }
@@ -1580,8 +1539,7 @@
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-active:focus-visible {
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 48%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 48%, transparent);
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-close {
@@ -1597,9 +1555,7 @@
   color: var(--sw-fg-muted);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  .sheetwrite-tab-active
-  + .sheetwrite-tab-close {
+:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-active + .sheetwrite-tab-close {
   color: var(--sheetwrite-tab-active-fg);
 }
 
@@ -1631,44 +1587,20 @@
 @layer components {
   .sw-showcase-page[data-framework="react"] {
     --sw-accent: var(--sw-fw-react);
-    --sw-accent-strong: color-mix(
-      in srgb,
-      var(--sw-fw-react) 72%,
-      var(--sw-fg-strong)
-    );
-    --sw-accent-soft: color-mix(
-      in srgb,
-      var(--sw-fw-react) 16%,
-      var(--sw-surface-1)
-    );
+    --sw-accent-strong: color-mix(in srgb, var(--sw-fw-react) 72%, var(--sw-fg-strong));
+    --sw-accent-soft: color-mix(in srgb, var(--sw-fw-react) 16%, var(--sw-surface-1));
   }
 
   .sw-showcase-page[data-framework="vue"] {
     --sw-accent: var(--sw-fw-vue);
-    --sw-accent-strong: color-mix(
-      in srgb,
-      var(--sw-fw-vue) 72%,
-      var(--sw-fg-strong)
-    );
-    --sw-accent-soft: color-mix(
-      in srgb,
-      var(--sw-fw-vue) 16%,
-      var(--sw-surface-1)
-    );
+    --sw-accent-strong: color-mix(in srgb, var(--sw-fw-vue) 72%, var(--sw-fg-strong));
+    --sw-accent-soft: color-mix(in srgb, var(--sw-fw-vue) 16%, var(--sw-surface-1));
   }
 
   .sw-showcase-page[data-framework="svelte"] {
     --sw-accent: var(--sw-fw-svelte);
-    --sw-accent-strong: color-mix(
-      in srgb,
-      var(--sw-fw-svelte) 72%,
-      var(--sw-fg-strong)
-    );
-    --sw-accent-soft: color-mix(
-      in srgb,
-      var(--sw-fw-svelte) 16%,
-      var(--sw-surface-1)
-    );
+    --sw-accent-strong: color-mix(in srgb, var(--sw-fw-svelte) 72%, var(--sw-fg-strong));
+    --sw-accent-soft: color-mix(in srgb, var(--sw-fw-svelte) 16%, var(--sw-surface-1));
   }
 
   .sw-demo-app[data-framework="react"] {
@@ -1797,8 +1729,7 @@
 
   .sw-demo-controlbar__search input:focus-visible {
     border-color: var(--sw-accent);
-    box-shadow: inset 0 0 0 2px
-      color-mix(in srgb, var(--sw-accent) 42%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 42%, transparent);
   }
 
   .sw-demo-controlbar__controls .sw-demo-select {
@@ -1958,9 +1889,7 @@
 }
 
 @media (max-width: 42rem) {
-  .sw-showcase-page[data-framework]
-    .sw-showcase-page__hero
-    .sw-showcase-page__install {
+  .sw-showcase-page[data-framework] .sw-showcase-page__hero .sw-showcase-page__install {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -2040,11 +1969,7 @@ button[aria-busy="true"]::after {
   right: var(--grid-scrollbar-width, 0px);
   bottom: var(--grid-scrollbar-width, 0px);
   width: 2.75rem;
-  background: linear-gradient(
-    to left,
-    var(--sheetwrite-bg, var(--sw-surface-1)),
-    transparent
-  );
+  background: linear-gradient(to left, var(--sheetwrite-bg, var(--sw-surface-1)), transparent);
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms ease;

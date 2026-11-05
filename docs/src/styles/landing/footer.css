@@ -42,12 +42,7 @@
   left: 50%;
   width: min(36rem, 70%);
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--sw-accent),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, var(--sw-accent), transparent);
   content: "";
   transform: translateX(-50%);
 }

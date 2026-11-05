@@ -35,9 +35,7 @@
   stroke: var(--sw-accent);
   stroke-width: 2;
   opacity: 0;
-  filter: drop-shadow(
-    0 0 10px color-mix(in srgb, var(--sw-accent) 55%, transparent)
-  );
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sw-accent) 55%, transparent));
 }
 
 .as .as-owner {
@@ -161,9 +159,7 @@
 
 .as-packet rect {
   fill: var(--sw-accent-strong);
-  filter: drop-shadow(
-    0 0 8px color-mix(in srgb, var(--sw-accent) 60%, transparent)
-  );
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--sw-accent) 60%, transparent));
 }
 
 .as .as-packet text {

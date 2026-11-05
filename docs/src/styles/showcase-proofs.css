@@ -304,11 +304,7 @@
     transparent
   );
   --sheetwrite-selection-border: var(--sw-proofs-grid-accent, var(--sw-accent));
-  --sheetwrite-search-match: color-mix(
-    in srgb,
-    var(--sw-warning) 25%,
-    transparent
-  );
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
   --sheetwrite-search-active: var(--sw-warning);
   --sheetwrite-highlight: color-mix(
     in srgb,
@@ -321,42 +317,22 @@
   --sheetwrite-widget-muted: var(--sw-fg-muted);
   --sheetwrite-widget-border: var(--sw-border);
   --sheetwrite-widget-accent: var(--sw-accent-strong);
-  --sheetwrite-widget-selection: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    transparent
-  );
+  --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
   --sheetwrite-toolbar-bg: var(--sw-surface-1);
   --sheetwrite-toolbar-fg: var(--sw-fg);
-  --sheetwrite-menu-hover: color-mix(
-    in srgb,
-    var(--sw-accent) 12%,
-    var(--sw-surface-2)
-  );
+  --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
   --sheetwrite-find-shadow: var(--sw-shadow-lg);
   --sheetwrite-menu-shadow: var(--sw-shadow-lg);
   --sheetwrite-assist-bg: var(--sw-surface-2);
   --sheetwrite-assist-fg: var(--sw-fg);
   --sheetwrite-assist-border: var(--sw-border-strong);
-  --sheetwrite-assist-selected: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    var(--sw-surface-2)
-  );
+  --sheetwrite-assist-selected: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-2));
   --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
   --sheetwrite-tab-bg: var(--sw-surface-0);
   --sheetwrite-tab-fg: var(--sw-fg-muted);
   --sheetwrite-tab-border: var(--sw-border);
-  --sheetwrite-tab-hover-bg: color-mix(
-    in srgb,
-    var(--sw-accent) 9%,
-    var(--sw-surface-2)
-  );
-  --sheetwrite-tab-active-bg: color-mix(
-    in srgb,
-    var(--sw-accent) 14%,
-    var(--sw-surface-0)
-  );
+  --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-2));
+  --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-0));
   --sheetwrite-tab-active-fg: var(--sw-accent-strong);
 }
 
@@ -375,11 +351,7 @@
     transparent
   );
   --sheetwrite-selection-border: var(--sw-proofs-grid-accent, var(--sw-accent));
-  --sheetwrite-search-match: color-mix(
-    in srgb,
-    var(--sw-warning) 25%,
-    transparent
-  );
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
   --sheetwrite-search-active: var(--sw-warning);
   --sheetwrite-highlight: color-mix(
     in srgb,
@@ -845,10 +817,7 @@
   box-shadow: inset 0 0 0 1px var(--sw-accent);
 }
 
-.sw-proofs-switch
-  input:checked
-  + .sw-proofs-switch-track
-  .sw-proofs-switch-thumb {
+.sw-proofs-switch input:checked + .sw-proofs-switch-track .sw-proofs-switch-thumb {
   transform: translateX(var(--sw-space-4));
 }
 
@@ -856,8 +825,7 @@
   box-shadow: inset 0 0 0 1px var(--sw-accent);
 }
 
-.sw-proofs-switch[data-state="on"]:not(:has(input:disabled)):hover
-  .sw-proofs-switch-track {
+.sw-proofs-switch[data-state="on"]:not(:has(input:disabled)):hover .sw-proofs-switch-track {
   background: var(--sw-accent-strong);
 }
 

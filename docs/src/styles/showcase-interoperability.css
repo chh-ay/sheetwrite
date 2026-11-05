@@ -12,18 +12,10 @@
 
   .sw-si-page {
     --sw-si-grid-block-size: clamp(30rem, 60dvh, 36rem);
-    --sw-si-split-block-size: clamp(
-      27rem,
-      calc(100dvh - (var(--sw-header-height) * 2)),
-      46rem
-    );
+    --sw-si-split-block-size: clamp(27rem, calc(100dvh - (var(--sw-header-height) * 2)), 46rem);
     /* As text on page surfaces, the demo danger colour mixes toward the theme's
        strong foreground. */
-    --sw-si-danger: color-mix(
-      in srgb,
-      var(--sw-danger) 68%,
-      var(--sw-fg-strong)
-    );
+    --sw-si-danger: color-mix(in srgb, var(--sw-danger) 68%, var(--sw-fg-strong));
     display: flex;
     width: calc(100% - 2 * var(--sw-page-inset));
     flex-direction: column;
@@ -169,10 +161,7 @@
 
   .sw-si-disclosure > summary {
     display: grid;
-    grid-template-columns: minmax(8rem, 0.3fr) minmax(18rem, 1fr) minmax(
-        14rem,
-        0.7fr
-      );
+    grid-template-columns: minmax(8rem, 0.3fr) minmax(18rem, 1fr) minmax(14rem, 0.7fr);
     gap: var(--sw-space-3);
     align-items: center;
     padding: var(--sw-space-3) var(--sw-space-4);
@@ -337,11 +326,7 @@
   }
 
   .sw-si-btn--danger {
-    border-color: color-mix(
-      in srgb,
-      var(--sw-danger) 55%,
-      var(--sw-border-strong)
-    );
+    border-color: color-mix(in srgb, var(--sw-danger) 55%, var(--sw-border-strong));
     background: color-mix(in srgb, var(--sw-danger) 12%, var(--sw-surface-1));
     color: color-mix(in srgb, var(--sw-danger) 62%, var(--sw-fg-strong));
     font-weight: 650;
@@ -409,55 +394,27 @@
     --sheetwrite-grid-line: var(--sw-border);
     --sheetwrite-header-bg: var(--sw-surface-2);
     --sheetwrite-header-fg: var(--sw-accent-strong);
-    --sheetwrite-selection: color-mix(
-      in srgb,
-      var(--sw-accent) 14%,
-      transparent
-    );
+    --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
     --sheetwrite-selection-border: var(--sw-accent);
-    --sheetwrite-search-match: color-mix(
-      in srgb,
-      var(--sw-warning) 25%,
-      transparent
-    );
+    --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
     --sheetwrite-search-active: var(--sw-warning);
-    --sheetwrite-highlight: color-mix(
-      in srgb,
-      var(--sw-accent) 20%,
-      transparent
-    );
+    --sheetwrite-highlight: color-mix(in srgb, var(--sw-accent) 20%, transparent);
     --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
     --sheetwrite-widget-bg: var(--sw-surface-2);
     --sheetwrite-widget-fg: var(--sw-fg);
     --sheetwrite-widget-muted: var(--sw-fg-muted);
     --sheetwrite-widget-border: var(--sw-border);
     --sheetwrite-widget-accent: var(--sw-accent-strong);
-    --sheetwrite-widget-selection: color-mix(
-      in srgb,
-      var(--sw-accent) 14%,
-      transparent
-    );
-    --sheetwrite-menu-hover: color-mix(
-      in srgb,
-      var(--sw-accent) 10%,
-      var(--sw-surface-2)
-    );
+    --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+    --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
     --sheetwrite-menu-shadow: var(--sw-shadow-lg);
     --sheetwrite-find-shadow: var(--sw-shadow-lg);
     --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
     --sheetwrite-tab-bg: var(--sw-surface-2);
     --sheetwrite-tab-fg: var(--sw-fg-muted);
     --sheetwrite-tab-border: var(--sw-border);
-    --sheetwrite-tab-hover-bg: color-mix(
-      in srgb,
-      var(--sw-accent) 9%,
-      var(--sw-surface-2)
-    );
-    --sheetwrite-tab-active-bg: color-mix(
-      in srgb,
-      var(--sw-accent) 14%,
-      var(--sw-surface-1)
-    );
+    --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-2));
+    --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-1));
     --sheetwrite-tab-active-fg: var(--sw-accent-strong);
 
     display: grid;
@@ -772,8 +729,7 @@
   .sw-si-model__segments input:checked + span {
     background: var(--sw-accent-soft);
     color: var(--sw-accent-strong);
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, var(--sw-accent) 45%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-accent) 45%, transparent);
     /* Weight, not only colour, marks the selected input. */
     font-weight: 750;
   }
@@ -936,11 +892,7 @@
   }
 
   .sw-si-choice summary:hover {
-    border-color: color-mix(
-      in srgb,
-      var(--sw-accent) 45%,
-      var(--sw-border-strong)
-    );
+    border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border-strong));
   }
 
   /* Result states as quiet pills; "missing" stays neutral so real states stand out. */
@@ -959,8 +911,7 @@
     font-style: normal;
   }
 
-  .sw-si-compat__tags
-    i:is([data-state="local-pass"], [data-state="reviewed-pass"]) {
+  .sw-si-compat__tags i:is([data-state="local-pass"], [data-state="reviewed-pass"]) {
     background: color-mix(in srgb, var(--sw-state-resolved) 14%, transparent);
     color: var(--sw-accent-strong);
   }
@@ -970,8 +921,7 @@
     color: var(--sw-state-pending);
   }
 
-  .sw-si-compat__tags
-    i:is([data-state="unsupported"], [data-state="regression"]) {
+  .sw-si-compat__tags i:is([data-state="unsupported"], [data-state="regression"]) {
     background: color-mix(in srgb, var(--sw-danger) 12%, transparent);
     color: var(--sw-si-danger);
   }
@@ -1094,8 +1044,7 @@
   .sw-si-compat__records button[aria-pressed="true"] {
     border-left-color: var(--sw-fg-strong);
     background: color-mix(in srgb, var(--sw-fg-strong) 7%, var(--sw-surface-1));
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, var(--sw-fg-strong) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-fg-strong) 20%, transparent);
   }
 
   .sw-si-compat__records button > span,
@@ -1125,27 +1074,17 @@
     background: color-mix(in srgb, currentColor 12%, transparent);
   }
 
-  .sw-si-compat__records
-    button[data-status="supported"]
-    > .sw-si-compat__record-status {
+  .sw-si-compat__records button[data-status="supported"] > .sw-si-compat__record-status {
     color: var(--sw-accent-strong);
   }
 
-  .sw-si-compat__records
-    button[data-status="partial"]
-    > .sw-si-compat__record-status,
-  .sw-si-compat__records
-    button[data-status="roundtrip-only"]
-    > .sw-si-compat__record-status,
-  .sw-si-compat__records
-    button[data-status="warning"]
-    > .sw-si-compat__record-status {
+  .sw-si-compat__records button[data-status="partial"] > .sw-si-compat__record-status,
+  .sw-si-compat__records button[data-status="roundtrip-only"] > .sw-si-compat__record-status,
+  .sw-si-compat__records button[data-status="warning"] > .sw-si-compat__record-status {
     color: var(--sw-state-requested);
   }
 
-  .sw-si-compat__records
-    button[data-status="unsupported"]
-    > .sw-si-compat__record-status {
+  .sw-si-compat__records button[data-status="unsupported"] > .sw-si-compat__record-status {
     color: var(--sw-si-danger);
   }
 
@@ -1189,23 +1128,17 @@
     color: var(--sw-fg-muted);
   }
 
-  .sw-si-compat__detail[data-status="supported"]
-    .sw-si-compat__mode
-    span:first-child {
+  .sw-si-compat__detail[data-status="supported"] .sw-si-compat__mode span:first-child {
     background: color-mix(in srgb, var(--sw-state-resolved) 14%, transparent);
     color: var(--sw-accent-strong);
   }
 
-  .sw-si-compat__detail[data-status="warning"]
-    .sw-si-compat__mode
-    span:first-child {
+  .sw-si-compat__detail[data-status="warning"] .sw-si-compat__mode span:first-child {
     background: color-mix(in srgb, var(--sw-state-pending) 14%, transparent);
     color: var(--sw-state-pending);
   }
 
-  .sw-si-compat__detail[data-status="unsupported"]
-    .sw-si-compat__mode
-    span:first-child {
+  .sw-si-compat__detail[data-status="unsupported"] .sw-si-compat__mode span:first-child {
     background: color-mix(in srgb, var(--sw-danger) 14%, transparent);
     color: var(--sw-si-danger);
   }
@@ -2286,12 +2219,10 @@
   color: var(--sw-accent-strong);
 }
 
-.sw-si-workbench
-  :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula):focus-visible {
+.sw-si-workbench :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula):focus-visible {
   border-color: var(--sw-accent);
   outline: none;
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 42%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 42%, transparent);
 }
 
 .sw-si-workbench .sheetwrite-shell-namebox[aria-invalid="true"] {
@@ -2356,8 +2287,7 @@
 
 .sw-si-workbench .sheetwrite-tab-active:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 48%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 48%, transparent);
 }
 
 /* Sheet add/remove: plain glyph controls, not filled bubbles. Hover tints
@@ -2417,8 +2347,7 @@
   line-height: 1.5;
 }
 
-.sw-si-page
-  :is(.sw-si-compat__records, .sw-si-filter__options, .sw-si-tablewrap, pre) {
+.sw-si-page :is(.sw-si-compat__records, .sw-si-filter__options, .sw-si-tablewrap, pre) {
   scrollbar-width: thin;
   scrollbar-color: var(--sw-border-strong) var(--sw-surface-1);
 }
@@ -2491,11 +2420,7 @@
   --sheetwrite-header-fg: var(--sw-accent-strong);
   --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
   --sheetwrite-selection-border: var(--sw-accent);
-  --sheetwrite-search-match: color-mix(
-    in srgb,
-    var(--sw-warning) 25%,
-    transparent
-  );
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
   --sheetwrite-search-active: var(--sw-warning);
   --sheetwrite-highlight: color-mix(in srgb, var(--sw-accent) 20%, transparent);
 }
@@ -2520,8 +2445,7 @@
   color: var(--sw-accent-strong);
 }
 
-.sw-si-workbench
-  :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
+.sw-si-workbench :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
   outline: 2px solid var(--sw-accent);
   outline-offset: 1px;
 }

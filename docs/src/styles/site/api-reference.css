@@ -278,11 +278,7 @@
   height: 1.3rem;
   border-radius: 0.3rem;
   color: var(--api-kind-color, var(--sw-fg-muted));
-  background: color-mix(
-    in srgb,
-    var(--api-kind-color, var(--sw-fg-muted)) 13%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--api-kind-color, var(--sw-fg-muted)) 13%, transparent);
   font: 650 0.7rem / 1 var(--sw-font-mono);
 }
 
@@ -408,8 +404,7 @@
 }
 
 .api-member:has(> summary:focus-visible) {
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 30%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 30%, transparent);
 }
 
 .api-declaration:has(> summary:focus-visible) {
@@ -467,15 +462,10 @@
 }
 
 .sw-prose .api-member-alias code {
-  border: 1px solid
-    color-mix(in srgb, var(--sw-code-function) 30%, var(--sw-border));
+  border: 1px solid color-mix(in srgb, var(--sw-code-function) 30%, var(--sw-border));
   padding: 0.04rem 0.3rem;
   border-radius: 0.3rem;
-  background: color-mix(
-    in srgb,
-    var(--sw-code-function) 8%,
-    var(--sw-surface-2)
-  );
+  background: color-mix(in srgb, var(--sw-code-function) 8%, var(--sw-surface-2));
   color: color-mix(in srgb, var(--sw-code-function) 74%, var(--sw-fg));
   font: 550 0.72rem / 1.5 var(--sw-font-mono);
 }
@@ -668,8 +658,7 @@
    no tier uses it. */
 .sw-code-popover__trigger {
   border-radius: 0.2rem;
-  text-decoration: underline dotted
-    color-mix(in srgb, var(--sw-fg-muted) 40%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-muted) 40%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.25em;
   cursor: help;
@@ -682,8 +671,7 @@
 
 .sw-code-popover__trigger[data-hover-kind="documented"],
 .sw-code-popover__trigger[data-hover-kind="reference"] {
-  text-decoration: underline dotted
-    color-mix(in srgb, var(--sw-accent) 55%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-accent) 55%, transparent);
   text-decoration-thickness: 1.5px;
 }
 
@@ -738,8 +726,7 @@ body .sw-code-popover__signature {
   margin: 0;
   padding: 0.85rem 1rem 0.9rem 1.15rem;
   overflow: auto hidden;
-  border-block-start: 2px solid
-    color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  border-block-start: 2px solid color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
   background: var(--sw-surface-2);
   color: var(--sw-fg-strong);
   font: 500 0.72rem / 1.54 var(--sw-font-mono);
@@ -914,8 +901,7 @@ body .sw-code-popover__accessible-signature {
 /* Type identifiers in generated declaration fences link to their API pages. */
 .sw-prose .expressive-code a.sw-code-ref {
   color: inherit;
-  text-decoration: underline dotted
-    color-mix(in srgb, var(--sw-fg-muted) 65%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-muted) 65%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
 }

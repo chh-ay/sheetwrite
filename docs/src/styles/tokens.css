@@ -29,8 +29,7 @@
      and interface text, JetBrains Mono for code and eyebrows. Roles, not raw
      sizes: a stylesheet picks the role that matches the text's job. */
   --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
-  --sw-font-display:
-    "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
   --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
@@ -198,10 +197,8 @@
   --sw-fw-svelte-strong: #8c2f06;
 
   --sw-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 8%);
-  --sw-shadow-md:
-    0 0.5rem 1.5rem rgb(15 23 42 / 8%), 0 2px 6px rgb(15 23 42 / 6%);
-  --sw-shadow-lg:
-    0 1.25rem 3rem rgb(15 23 42 / 12%), 0 2px 8px rgb(15 23 42 / 8%);
+  --sw-shadow-md: 0 0.5rem 1.5rem rgb(15 23 42 / 8%), 0 2px 6px rgb(15 23 42 / 6%);
+  --sw-shadow-lg: 0 1.25rem 3rem rgb(15 23 42 / 12%), 0 2px 8px rgb(15 23 42 / 8%);
   --sw-backdrop: rgb(10 18 32 / 45%);
   /* Overlays and masks. The mask colour is alpha only: masks read opacity, not hue. */
   --sw-mask-opaque: #000;

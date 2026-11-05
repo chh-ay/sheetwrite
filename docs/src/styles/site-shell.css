@@ -15,10 +15,7 @@
   z-index: 50;
   inset: 0 0 auto;
   display: grid;
-  grid-template-columns: calc(var(--sw-sidebar-width) - 2rem) minmax(
-      12rem,
-      28rem
-    ) 1fr;
+  grid-template-columns: calc(var(--sw-sidebar-width) - 2rem) minmax(12rem, 28rem) 1fr;
   align-items: center;
   gap: 1.5rem;
   height: var(--sw-header-height);
@@ -119,11 +116,7 @@
   border-radius: 0.65rem;
   color: var(--sw-fg-muted);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--sw-accent) 12%, transparent),
-      transparent 70%
-    ),
+    linear-gradient(135deg, color-mix(in srgb, var(--sw-accent) 12%, transparent), transparent 70%),
     var(--sw-surface-1);
   text-decoration: none;
   transition:
@@ -355,11 +348,7 @@
 .sw-document {
   width: calc(100% - var(--sw-sidebar-width));
   margin: 0 0 0 var(--sw-sidebar-width);
-  padding: 2.75rem
-    max(
-      clamp(1.5rem, 5vw, 4.5rem),
-      (100% - var(--sw-sidebar-width) - 70rem) / 2
-    )
+  padding: 2.75rem max(clamp(1.5rem, 5vw, 4.5rem), (100% - var(--sw-sidebar-width) - 70rem) / 2)
     4rem;
   min-width: 0;
 }
@@ -718,11 +707,7 @@
   border: 1px solid color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
   border-radius: 0.8rem;
   padding: 2rem;
-  background: color-mix(
-    in srgb,
-    var(--sw-accent-soft) 45%,
-    var(--sw-surface-0)
-  );
+  background: color-mix(in srgb, var(--sw-accent-soft) 45%, var(--sw-surface-0));
 }
 .sw-docs .sw-doc-start h2 {
   margin: 0.6rem 0;
@@ -981,10 +966,7 @@ html:has(.sw-nav-dialog[open]) {
     grid-template-columns: minmax(0, 1fr) 13rem;
     gap: 0 3.5rem;
     /* Keep the 70rem reading area; the outline gets its own 16.5rem. */
-    padding-inline: max(
-      clamp(1.5rem, 5vw, 4.5rem),
-      (100% - var(--sw-sidebar-width) - 86.5rem) / 2
-    );
+    padding-inline: max(clamp(1.5rem, 5vw, 4.5rem), (100% - var(--sw-sidebar-width) - 86.5rem) / 2);
   }
   .sw-document > .sw-document__header,
   .sw-document > .sw-symbol-filter,

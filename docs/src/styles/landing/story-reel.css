@@ -587,8 +587,7 @@
 .sr-undo .sr-block {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sr-restore-send 1s cubic-bezier(0.45, 0, 0.55, 1)
-    var(--restore-send) both;
+  animation: sr-restore-send 1s cubic-bezier(0.45, 0, 0.55, 1) var(--restore-send) both;
 }
 
 /* Inside the server it becomes five versions, then one outline groups them. */
@@ -605,8 +604,7 @@
 .sr-undo .sr-batch-group {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sr-batch-send 0.7s cubic-bezier(0.45, 0, 0.55, 1) var(--batch-send)
-    both;
+  animation: sr-batch-send 0.7s cubic-bezier(0.45, 0, 0.55, 1) var(--batch-send) both;
 }
 
 /* The peer's cells empty with the clear (v50), then all fill at once when the

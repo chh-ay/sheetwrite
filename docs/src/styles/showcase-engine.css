@@ -307,17 +307,9 @@
   --sheetwrite-header-fg: var(--sw-fg-muted);
   --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 18%, transparent);
   --sheetwrite-selection-border: var(--sw-accent);
-  --sheetwrite-search-match: color-mix(
-    in srgb,
-    var(--sw-warning) 24%,
-    transparent
-  );
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 24%, transparent);
   --sheetwrite-search-active: var(--sw-warning);
-  --sheetwrite-highlight: color-mix(
-    in srgb,
-    var(--sw-state-requested) 24%,
-    transparent
-  );
+  --sheetwrite-highlight: color-mix(in srgb, var(--sw-state-requested) 24%, transparent);
 }
 
 .sw-engine-facts {
@@ -413,8 +405,7 @@
   position: relative;
   display: grid;
   gap: var(--sw-space-1);
-  padding: var(--sw-space-2) var(--sw-space-4) var(--sw-space-2)
-    calc(var(--sw-space-4) * 1.6);
+  padding: var(--sw-space-2) var(--sw-space-4) var(--sw-space-2) calc(var(--sw-space-4) * 1.6);
   border-top: 1px solid var(--sw-border);
 }
 

@@ -45,11 +45,7 @@ a {
    colors keeps the UA scrollbar untouched. */
 @media (forced-colors: none) {
   :root {
-    --sw-scrollbar-thumb: color-mix(
-      in srgb,
-      var(--sw-fg-muted) 55%,
-      transparent
-    );
+    --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-muted) 55%, transparent);
     --sw-scrollbar-track: transparent;
     scrollbar-width: thin;
   }
@@ -96,8 +92,7 @@ a {
 }
 
 .expressive-code pre:focus-visible {
-  box-shadow: inset 0 0 0 2px
-    color-mix(in srgb, var(--sw-accent) 40%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 40%, transparent);
 }
 
 /* Forced-colors mode removes box shadows, so the focus ring above disappears.
@@ -472,18 +467,12 @@ a {
   margin: 1.75rem -0.75rem 2.25rem;
   overflow-x: auto;
   background:
-    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem
-      100% no-repeat local,
-    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem
-      100% no-repeat local,
-    radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent)
-      left / 0.8rem 100% no-repeat scroll,
-    radial-gradient(
-        farthest-side at 100% 50%,
-        var(--sw-shadow-edge),
-        transparent
-      )
-      right / 0.8rem 100% no-repeat scroll;
+    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
+      no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
+      100% no-repeat scroll;
   --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
 }
 
@@ -753,19 +742,11 @@ body .sw-code-popover__tag-link:hover {
 
 .sw-prose .expressive-code figure.frame.has-title > figcaption.header::before,
 .sw-prose .expressive-code figure.frame.has-title > figcaption.header::after,
-.sw-prose
-  .expressive-code
-  figure.frame.has-title
-  > figcaption.header
-  > span.title::after {
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title::after {
   content: none;
 }
 
-.sw-prose
-  .expressive-code
-  figure.frame.has-title
-  > figcaption.header
-  > span.title {
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title {
   position: static;
   display: inline-flex;
   height: auto;

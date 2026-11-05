@@ -554,8 +554,7 @@
   padding: 0.75rem;
   border-left: 1px solid var(--sw-border);
   background: var(--sw-surface-1);
-  box-shadow: -10px 0 24px -18px
-    color-mix(in srgb, var(--sw-fg) 45%, transparent);
+  box-shadow: -10px 0 24px -18px color-mix(in srgb, var(--sw-fg) 45%, transparent);
 }
 
 .ha-fields strong {

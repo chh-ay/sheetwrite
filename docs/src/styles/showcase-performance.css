@@ -12,15 +12,10 @@
     --sw-sp-page-width: 84rem;
     --sw-sp-measure: 54rem;
     --sw-sp-stage-offset: 24rem;
-    --sw-sp-grid-height: clamp(
-      28rem,
-      calc(100dvh - var(--sw-sp-stage-offset)),
-      34rem
-    );
+    --sw-sp-grid-height: clamp(28rem, calc(100dvh - var(--sw-sp-stage-offset)), 34rem);
     --sw-sp-instrument-width: 16rem;
     --sw-sp-line: 1px;
-    --sw-sp-focus: 0 0 0 0.2rem
-      color-mix(in srgb, var(--sw-accent) 35%, transparent);
+    --sw-sp-focus: 0 0 0 0.2rem color-mix(in srgb, var(--sw-accent) 35%, transparent);
 
     display: flex;
     min-height: 100dvh;
@@ -205,11 +200,8 @@
     background: var(--sw-accent);
   }
 
-  .sw-sp-flight[data-flying="true"]
-    .sw-sp-flight__hud-address
-    dd:first-of-type {
-    text-shadow: 0 0 1.25rem
-      color-mix(in srgb, var(--sw-accent) 45%, transparent);
+  .sw-sp-flight[data-flying="true"] .sw-sp-flight__hud-address dd:first-of-type {
+    text-shadow: 0 0 1.25rem color-mix(in srgb, var(--sw-accent) 45%, transparent);
   }
 
   .sw-sp-flight__map {
@@ -221,8 +213,7 @@
   .sw-sp-flight__map canvas {
     border: 1px solid var(--sw-border-strong);
     border-radius: var(--sw-radius-md);
-    background: linear-gradient(var(--sw-surface-0), var(--sw-surface-0))
-      padding-box;
+    background: linear-gradient(var(--sw-surface-0), var(--sw-surface-0)) padding-box;
     cursor: crosshair;
   }
 
@@ -489,39 +480,19 @@
     --sheetwrite-grid-line: var(--sw-border);
     --sheetwrite-header-bg: var(--sw-surface-2);
     --sheetwrite-header-fg: var(--sw-fg-strong);
-    --sheetwrite-selection: color-mix(
-      in srgb,
-      var(--sw-accent) 15%,
-      transparent
-    );
+    --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 15%, transparent);
     --sheetwrite-selection-border: var(--sw-accent);
-    --sheetwrite-search-match: color-mix(
-      in srgb,
-      var(--sw-warning) 24%,
-      transparent
-    );
+    --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 24%, transparent);
     --sheetwrite-search-active: var(--sw-warning);
-    --sheetwrite-highlight: color-mix(
-      in srgb,
-      var(--sw-accent) 18%,
-      transparent
-    );
+    --sheetwrite-highlight: color-mix(in srgb, var(--sw-accent) 18%, transparent);
     --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
     --sheetwrite-widget-bg: var(--sw-surface-2);
     --sheetwrite-widget-fg: var(--sw-fg);
     --sheetwrite-widget-muted: var(--sw-fg-muted);
     --sheetwrite-widget-border: var(--sw-border);
     --sheetwrite-widget-accent: var(--sw-accent-strong);
-    --sheetwrite-widget-selection: color-mix(
-      in srgb,
-      var(--sw-accent) 15%,
-      transparent
-    );
-    --sheetwrite-menu-hover: color-mix(
-      in srgb,
-      var(--sw-accent) 10%,
-      var(--sw-surface-2)
-    );
+    --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 15%, transparent);
+    --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
     --sheetwrite-menu-shadow: var(--sw-shadow-lg);
     --sheetwrite-find-shadow: var(--sw-shadow-lg);
 
@@ -832,11 +803,7 @@
 
   .sw-sp-page .sw-sp-stress button[aria-pressed="true"] {
     border-color: var(--sw-state-pending);
-    background: color-mix(
-      in srgb,
-      var(--sw-state-pending) 12%,
-      var(--sw-surface-1)
-    );
+    background: color-mix(in srgb, var(--sw-state-pending) 12%, var(--sw-surface-1));
     color: var(--sw-state-pending);
   }
 
@@ -1200,11 +1167,7 @@
     margin: 0;
     padding: var(--sw-sp-space-3) var(--sw-sp-space-4);
     border-top: var(--sw-sp-line) solid var(--sw-border);
-    background: color-mix(
-      in srgb,
-      var(--sw-state-pending) 8%,
-      var(--sw-surface-1)
-    );
+    background: color-mix(in srgb, var(--sw-state-pending) 8%, var(--sw-surface-1));
     color: var(--sw-fg-muted);
     font: 500 var(--sw-text-caption) / 1.5 var(--sw-font-mono);
   }
@@ -1575,11 +1538,7 @@
     margin: 0;
     padding: var(--sw-sp-space-3);
     border-left: calc(var(--sw-sp-line) * 3) solid var(--sw-state-pending);
-    background: color-mix(
-      in srgb,
-      var(--sw-state-pending) 8%,
-      var(--sw-surface-1)
-    );
+    background: color-mix(in srgb, var(--sw-state-pending) 8%, var(--sw-surface-1));
     color: var(--sw-fg);
     font-size: var(--sw-text-small);
     line-height: 1.6;
@@ -1767,15 +1726,10 @@
     flex-direction: column;
     justify-content: space-between;
     padding: clamp(1.25rem, 3vw, 2rem);
-    border-color: color-mix(
-      in srgb,
-      var(--sw-accent-strong) 42%,
-      var(--sw-border)
-    );
+    border-color: color-mix(in srgb, var(--sw-accent-strong) 42%, var(--sw-border));
     border-radius: var(--sw-radius-lg);
     background: color-mix(in srgb, var(--sw-accent) 6%, var(--sw-surface-1));
-    box-shadow: inset 0 1px 0
-      color-mix(in srgb, var(--sw-accent) 20%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sw-accent) 20%, transparent);
   }
 
   .sw-sp-scale-curve header {
@@ -1875,8 +1829,7 @@
 
   .sw-sp-proof-wins article > span {
     color: var(--sw-fg-muted);
-    font: 650 clamp(0.62rem, 3.5cqi, var(--sw-text-caption)) / 1.25
-      var(--sw-font-body);
+    font: 650 clamp(0.62rem, 3.5cqi, var(--sw-text-caption)) / 1.25 var(--sw-font-body);
     letter-spacing: 0.035em;
     text-transform: uppercase;
     white-space: nowrap;

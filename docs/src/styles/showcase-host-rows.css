@@ -149,11 +149,7 @@
   --sheetwrite-header-fg: var(--sw-fg-strong);
   --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 15%, transparent);
   --sheetwrite-selection-border: var(--sw-accent);
-  --sheetwrite-search-match: color-mix(
-    in srgb,
-    var(--sw-warning) 25%,
-    transparent
-  );
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
   --sheetwrite-search-active: var(--sw-warning);
   --sheetwrite-widget-bg: var(--sw-surface-2);
   --sheetwrite-widget-fg: var(--sw-fg);
@@ -367,8 +363,7 @@
   background: var(--sw-surface-2);
   color: var(--sw-accent-strong);
 }
-.host-row-stage
-  :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
+.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
   outline: 2px solid var(--sw-accent);
   outline-offset: 1px;
 }

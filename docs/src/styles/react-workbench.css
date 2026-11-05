@@ -176,10 +176,7 @@
 .sw-rwb-workspace {
   display: grid;
   min-height: 32rem;
-  grid-template-columns: minmax(0, 68.75rem) minmax(
-      var(--sw-rwb-rail-width),
-      1fr
-    );
+  grid-template-columns: minmax(0, 68.75rem) minmax(var(--sw-rwb-rail-width), 1fr);
   background: var(--sw-surface-1);
 }
 

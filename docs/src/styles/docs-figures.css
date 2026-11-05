@@ -93,8 +93,7 @@
 }
 .sw-prose .sw-grid-result__sheet tr.sw-grid-result__edge > :last-child {
   mask-image:
-    linear-gradient(to right, #000, transparent),
-    linear-gradient(to bottom, #000, transparent);
+    linear-gradient(to right, #000, transparent), linear-gradient(to bottom, #000, transparent);
   mask-composite: intersect;
 }
 .sw-prose .sw-grid-result__row-id {
@@ -242,8 +241,7 @@
   border: 1px solid var(--sw-border);
   border-radius: 0.45rem;
   background: var(--sw-surface-2);
-  box-shadow: 0 6px 18px
-    color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
 }
 .sw-mini-search > div {
   display: flex;
@@ -283,8 +281,7 @@
   border: 1px solid var(--sw-border);
   border-radius: 0.35rem;
   background: var(--sw-surface-2);
-  box-shadow: 0 6px 18px
-    color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
   font-size: 0.82rem;
 }
 /* Under a result sheet the menu opens from the clicked cell, past the row numbers. */
