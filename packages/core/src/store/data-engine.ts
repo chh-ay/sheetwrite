@@ -3810,14 +3810,14 @@ export class StoreDataEngine {
     const movedNamedFormulas = this.prepareMovedNamedFormulas(patch);
     if (movedNamedFormulas === null) return false;
 
-    const moved = this.captureMovedItems(sheet);
+    const moved = this.captureMovedItems(sheet, axis);
     const end = patch.from + patch.count;
     const cells =
       axis === "row"
         ? this.snapshotCells(patch.sheet, patch.from, end, 0, sheet.columns.length)
         : this.snapshotCells(patch.sheet, 0, sheet.rowCount, patch.from, end);
     const rowMeta = axis === "row" ? movedRowMeta(sheet, patch.from, patch.count) : [];
-    const columns = sheet.columns.slice(patch.from, end);
+    const columns = axis === "column" ? sheet.columns.slice(patch.from, end) : [];
 
     const reinserted =
       this.applyPatch(
@@ -3862,7 +3862,7 @@ export class StoreDataEngine {
    * then add, which would drop or shrink items inside the moved block, so
    * they are put back from these copies.
    */
-  private captureMovedItems(sheet: Sheet): MovedItems {
+  private captureMovedItems(sheet: Sheet, axis: SheetAxis): MovedItems {
     return {
       namedRanges: (this.workbook.namedRanges ?? [])
         .filter(
@@ -3877,7 +3877,8 @@ export class StoreDataEngine {
       hyperlinks: this.workbook.sheets.map(
         (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
       ),
-      tables: structuredClone(sheet.tables ?? []),
+      // Only a column move puts table metadata back; see `restoreMovedTables`.
+      tables: axis === "column" ? structuredClone(sheet.tables ?? []) : [],
       charts: this.captureCharts(),
     };
   }
