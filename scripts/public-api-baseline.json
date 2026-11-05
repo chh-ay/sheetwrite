@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "3dee9418f0274b3ccf8ef33f8dcdb8554a7836be3aac785b2354762fbb5234e9",
+  "sha256": "6c2cf0bed54946244281f8038b4465b1b8ce89c5342b80c6f9934c0045a27d0f",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -208,10 +208,10 @@
         "RemoteOperationOptions",
         "RemoteOperationSource",
         "ReplaceResult",
-        "RestoreProvenance",
         "ResolvedCell",
         "ResolvedHyperlinkTarget",
         "ResourceOwnerBytes",
+        "RestoreProvenance",
         "RibbonConfig",
         "RibbonMode",
         "RowBridge",

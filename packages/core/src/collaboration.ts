@@ -1,6 +1,6 @@
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
-import type { Sheet, WorkbookSnapshot } from "./types/document.js";
+import type { Sheet } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 
 /** Public collaborator identity attached to presence updates. */

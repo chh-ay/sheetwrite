@@ -32,6 +32,7 @@ export type CommitReason =
   | "replace"
   | "undo"
   | "redo"
+  | "restore"
   | "api";
 ```
 

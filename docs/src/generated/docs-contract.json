@@ -55,7 +55,7 @@
         "load-mount-queue-and-acknowledge": "/docs/features/collaboration/#load-mount-queue-and-acknowledge",
         "presence": "/docs/features/collaboration/#presence",
         "remote-operations-and-version-gaps": "/docs/features/collaboration/#remote-operations-and-version-gaps",
-        "revisions": "/docs/features/collaboration/#revisions"
+        "revisions": "/docs/features/collaboration/#restoring-versions"
       }
     },
     "/docs/guides/configuration/": {
@@ -250,9 +250,9 @@
     "toXlsxWorkbook"
   ],
   "entryPointCount": 29,
-  "exportCount": 681,
-  "symbolPageCount": 681,
-  "apiSha256": "3dee9418f0274b3ccf8ef33f8dcdb8554a7836be3aac785b2354762fbb5234e9",
+  "exportCount": 676,
+  "symbolPageCount": 676,
+  "apiSha256": "6c2cf0bed54946244281f8038b4465b1b8ce89c5342b80c6f9934c0045a27d0f",
   "compatibilitySha256": "39dd14155e04fdbb0816f506e1490faecdd3ca08ae72470187d871527fe14245",
   "formulaContractSha256": "06b6e1a6f1220f22ac87327224bc53823df98bbe9cde37a1bd9d33fc5e043bf5"
 }
