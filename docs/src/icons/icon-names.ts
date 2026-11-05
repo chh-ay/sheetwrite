@@ -1,6 +1,8 @@
 /** Every icon in `sprite.svg`, in sprite order; `test/icons.test.ts` keeps the two in step. */
 export const ICON_NAMES = [
   "arrow-right",
+  "arrow-up",
+  "arrow-down",
   "chevron-down",
   "chevron-right",
   "close",
