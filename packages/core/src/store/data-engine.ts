@@ -88,6 +88,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
+import type { DataModel, RelationshipStatus } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -233,6 +234,39 @@ function pivotStatusAt(status: Uint32Array, index: number): PivotStatusRecord | 
     headerRows: at(5),
     labelCols: at(6),
   };
+}
+
+/** Values in a `relationshipStatus` record: code, firstRow, secondRow, unmatched. */
+const RELATIONSHIP_STATUS_STRIDE = 4;
+/** Codes of `relationshipStatus`; twins of the `STATUS_*` codes in `store/relationships.rs`. */
+const RELATIONSHIP_STATUS = {
+  ok: 0,
+  missingTable: 1,
+  missingColumn: 2,
+  oneSideType: 3,
+  manySideType: 4,
+  duplicateKey: 5,
+} as const;
+
+/** Decodes one engine `relationshipStatus` record. */
+function relationshipStatusOf(record: Uint32Array): RelationshipStatus {
+  const [code, first = 0, second = 0, unmatched = 0] = record;
+  switch (code) {
+    case RELATIONSHIP_STATUS.ok:
+      return { status: "ok", unmatched };
+    case RELATIONSHIP_STATUS.missingTable:
+      return { status: "missingTable" };
+    case RELATIONSHIP_STATUS.missingColumn:
+      return { status: "missingColumn" };
+    case RELATIONSHIP_STATUS.oneSideType:
+      return { status: "typeMismatch", side: "to", row: first };
+    case RELATIONSHIP_STATUS.manySideType:
+      return { status: "typeMismatch", side: "from", row: first };
+    case RELATIONSHIP_STATUS.duplicateKey:
+      return { status: "duplicateKey", rows: [first, second] };
+    default:
+      throw new Error(`Sheetwrite: unknown relationship status code ${code}`);
+  }
 }
 
 /** Rows per allocation-lazy chunk; this matches the store engine's native default. */
@@ -624,6 +658,11 @@ export class StoreDataEngine {
       }
     }
 
+    if (!this.syncRelationships(workbook.dataModel)) {
+      this.wasm.free();
+      throw storeFailure("invalid-snapshot", "invalid data model");
+    }
+
     this.loadPivots();
 
     // Before any cell is loaded, so formulas compute once under the stored limits.
@@ -946,6 +985,26 @@ export class StoreDataEngine {
 
   private namedRangeScope(scope: SheetId | undefined): number {
     return scope === undefined ? -1 : this.handleOf(scope);
+  }
+
+  /**
+   * Sends every relationship of `model` to an engine that checks keys.
+   * Returns false when the engine refuses them; an engine without the call
+   * keeps them only in the workbook.
+   */
+  private syncRelationships(
+    model: DataModel | undefined,
+    wasm: RecomputingCellStore = this.wasm,
+  ): boolean {
+    if (!wasm.setRelationships) return true;
+    const strings = (model?.relationships ?? []).flatMap((relationship) => [
+      relationship.id,
+      relationship.from.table,
+      relationship.from.column,
+      relationship.to.table,
+      relationship.to.column,
+    ]);
+    return wasm.setRelationships(strings);
   }
 
   private syncTable(table: WorkbookTable): boolean {
@@ -1516,6 +1575,13 @@ export class StoreDataEngine {
       }
     }
     return outputs;
+  }
+
+  /** Key status of the relationship with `id`, checked now from the cell values. */
+  getRelationshipStatus(id: string): RelationshipStatus {
+    const record = this.wasm.relationshipStatus?.(id);
+    if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
+    return relationshipStatusOf(record);
   }
 
   /**
@@ -3346,13 +3412,17 @@ export class StoreDataEngine {
           issues,
         );
         if (issues.length > 0) return false;
-        this.workbook.dataModel = withRelationship(this.workbook.dataModel, patch.relationship);
+        const model = withRelationship(this.workbook.dataModel, patch.relationship);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 
       case "removeRelationship": {
         if (!findRelationship(this.workbook.dataModel, patch.id)) return false;
-        this.workbook.dataModel = withoutRelationship(this.workbook.dataModel, patch.id);
+        const model = withoutRelationship(this.workbook.dataModel, patch.id);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
     }
@@ -4645,6 +4715,9 @@ export class StoreDataEngine {
       // that call them. The registry switches to the replacement only in
       // commit, so an aborted release leaves it on the live store.
       this.hostFunctions?.restore(replacement);
+      if (!this.syncRelationships(this.workbook.dataModel, replacement)) {
+        throw new Error("Sheetwrite: the replacement engine refused the relationships");
+      }
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
       }

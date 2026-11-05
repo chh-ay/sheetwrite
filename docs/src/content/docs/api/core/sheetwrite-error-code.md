@@ -33,6 +33,9 @@ export type SheetwriteErrorCode =
   | "xlsx-resource-limit"
   | "resource-limit"
   | "invalid-snapshot"
+  | "invalid-history"
+  | "capacity"
+  | "integrity"
   | "invalid-argument"
   | "aborted"
   | "not-found"
@@ -87,6 +90,7 @@ export type SheetwriteErrorCode =
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

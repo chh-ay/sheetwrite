@@ -33,3 +33,24 @@ export interface DataModel {
   /** Relationships; at most one joins a pair of tables, and they form no cycle. */
   relationships: TableRelationship[];
 }
+
+/**
+ * Whether the keys of a relationship resolve, checked from the current cell
+ * values. Rows are data-row offsets in their table, header row excluded.
+ *
+ * - `ok`: every non-blank one-side key is unique; `unmatched` counts the
+ *   non-blank many-side keys that match no one-side row.
+ * - `missingTable`, `missingColumn`: a table or column was removed.
+ * - `typeMismatch`: the key at `row` on `side` is a boolean, an error on the
+ *   one side, or not the same kind (number or text) as the other keys.
+ * - `duplicateKey`: two one-side rows hold equal keys (text without case).
+ * - `unavailable`: the loaded engine does not check keys (the default
+ *   engine), or no relationship has this ID.
+ */
+export type RelationshipStatus =
+  | { status: "ok"; unmatched: number }
+  | { status: "missingTable" }
+  | { status: "missingColumn" }
+  | { status: "typeMismatch"; side: "from" | "to"; row: number }
+  | { status: "duplicateKey"; rows: [number, number] }
+  | { status: "unavailable" };

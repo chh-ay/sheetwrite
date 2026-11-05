@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "f71a6a4c638651ce1246fdc2f4b6debac0feeb63b583bcca2993479e774f7495",
+  "sha256": "b934928576318ea6e7128f2e06bf0b0dcd3f67cd66ec40da4b4d6016713f062c",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -202,6 +202,7 @@
         "Range",
         "RebaseConflict",
         "RebaseConflictCode",
+        "RelationshipStatus",
         "RemoteOperationOptions",
         "RemoteOperationSource",
         "ReplaceResult",
@@ -472,6 +473,11 @@
     },
     {
       "package": "@sheetwrite/core",
+      "entryPoint": "./browser/history",
+      "exports": ["IndexedDbHistoryStorage", "IndexedDbHistoryStorageOptions"]
+    },
+    {
+      "package": "@sheetwrite/core",
       "entryPoint": "./functions",
       "exports": [
         "FormulaAnalysis",
@@ -491,6 +497,36 @@
         "listFunctions",
         "registerFunction",
         "unregisterFunction"
+      ]
+    },
+    {
+      "package": "@sheetwrite/core",
+      "entryPoint": "./history",
+      "exports": [
+        "DEFAULT_HISTORY_LIMITS",
+        "HistoryArchive",
+        "HistoryArchiveOptions",
+        "HistoryCommit",
+        "HistoryError",
+        "HistoryErrorCode",
+        "HistoryGetRequest",
+        "HistoryHead",
+        "HistoryLimits",
+        "HistoryListPage",
+        "HistoryListRequest",
+        "HistoryManifest",
+        "HistoryPinRequest",
+        "HistoryPruneRequest",
+        "HistoryPublishRequest",
+        "HistoryPutRequest",
+        "HistoryRecordMetadata",
+        "HistorySnapshotProvider",
+        "HistoryStorageAdapter",
+        "HistoryStorageRequest",
+        "HistoryStorageUsage",
+        "HistoryStoredRecord",
+        "HistoryVersion",
+        "MemoryHistoryStorage"
       ]
     },
     {
@@ -558,6 +594,29 @@
         "moveFormulaAxis",
         "shiftFormulaAxis",
         "translateFormula"
+      ]
+    },
+    {
+      "package": "@sheetwrite/queries",
+      "entryPoint": ".",
+      "exports": [
+        "QueryAggregate",
+        "QueryBatch",
+        "QueryColumn",
+        "QueryColumnSpec",
+        "QueryColumnType",
+        "QueryDiagnostic",
+        "QueryEngine",
+        "QueryEngineOptions",
+        "QueryError",
+        "QueryInput",
+        "QueryJoinKind",
+        "QueryLimits",
+        "QueryMixedLanes",
+        "QueryPredicate",
+        "QuerySource",
+        "QueryStep",
+        "loadQueryEngine"
       ]
     },
     {

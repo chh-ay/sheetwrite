@@ -14,6 +14,7 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/wasm",
   "@sheetwrite/formulas",
   "@sheetwrite/core",
+  "@sheetwrite/queries",
   "@sheetwrite/xlsx",
   "@sheetwrite/charts",
   "@sheetwrite/react",
@@ -179,6 +180,10 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     cwd: "packages/wasm",
   },
   {
+    id: "test:rust:queries",
+    command: ["cargo", "test", "--manifest-path", "packages/queries/engine/Cargo.toml"],
+  },
+  {
     id: "lint:rust",
     command: ["bun", "run", "lint:rust"],
   },
@@ -186,6 +191,11 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     id: "audit:rust",
     command: ["cargo", "audit"],
     cwd: "packages/wasm",
+  },
+  {
+    id: "audit:rust:queries",
+    command: ["cargo", "audit"],
+    cwd: "packages/queries/engine",
   },
 ];
 

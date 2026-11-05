@@ -218,6 +218,7 @@ const historyPath = join(import.meta.dir, "size-history.json");
 const OPTIONAL_PACKAGE_CLOSURES = [
   { packageName: "@sheetwrite/xlsx", closure: "core-xlsx", metric: "xlsxPackageCount" },
   { packageName: "@sheetwrite/charts", closure: "core-charts", metric: "chartsPackageCount" },
+  { packageName: "@sheetwrite/queries", closure: "core-queries", metric: "queriesPackageCount" },
 ] as const;
 const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]> = {
   vite: [
@@ -229,13 +230,20 @@ const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]
     "worker-async",
     "xlsx-async",
     "charts-async",
+    "queries-async",
     "chrome-async",
   ],
   webpack: ["core-initial", "worker-async", "chrome-async"],
   next: ["core-initial"],
 };
 /** Lazily loaded roles; an asset that also belongs to an initial entry defeats the split. */
-const ASYNC_ROLES = new Set(["worker-async", "xlsx-async", "charts-async", "chrome-async"]);
+const ASYNC_ROLES: Readonly<Record<string, true>> = {
+  "worker-async": true,
+  "xlsx-async": true,
+  "charts-async": true,
+  "queries-async": true,
+  "chrome-async": true,
+};
 const ATTRIBUTION_METHOD = "source-map-generated-spans-with-explicit-opaque-assets-v2";
 const COMPARABLE_ENTRY = "core-first-paint";
 const SUBPATH_CANDIDATES = ["sync", "collaboration", "rebase", "persistence"] as const;
@@ -420,7 +428,7 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
   ]);
   for (const asset of assets) {
     if (
-      asset.roles.some((role) => ASYNC_ROLES.has(role)) &&
+      asset.roles.some((role) => ASYNC_ROLES[role] === true) &&
       asset.roles.some((role) => initialRoles.has(role))
     ) {
       throw new Error(`${bundler} async asset ${asset.path} leaked into an initial entry`);
@@ -987,6 +995,7 @@ async function buildSizeReport(
       ["svelte", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/svelte"]],
       ["core-xlsx", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/xlsx"]],
       ["core-charts", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/charts"]],
+      ["core-queries", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/queries"]],
     ];
     const closures = await Promise.all(
       closureSpecs.map(([name, names], index) =>

@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>382</dd></div>
+<div><dt>Exports</dt><dd>383</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -288,7 +288,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>97</span>
+### Types <span class="api-count" data-pagefind-ignore>98</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -346,6 +346,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/protection-resolver/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ProtectionResolver</code></span><span class="api-symbol-card__desc">Host-owned client UX permission callback for protected mutations.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/query-capability/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>QueryCapability</code></span><span class="api-symbol-card__desc">Whether a query is complete for the currently loaded datasource pages.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/rebase-conflict-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RebaseConflictCode</code></span><span class="api-symbol-card__desc">Stable conservative-rebase conflict category.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/relationship-status/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RelationshipStatus</code></span><span class="api-symbol-card__desc">Whether the keys of a relationship resolve, checked from the current cell values.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resolved-hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ResolvedHyperlinkTarget</code></span><span class="api-symbol-card__desc">Host-safe target resolved immediately before hyperlink activation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RevisionCoordinatorEvent</code></span><span class="api-symbol-card__desc">State or restore transition emitted by revision coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-restore-response/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RevisionRestoreResponse</code></span><span class="api-symbol-card__desc">Applied or conflict acknowledgement for a revision restore.</span></a>
