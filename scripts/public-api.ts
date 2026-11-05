@@ -267,6 +267,8 @@ function classifyEntry(
     subpath === "."
   )
     return "internal";
+  // `@sheetwrite/core/history` loads the diff kernel; hosts only point at its WASM asset.
+  if (packageName === "@sheetwrite/wasm" && subpath === "./history") return "internal";
   if (SUPPORTED_PACKAGES[packageName] === true) return "supported";
   return undefined;
 }
