@@ -10,3 +10,5 @@ The toolbar, the full ribbon and a new compact ribbon render one command model. 
 - Every command element has a `data-command` attribute. The old `.sheetwrite-tb-*` classes are gone.
 - The built-in toolbar loads with the ribbon's chunk, so it appears after the grid mounts.
 - The shell toolbar also loads lazily, with its row height reserved. Custom Border, Merge, Unmerge and Clear Formats items keep their one-click behavior.
+
+Removed: the `.sheetwrite-tb-*` toolbar classes; use the `data-command` attribute instead.

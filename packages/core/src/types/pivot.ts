@@ -36,15 +36,10 @@ export type PivotSource =
   | { table: WorkbookTableId; invalid?: true }
   | { model: { table: WorkbookTableId; fields: TableColumnRef[] }; invalid?: true };
 
-/** One aggregated value field. `name` replaces the default caption. */
-export interface PivotValueField {
-  /** Source field index that the value aggregates. */
-  field: number;
-  /** How the field's values in each output cell combine. */
-  aggregation: PivotAggregation;
-  /** Custom caption; without it the output shows the default caption. */
-  name?: string;
-}
+/** One implicit aggregation or saved measure; `name` overrides its caption. */
+export type PivotValueField =
+  | { field: number; aggregation: PivotAggregation; name?: string }
+  | { measure: string; name?: string };
 
 /** Keep-list filter: only source rows whose `field` value is in `values` contribute. */
 export interface PivotFilter {

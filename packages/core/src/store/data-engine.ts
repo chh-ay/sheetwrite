@@ -26,7 +26,11 @@ import {
 } from "../dashboard.js";
 import {
   type DataModelIssue,
+  findMeasure,
   findRelationship,
+  validateMeasureAdmission,
+  withMeasure,
+  withoutMeasure,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -1160,9 +1164,11 @@ export class StoreDataEngine {
   }
 
   /**
-   * Sends every relationship of `model` to an engine that checks keys.
-   * Returns false when the engine refuses them; an engine without the call
-   * keeps them only in the workbook.
+   * Sends every relationship and measure of `model` to an engine that
+   * computes model pivots. A measure travels as a relationship record with
+   * an empty one-side table: `[id, homeTable, formula, "", name]`. Returns
+   * false when the engine refuses them; an engine without the call keeps
+   * them only in the workbook.
    */
   private syncRelationships(
     model: DataModel | undefined,
@@ -1176,6 +1182,9 @@ export class StoreDataEngine {
       relationship.to.table,
       relationship.to.column,
     ]);
+    for (const measure of model?.measures ?? []) {
+      strings.push(measure.id, measure.table, measure.formula, "", measure.name);
+    }
     return wasm.setRelationships(strings);
   }
 
@@ -3728,6 +3737,26 @@ export class StoreDataEngine {
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
+
+      case "setMeasure":
+      case "removeMeasure": {
+        const current = this.workbook.dataModel;
+        if (patch.op === "setMeasure") {
+          const issues: DataModelIssue[] = [];
+          validateMeasureAdmission(patch.measure, current, this.workbook.sheets, issues);
+          if (issues.length > 0) return false;
+        } else if (!findMeasure(current, patch.id)) {
+          return false;
+        }
+
+        const model =
+          patch.op === "setMeasure"
+            ? withMeasure(current, patch.measure)
+            : withoutMeasure(current, patch.id);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 

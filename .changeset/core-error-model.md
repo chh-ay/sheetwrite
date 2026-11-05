@@ -12,3 +12,9 @@ Upgrade checklist:
 - The operation `comments` is now `comment`, and the grid export operation `export-xlsx` is now `xlsx-export`.
 - `datasource-error` contexts no longer copy column keys: they hold `columnBandCount` and the `start` and `end` of the first 64 bands. Read the keys from `event.request`.
 - If you `switch` over `SheetwriteErrorCode` or `SheetwriteErrorOperation` without a default case, add the new values.
+
+Changed: bad host input and passed limits on public paths throw a `SheetwriteError` (`invalid-argument`, `not-found`, `invalid-limits`) instead of `RangeError`, `TypeError` or `Error`; check `isSheetwriteError(error)` and `error.code` instead.
+
+Removed: the error operations `comments` and `export-xlsx`; use `comment` and `xlsx-export` instead.
+
+Changed: `datasource-error` contexts hold `columnBandCount` and the first 64 bands, not column keys; read the keys from `event.request` instead.

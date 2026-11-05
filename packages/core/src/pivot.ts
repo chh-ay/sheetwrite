@@ -215,17 +215,29 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
     issue(issues, path, "Pivot value field must be an object");
     return;
   }
-  if (!isIndex(ownValue(value, "field"), MAX_PIVOT_FIELD_INDEX)) {
-    issue(issues, `${path}.field`, "field must be a source column index");
-  }
-  const aggregation = ownValue(value, "aggregation");
-  if (typeof aggregation !== "string" || !Object.hasOwn(AGGREGATION_CODES, aggregation)) {
-    issue(issues, `${path}.aggregation`, "Unknown pivot aggregation");
+  const measure = ownValue(value, "measure");
+  if (measure !== undefined) {
+    const mixed =
+      ownValue(value, "field") !== undefined || ownValue(value, "aggregation") !== undefined;
+    if (!isBoundedName(measure) || mixed) issue(issues, `${path}.measure`, "Invalid measure value");
+  } else {
+    if (!isIndex(ownValue(value, "field"), MAX_PIVOT_FIELD_INDEX)) {
+      issue(issues, `${path}.field`, "field must be a source column index");
+    }
+    const aggregation = ownValue(value, "aggregation");
+    if (typeof aggregation !== "string" || !Object.hasOwn(AGGREGATION_CODES, aggregation)) {
+      issue(issues, `${path}.aggregation`, "Unknown pivot aggregation");
+    }
   }
   const name = ownValue(value, "name");
   if (name !== undefined && (typeof name !== "string" || name.length > MAX_PIVOT_NAME_LENGTH)) {
     issue(issues, `${path}.name`, `name must be a string of at most ${MAX_PIVOT_NAME_LENGTH}`);
   }
+}
+
+/** A non-empty string no longer than a pivot name. */
+function isBoundedName(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_PIVOT_NAME_LENGTH;
 }
 
 /** Each field takes at most one filter, and all filters share one value budget. */
@@ -397,7 +409,7 @@ function highestField(pivot: PivotDefinition): number {
   let highest = -1;
   for (const field of pivot.rows) highest = Math.max(highest, field);
   for (const field of pivot.columns) highest = Math.max(highest, field);
-  for (const value of pivot.values) highest = Math.max(highest, value.field);
+  for (const value of pivot.values) if ("field" in value) highest = Math.max(highest, value.field);
   for (const filter of pivot.filters ?? []) highest = Math.max(highest, filter.field);
   return highest;
 }
@@ -414,6 +426,10 @@ export function validatePivotReferences(
   path: string,
   issues: PivotIssueSink,
 ): void {
+  if (!("model" in pivot.source) && pivot.values.some((value) => "measure" in value)) {
+    issue(issues, `${path}.values`, "Measures need a model source");
+  }
+
   // Deleting every row keeps an anchor at row 0, so an empty sheet still owns it.
   if (
     pivot.anchor.row >= Math.max(ownerSize.rows, 1) ||
@@ -529,7 +545,10 @@ export function clonePivot(pivot: PivotDefinition): PivotDefinition {
     rows: pivot.rows.slice(),
     columns: pivot.columns.slice(),
     values: pivot.values.map((value) => {
-      const copy: PivotValueField = { field: value.field, aggregation: value.aggregation };
+      const copy: PivotValueField =
+        "measure" in value
+          ? { measure: value.measure }
+          : { field: value.field, aggregation: value.aggregation };
       if (value.name !== undefined) copy.name = value.name;
       return copy;
     }),
@@ -746,7 +765,7 @@ function remapFields(
   const changed =
     pivot.rows.some((field) => mapField(field) !== field) ||
     pivot.columns.some((field) => mapField(field) !== field) ||
-    pivot.values.some((value) => mapField(value.field) !== value.field) ||
+    pivot.values.some((value) => "field" in value && mapField(value.field) !== value.field) ||
     (pivot.filters?.some((filter) => mapField(filter.field) !== filter.field) ?? false);
   if (!changed) return pivot;
 
@@ -758,6 +777,7 @@ function remapFields(
     rows: mapList(pivot.rows),
     columns: mapList(pivot.columns),
     values: pivot.values.flatMap((value): PivotValueField[] => {
+      if ("measure" in value) return [value];
       const field = mapField(value.field);
       return field === null ? [] : [{ ...value, field }];
     }),
@@ -1016,6 +1036,8 @@ const FILTER_NULL = 0;
 const FILTER_NUMBER = 1;
 const FILTER_TEXT = 2;
 const FILTER_BOOLEAN = 3;
+/** A saved measure ID occupies the field slot as a string index. */
+const MEASURE_VALUE_CODE = 7;
 /** Flag bits in the engine payload. */
 const FLAG_ROW_TOTALS = 1;
 const FLAG_COLUMN_TOTALS = 2;
@@ -1084,8 +1106,8 @@ export function encodePivotPayload(
     numbers.push(pivot.values.length);
     for (const value of pivot.values) {
       numbers.push(
-        value.field,
-        AGGREGATION_CODES[value.aggregation],
+        "measure" in value ? text(value.measure) : value.field,
+        "measure" in value ? MEASURE_VALUE_CODE : AGGREGATION_CODES[value.aggregation],
         value.name === undefined ? NO_STRING : text(value.name),
       );
     }
