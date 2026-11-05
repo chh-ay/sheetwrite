@@ -1,11 +1,40 @@
 import { access } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 export const repositoryRoot = resolve(import.meta.dir, "..");
 export const contentRoot = join(repositoryRoot, "docs/src/content/docs");
 export const generatedDataRoot = join(repositoryRoot, "docs/src/generated");
 export const generatedManifestPath = join(generatedDataRoot, "public-api.json");
 export const docsContractPath = join(generatedDataRoot, "docs-contract.json");
+
+/**
+ * Content pages the docs generator owns, relative to `contentRoot`: whole
+ * directories and single pages. `.gitignore` lists the same paths; the
+ * generator removes a page under an owned directory once no source produces
+ * it, and `docs:check` reads owned pages only from the generator, never from
+ * disk.
+ */
+export const GENERATED_CONTENT_DIRECTORIES = [
+  "api",
+  "performance",
+  "reference/formula-functions",
+] as const;
+export const GENERATED_CONTENT_PAGES = [
+  "reference/compatibility-results.md",
+  "reference/excel-function-coverage.md",
+  "reference/formula-functions.md",
+  "reference/moved-guides.md",
+  "reference/package-entry-points.md",
+] as const;
+
+/** Whether the docs generator owns the content page at this absolute path. */
+export function isGeneratedContent(path: string): boolean {
+  const route = posix(relative(contentRoot, path));
+  return (
+    GENERATED_CONTENT_PAGES.some((page) => route === page) ||
+    GENERATED_CONTENT_DIRECTORIES.some((directory) => route.startsWith(`${directory}/`))
+  );
+}
 
 export const MIGRATION_ROUTES = {
   "docs/README.md": "/docs/start/installation/",
