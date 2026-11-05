@@ -253,7 +253,8 @@ describe("relationship history", () => {
     expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
 
     // A saved relationship to a removed table is valid in a snapshot.
-    const exported = grid.store.exportSnapshot();
+    const exported = grid.store.exportSnapshot?.();
+    if (!exported) throw new Error("the store must export snapshots");
     expect(validateWorkbookSnapshot(exported).ok).toBe(true);
 
     grid.undo();
