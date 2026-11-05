@@ -171,9 +171,11 @@ export interface Frame {
 function routeAt(t: number): { from: Target; to: Target; k: number } {
   let index = 0;
   while (index + 1 < ROUTE.length && (ROUTE[index + 1]?.[0] ?? Infinity) <= t) index++;
+
   const [start, from] = ROUTE[index] ?? ROUTE[0];
   const next = ROUTE[index + 1];
   if (next === undefined) return { from, to: from, k: 1 };
+
   // Hold at `from` until the move into `next` starts; moves take the gap.
   return { from, to: next[1], k: ease(span(t, start, next[0])) };
 }

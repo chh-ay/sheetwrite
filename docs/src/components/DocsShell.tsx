@@ -367,11 +367,14 @@ export function DocsShell({
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
   // better as a chip than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
+
   const outline = useDocumentOutline();
   const neighbours = documentNeighbours(activeHref);
+
   const release = releaseContext(activeHref);
   // Release notes are their own header section; every other page is Docs.
   const inReleases = activeHref?.startsWith(RELEASES_HREF) ?? false;
+
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -388,6 +391,7 @@ export function DocsShell({
   const openNavigation = () => {
     const dialog = navigationDialog.current;
     if (dialog === null) return;
+
     dialog.showModal();
     setNavigationOpen(true);
     // The current page can sit far down a long section list.

@@ -64,6 +64,7 @@ function collect(root: HTMLElement): Parts {
   for (const element of root.querySelectorAll<HTMLElement>("[data-target]")) {
     targets.set(element.dataset.target as Target, element);
   }
+
   return {
     root,
     window: query(root, ".ha-window"),
@@ -97,6 +98,7 @@ function collect(root: HTMLElement): Parts {
 function centerOf(parts: Parts, target: Target): { x: number; y: number } {
   const element = parts.targets.get(target);
   if (element === undefined) return { x: 0, y: 0 };
+
   const frame = parts.window.getBoundingClientRect();
   const box = element.getBoundingClientRect();
   return { x: box.left + box.width / 2 - frame.left, y: box.top + box.height / 2 - frame.top };
@@ -355,6 +357,7 @@ function cellBox(range: Range): CSSProperties {
 function SalesCells({ still }: Readonly<{ still: Frame }>) {
   const value = (row: number, column: number): ReactNode => {
     if (row === 0) return ["Region", "Units", "Rate", "Revenue"][column] ?? "";
+
     const sales = SALES[row - 1];
     if (sales !== undefined) {
       if (column === 0) return sales.region;
@@ -368,13 +371,16 @@ function SalesCells({ still }: Readonly<{ still: Frame }>) {
           money(BEFORE_REVENUE[row - 1] ?? 0)
         );
     }
+
     if (row === SALES.length + 1) {
       if (column === 0) return "Total";
       if (column === 1) return <span data-part="b6">{still.b6}</span>;
       if (column === 3) return <span data-part="d6">{still.d6}</span>;
     }
+
     return "";
   };
+
   return <Cells value={value} />;
 }
 
