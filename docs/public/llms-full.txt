@@ -11086,6 +11086,8 @@ A relationship refers to tables and columns by their stable IDs, so renames, col
 
 Removing a table or a column keeps the relationships that refer to it, and undo restores a working model.
 
+A [query](https://www.sheetwrite.dev/docs/api/queries/) refresh keeps the ID and column IDs of its output table, so relationships to that table stay. Pivots over related tables update in the same undo step as the refresh.
+
 ## Undo and collaboration
 
 `setRelationship` and `removeRelationship` are document operations. Each change is one undo step, and it is saved and synchronized like other workbook metadata. Two concurrent relationship changes conflict, because the rules apply to the whole model. A pending relationship also conflicts with a concurrent change to one of its tables, or with the removal of a sheet.
