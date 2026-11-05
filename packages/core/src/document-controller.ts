@@ -5,6 +5,7 @@ import {
   splitOversizedBlocks,
 } from "./atomic-batch.js";
 import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
+import { cloneRelationship, findRelationship } from "./data-model.js";
 import {
   type AdmittedTransactionResources,
   admitTransactionResources,
@@ -31,6 +32,8 @@ import {
   encodeMeasuredRestoreBlock,
   estimateRestoreBlockBytes,
 } from "./restore-block.js";
+import type { PermuteRowsOperation } from "./row-order.js";
+import { cloneQuery, findQuery } from "./saved-query.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import {
@@ -551,6 +554,9 @@ export class DocumentController {
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
 
+      case "permuteRows":
+        return this.inversePermutation(patch);
+
       case "addColumns":
         return [
           {
@@ -928,6 +934,35 @@ export class DocumentController {
         return [{ op: "setCalculation", calculation: { ...previous } }];
       }
 
+      case "setRelationship": {
+        const previous = findRelationship(
+          this.options.store.getWorkbook().dataModel,
+          patch.relationship.id,
+        );
+        return previous
+          ? [{ op: "setRelationship", relationship: cloneRelationship(previous) }]
+          : [{ op: "removeRelationship", id: patch.relationship.id }];
+      }
+
+      case "removeRelationship": {
+        const previous = findRelationship(this.options.store.getWorkbook().dataModel, patch.id);
+        return previous
+          ? [{ op: "setRelationship", relationship: cloneRelationship(previous) }]
+          : [];
+      }
+
+      case "setQuery": {
+        const previous = findQuery(this.options.store.getWorkbook().queries, patch.query.id);
+        return previous
+          ? [{ op: "setQuery", query: cloneQuery(previous) }]
+          : [{ op: "removeQuery", id: patch.query.id }];
+      }
+
+      case "removeQuery": {
+        const previous = findQuery(this.options.store.getWorkbook().queries, patch.id);
+        return previous ? [{ op: "setQuery", query: cloneQuery(previous) }] : [];
+      }
+
       case "setPivot": {
         const sheet = this.sheetById(patch.sheet);
         // A sheet created in this batch is removed by the addSheet inverse,
@@ -1070,6 +1105,20 @@ export class DocumentController {
 
       return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
     });
+  }
+
+  /**
+   * The inverse order moves every row back. A formula whose adjusted text
+   * lost a reference (`#REF!`) cannot be adjusted back, so its cell is
+   * captured before the sort and restored after the inverse order.
+   */
+  private inversePermutation(patch: PermuteRowsOperation): DocumentOp[] {
+    const engine = storeEngine(this.options.store);
+    const reverse = engine?.invertedPermutation(patch);
+    if (!engine || !reverse) return [];
+
+    const losses = engine.permuteRowsLosses(patch);
+    return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
   }
 
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {

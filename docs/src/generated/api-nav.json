@@ -12,6 +12,10 @@
     "href": "/docs/api/formulas/"
   },
   {
+    "label": "@sheetwrite/queries",
+    "href": "/docs/api/queries/"
+  },
+  {
     "label": "@sheetwrite/react",
     "href": "/docs/api/react/"
   },

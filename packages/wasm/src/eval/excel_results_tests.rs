@@ -86,8 +86,40 @@ fn lambda_arguments_can_be_errors_that_the_body_handles() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn engineering_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=DEC2HEX(Data!B3)", "1E"),
+        ("=BIN2DEC(Data!A1&Data!A2-Data!A2)", "2"),
+        ("=BITAND(Data!B1,Data!A3)", "2"),
+        ("=ERF(Data!F1)", "0"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn complex_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=IMSUM(Data!A1:A3)", "6"),
+        ("=IMSUM(Data!D1:D3)", "#NUM!"),
+        ("=IMPRODUCT(Data!A2:A3,COMPLEX(0,1))", "6i"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn bessel_functions_read_cells() {
+    assert_results(&[
+        ("=ROUND(BESSELJ(Data!A3,1),6)", "0.339059"),
+        ("=BESSELI(Data!F1,0)", "1"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn convert_reads_cells() {
-    assert_results(&[("=CONVERT(Data!A1,\"m\",\"cm\")", "100")]);
+    assert_results(&[
+        ("=CONVERT(Data!A1,\"m\",\"cm\")", "100"),
+    ]);
 }
 
 #[cfg(feature = "analysis")]

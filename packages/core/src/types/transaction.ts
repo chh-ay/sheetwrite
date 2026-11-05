@@ -98,6 +98,12 @@ export interface PendingCommit {
    * applies and publishes all of these versions, or none of them.
    */
   readonly versionOperationCounts?: readonly number[];
+  /**
+   * Authenticated ID of the person who made the change, from
+   * `SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+   * before it records history. At most `maxMutationIdBytes` UTF-8 bytes.
+   */
+  readonly authorId?: string;
 }
 
 /** Lifecycle state of one local mutation in the synchronization queue. */
@@ -132,11 +138,45 @@ export interface VersionedOperation {
    * only after its last member arrives.
    */
   batch?: VersionBatchMember;
+  /** Author the authority recorded for this version; every batch member carries the same one. */
+  authorId?: string;
+  /** Authority commit time, in milliseconds since the epoch. */
+  committedAt?: number;
 }
 
 /** Cancellable pending commit submitted to a persistence adapter. */
 export interface PersistenceCommitRequest extends PendingCommit {
   signal?: AbortSignal;
+}
+
+/**
+ * One transaction as the document authority committed it: its revisions, its
+ * author and its time. History archives record these, never optimistic edits.
+ */
+export interface CommittedTransaction {
+  /** Revision the transaction applies to. */
+  baseRevision: number;
+  /** Revision after the transaction; an atomic batch advances up to 16 revisions. */
+  revision: number;
+  /** Stable mutation ID of the commit, at most 256 code units. */
+  mutationId: string;
+  /** Authenticated ID of the person who made the change, at most 256 code units. */
+  authorId: string;
+  /** Commit time in milliseconds since the epoch; never before the previous commit. */
+  time: number;
+  /** The committed document operations, in order. */
+  operations: readonly DocumentOp[];
+}
+
+/**
+ * Durable record of committed transactions, written as part of the commit:
+ * when `record` rejects, the authority does not publish or acknowledge the
+ * commit. `capture` returns the committed document after the transaction and
+ * is called only when the journal needs a checkpoint. `HistoryArchive` from
+ * `@sheetwrite/core/history` implements this interface.
+ */
+export interface CommitJournal {
+  record(commit: CommittedTransaction, capture: () => WorkbookSnapshot): Promise<void>;
 }
 
 /** Cancellable commit of one atomic batch that spans several server versions. */

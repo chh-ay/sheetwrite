@@ -29,7 +29,7 @@ async function total(workbook: Workbook) {
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L153"><code>packages/core/src/store.ts#L153</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/store.ts#L155"><code>packages/core/src/store.ts#L155</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -61,6 +61,8 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-get-pivots"><code>getPivots</code></a>
 <a href="#sheetwrite-store-get-range-mutation-allocation-stats"><code>getRangeMutationAllocationStats</code></a>
 <a href="#sheetwrite-store-get-ref-target"><code>getRefTarget</code></a>
+<a href="#sheetwrite-store-get-relationship-status"><code>getRelationshipStatus</code></a>
+<a href="#sheetwrite-store-get-relationships"><code>getRelationships</code></a>
 <a href="#sheetwrite-store-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
 <a href="#sheetwrite-store-get-spill-anchor"><code>getSpillAnchor</code></a>
 <a href="#sheetwrite-store-get-visible-window"><code>getVisibleWindow</code></a>
@@ -76,6 +78,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-query-capability"><code>queryCapability</code></a>
 <a href="#sheetwrite-store-recalculate-volatile"><code>recalculateVolatile</code></a>
 <a href="#sheetwrite-store-remove-pivot"><code>removePivot</code></a>
+<a href="#sheetwrite-store-remove-relationship"><code>removeRelationship</code></a>
 <a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
 <a href="#sheetwrite-store-rename-sheet-formula-identity"><code>renameSheetFormulaIdentity</code></a>
 <a href="#sheetwrite-store-replace-snapshot"><code>replaceSnapshot</code></a>
@@ -90,9 +93,11 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-set-group-collapsed"><code>setGroupCollapsed</code></a>
 <a href="#sheetwrite-store-set-pivot"><code>setPivot</code></a>
 <a href="#sheetwrite-store-set-protection-resolver"><code>setProtectionResolver</code></a>
+<a href="#sheetwrite-store-set-relationship"><code>setRelationship</code></a>
 <a href="#sheetwrite-store-show-rows"><code>showRows</code></a>
 <a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
 <a href="#sheetwrite-store-sort-by-multi"><code>sortByMulti</code></a>
+<a href="#sheetwrite-store-sort-range"><code>sortRange</code></a>
 <a href="#sheetwrite-store-ungroup-rows"><code>ungroupRows</code></a>
 <a href="#sheetwrite-store-view-row-count"><code>viewRowCount</code></a>
 <a href="#sheetwrite-store-view-row-of"><code>viewRowOf</code></a>
@@ -100,7 +105,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>65</span>
+## Members <span class="api-count" data-pagefind-ignore>70</span>
 
 <div class="api-member-list">
 
@@ -388,6 +393,27 @@ getRefTarget: (addr: CellAddress) => CellAddress | null;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-get-relationship-status" data-pagefind-weight="1">
+<summary><code>getRelationshipStatus</code> <span class="api-member-summary">Whether the keys of the relationship with id resolve, checked now from the cell values.</span></summary>
+
+```ts generated
+getRelationshipStatus: (id: string) => RelationshipStatus;
+```
+
+<p class="api-member-doc">Whether the keys of the relationship with `id` resolve, checked now from
+the cell values. The default engine checks no keys and reports
+`unavailable`, as it does for an unknown ID.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-relationships" data-pagefind-weight="1">
+<summary><code>getRelationships</code> <span class="api-member-summary">Clones of the workbook's table relationships; readable without the engine.</span></summary>
+
+```ts generated
+getRelationships: () => TableRelationship[];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-get-runtime-resource-snapshot" data-pagefind-weight="1">
 <summary><code>getRuntimeResourceSnapshot</code></summary>
 
@@ -527,6 +553,15 @@ removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-remove-relationship" data-pagefind-weight="1">
+<summary><code>removeRelationship</code> <span class="api-member-summary">Remove the relationship with id.</span></summary>
+
+```ts generated
+removeRelationship: (id: string) => ApplyTransactionResult;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-remove-sheet-formula-identity" data-pagefind-weight="1">
 <summary><code>removeSheetFormulaIdentity</code></summary>
 
@@ -658,6 +693,18 @@ setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: Mutatio
 so every local mutation ingress shares one atomic commit barrier.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-set-relationship" data-pagefind-weight="1">
+<summary><code>setRelationship</code> <span class="api-member-summary">Insert a relationship, or replace the one with its ID.</span></summary>
+
+```ts generated
+setRelationship: (relationship: TableRelationship) => ApplyTransactionResult;
+```
+
+<p class="api-member-doc">Insert a relationship, or replace the one with its ID. Both columns must
+exist, at most one relationship may join two tables, and relationships
+must not form a cycle; otherwise the result is a no-op.</p>
+</details>
+
 <details class="api-member" id="sheetwrite-store-show-rows" data-pagefind-weight="1">
 <summary><code>showRows</code></summary>
 
@@ -681,6 +728,35 @@ sortBy: (sheet: SheetId, col: number, ascending: boolean) => ApplyTransactionRes
 
 ```ts generated
 sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-sort-range" data-pagefind-weight="1">
+<summary><code>sortRange</code> <span class="api-member-summary">Sort the rows of range in place, as Excel's Sort does: cells move with their row in one undoable transaction, and formulas follow Excel's rules for sorted rows.</span></summary>
+
+```ts generated
+sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult;
+```
+
+Sort the rows of `range` in place, as Excel's Sort does: cells move with
+their row in one undoable transaction, and formulas follow Excel's
+rules for sorted rows. Hidden and filtered-out rows keep their place.
+With `hasHeader`, the first row of `range` stays. A sort that would
+move part of a merged cell or spill range is rejected.
+
+### Examples
+
+```ts compile
+import type { SheetwriteStore } from "@sheetwrite/core";
+
+function sortByRevenue(store: SheetwriteStore) {
+  return store.sortRange(
+    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+    [{ col: 2, ascending: false }],
+    { hasHeader: true },
+  );
+}
 ```
 
 </details>
@@ -809,6 +885,8 @@ class SheetwriteStore implements Store {
   getPivots: (sheet?: SheetId) => PivotDefinition[];
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getRelationshipStatus: (id: string) => RelationshipStatus;
+  getRelationships: () => TableRelationship[];
   getRuntimeResourceSnapshot: (
     operation: RuntimeResourceOperation,
     phase: RuntimeResourcePhase,
@@ -848,6 +926,7 @@ class SheetwriteStore implements Store {
   queryCapability: (sheet: SheetId) => QueryCapability;
   recalculateVolatile: (now?: Date) => void;
   removePivot: (id: string, sheet?: SheetId) => ApplyTransactionResult;
+  removeRelationship: (id: string) => ApplyTransactionResult;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
   renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
   replaceSnapshot: (snapshot: WorkbookSnapshot) => void;
@@ -892,6 +971,9 @@ class SheetwriteStore implements Store {
     resolver: ProtectionResolver | undefined,
     mode?: MutationPolicyMode,
   ) => void;
+  setRelationship: (
+    relationship: TableRelationship,
+  ) => ApplyTransactionResult;
   showRows: (
     sheet: SheetId,
     rows?: readonly number[],
@@ -904,6 +986,13 @@ class SheetwriteStore implements Store {
   sortByMulti: (
     sheet: SheetId,
     keys: readonly SortKey[],
+  ) => ApplyTransactionResult;
+  sortRange: (
+    range: Range,
+    keys: readonly SortKey[],
+    options?: {
+      hasHeader?: boolean;
+    },
   ) => ApplyTransactionResult;
   ungroupRows: (
     sheet: SheetId,
@@ -934,6 +1023,7 @@ class SheetwriteStore implements Store {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>

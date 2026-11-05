@@ -732,6 +732,54 @@ fn criteria_wildcards_approximate_lookup_and_empty_logic_follow_spreadsheet_sema
     }
 }
 
+/// COUNTIF reads a dense column of number literals from its stored payloads.
+/// Column C holds the same numbers, but its last cell is a formula, so C is
+/// read cell by cell: both reads must count alike for every operator.
+#[test]
+fn countif_over_dense_numbers_counts_like_the_cell_reader() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(12, 8);
+    let numbers = [-1.5, 0.0, -0.0, 2.0, 2.0, 7.0];
+    for (row, value) in numbers.into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+        store.set_number(sheet, row, 1, 3.0 - row as f64, 0);
+        store.set_number(sheet, row, 2, value, 0);
+    }
+    store.set_formula(sheet, numbers.len() - 1, 2, "=7", 0);
+    let cases = [
+        ("2", 2.0),
+        ("\"=2\"", 2.0),
+        ("\"<>2\"", 4.0),
+        ("\"<2\"", 3.0),
+        ("\"<=2\"", 5.0),
+        ("\">2\"", 1.0),
+        ("\">=2\"", 3.0),
+        ("0", 2.0),
+        ("\"a\"", 0.0),
+        ("\"2*\"", 0.0),
+    ];
+    for (index, (criterion, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, 6, index, &format!("=COUNTIF(A1:A6,{criterion})"), 0);
+        store.set_formula(sheet, 7, index, &format!("=COUNTIF(C1:C6,{criterion})"), 0);
+    }
+    store.set_formula(sheet, 6, cases.len(), "=COUNTIF(A1:B6,\">=2\")", 0);
+    store.recompute(sheet);
+
+    for (index, (criterion, expected)) in cases.into_iter().enumerate() {
+        assert_eq!(
+            number(&store, sheet, 6, index),
+            expected,
+            "dense {criterion}"
+        );
+        assert_eq!(
+            number(&store, sheet, 7, index),
+            expected,
+            "cell reader {criterion}"
+        );
+    }
+    assert_eq!(number(&store, sheet, 6, cases.len()), 5.0);
+}
+
 /// Number text and wildcards each have one rule, so every function that reads
 /// them answers alike: arithmetic and SUM read text the way VALUE does, and
 /// criteria, wildcard lookups and SEARCH match patterns the same way.
@@ -1407,8 +1455,8 @@ fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     store.set_number(sheet, 2, 1, 7.0, 0);
     store.recompute(sheet);
 
-    assert_eq!(store.sort_rows(sheet, 0, true), vec![4, 0, 3, 1, 2, 5]);
-    assert_eq!(store.sort_rows(sheet, 0, false), vec![5, 2, 1, 3, 0, 4]);
+    assert_eq!(store.sort_rows(sheet, 0, true), vec![4, 3, 1, 2, 0, 5]);
+    assert_eq!(store.sort_rows(sheet, 0, false), vec![0, 2, 1, 3, 4, 5]);
     assert_close(store.aggregate(sheet, 1, 0), 12.0);
     assert_close(store.aggregate(sheet, 1, 1), 6.0);
     assert_close(store.aggregate(sheet, 1, 2), 5.0);
@@ -3529,11 +3577,11 @@ mod spill_query_fixtures {
 
         assert_eq!(
             store.sort_rows_multi(sheet, &[0], &[1], &[]),
-            vec![5, 1, 4, 2, 3, 0, 6]
+            vec![5, 1, 2, 3, 4, 0, 6]
         );
         assert_eq!(
             store.sort_rows_multi(sheet, &[0], &[0], &[]),
-            vec![0, 6, 3, 2, 4, 1, 5]
+            vec![4, 3, 2, 1, 5, 0, 6]
         );
     }
 
@@ -3685,15 +3733,16 @@ mod multi_key_sort_fixtures {
     #[test]
     fn multi_key_sort_orders_kinds_numbers_text_booleans_blanks() {
         let (store, sheet) = mixed_kind_fixture();
-        // Ascending: numbers 1.0, 2.0, 3.0; then error text, "a", "b"; then
-        // false, true; the blank sorts last. Descending reverses each group.
+        // Ascending: numbers 1.0, 2.0, 3.0; then "a", "b"; then false, true;
+        // then the error; the blank sorts last. Descending reverses the groups
+        // and each group, and the blank stays last.
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
-            vec![4, 0, 8, 7, 1, 5, 6, 3, 2]
+            vec![4, 0, 8, 1, 5, 6, 3, 7, 2]
         );
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
-            vec![2, 3, 6, 5, 1, 7, 8, 0, 4]
+            vec![7, 3, 6, 5, 1, 8, 0, 4, 2]
         );
         // Candidates restrict the same order to the picked rows.
         assert_eq!(

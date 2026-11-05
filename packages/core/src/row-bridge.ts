@@ -142,6 +142,8 @@ export interface RowBridgeMetadataDelta<
     | "note"
     | "named-range"
     | "calculation"
+    | "relationship"
+    | "query"
     | "chart"
     | "pivot";
 }
@@ -307,6 +309,7 @@ function operationRange(operation: DocumentOp): Range | null {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return operation.range;
     default:
       return null;
@@ -696,6 +699,20 @@ export class RowBridge<
           }
         }
       }
+    } else if (operation.op === "permuteRows") {
+      // Every cell of the range can take another row's content; the store
+      // reports each new value as a change.
+      const range = operation.range;
+      const startRow = Math.min(range.start.row, range.end.row);
+      const endRow = Math.max(range.start.row, range.end.row);
+      const startCol = Math.min(range.start.col, range.end.col);
+      const endCol = Math.max(range.start.col, range.end.col);
+
+      for (let row = startRow; row <= endRow; row += 1) {
+        for (let col = startCol; col <= endCol; col += 1) {
+          addresses.push({ sheet: range.sheet, row, col });
+        }
+      }
     }
 
     return addresses.map((addr) => {
@@ -768,7 +785,8 @@ export class RowBridge<
 
       case "setRange":
       case "setBlock":
-      case "restoreBlock": {
+      case "restoreBlock":
+      case "permuteRows": {
         const cells = this.cellsFor(operation, changeQueues);
         const range = operation.range;
         const base = this.base(
@@ -1017,6 +1035,14 @@ export class RowBridge<
 
       case "setCalculation":
         return [this.metadata(transaction, operation, "calculation", null)];
+
+      case "setRelationship":
+      case "removeRelationship":
+        return [this.metadata(transaction, operation, "relationship", null)];
+
+      case "setQuery":
+      case "removeQuery":
+        return [this.metadata(transaction, operation, "query", null)];
 
       case "setChart":
       case "removeChart":

@@ -245,7 +245,11 @@ impl CellStore {
             }
         }
 
-        let components = circular_components(&self.sheets, &self.formula_slots, &cyclic);
+        // A pass applies the index before it seeds cycle errors.
+        let Some(index) = self.graph.index() else {
+            return;
+        };
+        let components = circular_components(&self.sheets, &self.formula_slots, index, &cyclic);
         for (members, circular) in components.iter() {
             if circular && members.iter().all(|&key| self.is_scalar_formula(key)) {
                 self.iterate_component(members, pass, limits);

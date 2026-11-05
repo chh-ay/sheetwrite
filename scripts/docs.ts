@@ -140,6 +140,7 @@ const PACKAGE_DIRECTORIES: Readonly<Record<string, string>> = {
   "@sheetwrite/charts": "packages/charts",
   "@sheetwrite/core": "packages/core",
   "@sheetwrite/formulas": "packages/formulas",
+  "@sheetwrite/queries": "packages/queries",
   "@sheetwrite/react": "packages/react",
   "@sheetwrite/svelte": "packages/svelte",
   "@sheetwrite/vue": "packages/vue",
@@ -3941,7 +3942,12 @@ const SNIPPET_COMPILER_OPTIONS = {
   paths: {
     "@sheetwrite/charts": ["../packages/charts/dist/index.d.ts"],
     "@sheetwrite/core": ["../packages/core/dist/index.d.ts"],
+    // Subpaths whose `exports` target differs from the file name; the wildcard below
+    // would resolve `history` to the internal undo module.
+    "@sheetwrite/core/history": ["../packages/core/dist/history-archive.d.ts"],
+    "@sheetwrite/core/browser/history": ["../packages/core/dist/history-indexeddb.d.ts"],
     "@sheetwrite/core/*": ["../packages/core/dist/*"],
+    "@sheetwrite/queries": ["../packages/queries/dist/index.d.ts"],
     "@sheetwrite/react": ["../packages/react/dist/index.d.ts"],
     "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],
     "@sheetwrite/vue": ["../packages/vue/dist/index.d.ts"],
@@ -4379,6 +4385,7 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/queries": ["loadQueryEngine"],
   "@sheetwrite/charts": ["createChartViewCache", "registerChartsBackend"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],

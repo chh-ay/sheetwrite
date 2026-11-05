@@ -56,6 +56,8 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-named-formula-source"><code>namedFormulaSource</code></a>
 <a href="#cell-store-paged-dirty-coordinates"><code>pagedDirtyCoordinates</code></a>
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
+<a href="#cell-store-permute-rows"><code>permuteRows</code></a>
+<a href="#cell-store-permute-rows-losses"><code>permuteRowsLosses</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
 <a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
@@ -69,6 +71,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-recompute-volatile"><code>recomputeVolatile</code></a>
 <a href="#cell-store-reference-target"><code>referenceTarget</code></a>
 <a href="#cell-store-references-targeting"><code>referencesTargeting</code></a>
+<a href="#cell-store-relationship-status"><code>relationshipStatus</code></a>
 <a href="#cell-store-remap-range-styles"><code>remapRangeStyles</code></a>
 <a href="#cell-store-remove-cols"><code>removeCols</code></a>
 <a href="#cell-store-remove-named-range"><code>removeNamedRange</code></a>
@@ -80,6 +83,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-reset-query-resource-stats"><code>resetQueryResourceStats</code></a>
 <a href="#cell-store-restore-range"><code>restoreRange</code></a>
 <a href="#cell-store-row-count"><code>rowCount</code></a>
+<a href="#cell-store-row-order-targets"><code>rowOrderTargets</code></a>
 <a href="#cell-store-search"><code>search</code></a>
 <a href="#cell-store-set-block-packed"><code>setBlockPacked</code></a>
 <a href="#cell-store-set-bool"><code>setBool</code></a>
@@ -96,6 +100,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
 <a href="#cell-store-set-pivots"><code>setPivots</code></a>
+<a href="#cell-store-set-relationships"><code>setRelationships</code></a>
 <a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
 <a href="#cell-store-set-sheet-order"><code>setSheetOrder</code></a>
 <a href="#cell-store-set-sparse-block"><code>setSparseBlock</code></a>
@@ -114,7 +119,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>100</span>
+## Members <span class="api-count" data-pagefind-ignore>105</span>
 
 <div class="api-member-list">
 
@@ -572,6 +577,34 @@ pagedStats: (sheet: number) => Float64Array;
 
 </details>
 
+<details class="api-member" id="cell-store-permute-rows" data-pagefind-weight="1">
+<summary><code>permuteRows</code> <span class="api-member-summary">Move the rows of a rectangle: target row offset i gets the cells of source row offset order[i], for the cols columns from startcol.</span></summary>
+
+```ts generated
+permuteRows: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => number;
+```
+
+<p class="api-member-doc">Move the rows of a rectangle: target row offset `i` gets the cells of
+source row offset `order[i]`, for the `cols` columns from `start_col`.
+`order` must be a permutation of `0..order.len()`. Status: `0`
+success, `1` invalid shape, bounds or order, `3` dirty-capacity
+rejection, `4` a spill range that the rectangle moves only in part.</p>
+</details>
+
+<details class="api-member" id="cell-store-permute-rows-losses" data-pagefind-weight="1">
+<summary><code>permuteRowsLosses</code> <span class="api-member-summary">Offsets, row-major in the rectangle before the move, of the formula cells whose adjusted text the inverse order cannot restore: a reference that leaves the sheet becomes #REF!.</span></summary>
+
+```ts generated
+permuteRowsLosses: (sheet: number, start_row: number, start_col: number, cols: number, order: Uint32Array) => Uint32Array;
+```
+
+<p class="api-member-doc">Offsets, row-major in the rectangle before the move, of the formula
+cells whose adjusted text the inverse order cannot restore: a
+reference that leaves the sheet becomes `#REF!`. Undo restores these
+cells from a capture, so their order does not matter. An invalid
+shape or order gives no offsets.</p>
+</details>
+
 <details class="api-member" id="cell-store-persisted-cell-data" data-pagefind-weight="1">
 <summary><code>persistedCellData</code> <span class="api-member-summary">Sparse persisted-cell records.</span></summary>
 
@@ -712,6 +745,22 @@ referencesTargeting: (target_sheet: number, max_entries: number) => Uint32Array 
 targeting one sheet, bounded before crossing into the host.</p>
 </details>
 
+<details class="api-member" id="cell-store-relationship-status" data-pagefind-weight="1">
+<summary><code>relationshipStatus</code> <span class="api-member-summary">[code, firstRow, secondRow, unmatched] for the relationship with id, or an empty array for an unknown ID.</span></summary>
+
+```ts generated
+relationshipStatus: (id: string) => Uint32Array;
+```
+
+<p class="api-member-doc">`[code, firstRow, secondRow, unmatched]` for the relationship with
+`id`, or an empty array for an unknown ID. Codes: 0 ok, 1 missing
+table, 2 missing column, 3 and 4 a key of the wrong kind on the one
+or the many side (`firstRow`), 5 a duplicate one-side key (both
+rows). Rows are data-row offsets in their table. `unmatched` counts
+the non-blank many-side keys that match no one-side row. The keys
+are checked now, from the settled cell values.</p>
+</details>
+
 <details class="api-member" id="cell-store-remap-range-styles" data-pagefind-weight="1">
 <summary><code>remapRangeStyles</code> <span class="api-member-summary">Remap styles over a rectangle using parallel old/new id tables.</span></summary>
 
@@ -809,6 +858,18 @@ restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) =
 rowCount: (sheet: number) => number;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-row-order-targets" data-pagefind-weight="1">
+<summary><code>rowOrderTargets</code> <span class="api-member-summary">Where each row of order goes: entry i is the new row offset of source row offset i, which is also the order that moves every row back.</span></summary>
+
+```ts generated
+rowOrderTargets: (order: Uint32Array) => Uint32Array;
+```
+
+<p class="api-member-doc">Where each row of `order` goes: entry `i` is the new row offset of
+source row offset `i`, which is also the order that moves every row
+back. Empty when `order` is not a permutation of `0..order.len()`.</p>
 </details>
 
 <details class="api-member" id="cell-store-search" data-pagefind-weight="1">
@@ -1035,6 +1096,19 @@ anchorCol, nRows, ...rowFields, nCols, ...colFields, nValues,
 Text slots index `strings`. A pivot whose definition did not change
 keeps its cache. Output appears at the next recalculation. Returns
 `false`, changing nothing, for a malformed payload or a dead sheet.</p>
+</details>
+
+<details class="api-member" id="cell-store-set-relationships" data-pagefind-weight="1">
+<summary><code>setRelationships</code> <span class="api-member-summary">Replaces every relationship with the packed definitions: five strings each, [id, fromTable, fromColumn, toTable, toColumn], by stable table and column IDs.</span></summary>
+
+```ts generated
+setRelationships: (strings: string[]) => boolean;
+```
+
+<p class="api-member-doc">Replaces every relationship with the packed definitions: five strings
+each, `[id, fromTable, fromColumn, toTable, toColumn]`, by stable
+table and column IDs. Returns `false`, changing nothing, for a
+malformed payload.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-sheet-name" data-pagefind-weight="1">
@@ -1364,6 +1438,20 @@ class CellStore {
   namedFormulaSource: (name: string, scope: number) => string | undefined;
   pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;
+  permuteRows: (
+    sheet: number,
+    start_row: number,
+    start_col: number,
+    cols: number,
+    order: Uint32Array,
+  ) => number;
+  permuteRowsLosses: (
+    sheet: number,
+    start_row: number,
+    start_col: number,
+    cols: number,
+    order: Uint32Array,
+  ) => Uint32Array;
   persistedCellData: (sheet: number) => Float64Array;
   pinReadWindow: (
     sheet: number,
@@ -1402,6 +1490,7 @@ class CellStore {
     target_sheet: number,
     max_entries: number,
   ) => Uint32Array | undefined;
+  relationshipStatus: (id: string) => Uint32Array;
   remapRangeStyles: (
     sheet: number,
     r0: number,
@@ -1426,6 +1515,7 @@ class CellStore {
     snapshot: RangeSnapshot,
   ) => boolean;
   rowCount: (sheet: number) => number;
+  rowOrderTargets: (order: Uint32Array) => Uint32Array;
   search: (
     sheet: number,
     cols: Uint32Array,
@@ -1547,6 +1637,7 @@ class CellStore {
     numbers: Float64Array,
     strings: string[],
   ) => boolean;
+  setRelationships: (strings: string[]) => boolean;
   setSheetName: (sheet: number, id: string, name: string) => void;
   setSheetOrder: (order: Uint32Array) => boolean;
   setSparseBlock: (

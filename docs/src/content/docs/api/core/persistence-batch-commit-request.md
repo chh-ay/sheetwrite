@@ -8,10 +8,20 @@ description: "PersistenceBatchCommitRequest interface in @sheetwrite/core: Cance
 Cancellable commit of one atomic batch that spans several server versions.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L143"><code>packages/core/src/types/transaction.ts#L143</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L183"><code>packages/core/src/types/transaction.ts#L183</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#persistence-batch-commit-request-version-operation-counts"><code>versionOperationCounts</code></a>
+<a href="#persistence-batch-commit-request-document-id"><code>documentId</code></a>
+<a href="#persistence-batch-commit-request-base-version"><code>baseVersion</code></a>
+<a href="#persistence-batch-commit-request-client-mutation-id"><code>clientMutationId</code></a>
+<a href="#persistence-batch-commit-request-operations"><code>operations</code></a>
+<a href="#persistence-batch-commit-request-author-id"><code>authorId</code></a>
+<a href="#persistence-batch-commit-request-signal"><code>signal</code></a>
+</nav>
+
+## Members <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-member-list">
 
@@ -64,6 +74,18 @@ readonly operations: readonly DocumentOp[];
 
 </details>
 
+<details class="api-member" id="persistence-batch-commit-request-author-id" data-pagefind-weight="1">
+<summary><code>authorId</code> <span class="api-member-summary">Authenticated ID of the person who made the change, from SyncCoordinatorOptions.authorId.</span></summary>
+
+```ts generated
+readonly authorId?: string;
+```
+
+<p class="api-member-doc">Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.</p>
+</details>
+
 <details class="api-member" id="persistence-batch-commit-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
 
@@ -86,6 +108,7 @@ export interface PersistenceBatchCommitRequest {
   baseVersion: number;
   clientMutationId: string;
   readonly operations: readonly DocumentOp[];
+  readonly authorId?: string;
   signal?: AbortSignal;
 }
 ```
@@ -101,6 +124,7 @@ export interface PersistenceBatchCommitRequest {
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
