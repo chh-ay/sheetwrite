@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>383</dd></div>
+<div><dt>Exports</dt><dd>385</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -114,7 +114,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>169</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>171</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -153,6 +153,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/comment-message/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CommentMessage</code></span><span class="api-symbol-card__desc">One immutable author message in a comment thread.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-mutation-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CommentMutationRequest</code></span><span class="api-symbol-card__desc">Versioned comment mutation submitted to a host adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-thread/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CommentThread</code></span><span class="api-symbol-card__desc">Versioned discussion anchored to a document location.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/commit-journal/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CommitJournal</code></span><span class="api-symbol-card__desc">Durable record of committed transactions, written as part of the commit: when record rejects, the authority does not publish or acknowledge the commit.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/committed-transaction/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CommittedTransaction</code></span><span class="api-symbol-card__desc">One transaction as the document authority committed it: its revisions, its author and its time.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/conditional-format-rule/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ConditionalFormatRule</code></span><span class="api-symbol-card__desc">Ordered condition and style applied to a cell range.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-context/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ContextMenuContext</code></span><span class="api-symbol-card__desc">Cell and viewport coordinates resolved for one bundled context-menu opening.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-item/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ContextMenuItem</code></span><span class="api-symbol-card__desc">Built-in, separator, or custom callback row in the right-click menu.</span></a>
