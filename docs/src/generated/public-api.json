@@ -8414,7 +8414,7 @@
               "owners": [
                 "src/history-archive.ts"
               ],
-              "source": "src/history-archive.ts#L358",
+              "source": "src/history-archive.ts#L403",
               "jsDocTags": [],
               "documentation": "Opt-in archive of named and automatic versions for one document. It stores\ncontent-addressed checkpoints plus the committed transactions since each\none, through a host `HistoryStorageAdapter`. A grid that never imports this\nmodule has no history state.\n\nCalls that change the archive run one at a time. Each publishes atomically,\nso a failure or abort leaves the last durable version readable.",
               "memberDocs": [
