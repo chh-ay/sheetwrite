@@ -6,7 +6,7 @@
  *   The /showcases/ route asserts these at module scope, so a broken contract
  *   fails prerender (and therefore the docs build) before it ships.
  * - `collectMissingCapabilityFiles` — filesystem existence checks with an
- *   injected `exists`, run by scripts/docs.ts check and the inventory tests.
+ *   injected `exists`, run by `bun run docs:check` and the inventory tests.
  *   Deleting an owner route, a browser contract, or a shared scenario/protocol
  *   binding fails the build.
  */

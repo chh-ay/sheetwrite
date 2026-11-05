@@ -28,6 +28,7 @@
     "**/*.toml",
     "**/*.vue",
     "bun.lock",
+    "scripts/public-api-baseline.json",
     "test/conformance/corpus.json",
     "bench/src/matched-formula-harness.ts"
   ],

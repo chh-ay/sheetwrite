@@ -4,14 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  checkManifestBaseline,
-  type PublicApiBaseline,
-  publicApiDigest,
+  baselineFromManifest,
+  checkIntentionalExports,
   readPublicApiBaseline,
   writePublicApiBaseline,
 } from "./public-api-baseline.js";
-import { findUnusedPublicExports } from "./public-api-usage.js";
-import { analyzePublicApi, type PublicApiManifest } from "./public-api.js";
+import { analyzePublicApi } from "./public-api.js";
 
 const roots: string[] = [];
 
@@ -81,29 +79,6 @@ async function fixture(
     await writeFile(path, content);
   }
   return root;
-}
-
-function baselineArtifact(manifest: PublicApiManifest): PublicApiBaseline {
-  return {
-    schemaVersion: 2,
-    manifestFormatVersion: manifest.formatVersion,
-    sha256: publicApiDigest(manifest),
-    intentionalExports: manifest.packages
-      .flatMap((pkg) =>
-        pkg.entryPoints
-          .filter((entry) => entry.kind === "typescript")
-          .map((entry) => ({
-            package: pkg.name,
-            entryPoint: entry.subpath,
-            exports: entry.exports.map((apiExport) => apiExport.name).sort(),
-          })),
-      )
-      .sort((left, right) =>
-        `${left.package}\0${left.entryPoint}`.localeCompare(
-          `${right.package}\0${right.entryPoint}`,
-        ),
-      ),
-  };
 }
 
 afterEach(async () => {
@@ -267,109 +242,55 @@ export class LegacyFailure extends RangeError {}`,
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "duplicate-export" }));
   });
 
-  it("writes and reads an explicit baseline artifact without changing reviewed intent", async () => {
+  it("writes one export per line and reads the list back", async () => {
     const root = await fixture();
     const { manifest } = await analyzePublicApi(root);
-    // A reviewed baseline whose intent differs from a regenerated one, with a stale digest.
-    const generated = baselineArtifact(manifest);
-    const reviewed: typeof generated.intentionalExports = [];
-    expect(generated.intentionalExports.length).toBeGreaterThan(0);
     await mkdir(join(root, "scripts"), { recursive: true });
-    await writeFile(
-      join(root, "scripts/public-api-baseline.json"),
-      `${JSON.stringify({ ...generated, sha256: "0".repeat(64), intentionalExports: reviewed })}\n`,
-    );
     const written = await writePublicApiBaseline(root, manifest);
 
-    expect(written.sha256).toBe(publicApiDigest(manifest));
-    expect(written.intentionalExports).toEqual(reviewed);
+    expect(written).toEqual(baselineFromManifest(manifest));
     expect(await readPublicApiBaseline(root)).toEqual(written);
-    expect(
-      JSON.parse(await readFile(join(root, "scripts/public-api-baseline.json"), "utf8")),
-    ).toEqual(written);
+    const text = await readFile(join(root, "scripts/public-api-baseline.json"), "utf8");
+    for (const name of ["DataSource", "DocumentOp", "toXlsxTable"]) {
+      expect(text).toContain(`\n        "${name}"`);
+    }
   });
 
-  it("rejects malformed baseline artifacts", async () => {
+  it("rejects malformed baseline artifacts and lists that are not one export per line", async () => {
     const root = await fixture();
+    const path = join(root, "scripts/public-api-baseline.json");
     await mkdir(join(root, "scripts"), { recursive: true });
-    await writeFile(
-      join(root, "scripts/public-api-baseline.json"),
-      JSON.stringify({
-        schemaVersion: 2,
-        manifestFormatVersion: 2,
-        sha256: "not-a-digest",
-        intentionalExports: [],
-      }),
-    );
+    const entry = { package: "@sheetwrite/core", entryPoint: ".", exports: ["Box", "Store"] };
+    const baseline = { schemaVersion: 3, manifestFormatVersion: 2, intentionalExports: [entry] };
+
+    await writeFile(path, `${JSON.stringify({ ...baseline, schemaVersion: 2 }, null, 2)}\n`);
     await expect(readPublicApiBaseline(root)).rejects.toThrow(
       "Invalid public API baseline artifact",
     );
+    const unsorted = { ...entry, exports: ["Store", "Box"] };
+    await writeFile(
+      path,
+      `${JSON.stringify({ ...baseline, intentionalExports: [unsorted] }, null, 2)}\n`,
+    );
+    await expect(readPublicApiBaseline(root)).rejects.toThrow("not sorted and unique");
+    await writeFile(path, `${JSON.stringify(baseline)}\n`);
+    await expect(readPublicApiBaseline(root)).rejects.toThrow("not one export per line");
   });
 
-  it("accepts reviewed exports and only referenced members of a workspace namespace", async () => {
-    const root = await fixture();
-    const initial = await analyzePublicApi(root);
-    const baseline = baselineArtifact(initial.manifest);
-    expect(await findUnusedPublicExports(root, initial.manifest, baseline)).toEqual([]);
+  it("reports exports missing from the list and listed exports the package dropped", async () => {
+    const { manifest } = await analyzePublicApi(await fixture());
+    const baseline = baselineFromManifest(manifest);
+    expect(checkIntentionalExports(manifest, baseline)).toEqual([]);
 
-    await writeFile(
-      join(root, "packages/core/index.d.ts"),
-      `${canonicalDeclarations}
-/** Consumed fixture export. */
-export const Consumed = true;
-/** Unreachable fixture export. */
-export const StillUnreachable = true;
-`,
+    const renamed = await analyzePublicApi(
+      await fixture(
+        canonicalDeclarations.replace("interface DataSource", "interface DataProvider"),
+      ),
     );
-    const consumerRoot = join(root, "packages/consumer");
-    await mkdir(consumerRoot, { recursive: true });
-    await writeFile(
-      join(consumerRoot, "package.json"),
-      JSON.stringify({ name: "@fixture/consumer", private: true }),
-    );
-    await writeFile(
-      join(consumerRoot, "index.ts"),
-      'import * as Core from "@sheetwrite/core";\nexport const observed = Core.Consumed;\n',
-    );
-    const changed = await analyzePublicApi(root);
-
-    const issues = await findUnusedPublicExports(root, changed.manifest, baseline);
-    expect(issues).not.toContainEqual(
-      expect.objectContaining({ code: "unused-export", symbol: "Consumed" }),
-    );
-    expect(issues).toContainEqual(
-      expect.objectContaining({ code: "unused-export", symbol: "StillUnreachable" }),
-    );
+    const issues = checkIntentionalExports(renamed.manifest, baseline);
+    expect(issues.map((issue) => [issue.code, issue.symbol])).toEqual([
+      ["unlisted-export", "DataProvider"],
+      ["removed-export", "DataSource"],
+    ]);
   });
-
-  it("detects optionality, union, generic-constraint, export-name, and JSDoc drift", async () => {
-    const baselineRoot = await fixture();
-    const baseline = await analyzePublicApi(baselineRoot);
-    const expectedDigest = publicApiDigest(baseline.manifest);
-    const mutations = [
-      canonicalDeclarations.replace("getRows(request: unknown)", "getRows?(request: unknown)"),
-      canonicalDeclarations.replace(
-        'export type DocumentOp = { op: "set" };',
-        'export type DocumentOp = { op: "set" } | { op: "clear" };',
-      ),
-      canonicalDeclarations.replace(
-        "Box<T extends string = string>",
-        "Box<T extends string | number = string>",
-      ),
-      canonicalDeclarations.replace("interface DataSource", "interface DataProvider"),
-      canonicalDeclarations.replace(
-        "/** Canonical document operation. */",
-        "/** Changed document operation. */",
-      ),
-    ];
-
-    const results = await Promise.all(
-      mutations.map(async (mutation) => analyzePublicApi(await fixture(mutation))),
-    );
-    for (const result of results) {
-      expect(checkManifestBaseline(result.manifest, expectedDigest)).toContainEqual(
-        expect.objectContaining({ code: "manifest-drift" }),
-      );
-    }
-  }, 20_000);
 });

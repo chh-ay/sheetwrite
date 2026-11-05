@@ -110,9 +110,10 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           bun run size:record --version="$VERSION"
           # The landing page's first-load size is release evidence: take the
-          # measurement of the same CI run whose tarballs were published.
+          # measurement of the same CI run whose tarballs were published. The
+          # docs build renders the Performance pages and landing data from
+          # these two files, so the pull request commits only them.
           gh run download "$CI_RUN_ID" --name size-evidence --dir scripts
-          bun run docs:generate
       - name: Open package size history pull request
         if: steps.publish.outputs.verified != '[]'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -126,10 +127,7 @@ jobs:
           body: "Automated registry size history captured after the verified npm publication."
           add-paths: |
             scripts/size-history.json
-            docs/src/content/docs/performance/delivery-size.md
-            docs/src/generated/docs-contract.json
             scripts/size-report.json
-            docs/src/generated/landing-bench.json
 
   # The docs describe the published packages, so they deploy only after the
   # GitHub release for the same commit.

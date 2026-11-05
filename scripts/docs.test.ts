@@ -11,7 +11,7 @@ import {
   symbolDescription,
 } from "./docs-api.js";
 import { renderCompatibilityResults } from "./docs-compatibility.js";
-import { headingAnchors, parseFences, unresolvedSiteLinks } from "./docs-content-checks.js";
+import { parseFences, unresolvedSiteLinks } from "./docs-content-checks.js";
 import {
   landingBenchPayload,
   landingDownloads,
@@ -20,7 +20,9 @@ import {
   splitPerformancePages,
   validateDataArtifact,
 } from "./docs-performance.js";
+import { GENERATED_CONTENT_DIRECTORIES, GENERATED_CONTENT_PAGES } from "./docs-shared.js";
 import { ADAPTER_DOC_CONTRACT, adapterContractIssues } from "./docs.js";
+import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
@@ -777,5 +779,19 @@ describe("API symbol page reading experience", () => {
     // The full expansion stays available in the collapsed Declaration section.
     expect(declaration).toContain('mode: "memory" | "session"');
     expect(page).not.toContain("core-adapter/storage-mode");
+  });
+});
+
+describe("generated docs ownership", () => {
+  it("keeps every page the generator owns out of git", async () => {
+    const ignored = new Set(
+      (await readFile(resolve(import.meta.dir, "../.gitignore"), "utf8")).split("\n"),
+    );
+    for (const directory of GENERATED_CONTENT_DIRECTORIES) {
+      expect(ignored.has(`docs/src/content/docs/${directory}/`)).toBeTrue();
+    }
+    for (const page of GENERATED_CONTENT_PAGES) {
+      expect(ignored.has(`docs/src/content/docs/${page}`)).toBeTrue();
+    }
   });
 });

@@ -1,7 +1,6 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "manifestFormatVersion": 2,
-  "sha256": "598463b9cc682a85435a0e2aa573380db07b79cad89043b2b21ed3d1be837109",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -30,7 +29,9 @@
     {
       "package": "@sheetwrite/charts",
       "entryPoint": "./register",
-      "exports": ["registerChartsBackend"]
+      "exports": [
+        "registerChartsBackend"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -41,6 +42,7 @@
         "BoundaryDirection",
         "BoundaryOperationStats",
         "BoundaryTransferKind",
+        "CalculationSettings",
         "CellAddress",
         "CellAlign",
         "CellBlock",
@@ -62,6 +64,7 @@
         "CellScalar",
         "CellStyle",
         "CellValue",
+        "CellVerticalAlign",
         "ChangeEvent",
         "ChartAnchor",
         "ChartChangeEvent",
@@ -103,6 +106,8 @@
         "ContextMenuItem",
         "ContextMenuItems",
         "DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS",
+        "DEFAULT_MAX_CHANGE",
+        "DEFAULT_MAX_ITERATIONS",
         "DEFAULT_SNAPSHOT_RESOURCE_LIMITS",
         "DEFAULT_SYNC_COORDINATOR_LIMITS",
         "DEFAULT_THEME",
@@ -159,6 +164,7 @@
         "MAX_HYPERLINK_DISPLAY_LENGTH",
         "MAX_HYPERLINK_ID_LENGTH",
         "MAX_HYPERLINK_TARGET_LENGTH",
+        "MAX_ITERATIONS",
         "MemoryPersistenceAdapter",
         "MergeRange",
         "MountedChart",
@@ -203,7 +209,13 @@
         "ProtectedRange",
         "ProtectionRequest",
         "ProtectionResolver",
+        "QueryAggregate",
         "QueryCapability",
+        "QueryColumnSpec",
+        "QueryColumnType",
+        "QueryJoinKind",
+        "QueryPredicate",
+        "QueryStep",
         "REF_CYCLE",
         "RUNTIME_RESOURCE_SCHEMA_VERSION",
         "Range",
@@ -216,14 +228,6 @@
         "ResolvedCell",
         "ResolvedHyperlinkTarget",
         "ResourceOwnerBytes",
-        "RestoreProvenance",
-        "RevisionAdapter",
-        "RevisionCoordinator",
-        "RevisionCoordinatorEvent",
-        "RevisionCoordinatorOptions",
-        "RevisionRestoreRequest",
-        "RevisionRestoreResponse",
-        "RevisionSummary",
         "RibbonConfig",
         "RibbonMode",
         "RowBridge",
@@ -259,6 +263,9 @@
         "SHEETWRITE_ERROR_OPERATIONS",
         "STORE_MEMORY_HASH_ESTIMATE_VERSION",
         "STORE_MEMORY_PROTOCOL_VERSION",
+        "SavedQuery",
+        "SavedQueryOutput",
+        "SavedQuerySource",
         "SearchOptions",
         "SearchResult",
         "Selection",
@@ -336,9 +343,15 @@
         "WorkbookTablePatch",
         "WorkbookTableResourceLimits",
         "WorkbookTableStyle",
+        "WorkbookTableTotalsFunction",
         "WorkbookTableUnsupportedFeature",
+        "WorkbookTableXmlElement",
         "XlsxResourceError",
         "XlsxResourceLimits",
+        "XlsxSourceDependency",
+        "XlsxSourceGraph",
+        "XlsxSourcePart",
+        "XlsxSourceSnapshot",
         "XlsxTableExportBackend",
         "XlsxTableImportBackend",
         "XlsxWorkbookBackend",
@@ -349,6 +362,7 @@
         "cellA1",
         "cellScalarToText",
         "colToA1",
+        "convertXlsxFormulas",
         "createGrid",
         "createGridFromSnapshot",
         "createRowBridge",
@@ -363,8 +377,10 @@
         "fromCsv",
         "fromXlsxTable",
         "fromXlsxWorkbook",
+        "fromXlsxWorkbookFile",
         "hyperlinkAt",
         "initSheetwrite",
+        "isCellFontFamily",
         "isSafeExternalHyperlink",
         "isSheetwriteError",
         "isSheetwriteReady",
@@ -403,8 +419,11 @@
         "toTsv",
         "toTsvStream",
         "toXlsxTable",
+        "toXlsxTableStream",
         "toXlsxWorkbook",
+        "toXlsxWorkbookStream",
         "validWorkbookTable",
+        "validWorkbookTableXmlElement",
         "validateSheetName",
         "validateTransactionResources",
         "validateWorkbookSnapshot",
@@ -416,11 +435,14 @@
       "package": "@sheetwrite/core",
       "entryPoint": "./adapter",
       "exports": [
+        "AdapterGridController",
+        "AdapterGridInput",
         "DEFAULT_SIMPLE_COLUMN_WIDTH",
         "GRID_OPTION_POLICY",
         "GridAdapterEventHandlers",
         "GridController",
         "GridControllerHandlers",
+        "GridPublicationAdapter",
         "GridReadyEvent",
         "GridReadyReason",
         "GridResetReason",
@@ -458,6 +480,7 @@
         "SimpleGridInput",
         "SimpleSheetwriteOptions",
         "applyChangedLiveGridOptions",
+        "createAdapterGridController",
         "createGridController",
         "createRowBridge",
         "createSimpleGridInput",
@@ -482,7 +505,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./browser/history",
-      "exports": ["IndexedDbHistoryStorage", "IndexedDbHistoryStorageOptions"]
+      "exports": [
+        "IndexedDbHistoryStorage",
+        "IndexedDbHistoryStorageOptions"
+      ]
     },
     {
       "package": "@sheetwrite/core",
@@ -515,7 +541,6 @@
         "HISTORY_DIFF_NONE",
         "HistoryArchive",
         "HistoryArchiveOptions",
-        "HistoryCommit",
         "HistoryDiffCell",
         "HistoryDiffCells",
         "HistoryDiffCursor",
@@ -583,7 +608,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+      "exports": [
+        "WorkerAcknowledgement",
+        "createWorkerMessageHandler"
+      ]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -608,6 +636,7 @@
         "formulaFromXlsx",
         "formulaToXlsx",
         "formulaTokens",
+        "functionNames",
         "initSync",
         "isLoaded",
         "load",
@@ -734,6 +763,7 @@
       "entryPoint": ".",
       "exports": [
         "CellOut",
+        "CellSnapshot",
         "CellStore",
         "DistinctColumn",
         "EngineInstance",
@@ -759,6 +789,14 @@
       ]
     },
     {
+      "package": "@sheetwrite/wasm",
+      "entryPoint": "./history",
+      "exports": [
+        "DiffKernel",
+        "loadHistoryKernel"
+      ]
+    },
+    {
       "package": "@sheetwrite/xlsx",
       "entryPoint": ".",
       "exports": [
@@ -774,7 +812,9 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": ["registerXlsxBackends"]
+      "exports": [
+        "registerXlsxBackends"
+      ]
     }
   ]
 }

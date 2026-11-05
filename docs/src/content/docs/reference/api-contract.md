@@ -16,7 +16,7 @@ Every exported subpath has one explicit classification:
 | `testing-only` | Deterministic harnesses for consumers' tests; never production code. |
 | `asset` | CSS, Worker, or WASM bytes rather than a TypeScript symbol surface. |
 
-The [generated API index](/docs/api/) lists every package entry point, its classification, and every compiler-visible export. There is no manually maintained symbol inventory beside it.
+The [generated API index](/docs/api/) lists every package entry point, its classification, and every compiler-visible export. Beside it, the repository keeps only a reviewed list of export names, which the gate checks against the build.
 
 ## What the gate records
 
@@ -32,7 +32,7 @@ Named re-exports preserve documentation from both the export statement and the d
 
 ## Stability and changes
 
-`bun run api:check` hashes the normalized manifest. A changed digest must be reviewed with the declaration diff and accepted explicitly; rebuilding alone cannot rewrite the baseline. This catches additions, removals, signature drift, duplicate declaration merges, missing documentation, and dependency types that leak into the public surface.
+`bun run api:check` compares the built exports with `scripts/public-api-baseline.json`, the reviewed list of every export by package, entry point and name, one per line. An export the list does not hold, or a listed export that is gone, fails the check until `bun run api:baseline` rewrites the list and the change is reviewed with the declaration diff. Two changes that add different exports edit different lines of the list, so they merge without conflict. The same check rejects duplicate declaration merges, missing documentation, and dependency types that leak into the public surface.
 
 The API manifest describes type compatibility. Runtime behavior remains protected by package tests, adapter lifecycle contracts, browser scenarios, canonical tarball checks, and delivery-size budgets.
 

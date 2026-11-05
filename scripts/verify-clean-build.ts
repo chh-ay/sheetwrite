@@ -34,8 +34,20 @@ const GENERATED_OUTPUTS = [
   "packages/charts/dist",
   "packages/react/dist",
   "packages/vue/dist",
+  "packages/core/src/generated",
   "docs/dist",
   "docs/.tanstack",
+  "docs/src/generated",
+  "docs/public/llms.txt",
+  "docs/public/llms-full.txt",
+  "docs/src/content/docs/api",
+  "docs/src/content/docs/performance",
+  "docs/src/content/docs/reference/formula-functions",
+  "docs/src/content/docs/reference/compatibility-results.md",
+  "docs/src/content/docs/reference/excel-function-coverage.md",
+  "docs/src/content/docs/reference/formula-functions.md",
+  "docs/src/content/docs/reference/moved-guides.md",
+  "docs/src/content/docs/reference/package-entry-points.md",
 ] as const;
 
 const RUNTIME_ENTRY_PATHS = [

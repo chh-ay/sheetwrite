@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { readdir, readFile, rm } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
 
 import { MOVED_HEADINGS, MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
@@ -39,7 +39,6 @@ import {
 } from "./docs-compatibility.js";
 import {
   contentPathForRoute,
-  headingAnchors,
   markdownDocuments,
   readReadmes,
   siteLinkIssues,
@@ -59,21 +58,23 @@ import {
   exists,
   type ExpectedFile,
   generatedDataRoot,
+  GENERATED_CONTENT_DIRECTORIES,
   generatedManifestPath,
+  isGeneratedContent,
+  type MarkdownDocument,
   MIGRATION_ROUTES,
   posix,
   repositoryRoot,
   stableJson,
 } from "./docs-shared.js";
-import { extractVolatileFunctions } from "./formula-contract.js";
+import { siteDataFiles } from "./docs-site-data.js";
 import {
-  formulaFamilyNavigation,
   loadFormulaContractInventory,
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
-  renderFunctionMetadata,
 } from "./formula-docs.js";
-import { analyzePublicApi, type ApiExport, type PublicApiManifest } from "./public-api.js";
+import type { ApiExport, PublicApiAnalysis, PublicApiManifest } from "./public-api.js";
+import { writeIfChanged } from "./script-io.js";
 
 const REQUIRED_SEARCH_TERMS = [
   "rendererKind",
@@ -355,41 +356,8 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
   );
   const excelCoverage = renderExcelCoveragePage(formulaInventory, excelCatalog);
-  // An old overview heading forwards only when exactly one family page holds it;
-  // shared headings ("Signature profiles") stay on the overview.
-  const formulaHeadingTargets: Record<string, string> = {};
-  const overviewAnchors = headingAnchors(
-    formulaPages.find((page) => page.route === "reference/formula-functions.md")?.content ?? "",
-  );
-  const holders = new Map<string, string[]>();
-  for (const page of formulaPages) {
-    if (page.route === "reference/formula-functions.md") continue;
-    const href = `/docs/${page.route.replace(/\.md$/, "/")}`;
-    for (const heading of headingAnchors(page.content)) {
-      if (overviewAnchors.has(heading)) continue;
-      holders.set(heading, [...(holders.get(heading) ?? []), `${href}#${heading}`]);
-    }
-  }
-  for (const [heading, targets] of holders) {
-    if (targets.length === 1 && targets[0] !== undefined)
-      formulaHeadingTargets[heading] = targets[0];
-  }
-  // The old single-page table used a heading for each family's title.
-  for (const family of formulaFamilyNavigation(formulaPages)) {
-    const oldHeading = [...headingAnchors(`### ${family.label}`)][0];
-    if (oldHeading !== undefined) formulaHeadingTargets[oldHeading] = family.href;
-  }
-  const [engineTypes, engineCalc] = await Promise.all([
-    readFile(join(repositoryRoot, "packages/wasm/src/types.rs"), "utf8"),
-    readFile(join(repositoryRoot, "packages/wasm/src/calc.rs"), "utf8"),
-  ]);
-  const volatileNames = new Set(extractVolatileFunctions(engineTypes, engineCalc));
   const files: ExpectedFile[] = [
     ...apiFiles,
-    {
-      path: join(repositoryRoot, "packages/core/src/generated/function-metadata.ts"),
-      content: renderFunctionMetadata(formulaInventory, volatileNames),
-    },
     {
       path: join(contentRoot, "reference/package-entry-points.md"),
       content: renderEntryPointInventory(manifest),
@@ -404,14 +372,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     },
     ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
     { path: join(contentRoot, excelCoverage.route), content: excelCoverage.content },
-    {
-      path: join(generatedDataRoot, "formula-nav.json"),
-      content: stableJson(formulaFamilyNavigation(formulaPages)),
-    },
-    {
-      path: join(generatedDataRoot, "formula-heading-targets.json"),
-      content: stableJson(formulaHeadingTargets),
-    },
+    ...siteDataFiles(manifest, formulaPages),
     {
       path: join(generatedDataRoot, "formula-summary.json"),
       content: stableJson({ functionCount: formulaNames.size }),
@@ -437,44 +398,69 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     })),
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
-    {
-      path: join(generatedDataRoot, "api-nav.json"),
-      content: stableJson(
-        manifest.packages.map((pkg) => ({
-          label: pkg.name,
-          href: `/docs/api/${entrySlug(pkg.name, ".")}/`,
-        })),
-      ),
-    },
   ];
   files.push(...(await expectedLlmsFiles(manifest, repositoryRoot, files)));
+  const unowned = files.filter(
+    (file) => file.path.startsWith(`${contentRoot}${sep}`) && !isGeneratedContent(file.path),
+  );
+  if (unowned.length > 0) {
+    throw new Error(
+      `Generated pages outside GENERATED_CONTENT_DIRECTORIES and GENERATED_CONTENT_PAGES (add them there and to .gitignore): ${unowned.map((file) => posix(relative(repositoryRoot, file.path))).join(", ")}`,
+    );
+  }
   return files.sort((left, right) => left.path.localeCompare(right.path));
 }
 
-async function writeIfChanged(path: string, content: string): Promise<void> {
-  if ((await exists(path)) && (await readFile(path, "utf8")) === content) return;
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content);
+/** Every file under `root`, recursively; empty when `root` does not exist. */
+async function filesUnder(root: string): Promise<string[]> {
+  if (!(await exists(root))) return [];
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath, entry.name));
 }
 
-async function removeStaleApiPages(expected: readonly ExpectedFile[]): Promise<void> {
-  const apiRoot = join(contentRoot, "api");
-  if (!(await exists(apiRoot))) return;
-  const keep = new Set(
-    expected.filter((file) => file.path.startsWith(`${apiRoot}${sep}`)).map((file) => file.path),
-  );
-  const visit = async (directory: string): Promise<void> => {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        await visit(path);
-        if ((await readdir(path)).length === 0) await rm(path, { recursive: true });
-      } else if (entry.isFile() && entry.name.endsWith(".md") && !keep.has(path)) {
-        await rm(path);
-      }
+/**
+ * Deletes files left in generated directories by an earlier generation whose
+ * source is gone (a removed export's API page, a renamed data file), then the
+ * directories that leaves empty.
+ */
+async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Promise<void> {
+  const keep = new Set(expected.map((file) => file.path));
+  const roots = [
+    generatedDataRoot,
+    ...GENERATED_CONTENT_DIRECTORIES.map((directory) => join(contentRoot, directory)),
+  ];
+  for (const root of roots) {
+    for (const path of await filesUnder(root)) {
+      if (!keep.has(path)) await rm(path);
     }
-  };
-  await visit(apiRoot);
+    const directories = (await exists(root))
+      ? (await readdir(root, { recursive: true, withFileTypes: true }))
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => join(entry.parentPath, entry.name))
+          .sort((left, right) => right.length - left.length)
+      : [];
+    for (const directory of directories) {
+      if ((await readdir(directory)).length === 0) await rm(directory, { recursive: true });
+    }
+  }
+}
+
+/**
+ * The documentation as the site builds it: authored pages from disk plus the
+ * generated pages as the generator renders them now. Generated pages on disk
+ * are ignored, so the check needs no earlier generation and a stale copy
+ * cannot hide a broken link.
+ */
+async function siteDocuments(expected: readonly ExpectedFile[]): Promise<MarkdownDocument[]> {
+  const authored = (await markdownDocuments(contentRoot)).filter(
+    (document) => !isGeneratedContent(document.path),
+  );
+  const generated = expected.filter(
+    (file) => file.path.startsWith(`${contentRoot}${sep}`) && /\.mdx?$/.test(file.path),
+  );
+  return [...authored, ...generated];
 }
 
 async function checkDocs(
@@ -483,23 +469,13 @@ async function checkDocs(
   apiIssues: readonly { code: string; message: string }[],
 ): Promise<string[]> {
   const failures = apiIssues.map((issue) => `${issue.code}: ${issue.message}`);
-  for (const file of expected) {
-    if (!(await exists(file.path))) {
-      failures.push(`generated file missing: ${posix(relative(repositoryRoot, file.path))}`);
-      continue;
-    }
-    const actual = await readFile(file.path, "utf8");
-    if (actual !== file.content) {
-      failures.push(`generated file is stale: ${posix(relative(repositoryRoot, file.path))}`);
-    }
-  }
 
   for (const oldPath of Object.keys(MIGRATION_ROUTES)) {
     if (await exists(join(repositoryRoot, oldPath)))
       failures.push(`duplicate migrated guide remains: ${oldPath}`);
   }
 
-  const documents = await markdownDocuments(contentRoot);
+  const documents = await siteDocuments(expected);
   for (const route of Object.values(MIGRATION_ROUTES)) {
     if (contentPathForRoute(route, documents) === undefined) {
       failures.push(`migration route has no page: ${route}`);
@@ -580,7 +556,8 @@ async function checkDocs(
     );
   }
 
-  const apiIndex = await readFile(join(contentRoot, "api/index.md"), "utf8");
+  const apiIndex =
+    expected.find((file) => file.path === join(contentRoot, "api/index.md"))?.content ?? "";
   for (const apiPagePath of entryPageKeys) {
     const route = `/docs/${posix(relative(contentRoot, apiPagePath)).replace(/\.md$/, "/")}`;
     // The index links entries from raw-HTML table rows; markdown links stay
@@ -612,16 +589,20 @@ async function checkDocs(
   return [...new Set(failures)].sort();
 }
 
-export async function generateDocs(): Promise<void> {
-  const analysis = await analyzePublicApi(repositoryRoot);
-  const fatalIssues = analysis.issues.filter((issue) =>
-    ["malformed-report", "parse-error", "unclassified-entry", "unresolved-entry"].includes(
-      issue.code,
-    ),
-  );
+/** Analysis issues that leave no manifest to generate pages from. */
+const FATAL_ANALYSIS_ISSUES: Readonly<Record<string, true>> = {
+  "malformed-report": true,
+  "parse-error": true,
+  "unclassified-entry": true,
+  "unresolved-entry": true,
+};
+
+/** Writes every generated docs file and removes the ones no source produces any more. */
+export async function generateDocs(analysis: PublicApiAnalysis): Promise<string> {
+  const fatalIssues = analysis.issues.filter((issue) => FATAL_ANALYSIS_ISSUES[issue.code] === true);
   if (fatalIssues.length > 0) throw new Error(fatalIssues.map((issue) => issue.message).join("\n"));
   const expected = await expectedGeneratedFiles(analysis.manifest);
-  await removeStaleApiPages(expected);
+  await removeStaleGeneratedFiles(expected);
   for (const file of expected) await writeIfChanged(file.path, file.content);
   const entryCount = analysis.manifest.packages.reduce(
     (count, pkg) => count + pkg.entryPoints.length,
@@ -632,9 +613,7 @@ export async function generateDocs(): Promise<void> {
       count + pkg.entryPoints.reduce((subtotal, entry) => subtotal + entry.exports.length, 0),
     0,
   );
-  console.log(
-    `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`,
-  );
+  return `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`;
 }
 
 // Keep this starter surface explicit: removing a symbol must not silently remove its docs gate.
@@ -698,8 +677,12 @@ function requireApiExamples(manifest: PublicApiManifest): void {
   if (failures.length > 0) throw new Error(failures.join("\n"));
 }
 
-export async function verifyDocs(): Promise<void> {
-  const analysis = await analyzePublicApi(repositoryRoot);
+/**
+ * Renders the generated docs in memory and checks them with the authored
+ * pages: links, moved pages, examples, API coverage and the showcase
+ * capability contract. Throws every failure at once.
+ */
+export async function verifyDocs(analysis: PublicApiAnalysis): Promise<string> {
   requireApiExamples(analysis.manifest);
   const expected = await expectedGeneratedFiles(analysis.manifest);
   const failures = await checkDocs(analysis.manifest, expected, analysis.issues);
@@ -713,12 +696,5 @@ export async function verifyDocs(): Promise<void> {
     ),
   );
   if (failures.length > 0) throw new Error(failures.join("\n"));
-  console.log("Documentation contract check passed");
-}
-
-if (import.meta.main) {
-  const mode = process.argv[2];
-  if (mode === "generate") await generateDocs();
-  else if (mode === "check") await verifyDocs();
-  else throw new Error("Usage: bun scripts/docs.ts <generate|check>");
+  return "Documentation contract check passed";
 }
