@@ -48,6 +48,7 @@ const RECORD_ENCODINGS: readonly string[] = ["deflate-json-v1", "deflate-bytes-v
 /** Stable failure category for history validation, storage, and replay. */
 export type HistoryErrorCode =
   | "invalid-history"
+  | "invalid-scope"
   | "conflict"
   | "capacity"
   | "not-found"

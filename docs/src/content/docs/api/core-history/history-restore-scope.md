@@ -1,14 +1,14 @@
 ---
-title: "RevisionCoordinatorEvent | @sheetwrite/core"
-description: "RevisionCoordinatorEvent type in @sheetwrite/core: State or restore transition emitted by revision coordination."
+title: "HistoryRestoreScope | @sheetwrite/core/history"
+description: "HistoryRestoreScope type in @sheetwrite/core/history: What a restore covers."
 ---
-<!-- api-export:@sheetwrite/core|.|RevisionCoordinatorEvent -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
+<!-- api-export:@sheetwrite/core|./history|HistoryRestoreScope -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="type">type</span></div>
 
-State or restore transition emitted by revision coordination.
+What a restore covers.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/collaboration.ts#L289"><code>packages/core/src/collaboration.ts#L289</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/restore.ts#L24"><code>packages/core/src/version-history/restore.ts#L24</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>
@@ -17,25 +17,21 @@ State or restore transition emitted by revision coordination.
 <div class="api-variant">
 
 ```ts generated
-{ type: "restored"; targetVersion: number; version: number }
+{ kind: "workbook" }
 ```
 
 </div>
 <div class="api-variant">
 
 ```ts generated
-{
-  type: "conflict";
-  targetVersion: number;
-  currentVersion: number;
-}
+{ kind: "sheet"; sheet: SheetId }
 ```
 
 </div>
 <div class="api-variant">
 
 ```ts generated
-{ type: "error"; error: SheetwriteError }
+{ kind: "range"; range: Range }
 ```
 
 </div>
@@ -47,20 +43,17 @@ State or restore transition emitted by revision coordination.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type RevisionCoordinatorEvent =
+export type HistoryRestoreScope =
   | {
-      type: "restored";
-      targetVersion: number;
-      version: number;
+      kind: "workbook";
     }
   | {
-      type: "conflict";
-      targetVersion: number;
-      currentVersion: number;
+      kind: "sheet";
+      sheet: SheetId;
     }
   | {
-      type: "error";
-      error: SheetwriteError;
+      kind: "range";
+      range: Range;
     };
 ```
 
@@ -82,9 +75,9 @@ export type RevisionCoordinatorEvent =
 <li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 
-<p class="api-consumers-label">Public exports naming <code>RevisionCoordinatorEvent</code></p>
+<p class="api-consumers-label">Public exports naming <code>HistoryRestoreScope</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/core-history/history-archive/"><code>HistoryArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

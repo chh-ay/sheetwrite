@@ -320,6 +320,17 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
     ],
     ["sortFilter", [FUNNEL]],
     ["clearFilter", ["M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z", "m15.5 14.5 5 5m0-5-5 5"]],
+    // Custom Sort: sort levels of falling length beside the sort arrow.
+    ["sortCustom", ["M18 4v16m-3-3 3 3 3-3", "M3 6h10M3 12h7.5M3 18h5"]],
+    // Sort view only: an eye over a sort arrow; the cells stay where they are.
+    [
+      "sortView",
+      [
+        "M2.5 9.5S5.5 4.5 10 4.5s7.5 5 7.5 5-3 5-7.5 5-7.5-5-7.5-5Z",
+        "M12 9.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z",
+        "M19.5 13v8m-2.5-2.5 2.5 2.5 2.5-2.5",
+      ],
+    ],
   ],
   // Charts, one glyph per chart kind, and pivot tables.
   [

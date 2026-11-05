@@ -45,15 +45,16 @@ interface StoredPendingCommit extends PendingCommit {
   sequence?: number;
 }
 
-/** Optional commit fields: the atomic batch shape and the author, stored only when present. */
+/** Optional commit fields, stored only when present: batch shape, author and restore provenance. */
 function storedOptionalFields(
   commit: PendingCommit,
-): Pick<PendingCommit, "versionOperationCounts" | "authorId"> {
+): Pick<PendingCommit, "versionOperationCounts" | "authorId" | "restore"> {
   return {
     ...(commit.versionOperationCounts
       ? { versionOperationCounts: [...commit.versionOperationCounts] }
       : {}),
     ...(commit.authorId !== undefined ? { authorId: commit.authorId } : {}),
+    ...(commit.restore !== undefined ? { restore: { ...commit.restore } } : {}),
   };
 }
 

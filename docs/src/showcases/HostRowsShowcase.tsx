@@ -330,7 +330,7 @@ export default function HostRowsShowcase() {
               <button
                 type="button"
                 disabled={!ready}
-                onClick={() => grid.current?.sortBy(1, false)}
+                onClick={() => grid.current?.setViewSort([{ col: 1, ascending: false }])}
               >
                 Sort amount
               </button>

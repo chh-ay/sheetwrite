@@ -39,13 +39,6 @@ export {
   type PresenceMessage,
   type PresencePrivacyOptions,
   type PresenceTransport,
-  type RevisionAdapter,
-  RevisionCoordinator,
-  type RevisionCoordinatorEvent,
-  type RevisionCoordinatorOptions,
-  type RevisionRestoreRequest,
-  type RevisionRestoreResponse,
-  type RevisionSummary,
   type VersionedCommentEvent,
 } from "./collaboration.js";
 

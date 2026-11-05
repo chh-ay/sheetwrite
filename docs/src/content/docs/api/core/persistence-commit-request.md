@@ -8,7 +8,7 @@ description: "PersistenceCommitRequest interface in @sheetwrite/core: Cancellabl
 Cancellable pending commit submitted to a persistence adapter.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L148"><code>packages/core/src/types/transaction.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L160"><code>packages/core/src/types/transaction.ts#L160</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -19,9 +19,10 @@ Cancellable pending commit submitted to a persistence adapter.
 <a href="#persistence-commit-request-operations"><code>operations</code></a>
 <a href="#persistence-commit-request-version-operation-counts"><code>versionOperationCounts</code></a>
 <a href="#persistence-commit-request-author-id"><code>authorId</code></a>
+<a href="#persistence-commit-request-restore"><code>restore</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -94,6 +95,17 @@ readonly authorId?: string;
 `SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
 before it records history. At most `maxMutationIdBytes` UTF-8 bytes.</p>
 </details>
+
+<details class="api-member" id="persistence-commit-request-restore" data-pagefind-weight="1">
+<summary><code>restore</code> <span class="api-member-summary">Present when the commit restores a history version.</span></summary>
+
+```ts generated
+readonly restore?: RestoreProvenance;
+```
+
+<p class="api-member-doc">Present when the commit restores a history version. A restore is never
+rebased: a conflicting restore makes the client reload and restore again.</p>
+</details>
 </div>
 
 ## Declaration
@@ -110,6 +122,7 @@ export interface PersistenceCommitRequest {
   readonly operations: readonly DocumentOp[];
   readonly versionOperationCounts?: readonly number[];
   readonly authorId?: string;
+  readonly restore?: RestoreProvenance;
 }
 ```
 

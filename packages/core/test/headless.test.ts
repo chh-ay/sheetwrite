@@ -283,7 +283,7 @@ describe("grid.dataEdge (Ctrl+Arrow jump target for headless keymaps)", () => {
     expect(grid.dataEdge(0, 0, 1, 0)).toBe(1);
 
     // Ascending sort: view = A, B, C, then empties → view run 0..2, edge 2.
-    grid.sortBy(0, true);
+    grid.setViewSort([{ col: 0, ascending: true }]);
     expect(grid.dataEdge(0, 0, 1, 0)).toBe(2);
 
     grid.destroy();

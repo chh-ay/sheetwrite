@@ -647,7 +647,7 @@ function transformPivot(
   pivot.anchor = { row: anchor.row, col: anchor.col };
 
   const source = pivot.source;
-  if (source.invalid) return null;
+  if (source.invalid || "model" in source) return null;
   if ("table" in source) {
     // Field indices are table-column offsets. When the table's sheet is not
     // known, any concurrent column edit may shift them.

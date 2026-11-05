@@ -1,6 +1,7 @@
 //! Optional function families for the complete analysis engine.
 
 mod aggregate;
+mod bessel;
 mod compatibility;
 mod complex;
 mod database;
@@ -136,6 +137,13 @@ const FAMILIES: &[Family] = &[
         names: complex::NAMES,
         reference_cells: &[],
         evaluate: Some(complex::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: bessel::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bessel::evaluate),
         evaluate_ast: None,
         array: None,
     },

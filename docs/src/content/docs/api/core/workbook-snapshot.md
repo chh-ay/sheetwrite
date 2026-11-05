@@ -8,7 +8,7 @@ description: "WorkbookSnapshot interface in @sheetwrite/core: Schema-versioned s
 Schema-versioned serializable workbook document.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L486"><code>packages/core/src/types/document.ts#L486</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L488"><code>packages/core/src/types/document.ts#L488</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -112,10 +112,10 @@ export interface WorkbookSnapshot {
 <li><a href="/docs/api/core/memory-persistence-adapter/"><code>MemoryPersistenceAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/persistence-adapter/"><code>PersistenceAdapter</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/persistence-commit-response/"><code>PersistenceCommitResponse</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/revision-restore-response/"><code>RevisionRestoreResponse</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 10 more</li>
+<li><a href="/docs/api/core/sync-coordinator-event/"><code>SyncCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li class="api-consumer-more">and 9 more</li>
 </ul>
 </div>

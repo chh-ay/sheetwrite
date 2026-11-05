@@ -8,7 +8,7 @@ description: "XlsxSourceSnapshot interface in @sheetwrite/core: Bounded, frozen 
 Bounded, frozen record of the OOXML parts Sheetwrite does not model.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L478"><code>packages/core/src/types/document.ts#L478</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L480"><code>packages/core/src/types/document.ts#L480</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

@@ -1,8 +1,9 @@
 //! Key resolution for one-to-many table relationships (#229).
 //!
 //! A [`KeyIndex`] holds the non-blank keys of the one side, sorted, with the
-//! one-side row of each key. A many-side key finds its row with one binary
-//! search. Keys match as pivot group keys do: numbers by value and text
+//! one-side row of each key. Building it also maps every many-side row to
+//! its one-side row in one pass, so readers index a flat `Vec<u32>`. Keys
+//! match as pivot group keys do: numbers by value and text
 //! without case. Unlike a group key, a blank key matches nothing, so blank,
 //! `0` and `FALSE` stay apart.
 //!
@@ -16,6 +17,10 @@ use crate::types::Value;
 
 /// A many-side row whose key matches no one-side row.
 pub(crate) const NO_MATCH: u32 = u32::MAX;
+/// A many-side row whose key is blank, which matches nothing.
+pub(crate) const BLANK_KEY: u32 = u32::MAX - 1;
+/// A many-side row whose key is an error; reading the key gives the error.
+pub(crate) const KEY_ERROR: u32 = u32::MAX - 2;
 
 /// Why a relationship cannot resolve keys. Rows are data-row offsets in
 /// their table, header excluded.
@@ -48,20 +53,27 @@ enum Key<'a> {
     Other,
 }
 
-/// Whether `value` is a blank key, which matches no row.
-pub(crate) fn is_blank_key(value: &Value) -> bool {
-    matches!(key_of(value), Key::Blank)
+/// One key cell as the key reader returns it: literal text borrowed from the
+/// string pool with its pool id, so mapping 100,000 text keys allocates
+/// nothing, or any other cell as its settled value.
+pub(crate) enum KeyCell<'a> {
+    Text(&'a str, u32),
+    Value(Value),
 }
 
-fn key_of(value: &Value) -> Key<'_> {
-    match value {
-        Value::Blank => Key::Blank,
-        Value::Text(text) if text.is_empty() => Key::Blank,
-        Value::Text(text) => Key::Text(text),
+/// A pool id whose key has not been searched yet.
+const UNSEARCHED: u32 = u32::MAX - 3;
+
+fn key_of_cell<'a>(cell: &'a KeyCell<'_>) -> Key<'a> {
+    match cell {
+        KeyCell::Text("", _) | KeyCell::Value(Value::Blank) => Key::Blank,
+        KeyCell::Text(text, _) => Key::Text(text),
+        KeyCell::Value(Value::Text(text)) if text.is_empty() => Key::Blank,
+        KeyCell::Value(Value::Text(text)) => Key::Text(text),
         // Negative zero equals zero, so both sort as zero.
-        Value::Number(number) if *number == 0.0 => Key::Number(0.0),
-        Value::Number(number) => Key::Number(*number),
-        Value::Bool(_) | Value::Error(_) => Key::Other,
+        KeyCell::Value(Value::Number(number)) if *number == 0.0 => Key::Number(0.0),
+        KeyCell::Value(Value::Number(number)) => Key::Number(*number),
+        KeyCell::Value(Value::Bool(_) | Value::Error(_)) => Key::Other,
     }
 }
 
@@ -87,25 +99,6 @@ fn merge_kind(kind: KeyKind, key: &Key<'_>) -> Option<KeyKind> {
     }
 }
 
-/// Checks that the many-side keys `values(0..rows)` fit `kind`: numbers or
-/// text, the same kind as the one side. Errors are allowed here: the
-/// flattened row then carries the error, as a lookup would.
-fn check_many_side(
-    kind: KeyKind,
-    rows: u32,
-    values: impl Fn(u32) -> Value,
-) -> Result<(), KeyProblem> {
-    let mut kind = kind;
-    for row in 0..rows {
-        let value = values(row);
-        if matches!(value, Value::Error(_)) {
-            continue;
-        }
-        kind = merge_kind(kind, &key_of(&value)).ok_or(KeyProblem::ManySideType { row })?;
-    }
-    Ok(())
-}
-
 /// Sorted one-side keys of a relationship.
 #[derive(Debug, Default)]
 pub(crate) struct KeyIndex {
@@ -117,25 +110,29 @@ pub(crate) struct KeyIndex {
     text_ends: Vec<u32>,
     /// One-side row of each sorted key.
     rows: Vec<u32>,
+    /// For integer keys in a compact span: the sorted position of key
+    /// `numbers[0] + i` at `i`, or [`NO_MATCH`]. Empty otherwise. IDs are
+    /// usually such keys, and a direct read replaces the binary search.
+    dense: Vec<u32>,
 }
 
 impl KeyIndex {
-    /// Builds the index of the one-side keys `one(0..one_rows)` and checks
-    /// the many-side keys `many(0..many_rows)` against their kind.
-    pub(crate) fn build(
+    /// Builds the index of the one-side keys `one(0..one_rows)`, and the
+    /// row map of the many-side keys `many(0..many_rows)` against it.
+    pub(crate) fn build<'s>(
         one_rows: u32,
-        one: impl Fn(u32) -> Value,
+        one: impl Fn(u32) -> KeyCell<'s>,
         many_rows: u32,
-        many: impl Fn(u32) -> Value,
-    ) -> Result<Self, KeyProblem> {
+        many: impl Fn(u32) -> KeyCell<'s>,
+    ) -> Result<(Self, Vec<u32>), KeyProblem> {
         let mut kind = KeyKind::Empty;
         let mut numbers = Vec::new();
         let mut text = Vec::new();
         let mut text_ends = Vec::new();
         let mut rows = Vec::new();
         for row in 0..one_rows {
-            let value = one(row);
-            let key = key_of(&value);
+            let cell = one(row);
+            let key = key_of_cell(&cell);
             kind = merge_kind(kind, &key).ok_or(KeyProblem::OneSideType { row })?;
             match key {
                 Key::Number(number) => numbers.push(number),
@@ -147,15 +144,60 @@ impl KeyIndex {
             }
             rows.push(row);
         }
-        check_many_side(kind, many_rows, many)?;
 
         let index = match kind {
             KeyKind::Number => Self::sorted_numbers(numbers, rows),
             KeyKind::Text => Self::sorted_text(&text, &text_ends, rows),
             KeyKind::Empty => Self::default(),
         };
+        let map = index.map_rows(kind, many_rows, many)?;
         index.check_unique()?;
-        Ok(index)
+        Ok((index, map))
+    }
+
+    /// The one-side row of each many-side key `values(0..rows)`, in row
+    /// order, or [`NO_MATCH`], [`BLANK_KEY`] or [`KEY_ERROR`]. Checks that
+    /// the keys fit `kind`. Errors are allowed: the flattened row then
+    /// carries the error, as a lookup would.
+    fn map_rows<'s>(
+        &self,
+        kind: KeyKind,
+        rows: u32,
+        values: impl Fn(u32) -> KeyCell<'s>,
+    ) -> Result<Vec<u32>, KeyProblem> {
+        let mut kind = kind;
+        let mut scratch = Vec::new();
+        // The one-side row of each string pool id seen so far, indexed by
+        // id: many-side keys repeat, and equal text shares one id, so each
+        // distinct key is searched once.
+        let mut by_pool_id: Vec<u32> = Vec::new();
+        let mut map = Vec::with_capacity(rows as usize);
+        for row in 0..rows {
+            let cell = values(row);
+            if matches!(cell, KeyCell::Value(Value::Error(_))) {
+                map.push(KEY_ERROR);
+                continue;
+            }
+
+            let key = key_of_cell(&cell);
+            kind = merge_kind(kind, &key).ok_or(KeyProblem::ManySideType { row })?;
+            let target = match (&key, &cell) {
+                (Key::Blank, _) => BLANK_KEY,
+                (_, KeyCell::Text(_, id)) => {
+                    let slot = *id as usize;
+                    if slot >= by_pool_id.len() {
+                        by_pool_id.resize(slot + 1, UNSEARCHED);
+                    }
+                    if by_pool_id[slot] == UNSEARCHED {
+                        by_pool_id[slot] = self.find_key(&key, &mut scratch);
+                    }
+                    by_pool_id[slot]
+                }
+                _ => self.find_key(&key, &mut scratch),
+            };
+            map.push(target);
+        }
+        Ok(map)
     }
 
     /// Sorts number keys with their rows; equal keys keep row order.
@@ -163,9 +205,13 @@ impl KeyIndex {
         let order = sorted_entries(numbers.len(), &|left, right| {
             numbers[left as usize].total_cmp(&numbers[right as usize])
         });
+        let numbers: Vec<f64> = order.iter().map(|&entry| numbers[entry as usize]).collect();
+        let rows = order.iter().map(|&entry| rows[entry as usize]).collect();
+        let dense = dense_positions(&numbers);
         Self {
-            numbers: order.iter().map(|&entry| numbers[entry as usize]).collect(),
-            rows: order.iter().map(|&entry| rows[entry as usize]).collect(),
+            numbers,
+            rows,
+            dense,
             ..Self::default()
         }
     }
@@ -229,12 +275,14 @@ impl KeyIndex {
     /// The one-side row whose key equals `value`, or [`NO_MATCH`] for a
     /// blank key or a key no row holds. `scratch` holds the folded text of
     /// the key, so a lookup does not allocate for ASCII text.
+    #[cfg(test)]
     pub(crate) fn find(&self, value: &Value, scratch: &mut Vec<u8>) -> u32 {
-        let position = match key_of(value) {
-            Key::Number(number) => self
-                .numbers
-                .binary_search_by(|probe| probe.total_cmp(&number))
-                .ok(),
+        self.find_key(&key_of_cell(&KeyCell::Value(value.clone())), scratch)
+    }
+
+    fn find_key(&self, key: &Key<'_>, scratch: &mut Vec<u8>) -> u32 {
+        let position = match *key {
+            Key::Number(number) => self.search_number(number),
             Key::Text(text) if !self.text_ends.is_empty() => {
                 scratch.clear();
                 fold_into(text, scratch);
@@ -243,6 +291,36 @@ impl KeyIndex {
             Key::Text(_) | Key::Blank | Key::Other => None,
         };
         position.map_or(NO_MATCH, |position| self.rows[position])
+    }
+
+    /// Branch-free lower bound: the loop has a fixed trip count and a
+    /// conditional move, so lookups in key order do not stall on
+    /// mispredicted branches. Keys are finite and sorted ascending.
+    fn search_number(&self, number: f64) -> Option<usize> {
+        let keys = &self.numbers;
+        if keys.is_empty() {
+            return None;
+        }
+
+        if !self.dense.is_empty() {
+            let offset = number - keys[0];
+            let in_range = offset >= 0.0 && offset < self.dense.len() as f64;
+            if !in_range || offset.fract() != 0.0 {
+                return None;
+            }
+            let position = self.dense[offset as usize];
+            return (position != NO_MATCH).then_some(position as usize);
+        }
+        let mut base = 0;
+        let mut len = keys.len();
+        while len > 1 {
+            let half = len / 2;
+            if keys[base + half] <= number {
+                base += half;
+            }
+            len -= half;
+        }
+        (keys[base] == number).then_some(base)
     }
 
     fn search_text(&self, key: &[u8]) -> Option<usize> {
@@ -261,10 +339,35 @@ impl KeyIndex {
     /// Heap bytes the index holds.
     #[cfg(test)]
     fn heap_bytes(&self) -> usize {
-        self.numbers.capacity() * size_of::<f64>()
+        (self.numbers.capacity() * size_of::<f64>())
             + self.text.capacity()
-            + (self.text_ends.capacity() + self.rows.capacity()) * size_of::<u32>()
+            + (self.text_ends.capacity() + self.rows.capacity() + self.dense.capacity())
+                * size_of::<u32>()
     }
+}
+
+/// Spans up to this many slots per key get a direct position table: at most
+/// 16 bytes per key, beside the 12 bytes the sorted index takes.
+const DENSE_SLOTS_PER_KEY: usize = 4;
+
+/// The direct position table of sorted `numbers`, or empty when the keys are
+/// not integers or their span is too sparse.
+fn dense_positions(numbers: &[f64]) -> Vec<u32> {
+    let (Some(&first), Some(&last)) = (numbers.first(), numbers.last()) else {
+        return Vec::new();
+    };
+
+    let span = last - first;
+    let compact = span < (numbers.len() * DENSE_SLOTS_PER_KEY) as f64;
+    if !compact || numbers.iter().any(|number| number.fract() != 0.0) {
+        return Vec::new();
+    }
+
+    let mut dense = vec![NO_MATCH; span as usize + 1];
+    for (position, &number) in numbers.iter().enumerate() {
+        dense[(number - first) as usize] = position as u32;
+    }
+    dense
 }
 
 /// Entries `0..count` sorted by `compare`, then by entry, so equal keys keep
@@ -320,13 +423,67 @@ mod tests {
         Value::Text(Rc::from(value))
     }
 
+    fn blank(_: u32) -> KeyCell<'static> {
+        KeyCell::Value(Value::Blank)
+    }
+
     fn build(one: &[Value], many: &[Value]) -> Result<KeyIndex, KeyProblem> {
+        build_map(one, many).map(|(index, _)| index)
+    }
+
+    fn build_map(one: &[Value], many: &[Value]) -> Result<(KeyIndex, Vec<u32>), KeyProblem> {
         KeyIndex::build(
             one.len() as u32,
-            |row| one[row as usize].clone(),
+            |row| KeyCell::Value(one[row as usize].clone()),
             many.len() as u32,
-            |row| many[row as usize].clone(),
+            |row| KeyCell::Value(many[row as usize].clone()),
         )
+    }
+
+    #[test]
+    fn many_side_rows_map_to_one_side_rows_or_markers() {
+        let one = [text("A"), text("b"), Value::Blank, text("C")];
+        let many = [
+            text("c"),
+            Value::Blank,
+            text("z"),
+            Value::Error(FormulaError::Na),
+            text(""),
+            text("B"),
+        ];
+        let (_, map) = build_map(&one, &many).unwrap();
+        assert_eq!(map, [3, BLANK_KEY, NO_MATCH, KEY_ERROR, BLANK_KEY, 1]);
+
+        // Pooled text keys give the same rows, including repeated ids and
+        // ids whose text differs only in case from a one-side key.
+        let pooled = [("c", 7), ("", 2), ("z", 9), ("C", 8), ("c", 7), ("B", 4)];
+        let (_, map) = KeyIndex::build(
+            one.len() as u32,
+            |row| KeyCell::Value(one[row as usize].clone()),
+            pooled.len() as u32,
+            |row| {
+                let (text, id) = pooled[row as usize];
+                KeyCell::Text(text, id)
+            },
+        )
+        .unwrap();
+        assert_eq!(map, [3, BLANK_KEY, NO_MATCH, 3, 3, 1]);
+
+        let numbers: Vec<_> = (0..1_000)
+            .map(|row| Value::Number(f64::from(row * 3)))
+            .collect();
+        let probes: Vec<_> = (0..3_000)
+            .map(|row| Value::Number(f64::from(row)))
+            .collect();
+        let (_, map) = build_map(&numbers, &probes).unwrap();
+        for (row, &target) in map.iter().enumerate() {
+            let expected = if row % 3 == 0 {
+                row as u32 / 3
+            } else {
+                NO_MATCH
+            };
+            assert_eq!(target, expected, "row {row}");
+        }
     }
 
     fn find(index: &KeyIndex, value: Value) -> u32 {
@@ -419,16 +576,35 @@ mod tests {
     }
 
     #[test]
-    fn index_holds_twelve_bytes_per_number_key() {
+    fn index_holds_twelve_bytes_per_sparse_key_and_four_more_per_dense_id() {
         const ROWS: u32 = 100_000;
-        let index = KeyIndex::build(
-            ROWS,
-            |row| Value::Number(f64::from(row)),
-            0,
-            |_| Value::Blank,
-        )
-        .unwrap();
-        assert_eq!(index.heap_bytes(), ROWS as usize * 12);
+        let build = |step: u32| {
+            KeyIndex::build(
+                ROWS,
+                |row| KeyCell::Value(Value::Number(f64::from(row * step))),
+                0,
+                blank,
+            )
+            .unwrap()
+            .0
+        };
+        assert_eq!(build(10).heap_bytes(), ROWS as usize * 12);
+        assert_eq!(build(1).heap_bytes(), ROWS as usize * 16);
+
+        // Dense and sparse keys find the same rows, and gaps match nothing.
+        for step in [2, 10] {
+            let index = build(step);
+            assert_eq!(find(&index, Value::Number(f64::from(42 * step))), 42);
+            assert_eq!(
+                find(&index, Value::Number(f64::from(42 * step + 1))),
+                NO_MATCH
+            );
+            assert_eq!(find(&index, Value::Number(-1.0)), NO_MATCH);
+            assert_eq!(
+                find(&index, Value::Number(f64::from(42 * step) + 0.5)),
+                NO_MATCH
+            );
+        }
     }
 
     #[test]
@@ -436,13 +612,13 @@ mod tests {
         const ROWS: u32 = 1_000;
         // 7919 is prime to ROWS, so this visits every key once in scrambled order.
         let key = |row: u32| Value::Number(f64::from(row * 7_919 % ROWS));
-        let index = KeyIndex::build(ROWS, key, 0, |_| Value::Blank).unwrap();
+        let (index, _) = KeyIndex::build(ROWS, |row| KeyCell::Value(key(row)), 0, blank).unwrap();
         for row in 0..ROWS {
             assert_eq!(find(&index, key(row)), row);
         }
 
         let words = |row: u32| text(&format!("k{}", row * 7_919 % ROWS));
-        let index = KeyIndex::build(ROWS, words, 0, |_| Value::Blank).unwrap();
+        let (index, _) = KeyIndex::build(ROWS, |row| KeyCell::Value(words(row)), 0, blank).unwrap();
         for row in 0..ROWS {
             assert_eq!(find(&index, words(row)), row);
         }
@@ -450,7 +626,7 @@ mod tests {
         let late_duplicate =
             |row: u32| Value::Number(f64::from(if row == ROWS - 1 { 5 } else { row }));
         assert_eq!(
-            KeyIndex::build(ROWS, late_duplicate, 0, |_| Value::Blank).unwrap_err(),
+            KeyIndex::build(ROWS, |row| KeyCell::Value(late_duplicate(row)), 0, blank).unwrap_err(),
             KeyProblem::DuplicateKey {
                 first: 5,
                 second: ROWS - 1

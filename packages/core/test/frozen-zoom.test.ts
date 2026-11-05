@@ -363,7 +363,7 @@ describe("view composition", () => {
     // (17 rows). Hiding two of them leaves 15; the sort only reorders.
     grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
     grid.hideRows([1, 4]);
-    grid.sortByMulti([{ col: 1, ascending: false }]);
+    grid.setViewSort([{ col: 1, ascending: false }]);
 
     expect(grid.store.viewRowCount("s1")).toBe(15);
 
@@ -506,7 +506,7 @@ describe("row heights under views", () => {
     const grid = new GridImpl(host, { workbook }, store);
 
     // Sort amount descending → view order [4,3,2,1,0]; view row 1 is data row 3.
-    grid.sortBy(1, false);
+    grid.setViewSort([{ col: 1, ascending: false }]);
     const dataRow = store.dataRowAt("s1", 1);
     expect(dataRow).toBe(3);
 

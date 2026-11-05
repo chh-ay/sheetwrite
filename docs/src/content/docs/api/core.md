@@ -8,14 +8,14 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>399</dd></div>
+<div><dt>Exports</dt><dd>392</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
 
 ## Exported symbols
 
-### Classes <span class="api-count" data-pagefind-ignore>17</span>
+### Classes <span class="api-count" data-pagefind-ignore>16</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/comment-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CommentCoordinator</code></span><span class="api-symbol-card__desc">Transport/auth-neutral comment state with server-owned author and timestamp fields.</span></a>
@@ -25,7 +25,6 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/memory-persistence-adapter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>MemoryPersistenceAdapter</code></span><span class="api-symbol-card__desc">Executable database-neutral reference adapter for tests, demos, and local workflows.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>PersistenceError</code></span><span class="api-symbol-card__desc">Typed failure raised by persistence and synchronization flows.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>PresenceCoordinator</code></span><span class="api-symbol-card__desc">Ephemeral presence lifecycle; it never calls a document mutation API.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>RevisionCoordinator</code></span><span class="api-symbol-card__desc">Coordinates listing and restoring host-owned workbook revisions.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>RowBridge</code></span><span class="api-symbol-card__desc">Projects canonical document transactions into host-owned row changes.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SheetwriteError</code></span><span class="api-symbol-card__desc">Canonical envelope for thrown and callback-delivered Sheetwrite failures.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-store/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SheetwriteStore</code></span><span class="api-symbol-card__desc">Stable public facade and the sole transaction, epoch, policy, and event barrier.</span></a>
@@ -114,7 +113,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>180</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>176</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -220,10 +219,6 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/replace-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ReplaceResult</code></span><span class="api-symbol-card__desc">Replacement count and refreshed search state returned by replace-all.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resolved-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ResolvedCell</code></span><span class="api-symbol-card__desc">Authoritative source value, evaluated value, style, and load state for a cell.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resource-owner-bytes/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ResourceOwnerBytes</code></span><span class="api-symbol-card__desc">Retained logical payload and allocated capacity attributed to one exclusive owner.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-adapter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionAdapter</code></span><span class="api-symbol-card__desc">Host persistence contract for revision history and restore.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-coordinator-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionCoordinatorOptions</code></span><span class="api-symbol-card__desc">Document identity and version options for revision coordination.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-restore-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionRestoreRequest</code></span><span class="api-symbol-card__desc">Versioned restore request submitted to a revision adapter.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-summary/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RevisionSummary</code></span><span class="api-symbol-card__desc">Host-provided metadata describing a saved workbook revision.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/ribbon-config/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RibbonConfig</code></span><span class="api-symbol-card__desc">Initial layout settings for the built-in or composable ribbon.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RowBridgeCell</code></span><span class="api-symbol-card__desc">A cell effect with semantic column and host row identity.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-clear-delta/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RowBridgeClearDelta</code></span><span class="api-symbol-card__desc">A clearRange effect expanded to its exact changed cells.</span></a>
@@ -299,7 +294,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>103</span>
+### Types <span class="api-count" data-pagefind-ignore>101</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -363,8 +358,6 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/rebase-conflict-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RebaseConflictCode</code></span><span class="api-symbol-card__desc">Stable conservative-rebase conflict category.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/relationship-status/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RelationshipStatus</code></span><span class="api-symbol-card__desc">Whether the keys of a relationship resolve, checked from the current cell values.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resolved-hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ResolvedHyperlinkTarget</code></span><span class="api-symbol-card__desc">Host-safe target resolved immediately before hyperlink activation.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RevisionCoordinatorEvent</code></span><span class="api-symbol-card__desc">State or restore transition emitted by revision coordination.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/revision-restore-response/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RevisionRestoreResponse</code></span><span class="api-symbol-card__desc">Applied or conflict acknowledgement for a revision restore.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/ribbon-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RibbonMode</code></span><span class="api-symbol-card__desc">Layout of the Excel-style ribbon.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-delta/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RowBridgeDelta</code></span><span class="api-symbol-card__desc">Every possible projection produced by a row bridge.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/row-bridge-handler/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RowBridgeHandler</code></span><span class="api-symbol-card__desc">Callback accepted by imperative and framework adapters.</span></a>
