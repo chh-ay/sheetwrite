@@ -180,6 +180,10 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     cwd: "packages/wasm",
   },
   {
+    id: "test:rust:history",
+    command: ["cargo", "test", "--manifest-path", "packages/wasm/history/Cargo.toml"],
+  },
+  {
     id: "test:rust:queries",
     command: ["cargo", "test", "--manifest-path", "packages/queries/engine/Cargo.toml"],
   },
@@ -191,6 +195,11 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     id: "audit:rust",
     command: ["cargo", "audit"],
     cwd: "packages/wasm",
+  },
+  {
+    id: "audit:rust:history",
+    command: ["cargo", "audit"],
+    cwd: "packages/wasm/history",
   },
   {
     id: "audit:rust:queries",
