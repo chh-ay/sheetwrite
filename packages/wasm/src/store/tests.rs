@@ -1433,3 +1433,103 @@ fn related_pivot_output_over_a_related_table_spills() {
         Some("Region 1")
     );
 }
+
+/// The fixture with named sheets, its SUM pivot at A1 of `Output`, and a
+/// `Report` sheet for formulas that read the pivot.
+fn pivot_data_fixture() -> (CellStore, usize, usize) {
+    let (mut store, source, output) = fixture(12);
+    let report = store.add_sheet(4, 20);
+    store.set_sheet_name(source, "source", "Source");
+    store.set_sheet_name(output, "output", "Output");
+    store.set_sheet_name(report, "report", "Report");
+    install(&mut store, source, output, 12, &[SUM]);
+    (store, source, report)
+}
+
+fn report_cell(store: &mut CellStore, report: usize, formula: &str) -> CellOut {
+    store.set_formula(report, 0, 0, formula, 0);
+    store.recompute(report);
+    store.get_cell(report, 0, 0)
+}
+
+/// GETPIVOTDATA reads the value cell that the field and item pairs name,
+/// as on Microsoft's GETPIVOTDATA page: the data field by its source name or
+/// its caption, the pivot by any cell of its output, and the pairs in any
+/// order. Row `r` of the fixture is in region `r % 2` and quarter `r % 3`
+/// and sells `r`.
+#[test]
+fn getpivotdata_reads_the_value_cell_of_the_named_items() {
+    let (mut store, _, report) = pivot_data_fixture();
+    let cases: &[(&str, f64)] = &[
+        // Every row: 1 + 2 + ... + 12.
+        ("=GETPIVOTDATA(\"Sales\",Output!A1)", 78.0),
+        ("=GETPIVOTDATA(\"Sum of Sales\",Output!$C$4)", 78.0),
+        ("=GETPIVOTDATA(\"sales\",Output!B2)", 78.0),
+        // Odd rows: 1 + 3 + 5 + 7 + 9 + 11.
+        ("=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)", 36.0),
+        // Rows divisible by 3: 3 + 6 + 9 + 12.
+        ("=GETPIVOTDATA(\"Sales\",Output!A1,\"quarter\",0)", 30.0),
+        // Odd rows in quarter 2: 5 + 11, with the pairs in either order.
+        (
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1,\"Quarter\",2)",
+            16.0,
+        ),
+        (
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Quarter\",2,\"Region\",1)",
+            16.0,
+        ),
+    ];
+
+    for &(formula, expected) in cases {
+        assert_eq!(
+            report_cell(&mut store, report, formula).num(),
+            expected,
+            "{formula}"
+        );
+    }
+}
+
+/// Microsoft's page: a pivot reference that holds no pivot, an item or
+/// field the pivot does not show, and an unknown data field are `#REF!`.
+#[test]
+fn getpivotdata_shows_ref_for_what_the_pivot_does_not_show() {
+    let (mut store, _, report) = pivot_data_fixture();
+    for formula in [
+        "=GETPIVOTDATA(\"Sales\",Output!Z20)",
+        "=GETPIVOTDATA(\"Sales\",Report!B2)",
+        "=GETPIVOTDATA(\"Count of Sales\",Output!A1)",
+        "=GETPIVOTDATA(\"Units\",Output!A1)",
+        "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",7)",
+        "=GETPIVOTDATA(\"Sales\",Output!A1,\"Sales\",1)",
+    ] {
+        assert_eq!(
+            report_cell(&mut store, report, formula).string().as_deref(),
+            Some("#REF!"),
+            "{formula}"
+        );
+    }
+    assert_eq!(
+        report_cell(
+            &mut store,
+            report,
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\")"
+        )
+        .string()
+        .as_deref(),
+        Some("#VALUE!")
+    );
+}
+
+/// A formula on another sheet follows an edit of the pivot's source.
+#[test]
+fn getpivotdata_follows_source_edits() {
+    let (mut store, source, report) = pivot_data_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
+    assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
+
+    // Row 1 (region 1) sells 101 instead of 1.
+    store.set_number(source, 1, SALES, 101.0, 0);
+    store.recompute(source);
+
+    assert_eq!(store.get_cell(report, 0, 0).num(), 136.0);
+}
