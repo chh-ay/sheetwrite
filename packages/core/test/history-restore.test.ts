@@ -118,20 +118,27 @@ async function session(
   return { adapter, archive, journal };
 }
 
-function client(adapter: MemoryPersistenceAdapter, authorId: string, serverVersion = 0) {
+interface Client {
+  grid: Grid;
+  sync: SyncCoordinator;
+}
+
+/** A client that loads the authority's current document, as a host does on open. */
+async function client(adapter: MemoryPersistenceAdapter, authorId: string): Promise<Client> {
+  const loaded = await adapter.load(DOCUMENT);
   const host = document.createElement("div");
   document.body.appendChild(host);
-  const grid = createGridFromSnapshot(host, snapshot());
+  const grid = createGridFromSnapshot(host, loaded);
   const sync = new SyncCoordinator(grid, adapter, {
     documentId: DOCUMENT,
-    serverVersion,
+    serverVersion: loaded.version ?? 0,
     authorId,
   });
 
   return { grid, sync };
 }
 
-async function edit(target: ReturnType<typeof client>, patches: DocumentOp[]): Promise<void> {
+async function edit(target: Client, patches: DocumentOp[]): Promise<void> {
   const outcome = target.grid.applyTransaction({ patches });
   expect(outcome.status).toBe("applied");
   await target.sync.flush();
@@ -144,7 +151,7 @@ async function baseline(archive: HistoryArchive): Promise<HistoryVersion> {
 describe("restore a range", () => {
   it("restores values, formulas and styles as one undoable change", async () => {
     const { adapter, archive } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     const version = await baseline(archive);
 
     await edit(alice, [set("data", 0, 0, 100), set("data", 1, 1, 7)]);
@@ -182,7 +189,7 @@ describe("restore a range", () => {
 
   it("rejects a range that cuts a merge without changing the document", async () => {
     const { adapter, archive } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     const version = await baseline(archive);
 
     await edit(alice, [{ op: "addMerge", sheet: "data", merge: { r0: 2, c0: 0, r1: 3, c1: 1 } }]);
@@ -205,7 +212,7 @@ describe("restore a range", () => {
 describe("restore a sheet", () => {
   it("restores dimensions in place; a reference into a removed tail becomes #REF! and returns on undo", async () => {
     const { adapter, archive } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
 
     await edit(alice, [{ op: "removeRows", sheet: "data", at: 4, count: 4 }]);
     const small = await archive.saveVersion("Four rows", "alice", 0);
@@ -249,7 +256,7 @@ describe("restore a sheet", () => {
 describe("restore the workbook", () => {
   it("re-creates a removed sheet with its ID, removes later sheets and restores names", async () => {
     const { adapter, archive } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     await edit(alice, [
       {
         op: "setNamedRange",
@@ -302,13 +309,55 @@ describe("restore the workbook", () => {
 });
 
 describe("restore through sync", () => {
+  it("sends a restore larger than one server version as one atomic batch", async () => {
+    const { adapter, archive, journal } = await session();
+    const alice = await client(adapter, "alice");
+    const rows = 20_000;
+    const text = (row: number) => `${row}:${"x".repeat(230)}`;
+    const column = (col: number): DocumentOp => ({
+      op: "setBlock",
+      range: { sheet: "data", start: { row: 0, col }, end: { row: rows - 1, col } },
+      block: {
+        rowCount: rows,
+        colCount: 1,
+        values: Array.from({ length: rows }, (_, row) => text(row)),
+      },
+    });
+
+    await edit(alice, [{ op: "addRows", sheet: "data", at: 8, count: rows - 8 }]);
+    await edit(alice, [column(0)]);
+    await edit(alice, [column(1)]);
+    const version = await archive.saveVersion("Large", "alice", 0);
+    await edit(alice, [
+      {
+        op: "clearRange",
+        range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: rows - 1, col: 1 } },
+      },
+    ]);
+
+    const bob = await client(adapter, "bob");
+    let changes = 0;
+    bob.grid.on("change", () => changes++);
+
+    const scope = { kind: "sheet", sheet: "data" } as const;
+    const outcome = await archive.restoreVersion(bob.grid, version.id, scope, { sync: bob.sync });
+    expect(outcome.status).toBe("applied");
+    expect(changes).toBe(1);
+    expect(bob.sync.pendingCommits()[0]?.versionOperationCounts?.length).toBeGreaterThan(1);
+
+    await bob.sync.flush();
+    const last = journal.commits.at(-1);
+    expect((last?.revision ?? 0) - (last?.baseRevision ?? 0)).toBeGreaterThan(1);
+    expect(value(bob.grid, "data", rows - 1, 1)).toBe(text(rows - 1));
+  }, 60_000);
+
   it("records the restorer and the version it restores", async () => {
     const { adapter, archive, journal } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     const version = await baseline(archive);
     await edit(alice, [set("data", 0, 0, 9)]);
 
-    const bob = client(adapter, "bob", 1);
+    const bob = await client(adapter, "bob");
     await archive.restoreVersion(
       bob.grid,
       version.id,
@@ -325,14 +374,14 @@ describe("restore through sync", () => {
 
   it("lets only one of two concurrent restores commit; the other must reload", async () => {
     const { adapter, archive } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     const version = await baseline(archive);
     await edit(alice, [set("data", 0, 0, 9)]);
     const later = await archive.saveVersion("Later", "alice", 0);
     await edit(alice, [set("data", 0, 0, 10)]);
 
-    const bob = client(adapter, "bob", 2);
-    const carol = client(adapter, "carol", 2);
+    const bob = await client(adapter, "bob");
+    const carol = await client(adapter, "carol");
 
     await archive.restoreVersion(bob.grid, version.id, { kind: "workbook" }, { sync: bob.sync });
     await archive.restoreVersion(carol.grid, later.id, { kind: "workbook" }, { sync: carol.sync });
@@ -350,7 +399,7 @@ describe("restore through sync", () => {
 
   it("refuses to restore while local edits are pending", async () => {
     const { adapter, archive } = await session();
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     const version = await baseline(archive);
     alice.sync.setOnline(false);
     alice.grid.applyTransaction({ patches: [set("data", 0, 0, 5)] });
@@ -379,7 +428,7 @@ describe("restore through sync", () => {
     };
 
     const { adapter, archive } = await session(storage);
-    const alice = client(adapter, "alice");
+    const alice = await client(adapter, "alice");
     const version = await baseline(archive);
 
     pause = Promise.withResolvers<void>();

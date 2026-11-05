@@ -1,5 +1,6 @@
-import { isAtomicBatch, markAtomicBatch } from "./atomic-batch.js";
+import { markAtomicBatch, splitOversizedBlocks } from "./atomic-batch.js";
 import type { DocumentController } from "./document-controller.js";
+import { DEFAULT_TRANSACTION_RESOURCE_LIMITS } from "./document-protocol.js";
 import type { DocumentOp } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type { ApplyTransactionResult, RestoreProvenance } from "./types/transaction.js";
@@ -29,20 +30,27 @@ export function restoreProvenanceOf(
 
 /**
  * Commit `operations` on `grid` as one atomic restore transaction. `guards`
- * run at the end of its undo; see `DocumentController.commit`.
+ * run at the end of its undo; see `DocumentController.commit`. Returns `null`
+ * when a cell block cannot be cut small enough to fit one server version.
  */
 export function commitRestore(
   grid: Grid,
-  operations: DocumentOp[],
+  operations: readonly DocumentOp[],
   guards: readonly DocumentOp[],
   restore: RestoreProvenance,
-): ApplyTransactionResult {
+): ApplyTransactionResult | null {
   const controller = controllers.get(grid);
   if (!controller) {
     throw new Error("Restore requires a grid created by Sheetwrite");
   }
 
-  const batch = isAtomicBatch(operations) ? operations : markAtomicBatch(operations);
+  // Each cell band must fit one server version, so sync can send the restore as an atomic batch.
+  const split = splitOversizedBlocks(operations, DEFAULT_TRANSACTION_RESOURCE_LIMITS);
+  if (!split) {
+    return null;
+  }
+
+  const batch = markAtomicBatch(split.operations);
   provenance.set(batch, { ...restore });
 
   return controller.commit(batch, "restore", undefined, guards);

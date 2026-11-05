@@ -750,10 +750,19 @@ export class HistoryArchive {
 
             const plan = planRestore(grid.store, store, scope);
 
-            return commitRestore(grid, plan.operations, plan.guards, {
+            const outcome = commitRestore(grid, plan.operations, plan.guards, {
               versionId: id,
               scope: scope.kind,
             });
+
+            if (!outcome) {
+              throw new HistoryError(
+                "capacity",
+                "A restored cell block does not fit one server version",
+              );
+            }
+
+            return outcome;
           },
         ),
       );

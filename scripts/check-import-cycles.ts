@@ -208,6 +208,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "PersistenceCommitResponse",
       "RemoteOperationOptions",
       "RemoteOperationSource",
+      "RestoreProvenance",
       "SyncMutationRecord",
       "SyncMutationStatus",
       "Transaction",
