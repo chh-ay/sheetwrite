@@ -8,7 +8,7 @@ description: "QueryEngineOptions interface in @sheetwrite/queries: Hosts can pro
 Hosts can provide the compiled artifact instead of using browser artifact loading.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/index.ts#L22"><code>packages/queries/src/index.ts#L22</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/index.ts#L23"><code>packages/queries/src/index.ts#L23</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
@@ -16,10 +16,10 @@ Hosts can provide the compiled artifact instead of using browser artifact loadin
 <div class="api-member-list">
 
 <details class="api-member" id="query-engine-options-wasm" data-pagefind-weight="1">
-<summary><code>wasm</code></summary>
+<summary><code>wasm</code> <span class="api-member-summary">Compiled module or artifact bytes, as accepted by the generated bindings.</span></summary>
 
 ```ts generated
-readonly wasm?: WebAssembly.Module | BufferSource;
+readonly wasm?: SyncInitInput;
 ```
 
 </details>
@@ -32,7 +32,7 @@ readonly wasm?: WebAssembly.Module | BufferSource;
 
 ```ts generated
 export interface QueryEngineOptions {
-  readonly wasm?: WebAssembly.Module | BufferSource;
+  readonly wasm?: SyncInitInput;
 }
 ```
 

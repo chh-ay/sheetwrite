@@ -1,3 +1,4 @@
+import type { SyncInitInput } from "../pkg/sheetwrite_queries.js";
 import type { QueryEngine } from "./types.js";
 
 export { QueryError } from "./errors.js";
@@ -20,7 +21,8 @@ export type {
 
 /** Hosts can provide the compiled artifact instead of using browser artifact loading. */
 export interface QueryEngineOptions {
-  readonly wasm?: WebAssembly.Module | BufferSource;
+  /** Compiled module or artifact bytes, as accepted by the generated bindings. */
+  readonly wasm?: SyncInitInput;
 }
 
 /**

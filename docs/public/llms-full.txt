@@ -17259,10 +17259,13 @@ Members:
 ##### `QueryEngineOptions` — interface
 
 ```ts
-export interface QueryEngineOptions { readonly wasm?: WebAssembly.Module | BufferSource; }
+export interface QueryEngineOptions { readonly wasm?: SyncInitInput; }
 ```
 
 Hosts can provide the compiled artifact instead of using browser artifact loading.
+
+Members:
+- `wasm` — Compiled module or artifact bytes, as accepted by the generated bindings.
 
 ##### `QueryError` — class
 

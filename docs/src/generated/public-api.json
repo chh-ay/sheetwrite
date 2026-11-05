@@ -9422,7 +9422,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L46",
+              "source": "src/index.ts#L48",
               "jsDocTags": [
                 "example"
               ],
@@ -9525,14 +9525,19 @@
             {
               "name": "QueryEngineOptions",
               "kind": "interface",
-              "signature": "export interface QueryEngineOptions { readonly wasm?: WebAssembly.Module | BufferSource; }",
+              "signature": "export interface QueryEngineOptions { readonly wasm?: SyncInitInput; }",
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L22",
+              "source": "src/index.ts#L23",
               "jsDocTags": [],
               "documentation": "Hosts can provide the compiled artifact instead of using browser artifact loading.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "wasm",
+                  "documentation": "Compiled module or artifact bytes, as accepted by the generated bindings."
+                }
+              ]
             },
             {
               "name": "QueryError",
