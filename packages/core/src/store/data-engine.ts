@@ -140,7 +140,12 @@ import {
   workbookTableNameKey,
 } from "../workbook-table.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
-import { permutedHyperlinks, permutedMerges, permutedNotes } from "./permute-rows.js";
+import {
+  permutedHyperlinks,
+  permutedMerges,
+  permutedNotes,
+  tablesAllowRowMove,
+} from "./permute-rows.js";
 import {
   integerAt,
   mergeCrossesFreeze,
@@ -3685,6 +3690,7 @@ export class StoreDataEngine {
     const move = { bounds, targets: invertRowOrder(order) };
     const merges = permutedMerges(sheet.merges ?? [], move);
     if (!merges || merges.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
+    if (!tablesAllowRowMove(sheet.tables ?? [], bounds)) return false;
 
     const rows = bounds.end.row - bounds.start.row + 1;
     const cols = bounds.end.col - bounds.start.col + 1;

@@ -6,6 +6,7 @@
 import type { CellHyperlink } from "../types/cell.js";
 import type { MergeRange, Range } from "../types/coordinates.js";
 import type { CellNote } from "../types/document.js";
+import type { WorkbookTable } from "../types/table.js";
 
 /** Normalized bounds of a permuted range and where each of its rows goes. */
 export interface RowMove {
@@ -106,4 +107,33 @@ export function permutedMerges(merges: readonly MergeRange[], move: RowMove): Me
   }
 
   return moved;
+}
+
+/**
+ * Whether the range may move rows of the tables on its sheet. A sort in a
+ * table sorts its whole body: all table columns, without the header and
+ * totals rows. A range that crosses a table edge cannot sort (Microsoft
+ * Support, "Sort data in a range or table in Excel": "You cannot sort this
+ * way in a table").
+ */
+export function tablesAllowRowMove(tables: readonly WorkbookTable[], bounds: Range): boolean {
+  return tables.every((table) => {
+    const { range } = table;
+    const bodyStart = range.start.row + (table.headerRow ? 1 : 0);
+    const bodyEnd = range.end.row - (table.totalsRow ? 1 : 0);
+    const crosses =
+      range.sheet === bounds.sheet &&
+      range.start.row <= bounds.end.row &&
+      range.end.row >= bounds.start.row &&
+      range.start.col <= bounds.end.col &&
+      range.end.col >= bounds.start.col;
+    if (!crosses) return true;
+
+    return (
+      bounds.start.row === bodyStart &&
+      bounds.end.row === bodyEnd &&
+      bounds.start.col === range.start.col &&
+      bounds.end.col === range.end.col
+    );
+  });
 }

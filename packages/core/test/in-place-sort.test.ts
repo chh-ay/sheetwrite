@@ -199,6 +199,42 @@ describe("in-place sort", () => {
     }
   });
 
+  /** Microsoft Support: a sort in a table covers the whole table body. */
+  it("sorts a table body and rejects a range that crosses the table edge", () => {
+    const { store, controller } = setup([literal(1, 0, 2), literal(2, 0, 1)]);
+    try {
+      store.applyTransaction({
+        patches: [
+          {
+            op: "addTable",
+            table: {
+              id: "table-1",
+              name: "Table1",
+              range: block(0, 2, 1),
+              columns: [
+                { id: "a", name: "A" },
+                { id: "b", name: "B" },
+              ],
+              headerRow: true,
+              totalsRow: false,
+            },
+          },
+        ],
+      });
+
+      expect(controller.commit([permutation(block(1, 2, 0), [1, 0])], "sort").status).not.toBe(
+        "applied",
+      );
+      expect(controller.commit([permutation(block(1, 2, 1), [1, 0])], "sort").status).toBe(
+        "applied",
+      );
+      expect(column(store, 0, 3).slice(1)).toEqual([1, 2]);
+    } finally {
+      controller.destroy();
+      store.dispose();
+    }
+  });
+
   it("moves notes with their row", () => {
     const { store, controller } = setup([literal(0, 0, 2), literal(1, 0, 1)]);
     try {
