@@ -108,6 +108,7 @@ needs its confirmed persistence revision attached by the host.
 | `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
 | `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
 | `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
+| `diffVersions({ from, to, cursor?, maxEntries?, signal?, kernel? })` | One page of the changes between two versions; see [Compare versions](#compare-versions). |
 | `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
 | `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
 | `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |
@@ -120,7 +121,9 @@ blocks. Content IDs include the schema, encoding, references, and compressed
 payload. Unchanged pages are shared across checkpoints. SHA-256 verification and
 bounded inflate run before replay.
 
-An automatic marker is made after five active minutes with committed edits.
+An automatic marker is made after five active minutes with committed edits. Each
+marker keeps the checkpoints made since the marker before it, so the log between two
+retained versions stays readable for a diff.
 A checkpoint is due after 30 active minutes, 1,000 transactions, or 2 MiB of log.
 No history timer or workbook-sized version cache runs in the background.
 
@@ -191,6 +194,71 @@ In a shared document, pass the grid's `SyncCoordinator`. The restore needs it on
 with no pending or conflicted commits, and rejects with `conflict` if the document
 changes while the version is read. A restore commit is never rebased; see
 [Restoring versions](/docs/features/collaboration/#restoring-versions).
+
+### Compare versions
+
+`archive.diffVersions({ from, to })` returns one page of the changes from an earlier
+version to a later one. Both versions are rebuilt in private engine instances and
+compared in windows of at most 65,536 cells by a small, history-only WASM kernel
+(`@sheetwrite/wasm/history`, about 17 KB gzip). The kernel has no formula engine. It
+loads the first time a diff runs, so a grid that never compares versions downloads
+nothing for it. Pass `kernel` to load its WASM from a URL your bundler emitted for
+`@sheetwrite/wasm/history/wasm`.
+
+| Page field | Contents |
+| --- | --- |
+| `cells` | Changed cells as typed columns: `sheet` (index into `sheetIds`), `row`, `col`, `beforeRow`, `beforeCol`, `flags` and `author` (index into `authors`). |
+| `details` | Before and after of each changed cell (value, formula source, style) and every person who wrote it between the versions. |
+| `sheets` | Sheets that were added, removed, or changed outside their cells, with the changed fields (for example `name`, `rowCount` or `merges`) and the last person who changed them. |
+| `workbook` | Workbook fields that changed, such as `namedRanges` or `calculation`. |
+| `cursor` | Present when more changes follow. Pass it back to read the next page. |
+
+`flags` combines the `HistoryDiffFlag` bits `value`, `formula`, `style`, `added` and
+`removed`. Sources are compared, not calculated values: a formula whose result changed
+but whose source did not is not a change. Styles are compared by content.
+
+Rows and columns are aligned through the structural operations of the log, so an
+inserted, removed or moved row does not make the rows below it changed. `beforeRow` and
+`beforeCol` give the position of a cell in the earlier version, or `HISTORY_DIFF_NONE`
+on a row or column that was added. A sorted range (`permuteRows`) is compared by
+position, so its moved cells show as changed. Each change names the last person whose
+logged write reached the cell; the write follows the cell through inserted and removed
+rows. When a change is older than the retained log, or a version between the two was
+deleted, `author` is `HISTORY_DIFF_NONE` and `logComplete` is `false`.
+
+A page holds at most 1,000 changes (`maxEntries`). Nothing is kept between pages: each
+request rebuilds both versions and continues from `cursor`, so a closed or aborted diff
+holds no memory.
+
+`diffVersions({ from, to: "head" })` compares a version with the committed head. The
+head is leased for the call, so a concurrent prune cannot remove its records.
+
+### Version history panel
+
+Pass `createHistoryCommands` from `@sheetwrite/core/history` as `GridConfig.history`
+to show Review › **Version History** and **Save Version** in the full ribbon, the
+compact ribbon and the toolbar. The grid's first paint does not change: the panel
+loads as a separate chunk on the first command.
+
+```ts compile title="Opt in to the version history commands"
+import { createGrid } from "@sheetwrite/core";
+import { createHistoryCommands, type HistoryArchive } from "@sheetwrite/core/history";
+
+function mount(host: HTMLElement, archive: HistoryArchive, authorId: string) {
+  return createGrid(host, {
+    workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "Sheet1", rowCount: 10, columns: [] }] },
+    config: { ribbon: true, history: createHistoryCommands({ archive, authorId }) },
+  });
+}
+```
+
+The panel lists versions with their author and time and names the committed head
+after pending changes are sent. It compares a version with a later version or the
+current committed document, page by page, with added (+), removed (−) and changed (≠)
+cells, before and after, and authors. It opens a read-only preview, and restores the
+workbook, one sheet or a range after a confirmation. Pass `sync` so the panel waits
+for pending changes and restores through the coordinator, and `authorName` to show
+display names instead of IDs.
 
 ## Large undo
 

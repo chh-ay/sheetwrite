@@ -1,7 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 
 import { authoredAssertions } from "./formula-evidence.js";
-import { canonicalJson, sha256 } from "./normalize.js";
+import { sha256 } from "./normalize.js";
 import type {
   ConformanceCase,
   ConformanceCorpus,
@@ -13,8 +13,8 @@ import type {
   SemanticCategory,
 } from "./types.js";
 
+/** The corpus path recorded in the manifest; the corpus is generated, not read from it. */
 export const CORPUS_PATH = "test/conformance/corpus.json";
-export const MANIFEST_PATH = "test/conformance/corpus.manifest.json";
 export const INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
 export const MAX_CORPUS_BYTES = 2 * 1024 * 1024;
 export const REQUIRED_COUNTS = { formula: 2000, mutation: 250, workbook: 100 } as const;
@@ -121,6 +121,17 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
+  "trim-range": "A1:B3",
+  "vector-lookup": "60,A1:A3,B1:B3",
+  "info-type": '"numfile"',
+  "sheet-value": "A1",
+  "sheets-reference": "A1",
+  "point-angle": "1,1",
+  "precise-rounding": "4.3,2",
+  "radix-number": '"FF",16',
+  "radix-text": "7,2",
+  roman: "499,0",
+  "roman-text": '"LVII"',
   percentile: "A1:A3,0.5",
   "period-payment": "0.1,1,10,1000",
   "pv-fv-pmt": "0.1,10,-100",
@@ -157,7 +168,10 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
 };
 
 const ARGUMENTS_BY_FUNCTION: Record<string, string> = {
+  ACOTH: "2",
+  ATANH: "0.5",
   COUNTBLANK: "A1:A3",
+  "ERROR.TYPE": "1/0",
   DATEVALUE: '"2020-01-01"',
   TIMEVALUE: '"12:00"',
   "QUARTILE.INC": "B1:B3,2",
@@ -231,6 +245,55 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ISNUMBER: { empty: "NOT(ISNUMBER(C1))", error: "NOT(ISNUMBER(1/0))" },
   ISTEXT: { error: "NOT(ISTEXT(1/0))" },
   ISLOGICAL: { error: "NOT(ISLOGICAL(1/0))" },
+  TRIMRANGE: {
+    empty: "ISERROR(TRIMRANGE(C1))",
+    mixed: 'TRIMRANGE(C1)="2"',
+    boundary: "TRIMRANGE(C1)=0",
+  },
+  LOOKUP: {
+    "range-array": "ISERROR(LOOKUP(C1:C2,A1:A3,B1:B3))=ISERROR(VLOOKUP(C1:C2,A1:B3,2))",
+  },
+  "ERROR.TYPE": {
+    error: "ERROR.TYPE(1/0)=2",
+    empty: "ISNA(ERROR.TYPE(C1))",
+    mixed: "ISNA(ERROR.TYPE(C1))",
+    boundary: "ISNA(ERROR.TYPE(C1))",
+    "range-array": "ISNUMBER(ERROR.TYPE(C1:C2))+ISNA(ERROR.TYPE(C1:C2))=1",
+  },
+  INFO: {
+    empty: "ISERROR(INFO(C1))",
+    mixed: "ISERROR(INFO(C1))",
+    boundary: "ISERROR(INFO(C1))",
+    "range-array": "ISERROR(INFO(C1:C2))",
+  },
+  ISNONTEXT: { error: "ISNONTEXT(1/0)" },
+  ISREF: {
+    empty: "ISREF(C1)",
+    mixed: "ISREF(C1)",
+    boundary: "ISREF(C1)",
+    error: "NOT(ISREF(1/0))",
+  },
+  SHEET: { empty: "SHEET(C1)=1", mixed: "SHEET(C1)=1", boundary: "SHEET(C1)=1" },
+  SHEETS: { empty: "SHEETS(C1)=1", mixed: "SHEETS(C1)=1", boundary: "SHEETS(C1)=1" },
+  ACOS: { mixed: "ISERROR(ACOS(C1))" },
+  ASIN: { mixed: "ISERROR(ASIN(C1))" },
+  ACOSH: { empty: "ISERROR(ACOSH(C1))", boundary: "ISERROR(ACOSH(C1))" },
+  ATANH: { mixed: "ISERROR(ATANH(C1))", "range-array": "ISERROR(ATANH(C1:C2))" },
+  ACOTH: {
+    empty: "ISERROR(ACOTH(C1))",
+    boundary: "ISERROR(ACOTH(C1))",
+    "range-array": "ISERROR(ACOTH(C1:C2))",
+  },
+  COT: { empty: "ISERROR(COT(C1))", boundary: "ISERROR(COT(C1))" },
+  CSC: { empty: "ISERROR(CSC(C1))", boundary: "ISERROR(CSC(C1))" },
+  COTH: { empty: "ISERROR(COTH(C1))", boundary: "ISERROR(COTH(C1))" },
+  CSCH: { empty: "ISERROR(CSCH(C1))", boundary: "ISERROR(CSCH(C1))" },
+  ARABIC: {
+    empty: "ARABIC(C1)=0",
+    boundary: "ISERROR(ARABIC(C1))",
+    mixed: "ISERROR(ARABIC(C1))",
+    "range-array": "ISERROR(ARABIC(C1:C2))",
+  },
   COUNTA: { mixed: "COUNTA(C1,2,3)=3" },
   COUNTBLANK: { empty: "COUNTBLANK(C1)=1", mixed: "COUNTBLANK(C1)=0" },
   SUMPRODUCT: { empty: "SUMPRODUCT(C1,2,2,4)=0", mixed: "SUMPRODUCT(C1,2,2,4)=32" },
@@ -1150,24 +1213,13 @@ export async function readFormulaInventory(path = INVENTORY_PATH): Promise<Formu
   };
 }
 
-export async function readConformanceManifest(path = MANIFEST_PATH): Promise<ConformanceManifest> {
-  return JSON.parse(await readFile(path, "utf8")) as ConformanceManifest;
-}
-
-export async function writeConformanceEvidence(
+/**
+ * The compatibility test set and its manifest, generated from the inventory.
+ * Neither is committed: the generator spreads the formula cases across every
+ * supported function, so committing them made function pull requests conflict.
+ */
+export async function generatedConformanceEvidence(
   inventoryPath = INVENTORY_PATH,
-  corpusPath = CORPUS_PATH,
-  manifestPath = MANIFEST_PATH,
-): Promise<ConformanceManifest> {
-  const inventory = await readFormulaInventory(inventoryPath);
-  const { corpus, manifest } = generateConformanceEvidence(inventory);
-  const corpusBytes = `${canonicalJson(corpus)}\n`;
-  if (Buffer.byteLength(corpusBytes) > MAX_CORPUS_BYTES) {
-    throw new RangeError(`Generated corpus exceeds ${MAX_CORPUS_BYTES} bytes`);
-  }
-  await Promise.all([
-    writeFile(corpusPath, corpusBytes),
-    writeFile(manifestPath, `${canonicalJson(manifest)}\n`),
-  ]);
-  return manifest;
+): Promise<{ corpus: ConformanceCorpus; manifest: ConformanceManifest }> {
+  return generateConformanceEvidence(await readFormulaInventory(inventoryPath));
 }

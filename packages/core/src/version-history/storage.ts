@@ -87,9 +87,9 @@ export interface HistoryStorageTransaction {
   deletePin(token: string): Promise<void>;
 }
 
-/** Records that a head or marker owns directly: its checkpoint and log tail. */
-function roots(owner: Pick<HistoryVersion, "checkpoint" | "tail">): string[] {
-  return [...new Set([owner.checkpoint, ...owner.tail])];
+/** Records that a head or marker owns directly: its checkpoints and log tail. */
+function roots(owner: Pick<HistoryVersion, "checkpoint" | "tail" | "checkpoints">): string[] {
+  return [...new Set([owner.checkpoint, ...owner.tail, ...owner.checkpoints])];
 }
 
 function metadataBytes(value: unknown): number {
@@ -100,13 +100,18 @@ function oldestFirst(left: HistoryVersion, right: HistoryVersion): number {
   return left.time - right.time || compareCodeUnits(left.id, right.id);
 }
 
-function checkOwner(owner: Pick<HistoryVersion, "revision" | "checkpoint" | "tail">): void {
+function checkOwner(
+  owner: Pick<HistoryVersion, "revision" | "checkpoint" | "tail" | "checkpoints">,
+): void {
   const valid =
     integer(owner.revision) &&
     validId(owner.checkpoint) &&
     Array.isArray(owner.tail) &&
     owner.tail.length <= MAX_TAIL_TRANSACTIONS &&
-    owner.tail.every(validId);
+    owner.tail.every(validId) &&
+    Array.isArray(owner.checkpoints) &&
+    owner.checkpoints.length <= MAX_TAIL_TRANSACTIONS &&
+    owner.checkpoints.every(validId);
 
   if (!valid) {
     throw new HistoryError("invalid-history", "Invalid history revision references");
@@ -322,8 +327,21 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       throw new HistoryError("invalid-history", "Invalid history reader token");
     }
 
-    const versions = await transaction.versions();
-    const version = versions.find((candidate) => candidate.id === request.versionId);
+    const versions = request.versionId === "head" ? [] : await transaction.versions();
+    const head = manifest.head;
+    const version: HistoryVersion | undefined =
+      request.versionId === "head" && head
+        ? {
+            id: "head",
+            revision: head.revision,
+            kind: "automatic",
+            authorId: "",
+            time: head.time,
+            checkpoint: head.checkpoint,
+            tail: head.tail,
+            checkpoints: head.checkpoints,
+          }
+        : versions.find((candidate) => candidate.id === request.versionId);
     if (!version) {
       throw new HistoryError("not-found", "History version does not exist");
     }
@@ -350,12 +368,14 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
 
     const inserted = await this.insertRecords(transaction, manifest, request.records);
 
-    if (request.head) {
-      await this.moveHead(transaction, manifest, request.head);
+    // The marker first: it takes over checkpoints that the new head no longer
+    // lists, so they keep an owner while the old head lets them go.
+    if (request.version) {
+      await this.addVersion(transaction, manifest, request.version, request.head ?? manifest.head);
     }
 
-    if (request.version) {
-      await this.addVersion(transaction, manifest, request.version);
+    if (request.head) {
+      await this.moveHead(transaction, manifest, request.head);
     }
 
     // Every new record must have an owner; an orphan would never be pruned.
@@ -441,6 +461,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     transaction: HistoryStorageTransaction,
     manifest: HistoryManifest,
     version: HistoryVersion,
+    head: HistoryHead | undefined,
   ): Promise<void> {
     const versions = await transaction.versions();
     const duplicate = versions.find((candidate) => candidate.id === version.id);
@@ -454,7 +475,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       return;
     }
 
-    if (!manifest.head || version.revision > manifest.head.revision) {
+    if (!head || version.revision > head.revision) {
       throw new HistoryError("invalid-history", "Version is ahead of the history head");
     }
 

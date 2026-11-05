@@ -7,14 +7,9 @@ import {
   firstPaintGate,
   validateFirstPaintEvidence,
 } from "./first-paint-evidence.js";
-import {
-  BUNDLER_SOURCE_MAP_MODE,
-  classifyPackedPath,
-  SIZE_PROTOCOL_VERSION,
-  summarizePack,
-  validateBundlerEvidence,
-  validateComparableAttribution,
-} from "./size-report.js";
+import { validateBundlerEvidence, validateComparableAttribution } from "./size-bundler-evidence.js";
+import { classifyPackedPath, summarizePack } from "./size-install.js";
+import { BUNDLER_SOURCE_MAP_MODE, SIZE_PROTOCOL_VERSION } from "./size-report.js";
 
 function evidence(
   assets: unknown[],

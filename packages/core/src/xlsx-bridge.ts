@@ -5,6 +5,7 @@ import { storeEngine } from "./store/engine-registry.js";
 import type { ColumnarData } from "./types/data.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
+import type { PowerQueryCodec } from "./types/query.js";
 import type { Store } from "./types/store.js";
 import { hasAdmittedXlsxSource, setXlsxSourceVerifier } from "./xlsx-source.js";
 
@@ -284,7 +285,8 @@ export interface XlsxWorkbookWarning {
     | "external-formula"
     | "format-loss"
     | "validation-loss"
-    | "invalid-metadata";
+    | "invalid-metadata"
+    | "query-loss";
   message: string;
   sheet?: string;
   cell?: string;
@@ -304,6 +306,13 @@ export interface XlsxWorkbookOptions {
   /** Positive overrides for every XLSX resource dimension except `maxCells`. */
   resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
   onWarning?: (warning: XlsxWorkbookWarning) => void;
+  /**
+   * Power Query translation for saved queries, such as `loadPowerQueryCodec()`
+   * from `@sheetwrite/queries`. Without it, import keeps query parts as opaque
+   * parts, and export writes them back only while `workbook.queries` is
+   * unchanged since import.
+   */
+  powerQuery?: PowerQueryCodec;
 }
 
 /** @internal Core-owned provenance for snapshots it materialized during this call. */

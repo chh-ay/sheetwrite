@@ -4186,6 +4186,1353 @@
         }
       ],
       "returns": "scalar"
+    },
+    "accrued-interest": {
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "firstInterest",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "par",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "calcMethod",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "accrued-at-maturity": {
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "par",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "french-depreciation": {
+      "arguments": [
+        {
+          "name": "cost",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "datePurchased",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "firstPeriod",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "salvage",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "period",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "coupon": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "discount-security": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "price",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "dollar-fraction": {
+      "arguments": [
+        {
+          "name": "dollar",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fraction",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "bond-duration": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "coupon",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yield",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "interest-rate": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "investment",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "interest-payment": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "period",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "nper",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "odd-first-price": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "issue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "firstCoupon",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yield",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "odd-first-yield": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "issue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "firstCoupon",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "price",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "odd-last-price": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lastInterest",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yield",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "odd-last-yield": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lastInterest",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "price",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "bond-price": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yield",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "bond-yield": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "price",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "frequency",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "price-discount": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "discount",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "redemption",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "price-at-maturity": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "issue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yield",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "yield-at-maturity": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "issue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "price",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "received": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "investment",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "discount",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basis",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "treasury-bill-discount": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "discount",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "treasury-bill-yield": {
+      "arguments": [
+        {
+          "name": "settlement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "maturity",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "price",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "vdb": {
+      "arguments": [
+        {
+          "name": "cost",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "salvage",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "life",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "startPeriod",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "endPeriod",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "factor",
+          "required": false,
+          "default": 2,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "noSwitch",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "point-angle": {
+      "arguments": [
+        {
+          "name": "xNum",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "yNum",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "precise-rounding": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "significance",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "roman": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "form",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "roman-text": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "radix-text": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "radix",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "minLength",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "radix-number": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "radix",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "hypgeom-dist": {
+      "arguments": [
+        {
+          "name": "sampleS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberSample",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "populationS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberPop",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "negbinom-dist": {
+      "arguments": [
+        {
+          "name": "numberF",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probabilityS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "binom-dist-range": {
+      "arguments": [
+        {
+          "name": "trials",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probabilityS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberS",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "numberS2",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sheet-value": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": false,
+          "default": "formula-sheet",
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sheets-reference": {
+      "arguments": [
+        {
+          "name": "reference",
+          "required": false,
+          "default": "workbook",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "info-type": {
+      "arguments": [
+        {
+          "name": "typeText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "vector-lookup": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lookupVector",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "resultVector",
+          "required": false,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "trim-range": {
+      "arguments": [
+        {
+          "name": "range",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trimRows",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trimColumns",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "pivot-data": {
+      "arguments": [
+        {
+          "name": "dataField",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "pivotTable",
+          "required": true,
+          "default": null,
+          "accepts": ["reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fieldAndItem",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "paired"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5403,6 +6750,51 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "aggregate-counted": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "ignored",
+        "text": "function-defined",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -5568,7 +6960,7 @@
       "openFormula": "unverified",
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
-        "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
+        "CHISQ.TEST, CHITEST and paired T.TEST and TTEST skip pairs where either value is not a number. Type 3 of T.TEST and TTEST uses Welch's degrees of freedom without rounding."
       ]
     },
     "analysis-engineering": {
@@ -5580,6 +6972,40 @@
         "IMSUM and IMPRODUCT skip blank cells in a range.",
         "BESSELI, BESSELJ, BESSELK and BESSELY use the rational and polynomial approximations that give Excel's published results. They are accurate to about 1E-8.",
         "CONVERT uses the exact definition of each unit. A result can differ from Excel in the last digits."
+      ]
+    },
+    "excel-info": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "INFO returns #N/A for \"directory\", \"origin\", \"osversion\", \"release\" and \"system\", which describe the desktop program and its window. \"numfile\" is the number of sheets and \"recalc\" is \"Automatic\"."
+      ]
+    },
+    "excel-single-byte": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "LENB, LEFTB, RIGHTB, MIDB, REPLACEB, FINDB and SEARCHB count one byte per character, as Excel does when the default editing language is not a double-byte language. Excel counts two bytes for a double-byte character only when such a language is the default."
+      ]
+    },
+    "analysis-text-width": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
+      ]
+    },
+    "analysis-pivot-data": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in @sheetwrite/formulas. Items name row and column fields only; the fields named on each axis must be its outer levels.",
+        "An item list in braces, report filter fields and OLAP item names are not supported and give #REF!."
       ]
     }
   },
@@ -5609,7 +7035,16 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
+        "paths": [
+          "packages/wasm/src/eval/mod.rs",
+          "packages/wasm/src/eval/functions.rs",
+          "packages/wasm/src/eval/math.rs",
+          "packages/wasm/src/eval/math/trigonometry.rs",
+          "packages/wasm/src/eval/math/numerals.rs",
+          "packages/wasm/src/eval/statistics.rs",
+          "packages/wasm/src/eval/lookup.rs",
+          "packages/wasm/src/eval/array.rs"
+        ]
       },
       "assist": {
         "status": "implemented",
@@ -5912,7 +7347,7 @@
       },
       "evaluator": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/eval/info.rs"]
+        "paths": ["packages/wasm/src/eval/info.rs", "packages/wasm/src/store.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -5932,7 +7367,8 @@
         "status": "implemented",
         "paths": [
           "packages/wasm/src/eval/analysis/compatibility.rs",
-          "packages/wasm/src/eval/analysis/distributions.rs"
+          "packages/wasm/src/eval/analysis/distributions.rs",
+          "packages/wasm/src/eval/analysis/discrete.rs"
         ]
       },
       "assist": {
@@ -5984,6 +7420,108 @@
         "status": "source-linked",
         "paths": ["scripts/formula-contract.test.ts"]
       }
+    },
+    "analysis-securities": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/securities.rs",
+          "packages/wasm/src/eval/analysis/securities/day_count.rs",
+          "packages/wasm/src/eval/analysis/securities/odd.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-depreciation": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/depreciation.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-discrete": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/discrete.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-bytes": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/bytes.rs",
+          "packages/wasm/src/eval/analysis/bytes/width.rs",
+          "packages/wasm/src/eval/analysis/bytes/baht.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-pivot-data": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/pivot_data.rs",
+          "packages/wasm/src/pivot.rs",
+          "packages/wasm/src/store/pivots.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/store/tests.rs"]
+      }
     }
   },
   "unsupportedCategories": [
@@ -6028,7 +7566,7 @@
       "title": "External data functions",
       "status": "unsupported",
       "scope": "Functions that query external providers or live data connections are not evaluated.",
-      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD"],
+      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD", "STOCKHISTORY"],
       "source": "microsoft-excel-functions",
       "section": "Add-in and Automation functions",
       "implementation": {
@@ -6067,6 +7605,24 @@
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "language-services",
+      "title": "Language services",
+      "status": "unsupported",
+      "scope": "DETECTLANGUAGE and TRANSLATE call a translation service, and PHONETIC reads furigana that cells do not store. Formula evaluation calls no service and stores no phonetic text.",
+      "examples": ["DETECTLANGUAGE", "PHONETIC", "TRANSLATE"],
+      "source": "microsoft-excel-functions",
+      "section": "Text functions",
       "implementation": {
         "status": "missing",
         "paths": []
@@ -10830,6 +12386,1194 @@
       "implementation": "analysis-engineering",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ACCRINT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "accrued-interest",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ACCRINTM",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "accrued-at-maturity",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "AMORDEGRC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "french-depreciation",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-depreciation",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "AMORLINC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "french-depreciation",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-depreciation",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COUPDAYBS",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "coupon",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COUPDAYS",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "coupon",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COUPDAYSNC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "coupon",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COUPNCD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "coupon",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COUPNUM",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "coupon",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COUPPCD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "coupon",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DISC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "discount-security",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DOLLARDE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "dollar-fraction",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DOLLARFR",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "dollar-fraction",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DURATION",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "bond-duration",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "INTRATE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "interest-rate",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ISPMT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "interest-payment",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MDURATION",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "bond-duration",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ODDFPRICE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "odd-first-price",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ODDFYIELD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "odd-first-yield",
+      "semantics": "financial-iterative",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ODDLPRICE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "odd-last-price",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ODDLYIELD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "odd-last-yield",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PRICE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "bond-price",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PRICEDISC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "price-discount",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PRICEMAT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "price-at-maturity",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RECEIVED",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "received",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TBILLEQ",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "treasury-bill-discount",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TBILLPRICE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "treasury-bill-discount",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TBILLYIELD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "treasury-bill-yield",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "VDB",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "vdb",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-depreciation",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "YIELD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "bond-yield",
+      "semantics": "financial-iterative",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "YIELDDISC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "discount-security",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "YIELDMAT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "yield-at-maturity",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-securities",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ACOS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ACOSH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ACOT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ACOTH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ARABIC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "roman-text",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASIN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASINH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ATAN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ATAN2",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "point-angle",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ATANH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "BASE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "radix-text",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CEILING.PRECISE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "precise-rounding",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COSH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "COTH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CSC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CSCH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DECIMAL",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "radix-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DEGREES",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FLOOR.PRECISE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "precise-rounding",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISO.CEILING",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "precise-rounding",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RADIANS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ROMAN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "roman",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SEC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SECH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SIN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SINH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TAN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TANH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "AVERAGEA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MAXA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MINA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "STDEVA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "STDEVPA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "VARA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "VARPA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate-counted",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CHISQ.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "chi-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "F.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "t-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "Z.TEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "z-test",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-hypothesis",
+      "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMALN.PRECISE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BINOM.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HYPGEOM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "hypgeom-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NEGBINOM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "negbinom-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BINOM.DIST.RANGE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-dist-range",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-discrete",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERROR.TYPE",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISEVEN",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISNONTEXT",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISODD",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ISREF",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SHEET",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "sheet-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SHEETS",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "sheets-reference",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "INFO",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "info-type",
+      "semantics": "information",
+      "dialects": "excel-info",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LENB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LEFTB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RIGHTB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "MIDB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "mid",
+      "semantics": "text",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "REPLACEB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "replace",
+      "semantics": "text-sensitive",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FINDB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "find-search",
+      "semantics": "text-sensitive",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SEARCHB",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "find-search",
+      "semantics": "text-search",
+      "dialects": "excel-single-byte",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "ASC",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DBCS",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "BAHTTEXT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "text",
+      "dialects": "analysis-text-width",
+      "implementation": "analysis-bytes",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "LOOKUP",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "vector-lookup",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TRIMRANGE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "trim-range",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "GETPIVOTDATA",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "pivot-data",
+      "semantics": "information",
+      "dialects": "analysis-pivot-data",
+      "implementation": "analysis-pivot-data",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
     }
   ],
   "operators": [

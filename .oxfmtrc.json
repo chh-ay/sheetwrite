@@ -28,7 +28,7 @@
     "**/*.toml",
     "**/*.vue",
     "bun.lock",
-    "test/conformance/corpus.json",
+    "scripts/public-api-baseline.json",
     "bench/src/matched-formula-harness.ts"
   ],
   "sortImports": {

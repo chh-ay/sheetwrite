@@ -1584,15 +1584,11 @@ impl PivotCache {
             return self.col_axis.level_label(layout.col_groups[position], row);
         }
 
-        definition.values.get(slot).map_or(Value::Blank, |value| {
-            Value::text(value.name.clone().unwrap_or_else(|| {
-                format!(
-                    "{} of {}",
-                    value.aggregation.caption(),
-                    field_name(&self.headers[value.field], value.field)
-                )
-            }))
-        })
+        if slot < definition.values.len() {
+            Value::text(self.value_caption(slot))
+        } else {
+            Value::Blank
+        }
     }
 
     /// A data row cell: the row group labels, then one aggregate per value
@@ -1635,6 +1631,104 @@ impl PivotCache {
                 self.partials[pair as usize * definition.values.len() + slot]
                     .result(value.aggregation)
             })
+    }
+
+    /// The caption of value field `slot`: its custom name, or "Sum of Field".
+    fn value_caption(&self, slot: usize) -> String {
+        let value = &self.definition.values[slot];
+        value.name.clone().unwrap_or_else(|| {
+            format!(
+                "{} of {}",
+                value.aggregation.caption(),
+                field_name(&self.headers[value.field], value.field)
+            )
+        })
+    }
+
+    /// `GETPIVOTDATA`: the value cell of `data_field` in the row and column
+    /// groups that `items` name. `data_field` is a value field's caption, or
+    /// the source field it aggregates. Each item names a row or column field
+    /// and one of its keys; the fields named on each axis must be its outer
+    /// levels, so they name a group the output shows. Anything the output
+    /// does not show is `#REF!`, as in Excel. Names compare without case.
+    pub(crate) fn data_value(
+        &self,
+        layout: &PivotLayout,
+        data_field: &str,
+        items: &[(String, Value)],
+    ) -> Result<Value, FormulaError> {
+        let definition = &self.definition;
+        let wanted = data_field.to_lowercase();
+        let slot = (0..definition.values.len())
+            .find(|&slot| {
+                let field = definition.values[slot].field;
+                self.value_caption(slot).to_lowercase() == wanted
+                    || field_name(&self.headers[field], field).to_lowercase() == wanted
+            })
+            .ok_or(FormulaError::Ref)?;
+
+        let row_group = self.named_group(&self.row_axis, &definition.rows, items)?;
+        let col_group = self.named_group(&self.col_axis, &definition.columns, items)?;
+        let named = items.iter().filter(|(field, _)| {
+            let field = field.to_lowercase();
+            let on = |fields: &[usize]| {
+                fields
+                    .iter()
+                    .any(|&index| field_name(&self.headers[index], index).to_lowercase() == field)
+            };
+            on(&definition.rows) || on(&definition.columns)
+        });
+        if named.count() != items.len() {
+            return Err(FormulaError::Ref);
+        }
+
+        let row = *layout
+            .row_positions
+            .get(&row_group)
+            .ok_or(FormulaError::Ref)? as usize;
+        let col = *layout
+            .col_positions
+            .get(&col_group)
+            .ok_or(FormulaError::Ref)? as usize;
+        let offset = (layout.header_rows + row) * layout.cols
+            + layout.label_cols
+            + col * layout.value_slots
+            + slot;
+        match self.cell(layout, offset) {
+            Value::Blank => Err(FormulaError::Ref),
+            value => Ok(value),
+        }
+    }
+
+    /// The group of `axis` that `items` name on its `fields`: the root when
+    /// they name none, else the group of the named outer levels.
+    fn named_group(
+        &self,
+        axis: &Axis,
+        fields: &[usize],
+        items: &[(String, Value)],
+    ) -> Result<u32, FormulaError> {
+        let mut group = ROOT;
+        let mut ended = false;
+        for &field in fields {
+            let name = field_name(&self.headers[field], field).to_lowercase();
+            let mut matching = items
+                .iter()
+                .filter(|(item_field, _)| item_field.to_lowercase() == name);
+            let Some((_, item)) = matching.next() else {
+                ended = true;
+                continue;
+            };
+            if ended || matching.next().is_some() {
+                return Err(FormulaError::Ref);
+            }
+
+            let part = key_part(item).map_err(|_| FormulaError::Ref)?;
+            group = axis
+                .find(group, key_hash(group, &part), item)
+                .ok_or(FormulaError::Ref)?;
+        }
+        Ok(group)
     }
 
     /// Forgets the changes since the last call, for a caller that lays the

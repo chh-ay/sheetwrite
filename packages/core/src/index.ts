@@ -238,7 +238,6 @@ export {
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 
 export {
-  DEFAULT_SYNC_COORDINATOR_LIMITS,
   type PendingCommitLoadOptions,
   type PendingCommitStorage,
   type SyncActivityState,
@@ -247,16 +246,19 @@ export {
   type SyncConnectionState,
   SyncCoordinator,
   type SyncCoordinatorEvent,
-  type SyncCoordinatorLimits,
   type SyncCoordinatorOptions,
   SyncPendingCapacityError,
   type SyncPendingCapacityState,
-  type SyncPendingQueueLimits,
-  SyncProtocolError,
-  type SyncProtocolErrorCode,
   type SyncStateSnapshot,
   type SyncVersionGapRequest,
 } from "./sync.js";
+export {
+  DEFAULT_SYNC_COORDINATOR_LIMITS,
+  type SyncCoordinatorLimits,
+  type SyncPendingQueueLimits,
+  SyncProtocolError,
+  type SyncProtocolErrorCode,
+} from "./sync-protocol.js";
 
 export type {
   AggregateOp,
@@ -312,6 +314,11 @@ export type {
   ContextMenuContext,
   ContextMenuItem,
   ContextMenuItems,
+  Dashboard,
+  DashboardBox,
+  DashboardItem,
+  DashboardPivotItem,
+  DashboardSlicerItem,
   DataCell,
   DataModel,
   DataSource,
@@ -368,6 +375,11 @@ export type {
   ProtectedRange,
   ProtectionRequest,
   ProtectionResolver,
+  PowerQueryCodec,
+  PowerQueryExport,
+  PowerQueryImport,
+  PowerQueryLoss,
+  PowerQueryUnsupported,
   QueryAggregate,
   QueryCapability,
   QueryColumnSpec,
@@ -397,6 +409,7 @@ export type {
   SheetId,
   SheetLifecycleIssueCode,
   SheetLifecycleResult,
+  SheetKind,
   SheetSnapshot,
   SheetVisibility,
   SnapshotCell,

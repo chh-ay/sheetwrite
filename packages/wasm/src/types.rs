@@ -330,9 +330,14 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             | Func::Rand
             | Func::RandBetween
             | Func::Offset
-            | Func::Indirect,
+            | Func::Indirect
+            | Func::Sheet
+            | Func::Sheets
+            | Func::Info,
             _,
         ) => true,
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis(crate::eval::analysis::GETPIVOTDATA_ID), _) => true,
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_is_volatile),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_is_volatile(left) || ast_is_volatile(right)

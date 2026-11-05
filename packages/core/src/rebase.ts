@@ -1,6 +1,9 @@
 import { remapFormulaA1Refs } from "./a1.js";
 import { chartTouchesSheet } from "./chart-definition.js";
+import { boxesOverlap } from "./dashboard.js";
+import { cloneJsonValue } from "./plain-data.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
+import { cellRange, rangesIntersect } from "./store/ranges.js";
 import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
@@ -176,7 +179,7 @@ function conflict(
 }
 
 /** Whether an operation inserts, deletes, or moves rows or columns. */
-function changesStructure(operation: DocumentOp): boolean {
+export function changesStructure(operation: DocumentOp): boolean {
   switch (operation.op) {
     case "addRows":
     case "removeRows":
@@ -265,6 +268,7 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "setSheetMeta":
     case "setChart":
     case "setPivot":
+    case "setDashboardItem":
       return cloneJsonValue(operation);
     default:
       return { ...operation };
@@ -590,6 +594,9 @@ function transformDirectTarget(
     case "removeQuery":
     case "removeChart":
     case "removePivot":
+    // A dashboard has no rows or columns, so axis edits never move its items.
+    case "setDashboardItem":
+    case "removeDashboardItem":
       return null;
   }
 }
@@ -872,6 +879,19 @@ function operationContainsFormula(
   }
 }
 
+/** Two items of one dashboard whose boxes overlap: each is valid alone, not together. */
+function dashboardItemConflict(local: DocumentOp, remote: DocumentOp): TransformFailure | null {
+  const overlapping =
+    local.op === "setDashboardItem" &&
+    remote.op === "setDashboardItem" &&
+    remote.sheet === local.sheet &&
+    remote.item.id !== local.item.id &&
+    boxesOverlap(local.item.box, remote.item.box);
+  return overlapping
+    ? { code: "overlapping-edit", message: "A pending dashboard item overlaps a concurrent one" }
+    : null;
+}
+
 function lifecycleConflict(
   local: DocumentOp,
   remote: DocumentOp,
@@ -904,6 +924,9 @@ function lifecycleConflict(
       message: "A pending relationship names a table that a concurrent edit removed or changed",
     };
   }
+
+  const dashboardConflict = dashboardItemConflict(local, remote);
+  if (dashboardConflict) return dashboardConflict;
 
   if (remote.op === "addSheet" && local.op === "addSheet" && local.sheet.id === remote.sheet.id) {
     return {
@@ -1034,15 +1057,7 @@ function operationsOverlap(local: DocumentOp, remote: DocumentOp): boolean {
   const remoteRanges = mutationRanges(remote);
   for (const a of localRanges) {
     for (const b of remoteRanges) {
-      if (
-        a.sheet === b.sheet &&
-        Math.min(a.start.row, a.end.row) <= Math.max(b.start.row, b.end.row) &&
-        Math.min(b.start.row, b.end.row) <= Math.max(a.start.row, a.end.row) &&
-        Math.min(a.start.col, a.end.col) <= Math.max(b.start.col, b.end.col) &&
-        Math.min(b.start.col, b.end.col) <= Math.max(a.start.col, a.end.col)
-      ) {
-        return true;
-      }
+      if (rangesIntersect(a, b)) return true;
     }
   }
   return operationIdentity(local) !== "" && operationIdentity(local) === operationIdentity(remote);
@@ -1052,13 +1067,7 @@ function mutationRanges(operation: DocumentOp): Range[] {
   switch (operation.op) {
     case "set":
     case "setNote":
-      return [
-        {
-          sheet: operation.addr.sheet,
-          start: { row: operation.addr.row, col: operation.addr.col },
-          end: { row: operation.addr.row, col: operation.addr.col },
-        },
-      ];
+      return [cellRange(operation.addr)];
 
     case "setRange":
     case "setBlock":
@@ -1172,6 +1181,10 @@ function operationIdentity(operation: DocumentOp): string {
     case "removePivot":
       return `pivot:${operation.id}`;
 
+    case "setDashboardItem":
+    case "removeDashboardItem":
+      return `dashboard:${operation.sheet}:${operation.op === "setDashboardItem" ? operation.item.id : operation.id}`;
+
     default:
       return "";
   }
@@ -1196,8 +1209,4 @@ function overlappingStructure(operation: string): TransformFailure {
     code: "structural-overlap",
     message: `${operation} spans a concurrent row or column insertion/deletion boundary`,
   };
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }

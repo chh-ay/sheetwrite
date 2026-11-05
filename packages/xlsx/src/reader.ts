@@ -39,6 +39,7 @@ import {
 } from "@sheetwrite/core";
 
 import { readCharts } from "./chart-read.js";
+import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";
 import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
@@ -161,7 +162,8 @@ interface ParsedSheet {
   readonly rowCount: number;
   readonly columnCount: number;
   readonly conditionalFormats: ConditionalFormatRule[];
-  readonly sortKeys: NonNullable<SheetSnapshot["sortKeys"]>;
+  /** The worksheet `sortState`, kept unapplied for export. */
+  readonly sortState?: WorkbookTableXmlElement;
   readonly columns: Map<number, Partial<Column>>;
   readonly rowMeta: NonNullable<SheetSnapshot["rowMeta"]>;
   readonly merges: MergeRange[];
@@ -177,8 +179,6 @@ interface ParsedSheet {
   readonly hasRowOutlines: boolean;
   readonly hasUnsupportedValidation: boolean;
   readonly hasConditionalFormatting: boolean;
-  readonly hasUnsupportedSortState: boolean;
-  readonly hasSortState: boolean;
   readonly hasProtection: boolean;
   readonly hasAutoFilter: boolean;
   readonly hasValidationCollection: boolean;
@@ -850,31 +850,28 @@ function parseHyperlinks(
   return result;
 }
 
-function parseSortKeys(
+/**
+ * The worksheet `sortState`. Excel writes it after a sort whose cells it
+ * already moved, so it is kept for export and not applied as a view sort.
+ */
+function parseSortState(
   root: XmlElement,
-  rowCount: number,
-): { keys: NonNullable<SheetSnapshot["sortKeys"]>; unsupported: boolean } {
-  const state = xmlChild(root, "sortState");
-  if (!state) return { keys: [], unsupported: false };
-  const keys: NonNullable<SheetSnapshot["sortKeys"]> = [];
-  let unsupported = false;
-  for (const condition of xmlChildren(state, "sortCondition")) {
-    const reference = xmlAttribute(condition, "ref");
-    if (!reference) {
-      unsupported = true;
-      continue;
-    }
-    const range = parseRange(reference);
-    if (range.c0 !== range.c1 || range.r0 !== 0 || range.r1 < Math.max(0, rowCount - 1)) {
-      unsupported = true;
-      continue;
-    }
-    keys.push({
-      col: range.c0,
-      ascending: !xmlBoolean(xmlAttribute(condition, "descending")),
-    });
-  }
-  return { keys, unsupported };
+  styles: ParsedStyles,
+  context: XlsxCodecContext,
+  sheetName: string,
+): WorkbookTableXmlElement | undefined {
+  const element = xmlChild(root, "sortState");
+  if (!element) return undefined;
+
+  const rule = tableRuleMetadata(element, styles, { remaining: MAX_TABLE_RULE_NODES });
+  if (rule && validWorkbookTableXmlElement(rule, "sortState")) return rule;
+
+  emitWarning(context, {
+    code: "unsupported-feature",
+    message: "Invalid or oversized worksheet sortState was dropped",
+    sheet: sheetName,
+  });
+  return undefined;
 }
 
 function parseComments(
@@ -1592,7 +1589,7 @@ async function parseSheet(
       )
     : [];
   const conditionalFormats = parseConditionalFormats(root, styles, reference.name, context);
-  const sort = parseSortKeys(root, Math.max(0, maxRow + 1));
+  const sortState = parseSortState(root, styles, context, reference.name);
   const relationships = packageFile.relationships(reference.relationship.target);
   const hyperlinkCollection = xmlChild(root, "hyperlinks");
   const hyperlinks = parseHyperlinks(hyperlinkCollection, relationships, reference.name, context);
@@ -1681,7 +1678,7 @@ async function parseSheet(
     ...(Number.isInteger(frozenCols) && frozenCols > 0 ? { frozenCols } : {}),
     validations,
     conditionalFormats,
-    sortKeys: sort.keys,
+    ...(sortState ? { sortState } : {}),
     notes: comments.comments,
     hyperlinks,
     hasUnsupportedValidation: Boolean(validationCollection && validations.length === 0),
@@ -1689,8 +1686,6 @@ async function parseSheet(
     hasConditionalFormatting: root.children.some(
       (child) => xmlLocalName(child.name) === "conditionalFormatting",
     ),
-    hasSortState: Boolean(xmlChild(root, "sortState")),
-    hasUnsupportedSortState: sort.unsupported,
     hasRowOutlines: outlineLevels.size > 0,
     hasProtection: Boolean(xmlChild(root, "sheetProtection")),
     hasAutoFilter: Boolean(xmlChild(root, "autoFilter")),
@@ -1790,6 +1785,17 @@ function cellNumberFormatOverride(
   if (own !== undefined) return own;
   if (value.kind === "literal" && typeof value.value !== "number") return undefined;
   return "General";
+}
+
+/** Excel links customXml items from the workbook part; other writers may link them from the root. */
+function hasCustomXml(packageFile: OpcPackage): boolean {
+  return [
+    ...packageFile.relationships(packageFile.officeDocumentPart()),
+    ...packageFile.relationships(""),
+  ].some(
+    (relationship) =>
+      !relationship.external && relationshipTypeMatches(relationship.type, "customXml"),
+  );
 }
 
 function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnapshot): void {
@@ -2401,9 +2407,11 @@ export async function readWorkbook(
     const conditionalFormats = source.hasConditionalFormatting
       ? nativeConditionalFormats
       : (structuredClone(meta?.conditionalFormats) ?? []);
-    const sortKeys = source.hasSortState
-      ? structuredClone(source.sortKeys)
-      : (structuredClone(meta?.sortKeys) ?? []);
+    // A live view sort comes only from Sheetwrite's own metadata. The
+    // worksheet sortState is kept unapplied, unless it is the export of that
+    // view sort.
+    const sortKeys = structuredClone(meta?.sortKeys) ?? [];
+    const sortState = sortKeys.length === 0 ? source.sortState : undefined;
     const tables: WorkbookTable[] = source.tables.map((nativeTable, tableIndex) => {
       const metaTable =
         meta?.tables?.find(
@@ -2455,13 +2463,6 @@ export async function readWorkbook(
         sheet: source.name,
       });
     }
-    if (source.hasUnsupportedSortState) {
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message: "Excel sortState did not cover every Sheetwrite data row and was dropped",
-        sheet: source.name,
-      });
-    }
     sheets.push({
       id,
       name: source.name,
@@ -2488,6 +2489,7 @@ export async function readWorkbook(
         : {}),
       ...(notes.length > 0 ? { notes } : {}),
       ...(sortKeys.length > 0 ? { sortKeys } : {}),
+      ...(sortState ? { sortState: structuredClone(sortState) } : {}),
       ...(!source.hasAutoFilter && meta?.filters ? { filters: structuredClone(meta.filters) } : {}),
       ...(tables.length > 0 ? { tables } : {}),
       cells:
@@ -2562,6 +2564,22 @@ export async function readWorkbook(
     if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
   }
   const calculation = workbookCalculation(workbookRoot);
+  // Sheetwrite's own metadata holds relationships by stable IDs; a file
+  // without it may hold Excel's data model relationships.
+  let dataModel = metadata?.workbook.dataModel;
+  if (dataModel === undefined && hasExcelDataModel(workbookRoot)) {
+    const connectionsPart = workbookRelationships.find(
+      (relationship) =>
+        relationshipTypeMatches(relationship.type, "connections") && !relationship.external,
+    )?.target;
+    // A relationship can name a part the package lacks; such a file has no connections to read.
+    const readable =
+      connectionsPart !== undefined && packageFile.contentType(connectionsPart) !== undefined;
+    if (readable) await packageFile.load([connectionsPart]);
+    const connections = readable ? packageFile.readXml(connectionsPart) : undefined;
+    if (readable) packageFile.release([connectionsPart]);
+    dataModel = readExcelDataModel(workbookRoot, connections, sheets, context);
+  }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),
@@ -2570,6 +2588,7 @@ export async function readWorkbook(
       activeSheet,
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
       ...(calculation ? { calculation } : {}),
+      ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
     },
     sheets,
   };
@@ -2593,6 +2612,13 @@ export async function readWorkbook(
       new Set([...modelledPivotParts, ...chartParts.modelled]),
       chartParts.replacements,
     );
+  // The Power Query module loads only for workbooks that can hold queries:
+  // saved definitions in the hidden metadata, or a customXml item.
+  const sidecarQueries = metadata?.workbook.queries;
+  if (sidecarQueries?.length || hasCustomXml(packageFile)) {
+    const { readPowerQuery } = await import("./power-query.js");
+    await readPowerQuery(packageFile, snapshot, sidecarQueries, context);
+  }
   const formulas = await convertWorkbookFormulas(snapshot, "import");
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {

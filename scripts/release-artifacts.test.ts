@@ -96,6 +96,12 @@ const REQUIRED_FILES: Readonly<Record<string, readonly string[]>> = {
     "pkg/sheetwrite_wasm.d.ts",
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm_bg.wasm",
+    "history.d.ts",
+    "history.mjs",
+    "history-node.mjs",
+    "pkg-history/sheetwrite_history.d.ts",
+    "pkg-history/sheetwrite_history.js",
+    "pkg-history/sheetwrite_history_bg.wasm",
   ],
   "@sheetwrite/formulas": [
     "README.md",

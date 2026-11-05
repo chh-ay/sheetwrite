@@ -26,7 +26,7 @@ const MAX_PIVOT_NAME_LENGTH = 255;
 /** Most entries in one of `rows`, `columns`, `values`, `filters` or `sort`. */
 const MAX_PIVOT_FIELD_ENTRIES = 256;
 /** Most keep-list values across all filters of one pivot. */
-const MAX_PIVOT_FILTER_VALUES = 10_000;
+export const MAX_PIVOT_FILTER_VALUES = 10_000;
 /** Longest text filter value; Excel's cell text limit. */
 const MAX_PIVOT_FILTER_TEXT_LENGTH = 32_767;
 /** Field indices address source columns, so they share the sheet width bound. */
@@ -60,7 +60,8 @@ function isIndex(value: unknown, max = Number.MAX_SAFE_INTEGER): value is number
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= max;
 }
 
-function isPivotScalar(value: unknown): value is CellScalar {
+/** Whether `value` is a cell scalar that a filter keep-list may hold. */
+export function isPivotScalar(value: unknown): value is CellScalar {
   return (
     value === null ||
     typeof value === "boolean" ||

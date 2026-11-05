@@ -2,11 +2,14 @@
 
 mod aggregate;
 mod bessel;
+mod bytes;
 mod compatibility;
 mod complex;
 mod database;
 mod dates;
+mod depreciation;
 mod descriptive;
+mod discrete;
 mod distributions;
 mod engineering;
 mod finance;
@@ -16,8 +19,10 @@ pub(crate) use groupby::grouping;
 pub(crate) mod lambda;
 pub(super) mod math;
 mod matrices;
+mod pivot_data;
 mod regression;
 mod reshape;
+mod securities;
 mod text;
 mod units;
 
@@ -41,9 +46,17 @@ pub(super) type MatrixEvaluator = fn(
     usize,
 ) -> Result<EvalMatrix, FormulaError>;
 
-pub(super) type ShapeEvaluator =
-    fn(&CellStore, &str, &[Ast], usize) -> Result<(usize, usize, usize), FormulaError>;
-pub(super) type BoundEvaluator = fn(&CellStore, &str, &[Ast], usize) -> Result<usize, FormulaError>;
+/// Shape and bound hooks receive the pass that asks, so work they share with
+/// the evaluation that follows, such as compiled regex programs, is done once.
+pub(super) type ShapeEvaluator = fn(
+    &CellStore,
+    &str,
+    &[Ast],
+    usize,
+    &mut EvalPass<'_>,
+) -> Result<(usize, usize, usize), FormulaError>;
+pub(super) type BoundEvaluator =
+    fn(&CellStore, &str, &[Ast], usize, &mut EvalPass<'_>) -> Result<usize, FormulaError>;
 
 /// Array hooks must use the same shape, byte and work limits as built-in arrays.
 pub(super) struct ArrayHooks {
@@ -121,6 +134,13 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
+        names: discrete::NAMES,
+        reference_cells: &[],
+        evaluate: Some(discrete::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
@@ -156,9 +176,30 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
+        names: bytes::NAMES,
+        reference_cells: &[],
+        evaluate: Some(bytes::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: finance::NAMES,
         reference_cells: &[],
         evaluate: Some(finance::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: depreciation::NAMES,
+        reference_cells: &[],
+        evaluate: Some(depreciation::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: securities::NAMES,
+        reference_cells: &[],
+        evaluate: Some(securities::evaluate),
         evaluate_ast: None,
         array: None,
     },
@@ -216,6 +257,13 @@ const FAMILIES: &[Family] = &[
             bound: reshape::bound,
             evaluate: reshape::evaluate,
         }),
+    },
+    Family {
+        names: pivot_data::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(pivot_data::evaluate_ast),
+        array: None,
     },
     Family {
         names: lambda::NAMES,
@@ -277,6 +325,8 @@ const fn known_id(input: &str) -> u16 {
 
 pub(crate) const AGGREGATE_ID: u16 = known_id("AGGREGATE");
 pub(crate) const LAMBDA_ID: u16 = known_id("LAMBDA");
+/// `GETPIVOTDATA` is volatile: it reads pivot output through no reference.
+pub(crate) const GETPIVOTDATA_ID: u16 = known_id("GETPIVOTDATA");
 pub(crate) const PERCENTILE_EXC_ID: u16 = known_id("PERCENTILE.EXC");
 pub(crate) const QUARTILE_EXC_ID: u16 = known_id("QUARTILE.EXC");
 

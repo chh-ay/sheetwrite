@@ -10,10 +10,27 @@ dist/
 # Rust / WASM
 target/
 packages/wasm/pkg/
+packages/wasm/pkg-history/
 packages/formulas/pkg/
 packages/queries/pkg/
 # Copied from packages/wasm by the formulas build (scripts/wasm-factory.ts).
 packages/formulas/loader*.mjs
+
+# Generated from repository sources by the core build (scripts/function-metadata.ts)
+# and `bun run docs:generate` (scripts/docs-cli.ts). Keep the docs paths in step
+# with GENERATED_CONTENT_DIRECTORIES and GENERATED_CONTENT_PAGES in scripts/docs-shared.ts.
+packages/core/src/generated/
+docs/src/generated/
+docs/public/llms.txt
+docs/public/llms-full.txt
+docs/src/content/docs/api/
+docs/src/content/docs/performance/
+docs/src/content/docs/reference/formula-functions/
+docs/src/content/docs/reference/compatibility-results.md
+docs/src/content/docs/reference/excel-function-coverage.md
+docs/src/content/docs/reference/formula-functions.md
+docs/src/content/docs/reference/moved-guides.md
+docs/src/content/docs/reference/package-entry-points.md
 
 # Coverage
 coverage/

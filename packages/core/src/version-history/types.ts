@@ -47,6 +47,11 @@ export interface HistoryVersion {
   checkpoint: string;
   /** Transaction envelope IDs applied after the checkpoint, in order. */
   tail: readonly string[];
+  /**
+   * Checkpoints made since the previous marker. The marker keeps them, so the
+   * log between two retained versions stays readable for a diff.
+   */
+  checkpoints: readonly string[];
 }
 
 /** Immutable, content-addressed history payload and the records it refers to. */
@@ -69,6 +74,8 @@ export interface HistoryHead {
   revision: number;
   checkpoint: string;
   tail: readonly string[];
+  /** Checkpoints made since the newest version marker; the next marker takes them over. */
+  checkpoints: readonly string[];
   /** Time of the last archived commit. */
   time: number;
   /** Active editing time since the baseline; idle gaps count as at most one automatic interval. */
@@ -118,6 +125,7 @@ export interface HistoryPublishRequest extends HistoryStorageRequest {
 export interface HistoryPinRequest extends HistoryStorageRequest {
   kind: "pin" | "release";
   token: string;
+  /** Marker ID, or `"head"` to lease the committed head returned in the manifest. */
   versionId: string;
 }
 

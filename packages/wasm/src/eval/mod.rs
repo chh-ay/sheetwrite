@@ -947,7 +947,11 @@ impl CellStore {
                     }
 
                     let ast = entry.ast.as_ref()?;
-                    self.dynamic_array_bound(ast, key.sheet as usize)
+                    let mut pass = EvalPass {
+                        affected: &affected,
+                        results: &mut memo,
+                    };
+                    self.dynamic_array_bound(ast, key.sheet as usize, &mut pass)
                         .is_some()
                         .then(|| (key, ast.clone(), entry.has_spill_refs()))
                 })
@@ -995,7 +999,7 @@ impl CellStore {
                     ast
                 };
 
-                let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
+                let evaluated = match self.dynamic_array_bound(&ast, output_sheet, &mut pass) {
                     _ if cyclic.contains(&key) => Err(FormulaError::Cycle),
                     Some(Ok(bound)) => match dynamic_recompute_within_limit(spill_work, bound) {
                         Some(total) => {
@@ -1656,7 +1660,8 @@ impl CellStore {
                 | Func::Take
                 | Func::Drop
                 | Func::ChooseCols
-                | Func::ChooseRows,
+                | Func::ChooseRows
+                | Func::TrimRange,
                 _,
             ) => {
                 match self
@@ -1833,7 +1838,13 @@ impl CellStore {
             | Func::FormulaText
             | Func::IsFormula
             | Func::Hyperlink
-            | Func::Cell => return self.eval_information_family(func, args, sheet, pass, depth),
+            | Func::Cell
+            | Func::ErrorType
+            | Func::Info
+            | Func::IsNonText
+            | Func::IsRef
+            | Func::Sheet
+            | Func::Sheets => return self.eval_information_family(func, args, sheet, pass, depth),
             Func::Today | Func::Now | Func::Rand | Func::RandBetween => {
                 return self.eval_volatile_family(func, args, sheet, pass, depth)
             }
@@ -1845,6 +1856,7 @@ impl CellStore {
             | Func::AverageIf
             | Func::MaxIfs
             | Func::MinIfs => return self.eval_criteria_family(func, args, sheet, pass, depth + 1),
+            Func::Lookup => return self.eval_vector_lookup(args, sheet, pass, depth + 1),
             Func::Index
             | Func::Match
             | Func::VLookup

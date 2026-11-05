@@ -10,8 +10,8 @@ import {
   compareResults,
   compatibilityCheckSummary,
   type FormulaInventory,
+  generatedConformanceEvidence,
   loadCorpus,
-  readConformanceManifest,
   readFormulaInventory,
   runOffline,
   runSheetwriteCase,
@@ -22,9 +22,10 @@ import {
   validateResult,
   verifyCaptureArtifacts,
 } from "./conformance.js";
+import { AUTHORED_ASSERTIONS } from "./conformance/formula-evidence.js";
 
-const [CHECKED_MANIFEST, CHECKED_INVENTORY] = await Promise.all([
-  readConformanceManifest(),
+const [{ manifest: CHECKED_MANIFEST }, CHECKED_INVENTORY] = await Promise.all([
+  generatedConformanceEvidence(),
   readFormulaInventory(),
 ]);
 const NO_ARTIFACTS = new Set<string>();
@@ -373,5 +374,12 @@ describe("offline typed comparison", () => {
     expect(compatibilityCheckSummary(result, true)).toContain(
       "Excel and Google Sheets compatibility remains unclaimed",
     );
+  });
+});
+
+describe("authored formula assertions", () => {
+  it("lists functions in name order, so function pull requests add different lines", () => {
+    const names = Object.keys(AUTHORED_ASSERTIONS);
+    expect(names).toEqual([...names].sort());
   });
 });

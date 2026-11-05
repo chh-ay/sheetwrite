@@ -11,10 +11,11 @@ import type {
 } from "./cell.js";
 import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { Dashboard, DashboardItem, SheetKind } from "./dashboard.js";
 import type { DataModel, TableRelationship } from "./data-model.js";
 import type { PivotDefinition } from "./pivot.js";
 import type { SavedQuery } from "./query.js";
-import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
+import type { WorkbookTable, WorkbookTablePatch, WorkbookTableXmlElement } from "./table.js";
 
 /** Stable reason codes returned by worksheet-name validation. */
 export type SheetNameIssueCode =
@@ -47,6 +48,10 @@ export interface Sheet {
   id: SheetId;
   /** User-facing sheet name shown in tabs and workbook exports. */
   name: string;
+  /** A dashboard holds items and no cells; absent means a worksheet. */
+  kind?: SheetKind;
+  /** Items of a dashboard sheet; only on `kind: "dashboard"`. */
+  dashboard?: Dashboard;
   /** Hidden worksheets remain addressable but are omitted from the tab strip. */
   visibility?: SheetVisibility;
   /** Ordered schema; array positions are the zero-based column coordinates. */
@@ -71,6 +76,13 @@ export interface Sheet {
   notes?: CellNote[];
   /** Persisted sort keys for the sheet's view. */
   sortKeys?: SortKey[];
+  /**
+   * The worksheet `sortState` of an imported XLSX file. Excel writes it after
+   * a sort whose cells it already moved, so Sheetwrite keeps it for export and
+   * does not apply it. Export writes it while its references lie inside the
+   * sheet; a view sort (`sortKeys`) replaces it.
+   */
+  sortState?: WorkbookTableXmlElement;
   /** Persisted column filters as JSON-safe index/value tuples. */
   filters?: Array<[col: number, filter: ColumnFilter]>;
   /** Persisted merged-cell regions; covered cells render/export from the anchor. */
@@ -146,6 +158,8 @@ export interface Workbook {
 export interface AddSheetInput {
   id?: SheetId;
   name: string;
+  /** `"dashboard"` adds a dashboard, which ignores `rowCount` and `columns`. */
+  kind?: SheetKind;
   rowCount?: number;
   columns?: Column[];
 }
@@ -406,6 +420,10 @@ export interface SheetSnapshot {
   id: SheetId;
   name: string;
   order: number;
+  /** A dashboard holds items and no cells; absent means a worksheet. */
+  kind?: SheetKind;
+  /** Items of a dashboard sheet; only on `kind: "dashboard"`. */
+  dashboard?: Dashboard;
   /** Hidden worksheets remain in the workbook and retain formulas/references. */
   visibility?: SheetVisibility;
   rowCount: number;
@@ -421,6 +439,8 @@ export interface SheetSnapshot {
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
+  /** See `Sheet.sortState`. */
+  sortState?: WorkbookTableXmlElement;
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
@@ -465,6 +485,12 @@ export interface XlsxSourceGraph {
   readonly target: string;
   /** Pivot cache id written into `<pivotCaches>`. */
   readonly cacheId?: string;
+  /**
+   * 64-bit hex digest of `workbook.queries` at import, for graphs that hold
+   * saved query definitions (the DataMashup and its connections). Any query
+   * change makes the graph stale, so it is dropped.
+   */
+  readonly queries?: string;
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];
@@ -570,4 +596,8 @@ export type DocumentOp =
 
   /** Insert or replace the pivot with `pivot.id` on `sheet`. */
   | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition }
-  | { op: "removePivot"; sheet: SheetId; id: string };
+  | { op: "removePivot"; sheet: SheetId; id: string }
+
+  /** Insert or replace the item with `item.id` on the dashboard `sheet`. */
+  | { op: "setDashboardItem"; sheet: SheetId; item: DashboardItem }
+  | { op: "removeDashboardItem"; sheet: SheetId; id: string };

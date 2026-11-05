@@ -1190,3 +1190,88 @@ impl CellStore {
         }))
     }
 }
+
+/// Next smaller match by binary search over an ascending list, as
+/// `VLOOKUP` with `range_lookup` TRUE.
+const NEXT_SMALLER: i32 = -1;
+const BINARY_ASCENDING: i32 = 2;
+
+impl CellStore {
+    /// LOOKUP(lookup_value, lookup_vector, [result_vector]) and
+    /// LOOKUP(lookup_value, array). The search finds the largest value at
+    /// or below `lookup_value` in an ascending list. The array form
+    /// searches the first row of an array wider than it is tall, and the
+    /// first column otherwise, and returns the value at the same position
+    /// in the last row or column.
+    #[inline(never)]
+    pub(super) fn eval_vector_lookup(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        self.vector_lookup(args, sheet, pass, depth)
+            .unwrap_or_else(Value::Error)
+    }
+
+    fn vector_lookup(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        if !(2..=3).contains(&args.len()) {
+            return Err(FormulaError::Value);
+        }
+
+        let key = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
+            Value::Error(error) => return Err(error),
+            key => key,
+        };
+        let list = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
+        let (rows, cols) = list.shape();
+        let is_vector = rows == 1 || cols == 1;
+
+        if !is_vector && args.len() == 3 {
+            return Err(FormulaError::Na);
+        }
+
+        if is_vector {
+            let found = self
+                .search_lookup_arg(
+                    &list,
+                    ListPart::Whole,
+                    &key,
+                    NEXT_SMALLER,
+                    BINARY_ASCENDING,
+                    pass,
+                )?
+                .ok_or(FormulaError::Na)?;
+
+            if args.len() == 2 {
+                return list.value(self, found).ok_or(FormulaError::Na);
+            }
+
+            let result = self.lookup_arg(&args[2], sheet, ListPart::Whole, pass, depth + 1)?;
+            return result.value(self, found).ok_or(FormulaError::Na);
+        }
+
+        let part = if cols > rows {
+            ListPart::FirstRow
+        } else {
+            ListPart::FirstColumn
+        };
+        let table = self.lookup_arg(&args[1], sheet, part, pass, depth + 1)?;
+        let found = self
+            .search_lookup_arg(&table, part, &key, NEXT_SMALLER, BINARY_ASCENDING, pass)?
+            .ok_or(FormulaError::Na)?;
+        let value = match part {
+            ListPart::FirstRow => table.cell(self, rows - 1, found),
+            _ => table.cell(self, found, cols - 1),
+        };
+
+        value.ok_or(FormulaError::Na)
+    }
+}
