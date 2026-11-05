@@ -38,7 +38,6 @@ export interface BeginEditOptions {
 export class EditController {
   private readonly host: HTMLElement;
   private textarea: HTMLTextAreaElement | null = null;
-  private cell: { row: number; col: number } | null = null;
   private opts: BeginEditOptions | null = null;
   private composing = false;
   private tearingDown = false;
@@ -53,10 +52,6 @@ export class EditController {
 
   get isEditing(): boolean {
     return this.textarea !== null;
-  }
-
-  get editingCell(): { row: number; col: number } | null {
-    return this.cell;
   }
 
   begin(opts: BeginEditOptions): void {
@@ -81,7 +76,6 @@ export class EditController {
 
     this.host.appendChild(ta);
     this.textarea = ta;
-    this.cell = { row: opts.row, col: opts.col };
     this.opts = opts;
     this.position(opts.rect);
 
@@ -216,7 +210,6 @@ export class EditController {
     ta.removeEventListener("input", this.onInput);
     ta.remove();
     this.textarea = null;
-    this.cell = null;
     this.opts = null;
     this.composing = false;
     this.refStart = -1;

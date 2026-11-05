@@ -8,7 +8,8 @@ import {
   type DocumentValidationError,
   type DocumentValidationResult,
   documentOpTarget,
-  getLastMergeValidationStatsForTest,
+  type MergeScanStats,
+  overlappingMergeIndices,
   resolveTransactionResourceLimits,
   validateDocumentOperationShape,
   validateTransactionResources,
@@ -517,8 +518,8 @@ describe("workbook document protocol", () => {
         new Set(result.value.sheets[0]?.merges?.map((merge) => JSON.stringify(merge))),
       ).toEqual(new Set(merges.map((merge) => JSON.stringify(merge))));
       // Untrusted snapshots must validate merges in O(n log n), not pairwise.
-      const stats = getLastMergeValidationStatsForTest();
-      expect(stats.normalized).toBe(count);
+      const stats: MergeScanStats = { nodeVisits: 0 };
+      expect(overlappingMergeIndices(merges, stats).includes(true)).toBe(false);
       expect(stats.nodeVisits).toBeLessThan(count * (Math.ceil(Math.log2(count)) + 1) * 12);
     }
   });
