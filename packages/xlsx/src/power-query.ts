@@ -8,6 +8,7 @@ import type {
 import { validateWorkbookSnapshot } from "@sheetwrite/core";
 import { inflateSync, unzipSync, zipSync } from "fflate";
 
+import { CONTENT_TYPES_NS, MAIN_NS, PACKAGE_RELATIONSHIPS_NS, RELATIONSHIPS_NS } from "./format.js";
 import { type OpcPackage, relationshipTypeMatches } from "./opc.js";
 import { queriesDigest, queryWarning, textDigest } from "./query-digest.js";
 import type { QueryTableBinding } from "./query-table.js";
@@ -28,12 +29,9 @@ import type { ZipPart } from "./zip.js";
 
 const DATA_MASHUP_NS = "http://schemas.microsoft.com/DataMashup";
 const CUSTOM_XML_PROPS_NS = "http://schemas.openxmlformats.org/officeDocument/2006/customXml";
-const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
-const OFFICE_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const CUSTOM_XML_REL = `${OFFICE_REL}/customXml`;
-const CUSTOM_XML_PROPS_REL = `${OFFICE_REL}/customXmlProps`;
-const CONNECTIONS_REL = `${OFFICE_REL}/connections`;
+const CUSTOM_XML_REL = `${RELATIONSHIPS_NS}/customXml`;
+const CUSTOM_XML_PROPS_REL = `${RELATIONSHIPS_NS}/customXmlProps`;
+const CONNECTIONS_REL = `${RELATIONSHIPS_NS}/connections`;
 const CUSTOM_XML_PROPS_CONTENT =
   "application/vnd.openxmlformats-officedocument.customXmlProperties+xml";
 const CONNECTIONS_CONTENT =
@@ -422,7 +420,7 @@ function metadataXml(members: readonly MemberEntry[], digest: string): string {
 function mashupBinary(section: string, members: readonly MemberEntry[]): Uint8Array {
   const packageParts = zipSync({
     "[Content_Types].xml": utf8.encode(
-      '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="text/xml"/><Default Extension="m" ContentType="text/plain"/></Types>',
+      `<?xml version="1.0" encoding="utf-8"?><Types xmlns="${CONTENT_TYPES_NS}"><Default Extension="xml" ContentType="text/xml"/><Default Extension="m" ContentType="text/plain"/></Types>`,
     ),
     "Config/Package.xml": utf8.encode(
       '<?xml version="1.0" encoding="utf-8"?><Package xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Version>2.21.0.0</Version><MinVersion>2.21.0.0</MinVersion><Culture>en-US</Culture></Package>',
@@ -524,7 +522,7 @@ function preparePowerQuery(
   const propsPart = `customXml/itemProps${number}.xml`;
   const item = `<?xml version="1.0" encoding="utf-8"?><DataMashup xmlns="${DATA_MASHUP_NS}">${encodeBase64(mashupBinary(exported.section, members))}</DataMashup>`;
   const props = `<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="${guid()}" xmlns:ds="${CUSTOM_XML_PROPS_NS}"><ds:schemaRefs><ds:schemaRef ds:uri="${DATA_MASHUP_NS}"/></ds:schemaRefs></ds:datastoreItem>`;
-  const itemRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="${CUSTOM_XML_PROPS_REL}" Target="itemProps${number}.xml"/></Relationships>`;
+  const itemRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${PACKAGE_RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="${CUSTOM_XML_PROPS_REL}" Target="itemProps${number}.xml"/></Relationships>`;
   const parts: ZipPart[] = [
     { name: itemPart, data: utf8.encode(item) },
     { name: propsPart, data: utf8.encode(props) },
