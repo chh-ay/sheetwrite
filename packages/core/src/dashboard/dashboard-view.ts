@@ -62,8 +62,6 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   const root = document.createElement("div");
   root.className = "sheetwrite-dashboard";
   root.hidden = true;
-  // The grid's own keys (typing, arrows, copy) must not act on the hidden cells.
-  root.addEventListener("keydown", (event) => event.stopPropagation());
   viewport.appendChild(root);
 
   let sheet: SheetId | null = null;
