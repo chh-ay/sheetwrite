@@ -1,6 +1,7 @@
 import type * as WasmBindings from "../pkg/sheetwrite_queries.js";
 import { checkedU32, decodeType, encodeType, packStrings, unpackStrings } from "./encoding.js";
 import { QueryError } from "./errors.js";
+import { encodePlan } from "./plan-wire.js";
 import type {
   QueryBatch,
   QueryColumn,
@@ -229,18 +230,6 @@ function parse(
   );
 }
 
-function encodePlan(steps: readonly QueryStep[]): Uint8Array {
-  const json = JSON.stringify(steps, (_key: string, value: unknown): unknown => {
-    if (typeof value === "number" && Number.isFinite(value) === false) {
-      throw new QueryError({ code: "definition", step: null, row: null, column: null });
-    }
-
-    return value;
-  });
-
-  return new TextEncoder().encode(json);
-}
-
 /** The adapter only transfers buffers; Rust owns source parsing and step semantics. */
 export function createEngine(wasm: WasmModule): QueryEngine {
   return {
@@ -263,7 +252,15 @@ export function createEngine(wasm: WasmModule): QueryEngine {
           }
 
           const plan = encodePlan(steps);
-          return exportBatch(runner.execute(importBatch(wasm, source), plan));
+          return exportBatch(
+            runner.execute(
+              importBatch(wasm, source),
+              plan.codes,
+              plan.numbers,
+              plan.text,
+              plan.offsets,
+            ),
+          );
         }),
       );
     },

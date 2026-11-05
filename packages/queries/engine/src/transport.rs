@@ -380,10 +380,23 @@ impl QueryRunner {
         Ok(())
     }
 
-    /// Small saved plans use a bounded reader; data columns never pass through JSON.
+    /// Plans arrive as typed code, literal and string lanes; nothing passes through JSON.
     #[wasm_bindgen(js_name = execute)]
-    pub fn execute(&self, source: QueryBatch, plan: &[u8]) -> Result<QueryBatch, JsValue> {
-        let plan = crate::parse_plan(plan, &self.limits).map_err(error)?;
+    pub fn execute(
+        &self,
+        source: QueryBatch,
+        codes: &[u32],
+        numbers: &[f64],
+        text: &[u8],
+        offsets: &[u32],
+    ) -> Result<QueryBatch, JsValue> {
+        let wire = crate::PlanWire {
+            codes,
+            numbers,
+            text,
+            offsets,
+        };
+        let plan = crate::decode_plan(wire, &self.limits).map_err(error)?;
         let source = source.into_batch(&self.limits).map_err(error)?;
 
         crate::execute(source, &plan, &self.inputs, &self.limits)

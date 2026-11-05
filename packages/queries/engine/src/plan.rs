@@ -1,6 +1,4 @@
-//! Serializable plans contain only data; executable callbacks and credentials are excluded.
-
-use serde::Deserialize;
+//! Plans contain only data; executable callbacks and credentials are excluded.
 
 /// Default row bound applies to source admission and every expanding operation.
 pub const DEFAULT_MAX_ROWS: usize = 1_000_000;
@@ -89,8 +87,7 @@ impl Diagnostic {
 }
 
 /// Physical payload type; mixed values use separate compact typed lanes.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColumnType {
     Number,
     Logical,
@@ -124,8 +121,7 @@ pub enum SourceSpec {
 }
 
 /// Predicate literals are scalar data, never executable source expressions.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(Clone, Debug)]
 pub enum Literal {
     Null,
     Logical(bool),
@@ -134,8 +130,7 @@ pub enum Literal {
 }
 
 /// Relational operators use M null semantics; equality keeps null equal to itself.
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug)]
 pub enum CompareOp {
     Eq,
     Neq,
@@ -146,8 +141,7 @@ pub enum CompareOp {
 }
 
 /// Saved logical trees compile to checked column indexes before scanning rows.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub enum Predicate {
     Compare {
         column: String,
@@ -173,16 +167,14 @@ pub enum Predicate {
 }
 
 /// Only new conversion failures use this policy; existing errors remain errors.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorPolicy {
     Error,
     Null,
 }
 
 /// Semi/anti joins return only one side; outer joins fill absent cells with null.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JoinKind {
     Inner,
     Left,
@@ -195,8 +187,7 @@ pub enum JoinKind {
 }
 
 /// Numeric folds ignore nulls; counts and extrema have explicit distinct behavior.
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug)]
 pub enum AggregateOp {
     CountRows,
     Count,
@@ -207,8 +198,7 @@ pub enum AggregateOp {
 }
 
 /// A named aggregate refers to a stable input column except for row counts.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct Aggregate {
     pub id: String,
     pub name: String,
@@ -217,16 +207,14 @@ pub struct Aggregate {
 }
 
 /// Identity and display name for a column created by an expanding step.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct OutputColumn {
     pub id: String,
     pub name: String,
 }
 
 /// Ordered transformations are plain data and can be saved without host callbacks.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub enum Step {
     Filter {
         predicate: Predicate,
@@ -239,9 +227,7 @@ pub enum Step {
     },
     ChangeType {
         column: String,
-        #[serde(rename = "type")]
         column_type: ColumnType,
-        #[serde(rename = "onError")]
         on_error: ErrorPolicy,
     },
     Join {

@@ -24,21 +24,16 @@ pub fn parse_source(bytes: &[u8], spec: &SourceSpec, limits: &Limits) -> Result<
         } => {
             let mut output: Vec<Column> = columns.iter().cloned().map(Column::new).collect();
             crate::column::validate_names(&output)?;
-            if matches!(delimiter, b'\n' | b'\r' | b'"' | 0) {
-                return Err(Diagnostic::new("csv-options"));
-            }
 
-            let mut reader = csv::ReaderBuilder::new()
-                .delimiter(*delimiter)
-                .has_headers(*headers)
-                .from_reader(bytes);
+            let mut reader = crate::csv::Reader::new(bytes, *delimiter)?;
+            let mut record = crate::csv::Record::default();
             let positions: Vec<u32> = if *headers {
-                let fields = reader.headers().map_err(|_| Diagnostic::new("csv"))?;
+                reader.read(&mut record)?;
                 columns
                     .iter()
                     .map(|column| {
-                        let mut matches = fields
-                            .iter()
+                        let mut matches = record
+                            .fields()
                             .enumerate()
                             .filter(|(_, field)| *field == column.name);
                         let index = matches
@@ -57,22 +52,25 @@ pub fn parse_source(bytes: &[u8], spec: &SourceSpec, limits: &Limits) -> Result<
                 (0..flat_index(columns.len())?).collect()
             };
 
+            // Every record must have the first record's width, as RFC 4180 requires.
+            let mut width = headers.then_some(record.len());
             let mut rows = 0;
-            let mut record = csv::StringRecord::new();
             let mut budget = OutputBudget::new(limits);
 
-            while reader
-                .read_record(&mut record)
-                .map_err(|_| Diagnostic::new("csv"))?
-            {
+            while reader.read(&mut record)? {
                 limits.shape(rows + 1, output.len())?;
+
+                if *width.get_or_insert(record.len()) != record.len() {
+                    return Err(Diagnostic::new("csv"));
+                }
+
                 if !*headers && record.len() != output.len() {
                     return Err(Diagnostic::new("shape"));
                 }
 
                 for (index, column) in output.iter_mut().enumerate() {
                     let field = record
-                        .get(row_index(*at(&positions, index)?)?)
+                        .field(row_index(*at(&positions, index)?)?)
                         .ok_or_else(|| Diagnostic::new("shape"))?;
                     let value = if *empty_is_null && field.is_empty() {
                         Value::Null

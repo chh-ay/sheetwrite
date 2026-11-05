@@ -2,33 +2,16 @@
 
 use crate::budget::OutputBudget;
 use crate::buffers::{at, at_mut, flat_index, row_index};
-use crate::column::{
-    date_from_text, datetime_from_text, formatted, validate_names, Batch, Column, Value,
-};
+use crate::calendar::{date_from_text, datetime_from_text};
+use crate::column::{formatted, validate_names, Batch, Column, Value};
 use crate::keys::indexes;
 use crate::plan::*;
 use crate::predicate::{compile_predicate, test_predicate};
 
-const MAX_PLAN_BYTES: usize = 1024 * 1024;
-
-/// Decodes a bounded saved step list; schema-dependent validation happens in execution.
-pub fn parse_plan(bytes: &[u8], limits: &Limits) -> Result<Plan, Diagnostic> {
-    if bytes.len() > MAX_PLAN_BYTES {
-        return Err(Diagnostic::limit());
-    }
-
-    let plan: Plan = crate::json::from_slice(bytes).map_err(|_| Diagnostic::new("definition"))?;
-    if plan.len() > limits.max_steps {
-        return Err(Diagnostic::limit());
-    }
-
-    Ok(plan)
-}
-
 /// Executes one ordered plan; every failure carries its step and leaves inputs unchanged.
 pub fn execute(
     mut batch: Batch,
-    plan: &Plan,
+    plan: &[Step],
     inputs: &[(String, Batch)],
     limits: &Limits,
 ) -> Result<Batch, Diagnostic> {

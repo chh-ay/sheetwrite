@@ -1,9 +1,7 @@
 mod support;
 
-use sheetwrite_queries::{
-    execute, parse_plan, parse_source, ColumnType, Limits, SourceSpec, Value,
-};
-use support::{column, json_batch};
+use sheetwrite_queries::{execute, parse_source, ColumnType, JoinKind, Limits, SourceSpec, Value};
+use support::{column, join, json_batch, select};
 
 #[test]
 fn all_join_kinds_match_null_and_duplicate_composite_keys() {
@@ -12,19 +10,16 @@ fn all_join_kinds_match_null_and_duplicate_composite_keys() {
     let right_json = br#"[{"RightKey":null,"RightN":0},{"RightKey":"a","RightN":1},{"RightKey":"a","RightN":1},{"RightKey":"a","RightN":3}]"#;
 
     for (kind, rows, width) in [
-        ("inner", 5, 4),
-        ("left", 6, 4),
-        ("right", 6, 4),
-        ("full", 7, 4),
-        ("leftSemi", 3, 2),
-        ("rightSemi", 3, 2),
-        ("leftAnti", 1, 2),
-        ("rightAnti", 1, 2),
+        (JoinKind::Inner, 5, 4),
+        (JoinKind::Left, 6, 4),
+        (JoinKind::Right, 6, 4),
+        (JoinKind::Full, 7, 4),
+        (JoinKind::LeftSemi, 3, 2),
+        (JoinKind::RightSemi, 3, 2),
+        (JoinKind::LeftAnti, 1, 2),
+        (JoinKind::RightAnti, 1, 2),
     ] {
-        let steps = format!(
-            r#"[{{"kind":"join","input":"right","keys":[["key","rk"],["n","rn"]],"join":"{kind}"}}]"#
-        );
-        let plan = parse_plan(steps.as_bytes(), &Limits::default()).unwrap();
+        let plan = [join("right", &[("key", "rk"), ("n", "rn")], kind)];
         let right = json_batch(
             right_json,
             vec![
@@ -45,18 +40,18 @@ fn all_join_kinds_match_null_and_duplicate_composite_keys() {
         assert_eq!(
             (output.row_count(), output.columns().len()),
             (rows, width),
-            "{kind}"
+            "{kind:?}"
         );
 
-        if kind == "inner" || kind == "full" {
+        if matches!(kind, JoinKind::Inner | JoinKind::Full) {
             assert_eq!(output.value(0, 0).unwrap(), Value::Null);
         }
 
-        if kind == "leftAnti" {
+        if kind == JoinKind::LeftAnti {
             assert_eq!(output.value(0, 0).unwrap(), Value::Text("z"));
         }
 
-        if kind == "rightAnti" {
+        if kind == JoinKind::RightAnti {
             assert_eq!(output.value(1, 0).unwrap(), Value::Number(3.0));
         }
     }
@@ -64,11 +59,7 @@ fn all_join_kinds_match_null_and_duplicate_composite_keys() {
 
 #[test]
 fn join_growth_and_error_keys_fail_before_output() {
-    let plan = parse_plan(
-        br#"[{"kind":"join","input":"right","keys":[["key","right"]],"join":"inner"}]"#,
-        &Limits::default(),
-    )
-    .unwrap();
+    let plan = [join("right", &[("key", "right")], JoinKind::Inner)];
     let right = json_batch(
         br#"[{"Right":1},{"Right":1}]"#,
         vec![column("right", "Right", ColumnType::Number)],
@@ -137,11 +128,7 @@ fn join_byte_budget_counts_text_across_all_output_columns() {
         br#"[{"Right":1},{"Right":1}]"#,
         vec![column("right", "Right", ColumnType::Number)],
     );
-    let plan = parse_plan(
-        br#"[{"kind":"join","input":"right","keys":[["key","right"]],"join":"inner"}]"#,
-        &limits,
-    )
-    .unwrap();
+    let plan = [join("right", &[("key", "right")], JoinKind::Inner)];
 
     let error = execute(left, &plan, &[("right".to_owned(), right)], &limits).unwrap_err();
 
@@ -204,11 +191,7 @@ fn malformed_sources_and_duplicate_definitions_are_rejected() {
     }
 
     let batch = parse_source(br#"[{"Key":"a"}]"#, &schema, &Limits::default()).unwrap();
-    let plan = parse_plan(
-        br#"[{"kind":"select","columns":["key","key"]}]"#,
-        &Limits::default(),
-    )
-    .unwrap();
+    let plan = [select(&["key", "key"])];
 
     assert_eq!(
         execute(batch, &plan, &[], &Limits::default())

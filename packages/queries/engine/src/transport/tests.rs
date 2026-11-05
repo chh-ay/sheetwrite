@@ -1,7 +1,9 @@
 //! The unpivot boundary must retain the mixed error tag and transfer buffers once.
 
 use super::QueryColumn;
-use crate::{execute, parse_plan, parse_source, ColumnSpec, ColumnType, Limits, SourceSpec};
+use crate::{
+    execute, parse_source, ColumnSpec, ColumnType, Limits, OutputColumn, SourceSpec, Step,
+};
 
 #[test]
 fn unpivot_error_has_a_distinct_mixed_transport_tag() {
@@ -19,11 +21,17 @@ fn unpivot_error_has_a_distinct_mixed_transport_tag() {
         &Limits::default(),
     )
     .unwrap();
-    let plan = parse_plan(
-        br#"[{"kind":"unpivot","columns":["value"],"attribute":{"id":"name","name":"Name"},"value":{"id":"result","name":"Result"}}]"#,
-        &Limits::default(),
-    )
-    .unwrap();
+    let plan = [Step::Unpivot {
+        columns: vec![String::from("value")],
+        attribute: OutputColumn {
+            id: String::from("name"),
+            name: String::from("Name"),
+        },
+        value: OutputColumn {
+            id: String::from("result"),
+            name: String::from("Result"),
+        },
+    }];
 
     let output = execute(source, &plan, &[], &Limits::default()).unwrap();
     let column = output.columns.into_iter().nth(1).unwrap();

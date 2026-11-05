@@ -39,10 +39,15 @@ and network policy remain outside the query engine.
 ## Sources and column types
 
 `engine.parse(bytes, source, limits?)` accepts UTF-8 CSV or a JSON array of
-records. JSON `path` selects a nested record array. CSV options are a delimiter
-byte, `headers` (default `true`), and `emptyIsNull` (default `true`). With headers,
-column names select source fields. Without headers, schema order selects fields.
-The schema is explicit: parsing does not sample rows or guess types.
+records. JSON `path` selects a nested record array. CSV options are an ASCII
+delimiter byte, `headers` (default `true`), and `emptyIsNull` (default `true`).
+With headers, column names select source fields. Without headers, schema order
+selects fields. The schema is explicit: parsing does not sample rows or guess types.
+
+CSV follows RFC 4180. Records end at LF, CRLF, or CR, and empty lines are
+skipped. A quoted field can contain delimiters, line breaks, and doubled quotes.
+Only a delimiter or a record end can follow its closing quote. Every record must
+have as many fields as the first record.
 
 A `QueryBatch` has `rowCount` and ordered `columns`. Each column has a stable
 `id`, a display/source `name`, a validity bitset, and typed payload lanes:
@@ -82,7 +87,10 @@ IDs must be unique; names must not collide when ASCII letter case is ignored.
 - **Select:** project and reorder columns without changing their IDs.
 - **Rename:** update display names without copying payloads.
 - **Change type:** preserve matching values, null, and existing errors. Convert
-  text to finite numbers, exact `true`/`false`, ISO dates, or ISO date/time values.
+  text to finite numbers, exact `true`/`false`, dates as `YYYY-MM-DD`, or
+  date/times as `YYYY-MM-DDTHH:MM:SS` with an optional fraction of one to nine
+  digits (truncated to microseconds). Other layouts, offsets, and zones are
+  conversion errors.
   Convert typed values to invariant text, or preserve their type in a mixed
   column. Other conversions produce errors. `onError: "null"` replaces only new
   conversion errors with null; the default explicit policy is `"error"`.

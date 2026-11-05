@@ -1,10 +1,11 @@
-//! A bounded streaming JSON reader for source records and small saved plans.
+//! A bounded pull reader for JSON source records (RFC 8259).
 //!
-//! Borrowed UTF-8 strings stay borrowed. Only escaped strings need a decode buffer.
+//! Borrowed UTF-8 strings stay borrowed. Only escaped strings need a decode buffer. Syntax
+//! failures never include source text, which can contain private values.
 
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
 
-use serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, SeqAccess, Visitor};
+use crate::plan::Diagnostic;
 
 const MAX_JSON_DEPTH: usize = 128;
 const HEX_DIGITS: usize = 4;
@@ -17,33 +18,30 @@ const SUPPLEMENTARY_START: u32 = 0x10000;
 const SURROGATE_SHIFT: u32 = 10;
 const CONTROL_CHARACTER_END: u8 = 0x1f;
 
-/// Syntax failures never include source text, which can contain private values.
-#[derive(Debug)]
-pub(crate) struct JsonError;
-
-impl fmt::Display for JsonError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("invalid JSON")
-    }
+fn syntax() -> Diagnostic {
+    Diagnostic::new("json")
 }
 
-impl std::error::Error for JsonError {}
-
-impl de::Error for JsonError {
-    fn custom<T: fmt::Display>(_message: T) -> Self {
-        Self
-    }
+/// The next value's kind, decided by its first byte.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Kind {
+    Null,
+    Logical,
+    Number,
+    Text,
+    Array,
+    Object,
 }
 
-/// The cursor owns no source data and limits nesting before visiting child values.
-pub(crate) struct Deserializer<'a> {
+/// The cursor owns no source data and limits nesting before it enters a container.
+pub(crate) struct Reader<'a> {
     bytes: &'a [u8],
     offset: usize,
     depth: usize,
 }
 
-impl<'a> Deserializer<'a> {
-    /// The caller keeps the byte slice alive for every borrowed visitor value.
+impl<'a> Reader<'a> {
+    /// The caller keeps the byte slice alive for every borrowed string.
     pub(crate) fn new(bytes: &'a [u8]) -> Self {
         Self {
             bytes,
@@ -53,12 +51,12 @@ impl<'a> Deserializer<'a> {
     }
 
     /// A complete document has no non-whitespace bytes after its root value.
-    pub(crate) fn end(&mut self) -> Result<(), JsonError> {
+    pub(crate) fn end(&mut self) -> Result<(), Diagnostic> {
         self.whitespace();
         if self.offset == self.bytes.len() {
             Ok(())
         } else {
-            Err(JsonError)
+            Err(syntax())
         }
     }
 
@@ -75,33 +73,148 @@ impl<'a> Deserializer<'a> {
         }
     }
 
-    fn require(&mut self, byte: u8) -> Result<(), JsonError> {
+    fn require(&mut self, byte: u8) -> Result<(), Diagnostic> {
         self.whitespace();
         if self.peek() != Some(byte) {
-            return Err(JsonError);
+            return Err(syntax());
         }
 
         self.offset += 1;
         Ok(())
     }
 
-    fn literal(&mut self, literal: &[u8]) -> Result<(), JsonError> {
-        let end = self.offset.checked_add(literal.len()).ok_or(JsonError)?;
+    fn literal(&mut self, literal: &[u8]) -> Result<(), Diagnostic> {
+        let end = self.offset.checked_add(literal.len()).ok_or_else(syntax)?;
         if self.bytes.get(self.offset..end) != Some(literal) {
-            return Err(JsonError);
+            return Err(syntax());
         }
 
         self.offset = end;
         Ok(())
     }
 
-    fn string(&mut self) -> Result<Cow<'a, str>, JsonError> {
+    /// Classifies the next value without consuming it.
+    pub(crate) fn kind(&mut self) -> Result<Kind, Diagnostic> {
+        self.whitespace();
+
+        Ok(match self.peek().ok_or_else(syntax)? {
+            b'n' => Kind::Null,
+            b't' | b'f' => Kind::Logical,
+            b'"' => Kind::Text,
+            b'[' => Kind::Array,
+            b'{' => Kind::Object,
+            b'-' | b'0'..=b'9' => Kind::Number,
+            _ => return Err(syntax()),
+        })
+    }
+
+    pub(crate) fn null(&mut self) -> Result<(), Diagnostic> {
+        self.whitespace();
+        self.literal(b"null")
+    }
+
+    pub(crate) fn logical(&mut self) -> Result<bool, Diagnostic> {
+        self.whitespace();
+        if self.peek() == Some(b't') {
+            self.literal(b"true")?;
+            Ok(true)
+        } else {
+            self.literal(b"false")?;
+            Ok(false)
+        }
+    }
+
+    /// Opens an array or object; `open` is `[` or `{`.
+    fn enter(&mut self, open: u8) -> Result<(), Diagnostic> {
+        if self.depth >= MAX_JSON_DEPTH {
+            return Err(syntax());
+        }
+
+        self.require(open)?;
+        self.depth += 1;
+        Ok(())
+    }
+
+    /// Consumes the closing byte or the separator; `first` tracks whether a comma is due.
+    fn next_item(&mut self, close: u8, first: &mut bool) -> Result<bool, Diagnostic> {
+        self.whitespace();
+        if self.peek() == Some(close) {
+            self.offset += 1;
+            self.depth -= 1;
+            return Ok(false);
+        }
+
+        if !*first {
+            self.require(b',')?;
+        }
+
+        *first = false;
+        Ok(true)
+    }
+
+    pub(crate) fn enter_array(&mut self) -> Result<(), Diagnostic> {
+        self.enter(b'[')
+    }
+
+    /// Returns false once the array has closed.
+    pub(crate) fn next_element(&mut self, first: &mut bool) -> Result<bool, Diagnostic> {
+        self.next_item(b']', first)
+    }
+
+    pub(crate) fn enter_object(&mut self) -> Result<(), Diagnostic> {
+        self.enter(b'{')
+    }
+
+    /// Returns the next member name, positioned at its value, or `None` once the object closed.
+    pub(crate) fn next_key(
+        &mut self,
+        first: &mut bool,
+    ) -> Result<Option<Cow<'a, str>>, Diagnostic> {
+        if !self.next_item(b'}', first)? {
+            return Ok(None);
+        }
+
+        let key = self.string()?;
+        self.require(b':')?;
+
+        Ok(Some(key))
+    }
+
+    /// Skips one complete value of any kind, with the same nesting bound.
+    pub(crate) fn skip(&mut self) -> Result<(), Diagnostic> {
+        match self.kind()? {
+            Kind::Null => self.null(),
+            Kind::Logical => self.logical().map(|_| ()),
+            Kind::Number => self.number().map(|_| ()),
+            Kind::Text => self.string().map(|_| ()),
+            Kind::Array => {
+                self.enter_array()?;
+                let mut first = true;
+                while self.next_element(&mut first)? {
+                    self.skip()?;
+                }
+
+                Ok(())
+            }
+            Kind::Object => {
+                self.enter_object()?;
+                let mut first = true;
+                while self.next_key(&mut first)?.is_some() {
+                    self.skip()?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) fn string(&mut self) -> Result<Cow<'a, str>, Diagnostic> {
         self.require(b'"')?;
         let mut start = self.offset;
         let mut decoded: Option<String> = None;
 
         loop {
-            match self.peek().ok_or(JsonError)? {
+            match self.peek().ok_or_else(syntax)? {
                 b'"' => {
                     let segment = self.string_segment(start)?;
                     self.offset += 1;
@@ -120,19 +233,19 @@ impl<'a> Deserializer<'a> {
                     decoded.push(self.escape()?);
                     start = self.offset;
                 }
-                0..=CONTROL_CHARACTER_END => return Err(JsonError),
+                0..=CONTROL_CHARACTER_END => return Err(syntax()),
                 _ => self.offset += 1,
             }
         }
     }
 
-    fn string_segment(&self, start: usize) -> Result<&'a str, JsonError> {
-        let bytes = self.bytes.get(start..self.offset).ok_or(JsonError)?;
-        std::str::from_utf8(bytes).map_err(|_| JsonError)
+    fn string_segment(&self, start: usize) -> Result<&'a str, Diagnostic> {
+        let bytes = self.bytes.get(start..self.offset).ok_or_else(syntax)?;
+        std::str::from_utf8(bytes).map_err(|_| syntax())
     }
 
-    fn escape(&mut self) -> Result<char, JsonError> {
-        let escaped = self.peek().ok_or(JsonError)?;
+    fn escape(&mut self) -> Result<char, Diagnostic> {
+        let escaped = self.peek().ok_or_else(syntax)?;
         self.offset += 1;
 
         match escaped {
@@ -145,15 +258,15 @@ impl<'a> Deserializer<'a> {
             b'r' => Ok('\r'),
             b't' => Ok('\t'),
             b'u' => self.unicode_escape(),
-            _ => Err(JsonError),
+            _ => Err(syntax()),
         }
     }
 
-    fn hex_quad(&mut self) -> Result<u32, JsonError> {
+    fn hex_quad(&mut self) -> Result<u32, Diagnostic> {
         let mut value = 0;
         for _ in 0..HEX_DIGITS {
-            let byte = self.peek().ok_or(JsonError)?;
-            let digit = char::from(byte).to_digit(HEX_RADIX).ok_or(JsonError)?;
+            let byte = self.peek().ok_or_else(syntax)?;
+            let digit = char::from(byte).to_digit(HEX_RADIX).ok_or_else(syntax)?;
             value = value * HEX_RADIX + digit;
             self.offset += 1;
         }
@@ -161,25 +274,27 @@ impl<'a> Deserializer<'a> {
         Ok(value)
     }
 
-    fn unicode_escape(&mut self) -> Result<char, JsonError> {
+    fn unicode_escape(&mut self) -> Result<char, Diagnostic> {
         let high = self.hex_quad()?;
         if (HIGH_SURROGATE_START..=HIGH_SURROGATE_END).contains(&high) {
             self.literal(b"\\u")?;
             let low = self.hex_quad()?;
             if !(LOW_SURROGATE_START..=LOW_SURROGATE_END).contains(&low) {
-                return Err(JsonError);
+                return Err(syntax());
             }
 
             let scalar =
                 SUPPLEMENTARY_START + ((high - HIGH_SURROGATE_START) << SURROGATE_SHIFT) + low
                     - LOW_SURROGATE_START;
-            char::from_u32(scalar).ok_or(JsonError)
+            char::from_u32(scalar).ok_or_else(syntax)
         } else {
-            char::from_u32(high).ok_or(JsonError)
+            char::from_u32(high).ok_or_else(syntax)
         }
     }
 
-    fn number(&mut self) -> Result<f64, JsonError> {
+    /// Validates the RFC 8259 number grammar; out-of-range magnitudes parse to infinity.
+    pub(crate) fn number(&mut self) -> Result<f64, Diagnostic> {
+        self.whitespace();
         let start = self.offset;
         if self.peek() == Some(b'-') {
             self.offset += 1;
@@ -188,13 +303,13 @@ impl<'a> Deserializer<'a> {
         match self.peek() {
             Some(b'0') => self.offset += 1,
             Some(b'1'..=b'9') => self.digits(),
-            _ => return Err(JsonError),
+            _ => return Err(syntax()),
         }
 
         if self.peek() == Some(b'.') {
             self.offset += 1;
             if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
-                return Err(JsonError);
+                return Err(syntax());
             }
             self.digits();
         }
@@ -205,167 +320,21 @@ impl<'a> Deserializer<'a> {
                 self.offset += 1;
             }
             if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
-                return Err(JsonError);
+                return Err(syntax());
             }
             self.digits();
         }
 
-        let token = self.bytes.get(start..self.offset).ok_or(JsonError)?;
+        let token = self.bytes.get(start..self.offset).ok_or_else(syntax)?;
         std::str::from_utf8(token)
-            .map_err(|_| JsonError)?
+            .map_err(|_| syntax())?
             .parse()
-            .map_err(|_| JsonError)
+            .map_err(|_| syntax())
     }
 
     fn digits(&mut self) {
         while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
             self.offset += 1;
         }
-    }
-}
-
-/// Small plan metadata uses the same reader as source records, with a complete-root check.
-pub(crate) fn from_slice<'a, T: serde::Deserialize<'a>>(bytes: &'a [u8]) -> Result<T, JsonError> {
-    let mut deserializer = Deserializer::new(bytes);
-    let value = T::deserialize(&mut deserializer)?;
-    deserializer.end()?;
-    Ok(value)
-}
-
-impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
-    type Error = JsonError;
-
-    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, JsonError> {
-        self.whitespace();
-        match self.peek().ok_or(JsonError)? {
-            b'n' => {
-                self.literal(b"null")?;
-                visitor.visit_unit()
-            }
-            b't' => {
-                self.literal(b"true")?;
-                visitor.visit_bool(true)
-            }
-            b'f' => {
-                self.literal(b"false")?;
-                visitor.visit_bool(false)
-            }
-            b'"' => match self.string()? {
-                Cow::Borrowed(value) => visitor.visit_borrowed_str(value),
-                Cow::Owned(value) => visitor.visit_string(value),
-            },
-            b'[' | b'{' => {
-                if self.depth >= MAX_JSON_DEPTH {
-                    return Err(JsonError);
-                }
-                let opening = self.peek().ok_or(JsonError)?;
-                self.offset += 1;
-                self.depth += 1;
-
-                let result = if opening == b'[' {
-                    visitor.visit_seq(Sequence {
-                        parser: self,
-                        first: true,
-                    })
-                } else {
-                    visitor.visit_map(Record {
-                        parser: self,
-                        first: true,
-                    })
-                };
-                self.depth -= 1;
-                result
-            }
-            b'-' | b'0'..=b'9' => visitor.visit_f64(self.number()?),
-            _ => Err(JsonError),
-        }
-    }
-
-    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, JsonError> {
-        self.whitespace();
-        if self.peek() == Some(b'n') {
-            self.literal(b"null")?;
-            visitor.visit_none()
-        } else {
-            visitor.visit_some(self)
-        }
-    }
-
-    fn deserialize_enum<V: Visitor<'de>>(
-        self,
-        _name: &'static str,
-        _variants: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, JsonError> {
-        visitor.visit_enum(self.string()?.into_deserializer())
-    }
-
-    serde::forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
-        unit unit_struct newtype_struct seq tuple tuple_struct map struct identifier ignored_any
-    }
-}
-
-struct Sequence<'a, 'de> {
-    parser: &'a mut Deserializer<'de>,
-    first: bool,
-}
-
-impl<'de> SeqAccess<'de> for Sequence<'_, 'de> {
-    type Error = JsonError;
-
-    fn next_element_seed<T: DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>, JsonError> {
-        self.parser.whitespace();
-        if self.parser.peek() == Some(b']') {
-            self.parser.offset += 1;
-            return Ok(None);
-        }
-        if !self.first {
-            self.parser.require(b',')?;
-        }
-        self.first = false;
-
-        seed.deserialize(&mut *self.parser).map(Some)
-    }
-}
-
-struct Record<'a, 'de> {
-    parser: &'a mut Deserializer<'de>,
-    first: bool,
-}
-
-impl<'de> MapAccess<'de> for Record<'_, 'de> {
-    type Error = JsonError;
-
-    fn next_key_seed<T: DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>, JsonError> {
-        self.parser.whitespace();
-        if self.parser.peek() == Some(b'}') {
-            self.parser.offset += 1;
-            return Ok(None);
-        }
-        if !self.first {
-            self.parser.require(b',')?;
-        }
-
-        self.parser.whitespace();
-        if self.parser.peek() != Some(b'"') {
-            return Err(JsonError);
-        }
-
-        self.first = false;
-
-        let key = seed.deserialize(&mut *self.parser)?;
-        self.parser.require(b':')?;
-        Ok(Some(key))
-    }
-
-    fn next_value_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> Result<T::Value, JsonError> {
-        seed.deserialize(&mut *self.parser)
     }
 }

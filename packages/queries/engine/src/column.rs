@@ -9,10 +9,6 @@ use std::cmp::Ordering;
 mod transfer;
 pub(crate) use transfer::ColumnBuffers;
 
-const MICROS_PER_SECOND: i64 = 1_000_000;
-const NANOS_PER_MICROSECOND: i64 = 1_000;
-const UNIX_EPOCH_YEAR: i32 = 1970;
-
 /// A borrowed scalar view; null and error remain distinct from every typed value.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value<'a> {
@@ -339,34 +335,14 @@ fn type_rank(value: Value<'_>) -> u8 {
     }
 }
 
-/// Date storage uses whole days from the Unix epoch, independent of worksheet serials.
-pub(crate) fn date_from_text(value: &str) -> Option<i32> {
-    let date = chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()?;
-    let epoch = chrono::NaiveDate::from_ymd_opt(UNIX_EPOCH_YEAR, 1, 1)?;
-    i32::try_from(date.signed_duration_since(epoch).num_days()).ok()
-}
-
-/// Timestamps use microseconds without a zone; unsupported formats do not get guessed.
-pub(crate) fn datetime_from_text(value: &str) -> Option<i64> {
-    chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f")
-        .ok()
-        .map(|date| date.and_utc().timestamp_micros())
-}
-
 /// Formatting is invariant so refresh does not depend on the host's locale.
 pub(crate) fn formatted(value: Value<'_>) -> Option<String> {
     match value {
         Value::Text(value) => Some(value.to_owned()),
         Value::Number(value) => Some(value.to_string()),
         Value::Logical(value) => Some(value.to_string()),
-        Value::Date(days) => chrono::NaiveDate::from_ymd_opt(UNIX_EPOCH_YEAR, 1, 1)?
-            .checked_add_signed(chrono::TimeDelta::days(i64::from(days)))
-            .map(|date| date.format("%Y-%m-%d").to_string()),
-        Value::DateTime(micros) => chrono::DateTime::from_timestamp(
-            micros.div_euclid(MICROS_PER_SECOND),
-            u32::try_from(micros.rem_euclid(MICROS_PER_SECOND) * NANOS_PER_MICROSECOND).ok()?,
-        )
-        .map(|date| date.naive_utc().format("%Y-%m-%dT%H:%M:%S%.f").to_string()),
+        Value::Date(days) => crate::calendar::format_date(days),
+        Value::DateTime(micros) => crate::calendar::format_datetime(micros),
         Value::Null | Value::Error(_) => None,
     }
 }
