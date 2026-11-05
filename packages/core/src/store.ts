@@ -1138,3 +1138,97 @@ function requiredOperationSheets(operation: DocumentOp, includePrimary: boolean)
 
   return requiredSheets;
 }
+
+/** Every sheet a new sheet's snapshot refers to, which must exist once it is added. */
+function addedSheetReferences(sheet: SheetSnapshot): SheetId[] {
+  const requiredSheets: SheetId[] = [];
+  for (const block of sheet.cells) {
+    for (const cell of block.cells) {
+      if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+    }
+  }
+
+  for (const rule of sheet.conditionalFormats ?? []) {
+    requiredSheets.push(rule.range.sheet);
+  }
+
+  for (const hyperlink of sheet.hyperlinks ?? []) {
+    requiredSheets.push(hyperlink.range.sheet);
+    if (hyperlink.target.kind === "internal") {
+      requiredSheets.push(hyperlink.target.range.sheet);
+    }
+  }
+
+  for (const rule of sheet.validationRules ?? []) {
+    requiredSheets.push(rule.range.sheet);
+  }
+
+  for (const entry of sheet.protectedRanges ?? []) {
+    requiredSheets.push(entry.range.sheet);
+  }
+
+  for (const note of sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+  for (const chart of sheet.charts ?? []) {
+    for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
+  }
+
+  return requiredSheets;
+}
+
+/**
+ * Sheets an operation reads or writes. The primary sheet is included unless
+ * sheet lifecycle already checked it.
+ */
+function requiredOperationSheets(operation: DocumentOp, includePrimary: boolean): SheetId[] {
+  if (operation.op === "addSheet") return addedSheetReferences(operation.sheet);
+
+  const requiredSheets: SheetId[] = [];
+  const primarySheet = patchSheetId(operation);
+  if (includePrimary && primarySheet !== null) requiredSheets.push(primarySheet);
+
+  if (operation.op === "set" && operation.value.kind === "ref") {
+    requiredSheets.push(operation.value.target.sheet);
+  } else if (operation.op === "setRange") {
+    for (const cell of operation.cells) {
+      if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+    }
+  } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
+    if (operation.op === "restoreBlock") {
+      requiredSheets.push(
+        ...preparedRestore(operation, validateDocumentOperationShape).requiredSheets,
+      );
+    } else {
+      for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+    }
+  } else if (operation.op === "setNamedRange") {
+    if (operation.namedRange.range) requiredSheets.push(operation.namedRange.range.sheet);
+    if (operation.namedRange.scope !== undefined) {
+      requiredSheets.push(operation.namedRange.scope);
+    }
+  } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
+    requiredSheets.push(operation.scope);
+  } else if (operation.op === "setHyperlink") {
+    requiredSheets.push(operation.hyperlink.range.sheet);
+    if (operation.hyperlink.target.kind === "internal") {
+      requiredSheets.push(operation.hyperlink.target.range.sheet);
+    }
+  } else if (operation.op === "setValidationRule") {
+    requiredSheets.push(operation.rule.range.sheet);
+  } else if (operation.op === "setProtectedRange") {
+    requiredSheets.push(operation.protectedRange.range.sheet);
+  } else if (operation.op === "setSheetMeta") {
+    for (const rule of operation.patch.conditionalFormats ?? []) {
+      requiredSheets.push(rule.range.sheet);
+    }
+  } else if (operation.op === "setChart") {
+    for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
+  } else if (
+    operation.op === "setPivot" &&
+    !operation.pivot.source.invalid &&
+    "range" in operation.pivot.source
+  ) {
+    requiredSheets.push(operation.pivot.source.range.sheet);
+  }
+
+  return requiredSheets;
+}
