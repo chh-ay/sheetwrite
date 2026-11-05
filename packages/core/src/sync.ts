@@ -2247,6 +2247,7 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   restoreBlock: true,
   setRangeStyle: true,
   clearRange: true,
+  permuteRows: true,
   addRows: true,
   removeRows: true,
   moveRows: true,

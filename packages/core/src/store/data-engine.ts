@@ -2471,7 +2471,8 @@ export class StoreDataEngine {
           patch.op === "setBlock" ||
           patch.op === "restoreBlock" ||
           patch.op === "setRangeStyle" ||
-          patch.op === "clearRange"
+          patch.op === "clearRange" ||
+          patch.op === "permuteRows"
         ) {
           touchedSheets.add(patch.range.sheet);
         } else if (patch.op === "addTable") {
