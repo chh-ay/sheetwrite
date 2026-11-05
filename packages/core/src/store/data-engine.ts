@@ -695,7 +695,8 @@ export class StoreDataEngine {
   private wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
   private readonly storageOptions: SheetwriteStoreOptions;
-  private readonly sheets: SheetRegistry;
+  /** Sheets and engine handles, shared with the store parts and the public store. */
+  readonly sheets: SheetRegistry;
   private readonly styles = new StyleDictionary();
   private readonly sheetIdsByHandle: SheetId[] = [];
   private readonly view: StoreViewState;
@@ -1496,7 +1497,8 @@ export class StoreDataEngine {
     return this.pagedDirtyPreflight?.issue(patches, this.resourceOperation) ?? null;
   }
 
-  private requireCompleteQuery(sheet: SheetId): void {
+  /** Throw `IncompleteDataError` while a paged sheet has unloaded cells a query would need. */
+  requireCompleteQuery(sheet: SheetId): void {
     const capability = this.queryCapability(sheet);
     if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
   }

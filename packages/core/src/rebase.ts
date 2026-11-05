@@ -178,7 +178,7 @@ function conflict(
 }
 
 /** Whether an operation inserts, deletes, or moves rows or columns. */
-function changesStructure(operation: DocumentOp): boolean {
+export function changesStructure(operation: DocumentOp): boolean {
   switch (operation.op) {
     case "addRows":
     case "removeRows":
