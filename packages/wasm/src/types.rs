@@ -297,7 +297,7 @@ impl ReadSet {
             | Ast::Num(_)
             | Ast::Array { .. } => {}
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } => {}
+            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {}
         }
     }
 

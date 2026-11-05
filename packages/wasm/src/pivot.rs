@@ -122,6 +122,8 @@ pub(crate) struct PivotValue {
     pub(crate) field: usize,
     pub(crate) aggregation: Aggregation,
     pub(crate) name: Option<String>,
+    /// Saved measure identity; measure values keep no row contributions.
+    pub(crate) measure: Option<String>,
 }
 
 /// The one letter whose lowercase depends on its neighbors: `to_lowercase`
@@ -256,13 +258,7 @@ impl PivotDefinition {
     /// Heap bytes the definition owns: field lists, value names and filter keeps.
     pub(crate) fn retained_bytes(&self) -> usize {
         (self.rows.capacity() + self.columns.capacity()) * size_of::<usize>()
-            + self.values.capacity() * size_of::<PivotValue>()
-            + self
-                .values
-                .iter()
-                .filter_map(|value| value.name.as_ref())
-                .map(String::capacity)
-                .sum::<usize>()
+            + value_bytes(&self.values)
             + self.filters.capacity() * size_of::<PivotFilter>()
             + self
                 .filters
@@ -272,6 +268,17 @@ impl PivotDefinition {
             + self.row_descending.capacity()
             + self.column_descending.capacity()
     }
+}
+
+/// Heap bytes of a value-field list: its entries, names and measure IDs.
+fn value_bytes(values: &Vec<PivotValue>) -> usize {
+    values.capacity() * size_of::<PivotValue>()
+        + values
+            .iter()
+            .flat_map(|value| [&value.name, &value.measure])
+            .filter_map(Option::as_ref)
+            .map(String::capacity)
+            .sum::<usize>()
 }
 
 /// Text payload bytes of `values`.
@@ -1150,6 +1157,9 @@ pub(crate) struct PivotCache {
     headers: Vec<Value>,
     row_axis: Axis,
     col_axis: Axis,
+    /// Value fields in output order, measures included. `definition.values`
+    /// holds only the aggregated ones, so the row loops never skip a slot.
+    outputs: Vec<PivotValue>,
     /// Leaf group of each source row on each axis, or `NO_GROUP`.
     row_leaf: Vec<u32>,
     col_leaf: Vec<u32>,
@@ -1182,11 +1192,180 @@ pub(crate) struct PivotCache {
     pub(crate) output_reads: std::cell::Cell<usize>,
 }
 
+/// Output position of each axis group, `NO_GROUP` when the layout hides it.
+fn group_positions(groups: &[u32], axis: &Axis) -> Vec<u32> {
+    let mut positions = vec![NO_GROUP; axis.groups.len()];
+    for (position, &group) in groups.iter().enumerate() {
+        positions[group as usize] = position as u32;
+    }
+    positions
+}
+
+/// Buffers of one counting pass over the base rows, reused across depth
+/// pairs and freed with the pass.
+struct CellScratch {
+    /// Start of each cell's rows in `order`; `starts[cell + 1]` first holds
+    /// the cell's row count.
+    starts: Vec<u32>,
+    /// Next free slot of each cell while rows are placed.
+    next: Vec<u32>,
+    /// The cell of each base row, or `NO_GROUP`.
+    cell_of_row: Vec<u32>,
+    /// Base rows grouped by cell.
+    order: Vec<u32>,
+}
+
+impl CellScratch {
+    fn new(cells: usize, rows: usize) -> Self {
+        Self {
+            starts: vec![0; cells + 1],
+            next: Vec::with_capacity(cells + 1),
+            cell_of_row: vec![NO_GROUP; rows],
+            order: vec![0; rows],
+        }
+    }
+}
+
 fn pair_key(row_group: u32, col_group: u32) -> u64 {
     (u64::from(row_group) << 32) | u64::from(col_group)
 }
 
 impl PivotCache {
+    /// Value definitions in output order.
+    pub(crate) fn values(&self) -> &[PivotValue] {
+        &self.outputs
+    }
+
+    /// Gives each measure value without a custom caption its measure's name,
+    /// as Excel heads a measure column with the measure name.
+    pub(crate) fn name_measures(&mut self, mut name_of: impl FnMut(&str) -> Option<String>) {
+        for value in &mut self.outputs {
+            if value.name.is_none() {
+                value.name = value.measure.as_deref().and_then(&mut name_of);
+            }
+        }
+    }
+
+    /// Calls `evaluate(offset, slot, rows)` for every measure cell of
+    /// `layout`, where `rows` (ascending) are the base rows of that cell's
+    /// filter context. For each pair of axis depths, every leaf group maps
+    /// to the output position of its ancestor at that depth, and one
+    /// counting pass over the rows lists each cell's rows together.
+    #[inline(never)]
+    pub(crate) fn visit_measure_cells(
+        &self,
+        layout: &PivotLayout,
+        evaluate: &mut dyn FnMut(usize, usize, &[u32]),
+    ) {
+        if layout.header_rows == 0 || !self.outputs.iter().any(|value| value.measure.is_some()) {
+            return;
+        }
+
+        let row_positions = group_positions(&layout.row_groups, &self.row_axis);
+        let col_positions = group_positions(&layout.col_groups, &self.col_axis);
+        // Cell index `row position * width + column position` stays under
+        // the output cell bound, so it fits in `u32`.
+        let width = layout.col_groups.len();
+        let mut scratch = CellScratch::new(layout.row_groups.len() * width, self.row_leaf.len());
+
+        for row_depth in 0..=self.row_axis.width as u32 {
+            let row_cells =
+                self.ancestor_positions(&self.row_axis, row_depth, &row_positions, true);
+            for col_depth in 0..=self.col_axis.width as u32 {
+                let col_cells =
+                    self.ancestor_positions(&self.col_axis, col_depth, &col_positions, false);
+                scratch.starts.fill(0);
+                for (row, cell) in scratch.cell_of_row.iter_mut().enumerate() {
+                    let row_leaf = self.row_leaf[row];
+                    *cell = NO_GROUP;
+                    if row_leaf == NO_GROUP {
+                        continue;
+                    }
+                    let position = row_cells[row_leaf as usize];
+                    let col = col_cells[self.col_leaf[row] as usize];
+                    if position != NO_GROUP && col != NO_GROUP {
+                        *cell = position * width as u32 + col;
+                        scratch.starts[*cell as usize + 1] += 1;
+                    }
+                }
+                self.visit_cells(layout, &mut scratch, evaluate);
+            }
+        }
+    }
+
+    /// Places each row under its cell (counts in `starts[cell + 1]`, rows
+    /// stay ascending inside a cell) and evaluates every non-empty cell.
+    fn visit_cells(
+        &self,
+        layout: &PivotLayout,
+        scratch: &mut CellScratch,
+        evaluate: &mut dyn FnMut(usize, usize, &[u32]),
+    ) {
+        let CellScratch {
+            starts,
+            next,
+            cell_of_row,
+            order,
+        } = scratch;
+        for index in 1..starts.len() {
+            starts[index] += starts[index - 1];
+        }
+        next.clone_from(starts);
+        for (row, &cell) in cell_of_row.iter().enumerate() {
+            if cell != NO_GROUP {
+                order[next[cell as usize] as usize] = row as u32;
+                next[cell as usize] += 1;
+            }
+        }
+
+        let width = layout.col_groups.len();
+        for cell in 0..starts.len() - 1 {
+            let rows = &order[starts[cell] as usize..starts[cell + 1] as usize];
+            if rows.is_empty() {
+                continue;
+            }
+            let offset = (layout.header_rows + cell / width) * layout.cols
+                + layout.label_cols
+                + (cell % width) * layout.value_slots;
+            for (slot, value) in self.outputs.iter().enumerate() {
+                if value.measure.is_some() {
+                    evaluate(offset + slot, slot, rows);
+                }
+            }
+        }
+    }
+
+    /// For each leaf group of `axis`, the output position of its ancestor at
+    /// `depth`; `NO_GROUP` when the layout does not show that ancestor or,
+    /// on the row axis (`rows`), shows it without value cells.
+    fn ancestor_positions(
+        &self,
+        axis: &Axis,
+        depth: u32,
+        positions: &[u32],
+        rows: bool,
+    ) -> Vec<u32> {
+        let mut leaf_positions = vec![NO_GROUP; axis.groups.len()];
+        for (group, leaf_position) in leaf_positions.iter_mut().enumerate() {
+            if axis.groups[group].depth as usize != axis.width {
+                continue;
+            }
+            let ancestor = axis.ancestor(group as u32, depth);
+            if !rows || self.shows_values(ancestor) {
+                *leaf_position = positions[ancestor as usize];
+            }
+        }
+        leaf_positions
+    }
+
+    /// Whether a row group shows value cells; compact rows without
+    /// subtotals show inner groups as bare labels.
+    fn shows_values(&self, row_group: u32) -> bool {
+        let depth = self.row_axis.groups[row_group as usize].depth as usize;
+        let definition = &self.definition;
+        definition.tabular || definition.subtotals || depth == 0 || depth >= definition.rows.len()
+    }
+
     /// Groups and aggregates every source row. Fails with `#NUM!` as soon as
     /// the groups pass [`MAX_PIVOT_GROUPS`], before memory grows further.
     pub(crate) fn build(
@@ -1201,6 +1380,9 @@ impl PivotCache {
         }
 
         let rows = source.rows();
+        let outputs = definition.values.clone();
+        let mut definition = definition.clone();
+        definition.values.retain(|value| value.measure.is_none());
         let values = definition.values.len();
         let mut cache = Self {
             headers: (0..source.width())
@@ -1224,7 +1406,8 @@ impl PivotCache {
             row_path: Vec::new(),
             col_path: Vec::new(),
             folded: String::new(),
-            definition: definition.clone(),
+            outputs,
+            definition,
             #[cfg(test)]
             aggregate_updates: 0,
             #[cfg(test)]
@@ -1498,10 +1681,10 @@ impl PivotCache {
             definition.column_totals,
         );
 
-        let value_slots = if definition.values.is_empty() && col_width > 0 {
+        let value_slots = if self.outputs.is_empty() && col_width > 0 {
             1
         } else {
-            definition.values.len()
+            self.outputs.len()
         };
         let label_cols = if definition.tabular {
             row_width
@@ -1584,7 +1767,7 @@ impl PivotCache {
             return self.col_axis.level_label(layout.col_groups[position], row);
         }
 
-        if slot < definition.values.len() {
+        if slot < self.outputs.len() {
             Value::text(self.value_caption(slot))
         } else {
             Value::Blank
@@ -1620,22 +1803,30 @@ impl PivotCache {
 
         let position = (col - layout.label_cols) / layout.value_slots;
         let slot = (col - layout.label_cols) % layout.value_slots;
-        let Some(value) = definition.values.get(slot) else {
+        let Some(value) = self.outputs.get(slot) else {
             return Value::Blank;
         };
+        if value.measure.is_some() {
+            return Value::Blank;
+        }
+        let aggregated_slot = self.outputs[..slot]
+            .iter()
+            .filter(|value| value.measure.is_none())
+            .count();
 
         let col_group = layout.col_groups[position];
         self.pairs
             .get(&pair_key(row_group, col_group))
             .map_or(Value::Blank, |&pair| {
-                self.partials[pair as usize * definition.values.len() + slot]
+                self.partials[pair as usize * definition.values.len() + aggregated_slot]
                     .result(value.aggregation)
             })
     }
 
-    /// The caption of value field `slot`: its custom name, or "Sum of Field".
+    /// The caption of value field `slot` in output order: its custom name
+    /// (a measure's name), or "Sum of Field".
     fn value_caption(&self, slot: usize) -> String {
-        let value = &self.definition.values[slot];
+        let value = &self.outputs[slot];
         value.name.clone().unwrap_or_else(|| {
             format!(
                 "{} of {}",
@@ -1659,11 +1850,13 @@ impl PivotCache {
     ) -> Result<Value, FormulaError> {
         let definition = &self.definition;
         let wanted = data_field.to_lowercase();
-        let slot = (0..definition.values.len())
+        let slot = (0..self.outputs.len())
             .find(|&slot| {
-                let field = definition.values[slot].field;
+                let value = &self.outputs[slot];
                 self.value_caption(slot).to_lowercase() == wanted
-                    || field_name(&self.headers[field], field).to_lowercase() == wanted
+                    || (value.measure.is_none()
+                        && field_name(&self.headers[value.field], value.field).to_lowercase()
+                            == wanted)
             })
             .ok_or(FormulaError::Ref)?;
 
@@ -1750,7 +1943,7 @@ impl PivotCache {
         pairs.sort_unstable();
         pairs.dedup();
 
-        let values = self.definition.values.len();
+        let values = self.outputs.len();
         let mut offsets = Vec::with_capacity(pairs.len() * values);
         for (row_group, col_group) in pairs {
             let (Some(&row), Some(&col)) = (
@@ -1788,6 +1981,7 @@ impl PivotCache {
             + self.headers.capacity() * size_of::<Value>()
             + text_bytes(&self.headers)
             + self.definition.retained_bytes()
+            + value_bytes(&self.outputs)
             + self.keys.capacity() * size_of::<Value>()
             + (self.row_path.capacity() + self.col_path.capacity()) * size_of::<u32>()
             + self.folded.capacity()
@@ -1839,6 +2033,7 @@ mod tests {
                 field: 2,
                 aggregation: Aggregation::Sum,
                 name: None,
+                measure: None,
             }],
             filters: Vec::new(),
             row_descending: vec![false],

@@ -50,7 +50,7 @@ export function areaFields(pivot: PivotDefinition, area: PivotArea): number[] {
     case "columns":
       return [...pivot.columns];
     case "values":
-      return pivot.values.map((value) => value.field);
+      return pivot.values.map((value) => ("field" in value ? value.field : -1));
     case "filters":
       return (pivot.filters ?? []).map((filter) => filter.field);
   }
@@ -105,6 +105,8 @@ function removePlacement(
     case "values": {
       const value = pivot.values[index];
       if (value === undefined) return [pivot, null];
+      if ("measure" in value)
+        return [{ ...pivot, values: withoutIndex(pivot.values, index) }, null];
       return [
         { ...pivot, values: withoutIndex(pivot.values, index) },
         { field: value.field, value },
@@ -181,6 +183,13 @@ export function placeField(
 
 /** Remove one entry from its area. */
 export function removeField(pivot: PivotDefinition, placement: PivotPlacement): PivotDefinition {
+  // A measure value has no source field to carry anywhere, so removing it
+  // is the one edit it takes.
+  const value = placement.area === "values" ? pivot.values[placement.index] : undefined;
+  if (value !== undefined && "measure" in value) {
+    return { ...pivot, values: withoutIndex(pivot.values, placement.index) };
+  }
+
   const [next, entry] = removePlacement(pivot, placement);
   return entry === null ? pivot : pruneSort(next);
 }
@@ -207,7 +216,7 @@ export function setAggregation(
   return {
     ...pivot,
     values: pivot.values.map((value, position) =>
-      position === index ? { ...value, aggregation } : value,
+      position === index && "field" in value ? { ...value, aggregation } : value,
     ),
   };
 }

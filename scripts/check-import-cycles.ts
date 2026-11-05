@@ -103,7 +103,14 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   "data-model": {
     source: "packages/core/src/types/data-model.ts",
     dependencies: ["table"],
-    exports: ["DataModel", "RelationshipStatus", "TableColumnRef", "TableRelationship"],
+    exports: [
+      "DataModel",
+      "Measure",
+      "MeasureStatus",
+      "RelationshipStatus",
+      "TableColumnRef",
+      "TableRelationship",
+    ],
   },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
