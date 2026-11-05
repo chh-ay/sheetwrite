@@ -630,8 +630,6 @@ fn merge_sort(items: &mut [u32], compare: &mut dyn FnMut(u32, u32) -> Ordering) 
     }
 }
 
-}
-
 /// The search states of one pass, by range group and list part. `slots` maps
 /// a key to its state and is valid only where `states` holds that key, so a
 /// pass clears only `states`.
