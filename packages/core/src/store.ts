@@ -1,5 +1,6 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
+import { cloneRelationship, cloneRelationships } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -42,6 +43,7 @@ import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
+import type { TableRelationship } from "./types/data-model.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
@@ -334,6 +336,28 @@ export class SheetwriteStore implements Store {
    */
   getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
     return this.engine.getPivotResult(sheet, id);
+  }
+
+  /** Clones of the workbook's table relationships; readable without the engine. */
+  getRelationships(): TableRelationship[] {
+    return cloneRelationships(this.engine.getWorkbook().dataModel);
+  }
+
+  /**
+   * Insert a relationship, or replace the one with its ID. Both columns must
+   * exist, at most one relationship may join two tables, and relationships
+   * must not form a cycle; otherwise the result is a no-op.
+   */
+  setRelationship(relationship: TableRelationship): ApplyTransactionResult {
+    return this.applyTransaction(
+      { patches: [{ op: "setRelationship", relationship: cloneRelationship(relationship) }] },
+      "api",
+    );
+  }
+
+  /** Remove the relationship with `id`. */
+  removeRelationship(id: string): ApplyTransactionResult {
+    return this.applyTransaction({ patches: [{ op: "removeRelationship", id }] }, "api");
   }
 
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {
