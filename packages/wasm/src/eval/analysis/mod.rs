@@ -2,6 +2,7 @@
 
 mod aggregate;
 mod compatibility;
+mod complex;
 mod database;
 mod dates;
 mod descriptive;
@@ -120,6 +121,13 @@ const FAMILIES: &[Family] = &[
         names: hypothesis::NAMES,
         reference_cells: &[],
         evaluate: Some(hypothesis::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: complex::NAMES,
+        reference_cells: &[],
+        evaluate: Some(complex::evaluate),
         evaluate_ast: None,
         array: None,
     },
