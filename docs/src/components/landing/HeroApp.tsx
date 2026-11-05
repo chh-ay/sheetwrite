@@ -137,7 +137,7 @@ function apply(parts: Parts, frame: Frame): void {
   parts.salesView.style.opacity = String(1 - frame.pivotView);
   parts.fields.style.opacity = String(frame.fields);
   parts.fields.style.transform = `translateX(${(1 - frame.fields) * 24}px)`;
-  // The pivot's Units cells read this; see `[data-units]` in landing.css.
+  // The pivot's Units cells read this; see `[data-units]` in styles/landing/hero.css.
   parts.pivotView.style.setProperty("--units", String(frame.unitsColumn));
   parts.unitsChip.style.opacity = String(frame.unitsColumn);
 

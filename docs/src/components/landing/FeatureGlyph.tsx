@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-/** Small looping illustrations for the landing capability cards (CSS keyframes in landing.css). */
+/** Small looping illustrations for the landing capability cards (CSS keyframes in styles/landing/features.css). */
 export type FeatureGlyphKind =
   | "spreadsheet"
   | "analysis"
