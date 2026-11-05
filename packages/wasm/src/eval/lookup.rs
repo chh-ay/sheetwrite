@@ -483,94 +483,61 @@ fn classify(list: &ListView<'_>) -> Option<UniformKind> {
     found
 }
 
-/// First and last position of one class of equal entries.
-type Bounds = (u32, u32);
-
-fn widen(bounds: &mut Option<Bounds>, position: u32) {
-    *bounds = Some(match *bounds {
-        None => (position, position),
-        Some((first, _)) => (first, position),
-    });
+/// Exact-match class order: blank, `""`, numbers, other text, logicals.
+/// Within a class, entries the lookup order calls equal sort together.
+fn class_of(entry: Entry<'_>) -> u8 {
+    match entry {
+        Entry::Blank => 0,
+        Entry::Text("") => 1,
+        Entry::Number(_) => 2,
+        Entry::Text(_) => 3,
+        Entry::Bool(_) => 4,
+        Entry::Error(_) => 5,
+    }
 }
 
-/// The first and last position of every class of equal entries. Two
-/// entries share a class exactly when the lookup order calls them equal
-/// within one type; blank equals `0`, `""` and `FALSE` across types, so a key
-/// looks in each class it can equal.
-///
-/// Distinct numbers and case-folded texts are sorted once, with the sorts
-/// the engine already has for `u64` and `String`, and each class keeps only
-/// its bounds: the index holds no copy of a text.
+/// The index order of two entries: by class, then by value within it. Only
+/// lists without an error or NaN are indexed, so numbers have a total order.
+fn index_order(left: Entry<'_>, right: Entry<'_>) -> Ordering {
+    class_of(left)
+        .cmp(&class_of(right))
+        .then_with(|| match (left, right) {
+            (Entry::Number(left), Entry::Number(right)) => {
+                left.partial_cmp(&right).unwrap_or(Ordering::Equal)
+            }
+            (Entry::Text(left), Entry::Text(right)) => compare_text_case_insensitive(left, right),
+            (Entry::Bool(left), Entry::Bool(right)) => left.cmp(&right),
+            _ => Ordering::Equal,
+        })
+}
+
+/// Every position sorted by class, value and position, so an equal run is
+/// contiguous and its ends are its first and last position. Entries are read
+/// from the list, so the index holds 4 B per position and no copy of a text.
+/// Blank equals `0`, `""` and `FALSE` across classes, so a key looks in each
+/// class it can equal.
 struct ExactIndex {
-    blank: Option<Bounds>,
-    empty_text: Option<Bounds>,
-    false_bool: Option<Bounds>,
-    true_bool: Option<Bounds>,
-    /// Distinct number values in sorted order, with their bounds.
-    numbers: Vec<u64>,
-    number_bounds: Vec<Bounds>,
-    /// One position per distinct case-folded text, in sorted order, with
-    /// the bounds of that text.
-    texts: Vec<u32>,
-    text_bounds: Vec<Bounds>,
+    order: Vec<u32>,
 }
 
 impl ExactIndex {
     /// The index of `list`, or `None` for a list with an error or NaN, whose
     /// scan order must decide.
     fn build(list: &ListView<'_>) -> Option<Self> {
-        let mut numbers = Vec::new();
-        let mut texts = Vec::new();
         for position in 0..list.len() {
             match list.entry(position) {
                 Entry::Error(_) => return None,
                 Entry::Number(number) if number.is_nan() => return None,
-                Entry::Number(number) => numbers.push(number_value(number)),
-                Entry::Text(text) if !text.is_empty() => texts.push(fold_case(text)),
                 _ => {}
             }
         }
-        numbers.sort_unstable();
-        numbers.dedup();
-        texts.sort_unstable();
-        texts.dedup();
 
-        let mut folded = String::new();
-        let mut index = Self {
-            blank: None,
-            empty_text: None,
-            false_bool: None,
-            true_bool: None,
-            number_bounds: vec![(u32::MAX, 0); numbers.len()],
-            numbers,
-            texts: vec![u32::MAX; texts.len()],
-            text_bounds: vec![(u32::MAX, 0); texts.len()],
-        };
-        for position in 0..list.len() {
-            let at = position as u32;
-            match list.entry(position) {
-                Entry::Blank => widen(&mut index.blank, at),
-                Entry::Text("") => widen(&mut index.empty_text, at),
-                Entry::Bool(false) => widen(&mut index.false_bool, at),
-                Entry::Bool(true) => widen(&mut index.true_bool, at),
-                Entry::Number(number) => {
-                    let rank = index.numbers.binary_search(&number_value(number)).ok()?;
-                    let bounds = &mut index.number_bounds[rank];
-                    *bounds = (bounds.0.min(at), at);
-                }
-                Entry::Text(text) => {
-                    fold_case_into(text, &mut folded);
-                    let rank = texts.binary_search(&folded).ok()?;
-                    if index.texts[rank] == u32::MAX {
-                        index.texts[rank] = at;
-                    }
-                    let bounds = &mut index.text_bounds[rank];
-                    *bounds = (bounds.0.min(at), at);
-                }
-                Entry::Error(_) => return None,
-            }
-        }
-        Some(index)
+        let mut order: Vec<u32> = (0..list.len() as u32).collect();
+        merge_sort(&mut order, &mut |left, right| {
+            index_order(list.entry(left as usize), list.entry(right as usize))
+                .then(left.cmp(&right))
+        });
+        Some(Self { order })
     }
 
     /// The first (or last) position equal to `key`, or `None` for a key the
@@ -582,94 +549,87 @@ impl ExactIndex {
         search_reverse: bool,
     ) -> Option<Option<usize>> {
         let mut found: Option<usize> = None;
-        let mut consider = |bounds: Option<Bounds>| {
-            let Some((first, last)) = bounds else {
+        let mut consider = |probe: Entry<'_>| {
+            let versus = |position: &u32| index_order(list.entry(*position as usize), probe);
+            let start = self
+                .order
+                .partition_point(|position| versus(position).is_lt());
+            let end =
+                start + self.order[start..].partition_point(|position| versus(position).is_eq());
+            if start == end {
                 return;
-            };
-            let position = if search_reverse { last } else { first } as usize;
+            }
+            let position = if search_reverse {
+                self.order[end - 1]
+            } else {
+                self.order[start]
+            } as usize;
             found = Some(match found {
                 None => position,
                 Some(current) if search_reverse => current.max(position),
                 Some(current) => current.min(position),
             });
         };
-        let number = |value: f64| {
-            self.numbers
-                .binary_search(&number_value(value))
-                .ok()
-                .map(|rank| self.number_bounds[rank])
-        };
 
         match key {
             Entry::Blank => {
-                consider(self.blank);
-                consider(number(0.0));
-                consider(self.empty_text);
-                consider(self.false_bool);
+                consider(Entry::Blank);
+                consider(Entry::Number(0.0));
+                consider(Entry::Text(""));
+                consider(Entry::Bool(false));
             }
-            Entry::Bool(false) => {
-                consider(self.false_bool);
-                consider(self.blank);
+            Entry::Bool(false) | Entry::Text("") => {
+                consider(key);
+                consider(Entry::Blank);
             }
-            Entry::Bool(true) => consider(self.true_bool),
-            Entry::Text("") => {
-                consider(self.empty_text);
-                consider(self.blank);
+            Entry::Number(number) if number == 0.0 => {
+                consider(key);
+                consider(Entry::Blank);
             }
-            Entry::Text(text) => {
-                let rank =
-                    self.texts
-                        .binary_search_by(|&position| match list.entry(position as usize) {
-                            Entry::Text(stored) => compare_text_case_insensitive(stored, text),
-                            _ => Ordering::Less,
-                        });
-                consider(rank.ok().map(|rank| self.text_bounds[rank]));
-            }
-            Entry::Number(value) if !value.is_nan() => {
-                consider(number(value));
-                if value == 0.0 {
-                    consider(self.blank);
-                }
-            }
-            _ => return None,
+            Entry::Number(number) if number.is_nan() => return None,
+            Entry::Error(_) => return None,
+            _ => consider(key),
         }
         Some(found)
     }
 
     fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
-        stats.add_vec::<u64>(self.numbers.len(), self.numbers.capacity());
-        stats.add_vec::<Bounds>(self.number_bounds.len(), self.number_bounds.capacity());
-        stats.add_vec::<u32>(self.texts.len(), self.texts.capacity());
-        stats.add_vec::<Bounds>(self.text_bounds.len(), self.text_bounds.capacity());
+        stats.add_vec::<u32>(self.order.len(), self.order.capacity());
     }
 }
 
-/// Case-folded text, with the fast path for ASCII. Folded texts compare by
-/// bytes in the order `compare_text_case_insensitive` gives their sources.
-fn fold_case(text: &str) -> String {
-    let mut folded = String::new();
-    fold_case_into(text, &mut folded);
-    folded
-}
-
-/// [`fold_case`] into a reused buffer.
-fn fold_case_into(text: &str, folded: &mut String) {
-    folded.clear();
-    if text.is_ascii() {
-        folded.push_str(text);
-        folded.make_ascii_lowercase();
-    } else {
-        folded.push_str(&text.to_lowercase());
+/// A stable bottom-up merge sort. One copy serves every comparator, so the
+/// index adds no generic sort to the module.
+fn merge_sort(items: &mut [u32], compare: &mut dyn FnMut(u32, u32) -> Ordering) {
+    let len = items.len();
+    let mut scratch = vec![0u32; len];
+    let mut width = 1;
+    while width < len {
+        let mut start = 0;
+        while start < len {
+            let middle = (start + width).min(len);
+            let end = (start + 2 * width).min(len);
+            let (mut left, mut right, mut write) = (start, middle, start);
+            while left < middle && right < end {
+                if compare(items[right], items[left]).is_lt() {
+                    scratch[write] = items[right];
+                    right += 1;
+                } else {
+                    scratch[write] = items[left];
+                    left += 1;
+                }
+                write += 1;
+            }
+            scratch[write..write + middle - left].copy_from_slice(&items[left..middle]);
+            write += middle - left;
+            scratch[write..write + end - right].copy_from_slice(&items[right..end]);
+            start = end;
+        }
+        items.copy_from_slice(&scratch);
+        width *= 2;
     }
 }
 
-/// A number's index value: its bits, with `-0` folded into `0`.
-fn number_value(number: f64) -> u64 {
-    if number == 0.0 {
-        0
-    } else {
-        number.to_bits()
-    }
 }
 
 /// The search states of one pass, by range group and list part. `slots` maps
