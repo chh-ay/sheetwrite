@@ -1,5 +1,5 @@
 /** Step of each arrow key in a vertical menu or list. */
-export const VERTICAL_STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 };
+const VERTICAL_STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 };
 /** Step of each arrow key in a popup laid out in rows and columns. */
 export const TWO_AXIS_STEPS: Readonly<Record<string, number>> = {
   ArrowDown: 1,

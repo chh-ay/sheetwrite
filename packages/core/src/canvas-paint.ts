@@ -467,7 +467,7 @@ export function blitVerticalScroll(
 }
 
 /** Solid lines on the freeze boundaries, drawn over the pane seams (Sheets-style). */
-export function paintFreezeDivider(
+function paintFreezeDivider(
   ctx: Ctx,
   theme: Theme,
   viewport: { width: number; height: number },

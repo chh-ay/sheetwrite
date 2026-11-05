@@ -278,7 +278,14 @@ describe("SheetTabs", () => {
           const top = window.innerHeight - 24;
           return { left, right: left + 20, top, bottom: top + 24, width: 20, height: 24 };
         }
-        return { left: 0, right: menuWidth, top: 0, bottom: menuHeight, width: menuWidth, height: menuHeight };
+        return {
+          left: 0,
+          right: menuWidth,
+          top: 0,
+          bottom: menuHeight,
+          width: menuWidth,
+          height: menuHeight,
+        };
       },
     });
     try {
