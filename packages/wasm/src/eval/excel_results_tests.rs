@@ -97,6 +97,25 @@ fn engineering_functions_read_cells_and_ranges() {
 
 #[cfg(feature = "analysis")]
 #[test]
+fn complex_functions_read_cells_and_ranges() {
+    assert_results(&[
+        ("=IMSUM(Data!A1:A3)", "6"),
+        ("=IMSUM(Data!D1:D3)", "#NUM!"),
+        ("=IMPRODUCT(Data!A2:A3,COMPLEX(0,1))", "6i"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn bessel_functions_read_cells() {
+    assert_results(&[
+        ("=ROUND(BESSELJ(Data!A3,1),6)", "0.339059"),
+        ("=BESSELI(Data!F1,0)", "1"),
+    ]);
+}
+
+#[cfg(feature = "analysis")]
+#[test]
 fn legacy_statistics_names_read_references_as_their_successors() {
     assert_results(&[
         ("=STDEV(Data!A1:A3)", "1"),
