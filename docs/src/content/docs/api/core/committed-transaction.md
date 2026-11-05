@@ -1,22 +1,23 @@
 ---
-title: "HistoryCommit | @sheetwrite/core/history"
-description: "HistoryCommit interface in @sheetwrite/core/history: One committed transaction, confirmed by the document authority; never an optimistic local edit."
+title: "CommittedTransaction | @sheetwrite/core"
+description: "CommittedTransaction interface in @sheetwrite/core: One transaction as the document authority committed it: its revisions, its author and its time."
 ---
-<!-- api-export:@sheetwrite/core|./history|HistoryCommit -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-history/">@sheetwrite/core/history</a><span class="api-status" data-kind="interface">interface</span></div>
+<!-- api-export:@sheetwrite/core|.|CommittedTransaction -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-One committed transaction, confirmed by the document authority; never an optimistic local edit.
+One transaction as the document authority committed it: its revisions, its
+author and its time. History archives record these, never optimistic edits.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/version-history/types.ts#L36"><code>packages/core/src/version-history/types.ts#L36</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/transaction.ts#L156"><code>packages/core/src/types/transaction.ts#L156</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="history-commit-base-revision" data-pagefind-weight="1">
-<summary><code>baseRevision</code> <span class="api-member-summary">Revision the transaction applies to; equals the archive head.</span></summary>
+<details class="api-member" id="committed-transaction-base-revision" data-pagefind-weight="1">
+<summary><code>baseRevision</code> <span class="api-member-summary">Revision the transaction applies to.</span></summary>
 
 ```ts generated
 baseRevision: number;
@@ -24,8 +25,8 @@ baseRevision: number;
 
 </details>
 
-<details class="api-member" id="history-commit-revision" data-pagefind-weight="1">
-<summary><code>revision</code> <span class="api-member-summary">Revision after the transaction; an atomic batch can advance up to 16 revisions.</span></summary>
+<details class="api-member" id="committed-transaction-revision" data-pagefind-weight="1">
+<summary><code>revision</code> <span class="api-member-summary">Revision after the transaction; an atomic batch advances up to 16 revisions.</span></summary>
 
 ```ts generated
 revision: number;
@@ -33,8 +34,8 @@ revision: number;
 
 </details>
 
-<details class="api-member" id="history-commit-mutation-id" data-pagefind-weight="1">
-<summary><code>mutationId</code> <span class="api-member-summary">Stable mutation ID from the commit, at most 256 code units.</span></summary>
+<details class="api-member" id="committed-transaction-mutation-id" data-pagefind-weight="1">
+<summary><code>mutationId</code> <span class="api-member-summary">Stable mutation ID of the commit, at most 256 code units.</span></summary>
 
 ```ts generated
 mutationId: string;
@@ -42,7 +43,7 @@ mutationId: string;
 
 </details>
 
-<details class="api-member" id="history-commit-author-id" data-pagefind-weight="1">
+<details class="api-member" id="committed-transaction-author-id" data-pagefind-weight="1">
 <summary><code>authorId</code> <span class="api-member-summary">Authenticated ID of the person who made the change, at most 256 code units.</span></summary>
 
 ```ts generated
@@ -51,7 +52,7 @@ authorId: string;
 
 </details>
 
-<details class="api-member" id="history-commit-time" data-pagefind-weight="1">
+<details class="api-member" id="committed-transaction-time" data-pagefind-weight="1">
 <summary><code>time</code> <span class="api-member-summary">Commit time in milliseconds since the epoch; never before the previous commit.</span></summary>
 
 ```ts generated
@@ -60,7 +61,7 @@ time: number;
 
 </details>
 
-<details class="api-member" id="history-commit-operations" data-pagefind-weight="1">
+<details class="api-member" id="committed-transaction-operations" data-pagefind-weight="1">
 <summary><code>operations</code> <span class="api-member-summary">The committed document operations, in order.</span></summary>
 
 ```ts generated
@@ -76,7 +77,7 @@ operations: readonly DocumentOp[];
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface HistoryCommit {
+export interface CommittedTransaction {
   baseRevision: number;
   revision: number;
   mutationId: string;
@@ -104,9 +105,10 @@ export interface HistoryCommit {
 <li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 
-<p class="api-consumers-label">Public exports naming <code>HistoryCommit</code></p>
+<p class="api-consumers-label">Public exports naming <code>CommittedTransaction</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/commit-journal/"><code>CommitJournal</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-history/history-archive/"><code>HistoryArchive</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

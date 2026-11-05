@@ -8,6 +8,7 @@ import { buildOnEngineInstance, prepareEngineInstance } from "./engine.js";
 import { SheetwriteStore } from "./store.js";
 import { forgetLiveStoreEngine } from "./store/engine-registry.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
+import type { CommittedTransaction } from "./types/transaction.js";
 import {
   type HistoryRecordReader,
   readCheckpoint,
@@ -29,7 +30,6 @@ import {
 } from "./version-history/codec.js";
 import type {
   HistoryArchiveOptions,
-  HistoryCommit,
   HistoryHead,
   HistoryLimits,
   HistoryListPage,
@@ -46,7 +46,6 @@ export type { HistoryErrorCode } from "./version-history/codec.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,
-  HistoryCommit,
   HistoryGetRequest,
   HistoryHead,
   HistoryLimits,
@@ -112,7 +111,7 @@ function validId(value: unknown): value is string {
  * its encoded operation bytes. A transaction spans at most one atomic batch.
  */
 function checkCommit(
-  commit: HistoryCommit,
+  commit: CommittedTransaction,
   baseRevision: number,
   notBefore: number,
   limits: Readonly<HistoryLimits>,
@@ -154,7 +153,7 @@ function checkCommit(
  * envelope with its author and revision. The envelope is the last record.
  */
 async function writeCommit(
-  commit: HistoryCommit,
+  commit: CommittedTransaction,
   limits: Readonly<HistoryLimits>,
 ): Promise<HistoryStoredRecord[]> {
   const payload = jsonBytes(commit.operations, limits.maxTransactionBytes);
@@ -191,7 +190,7 @@ async function readCommit(
   id: string,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
-): Promise<HistoryCommit> {
+): Promise<CommittedTransaction> {
   const record = await read(id);
   const envelope = await decodeRecord(record, limits);
   if (record.kind !== "transaction" || !object(envelope)) {
@@ -504,7 +503,7 @@ export class HistoryArchive {
    * automatic version is made after `automaticIntervalMs` of active time.
    */
   async record(
-    commit: HistoryCommit,
+    commit: CommittedTransaction,
     capture?: HistorySnapshotProvider,
     signal?: AbortSignal,
   ): Promise<void> {

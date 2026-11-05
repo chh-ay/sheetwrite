@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "b934928576318ea6e7128f2e06bf0b0dcd3f67cd66ec40da4b4d6016713f062c",
+  "sha256": "471fda7b3e75eb195f276a096c7beee33e01e5a6f46b667dec868bbe637a9721",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -93,7 +93,9 @@
         "CommentMutationRequest",
         "CommentMutationResponse",
         "CommentThread",
+        "CommitJournal",
         "CommitReason",
+        "CommittedTransaction",
         "ConditionalFormatPredicate",
         "ConditionalFormatRule",
         "ContextMenuActionName",
@@ -506,7 +508,6 @@
         "DEFAULT_HISTORY_LIMITS",
         "HistoryArchive",
         "HistoryArchiveOptions",
-        "HistoryCommit",
         "HistoryError",
         "HistoryErrorCode",
         "HistoryGetRequest",
