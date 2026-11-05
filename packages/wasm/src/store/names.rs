@@ -66,6 +66,17 @@ pub(super) struct Definition {
     /// whose sheet is [`NO_SHEET`] takes the formula's sheet at bind.
     /// `resolve_name_definitions` sets it whenever formulas are refreshed.
     resolved: Option<NameTarget>,
+    /// Where `resolve_name_definitions` is with this definition while it
+    /// orders definitions so that each one's names are resolved first.
+    visit: Cell<Visit>,
+}
+
+/// The state of a definition while `resolve_name_definitions` orders them.
+#[derive(Clone, Copy, PartialEq)]
+enum Visit {
+    Unvisited,
+    Visiting,
+    Done,
 }
 
 impl Definition {
@@ -99,10 +110,21 @@ pub(crate) struct NamePlacement {
     /// defines in its own scope, so it reads differently on that sheet. Only
     /// set while definitions are resolved for every sheet.
     sheet_bound: Cell<bool>,
-    /// Expansions for this cell that depend on it, by name key, so a name
-    /// used many times in one formula is expanded once. A formula uses few
-    /// names, so a list is searched.
-    placed: RefCell<Vec<(String, NameTarget)>>,
+    /// The names already expanded for this one formula, so a name used many
+    /// times, directly or through other names, is expanded once. It lives
+    /// only as long as this placement, which serves one formula. A formula
+    /// uses few names, so a list is searched.
+    placed: RefCell<Vec<Placed>>,
+}
+
+/// One name expanded for the formula of a [`NamePlacement`].
+struct Placed {
+    key: String,
+    target: NameTarget,
+    /// Whether the expansion depends on the formula's cell.
+    positional: bool,
+    /// Whether the expansion depends on the formula's sheet.
+    sheet_bound: bool,
 }
 
 impl NamePlacement {
@@ -154,6 +176,7 @@ impl CellStore {
             positional: is_positional(&ast),
             ast,
             resolved: None,
+            visit: Cell::new(Visit::Unvisited),
         };
         self.defined_names
             .insert(key, DefinedName::Formula(Box::new(definition)));
@@ -268,14 +291,19 @@ impl CellStore {
             }
             expanding.len()
         };
-        if let Some((_, target)) = placement
+        if let Some(placed) = placement
             .placed
             .borrow()
             .iter()
-            .find(|(placed, _)| *placed == key)
+            .find(|placed| placed.key == key)
         {
-            placement.positional.set(true);
-            return Some(target.clone());
+            placement
+                .positional
+                .set(placement.positional.get() || placed.positional);
+            placement
+                .sheet_bound
+                .set(placement.sheet_bound.get() || placed.sheet_bound);
+            return Some(placed.target.clone());
         }
         if let Some(target) = &definition.resolved {
             return Some(match target {
@@ -285,6 +313,7 @@ impl CellStore {
         }
 
         let outer_positional = placement.positional.replace(definition.positional);
+        let outer_sheet_bound = placement.sheet_bound.replace(false);
         let outer_cut = placement.lowest_cut.replace(usize::MAX);
         placement.expanding.borrow_mut().push(key.clone());
         let mut ast = definition.ast.clone();
@@ -303,39 +332,96 @@ impl CellStore {
         );
         placement.expanding.borrow_mut().pop();
         let positional = placement.positional.get();
+        let sheet_bound = placement.sheet_bound.get();
         let cut = placement.lowest_cut.get();
         placement.positional.set(outer_positional || positional);
+        placement.sheet_bound.set(outer_sheet_bound || sheet_bound);
         placement.lowest_cut.set(outer_cut.min(cut));
 
         let target = match reference_target(&ast, &definition.name, scope, formula_sheet) {
             Some(range) => place_range(range, formula_sheet, depth),
             None => NameTarget::Formula(Rc::new(bounded_expansion(&definition.name, ast))),
         };
-        if positional && cut >= depth {
-            placement.placed.borrow_mut().push((key, target.clone()));
+        if cut >= depth {
+            placement.placed.borrow_mut().push(Placed {
+                key,
+                target: target.clone(),
+                positional,
+                sheet_bound,
+            });
         }
         Some(target)
     }
 
     /// Resolve every name definition once, for every formula that uses it.
     /// A definition whose expansion depends on the cell or the sheet that
-    /// uses it is left unresolved and is expanded where it is used.
+    /// uses it is left unresolved and is expanded where it is used. Names
+    /// that a definition uses are resolved before it, so it reads their
+    /// resolved form.
     pub(super) fn resolve_name_definitions(&mut self) {
         let mut keys = Vec::new();
         for (key, definition) in &mut self.defined_names {
             if let DefinedName::Formula(definition) = definition {
                 definition.resolved = None;
+                definition.visit.set(Visit::Unvisited);
                 keys.push(key.clone());
             }
         }
 
         let placement = NamePlacement::new(0, 0);
-        for key in keys {
+        for key in self.dependency_order(keys) {
             let resolved = self.resolve_definition(&key, &placement);
             if let Some(DefinedName::Formula(definition)) = self.defined_names.get_mut(&key) {
                 definition.resolved = resolved;
             }
         }
+    }
+
+    /// `keys` ordered so that each definition comes after the definitions it
+    /// uses. Definitions in a cycle come in the order the walk meets them.
+    fn dependency_order(&self, keys: Vec<NameKey>) -> Vec<NameKey> {
+        let mut order = Vec::with_capacity(keys.len());
+        let mut stack: Vec<(NameKey, bool)> = Vec::new();
+        for root in keys {
+            stack.push((root, false));
+            while let Some((key, used_names_done)) = stack.pop() {
+                let Some(DefinedName::Formula(definition)) = self.defined_names.get(&key) else {
+                    continue;
+                };
+                if used_names_done {
+                    definition.visit.set(Visit::Done);
+                    order.push(key);
+                    continue;
+                }
+                if definition.visit.get() != Visit::Unvisited {
+                    continue;
+                }
+
+                definition.visit.set(Visit::Visiting);
+                let scope = key.0;
+                stack.push((key, true));
+                let mut names = Vec::new();
+                used_names(&definition.ast, &mut names);
+                for name in names {
+                    stack.push((self.used_name_key(scope, name), false));
+                }
+            }
+        }
+        order
+    }
+
+    /// The key that `name`, used in a definition in `scope`, resolves to
+    /// while definitions are resolved: the scope's own name first.
+    fn used_name_key(&self, scope: Option<u32>, name: &str) -> NameKey {
+        let key = workbook_name_key(name);
+        if scope.is_some() {
+            let scoped = (scope, key);
+            if self.defined_names.contains_key(&scoped) {
+                return scoped;
+            }
+            return (None, scoped.1);
+        }
+        (None, key)
     }
 
     /// The expansion of one definition for every sheet, or nothing when it
@@ -487,6 +573,7 @@ impl CellStore {
             positional: is_positional(&ast),
             ast,
             resolved: None,
+            visit: Cell::new(Visit::Unvisited),
         };
         self.defined_names
             .insert(key, DefinedName::Formula(Box::new(definition)));
@@ -587,6 +674,31 @@ fn reference_target(
         row_end,
         col_end,
     })
+}
+
+/// The names that `ast` uses, as a name or as a function it calls.
+fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
+    match ast {
+        Ast::Name(name) => names.push(name),
+        Ast::UnknownFunc(name, args) => {
+            names.push(name);
+            for arg in args {
+                used_names(arg, names);
+            }
+        }
+        Ast::Func(_, args) => {
+            for arg in args {
+                used_names(arg, names);
+            }
+        }
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            used_names(left, names);
+            used_names(right, names);
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => used_names(inner, names),
+        Ast::LetSlot { expression, .. } => used_names(expression, names),
+        _ => {}
+    }
 }
 
 /// Whether a name's formula reads differently from different cells: it has

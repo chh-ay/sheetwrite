@@ -3,6 +3,7 @@ import {
   type CellStyle,
   type DocumentOp,
   type Grid,
+  type SavedQuery,
   type Workbook,
 } from "@sheetwrite/core";
 import { createSpreadsheetShell, type SpreadsheetShell } from "@sheetwrite/core/shell";
@@ -16,6 +17,7 @@ import { siteGridTheme } from "../site-grid-theme.js";
 
 export const SALES_SHEET = "sales";
 export const SUMMARY_SHEET = "summary";
+export const TARGETS_SHEET = "targets";
 export const SALES_ROWS = 48;
 
 const REGIONS = ["North", "South", "East", "West"] as const;
@@ -89,6 +91,12 @@ export function salesWorkbook(): Workbook {
           column("revenue", "Revenue", 120, "number"),
           column("share", "Share", 88, "number"),
         ],
+      },
+      {
+        id: TARGETS_SHEET,
+        name: "Targets",
+        rowCount: REGIONS.length + 2,
+        columns: [column("region", "Region", 112), column("target", "Target", 120, "number")],
       },
     ],
   };
@@ -190,6 +198,51 @@ export function salesOperations(): DocumentOp[] {
   return ops;
 }
 
+/**
+ * Regional targets as the host's source would serve them. The page has no
+ * network source: the host fetch callback returns these bytes, so Data ›
+ * Refresh All runs the saved query without a request.
+ */
+const TARGETS_CSV = "Region,Target\nNorth,52000\nSouth,48000\nEast,61000\nWest,0\n";
+
+/** A saved query with an output table, so the Data tab's query commands have work. */
+const TARGETS_QUERY: SavedQuery = {
+  id: "regional-targets",
+  name: "Regional targets",
+  source: {
+    kind: "csv",
+    sourceId: "regional-targets",
+    columns: [
+      { id: "region", name: "Region", type: "text" },
+      { id: "target", name: "Target", type: "number" },
+    ],
+  },
+  steps: [{ kind: "filter", predicate: { kind: "compare", column: "target", op: "gt", value: 0 } }],
+  output: {
+    table: "regional-targets",
+    tableName: "Targets",
+    anchor: { sheet: TARGETS_SHEET, row: 0, col: 0 },
+  },
+};
+
+/**
+ * Connects a query session after the shell is shown. The query package and
+ * its WASM load only here, never with the grid.
+ */
+async function connectQueries(grid: Grid): Promise<() => void> {
+  const { createQuerySession } = await import("@sheetwrite/queries");
+  const session = await createQuerySession(grid, {
+    fetchSource: async () => ({ kind: "bytes", bytes: new TextEncoder().encode(TARGETS_CSV) }),
+  });
+  const defined = session.define(TARGETS_QUERY);
+  if (defined.status !== "applied")
+    throw new Error(`The targets query was not saved: ${defined.status}`);
+  const refreshed = await session.refreshAll();
+  if (refreshed.status !== "applied")
+    throw new Error(`The targets query did not load: ${refreshed.status}`);
+  return () => session.dispose();
+}
+
 export interface SpreadsheetScenario {
   readonly ready: Promise<void>;
   grid(): Grid | null;
@@ -204,23 +257,30 @@ export interface SpreadsheetScenario {
 export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenario {
   let shell: SpreadsheetShell | null = null;
   let disposed = false;
+  let stopQueries: (() => void) | undefined;
 
-  const ready = initSheetwrite().then(() => {
-    if (disposed) return;
-    shell = createSpreadsheetShell(host, {
-      ribbon: { mode: "auto" },
-      grid: { workbook: salesWorkbook(), theme: siteGridTheme(), config: {} },
+  const ready = initSheetwrite()
+    .then(() => {
+      if (disposed) return;
+      shell = createSpreadsheetShell(host, {
+        ribbon: { mode: "auto" },
+        grid: { workbook: salesWorkbook(), theme: siteGridTheme(), config: {} },
+      });
+      const result = shell.grid.applyTransaction({ patches: salesOperations() });
+      if (result.status === "rejected") {
+        throw new Error(
+          `The sales workbook did not load: ${result.issues[0]?.message ?? "rejected"}`,
+        );
+      }
+      if (result.status !== "applied")
+        throw new Error(`The sales workbook did not load: ${result.status}`);
+      shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
+      return connectQueries(shell.grid);
+    })
+    .then((disconnect) => {
+      if (disposed) disconnect?.();
+      else stopQueries = disconnect;
     });
-    const result = shell.grid.applyTransaction({ patches: salesOperations() });
-    if (result.status === "rejected") {
-      throw new Error(
-        `The sales workbook did not load: ${result.issues[0]?.message ?? "rejected"}`,
-      );
-    }
-    if (result.status !== "applied")
-      throw new Error(`The sales workbook did not load: ${result.status}`);
-    shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
-  });
 
   const stopTheme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));
 
@@ -230,6 +290,7 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
     dispose() {
       disposed = true;
       stopTheme();
+      stopQueries?.();
       shell?.destroy();
       shell = null;
     },

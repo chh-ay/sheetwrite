@@ -3,6 +3,7 @@ import type {
   SavedQuery,
   WorkbookSnapshot,
   WorkbookTable,
+  XlsxUnsupportedQuery,
 } from "@sheetwrite/core";
 import { validateWorkbookSnapshot } from "@sheetwrite/core";
 import { inflateSync, unzipSync, zipSync } from "fflate";
@@ -50,6 +51,10 @@ const SECTION_DIGEST_ENTRY = "SheetwriteSectionDigest";
 const UINT32_BYTES = 4;
 const BINARY_VERSION = 0;
 /** Bounds the decoded mashup; a workbook's queries are small text. */
+// Snapshot protocol caps for kept members (core document-protocol.ts).
+const MAX_UNSUPPORTED_QUERIES = 256;
+const MAX_QUERY_MEMBER_LENGTH = 1024;
+const MAX_QUERY_REASON_LENGTH = 64;
 const MAX_MASHUP_BYTES = 16 * 1024 * 1024;
 const MAX_SECTION_BYTES = 4 * 1024 * 1024;
 const UTF16_LE_BOM = [0xff, 0xfe] as const;
@@ -273,6 +278,7 @@ export async function readPowerQuery(
   }
 
   let queries: SavedQuery[] | undefined;
+  let unsupported: XlsxUnsupportedQuery[] = [];
   if (sidecarQueries?.length && mashup.digest === textDigest(mashup.section)) {
     queries = structuredClone([...sidecarQueries]);
   } else if (context.options?.powerQuery) {
@@ -300,6 +306,14 @@ export async function readPowerQuery(
         };
       });
 
+      // The query panel lists these from the kept graph; the caps match the snapshot protocol.
+      unsupported = imported.unsupported
+        .filter((member) => member.member.length <= MAX_QUERY_MEMBER_LENGTH)
+        .slice(0, MAX_UNSUPPORTED_QUERIES)
+        .map((member) => ({
+          member: member.member,
+          reason: member.reason.slice(0, MAX_QUERY_REASON_LENGTH),
+        }));
       for (const member of imported.unsupported) {
         queryWarning(
           context,
@@ -335,9 +349,15 @@ export async function readPowerQuery(
   snapshot.workbook.xlsxSource = {
     ...source,
     graphs: source.graphs.map((graph) =>
-      graph.target === mashupPart || relationshipTypeMatches(graph.type, "connections")
-        ? { ...graph, queries: digest }
-        : graph,
+      graph.target === mashupPart
+        ? {
+            ...graph,
+            queries: digest,
+            ...(unsupported.length > 0 ? { unsupportedQueries: unsupported } : {}),
+          }
+        : relationshipTypeMatches(graph.type, "connections")
+          ? { ...graph, queries: digest }
+          : graph,
     ),
   };
 }

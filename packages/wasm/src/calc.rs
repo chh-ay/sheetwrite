@@ -1635,7 +1635,7 @@ impl<'a> Parser<'a> {
                 Ok(value)
             }
             Some(Tok::Ident(name, quoted)) => self.ident_at(name, quoted, depth),
-            Some(Tok::Structured(raw)) => parse_structured_ref(raw, None),
+            Some(Tok::Structured(raw)) => self.structured_or_external_at(raw),
             Some(Tok::Error(FormulaError::Ref)) => Ok(Ast::InvalidRef),
             Some(Tok::LBrace) => self.array_constant(),
             None | Some(Tok::End) => Err("Enter a value to complete the formula.".into()),
@@ -1697,6 +1697,27 @@ impl<'a> Parser<'a> {
             }
         };
         Ok(value)
+    }
+
+    /// A `[...]` that starts an operand. Before `Sheet1!`, it is the workbook
+    /// of an external reference (`[Budget.xlsx]Annual!C10`), kept as a sheet
+    /// reference whose name holds the workbook. Otherwise it is a table
+    /// reference of the current table.
+    fn structured_or_external_at(&mut self, raw: String) -> Result<Ast, String> {
+        let names_sheet = self.sheet_qualifiers
+            && matches!(
+                self.toks.as_slice().get(..2),
+                Some([Tok::Ident(_, false), Tok::Bang])
+            );
+        if !names_sheet {
+            return parse_structured_ref(raw, None);
+        }
+
+        let Some(Tok::Ident(sheet, _)) = self.next() else {
+            unreachable!("peeked external sheet name");
+        };
+        let _ = self.next();
+        self.sheet_ref_at(format!("{raw}{sheet}"), false)
     }
 
     fn ident_at(&mut self, name: Cow<'a, str>, quoted: bool, depth: usize) -> Result<Ast, String> {
@@ -1900,6 +1921,13 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
     name.chars().flat_map(char::to_lowercase).collect()
 }
 
+/// Whether a sheet reference names a sheet of another workbook:
+/// `[Budget.xlsx]Annual` or `C:\Reports\[Budget.xlsx]Annual`. Excel sheet
+/// names cannot hold `[` or `]`, so a bracket marks the workbook.
+pub(crate) fn is_external_sheet(name: &str) -> bool {
+    name.contains(']')
+}
+
 /// The error for a token after a complete formula.
 fn trailing_token_error(tok: &Tok<'_>) -> String {
     if *tok == Tok::RParen {
@@ -1957,6 +1985,14 @@ where
     F: Fn(&str) -> Option<u32>,
     S: Fn(&mut SheetSpanRef) -> bool,
 {
+    // A sheet of another workbook has no handle here; it stays a sheet
+    // reference, which reads as #REF! without values for that workbook.
+    if let Ast::SheetCell(sheet_ref, ..) | Ast::SheetRange(sheet_ref, ..) = &ast {
+        if is_external_sheet(&sheet_ref.name) {
+            return Ok(ast);
+        }
+    }
+
     match ast {
         Ast::SheetSpan(mut span) => {
             for endpoint in [&mut span.first, &mut span.last] {
