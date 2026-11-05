@@ -8,7 +8,7 @@ description: "QueryAggregate interface in @sheetwrite/queries: Column is require
 Column is required except for countRows; numeric aggregates ignore nulls.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L69"><code>packages/queries/src/types.ts#L69</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L34"><code>packages/core/dist/types/query.d.ts#L34</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -80,6 +80,7 @@ export interface QueryAggregate {
 <p class="api-consumers-label">Public exports naming <code>QueryAggregate</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-step/"><code>QueryStep</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

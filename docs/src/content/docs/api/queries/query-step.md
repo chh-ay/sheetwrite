@@ -6,9 +6,10 @@ description: "QueryStep type in @sheetwrite/queries: Saved step order is executi
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/queries/">@sheetwrite/queries</a><span class="api-status" data-kind="type">type</span></div>
 
 Saved step order is execution order; each column reference is a stable identity.
+In a saved query, a join `input` is the ID of another saved query.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L77"><code>packages/queries/src/types.ts#L77</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L44"><code>packages/core/dist/types/query.d.ts#L44</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>7</span>
@@ -157,6 +158,7 @@ export type QueryStep =
 <p class="api-consumers-label">Public exports naming <code>QueryStep</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/saved-query/"><code>SavedQuery</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/queries/query-engine/"><code>QueryEngine</code></a><span class="api-consumer-kind">@sheetwrite/queries</span></li>
 </ul>
 </div>

@@ -13,13 +13,10 @@ import { brotliCompressSync, gzipSync } from "node:zlib";
 
 import { getEngine, prepareEngineInstance } from "../../packages/core/src/engine.js";
 import { initSheetwrite } from "../../packages/core/src/grid.js";
-import {
-  HistoryArchive,
-  MemoryHistoryStorage,
-  type HistoryCommit,
-} from "../../packages/core/src/history-archive.js";
+import { HistoryArchive, MemoryHistoryStorage } from "../../packages/core/src/history-archive.js";
 import type { CellValue } from "../../packages/core/src/types/cell.js";
 import type { SnapshotCell, WorkbookSnapshot } from "../../packages/core/src/types/document.js";
+import type { CommittedTransaction } from "../../packages/core/src/types/transaction.js";
 import { median } from "./stats.js";
 
 const ROWS = 5000;
@@ -133,10 +130,10 @@ function workbook(): WorkbookSnapshot {
 }
 
 /** One three-cell edit, padded to exactly 512 encoded bytes, applied to `source` too. */
-function commit(revision: number, source: WorkbookSnapshot): HistoryCommit {
+function commit(revision: number, source: WorkbookSnapshot): CommittedTransaction {
   const row = (revision * 7919) % ROWS;
 
-  const operations: HistoryCommit["operations"] = [1, 2, 3].map((col) => {
+  const operations: CommittedTransaction["operations"] = [1, 2, 3].map((col) => {
     const value: CellValue = {
       kind: "literal",
       value: ((revision * 104729 + col) % 1_000_000) / 100,
@@ -151,7 +148,7 @@ function commit(revision: number, source: WorkbookSnapshot): HistoryCommit {
     return { op: "set", addr: { sheet: "sales", row, col }, value };
   });
 
-  const entry: HistoryCommit = {
+  const entry: CommittedTransaction = {
     baseRevision: revision - 1,
     revision,
     mutationId: `session-${revision}`,

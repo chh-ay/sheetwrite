@@ -1,4 +1,4 @@
-import type { DocumentOp, WorkbookSnapshot } from "../types/document.js";
+import type { WorkbookSnapshot } from "../types/document.js";
 
 /** Resource and retention ceilings for an opt-in history archive. */
 export interface HistoryLimits {
@@ -30,22 +30,6 @@ export interface HistoryLimits {
   checkpointTransactions: number;
   /** Encoded log bytes between checkpoints; defaults to 2 MiB. */
   checkpointLogBytes: number;
-}
-
-/** One committed transaction, confirmed by the document authority; never an optimistic local edit. */
-export interface HistoryCommit {
-  /** Revision the transaction applies to; equals the archive head. */
-  baseRevision: number;
-  /** Revision after the transaction; an atomic batch can advance up to 16 revisions. */
-  revision: number;
-  /** Stable mutation ID from the commit, at most 256 code units. */
-  mutationId: string;
-  /** Authenticated ID of the person who made the change, at most 256 code units. */
-  authorId: string;
-  /** Commit time in milliseconds since the epoch; never before the previous commit. */
-  time: number;
-  /** The committed document operations, in order. */
-  operations: readonly DocumentOp[];
 }
 
 /** A durable marker at one archived revision. */
