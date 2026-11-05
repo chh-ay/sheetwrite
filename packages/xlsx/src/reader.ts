@@ -923,6 +923,48 @@ function columnWidthPixels(width: number): number {
   );
 }
 
+/**
+ * For each column, the index of the last declaration in `spans` that covers
+ * it, or -1. `spans` holds each declaration's first and last zero-based
+ * column. A later declaration wins, as in Excel. Declarations are visited
+ * last to first and each column is claimed once, so overlapping full-width
+ * declarations cost one pass over the columns, not one per declaration.
+ */
+function lastColumnDeclarations(spans: readonly number[]): Int32Array {
+  let columnCount = 0;
+  for (let at = 1; at < spans.length; at += 2) {
+    columnCount = Math.max(columnCount, (spans[at] ?? 0) + 1);
+  }
+
+  const owners = new Int32Array(columnCount).fill(-1);
+  // `nextFree[col]` leads to the first unclaimed column at or after `col`.
+  const nextFree = Int32Array.from({ length: columnCount + 1 }, (_, col) => col);
+  const firstFree = (col: number): number => {
+    let free = col;
+    while (nextFree[free] !== free) free = nextFree[free] ?? columnCount;
+
+    // Point every column on the walked path at the answer, so no path is walked twice.
+    let step = col;
+    while (step !== free) {
+      const next = nextFree[step] ?? columnCount;
+      nextFree[step] = free;
+      step = next;
+    }
+    return free;
+  };
+
+  for (let declaration = spans.length / 2 - 1; declaration >= 0; declaration--) {
+    const first = spans[declaration * 2] ?? 0;
+    const last = spans[declaration * 2 + 1] ?? -1;
+    for (let col = firstFree(first); col <= last; col = firstFree(col + 1)) {
+      owners[col] = declaration;
+      nextFree[col] = col + 1;
+    }
+  }
+
+  return owners;
+}
+
 function parseColumns(
   root: XmlElement,
   styles: ParsedStyles,
@@ -932,6 +974,9 @@ function parseColumns(
   const columns = new Map<number, Partial<Column>>();
   const collection = xmlChild(root, "cols");
   if (!collection) return columns;
+
+  const spans: number[] = [];
+  const definitions: Partial<Column>[] = [];
   for (const element of xmlChildren(collection, "col")) {
     const min = parseUnsigned(xmlAttribute(element, "min"), "column minimum");
     const max = parseUnsigned(xmlAttribute(element, "max"), "column maximum");
@@ -963,18 +1008,23 @@ function parseColumns(
           ? "currency"
           : "number"
         : undefined;
-    for (let index = min - 1; index < max; index++) {
-      columns.set(index, {
-        ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
-        ...(xmlAttribute(element, "hidden") !== undefined
-          ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
-          : {}),
-        cellStyle: structuredClone(style.style ?? {}),
-        ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
-        ...(type ? { type } : {}),
-      });
-    }
+    spans.push(min - 1, max - 1);
+    definitions.push({
+      ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
+      ...(xmlAttribute(element, "hidden") !== undefined
+        ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
+        : {}),
+      cellStyle: structuredClone(style.style ?? {}),
+      ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
+      ...(type ? { type } : {}),
+    });
   }
+
+  // Readers copy a definition before they change it, so columns of one declaration share it.
+  lastColumnDeclarations(spans).forEach((declaration, col) => {
+    const definition = definitions[declaration];
+    if (definition) columns.set(col, definition);
+  });
   return columns;
 }
 
@@ -1220,6 +1270,54 @@ function parseTables(
   return tables;
 }
 
+type RowGroups = NonNullable<SheetSnapshot["rowGroups"]>;
+
+/**
+ * The row outline groups: for each level, each run of consecutive outlined
+ * rows at that level or deeper. A group is collapsed when its last row or the
+ * row after it is marked collapsed, or when every row of the group is hidden.
+ * Each level is one walk over the outlined rows in order.
+ */
+function outlineRowGroups(
+  levels: ReadonlyMap<number, number>,
+  collapsedRows: ReadonlySet<number>,
+  hiddenRows: ReadonlySet<number>,
+): RowGroups {
+  const rows = Uint32Array.from(levels.keys()).sort();
+  const rowLevels = Uint8Array.from(rows, (row) => levels.get(row) ?? 0);
+  const maxLevel = rowLevels.reduce((maximum, level) => Math.max(maximum, level), 0);
+  const groups: RowGroups = [];
+
+  for (let level = 1; level <= maxLevel; level++) {
+    let start = -1;
+    let end = -1;
+    let allHidden = true;
+    const close = (): void => {
+      const collapsed = collapsedRows.has(end + 1) || collapsedRows.has(end) || allHidden;
+      groups.push({ start, end, collapsed });
+    };
+
+    rows.forEach((row, index) => {
+      if ((rowLevels[index] ?? 0) < level) return;
+
+      if (start >= 0 && row === end + 1) {
+        end = row;
+        allHidden &&= hiddenRows.has(row);
+        return;
+      }
+
+      if (start >= 0) close();
+      start = row;
+      end = row;
+      allHidden = hiddenRows.has(row);
+    });
+
+    if (start >= 0) close();
+  }
+
+  return groups;
+}
+
 /**
  * Rows are streamed from the inflated worksheet; only cells and the small
  * non-row tree stay resident. `columnSource` is set for the second pass over a
@@ -1265,6 +1363,8 @@ async function parseSheet(
     columnStylesRead = true;
     const columnCollection = xmlChild(root, "cols");
     columnsPrecedeRows = columnCollection !== undefined;
+    const spans: number[] = [];
+    const columnStyles: string[] = [];
     for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
       const style = xmlAttribute(columnElement, "style");
       if (style === undefined) continue;
@@ -1272,8 +1372,14 @@ async function parseSheet(
       const max = parseUnsigned(xmlAttribute(columnElement, "max"), "column maximum");
       if (min < 1 || max < min) readerFailure("column range is invalid");
       assertResource(context, "maxColumnsPerSheet", max);
-      for (let index = min - 1; index < max; index++) inheritedColumnStyles.set(index, style);
+      spans.push(min - 1, max - 1);
+      columnStyles.push(style);
     }
+
+    lastColumnDeclarations(spans).forEach((declaration, col) => {
+      const style = columnStyles[declaration];
+      if (style !== undefined) inheritedColumnStyles.set(col, style);
+    });
   };
   if (columnSource) readColumnStyles(columnSource);
 
@@ -1517,39 +1623,7 @@ async function parseSheet(
   const hiddenOutlineRows = new Set(
     rowMeta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
   );
-  const rowGroups: NonNullable<SheetSnapshot["rowGroups"]> = [];
-  const maxOutlineLevel = Math.max(0, ...outlineLevels.values());
-  for (let level = 1; level <= maxOutlineLevel; level++) {
-    let start: number | undefined;
-    let previous = -2;
-    const outlined = [...outlineLevels.entries()]
-      .filter(([, rowLevel]) => rowLevel >= level)
-      .map(([row]) => row)
-      .sort((left, right) => left - right);
-    for (const row of [...outlined, Number.NaN]) {
-      if (start === undefined) {
-        if (Number.isFinite(row)) {
-          start = row;
-          previous = row;
-        }
-      } else if (row === previous + 1) {
-        previous = row;
-      } else {
-        rowGroups.push({
-          start,
-          end: previous,
-          collapsed:
-            collapsedRows.has(previous + 1) ||
-            collapsedRows.has(previous) ||
-            outlined
-              .filter((candidate) => candidate >= start! && candidate <= previous)
-              .every((candidate) => hiddenOutlineRows.has(candidate)),
-        });
-        start = Number.isFinite(row) ? row : undefined;
-        previous = row;
-      }
-    }
-  }
+  const rowGroups = outlineRowGroups(outlineLevels, collapsedRows, hiddenOutlineRows);
   const view = xmlChildren(xmlChild(root, "sheetViews") ?? root, "sheetView").at(-1);
   const pane = view ? xmlChild(view, "pane") : undefined;
   const paneState = pane ? xmlAttribute(pane, "state") : undefined;
