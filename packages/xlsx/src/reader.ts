@@ -39,6 +39,7 @@ import {
 } from "@sheetwrite/core";
 
 import { readCharts } from "./chart-read.js";
+import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";
 import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
@@ -2562,6 +2563,22 @@ export async function readWorkbook(
     if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
   }
   const calculation = workbookCalculation(workbookRoot);
+  // Sheetwrite's own metadata holds relationships by stable IDs; a file
+  // without it may hold Excel's data model relationships.
+  let dataModel = metadata?.workbook.dataModel;
+  if (dataModel === undefined && hasExcelDataModel(workbookRoot)) {
+    const connectionsPart = workbookRelationships.find(
+      (relationship) =>
+        relationshipTypeMatches(relationship.type, "connections") && !relationship.external,
+    )?.target;
+    // A relationship can name a part the package lacks; such a file has no connections to read.
+    const readable =
+      connectionsPart !== undefined && packageFile.contentType(connectionsPart) !== undefined;
+    if (readable) await packageFile.load([connectionsPart]);
+    const connections = readable ? packageFile.readXml(connectionsPart) : undefined;
+    if (readable) packageFile.release([connectionsPart]);
+    dataModel = readExcelDataModel(workbookRoot, connections, sheets, context);
+  }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),
@@ -2570,6 +2587,7 @@ export async function readWorkbook(
       activeSheet,
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
       ...(calculation ? { calculation } : {}),
+      ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
     },
     sheets,
   };

@@ -138,3 +138,7 @@ The result equals a pivot over the table you get by looking up each related colu
 | The many-side key is an error | That error |
 
 A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A missing table, column or relationship shows `#REF!`. The default engine keeps and syncs model pivots but does not compute them. XLSX export keeps them in Sheetwrite metadata, because Excel needs its own data-model binary for a model pivot.
+
+## XLSX files
+
+Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model: Excel opens the file without it, and shows a pivot over related tables as the values that Export XLSX wrote. See [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/#excel-data-model).
