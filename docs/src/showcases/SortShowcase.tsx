@@ -87,7 +87,7 @@ function SortControls({
               icon="sort-desc"
               key={id}
               onClick={() => void run("Sort", (current) => current.sortInPlace(id))}
-              variant="primary"
+              variant={id === SORT_IDS[0] ? "primary" : "default"}
             >
               {SORTS[id].label}
             </ControlButton>

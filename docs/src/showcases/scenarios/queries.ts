@@ -148,13 +148,18 @@ const REPORT_FORMULAS = [
 ] as const;
 const FORMULA_LABEL_COL = 4;
 
+/** Money columns: Revenue in Region totals and Amount in Large orders. */
+const MONEY_COLUMNS: Readonly<Record<string, number>> = { [REPORT_SHEET]: 1, [LARGE_SHEET]: 3 };
+
 function queriesWorkbook(): Workbook {
-  const columns = (widths: readonly number[]) =>
+  // A column format, because a refresh rewrites the table cells and their styles.
+  const columns = (sheet: string, widths: readonly number[]) =>
     widths.map((width, index) => ({
       key: `c${index}`,
       header: "",
       width,
       type: "text" as const,
+      ...(MONEY_COLUMNS[sheet] === index ? { numberFormat: MONEY } : {}),
     }));
   return {
     activeSheet: REPORT_SHEET,
@@ -163,56 +168,41 @@ function queriesWorkbook(): Workbook {
         id: REPORT_SHEET,
         name: "Report",
         rowCount: 24,
-        columns: columns([120, 112, 88, 32, 136, 112]),
+        columns: columns(REPORT_SHEET, [120, 112, 88, 32, 136, 112]),
       },
       {
         id: LARGE_SHEET,
         name: "Large orders",
         rowCount: 400,
-        columns: columns([112, 104, 80, 104]),
+        columns: columns(LARGE_SHEET, [112, 104, 80, 104]),
       },
     ],
     queries: [REGIONS_QUERY, regionTotalsQuery("shipped"), LARGE_ORDERS_QUERY],
   };
 }
 
-/** Rows of the Region totals table that get the money format: the header and every region. */
-const REGION_TABLE_ROWS = 1 + REGIONS.length;
-
 function reportOperations(): DocumentOp[] {
-  const moneyColumn: DocumentOp = {
-    op: "setRangeStyle",
-    range: {
-      sheet: REPORT_SHEET,
-      start: { row: 1, col: 1 },
-      end: { row: REGION_TABLE_ROWS - 1, col: 1 },
+  return REPORT_FORMULAS.flatMap((formula, row): DocumentOp[] => [
+    {
+      op: "set",
+      addr: { sheet: REPORT_SHEET, row, col: FORMULA_LABEL_COL },
+      value: { kind: "literal", value: formula.label },
     },
-    style: { numberFormat: MONEY },
-  };
-  return [
-    moneyColumn,
-    ...REPORT_FORMULAS.flatMap((formula, row): DocumentOp[] => [
-      {
-        op: "set",
-        addr: { sheet: REPORT_SHEET, row, col: FORMULA_LABEL_COL },
-        value: { kind: "literal", value: formula.label },
+    {
+      op: "set",
+      addr: { sheet: REPORT_SHEET, row, col: FORMULA_LABEL_COL + 1 },
+      value: { kind: "formula", src: formula.src },
+    },
+    {
+      op: "setRangeStyle",
+      range: {
+        sheet: REPORT_SHEET,
+        start: { row, col: FORMULA_LABEL_COL + 1 },
+        end: { row, col: FORMULA_LABEL_COL + 1 },
       },
-      {
-        op: "set",
-        addr: { sheet: REPORT_SHEET, row, col: FORMULA_LABEL_COL + 1 },
-        value: { kind: "formula", src: formula.src },
-      },
-      {
-        op: "setRangeStyle",
-        range: {
-          sheet: REPORT_SHEET,
-          start: { row, col: FORMULA_LABEL_COL + 1 },
-          end: { row, col: FORMULA_LABEL_COL + 1 },
-        },
-        style: { numberFormat: formula.format },
-      },
-    ]),
-  ];
+      style: { numberFormat: formula.format },
+    },
+  ]);
 }
 
 /** Why a refresh wrote nothing, with the engine's diagnostic when it has one. */

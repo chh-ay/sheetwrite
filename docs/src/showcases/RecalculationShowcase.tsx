@@ -14,6 +14,7 @@ import {
   FORMULA_COUNT,
   LOOKUPS,
   median,
+  PRICE_CHANGE_CELL,
   ROWS,
   SERIES_LENGTH,
   type MeasuredRun,
@@ -95,7 +96,7 @@ function RecalculationControls({
     <>
       <ShowcaseControlGroup
         title={`Edit under ${ROWS.toLocaleString("en")} formulas`}
-        description="Every revenue formula reads the price-change cell H1."
+        description={`Every revenue formula reads the price-change cell ${PRICE_CHANGE_CELL.replaceAll("$", "")}.`}
       >
         <ControlActions>
           <ControlButton
@@ -205,7 +206,7 @@ export default function RecalculationShowcase() {
       facts={[
         { label: "Rows", value: ROWS.toLocaleString("en") },
         { label: "Formulas", value: FORMULA_COUNT.toLocaleString("en") },
-        { label: "First calculation", value: milliseconds(snapshot?.firstCalculationMs) },
+        { label: "Load and first calculation", value: milliseconds(snapshot?.firstCalculationMs) },
       ]}
       guide={{ href: "/docs/concepts/calculation-engine/", label: "How the engine recalculates" }}
       id="recalculation"

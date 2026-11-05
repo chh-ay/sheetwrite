@@ -1,10 +1,11 @@
-import type {
-  CellScalar,
-  CellValue,
-  ColumnarData,
-  DocumentOp,
-  Grid,
-  Workbook,
+import {
+  colToA1,
+  type CellScalar,
+  type CellValue,
+  type ColumnarData,
+  type DocumentOp,
+  type Grid,
+  type Workbook,
 } from "@sheetwrite/core";
 
 import type { LiveScenario } from "../use-live-scenario.js";
@@ -29,31 +30,33 @@ export const SERIES_LENGTH = 10;
 const LOOKUP_STEP = 7_000;
 
 const SKU = (index: number) => `SKU-${String(index + 1).padStart(6, "0")}`;
-const RANGE_END = ROWS;
 
-/** Control cells: a label in column G and its value or formula in column H. */
+/** Control cells: a label in the Control column and its value or formula beside it. */
 const CONTROLS = {
   priceChange: { row: 0, label: "Price change" },
   revenue: { row: 1, label: "Total revenue" },
   lookupStart: { row: 2, label: "First SKU looked up" },
   lookupTotal: { row: 3, label: "Looked-up prices" },
 } as const;
-const LABEL_COL = 6;
-const VALUE_COL = 7;
-const LOOKUP_COL = 9;
 
 const COLUMNS = [
   { key: "sku", header: "SKU", width: 112, type: "text" },
   { key: "price", header: "Price", width: 88, type: "number", numberFormat: "$#,##0.00" },
   { key: "units", header: "Units", width: 72, type: "number" },
   { key: "revenue", header: "Revenue", width: 112, type: "number", numberFormat: "$#,##0.00" },
-  { key: "gap", header: "", width: 24, type: "text" },
-  { key: "gap2", header: "", width: 24, type: "text" },
-  { key: "label", header: "", width: 152, type: "text" },
-  { key: "value", header: "", width: 120, type: "number" },
-  { key: "gap3", header: "", width: 24, type: "text" },
-  { key: "lookup", header: "Lookup", width: 104, type: "number", numberFormat: "$#,##0.00" },
+  { key: "lookup", header: "Looked up", width: 104, type: "number", numberFormat: "$#,##0.00" },
+  { key: "control", header: "Control", width: 152, type: "text" },
+  { key: "value", header: "Value", width: 120, type: "number" },
 ] as const;
+
+type ColumnKey = (typeof COLUMNS)[number]["key"];
+const columnIndex = (key: ColumnKey) => COLUMNS.findIndex((column) => column.key === key);
+/** The column letter of a model column, for formulas. */
+const letter = (key: ColumnKey) => colToA1(columnIndex(key));
+const LABEL_COL = columnIndex("control");
+export const VALUE_COL = columnIndex("value");
+/** The price-change cell every revenue formula reads, as an absolute reference. */
+export const PRICE_CHANGE_CELL = `$${letter("value")}$${CONTROLS.priceChange.row + 1}`;
 
 function modelData(): ColumnarData {
   const sku: CellScalar[] = new Array(ROWS);
@@ -61,34 +64,28 @@ function modelData(): ColumnarData {
   const units = new Float64Array(ROWS);
   const revenue: CellValue[] = new Array(ROWS);
   const lookup: (CellValue | null)[] = new Array(ROWS).fill(null);
+  const [skuCol, priceCol, unitsCol] = [letter("sku"), letter("price"), letter("units")];
+  const lookupStart = `$${letter("value")}$${CONTROLS.lookupStart.row + 1}`;
   for (let index = 0; index < ROWS; index++) {
     const line = index + 1;
     sku[index] = SKU(index);
     price[index] = 4 + ((index * 37) % 400) / 4;
     units[index] = 1 + ((index * 13) % 40);
-    revenue[index] = { kind: "formula", src: `=B${line}*C${line}*(1+$H$1)` };
+    revenue[index] = {
+      kind: "formula",
+      src: `=${priceCol}${line}*${unitsCol}${line}*(1+${PRICE_CHANGE_CELL})`,
+    };
   }
   for (let index = 0; index < LOOKUPS; index++) {
     lookup[index] = {
       kind: "formula",
-      src: `=XLOOKUP("SKU-"&TEXT($H$3+${index},"000000"),$A$1:$A$${RANGE_END},$B$1:$B$${RANGE_END})`,
+      src: `=XLOOKUP("SKU-"&TEXT(${lookupStart}+${index},"000000"),$${skuCol}$1:$${skuCol}$${ROWS},$${priceCol}$1:$${priceCol}$${ROWS})`,
     };
   }
   const empty = new Array(ROWS).fill(null);
   return {
     rowCount: ROWS,
-    columns: {
-      sku,
-      price,
-      units,
-      revenue,
-      gap: empty,
-      gap2: empty,
-      label: empty,
-      value: empty,
-      gap3: empty,
-      lookup,
-    },
+    columns: { sku, price, units, revenue, lookup, control: empty, value: empty },
   };
 }
 
@@ -98,14 +95,22 @@ function controlOperations(): DocumentOp[] {
     addr: { sheet: MODEL_SHEET, row, col },
     value,
   });
+  const revenueCol = letter("revenue");
+  const lookupCol = letter("lookup");
   return [
     ...Object.values(CONTROLS).map((control) =>
       cell(control.row, LABEL_COL, { kind: "literal", value: control.label }),
     ),
     cell(CONTROLS.priceChange.row, VALUE_COL, { kind: "literal", value: 0 }),
-    cell(CONTROLS.revenue.row, VALUE_COL, { kind: "formula", src: `=SUM(D1:D${RANGE_END})` }),
+    cell(CONTROLS.revenue.row, VALUE_COL, {
+      kind: "formula",
+      src: `=SUM(${revenueCol}1:${revenueCol}${ROWS})`,
+    }),
     cell(CONTROLS.lookupStart.row, VALUE_COL, { kind: "literal", value: 1 }),
-    cell(CONTROLS.lookupTotal.row, VALUE_COL, { kind: "formula", src: `=SUM(J1:J${LOOKUPS})` }),
+    cell(CONTROLS.lookupTotal.row, VALUE_COL, {
+      kind: "formula",
+      src: `=SUM(${lookupCol}1:${lookupCol}${LOOKUPS})`,
+    }),
   ];
 }
 
@@ -136,7 +141,7 @@ export interface MeasuredRun {
 }
 
 export interface RecalculationSnapshot {
-  /** Creating the grid with 100,000 rows and calculating every formula once. */
+  /** Loading the engine, creating the grid with every row and calculating every formula once. */
   readonly firstCalculationMs: number | null;
   readonly runs: readonly MeasuredRun[];
   readonly revenue: CellScalar;

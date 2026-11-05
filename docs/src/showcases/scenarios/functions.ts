@@ -255,7 +255,7 @@ function lookupPivot(): PivotDefinition {
 }
 
 function functionsWorkbook(): Workbook {
-  const widths = [128, 176, 24, 152, 360, 160, 24, 96, 96, 24, 112, 112];
+  const widths = [128, 152, 24, 136, 296, 152, 24, 96, 96, 24, 112, 112];
   return {
     activeSheet: FAMILIES[0].id,
     sheets: FAMILIES.map((family) => ({

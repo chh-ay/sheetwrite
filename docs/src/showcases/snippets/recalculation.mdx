@@ -1,17 +1,20 @@
 ```ts prelude="core" title="recalculation.ts"
-// 100,000 revenue formulas that all read H1, loaded as columnar data
-const revenue = Array.from({ length: 100_000 }, (_, row) => ({
+// Revenue formulas that all read the price-change cell G1, loaded as columnar data
+const rowCount = 100_000;
+const revenue = Array.from({ length: rowCount }, (_, row) => ({
   kind: "formula" as const,
-  src: `=B${row + 1}*C${row + 1}*(1+$H$1)`,
+  src: `=B${row + 1}*C${row + 1}*(1+$G$1)`,
 }));
-const grid = createGrid(host, { workbook, data: { rowCount: 100_000, columns: { revenue } } });
+const grid = createGrid(host, { workbook, data: { rowCount, columns: { revenue } } });
 
 // One edit, timed until a dependent total is readable, then until the next frame
 const started = performance.now();
 grid.applyTransaction({
-  patches: [{ op: "set", addr: { sheet: "model", row: 0, col: 7 }, value: { kind: "literal", value: 0.05 } }],
+  patches: [{ op: "set", addr: { sheet: "model", row: 0, col: 6 }, value: { kind: "literal", value: 0.05 } }],
 });
-grid.store.getCell({ sheet: "model", row: 1, col: 7 }).resolved;
+grid.store.getCell({ sheet: "model", row: 1, col: 6 }).resolved;
 const recalcMs = performance.now() - started;
-requestAnimationFrame(() => requestAnimationFrame(() => console.info(recalcMs, performance.now() - started)));
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => console.info({ recalcMs, paintedMs: performance.now() - started })),
+);
 ```
