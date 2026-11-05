@@ -8,7 +8,7 @@ import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./e
 import { GridImpl } from "./grid.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { SheetwriteStore } from "./store.js";
-import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync.js";
+import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync-protocol.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
 import type { Grid, GridOptions } from "./types/grid.js";
 import type {

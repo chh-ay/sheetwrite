@@ -28,7 +28,8 @@ import { decodeStoreMemoryStats } from "../src/resource-accounting.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge } from "../src/row-bridge.js";
 import { IncompleteDataError } from "../src/store/data-engine.js";
-import { SyncPendingCapacityError, SyncProtocolError } from "../src/sync.js";
+import { SyncProtocolError } from "../src/sync-protocol.js";
+import { SyncPendingCapacityError } from "../src/sync.js";
 import type { Workbook } from "../src/types/document.js";
 import { XlsxResourceError } from "../src/xlsx-bridge.js";
 
