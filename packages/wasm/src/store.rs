@@ -30,6 +30,7 @@ use crate::types::{
 };
 use crate::window::ConditionalRules;
 
+mod external_links;
 mod hidden_rows;
 #[cfg(feature = "analysis")]
 mod model_source;

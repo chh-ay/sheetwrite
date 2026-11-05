@@ -585,4 +585,27 @@ mod tests {
             assert!(CellStore::read_memory_state(&bytes[..length]).is_err());
         }
     }
+
+    #[test]
+    fn memory_transfer_keeps_link_values_out_of_the_tabs() {
+        let mut original = CellStore::new();
+        let report = original.add_sheet(1, 2);
+        original.set_sheet_name(report, "report", "Report");
+        let annual = original.add_external_sheet("Budget.xlsx", "Annual", 1, 1);
+        original.set_number(annual, 0, 0, 7.0, 0);
+        original.set_formula(report, 0, 0, "=[Budget.xlsx]Annual!A1", 0);
+        original.set_formula(report, 1, 0, "=SHEETS()", 0);
+        original.recompute_changed();
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(annual, 0, 0, 9.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(report, 0, 0).num(), 9.0);
+        assert_eq!(replacement.get_cell(report, 1, 0).num(), 1.0);
+        assert_eq!(
+            replacement.add_external_sheet("Budget.xlsx", "Annual", 1, 1),
+            annual
+        );
+    }
 }
