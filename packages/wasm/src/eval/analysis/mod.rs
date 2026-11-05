@@ -6,6 +6,7 @@ mod compatibility;
 mod complex;
 mod database;
 mod dates;
+mod depreciation;
 mod descriptive;
 mod distributions;
 mod engineering;
@@ -18,7 +19,9 @@ pub(super) mod math;
 mod matrices;
 mod regression;
 mod reshape;
+mod securities;
 mod text;
+mod units;
 
 use crate::calc::Ast;
 use crate::store::CellStore;
@@ -148,9 +151,30 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
+        names: units::NAMES,
+        reference_cells: &[],
+        evaluate: Some(units::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: finance::NAMES,
         reference_cells: &[],
         evaluate: Some(finance::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: depreciation::NAMES,
+        reference_cells: &[],
+        evaluate: Some(depreciation::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: securities::NAMES,
+        reference_cells: &[],
+        evaluate: Some(securities::evaluate),
         evaluate_ast: None,
         array: None,
     },

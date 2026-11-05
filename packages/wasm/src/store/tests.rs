@@ -1087,3 +1087,349 @@ fn pivot_multi_level_layout_matches_pivotby_through_group_edits() {
         }
     }
 }
+
+/// A lookup-flattened range and model pivot over the same generated orders.
+/// The oracle joins by a linear scan, independent of the engine's index.
+struct RelatedFixture {
+    store: CellStore,
+    orders: usize,
+    customers: usize,
+    regions: usize,
+    flat: usize,
+    model_output: usize,
+    flat_output: usize,
+    keys: Vec<Option<usize>>,
+    customer_regions: Vec<Option<usize>>,
+}
+
+impl RelatedFixture {
+    fn new(rows: usize) -> Self {
+        let mut store = CellStore::new();
+        let orders = store.add_sheet(2, rows + 1);
+        let customers = store.add_sheet(3, 10);
+        let regions = store.add_sheet(2, 5);
+        let flat = store.add_sheet(4, rows + 1);
+        let model_output = store.add_sheet(32, 100);
+        let flat_output = store.add_sheet(32, 100);
+        let keys: Vec<_> = (0..rows)
+            .map(|row| (row % 11 != 0).then_some(row * 7 % 12))
+            .collect();
+        let customer_regions: Vec<_> = (0..9)
+            .map(|row| (row % 4 != 0).then_some(row % 5))
+            .collect();
+
+        for (table_id, sheet, last_row, ids) in [
+            ("orders", orders, rows, vec!["customer", "amount"]),
+            ("customers", customers, 9, vec!["id", "region", "credit"]),
+            ("regions", regions, 4, vec!["id", "name"]),
+        ] {
+            assert!(store.set_table(
+                table_id,
+                table_id,
+                sheet,
+                0,
+                0,
+                last_row,
+                ids.len() - 1,
+                true,
+                false,
+                ids.iter().map(|id| id.to_string()).collect(),
+                ids.iter().map(|id| id.to_string()).collect(),
+            ));
+        }
+        for (row, key) in keys.iter().enumerate() {
+            if let Some(key) = key {
+                store.set_string(orders, row + 1, 0, &format!("c{key}"), 0);
+            }
+            store.set_number(orders, row + 1, 1, (row % 17) as f64, 0);
+        }
+        for (row, region) in customer_regions.iter().enumerate() {
+            store.set_string(customers, row + 1, 0, &format!("C{row}"), 0);
+            if let Some(region) = region {
+                store.set_number(customers, row + 1, 1, *region as f64, 0);
+            }
+            store.set_number(customers, row + 1, 2, (row * 3) as f64, 0);
+        }
+        for row in 0..4 {
+            store.set_number(regions, row + 1, 0, row as f64, 0);
+            store.set_string(regions, row + 1, 1, &format!("Region {row}"), 0);
+        }
+        assert!(store.set_relationships(
+            [
+                "r1",
+                "orders",
+                "customer",
+                "customers",
+                "id",
+                "r2",
+                "customers",
+                "region",
+                "regions",
+                "id"
+            ]
+            .map(String::from)
+            .to_vec(),
+        ));
+        for (col, header) in ["name", "credit", "amount", "customer"].iter().enumerate() {
+            store.set_string(flat, 0, col, header, 0);
+        }
+        let mut fixture = Self {
+            store,
+            orders,
+            customers,
+            regions,
+            flat,
+            model_output,
+            flat_output,
+            keys,
+            customer_regions,
+        };
+        fixture.flatten();
+        fixture
+    }
+
+    fn flatten(&mut self) {
+        for (row, key) in self.keys.iter().enumerate() {
+            let customer = key.and_then(|key| (0..9).find(|&candidate| candidate == key));
+            let region = customer
+                .and_then(|customer| self.customer_regions[customer])
+                .and_then(|key| (0..4).find(|&candidate| candidate == key));
+            for col in 0..4 {
+                self.store.clear_cell(self.flat, row + 1, col, 0);
+            }
+            if let Some(region) = region {
+                self.store
+                    .set_string(self.flat, row + 1, 0, &format!("Region {region}"), 0);
+            }
+            if let Some(customer) = customer {
+                self.store
+                    .set_number(self.flat, row + 1, 1, (customer * 3) as f64, 0);
+            }
+            self.store
+                .set_number(self.flat, row + 1, 2, (row % 17) as f64, 0);
+            if let Some(key) = key {
+                self.store
+                    .set_string(self.flat, row + 1, 3, &format!("c{key}"), 0);
+            }
+        }
+    }
+
+    fn install(&mut self, value_field: usize, aggregations: &[u32]) {
+        let payload = PivotPayload {
+            source: self.flat,
+            last_row: self.keys.len(),
+            last_col: 3,
+            rows: &[0],
+            columns: &[],
+            value_field,
+            aggregations,
+            ..PivotPayload::default()
+        }
+        .numbers();
+        assert!(self
+            .store
+            .set_pivots(self.flat_output, &payload, vec!["flat".into()]));
+
+        // Model source: kind 3, base table, field count, then table/column pairs.
+        let mut model = payload;
+        model.splice(
+            1..7,
+            [3.0, 1.0, 4.0, 2.0, 3.0, 4.0, 5.0, 1.0, 6.0, 1.0, 7.0],
+        );
+        assert!(self.store.set_pivots(
+            self.model_output,
+            &model,
+            [
+                "model",
+                "orders",
+                "regions",
+                "name",
+                "customers",
+                "credit",
+                "amount",
+                "customer"
+            ]
+            .map(String::from)
+            .to_vec()
+        ));
+        self.store.recompute_changed();
+    }
+
+    fn assert_equal(&self) {
+        let actual = self.store.pivot_status(self.model_output);
+        let expected = self.store.pivot_status(self.flat_output);
+        assert_eq!(actual, expected);
+        for row in 0..actual[STATUS_ROWS] as usize {
+            for col in 0..actual[STATUS_COLS] as usize {
+                let actual = self.store.get_cell(self.model_output, row, col);
+                let expected = self.store.get_cell(self.flat_output, row, col);
+                assert_eq!(
+                    (actual.kind(), actual.num().to_bits(), actual.string()),
+                    (expected.kind(), expected.num().to_bits(), expected.string()),
+                    "at ({row}, {col})",
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn related_pivots_equal_a_lookup_flattened_range_through_key_and_value_edits() {
+    let mut fixture = RelatedFixture::new(199);
+    for value_field in [1, 2] {
+        fixture.install(
+            value_field,
+            &[SUM, COUNT, AVERAGE, MIN, MAX, COUNTA, DISTINCT_COUNT],
+        );
+        fixture.assert_equal();
+
+        // A fact key moves between groups; a dimension key changes every fact that uses it.
+        fixture.keys[13] = Some(3);
+        fixture.store.set_string(fixture.orders, 14, 0, "c3", 0);
+        fixture.flatten();
+        fixture.store.recompute_changed();
+        fixture.assert_equal();
+
+        fixture.customer_regions[3] = Some(2);
+        fixture.store.set_number(fixture.customers, 4, 1, 2.0, 0);
+        fixture.flatten();
+        fixture.store.recompute_changed();
+        fixture.assert_equal();
+
+        fixture
+            .store
+            .set_string(fixture.regions, 3, 1, "Renamed", 0);
+        for row in 0..fixture.keys.len() {
+            let customer = fixture.keys[row].filter(|&key| key < 9);
+            if customer.is_some_and(|customer| fixture.customer_regions[customer] == Some(2)) {
+                fixture
+                    .store
+                    .set_string(fixture.flat, row + 1, 0, "Renamed", 0);
+            }
+        }
+        fixture.store.recompute_changed();
+        fixture.assert_equal();
+        fixture
+            .store
+            .set_string(fixture.regions, 3, 1, "Region 2", 0);
+        fixture.flatten();
+    }
+}
+
+#[test]
+fn related_pivot_key_failures_recover_and_missing_relationships_show_ref() {
+    let mut fixture = RelatedFixture::new(31);
+    // An initially invalid key set must wake when a dimension key is repaired.
+    fixture.store.set_string(fixture.customers, 9, 0, "c0", 0);
+    fixture.install(2, &[SUM]);
+    let value_error = FormulaError::Value.slot() as u32 + 1;
+    assert_eq!(
+        fixture.store.pivot_status(fixture.model_output)[0],
+        value_error
+    );
+
+    fixture.store.set_string(fixture.customers, 9, 0, "C8", 0);
+    fixture.store.recompute_changed();
+    fixture.assert_equal();
+
+    fixture.store.set_string(fixture.customers, 1, 1, "0", 0);
+    fixture.store.recompute_changed();
+    assert_eq!(
+        fixture.store.pivot_status(fixture.model_output)[0],
+        value_error
+    );
+    fixture.store.clear_cell(fixture.customers, 1, 1, 0);
+    fixture.store.recompute_changed();
+    fixture.assert_equal();
+
+    // A many-side error is the related field's error, not a missing match.
+    fixture.store.set_formula(fixture.orders, 2, 0, "=NA()", 0);
+    fixture.store.set_formula(fixture.flat, 2, 0, "=NA()", 0);
+    fixture.store.set_formula(fixture.flat, 2, 1, "=NA()", 0);
+    fixture.store.recompute_changed();
+    fixture.assert_equal();
+
+    assert!(fixture.store.set_relationships(Vec::new()));
+    let ref_error = FormulaError::Ref.slot() as u32 + 1;
+    assert_eq!(
+        fixture.store.pivot_status(fixture.model_output)[0],
+        ref_error
+    );
+    assert!(fixture.store.set_relationships(
+        [
+            "r1",
+            "orders",
+            "customer",
+            "customers",
+            "id",
+            "r2",
+            "customers",
+            "region",
+            "regions",
+            "id"
+        ]
+        .map(String::from)
+        .to_vec(),
+    ));
+    fixture.assert_equal();
+
+    // Malformed field indices must not access memory outside the virtual source.
+    let payload = PivotPayload {
+        source: fixture.flat,
+        last_row: 31,
+        last_col: 3,
+        rows: &[0],
+        value_field: 2,
+        aggregations: &[SUM],
+        anchor: (1, 0),
+        ..PivotPayload::default()
+    }
+    .numbers();
+    let mut model = payload;
+    model.splice(1..7, [3.0, 1.0, 1.0, 2.0, 3.0]);
+    assert!(fixture.store.set_pivots(
+        fixture.regions,
+        &model,
+        ["overlap", "orders", "regions", "name"]
+            .map(String::from)
+            .to_vec()
+    ));
+    fixture.store.recompute_changed();
+    // The field count is one but the value references field 2: reject as a
+    // missing field, rather than accessing unrelated memory.
+    assert_eq!(fixture.store.pivot_status(fixture.regions)[0], ref_error);
+}
+
+#[test]
+fn related_pivot_output_over_a_related_table_spills() {
+    let mut fixture = RelatedFixture::new(31);
+    let payload = PivotPayload {
+        source: fixture.flat,
+        last_row: 31,
+        last_col: 3,
+        rows: &[0],
+        value_field: 1,
+        aggregations: &[SUM],
+        anchor: (2, 1),
+        ..PivotPayload::default()
+    }
+    .numbers();
+    let mut model = payload;
+    model.splice(1..7, [3.0, 1.0, 2.0, 2.0, 3.0, 4.0, 5.0]);
+    let strings = ["related", "orders", "regions", "name", "orders", "amount"];
+    assert!(fixture
+        .store
+        .set_pivots(fixture.regions, &model, strings.map(String::from).to_vec()));
+    fixture.store.recompute_changed();
+
+    let status = fixture.store.pivot_status(fixture.regions);
+    assert_eq!(status[STATUS_ERROR], FormulaError::Spill.slot() as u32 + 1);
+    assert_eq!(
+        fixture
+            .store
+            .get_cell(fixture.regions, 2, 1)
+            .string()
+            .as_deref(),
+        Some("Region 1")
+    );
+}

@@ -44,6 +44,7 @@ function registerXlsxBackends(): void
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/queries</code><span class="api-consumer-kind">dev</span></li>
 </ul>
 
 <p class="api-consumers-label">Public exports naming <code>registerXlsxBackends</code></p>

@@ -12,6 +12,7 @@ Verified contracts:
 
 - Vite builds separate core, React, Vue, Svelte, Worker, lazy XLSX, and lazy charts entries; initializes core with `await initSheetwrite()`; and emits the co-located WASM asset.
 - The charts view cache must be in the lazy charts chunk and in no core or adapter initial chunk.
+- The Sort panel must be a lazy chunk of its own in the Vite, webpack and Next.js builds: in no initial chunk and apart from the other side panels.
 - Vite's emitted browser JavaScript is scanned and fails if it contains `node:fs`, `node:fs/promises`, or `fs/promises`.
 - webpack 5 initializes with no explicit WASM URL and builds without `IgnorePlugin`.
 - Next.js initializes from a client component and builds without `IgnorePlugin`.

@@ -11,10 +11,12 @@ The full engine adds these function families:
 | Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `FORECAST.LINEAR` |
 | Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
 | Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT` |
+| Securities | `PRICE`, `YIELD`, `ACCRINT`, `COUPNCD`, `DURATION`, `TBILLPRICE` |
 | Dates | `NETWORKDAYS.INTL`, `WORKDAY.INTL`, `DATEDIF`, `ISOWEEKNUM` |
 | Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE` |
 | Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET` |
 | Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ` |
+| Unit conversion | `CONVERT` |
 | Bessel functions | `BESSELJ`, `BESSELY`, `BESSELI`, `BESSELK` |
 | Complex numbers | `COMPLEX`, `IMSUM`, `IMPRODUCT`, `IMABS`, `IMEXP`, `IMSQRT` |
 | Engineering | `DEC2HEX`, `HEX2DEC`, `BITAND`, `BITLSHIFT`, `ERF`, `GESTEP` |

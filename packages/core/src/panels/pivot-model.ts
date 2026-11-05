@@ -3,6 +3,7 @@
 
 import type { CellScalar } from "../types/cell.js";
 import type { Range } from "../types/coordinates.js";
+import type { TableColumnRef, TableRelationship } from "../types/data-model.js";
 import type {
   PivotAggregation,
   PivotDefinition,
@@ -274,7 +275,8 @@ export function sourceDataRange(
     return { ...range, start: { row: range.start.row + 1, col: range.start.col } };
   }
 
-  const table = tables.find((candidate) => candidate.id === source.table);
+  const id = "model" in source ? source.model.table : source.table;
+  const table = tables.find((candidate) => candidate.id === id);
   if (table === undefined) return null;
   const first = table.range.start.row + (table.headerRow ? 1 : 0);
   const last = table.range.end.row - (table.totalsRow ? 1 : 0);
@@ -284,6 +286,74 @@ export function sourceDataRange(
     start: { row: first, col: table.range.start.col },
     end: { row: last, col: table.range.end.col },
   };
+}
+
+/** The base table of a table or model source; a range source has none. */
+export function baseTable(source: PivotSource): string | undefined {
+  if (source.invalid || "range" in source) return undefined;
+  return "model" in source ? source.model.table : source.table;
+}
+
+/**
+ * Tables that `base` reaches by following relationships from the many side
+ * to the one side, nearest first; the tables a model pivot can read beside
+ * its base table.
+ */
+export function relatedTables(
+  base: string,
+  tables: readonly WorkbookTable[],
+  relationships: readonly TableRelationship[],
+): WorkbookTable[] {
+  const reached = [base];
+  for (let next = 0; next < reached.length; next++) {
+    for (const relationship of relationships) {
+      const to = relationship.to.table;
+      if (relationship.from.table === reached[next] && !reached.includes(to)) reached.push(to);
+    }
+  }
+  return reached.slice(1).flatMap((id) => tables.filter((table) => table.id === id));
+}
+
+/**
+ * `pivot` reading `column` of `table`, and that column's field index. A
+ * table source becomes a model source whose first fields are the base
+ * table's columns in order, so every field index in use keeps its meaning.
+ */
+export function withModelField(
+  pivot: PivotDefinition,
+  tables: readonly WorkbookTable[],
+  column: TableColumnRef,
+): { pivot: PivotDefinition; field: number } | null {
+  const source = pivot.source;
+  if (source.invalid || "range" in source) return null;
+
+  let fields: TableColumnRef[];
+  if ("model" in source) fields = source.model.fields.map((field) => ({ ...field }));
+  else {
+    const base = tables.find((candidate) => candidate.id === source.table);
+    if (base === undefined) return null;
+    fields = base.columns.map((entry) => ({ table: base.id, column: entry.id }));
+  }
+
+  const found = fields.findIndex(
+    (field) => field.table === column.table && field.column === column.column,
+  );
+  if (found < 0) fields.push({ ...column });
+  const table = "model" in source ? source.model.table : source.table;
+  return {
+    pivot: { ...pivot, source: { model: { table, fields } } },
+    field: found < 0 ? fields.length - 1 : found,
+  };
+}
+
+/** The type the field list shows for a field with these distinct values. */
+export function valuesType(values: readonly CellScalar[]): PivotFieldType {
+  const kinds = new Set(
+    values.filter((value) => value !== null && value !== "").map((value) => typeof value),
+  );
+  if (kinds.size === 0) return "blank";
+  if (kinds.size > 1) return "mixed";
+  return kinds.has("number") ? "number" : kinds.has("boolean") ? "boolean" : "text";
 }
 
 /** The first `PivotTableN` name and `pivot-N` ID that no pivot in the workbook uses. */

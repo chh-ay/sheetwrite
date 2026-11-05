@@ -12,7 +12,7 @@ call it load no query code or WASM.
 ## Examples
 
 ```ts compile
-import type { Grid } from "@sheetwrite/core";
+import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
 import { createQuerySession } from "@sheetwrite/queries";
 
 async function refreshSales(grid: Grid) {

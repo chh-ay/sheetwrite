@@ -120,7 +120,7 @@ function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): vo
   expect(secondValues.slice(3, 5)).toEqual([3, "range"]);
   expect(secondValues.slice(6, 9)).toEqual([4, 8, 8]);
 
-  store.sortBy("s1", 0, false);
+  store.setViewSort("s1", [{ col: 0, ascending: false }]);
   const viewOrder = [0, 1, 2, 3].map((row) => store.dataRowAt("s1", row));
   expect(new Set(viewOrder).size).toBe(4);
   for (let viewRow = 0; viewRow < viewOrder.length; viewRow++) {

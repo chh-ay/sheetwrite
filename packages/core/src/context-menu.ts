@@ -76,6 +76,11 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
         { action: "showAllColumns", label: "Show all" },
         { action: "autoFitColumn", label: "Auto-fit width" },
         { action: "separator" },
+        { action: "sortAscending" },
+        { action: "sortDescending" },
+        { action: "sortViewAscending" },
+        { action: "sortViewDescending" },
+        { action: "separator" },
         { action: "clearFilter", label: "Clear filter" },
       ],
     },
@@ -120,6 +125,10 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   showAllColumns: "unhideColumns",
   autoFitColumn: "format",
   clearFilter: "clearFilter",
+  sortAscending: "sortAsc",
+  sortDescending: "sortDesc",
+  sortViewAscending: "sortView",
+  sortViewDescending: "sortView",
   exportCsv: "exportCsv",
   exportXlsx: "exportXlsx",
   editNote: "note",
@@ -166,6 +175,10 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   showAllColumns: "Show all columns",
   autoFitColumn: "Auto-fit column",
   clearFilter: "Clear column filter",
+  sortAscending: "Sort A to Z",
+  sortDescending: "Sort Z to A",
+  sortViewAscending: "Sort view A to Z",
+  sortViewDescending: "Sort view Z to A",
   exportCsv: "Export CSV",
   exportXlsx: "Export XLSX",
   editNote: "Edit note",
@@ -234,6 +247,18 @@ function actionHandler(
 
     case "clearFilter":
       return () => actions.clearFilter();
+
+    case "sortAscending":
+      return () => actions.sort(true);
+
+    case "sortDescending":
+      return () => actions.sort(false);
+
+    case "sortViewAscending":
+      return () => actions.sortView(true);
+
+    case "sortViewDescending":
+      return () => actions.sortView(false);
 
     case "exportCsv":
       return () => actions.exportCsv();
