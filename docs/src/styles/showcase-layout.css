@@ -67,6 +67,8 @@
   color: var(--sw-fg-strong);
   font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-ui) var(--sw-font-display);
   font-variant-numeric: tabular-nums;
+  /* Package paths such as @sheetwrite/core/history have no spaces to break at. */
+  overflow-wrap: anywhere;
 }
 
 .sw-showcase__stage {
@@ -159,6 +161,25 @@
 @media (min-width: 52rem) {
   .sw-showcase__header {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+
+/* Status badges keep their own width inside a control group. */
+.sw-showcase__control-body > .sw-badge {
+  justify-self: start;
+}
+
+/* Tablets: the panel spans the stage under the demo, so its groups sit in
+   two columns instead of stretching each row across the page. */
+@media (min-width: 52rem) and (max-width: 71.99rem) {
+  .sw-showcase__controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sw-space-8);
+  }
+
+  .sw-showcase__control-group + .sw-showcase__control-group {
+    padding-top: 0;
+    border-top: 0;
   }
 }
 

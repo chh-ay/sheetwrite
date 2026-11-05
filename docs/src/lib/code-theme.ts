@@ -10,6 +10,8 @@ import { type SiteTheme, themeTokens, tokenColour } from "./design-tokens.ts";
 type ShikiOptions = Exclude<NonNullable<RehypeExpressiveCodeOptions["shiki"]>, boolean>;
 /** One entry of Expressive Code's `shiki.langs`. */
 export type ShikiLanguageInput = NonNullable<ShikiOptions["langs"]>[number];
+/** One TextMate grammar Shiki registers; the plain-object form of a language input. */
+type ShikiLanguage = Extract<ShikiLanguageInput, { scopeName: string }>;
 
 /**
  * The site's code theme, built at build time from the `--sw-code-*` tokens.
@@ -194,7 +196,7 @@ const CLASS_MEMBER_RULES = [
   "punctuation-semicolon",
 ];
 
-const TS_MEMBER_GRAMMAR = {
+const TS_MEMBER_GRAMMAR: ShikiLanguage = {
   name: "ts-member",
   scopeName: "source.ts.member",
   embeddedLangs: ["typescript"],
@@ -233,7 +235,7 @@ export function tsMemberLanguage(): ShikiLanguageInput {
   const typescriptUrl = bundledTypeScriptGrammarUrl();
   return async () => {
     // The grammar is not a docs dependency; its path is resolved through Shiki at run time.
-    const typescript: { default: unknown[] } = await import(typescriptUrl);
+    const typescript: { default: ShikiLanguage[] } = await import(typescriptUrl);
     return [...typescript.default, TS_MEMBER_GRAMMAR];
   };
 }
