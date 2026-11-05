@@ -126,7 +126,7 @@ it("sets a value field's number format from the field list in one undo step", as
   (await loadPanels(grid)).openPivotPanel(grid, "data", "by-region");
   const panel = () => document.querySelector(".sheetwrite-panel");
 
-  press(panel()?.querySelector('[aria-label="Count of Amount in Values actions"]'));
+  press(panel()?.querySelector('[aria-label="Count Numbers of Amount in Values actions"]'));
   press(
     [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
       (item) => item.textContent === "Number Format…",

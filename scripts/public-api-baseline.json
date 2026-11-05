@@ -183,7 +183,7 @@
     "@sheetwrite/core#.#PivotSort": "39073a1f42a7",
     "@sheetwrite/core#.#PivotSource": "c7178a3063f0",
     "@sheetwrite/core#.#PivotSourceField": "672290b9ee56",
-    "@sheetwrite/core#.#PivotValueField": "2a1047061ad5",
+    "@sheetwrite/core#.#PivotValueField": "8177039f3bc9",
     "@sheetwrite/core#.#PowerQueryCodec": "5397488bbe77",
     "@sheetwrite/core#.#PowerQueryExport": "3738370d6903",
     "@sheetwrite/core#.#PowerQueryImport": "da52966bd468",

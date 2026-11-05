@@ -1,6 +1,6 @@
 import { expect, it } from "bun:test";
 
-import { validateDocumentOperationShape } from "../src/index.js";
+import { validateDocumentOperationShape } from "../src/document-protocol.js";
 
 it("refuses a value number format that is empty or longer than a cell format", () => {
   const pivot = (numberFormat: string) => ({
