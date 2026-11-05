@@ -7,6 +7,7 @@ use crate::plan::{ColumnSpec, ColumnType, Diagnostic, Limits};
 use std::cmp::Ordering;
 
 mod transfer;
+#[cfg(feature = "engine")]
 pub(crate) use transfer::ColumnBuffers;
 
 /// A borrowed scalar view; null and error remain distinct from every typed value.

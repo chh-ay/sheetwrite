@@ -50,7 +50,8 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <table class="api-entry-table">
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
-<tr><td><a href="/docs/api/queries/"><code>@sheetwrite/queries</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>29</td></tr>
+<tr><td><a href="/docs/api/queries/"><code>@sheetwrite/queries</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>30</td></tr>
+<tr><td><a href="/docs/api/queries-power-query-wasm/"><code>@sheetwrite/queries/power-query-wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 <tr><td><a href="/docs/api/queries-wasm/"><code>@sheetwrite/queries/wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 </tbody>
 </table>

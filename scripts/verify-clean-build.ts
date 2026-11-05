@@ -25,6 +25,7 @@ const GENERATED_OUTPUTS = [
   "packages/formulas/loader-node.mjs",
   "packages/formulas/loader-state.mjs",
   "packages/queries/pkg",
+  "packages/queries/pkg-power-query",
   "packages/queries/engine/target",
   "packages/queries/dist",
   "packages/core/dist",

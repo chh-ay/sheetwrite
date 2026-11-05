@@ -10,6 +10,13 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# The engine and the Power Query codec build as separate artifacts, so a
+# workbook that only runs queries never loads the M translation.
+default = ["engine"]
+engine = []
+power-query = []
+
 [dependencies]
 wasm-bindgen = "0.2"
 

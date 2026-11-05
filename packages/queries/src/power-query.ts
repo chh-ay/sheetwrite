@@ -6,7 +6,7 @@ import type {
   SavedQuery,
 } from "@sheetwrite/core";
 
-import type * as WasmBindings from "../pkg/sheetwrite_queries.js";
+import type * as WasmBindings from "../pkg-power-query/sheetwrite_power_query.js";
 import { unpackStrings } from "./encoding.js";
 import { QueryError } from "./errors.js";
 import { NO_COLUMN } from "./plan-wire.js";

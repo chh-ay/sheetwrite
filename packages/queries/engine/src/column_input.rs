@@ -4,8 +4,8 @@ use wasm_bindgen::prelude::*;
 
 use crate::buffers::row_index;
 use crate::column::{Column, ColumnBuffers};
+use crate::failure::error;
 use crate::plan::Diagnostic;
-use crate::transport::error;
 use crate::wire::decode_type;
 
 /// Packed metadata contains id, name, then an interned code pool for sparse error rows.

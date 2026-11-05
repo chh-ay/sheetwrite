@@ -5,6 +5,9 @@
 //! supported forms back to saved queries. Imported M is data: nothing in it
 //! is evaluated, and no source is fetched while it is read.
 
+// Host lane encoding is used only by the codec artifact's bindings.
+#![cfg_attr(not(feature = "power-query"), allow(dead_code))]
+
 mod emit;
 mod import;
 mod parse;

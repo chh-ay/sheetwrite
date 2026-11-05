@@ -12,6 +12,7 @@ target/
 packages/wasm/pkg/
 packages/formulas/pkg/
 packages/queries/pkg/
+packages/queries/pkg-power-query/
 # Copied from packages/wasm by the formulas build (scripts/wasm-factory.ts).
 packages/formulas/loader*.mjs
 

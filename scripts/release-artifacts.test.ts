@@ -118,6 +118,8 @@ const REQUIRED_FILES: Readonly<Record<string, readonly string[]>> = {
     "dist/node.js",
     "pkg/sheetwrite_queries.js",
     "pkg/sheetwrite_queries_bg.wasm",
+    "pkg-power-query/sheetwrite_power_query.js",
+    "pkg-power-query/sheetwrite_power_query_bg.wasm",
   ],
   "@sheetwrite/core": [
     "README.md",

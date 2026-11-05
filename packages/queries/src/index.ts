@@ -1,5 +1,6 @@
 import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
 
+import type { SyncInitInput as PowerQuerySyncInitInput } from "../pkg-power-query/sheetwrite_power_query.js";
 import type { SyncInitInput } from "../pkg/sheetwrite_queries.js";
 import { connect } from "./connect.js";
 import type { QuerySession, QuerySessionOptions } from "./session.js";
@@ -34,6 +35,12 @@ export type {
   QuerySource,
   QueryStep,
 } from "./types.js";
+
+/** Hosts can provide the compiled codec artifact, `@sheetwrite/queries/power-query-wasm`. */
+export interface PowerQueryCodecOptions {
+  /** Compiled module or artifact bytes, as accepted by the generated bindings. */
+  readonly wasm?: PowerQuerySyncInitInput;
+}
 
 /** Hosts can provide the compiled artifact instead of using browser artifact loading. */
 export interface QueryEngineOptions {
@@ -119,8 +126,9 @@ export async function createQuerySession(
 export async function loadPowerQueryCodec(
   options: QueryEngineOptions = {},
 ): Promise<PowerQueryCodec> {
+  // The codec is its own artifact, so workbooks that only run queries never load it.
   const [wasm, { createPowerQueryCodec }] = await Promise.all([
-    import("../pkg/sheetwrite_queries.js"),
+    import("../pkg-power-query/sheetwrite_power_query.js"),
     import("./power-query.js"),
   ]);
   await wasm.default(options.wasm === undefined ? undefined : { module_or_path: options.wasm });

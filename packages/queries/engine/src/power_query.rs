@@ -4,10 +4,10 @@ use std::mem;
 
 use wasm_bindgen::prelude::*;
 
+use crate::failure::error;
 use crate::m::{decode_queries, emit_section, encode_queries, import_section, PlanWriter};
 use crate::plan::{Diagnostic, Limits};
 use crate::plan_wire::{PlanWire, NO_COLUMN};
-use crate::transport::error;
 
 /// Section documents above this size are rejected before lexing.
 const MAX_SECTION_BYTES: usize = 4 * 1024 * 1024;

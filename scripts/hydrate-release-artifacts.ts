@@ -21,11 +21,13 @@ for (const artifact of manifest.packages) {
       file.startsWith("dist/") ||
       file === "pkg" ||
       file.startsWith("pkg/") ||
+      file.startsWith("pkg-power-query/") ||
       (directory !== "wasm" && COPIED_LOADERS.includes(file)),
   );
   if (generatedFiles.length === 0) continue;
   await rm(join(packageRoot, "dist"), { recursive: true, force: true });
   await rm(join(packageRoot, "pkg"), { recursive: true, force: true });
+  await rm(join(packageRoot, "pkg-power-query"), { recursive: true, force: true });
   await mkdir(packageRoot, { recursive: true });
   const child = Bun.spawn(
     [

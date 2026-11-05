@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "8ecccd575c050419e5eb1cf6cb4ffb5edee955b2e97ba70239a94fc45b200bd7",
+  "sha256": "8a808ee61b8989807afed1be086343fdf2b21c5e57b6ce0c55b732339e221fb9",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -607,6 +607,7 @@
       "package": "@sheetwrite/queries",
       "entryPoint": ".",
       "exports": [
+        "PowerQueryCodecOptions",
         "QueryAggregate",
         "QueryBatch",
         "QueryColumn",
