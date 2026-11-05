@@ -8,7 +8,7 @@ use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 use super::value::{aggregate_number, bool_from_value, number_from_value, text_from_value};
 use super::{date, financial, math, statistics, text};
 
-const MAX_FUNCTION_ARGS: usize = 254;
+pub(super) const MAX_FUNCTION_ARGS: usize = 254;
 
 #[derive(Debug)]
 pub(super) struct FuncValue {
@@ -447,6 +447,44 @@ impl ReductionFold {
                     self.max = self.max.max(number);
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// [`Self::push`] for a finite number, without building a value.
+    #[inline]
+    pub(super) fn push_number(&mut self, number: f64) -> Result<(), FormulaError> {
+        if self.cells >= RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.cells += 1;
+        match self.kind {
+            ReductionKind::Count | ReductionKind::CountA => self.count += 1,
+            _ => {
+                self.count += 1;
+                self.sum += number;
+                self.min = self.min.min(number);
+                self.max = self.max.max(number);
+            }
+        }
+        Ok(())
+    }
+
+    /// [`Self::push`] for an empty cell, which only counts toward the limit.
+    #[inline]
+    pub(super) fn push_blank(&mut self) -> Result<(), FormulaError> {
+        if self.cells >= RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.cells += 1;
+        Ok(())
+    }
+
+    /// Fails like the accumulator does before it reads `cells` more values:
+    /// the whole argument must fit under the cell limit.
+    pub(super) fn reserve(&self, cells: u64) -> Result<(), FormulaError> {
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
         }
         Ok(())
     }
