@@ -205,7 +205,7 @@ impl<'a> RangeReader<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::{FxHashMap, FxHashSet};
+    use crate::formula_slots::{FormulaResults, FormulaWork};
 
     use super::RangeReader;
     use crate::eval::functions::FuncAccumulator;
@@ -215,13 +215,12 @@ mod tests {
 
     /// The list-building path's row-major values, used as the reference.
     fn listed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
-        let affected = FxHashSet::default();
-        let mut memo = FxHashMap::default();
-        let mut visiting = FxHashSet::default();
+        let affected = FormulaWork::default();
+        let mut results = FormulaResults::default();
+
         let mut pass = EvalPass {
             affected: &affected,
-            memo: &mut memo,
-            visiting: &mut visiting,
+            results: &mut results,
         };
         let mut values = FuncAccumulator::default();
         store.eval_range_values(range, &mut pass, 0, &mut values)?;
@@ -234,13 +233,12 @@ mod tests {
 
     /// The streaming path's row-major values, stopping at the first error.
     fn streamed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
-        let affected = FxHashSet::default();
-        let mut memo = FxHashMap::default();
-        let mut visiting = FxHashSet::default();
+        let affected = FormulaWork::default();
+        let mut results = FormulaResults::default();
+
         let mut pass = EvalPass {
             affected: &affected,
-            memo: &mut memo,
-            visiting: &mut visiting,
+            results: &mut results,
         };
         let mut reader = RangeReader::new(store, range, 0)?;
         let mut values = Vec::new();
@@ -260,13 +258,12 @@ mod tests {
         store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
         store.recompute(sheet);
 
-        let affected = FxHashSet::default();
-        let mut memo = FxHashMap::default();
-        let mut visiting = FxHashSet::default();
+        let affected = FormulaWork::default();
+        let mut results = FormulaResults::default();
+
         let mut pass = EvalPass {
             affected: &affected,
-            memo: &mut memo,
-            visiting: &mut visiting,
+            results: &mut results,
         };
         let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
         let mut reader = RangeReader::new(&store, range, 0).unwrap();
@@ -300,13 +297,12 @@ mod tests {
         store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
         store.recompute(sheet);
 
-        let affected = FxHashSet::default();
-        let mut memo = FxHashMap::default();
-        let mut visiting = FxHashSet::default();
+        let affected = FormulaWork::default();
+        let mut results = FormulaResults::default();
+
         let mut pass = EvalPass {
             affected: &affected,
-            memo: &mut memo,
-            visiting: &mut visiting,
+            results: &mut results,
         };
         let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
         let mut reader = RangeReader::new(&store, range, 0).unwrap();
@@ -337,13 +333,12 @@ mod tests {
         store: &CellStore,
         range: CellRange,
     ) -> Result<Vec<Value>, FormulaError> {
-        let affected = FxHashSet::default();
-        let mut memo = FxHashMap::default();
-        let mut visiting = FxHashSet::default();
+        let affected = FormulaWork::default();
+        let mut results = FormulaResults::default();
+
         let mut pass = EvalPass {
             affected: &affected,
-            memo: &mut memo,
-            visiting: &mut visiting,
+            results: &mut results,
         };
         let mut reader = RangeReader::new(store, range, 0)?;
         let mut values = Vec::new();
