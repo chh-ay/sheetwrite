@@ -12,6 +12,7 @@ import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
+import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
@@ -233,6 +234,7 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "importXlsx",
   "versionHistory",
   "saveVersion",
+  "newDashboard",
   "undo",
   "redo",
 ];
@@ -570,6 +572,8 @@ export class GridImpl implements Grid {
   private activeSheet: SheetId;
   /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
   private activeSheetCache: Sheet | null = null;
+  /** Shows the dashboard view while a dashboard sheet is active; spreadsheet grids only. */
+  private dashboardView: DashboardViewHook | null = null;
   /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
   private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
   private readonly virtualColumnTargets = new Map<SheetId, number>();
@@ -1162,6 +1166,9 @@ export class GridImpl implements Grid {
   private attachPanels(): void {
     if (this.presentation !== "spreadsheet") return;
     this.lifetime.add(attachPanelTriggers(this, this.config?.icons));
+    const dashboard = attachDashboardView(this, this.viewportEl, () => this.readOnly);
+    this.dashboardView = dashboard;
+    this.lifetime.add(() => dashboard.dispose());
   }
 
   private refreshSourcePresence(): void {
@@ -2650,6 +2657,7 @@ export class GridImpl implements Grid {
   /** Bring editors, tabs, the find bar and command state in line with `readOnly`. */
   private syncReadOnlyChrome(readOnly: boolean): void {
     this.sheetTabs?.setReadOnly(readOnly);
+    this.dashboardView?.sync();
     if (readOnly) {
       this.cancelAutoFit();
       this.interactions.reconcile("read-only");
@@ -3429,6 +3437,9 @@ export class GridImpl implements Grid {
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
       versionHistory: () => this.config?.history?.(this, "open"),
+      // The dashboard chunk names and adds the sheet; first paint carries only this call.
+      newDashboard: () =>
+        void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
       saveVersion: () => {
         if (!this.readOnly) this.config?.history?.(this, "save");
       },

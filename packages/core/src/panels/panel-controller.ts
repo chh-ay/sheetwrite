@@ -5,9 +5,11 @@
 // (`openLazyPanel`). Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
+import { firstFreeBox } from "../dashboard/dashboard-layout.js";
 import { sheetNameKey } from "../name-key.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
+import type { DashboardItem } from "../types/dashboard.js";
 import type { SheetSnapshot } from "../types/document.js";
 import type { Grid, GridPanel, IconOverrides } from "../types/grid.js";
 import type { PivotDefinition } from "../types/pivot.js";
@@ -222,7 +224,9 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
 /** Where Insert › PivotTable puts the new pivot. */
 export type PivotDestination =
   | { readonly kind: "new-sheet" }
-  | { readonly kind: "cell"; readonly text: string };
+  | { readonly kind: "cell"; readonly text: string }
+  /** A free box on the active dashboard, for a pivot over the table `table`. */
+  | { readonly kind: "dashboard"; readonly table: string };
 
 /**
  * Insert › PivotTable: a pivot with no fields over the selection, or over the
@@ -232,6 +236,7 @@ export type PivotDestination =
  * message for the form, or null.
  */
 export function insertPivot(grid: Grid, destination: PivotDestination): string | null {
+  if (destination.kind === "dashboard") return insertDashboardPivot(grid, destination.table);
   const workbook = grid.store.getWorkbook();
   const range = selectionRange(grid.getSelection(), workbook.sheets);
   if (range === null) return NO_SELECTION;
@@ -279,6 +284,46 @@ export function insertPivot(grid: Grid, destination: PivotDestination): string |
   if (grid.getActiveSheet() !== anchor.sheet) grid.setActiveSheet(anchor.sheet);
   grid.setSelection({ kind: "cell", addr: anchor });
   openPivotPanel(grid, anchor.sheet, pivot.id);
+  return null;
+}
+
+/** Width and height, in dashboard cells, of a new pivot item. */
+const NEW_PIVOT_BOX = { w: 6, h: 8 } as const;
+
+/**
+ * Insert › PivotTable on a dashboard: a pivot with no fields over `table`
+ * and an item that shows it in the first free box, in one undo step. The
+ * field list opens.
+ */
+function insertDashboardPivot(grid: Grid, table: string): string | null {
+  const sheet = grid.getActiveSheet();
+  const items =
+    grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
+    [];
+  const pivot: PivotDefinition = {
+    ...nextPivotIdentity(grid.getPivots()),
+    source: { table },
+    anchor: { row: 0, col: 0 },
+    rows: [],
+    columns: [],
+    values: [],
+  };
+  const item: DashboardItem = {
+    id: pivot.id,
+    box: firstFreeBox(items, NEW_PIVOT_BOX.w, NEW_PIVOT_BOX.h),
+    kind: "pivot",
+    pivot: pivot.id,
+  };
+  const message = rejectionMessage(
+    grid.applyTransaction({
+      patches: [
+        { op: "setPivot", sheet, pivot },
+        { op: "setDashboardItem", sheet, item },
+      ],
+    }),
+  );
+  if (message !== null) return message;
+  openPivotPanel(grid, sheet, pivot.id);
   return null;
 }
 
