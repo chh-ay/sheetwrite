@@ -12,7 +12,6 @@ use std::cell::OnceCell;
 use std::rc::{Rc, Weak};
 
 use regex_lite::{Regex, RegexBuilder};
-use rustc_hash::FxHashMap;
 
 use crate::calc::{Ast, Func};
 use crate::memory::MemoryOwnerStats;
@@ -30,13 +29,14 @@ const PATTERN_ARGUMENT: usize = 1;
 
 /// One pattern text and its compiled programs, one per case mode.
 pub(crate) struct SharedPattern {
-    text: String,
+    /// Shared with the store's index entry, so the text is stored once.
+    text: Rc<str>,
     /// `[case-sensitive, case-insensitive]`, each compiled on first use.
     programs: [OnceCell<Result<Rc<Regex>, FormulaError>>; 2],
 }
 
 impl SharedPattern {
-    fn new(text: String) -> Self {
+    fn new(text: Rc<str>) -> Self {
         Self {
             text,
             programs: [OnceCell::new(), OnceCell::new()],
@@ -71,35 +71,51 @@ impl std::fmt::Debug for SharedPattern {
     }
 }
 
-/// The store's weak index from pattern text to the formulas' shared pattern.
+/// The store's weak index from pattern text to the formulas' shared pattern,
+/// sorted by text. Formulas are installed far less often than they are
+/// evaluated, so a sorted list serves the lookups.
 #[derive(Default)]
 pub(crate) struct PatternIndex {
-    by_text: FxHashMap<String, Weak<SharedPattern>>,
+    entries: Vec<(Rc<str>, Weak<SharedPattern>)>,
     sweep_at: usize,
 }
 
 impl PatternIndex {
     /// The shared pattern for `text`, made when no formula holds one yet.
     fn shared(&mut self, text: &str) -> Rc<SharedPattern> {
-        if let Some(pattern) = self.by_text.get(text).and_then(Weak::upgrade) {
-            return pattern;
+        match self
+            .entries
+            .binary_search_by(|(key, _)| key.as_ref().cmp(text))
+        {
+            Ok(position) => {
+                let (key, entry) = &mut self.entries[position];
+                if let Some(pattern) = entry.upgrade() {
+                    return pattern;
+                }
+                let pattern = Rc::new(SharedPattern::new(Rc::clone(key)));
+                *entry = Rc::downgrade(&pattern);
+                pattern
+            }
+            Err(position) => {
+                let key: Rc<str> = Rc::from(text);
+                let pattern = Rc::new(SharedPattern::new(Rc::clone(&key)));
+                self.entries
+                    .insert(position, (key, Rc::downgrade(&pattern)));
+                self.sweep_when_grown();
+                pattern
+            }
         }
-
-        let pattern = Rc::new(SharedPattern::new(text.to_owned()));
-        self.by_text
-            .insert(text.to_owned(), Rc::downgrade(&pattern));
-        self.sweep_when_grown();
-        pattern
     }
 
     fn sweep_when_grown(&mut self) {
-        if self.by_text.len() < self.sweep_at.max(FIRST_SWEEP_LEN) {
+        if self.entries.len() < self.sweep_at.max(FIRST_SWEEP_LEN) {
             return;
         }
 
-        self.by_text.retain(|_, pattern| pattern.strong_count() > 0);
-        self.by_text.shrink_to_fit();
-        self.sweep_at = self.by_text.len() * 2;
+        self.entries
+            .retain(|(_, pattern)| pattern.strong_count() > 0);
+        self.entries.shrink_to_fit();
+        self.sweep_at = self.entries.len() * 2;
     }
 
     /// Replaces the literal pattern arguments of the REGEX calls in `ast`
@@ -131,18 +147,18 @@ impl PatternIndex {
         }
     }
 
-    /// Counts the index and the text of each live shared pattern. Compiled
-    /// programs are not counted: `regex-lite` does not report their size.
+    /// Counts the index, each pattern text once, and each live shared
+    /// pattern. Compiled programs are not counted: `regex-lite` does not
+    /// report their size.
     pub(crate) fn add_memory_stats(&self, out: &mut MemoryOwnerStats) {
         let bytes = std::mem::size_of::<Self>();
         out.add_payload(bytes, bytes);
-        out.add_vec::<(String, Weak<SharedPattern>)>(self.by_text.len(), self.by_text.capacity());
-        for (text, pattern) in &self.by_text {
-            out.add_payload(text.len(), text.capacity());
-            if let Some(pattern) = pattern.upgrade() {
+        out.add_vec::<(Rc<str>, Weak<SharedPattern>)>(self.entries.len(), self.entries.capacity());
+        for (text, pattern) in &self.entries {
+            out.add_payload(text.len(), text.len());
+            if pattern.strong_count() > 0 {
                 let bytes = std::mem::size_of::<SharedPattern>();
                 out.add_payload(bytes, bytes);
-                out.add_payload(pattern.text.len(), pattern.text.capacity());
             }
         }
     }
