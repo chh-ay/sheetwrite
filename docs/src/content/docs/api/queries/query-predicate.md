@@ -1,14 +1,14 @@
 ---
 title: "QueryPredicate | @sheetwrite/queries"
-description: "QueryPredicate type in @sheetwrite/queries: Data-only predicate trees use M null logic; only logical true selects a row."
+description: "QueryPredicate type in @sheetwrite/queries: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/queries|.|QueryPredicate -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/queries/">@sheetwrite/queries</a><span class="api-status" data-kind="type">type</span></div>
 
-Data-only predicate trees use M null logic; only logical true selects a row.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L12"><code>packages/core/dist/types/query.d.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L9"><code>packages/core/dist/types/query.d.ts#L9</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>

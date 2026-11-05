@@ -1,14 +1,14 @@
 ---
 title: "QueryJoinKind | @sheetwrite/queries"
-description: "QueryJoinKind type in @sheetwrite/queries: Join kinds retain duplicate matches and match null keys to null keys."
+description: "QueryJoinKind type in @sheetwrite/queries: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/queries|.|QueryJoinKind -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/queries/">@sheetwrite/queries</a><span class="api-status" data-kind="type">type</span></div>
 
-Join kinds retain duplicate matches and match null keys to null keys.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L32"><code>packages/core/dist/types/query.d.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L28"><code>packages/core/dist/types/query.d.ts#L28</code></a></dd></div>
 </dl>
 
 ## Declaration

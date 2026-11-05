@@ -1,14 +1,14 @@
 ---
 title: "ChartRenderer | @sheetwrite/charts"
-description: "ChartRenderer interface in @sheetwrite/charts: Draws charts into host elements that the grid's object layer owns."
+description: "ChartRenderer interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartRenderer -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Draws charts into host elements that the grid's object layer owns.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L99"><code>packages/core/dist/types/chart.d.ts#L99</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L62"><code>packages/core/dist/types/chart.d.ts#L62</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -16,7 +16,7 @@ Draws charts into host elements that the grid's object layer owns.
 <div class="api-member-list">
 
 <details class="api-member" id="chart-renderer-mount" data-pagefind-weight="1">
-<summary><code>mount</code> <span class="api-member-summary">host is an empty element that core owns, positions and clips.</span></summary>
+<summary><code>mount</code></summary>
 
 ```ts generated
 mount(host: HTMLElement, chart: ChartRef, size: { width: number; height: number; }): MountedChart;

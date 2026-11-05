@@ -1,14 +1,14 @@
 ---
 title: "CellScalar | @sheetwrite/react"
-description: "CellScalar type in @sheetwrite/react: A scalar that can be displayed directly."
+description: "CellScalar type in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/react|.|CellScalar -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>
 
-A scalar that can be displayed directly.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/cell.d.ts#L112"><code>packages/core/dist/types/cell.d.ts#L112</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/cell.d.ts#L69"><code>packages/core/dist/types/cell.d.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration

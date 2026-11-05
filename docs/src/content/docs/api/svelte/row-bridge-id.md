@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeId | @sheetwrite/svelte"
-description: "RowBridgeId type in @sheetwrite/svelte: A stable host identity for one data-space row."
+description: "RowBridgeId type in @sheetwrite/svelte: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/svelte|.|RowBridgeId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
 
-A stable host identity for one data-space row.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L6"><code>packages/core/dist/row-bridge.d.ts#L6</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L5"><code>packages/core/dist/row-bridge.d.ts#L5</code></a></dd></div>
 </dl>
 
 ## Declaration

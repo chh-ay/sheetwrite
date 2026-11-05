@@ -1,14 +1,14 @@
 ---
 title: "CellEditor | @sheetwrite/vue"
-description: "CellEditor interface in @sheetwrite/vue: Framework-neutral named editor definition registered through GridOptions.editors."
+description: "CellEditor interface in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditor -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Framework-neutral named editor definition registered through GridOptions.editors.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L60"><code>packages/core/dist/types/grid.d.ts#L60</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L47"><code>packages/core/dist/types/grid.d.ts#L47</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

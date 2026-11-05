@@ -1,15 +1,14 @@
 ---
 title: "QueryStep | @sheetwrite/queries"
-description: "QueryStep type in @sheetwrite/queries: Saved step order is execution order; each column reference is a stable identity."
+description: "QueryStep type in @sheetwrite/queries: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/queries|.|QueryStep -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/queries/">@sheetwrite/queries</a><span class="api-status" data-kind="type">type</span></div>
 
-Saved step order is execution order; each column reference is a stable identity.
-In a saved query, a join `input` is the ID of another saved query.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L44"><code>packages/core/dist/types/query.d.ts#L44</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L35"><code>packages/core/dist/types/query.d.ts#L35</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>7</span>

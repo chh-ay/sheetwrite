@@ -1,14 +1,14 @@
 ---
 title: "ChartRef | @sheetwrite/charts"
-description: "ChartRef interface in @sheetwrite/charts: Stable identity of one chart: the sheet that owns it and its ID on that sheet."
+description: "ChartRef interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartRef -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Stable identity of one chart: the sheet that owns it and its ID on that sheet.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L63"><code>packages/core/dist/types/chart.d.ts#L63</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L44"><code>packages/core/dist/types/chart.d.ts#L44</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

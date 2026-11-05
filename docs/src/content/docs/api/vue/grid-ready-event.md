@@ -1,14 +1,14 @@
 ---
 title: "GridReadyEvent | @sheetwrite/vue"
-description: "GridReadyEvent interface in @sheetwrite/vue: Grid handle, generation, and reason published after adapter initialization."
+description: "GridReadyEvent interface in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|GridReadyEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Grid handle, generation, and reason published after adapter initialization.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/adapter.d.ts#L34"><code>packages/core/dist/adapter.d.ts#L34</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/adapter.d.ts#L30"><code>packages/core/dist/adapter.d.ts#L30</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -16,7 +16,7 @@ Grid handle, generation, and reason published after adapter initialization.
 <div class="api-member-list">
 
 <details class="api-member" id="grid-ready-event-grid" data-pagefind-weight="1">
-<summary><code>grid</code> <span class="api-member-summary">Live handle just published by the adapter; replaced on the next reset generation.</span></summary>
+<summary><code>grid</code></summary>
 
 ```ts generated
 grid: Grid;
@@ -25,7 +25,7 @@ grid: Grid;
 </details>
 
 <details class="api-member" id="grid-ready-event-generation" data-pagefind-weight="1">
-<summary><code>generation</code> <span class="api-member-summary">One-based adapter generation, incremented whenever a Grid is replaced.</span></summary>
+<summary><code>generation</code></summary>
 
 ```ts generated
 generation: number;
@@ -34,7 +34,7 @@ generation: number;
 </details>
 
 <details class="api-member" id="grid-ready-event-reason" data-pagefind-weight="1">
-<summary><code>reason</code> <span class="api-member-summary">Whether readiness followed first initialization, an input reset, or a renderer reset.</span></summary>
+<summary><code>reason</code></summary>
 
 ```ts generated
 reason: GridReadyReason;

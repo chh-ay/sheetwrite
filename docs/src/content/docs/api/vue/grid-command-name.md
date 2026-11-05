@@ -1,14 +1,14 @@
 ---
 title: "GridCommandName | @sheetwrite/vue"
-description: "GridCommandName type in @sheetwrite/vue: Built-in command names accepted by state queries and change events."
+description: "GridCommandName type in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|GridCommandName -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
 
-Built-in command names accepted by state queries and change events.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L191"><code>packages/core/dist/types/grid.d.ts#L191</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L108"><code>packages/core/dist/types/grid.d.ts#L108</code></a></dd></div>
 </dl>
 
 ## Declaration

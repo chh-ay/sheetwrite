@@ -1,14 +1,14 @@
 ---
 title: "ChartDefinition | @sheetwrite/charts"
-description: "ChartDefinition interface in @sheetwrite/charts: Persisted chart definition; IDs are unique within the owning sheet."
+description: "ChartDefinition interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartDefinition -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Persisted chart definition; IDs are unique within the owning sheet.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L25"><code>packages/core/dist/types/chart.d.ts#L25</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L18"><code>packages/core/dist/types/chart.d.ts#L18</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -44,7 +44,7 @@ kind: ChartKind;
 </details>
 
 <details class="api-member" id="chart-definition-title" data-pagefind-weight="1">
-<summary><code>title</code> <span class="api-member-summary">Text above the chart; undefined shows no title.</span></summary>
+<summary><code>title</code></summary>
 
 ```ts generated
 title?: string;
@@ -53,7 +53,7 @@ title?: string;
 </details>
 
 <details class="api-member" id="chart-definition-axes" data-pagefind-weight="1">
-<summary><code>axes</code> <span class="api-member-summary">Axis titles; undefined shows no axis titles.</span></summary>
+<summary><code>axes</code></summary>
 
 ```ts generated
 axes?: { xTitle?: string; yTitle?: string; };
@@ -62,7 +62,7 @@ axes?: { xTitle?: string; yTitle?: string; };
 </details>
 
 <details class="api-member" id="chart-definition-legend" data-pagefind-weight="1">
-<summary><code>legend</code> <span class="api-member-summary">Legend position; undefined lets the renderer use its default position.</span></summary>
+<summary><code>legend</code></summary>
 
 ```ts generated
 legend?: "none" | "top" | "right" | "bottom" | "left";

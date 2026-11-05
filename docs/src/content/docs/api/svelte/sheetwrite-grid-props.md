@@ -265,7 +265,7 @@ grid?: Grid;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-grid-change" data-pagefind-weight="1">
-<summary><code>onGridChange</code> <span class="api-member-summary">Receives every committed Grid change, including its applied transaction.</span></summary>
+<summary><code>onGridChange</code></summary>
 
 ```ts generated
 onGridChange?: (event: ChangeEvent) => void;
@@ -274,7 +274,7 @@ onGridChange?: (event: ChangeEvent) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-row-delta" data-pagefind-weight="1">
-<summary><code>onRowDelta</code> <span class="api-member-summary">Receives projected host-row effects when a row bridge is attached.</span></summary>
+<summary><code>onRowDelta</code></summary>
 
 ```ts generated
 onRowDelta?: RowBridgeHandler<Id>;
@@ -283,7 +283,7 @@ onRowDelta?: RowBridgeHandler<Id>;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-selection-change" data-pagefind-weight="1">
-<summary><code>onSelectionChange</code> <span class="api-member-summary">Receives the current selection, or null after it is cleared.</span></summary>
+<summary><code>onSelectionChange</code></summary>
 
 ```ts generated
 onSelectionChange?: (selection: Selection | null) => void;
@@ -292,7 +292,7 @@ onSelectionChange?: (selection: Selection | null) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-viewport-change" data-pagefind-weight="1">
-<summary><code>onViewportChange</code> <span class="api-member-summary">Receives visible row bounds and vertical scroll offset after scrolling.</span></summary>
+<summary><code>onViewportChange</code></summary>
 
 ```ts generated
 onViewportChange?: (event: GridEvents["scroll"]) => void;
@@ -301,7 +301,7 @@ onViewportChange?: (event: GridEvents["scroll"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-edit-begin" data-pagefind-weight="1">
-<summary><code>onEditBegin</code> <span class="api-member-summary">Fires when cell editing begins.</span></summary>
+<summary><code>onEditBegin</code></summary>
 
 ```ts generated
 onEditBegin?: (event: GridEvents["edit-begin"]) => void;
@@ -310,7 +310,7 @@ onEditBegin?: (event: GridEvents["edit-begin"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-edit-commit" data-pagefind-weight="1">
-<summary><code>onEditCommit</code> <span class="api-member-summary">Fires after an edit commits its parsed cell value.</span></summary>
+<summary><code>onEditCommit</code></summary>
 
 ```ts generated
 onEditCommit?: (event: GridEvents["edit-commit"]) => void;
@@ -319,7 +319,7 @@ onEditCommit?: (event: GridEvents["edit-commit"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-search" data-pagefind-weight="1">
-<summary><code>onSearch</code> <span class="api-member-summary">Receives refreshed search matches and active-match index.</span></summary>
+<summary><code>onSearch</code></summary>
 
 ```ts generated
 onSearch?: (result: GridEvents["search"]) => void;
@@ -328,7 +328,7 @@ onSearch?: (result: GridEvents["search"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-active-sheet-change" data-pagefind-weight="1">
-<summary><code>onActiveSheetChange</code> <span class="api-member-summary">Fires after the visible sheet changes.</span></summary>
+<summary><code>onActiveSheetChange</code></summary>
 
 ```ts generated
 onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
@@ -337,7 +337,7 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-command-state-change" data-pagefind-weight="1">
-<summary><code>onCommandStateChange</code> <span class="api-member-summary">Receives observable undo/redo and formatting command state.</span></summary>
+<summary><code>onCommandStateChange</code></summary>
 
 ```ts generated
 onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
@@ -346,7 +346,7 @@ onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-mutation-rejected" data-pagefind-weight="1">
-<summary><code>onMutationRejected</code> <span class="api-member-summary">Receives structured issues when a Grid mutation is rejected.</span></summary>
+<summary><code>onMutationRejected</code></summary>
 
 ```ts generated
 onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
@@ -355,7 +355,7 @@ onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-renderer-fallback" data-pagefind-weight="1">
-<summary><code>onRendererFallback</code> <span class="api-member-summary">Fires when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+<summary><code>onRendererFallback</code></summary>
 
 ```ts generated
 onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
@@ -364,7 +364,7 @@ onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-datasource-error" data-pagefind-weight="1">
-<summary><code>onDatasourceError</code> <span class="api-member-summary">Receives failed datasource requests and their errors.</span></summary>
+<summary><code>onDatasourceError</code></summary>
 
 ```ts generated
 onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
@@ -373,7 +373,7 @@ onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-export-error" data-pagefind-weight="1">
-<summary><code>onExportError</code> <span class="api-member-summary">Receives failures from built-in XLSX export actions.</span></summary>
+<summary><code>onExportError</code></summary>
 
 ```ts generated
 onExportError?: (event: GridEvents["export-error"]) => void;
@@ -382,7 +382,7 @@ onExportError?: (event: GridEvents["export-error"]) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
-<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
+<summary><code>onReady</code></summary>
 
 ```ts generated
 onReady?: (event: GridReadyEvent) => void;
@@ -391,7 +391,7 @@ onReady?: (event: GridReadyEvent) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-on-initialization-error" data-pagefind-weight="1">
-<summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
+<summary><code>onInitializationError</code></summary>
 
 ```ts generated
 onInitializationError?: (error: SheetwriteError) => void;
@@ -400,7 +400,7 @@ onInitializationError?: (error: SheetwriteError) => void;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-wasm-source" data-pagefind-weight="1">
-<summary><code>wasmSource</code> <span class="api-member-summary">Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins.</span></summary>
+<summary><code>wasmSource</code></summary>
 
 ```ts generated
 wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;

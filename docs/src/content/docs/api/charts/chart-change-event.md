@@ -1,16 +1,14 @@
 ---
 title: "ChartChangeEvent | @sheetwrite/charts"
-description: "ChartChangeEvent interface in @sheetwrite/charts: Charts whose ChartView may differ after one store commit."
+description: "ChartChangeEvent interface in @sheetwrite/charts: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/charts|.|ChartChangeEvent -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/charts/">@sheetwrite/charts</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Charts whose `ChartView` may differ after one store commit. Emitted at most
-once per commit, only when `charts` is not empty; each chart appears once.
-A chart that no longer exists resolves to `null`.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L72"><code>packages/core/dist/types/chart.d.ts#L72</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L48"><code>packages/core/dist/types/chart.d.ts#L48</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -18,18 +16,16 @@ A chart that no longer exists resolves to `null`.
 <div class="api-member-list">
 
 <details class="api-member" id="chart-change-event-epoch" data-pagefind-weight="1">
-<summary><code>epoch</code> <span class="api-member-summary">Store epoch after the commit.</span></summary>
+<summary><code>epoch</code></summary>
 
 ```ts generated
 readonly epoch: number | undefined;
 ```
 
-<p class="api-member-doc">Store epoch after the commit. `undefined` when the store sent its change
-event without an epoch, which a custom `Store` can do.</p>
 </details>
 
 <details class="api-member" id="chart-change-event-charts" data-pagefind-weight="1">
-<summary><code>charts</code> <span class="api-member-summary">Charts to resolve again, in commit order of the edits that touched them.</span></summary>
+<summary><code>charts</code></summary>
 
 ```ts generated
 readonly charts: readonly ChartRef[];

@@ -1,34 +1,14 @@
 ---
 title: "Grid | @sheetwrite/svelte"
-description: "Grid interface in @sheetwrite/svelte: Imperative grid handle for document commands, events, rendering, and teardown."
+description: "Grid interface in @sheetwrite/svelte: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/svelte|.|Grid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Imperative grid handle for document commands, events, rendering, and teardown.
-
-## Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function updateTotal(grid: Grid) {
-  const sheet = grid.getActiveSheet();
-  const result = grid.applyTransaction({
-    patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
-  });
-  if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
-  return grid.aggregate(0, "sum");
-}
-```
-
-## See also
-
-- [createGrid](/docs/api/core/create-grid/)
-- [Grid.applyTransaction](/docs/api/svelte/grid/#grid-apply-transaction)
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L645"><code>packages/core/dist/types/grid.d.ts#L645</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L287"><code>packages/core/dist/types/grid.d.ts#L287</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -152,7 +132,7 @@ readonly store: Store;
 </details>
 
 <details class="api-member" id="grid-actions" data-pagefind-weight="1">
-<summary><code>actions</code> <span class="api-member-summary">Imperative action surface for binding custom toolbars/menus.</span></summary>
+<summary><code>actions</code></summary>
 
 ```ts generated
 readonly actions: GridActions;
@@ -161,7 +141,7 @@ readonly actions: GridActions;
 </details>
 
 <details class="api-member" id="grid-get-runtime-resource-snapshot" data-pagefind-weight="1">
-<summary><code>getRuntimeResourceSnapshot</code> <span class="api-member-summary">Versioned coarse runtime ownership snapshot, including datasource state.</span></summary>
+<summary><code>getRuntimeResourceSnapshot</code></summary>
 
 ```ts generated
 getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot;
@@ -170,7 +150,7 @@ getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeRe
 </details>
 
 <details class="api-member" id="grid-get-command-state" data-pagefind-weight="1">
-<summary><code>getCommandState</code> <span class="api-member-summary">Query undo/redo availability and formatting active/mixed/disabled state.</span></summary>
+<summary><code>getCommandState</code></summary>
 
 ```ts generated
 getCommandState(command: GridCommandName): GridCommandState;
@@ -179,28 +159,21 @@ getCommandState(command: GridCommandName): GridCommandState;
 </details>
 
 <details class="api-member" id="grid-get-focus-cell-style" data-pagefind-weight="1">
-<summary><code>getFocusCellStyle</code> <span class="api-member-summary">Effective style of the focus cell: its own style over its column's cellStyle.</span></summary>
+<summary><code>getFocusCellStyle</code></summary>
 
 ```ts generated
 getFocusCellStyle(): CellStyle;
 ```
 
-<p class="api-member-doc">Effective style of the focus cell: its own style over its column's
-`cellStyle`. Empty when nothing is selected.</p>
 </details>
 
 <details class="api-member" id="grid-summarize-selection" data-pagefind-weight="1">
-<summary><code>summarizeSelection</code> <span class="api-member-summary">Totals for the current selection, for a status bar.</span></summary>
+<summary><code>summarizeSelection</code></summary>
 
 ```ts generated
 summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
 ```
 
-<p class="api-member-doc">Totals for the current selection, for a status bar. Large selections are
-read in chunks between frames, so the page stays responsive; abort
-`signal` to stop early, which rejects with the signal's reason.
-`destroy()` stops every running summary the same way, with an
-`AbortError`. Resolves null when nothing is selected.</p>
 </details>
 
 <details class="api-member" id="grid-set-active-sheet" data-pagefind-weight="1">
@@ -222,18 +195,16 @@ scrollToCell(addr: CellAddress): void;
 </details>
 
 <details class="api-member" id="grid-get-cell-at-point" data-pagefind-weight="1">
-<summary><code>getCellAtPoint</code> <span class="api-member-summary">Resolve browser viewport coordinates to an active-sheet cell for host-owned menus and interactions.</span></summary>
+<summary><code>getCellAtPoint</code></summary>
 
 ```ts generated
 getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
 ```
 
-<p class="api-member-doc">Resolve browser viewport coordinates to an active-sheet cell for host-owned
-menus and interactions. Returns null outside the cell body.</p>
 </details>
 
 <details class="api-member" id="grid-get-active-sheet" data-pagefind-weight="1">
-<summary><code>getActiveSheet</code> <span class="api-member-summary">Id of the currently visible sheet.</span></summary>
+<summary><code>getActiveSheet</code></summary>
 
 ```ts generated
 getActiveSheet(): SheetId;
@@ -242,14 +213,12 @@ getActiveSheet(): SheetId;
 </details>
 
 <details class="api-member" id="grid-get-cell-input" data-pagefind-weight="1">
-<summary><code>getCellInput</code> <span class="api-member-summary">Editable snapshot of the cell at a view position on the active sheet, or null when out of bounds.</span></summary>
+<summary><code>getCellInput</code></summary>
 
 ```ts generated
 getCellInput(row: number, col: number): CellInputSnapshot | null;
 ```
 
-<p class="api-member-doc">Editable snapshot of the cell at a view position on the active sheet, or
-null when out of bounds. See <a href="/docs/api/core/cell-input-snapshot/"><code>CellInputSnapshot</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-get-selection" data-pagefind-weight="1">
@@ -271,17 +240,16 @@ setSelection(sel: Selection | null): void;
 </details>
 
 <details class="api-member" id="grid-get-theme" data-pagefind-weight="1">
-<summary><code>getTheme</code> <span class="api-member-summary">Resolved base theme, before zoom scaling.</span></summary>
+<summary><code>getTheme</code></summary>
 
 ```ts generated
 getTheme(): Theme;
 ```
 
-<p class="api-member-doc">Resolved base theme, before zoom scaling. The returned object is a copy.</p>
 </details>
 
 <details class="api-member" id="grid-get-shortcut-label" data-pagefind-weight="1">
-<summary><code>getShortcutLabel</code> <span class="api-member-summary">Platform-aware label for a bound action, or an empty string when disabled.</span></summary>
+<summary><code>getShortcutLabel</code></summary>
 
 ```ts generated
 getShortcutLabel(action: KeyboardAction): string;
@@ -290,7 +258,7 @@ getShortcutLabel(action: KeyboardAction): string;
 </details>
 
 <details class="api-member" id="grid-set-theme" data-pagefind-weight="1">
-<summary><code>setTheme</code> <span class="api-member-summary">Imperative patch: merge theme into the accumulated base theme.</span></summary>
+<summary><code>setTheme</code></summary>
 
 ```ts generated
 setTheme(theme: Partial<Theme>): void;
@@ -299,21 +267,16 @@ setTheme(theme: Partial<Theme>): void;
 </details>
 
 <details class="api-member" id="grid-replace-theme" data-pagefind-weight="1">
-<summary><code>replaceTheme</code> <span class="api-member-summary">Option-level replacement: re-run construction-time resolution (DEFAULTTHEME &lt; CSS custom properties &lt; theme) with the new partial.</span></summary>
+<summary><code>replaceTheme</code></summary>
 
 ```ts generated
 replaceTheme(theme: Partial<Theme> | undefined): void;
 ```
 
-<p class="api-member-doc">Option-level replacement: re-run construction-time resolution
-(`DEFAULT_THEME &lt; CSS custom properties &lt; theme`) with the new partial.
-`undefined` restores the CSS-variable/default resolution. Adapters call
-this for their declarative `theme` prop; imperative patching stays on
-<a href="/docs/api/svelte/grid/#grid-set-theme"><code>setTheme</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-get-effective-theme" data-pagefind-weight="1">
-<summary><code>getEffectiveTheme</code> <span class="api-member-summary">The effective (post-zoom) theme the renderer is currently painting with.</span></summary>
+<summary><code>getEffectiveTheme</code></summary>
 
 ```ts generated
 getEffectiveTheme(): Theme;
@@ -322,60 +285,34 @@ getEffectiveTheme(): Theme;
 </details>
 
 <details class="api-member" id="grid-set-read-only" data-pagefind-weight="1">
-<summary><code>setReadOnly</code> <span class="api-member-summary">Update editability without replacing the Grid or clearing session state.</span></summary>
+<summary><code>setReadOnly</code></summary>
 
 ```ts generated
 setReadOnly(readOnly: boolean): void;
 ```
 
-<p class="api-member-doc">Update editability without replacing the Grid or clearing session state.
-Has no effect after `engine-failed`: that grid stays read-only.</p>
 </details>
 
 <details class="api-member" id="grid-set-config" data-pagefind-weight="1">
-<summary><code>setConfig</code> <span class="api-member-summary">Reconfigure built-in chrome and keyboard handling without replacing the Grid or clearing selection/history.</span></summary>
+<summary><code>setConfig</code></summary>
 
 ```ts generated
 setConfig(config: GridConfig | undefined): void;
 ```
 
-<p class="api-member-doc">Reconfigure built-in chrome and keyboard handling without replacing the
-Grid or clearing selection/history. Construction-bound GridOptions are not
-accepted here.</p>
 </details>
 
 <details class="api-member" id="grid-apply-transaction" data-pagefind-weight="1">
-<summary><code>applyTransaction</code> <span class="api-member-summary">Apply arbitrary patches as one undoable Grid commit.</span></summary>
+<summary><code>applyTransaction</code></summary>
 
 ```ts generated
 applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
 ```
 
-Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
-Use `Store.applyTransaction` only for low-level writes that intentionally
-bypass Grid history and policy.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function setFirstCell(grid: Grid) {
-  return grid.applyTransaction({ patches: [
-    { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
-      value: { kind: "literal", value: 42 } },
-  ] });
-}
-```
-
-### See also
-
-- [Transaction](/docs/api/core/transaction/)
-
 </details>
 
 <details class="api-member" id="grid-export-snapshot" data-pagefind-weight="1">
-<summary><code>exportSnapshot</code> <span class="api-member-summary">Deterministically export the complete authoritative workbook document.</span></summary>
+<summary><code>exportSnapshot</code></summary>
 
 ```ts generated
 exportSnapshot(): WorkbookSnapshot;
@@ -384,14 +321,12 @@ exportSnapshot(): WorkbookSnapshot;
 </details>
 
 <details class="api-member" id="grid-apply-remote-operations" data-pagefind-weight="1">
-<summary><code>applyRemoteOperations</code> <span class="api-member-summary">Apply host-supplied operations without undo history or outgoing dirty state.</span></summary>
+<summary><code>applyRemoteOperations</code></summary>
 
 ```ts generated
 applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult;
 ```
 
-<p class="api-member-doc">Apply host-supplied operations without undo history or outgoing dirty state.
-The resulting change event has `source: &quot;remote&quot;`.</p>
 </details>
 
 <details class="api-member" id="grid-define-cell-renderer" data-pagefind-weight="1">
@@ -404,151 +339,61 @@ defineCellRenderer(name: string, renderer: CellRenderer): void;
 </details>
 
 <details class="api-member" id="grid-aggregate" data-pagefind-weight="1">
-<summary><code>aggregate</code> <span class="api-member-summary">Column aggregate over the active sheet's data.</span></summary>
+<summary><code>aggregate</code></summary>
 
 ```ts generated
 aggregate(col: number, op: AggregateOp): number;
 ```
 
-Column aggregate over the active sheet's data.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function total(grid: Grid) {
-  return grid.aggregate(1, "sum");
-}
-```
-
-### See also
-
-- [SheetwriteStore.aggregate](/docs/api/core/sheetwrite-store/#sheetwrite-store-aggregate)
-
 </details>
 
 <details class="api-member" id="grid-sort-by" data-pagefind-weight="1">
-<summary><code>sortBy</code> <span class="api-member-summary">Excel's quick sort by column col: sort the cells of the table body that holds the focus cell, or else of the selected range, or else of the current region around the focus cell.</span></summary>
+<summary><code>sortBy</code></summary>
 
 ```ts generated
 sortBy(col: number, ascending?: boolean): ApplyTransactionResult;
 ```
 
-Excel's quick sort by column `col`: sort the cells of the table body
-that holds the focus cell, or else of the selected range, or else of the
-current region around the focus cell. A first row of text over other
-values stays as a header.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function largestFirst(grid: Grid) {
-  grid.sortBy(1, false);
-}
-```
-
-### See also
-
-- [Grid.sortRange](/docs/api/svelte/grid/#grid-sort-range)
-
 </details>
 
 <details class="api-member" id="grid-filter-by" data-pagefind-weight="1">
-<summary><code>filterBy</code> <span class="api-member-summary">Filter the displayed rows to those whose column text contains needle.</span></summary>
+<summary><code>filterBy</code></summary>
 
 ```ts generated
 filterBy(col: number, needle: string): void;
 ```
 
-Filter the displayed rows to those whose column text contains `needle`.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function showOpenRows(grid: Grid) {
-  grid.filterBy(0, "Open");
-}
-```
-
-### See also
-
-- [Grid.clearView](/docs/api/svelte/grid/#grid-clear-view)
-
 </details>
 
 <details class="api-member" id="grid-set-column-filter" data-pagefind-weight="1">
-<summary><code>setColumnFilter</code> <span class="api-member-summary">Set or clear (null) one column's filter.</span></summary>
+<summary><code>setColumnFilter</code></summary>
 
 ```ts generated
 setColumnFilter(col: number, filter: ColumnFilter | null): void;
 ```
 
-<p class="api-member-doc">Set or clear (null) one column's filter. All column filters AND together
-and compose with the active sort and hidden rows.</p>
 </details>
 
 <details class="api-member" id="grid-set-view-sort" data-pagefind-weight="1">
-<summary><code>setViewSort</code> <span class="api-member-summary">Sort the displayed rows of the active sheet by keys (first key primary; stable) without moving any cell; an empty list clears the view sort.</span></summary>
+<summary><code>setViewSort</code></summary>
 
 ```ts generated
 setViewSort(keys: readonly SortKey[]): ApplyTransactionResult;
 ```
 
-Sort the displayed rows of the active sheet by `keys` (first key primary;
-stable) without moving any cell; an empty list clears the view sort. The
-keys are saved with the sheet and export to XLSX as `sortState`.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function showLargestFirst(grid: Grid) {
-  grid.setViewSort([{ col: 1, ascending: false }]);
-}
-```
-
-### See also
-
-- [Grid.clearView](/docs/api/svelte/grid/#grid-clear-view)
-
 </details>
 
 <details class="api-member" id="grid-sort-range" data-pagefind-weight="1">
-<summary><code>sortRange</code> <span class="api-member-summary">Sort the cells of range in place, as Excel's Sort does: one undoable change that collaborators receive as one transaction.</span></summary>
+<summary><code>sortRange</code></summary>
 
 ```ts generated
 sortRange(range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }): ApplyTransactionResult;
 ```
 
-Sort the cells of `range` in place, as Excel's Sort does: one undoable
-change that collaborators receive as one transaction. With `hasHeader`
-the first row stays. Merged cells of different sizes reject the sort and
-emit `mutation-rejected`.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function sortOrders(grid: Grid) {
-  grid.sortRange(
-    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
-    [{ col: 2, ascending: false }],
-    { hasHeader: true },
-  );
-}
-```
-
 </details>
 
 <details class="api-member" id="grid-get-column-filters" data-pagefind-weight="1">
-<summary><code>getColumnFilters</code> <span class="api-member-summary">Active column filters on the active sheet, keyed by column index.</span></summary>
+<summary><code>getColumnFilters</code></summary>
 
 ```ts generated
 getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
@@ -557,18 +402,16 @@ getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
 </details>
 
 <details class="api-member" id="grid-distinct-values" data-pagefind-weight="1">
-<summary><code>distinctValues</code> <span class="api-member-summary">Distinct resolved values of a column in first-seen order.</span></summary>
+<summary><code>distinctValues</code></summary>
 
 ```ts generated
 distinctValues(col: number, limit?: number): CellScalar[];
 ```
 
-<p class="api-member-doc">Distinct resolved values of a column in first-seen order. Defaults to
-1,000 values for bounded filter menus; pass 0 to request an uncapped scan.</p>
 </details>
 
 <details class="api-member" id="grid-hide-rows" data-pagefind-weight="1">
-<summary><code>hideRows</code> <span class="api-member-summary">Hide the given data rows (composes with filters/sort).</span></summary>
+<summary><code>hideRows</code></summary>
 
 ```ts generated
 hideRows(rows: readonly number[]): void;
@@ -577,7 +420,7 @@ hideRows(rows: readonly number[]): void;
 </details>
 
 <details class="api-member" id="grid-show-rows" data-pagefind-weight="1">
-<summary><code>showRows</code> <span class="api-member-summary">Show the given data rows again, or every hidden row when omitted.</span></summary>
+<summary><code>showRows</code></summary>
 
 ```ts generated
 showRows(rows?: readonly number[]): void;
@@ -586,7 +429,7 @@ showRows(rows?: readonly number[]): void;
 </details>
 
 <details class="api-member" id="grid-hidden-rows" data-pagefind-weight="1">
-<summary><code>hiddenRows</code> <span class="api-member-summary">Currently hidden data rows on the active sheet.</span></summary>
+<summary><code>hiddenRows</code></summary>
 
 ```ts generated
 hiddenRows(): readonly number[];
@@ -595,7 +438,7 @@ hiddenRows(): readonly number[];
 </details>
 
 <details class="api-member" id="grid-hide-columns" data-pagefind-weight="1">
-<summary><code>hideColumns</code> <span class="api-member-summary">Hide columns through one bulk-safe metadata transaction.</span></summary>
+<summary><code>hideColumns</code></summary>
 
 ```ts generated
 hideColumns(cols?: readonly number[]): void;
@@ -604,7 +447,7 @@ hideColumns(cols?: readonly number[]): void;
 </details>
 
 <details class="api-member" id="grid-show-columns" data-pagefind-weight="1">
-<summary><code>showColumns</code> <span class="api-member-summary">Show columns through one bulk-safe metadata transaction.</span></summary>
+<summary><code>showColumns</code></summary>
 
 ```ts generated
 showColumns(cols?: readonly number[]): void;
@@ -613,7 +456,7 @@ showColumns(cols?: readonly number[]): void;
 </details>
 
 <details class="api-member" id="grid-hidden-columns" data-pagefind-weight="1">
-<summary><code>hiddenColumns</code> <span class="api-member-summary">Currently hidden columns on the active sheet.</span></summary>
+<summary><code>hiddenColumns</code></summary>
 
 ```ts generated
 hiddenColumns(): readonly number[];
@@ -622,7 +465,7 @@ hiddenColumns(): readonly number[];
 </details>
 
 <details class="api-member" id="grid-group-rows" data-pagefind-weight="1">
-<summary><code>groupRows</code> <span class="api-member-summary">Define a collapsible row group over a data-row range (end-inclusive).</span></summary>
+<summary><code>groupRows</code></summary>
 
 ```ts generated
 groupRows(start: number, end: number): void;
@@ -631,7 +474,7 @@ groupRows(start: number, end: number): void;
 </details>
 
 <details class="api-member" id="grid-ungroup-rows" data-pagefind-weight="1">
-<summary><code>ungroupRows</code> <span class="api-member-summary">Remove a row group (rows become visible if the group was collapsed).</span></summary>
+<summary><code>ungroupRows</code></summary>
 
 ```ts generated
 ungroupRows(start: number, end: number): void;
@@ -640,7 +483,7 @@ ungroupRows(start: number, end: number): void;
 </details>
 
 <details class="api-member" id="grid-set-group-collapsed" data-pagefind-weight="1">
-<summary><code>setGroupCollapsed</code> <span class="api-member-summary">Collapse/expand a row group; collapsing hides its rows.</span></summary>
+<summary><code>setGroupCollapsed</code></summary>
 
 ```ts generated
 setGroupCollapsed(start: number, collapsed: boolean): void;
@@ -649,7 +492,7 @@ setGroupCollapsed(start: number, collapsed: boolean): void;
 </details>
 
 <details class="api-member" id="grid-row-groups" data-pagefind-weight="1">
-<summary><code>rowGroups</code> <span class="api-member-summary">Row groups on the active sheet.</span></summary>
+<summary><code>rowGroups</code></summary>
 
 ```ts generated
 rowGroups(): readonly RowGroup[];
@@ -658,7 +501,7 @@ rowGroups(): readonly RowGroup[];
 </details>
 
 <details class="api-member" id="grid-clear-view" data-pagefind-weight="1">
-<summary><code>clearView</code> <span class="api-member-summary">Clear any active sort/filter view.</span></summary>
+<summary><code>clearView</code></summary>
 
 ```ts generated
 clearView(): void;
@@ -667,35 +510,16 @@ clearView(): void;
 </details>
 
 <details class="api-member" id="grid-undo" data-pagefind-weight="1">
-<summary><code>undo</code> <span class="api-member-summary">Undo the last recorded cell edit.</span></summary>
+<summary><code>undo</code></summary>
 
 ```ts generated
 undo(): void;
 ```
 
-Undo the last recorded cell edit. If the restored data is above the
-transaction resource limits, nothing changes: the Grid emits
-`mutation-rejected` and removes that entry, so older edits stay undoable.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function undoAndRestore(grid: Grid) {
-  grid.undo();
-  grid.redo();
-}
-```
-
-### See also
-
-- [Grid.redo](/docs/api/svelte/grid/#grid-redo)
-
 </details>
 
 <details class="api-member" id="grid-redo" data-pagefind-weight="1">
-<summary><code>redo</code> <span class="api-member-summary">Redo the last undone cell edit.</span></summary>
+<summary><code>redo</code></summary>
 
 ```ts generated
 redo(): void;
@@ -704,68 +528,34 @@ redo(): void;
 </details>
 
 <details class="api-member" id="grid-export-csv" data-pagefind-weight="1">
-<summary><code>exportCsv</code> <span class="api-member-summary">Download the active sheet as CSV.</span></summary>
+<summary><code>exportCsv</code></summary>
 
 ```ts generated
 exportCsv(filename: string): void;
 ```
 
-Download the active sheet as CSV.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function downloadCsv(grid: Grid) {
-  grid.exportCsv("sales.csv");
-}
-```
-
 </details>
 
 <details class="api-member" id="grid-export-xlsx" data-pagefind-weight="1">
-<summary><code>exportXlsx</code> <span class="api-member-summary">Download the active sheet through the registered XLSX backend.</span></summary>
+<summary><code>exportXlsx</code></summary>
 
 ```ts generated
 exportXlsx(filename: string): Promise<void>;
 ```
 
-Download the active sheet through the registered XLSX backend.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-import { registerXlsxBackends } from "@sheetwrite/xlsx";
-
-async function downloadXlsx(grid: Grid) {
-  await registerXlsxBackends();
-  await grid.exportXlsx("sales.xlsx");
-}
-```
-
-### See also
-
-- [toXlsxWorkbook](/docs/api/core/to-xlsx-workbook/)
-
 </details>
 
 <details class="api-member" id="grid-import-workbook" data-pagefind-weight="1">
-<summary><code>importWorkbook</code> <span class="api-member-summary">Replace the document without recreating the grid or chrome.</span></summary>
+<summary><code>importWorkbook</code></summary>
 
 ```ts generated
 importWorkbook(source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>), options?: { signal?: AbortSignal; }): Promise<void>;
 ```
 
-<p class="api-member-doc">Replace the document without recreating the grid or chrome. A new import
-aborts the previous loader. Failure keeps the document and history; success
-clears undo and redo. Import is not undoable, like Excel Open.
-Injected stores, datasource grids and attached collaboration sessions reject.</p>
 </details>
 
 <details class="api-member" id="grid-search" data-pagefind-weight="1">
-<summary><code>search</code> <span class="api-member-summary">Find cells matching query; highlights matches, emits search, returns the result.</span></summary>
+<summary><code>search</code></summary>
 
 ```ts generated
 search(query: string, opts?: SearchOptions): SearchResult;
@@ -774,7 +564,7 @@ search(query: string, opts?: SearchOptions): SearchResult;
 </details>
 
 <details class="api-member" id="grid-find-next" data-pagefind-weight="1">
-<summary><code>findNext</code> <span class="api-member-summary">Move the active match to the next match and scroll it into view.</span></summary>
+<summary><code>findNext</code></summary>
 
 ```ts generated
 findNext(): SearchResult;
@@ -783,7 +573,7 @@ findNext(): SearchResult;
 </details>
 
 <details class="api-member" id="grid-find-prev" data-pagefind-weight="1">
-<summary><code>findPrev</code> <span class="api-member-summary">Move the active match to the previous match and scroll it into view.</span></summary>
+<summary><code>findPrev</code></summary>
 
 ```ts generated
 findPrev(): SearchResult;
@@ -792,7 +582,7 @@ findPrev(): SearchResult;
 </details>
 
 <details class="api-member" id="grid-clear-search" data-pagefind-weight="1">
-<summary><code>clearSearch</code> <span class="api-member-summary">Clear the current search and its highlights.</span></summary>
+<summary><code>clearSearch</code></summary>
 
 ```ts generated
 clearSearch(): void;
@@ -801,30 +591,21 @@ clearSearch(): void;
 </details>
 
 <details class="api-member" id="grid-replace-current" data-pagefind-weight="1">
-<summary><code>replaceCurrent</code> <span class="api-member-summary">Replace the active match with replacement, then advance to the next match (re-scanning against the new data).</span></summary>
+<summary><code>replaceCurrent</code></summary>
 
 ```ts generated
 replaceCurrent(replacement: string): SearchResult;
 ```
 
-<p class="api-member-doc">Replace the active match with `replacement`, then advance to the next match
-(re-scanning against the new data). Only literal text/number cells are
-eligible; formula and ref cells are skipped (formula source is never
-rewritten). Honors the active <a href="/docs/api/core/search-options/"><code>SearchOptions</code></a> (matchCase; `wholeCell`
-swaps the entire cell). The write flows through the grid's commit path as
-one undoable step. No-op when read-only or when there is no active match.</p>
 </details>
 
 <details class="api-member" id="grid-replace-all" data-pagefind-weight="1">
-<summary><code>replaceAll</code> <span class="api-member-summary">Replace every current match in a single undoable transaction (one undo() restores them all), then re-scan.</span></summary>
+<summary><code>replaceAll</code></summary>
 
 ```ts generated
 replaceAll(replacement: string): ReplaceResult;
 ```
 
-<p class="api-member-doc">Replace every current match in a single undoable transaction (one
-`undo()` restores them all), then re-scan. Formula/ref cells are skipped
-and not counted. No-op when read-only.</p>
 </details>
 
 <details class="api-member" id="grid-insert-rows" data-pagefind-weight="1">
@@ -864,7 +645,7 @@ removeColumns(at: number, count?: number): void;
 </details>
 
 <details class="api-member" id="grid-add-sheet" data-pagefind-weight="1">
-<summary><code>addSheet</code> <span class="api-member-summary">Add a sheet with a stable ID and return its actionable transaction outcome.</span></summary>
+<summary><code>addSheet</code></summary>
 
 ```ts generated
 addSheet(input: AddSheetInput): SheetLifecycleResult;
@@ -873,7 +654,7 @@ addSheet(input: AddSheetInput): SheetLifecycleResult;
 </details>
 
 <details class="api-member" id="grid-remove-sheet" data-pagefind-weight="1">
-<summary><code>removeSheet</code> <span class="api-member-summary">Remove a sheet while preserving at least one visible worksheet.</span></summary>
+<summary><code>removeSheet</code></summary>
 
 ```ts generated
 removeSheet(id: SheetId): SheetLifecycleResult;
@@ -900,7 +681,7 @@ moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
 </details>
 
 <details class="api-member" id="grid-set-sheet-visibility" data-pagefind-weight="1">
-<summary><code>setSheetVisibility</code> <span class="api-member-summary">Set host-visible worksheet state; stock UI never offers veryHidden.</span></summary>
+<summary><code>setSheetVisibility</code></summary>
 
 ```ts generated
 setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
@@ -945,14 +726,12 @@ getHyperlink(addr: CellAddress): CellHyperlink | null;
 </details>
 
 <details class="api-member" id="grid-activate-hyperlink" data-pagefind-weight="1">
-<summary><code>activateHyperlink</code> <span class="api-member-summary">Validate and emit a host-owned activation event.</span></summary>
+<summary><code>activateHyperlink</code></summary>
 
 ```ts generated
 activateHyperlink(addr: CellAddress): boolean;
 ```
 
-<p class="api-member-doc">Validate and emit a host-owned activation event. External targets are never
-opened by Sheetwrite; internal navigation occurs only under the explicit policy.</p>
 </details>
 
 <details class="api-member" id="grid-set-validation-rule" data-pagefind-weight="1">
@@ -992,7 +771,7 @@ removeProtectedRange(id: string): ApplyTransactionResult;
 </details>
 
 <details class="api-member" id="grid-get-pivots" data-pagefind-weight="1">
-<summary><code>getPivots</code> <span class="api-member-summary">Clones of the pivot definitions on sheet, or on every sheet; no engine is needed.</span></summary>
+<summary><code>getPivots</code></summary>
 
 ```ts generated
 getPivots(sheet?: SheetId): PivotDefinition[];
@@ -1001,19 +780,16 @@ getPivots(sheet?: SheetId): PivotDefinition[];
 </details>
 
 <details class="api-member" id="grid-set-pivot" data-pagefind-weight="1">
-<summary><code>setPivot</code> <span class="api-member-summary">Insert or replace a pivot as one undo entry.</span></summary>
+<summary><code>setPivot</code></summary>
 
 ```ts generated
 setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
 ```
 
-<p class="api-member-doc">Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet
-that holds the pivot's ID, then to the active sheet. The pivot's
-`savedOutput` is removed, because it does not match a changed definition.</p>
 </details>
 
 <details class="api-member" id="grid-remove-pivot" data-pagefind-weight="1">
-<summary><code>removePivot</code> <span class="api-member-summary">Remove a pivot from sheet (default: the sheet that holds it) as one undo entry.</span></summary>
+<summary><code>removePivot</code></summary>
 
 ```ts generated
 removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
@@ -1022,7 +798,7 @@ removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
 </details>
 
 <details class="api-member" id="grid-get-pivot-fields" data-pagefind-weight="1">
-<summary><code>getPivotFields</code> <span class="api-member-summary">Source fields for the field list; empty on the default engine.</span></summary>
+<summary><code>getPivotFields</code></summary>
 
 ```ts generated
 getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
@@ -1031,19 +807,16 @@ getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
 </details>
 
 <details class="api-member" id="grid-get-pivot-result" data-pagefind-weight="1">
-<summary><code>getPivotResult</code> <span class="api-member-summary">Plain-JSON output of one pivot.</span></summary>
+<summary><code>getPivotResult</code></summary>
 
 ```ts generated
 getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
 ```
 
-<p class="api-member-doc">Plain-JSON output of one pivot. The default engine reports the saved
-output (`saved`), or `unavailable` without one. Null when `sheet` holds
-no pivot with `id`.</p>
 </details>
 
 <details class="api-member" id="grid-get-charts" data-pagefind-weight="1">
-<summary><code>getCharts</code> <span class="api-member-summary">Clones of the chart definitions on sheet (default: the active sheet).</span></summary>
+<summary><code>getCharts</code></summary>
 
 ```ts generated
 getCharts(sheet?: SheetId): readonly ChartDefinition[];
@@ -1052,18 +825,16 @@ getCharts(sheet?: SheetId): readonly ChartDefinition[];
 </details>
 
 <details class="api-member" id="grid-set-chart" data-pagefind-weight="1">
-<summary><code>setChart</code> <span class="api-member-summary">Insert or replace the chart with chart.id as one undo entry.</span></summary>
+<summary><code>setChart</code></summary>
 
 ```ts generated
 setChart(chart: ChartDefinition, sheet?: SheetId): ApplyTransactionResult;
 ```
 
-<p class="api-member-doc">Insert or replace the chart with `chart.id` as one undo entry. `sheet`
-defaults to the active sheet; chart IDs are unique only within a sheet.</p>
 </details>
 
 <details class="api-member" id="grid-remove-chart" data-pagefind-weight="1">
-<summary><code>removeChart</code> <span class="api-member-summary">Remove a chart from sheet (default: the first sheet that holds it) as one undo entry.</span></summary>
+<summary><code>removeChart</code></summary>
 
 ```ts generated
 removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
@@ -1072,28 +843,21 @@ removeChart(id: string, sheet?: SheetId): ApplyTransactionResult;
 </details>
 
 <details class="api-member" id="grid-select-chart" data-pagefind-weight="1">
-<summary><code>selectChart</code> <span class="api-member-summary">Select the chart object id on sheet (default: the active sheet), or deselect with null.</span></summary>
+<summary><code>selectChart</code></summary>
 
 ```ts generated
 selectChart(id: string | null, sheet?: SheetId): void;
 ```
 
-<p class="api-member-doc">Select the chart object `id` on `sheet` (default: the active sheet), or
-deselect with `null`. Selecting a chart on another sheet activates that
-sheet first. Emits `chart-select`.</p>
 </details>
 
 <details class="api-member" id="grid-open-panel" data-pagefind-weight="1">
-<summary><code>openPanel</code> <span class="api-member-summary">Show panel on the grid's right edge and shrink the cells to make room; null closes the open panel.</span></summary>
+<summary><code>openPanel</code></summary>
 
 ```ts generated
 openPanel(panel: GridPanel | null): void;
 ```
 
-<p class="api-member-doc">Show `panel` on the grid's right edge and shrink the cells to make room;
-`null` closes the open panel. One panel shows at a time: opening a panel
-closes the previous one. Escape and the close button close it and return
-focus to the grid.</p>
 </details>
 
 <details class="api-member" id="grid-set-protection-resolver" data-pagefind-weight="1">
@@ -1124,7 +888,7 @@ getNote(addr: CellAddress): string | null;
 </details>
 
 <details class="api-member" id="grid-set-overscan" data-pagefind-weight="1">
-<summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render window overscan (row/column positions painted past each edge); undefined restores the default of 6.</span></summary>
+<summary><code>setOverscan</code></summary>
 
 ```ts generated
 setOverscan(overscan?: number): void;
@@ -1133,30 +897,25 @@ setOverscan(overscan?: number): void;
 </details>
 
 <details class="api-member" id="grid-set-min-columns" data-pagefind-weight="1">
-<summary><code>setMinColumns</code> <span class="api-member-summary">Live-update the minimum rendered column count.</span></summary>
+<summary><code>setMinColumns</code></summary>
 
 ```ts generated
 setMinColumns(minColumns?: number): void;
 ```
 
-<p class="api-member-doc">Live-update the minimum rendered column count. Increasing the minimum
-silently extends presentation padding; `undefined` restores the default.</p>
 </details>
 
 <details class="api-member" id="grid-highlight-cells" data-pagefind-weight="1">
-<summary><code>highlightCells</code> <span class="api-member-summary">Draw temporary highlights outside document history.</span></summary>
+<summary><code>highlightCells</code></summary>
 
 ```ts generated
 highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
 ```
 
-<p class="api-member-doc">Draw temporary highlights outside document history. Pass `null` to clear all
-highlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.
-Undo does not clear highlights; use `styleRange` for persistent cell fills.</p>
 </details>
 
 <details class="api-member" id="grid-set-presence-overlays" data-pagefind-weight="1">
-<summary><code>setPresenceOverlays</code> <span class="api-member-summary">Replace ephemeral remote-presence overlays; null clears every collaborator.</span></summary>
+<summary><code>setPresenceOverlays</code></summary>
 
 ```ts generated
 setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
@@ -1165,19 +924,16 @@ setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
 </details>
 
 <details class="api-member" id="grid-style-range" data-pagefind-weight="1">
-<summary><code>styleRange</code> <span class="api-member-summary">Merge style into every cell of range (null clears cell styles) as one undoable transaction.</span></summary>
+<summary><code>styleRange</code></summary>
 
 ```ts generated
 styleRange(range: Range, style: Partial<CellStyle> | null): void;
 ```
 
-<p class="api-member-doc">Merge `style` into every cell of `range` (null clears cell styles) as one
-undoable transaction. Styles land in the store and paint in the canvas —
-unlike <a href="/docs/api/svelte/grid/#grid-highlight-cells"><code>highlightCells</code></a>, which draws a translucent overlay above it.</p>
 </details>
 
 <details class="api-member" id="grid-begin-edit" data-pagefind-weight="1">
-<summary><code>beginEdit</code> <span class="api-member-summary">Open the cell editor at a view cell, optionally seeding text / selecting all.</span></summary>
+<summary><code>beginEdit</code></summary>
 
 ```ts generated
 beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;
@@ -1186,21 +942,16 @@ beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void
 </details>
 
 <details class="api-member" id="grid-data-edge" data-pagefind-weight="1">
-<summary><code>dataEdge</code> <span class="api-member-summary">Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the moved axis (row for vertical moves, col for horizontal), or null when the store is not columnar.</span></summary>
+<summary><code>dataEdge</code></summary>
 
 ```ts generated
 dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;
 ```
 
-<p class="api-member-doc">Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the
-moved axis (row for vertical moves, col for horizontal), or null when the
-store is not columnar. Under an active sort/filter view, `row` is a view
-position and vertical moves return view positions. For hosts building
-their own keymaps (`config.keyboard`).</p>
 </details>
 
 <details class="api-member" id="grid-set-row-height" data-pagefind-weight="1">
-<summary><code>setRowHeight</code> <span class="api-member-summary">Set one row's persistent display height through document history.</span></summary>
+<summary><code>setRowHeight</code></summary>
 
 ```ts generated
 setRowHeight(row: number, height: number): void;
@@ -1209,7 +960,7 @@ setRowHeight(row: number, height: number): void;
 </details>
 
 <details class="api-member" id="grid-set-column-width" data-pagefind-weight="1">
-<summary><code>setColumnWidth</code> <span class="api-member-summary">Set one column's width via an undoable setColumn patch.</span></summary>
+<summary><code>setColumnWidth</code></summary>
 
 ```ts generated
 setColumnWidth(col: number, width: number): void;
@@ -1218,7 +969,7 @@ setColumnWidth(col: number, width: number): void;
 </details>
 
 <details class="api-member" id="grid-auto-fit-rows" data-pagefind-weight="1">
-<summary><code>autoFitRows</code> <span class="api-member-summary">Explicitly resize rows to fit wrapped content; never runs during paint.</span></summary>
+<summary><code>autoFitRows</code></summary>
 
 ```ts generated
 autoFitRows(range?: Range): void;
@@ -1227,7 +978,7 @@ autoFitRows(range?: Range): void;
 </details>
 
 <details class="api-member" id="grid-auto-fit-columns" data-pagefind-weight="1">
-<summary><code>autoFitColumns</code> <span class="api-member-summary">Explicitly resize columns from a bulk worksheet read.</span></summary>
+<summary><code>autoFitColumns</code></summary>
 
 ```ts generated
 autoFitColumns(cols?: readonly number[]): void;
@@ -1236,18 +987,16 @@ autoFitColumns(cols?: readonly number[]): void;
 </details>
 
 <details class="api-member" id="grid-set-frozen" data-pagefind-weight="1">
-<summary><code>setFrozen</code> <span class="api-member-summary">Pin the first rows view rows and cols columns; they stay visible while the body scrolls (0 = unfreeze that axis).</span></summary>
+<summary><code>setFrozen</code></summary>
 
 ```ts generated
 setFrozen(rows: number, cols?: number): void;
 ```
 
-<p class="api-member-doc">Pin the first `rows` view rows and `cols` columns; they stay visible while
-the body scrolls (0 = unfreeze that axis). Persisted on the active sheet.</p>
 </details>
 
 <details class="api-member" id="grid-set-zoom" data-pagefind-weight="1">
-<summary><code>setZoom</code> <span class="api-member-summary">Content zoom factor (0.5–2): scales row/column geometry and fonts.</span></summary>
+<summary><code>setZoom</code></summary>
 
 ```ts generated
 setZoom(zoom: number): void;
@@ -1265,7 +1014,7 @@ getZoom(): number;
 </details>
 
 <details class="api-member" id="grid-renderer-kind" data-pagefind-weight="1">
-<summary><code>rendererKind</code> <span class="api-member-summary">Which renderer is actually active: &quot;worker&quot; when the OffscreenCanvas worker constructed successfully, &quot;canvas&quot; otherwise (including after a renderer-fallback).</span></summary>
+<summary><code>rendererKind</code></summary>
 
 ```ts generated
 rendererKind(): "canvas" | "worker";
@@ -1292,47 +1041,21 @@ refresh(): void;
 </details>
 
 <details class="api-member" id="grid-trim-memory" data-pagefind-weight="1">
-<summary><code>trimMemory</code> <span class="api-member-summary">Drop the memory this grid can build again: decoded cell strings, rendered number text, compiled number formats, text measurement and unused overlay nodes, in the grid and in its worker renderer.</span></summary>
+<summary><code>trimMemory</code></summary>
 
 ```ts generated
 trimMemory(): void;
 ```
 
-Drop the memory this grid can build again: decoded cell strings, rendered
-number text, compiled number formats, text measurement and unused overlay
-nodes, in the grid and in its worker renderer. Document data, undo history
-and the visible output do not change. The next frame and the next use
-build again what they need. Call it on a memory signal or when the page
-goes to the background; it does nothing after `destroy()`.
-
-Number format caches are shared by all grids on the page, so a trim also
-drops them for the other grids. WebAssembly memory does not shrink; call
-`releaseEngineMemory()` for that.
-
-### Examples
-
-```ts compile
-import type { Grid } from "@sheetwrite/core";
-
-function trimWhenHidden(grid: Grid) {
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") grid.trimMemory();
-  });
-}
-```
-
 </details>
 
 <details class="api-member" id="grid-destroy" data-pagefind-weight="1">
-<summary><code>destroy</code> <span class="api-member-summary">Free everything this grid owns: its DOM, listeners, timers, renderer, worker and caches, and the store that it created.</span></summary>
+<summary><code>destroy</code></summary>
 
 ```ts generated
 destroy(): void;
 ```
 
-<p class="api-member-doc">Free everything this grid owns: its DOM, listeners, timers, renderer,
-worker and caches, and the store that it created. Call it when the host
-view is removed; a second call does nothing.</p>
 </details>
 </div>
 

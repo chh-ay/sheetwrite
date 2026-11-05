@@ -1,14 +1,14 @@
 ---
 title: "GridCommandState | @sheetwrite/react"
-description: "GridCommandState interface in @sheetwrite/react: Observable availability and selection-derived activity for one command."
+description: "GridCommandState interface in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/react|.|GridCommandState -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Observable availability and selection-derived activity for one command.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L193"><code>packages/core/dist/types/grid.d.ts#L193</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/grid.d.ts#L109"><code>packages/core/dist/types/grid.d.ts#L109</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

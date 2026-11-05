@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeHandler | @sheetwrite/vue"
-description: "RowBridgeHandler type in @sheetwrite/vue: Callback accepted by imperative and framework adapters."
+description: "RowBridgeHandler type in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|RowBridgeHandler -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
 
-Callback accepted by imperative and framework adapters.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L138"><code>packages/core/dist/row-bridge.d.ts#L138</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L113"><code>packages/core/dist/row-bridge.d.ts#L113</code></a></dd></div>
 </dl>
 
 ## Declaration

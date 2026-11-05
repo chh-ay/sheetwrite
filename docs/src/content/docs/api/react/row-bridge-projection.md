@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeProjection | @sheetwrite/react"
-description: "RowBridgeProjection interface in @sheetwrite/react: Result of projection or reconciliation."
+description: "RowBridgeProjection interface in @sheetwrite/react: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/react|.|RowBridgeProjection -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Result of projection or reconciliation.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L132"><code>packages/core/dist/row-bridge.d.ts#L132</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L108"><code>packages/core/dist/row-bridge.d.ts#L108</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

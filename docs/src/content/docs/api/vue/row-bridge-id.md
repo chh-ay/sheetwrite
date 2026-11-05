@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeId | @sheetwrite/vue"
-description: "RowBridgeId type in @sheetwrite/vue: A stable host identity for one data-space row."
+description: "RowBridgeId type in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|RowBridgeId -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
 
-A stable host identity for one data-space row.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L6"><code>packages/core/dist/row-bridge.d.ts#L6</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L5"><code>packages/core/dist/row-bridge.d.ts#L5</code></a></dd></div>
 </dl>
 
 ## Declaration

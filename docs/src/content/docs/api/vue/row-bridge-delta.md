@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeDelta | @sheetwrite/vue"
-description: "RowBridgeDelta type in @sheetwrite/vue: Every possible projection produced by a row bridge."
+description: "RowBridgeDelta type in @sheetwrite/vue: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|RowBridgeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
 
-Every possible projection produced by a row bridge.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L114"><code>packages/core/dist/row-bridge.d.ts#L114</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/row-bridge.d.ts#L95"><code>packages/core/dist/row-bridge.d.ts#L95</code></a></dd></div>
 </dl>
 
 ## Declaration

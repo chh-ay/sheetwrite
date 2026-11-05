@@ -1,14 +1,14 @@
 ---
 title: "QueryAggregate | @sheetwrite/queries"
-description: "QueryAggregate interface in @sheetwrite/queries: Column is required except for countRows; numeric aggregates ignore nulls."
+description: "QueryAggregate interface in @sheetwrite/queries: Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/queries|.|QueryAggregate -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/queries/">@sheetwrite/queries</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Column is required except for countRows; numeric aggregates ignore nulls.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L34"><code>packages/core/dist/types/query.d.ts#L34</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/query.d.ts#L29"><code>packages/core/dist/types/query.d.ts#L29</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
