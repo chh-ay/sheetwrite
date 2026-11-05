@@ -10,7 +10,7 @@
 //! text, logical values and blanks are left out, a non-finite number reads as
 //! `#NUM!` and text missing from the pool as `#REF!`.
 
-use super::matrix::range_from_ast;
+use super::matrix::written_range;
 use super::range_reader::{LiteralColumns, RangeReader};
 use super::statistics::{
     paired_statistic, percentile, PairedCell, PairedKind, MAX_SELECTION_VALUES,
@@ -63,14 +63,15 @@ fn paired_cells<'a>(
 
 impl CellStore {
     /// The dense literal cells of the range `arg`, or `None` when it is not a
-    /// range of them.
+    /// range of them. Only an argument written as a range qualifies: these
+    /// functions read a lone cell as a scalar, whose numeric text counts.
     fn literal_range_argument(
         &self,
         arg: &Ast,
         sheet: usize,
         depth: usize,
     ) -> Option<LiteralColumns<'_>> {
-        RangeReader::new(self, range_from_ast(arg, sheet)?, depth)
+        RangeReader::new(self, written_range(arg, sheet)?, depth)
             .ok()?
             .literal_columns()
     }
@@ -192,6 +193,9 @@ mod tests {
             format!("=COVARIANCE.P(B1:B{last},C1:C{last})"),
             format!("=CORREL(F1:F{last},F1:F{last})"),
             "=COVARIANCE.P(A1:A10,B1:B12)".to_owned(),
+            // A lone cell is a scalar argument: its numeric text counts.
+            "=PERCENTILE.INC(A1,0.5)".to_owned(),
+            "=COVARIANCE.P(A1,B1)".to_owned(),
         ]
     }
 
@@ -221,10 +225,11 @@ mod tests {
         KERNEL_RESULTS.with(|calls| calls.set(0));
         let scanned = results(true);
 
-        // Every formula but the one with different cell counts takes the kernel.
+        // Every formula but the one with different cell counts and the two
+        // with lone cells takes the kernel.
         assert_eq!(
             KERNEL_RESULTS.with(std::cell::Cell::get),
-            formulas().len() - 1
+            formulas().len() - 3
         );
         for ((source, accumulated), scanned) in formulas().iter().zip(&accumulated).zip(&scanned) {
             assert_eq!(accumulated, scanned, "{source}");
