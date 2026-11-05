@@ -1,13 +1,13 @@
+import { colToA1, rangeA1 } from "../a1.js";
 /**
  * Sheet metadata that moves with the rows of a `permuteRows` operation.
  * Notes and hyperlinks are cell properties, so they move with their row, as
  * in an Excel sort. A merged cell moves only as a whole record of rows.
  */
-import type { PermuteRowsOperation } from "../row-order.js";
 import type { CellHyperlink } from "../types/cell.js";
 import type { MergeRange, Range } from "../types/coordinates.js";
-import type { CellNote } from "../types/document.js";
-import type { WorkbookTable } from "../types/table.js";
+import type { CellNote, DocumentOp, SortKey } from "../types/document.js";
+import type { WorkbookTable, WorkbookTableXmlElement } from "../types/table.js";
 
 /** Normalized bounds of a permuted range and where each of its rows goes. */
 export interface RowMove {
@@ -145,6 +145,48 @@ export const MERGED_CELLS_SORT_MESSAGE =
 
 /** How a sort request changes a range. */
 export type SortRangePlan =
-  | { kind: "move"; operation: PermuteRowsOperation }
+  | { kind: "move"; operations: DocumentOp[] }
   | { kind: "unchanged" }
   | { kind: "refused"; message: string };
+
+/** The table whose body (the rows between its header and totals rows) is `range`. */
+export function tableWithBody(
+  tables: readonly WorkbookTable[],
+  range: Range,
+): WorkbookTable | undefined {
+  return tables.find((table) => {
+    const bodyStart = table.range.start.row + (table.headerRow ? 1 : 0);
+    const bodyEnd = table.range.end.row - (table.totalsRow ? 1 : 0);
+    return (
+      table.range.sheet === range.sheet &&
+      range.start.row === bodyStart &&
+      range.end.row === bodyEnd &&
+      range.start.col === table.range.start.col &&
+      range.end.col === table.range.end.col
+    );
+  });
+}
+
+/**
+ * The `sortState` element Excel writes on a table after a sort: the sorted
+ * body and one condition per key column. Export anchors its references to
+ * the table's current range.
+ */
+export function tableSortState(body: Range, keys: readonly SortKey[]): WorkbookTableXmlElement {
+  const firstRow = body.start.row + 1;
+  const lastRow = body.end.row + 1;
+  return {
+    name: "sortState",
+    attributes: { ref: rangeA1(body.start, body.end) },
+    text: "",
+    children: keys.map((key) => ({
+      name: "sortCondition",
+      attributes: {
+        ref: `${colToA1(key.col)}${firstRow}:${colToA1(key.col)}${lastRow}`,
+        ...(key.ascending ? {} : { descending: "1" }),
+      },
+      text: "",
+      children: [],
+    })),
+  };
+}

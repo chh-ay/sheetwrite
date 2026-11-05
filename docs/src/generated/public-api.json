@@ -386,7 +386,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L458",
+              "source": "src/workbook-table.ts#L464",
               "jsDocTags": [],
               "documentation": "Reject an invalid or oversized live workbook before table arrays are copied to WASM.",
               "memberDocs": []
@@ -434,7 +434,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L119",
+              "source": "src/types/document.ts#L126",
               "jsDocTags": [],
               "documentation": "Workbook calculation options, mirroring Excel's \"Enable iterative calculation\".\nA workbook without this record uses the defaults.",
               "memberDocs": [
@@ -495,7 +495,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L396",
+              "source": "src/types/document.ts#L403",
               "jsDocTags": [],
               "documentation": "Sparse row-major cells bounded by one rectangular block.",
               "memberDocs": []
@@ -682,7 +682,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L246",
+              "source": "src/types/document.ts#L253",
               "jsDocTags": [],
               "documentation": "Serializable plain-text note anchored to a cell.",
               "memberDocs": []
@@ -1200,7 +1200,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L101",
+              "source": "src/types/document.ts#L108",
               "jsDocTags": [],
               "documentation": "One column's filter predicate. All active column filters AND together;\nmatching is against the cell's resolved value (text or number).",
               "memberDocs": []
@@ -1224,7 +1224,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L325",
+              "source": "src/collaboration.ts#L323",
               "jsDocTags": [],
               "documentation": "Host persistence contract for versioned comment threads.",
               "memberDocs": []
@@ -1236,7 +1236,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L254",
+              "source": "src/collaboration.ts#L252",
               "jsDocTags": [],
               "documentation": "Document location to which a comment thread is attached.",
               "memberDocs": []
@@ -1248,7 +1248,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L247",
+              "source": "src/collaboration.ts#L245",
               "jsDocTags": [],
               "documentation": "Stable host-provided identity displayed on a comment message.",
               "memberDocs": []
@@ -1260,7 +1260,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L352",
+              "source": "src/collaboration.ts#L350",
               "jsDocTags": [],
               "documentation": "Transport/auth-neutral comment state with server-owned author and timestamp fields.",
               "memberDocs": []
@@ -1272,7 +1272,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L342",
+              "source": "src/collaboration.ts#L340",
               "jsDocTags": [],
               "documentation": "State transition emitted by the comment coordinator.",
               "memberDocs": []
@@ -1284,7 +1284,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L336",
+              "source": "src/collaboration.ts#L334",
               "jsDocTags": [],
               "documentation": "Document identity and initial version for comment coordination.",
               "memberDocs": []
@@ -1296,7 +1296,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L312",
+              "source": "src/collaboration.ts#L310",
               "jsDocTags": [],
               "documentation": "Versioned comment-thread listing returned by a host adapter.",
               "memberDocs": []
@@ -1308,7 +1308,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L259",
+              "source": "src/collaboration.ts#L257",
               "jsDocTags": [],
               "documentation": "One immutable author message in a comment thread.",
               "memberDocs": []
@@ -1320,7 +1320,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L280",
+              "source": "src/collaboration.ts#L278",
               "jsDocTags": [],
               "documentation": "Serializable operation that creates or updates comment state.",
               "memberDocs": []
@@ -1332,7 +1332,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L292",
+              "source": "src/collaboration.ts#L290",
               "jsDocTags": [],
               "documentation": "Versioned comment mutation submitted to a host adapter.",
               "memberDocs": []
@@ -1344,7 +1344,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L301",
+              "source": "src/collaboration.ts#L299",
               "jsDocTags": [],
               "documentation": "Applied, duplicate, or conflict acknowledgement for a comment mutation.",
               "memberDocs": []
@@ -1356,7 +1356,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L268",
+              "source": "src/collaboration.ts#L266",
               "jsDocTags": [],
               "documentation": "Versioned discussion anchored to a document location.",
               "memberDocs": []
@@ -1380,7 +1380,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L259",
+              "source": "src/types/document.ts#L266",
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
@@ -1575,7 +1575,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L464",
+              "source": "src/grid.ts#L457",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1590,7 +1590,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L72",
+              "source": "src/persistence.ts#L69",
               "jsDocTags": [],
               "documentation": "Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes\nthe hydrated store just like one created through `createGrid`.",
               "memberDocs": []
@@ -1602,7 +1602,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1118",
+              "source": "src/row-bridge.ts#L1099",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1798,7 +1798,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L191",
+              "source": "src/types/document.ts#L198",
               "jsDocTags": [],
               "documentation": "Native comparison semantics for numeric, date-serial, and text-length validation.\nInterval operands are inclusive; `notBetween` accepts values outside that interval.",
               "memberDocs": []
@@ -1810,7 +1810,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L210",
+              "source": "src/types/document.ts#L217",
               "jsDocTags": [],
               "documentation": "Serializable condition enforced by a data-validation rule.\n\n`min` and `max` remain inclusive legacy bounds. Use `comparison` when the\noperator itself is significant; comparison and legacy bounds are mutually exclusive.",
               "memberDocs": []
@@ -1822,7 +1822,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L228",
+              "source": "src/types/document.ts#L235",
               "jsDocTags": [],
               "documentation": "One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.",
               "memberDocs": []
@@ -1858,7 +1858,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L36",
+              "source": "src/delimited-text.ts#L35",
               "jsDocTags": [],
               "documentation": "Synchronous operations return one in-memory string, so byte/cell ceilings\nbound allocation while sheet-compatible dimensions remain independently valid.",
               "memberDocs": []
@@ -1870,7 +1870,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L66",
+              "source": "src/document-protocol.ts#L64",
               "jsDocTags": [],
               "documentation": "Excel's convergence threshold for a new workbook.",
               "memberDocs": []
@@ -1882,7 +1882,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L63",
+              "source": "src/document-protocol.ts#L61",
               "jsDocTags": [],
               "documentation": "Excel's iteration count for a new workbook.",
               "memberDocs": []
@@ -1894,7 +1894,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L382",
+              "source": "src/document-protocol.ts#L380",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1904,9 +1904,9 @@
               "kind": "variable",
               "signature": "Readonly<SyncCoordinatorLimits>",
               "owners": [
-                "src/sync-protocol.ts"
+                "src/sync.ts"
               ],
-              "source": "src/sync-protocol.ts#L70",
+              "source": "src/sync.ts#L165",
               "jsDocTags": [],
               "documentation": "Security and durability defaults bound hostile remote versions, recovery\nbuffers, acknowledgement memory, and the offline pending queue independently.",
               "memberDocs": []
@@ -1918,7 +1918,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L338",
+              "source": "src/grid.ts#L331",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1930,7 +1930,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L117",
+              "source": "src/document-protocol.ts#L115",
               "jsDocTags": [],
               "documentation": "Inclusive defaults for every atomic document transaction accepted by a\nStore or Grid. The count bounds object-heavy validation and dispatch; the\nexact UTF-8 JSON size bounds hostile or accidentally oversized payloads.",
               "memberDocs": []
@@ -1942,7 +1942,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L26",
+              "source": "src/workbook-table.ts#L25",
               "jsDocTags": [],
               "documentation": "Independent metadata ceilings enforced before table arrays cross the WASM boundary.",
               "memberDocs": []
@@ -1966,7 +1966,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L55",
+              "source": "src/delimited-text.ts#L54",
               "jsDocTags": [],
               "documentation": "Phase reported by a typed delimited-text resource failure.",
               "memberDocs": []
@@ -1978,7 +1978,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L22",
+              "source": "src/delimited-text.ts#L21",
               "jsDocTags": [],
               "documentation": "Optional resource ceilings for an in-memory delimited-text operation.",
               "memberDocs": [
@@ -1999,7 +1999,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L78",
+              "source": "src/delimited-text.ts#L77",
               "jsDocTags": [],
               "documentation": "Stable invalid-option failure for a delimited-text resource ceiling.",
               "memberDocs": []
@@ -2011,7 +2011,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L58",
+              "source": "src/delimited-text.ts#L57",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure raised before the next oversized parse or encode allocation.",
               "memberDocs": []
@@ -2023,7 +2023,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L4",
+              "source": "src/delimited-text.ts#L3",
               "jsDocTags": [],
               "documentation": "Resource ceilings shared by synchronous CSV and TSV parsing and encoding.",
               "memberDocs": [
@@ -2076,7 +2076,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L508",
+              "source": "src/types/document.ts#L517",
               "jsDocTags": [],
               "documentation": "Exhaustive serializable operation union for workbook mutations.",
               "memberDocs": []
@@ -2088,7 +2088,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3449",
+              "source": "src/document-protocol.ts#L3732",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -2100,7 +2100,7 @@
               "owners": [
                 "src/rebase.ts"
               ],
-              "source": "src/rebase.ts#L30",
+              "source": "src/rebase.ts#L28",
               "jsDocTags": [],
               "documentation": "Successful rebased operations or a conservative rebase conflict.",
               "memberDocs": []
@@ -2112,7 +2112,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L430",
+              "source": "src/document-protocol.ts#L428",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -2124,7 +2124,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L445",
+              "source": "src/document-protocol.ts#L443",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -3083,7 +3083,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L598",
+              "source": "src/store/data-engine.ts#L449",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -3095,7 +3095,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L382",
+              "source": "src/grid.ts#L375",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3134,7 +3134,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L513",
+              "source": "src/errors.ts#L527",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure\nenvelopes by shape: a string `name` and `message`, a non-empty string `code`\nand `operation`, and a JSON-safe `context` when present. The guard does not\ncheck `code` against a list, so a code from a newer Sheetwrite still passes;\nhandle unknown codes in the `default` branch of a `switch`.",
               "memberDocs": []
@@ -3146,7 +3146,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L394",
+              "source": "src/grid.ts#L387",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3350,7 +3350,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L69",
+              "source": "src/document-protocol.ts#L67",
               "jsDocTags": [],
               "documentation": "Largest iteration count Excel accepts.",
               "memberDocs": []
@@ -3362,7 +3362,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L115",
+              "source": "src/persistence.ts#L112",
               "jsDocTags": [],
               "documentation": "Executable database-neutral reference adapter for tests, demos, and local workflows.",
               "memberDocs": [
@@ -3412,7 +3412,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L303",
+              "source": "src/types/document.ts#L310",
               "jsDocTags": [],
               "documentation": "Structured warning or rejection produced while applying an operation.",
               "memberDocs": []
@@ -3424,7 +3424,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L252",
+              "source": "src/types/document.ts#L259",
               "jsDocTags": [],
               "documentation": "Atomic or partial handling for locally denied operations.",
               "memberDocs": []
@@ -3436,7 +3436,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L158",
+              "source": "src/types/document.ts#L165",
               "jsDocTags": [],
               "documentation": "A defined name: a workbook-global or sheet-scoped name that formulas use.\nIt refers to one rectangular range, or holds a formula such as a constant,\nan expression or a `LAMBDA`.",
               "memberDocs": []
@@ -3484,7 +3484,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L385",
+              "source": "src/types/document.ts#L392",
               "jsDocTags": [],
               "documentation": "Dense row-major mutation payload. Primitive arrays keep large paste/fill\noperations JSON-safe without allocating one operation object per cell.\nFormula/reference tuples are sparse exceptions keyed by row-major offset.",
               "memberDocs": []
@@ -3598,7 +3598,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L57",
+              "source": "src/sync.ts#L46",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -3623,7 +3623,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L68",
+              "source": "src/sync.ts#L57",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -3722,7 +3722,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L59",
+              "source": "src/persistence.ts#L56",
               "jsDocTags": [],
               "documentation": "Typed failure raised by persistence and synchronization flows.",
               "memberDocs": []
@@ -3734,7 +3734,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L51",
+              "source": "src/persistence.ts#L48",
               "jsDocTags": [],
               "documentation": "Stable category for a persistence failure.",
               "memberDocs": []
@@ -4045,7 +4045,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L9",
+              "source": "src/collaboration.ts#L7",
               "jsDocTags": [],
               "documentation": "Public collaborator identity attached to presence updates.",
               "memberDocs": []
@@ -4057,7 +4057,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L79",
+              "source": "src/collaboration.ts#L77",
               "jsDocTags": [],
               "documentation": "Ephemeral presence lifecycle; it never calls a document mutation API.",
               "memberDocs": []
@@ -4069,7 +4069,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L56",
+              "source": "src/collaboration.ts#L54",
               "jsDocTags": [],
               "documentation": "Connection or actor transition emitted by presence coordination.",
               "memberDocs": []
@@ -4081,7 +4081,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L41",
+              "source": "src/collaboration.ts#L39",
               "jsDocTags": [],
               "documentation": "Identity, privacy, and timing options for presence coordination.",
               "memberDocs": [
@@ -4110,7 +4110,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L16",
+              "source": "src/collaboration.ts#L14",
               "jsDocTags": [],
               "documentation": "Ephemeral collaborator selection and activity update.",
               "memberDocs": []
@@ -4134,7 +4134,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L33",
+              "source": "src/collaboration.ts#L31",
               "jsDocTags": [],
               "documentation": "Controls which ephemeral collaborator details may be transmitted.",
               "memberDocs": []
@@ -4146,7 +4146,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L24",
+              "source": "src/collaboration.ts#L22",
               "jsDocTags": [],
               "documentation": "Host transport contract for ephemeral presence messages.",
               "memberDocs": []
@@ -4158,7 +4158,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L238",
+              "source": "src/types/document.ts#L245",
               "jsDocTags": [],
               "documentation": "Serializable client UX policy. A host resolver decides whether a local mutation may proceed.",
               "memberDocs": []
@@ -4170,7 +4170,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L284",
+              "source": "src/types/document.ts#L291",
               "jsDocTags": [],
               "documentation": "Local operation and protected-range context supplied to the host policy.",
               "memberDocs": []
@@ -4182,7 +4182,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L291",
+              "source": "src/types/document.ts#L298",
               "jsDocTags": [],
               "documentation": "Host-owned client UX permission callback for protected mutations.",
               "memberDocs": []
@@ -4302,7 +4302,7 @@
               "owners": [
                 "src/rebase.ts"
               ],
-              "source": "src/rebase.ts#L22",
+              "source": "src/rebase.ts#L20",
               "jsDocTags": [],
               "documentation": "Reason and affected operations for an unsafe document rebase.",
               "memberDocs": []
@@ -4314,7 +4314,7 @@
               "owners": [
                 "src/rebase.ts"
               ],
-              "source": "src/rebase.ts#L13",
+              "source": "src/rebase.ts#L11",
               "jsDocTags": [],
               "documentation": "Stable conservative-rebase conflict category.",
               "memberDocs": []
@@ -4326,7 +4326,7 @@
               "owners": [
                 "src/rebase.ts"
               ],
-              "source": "src/rebase.ts#L64",
+              "source": "src/rebase.ts#L62",
               "jsDocTags": [],
               "documentation": "Conservative server-ordered rebase for pending offline work. Non-overlapping\nliteral edits are shifted across row/column insertion and deletion. Ambiguous\nformula, overlapping, sheet-lifecycle, and move cases become explicit\nconflicts instead of lossy guesses. This is the collaboration design gate;\nno CRDT dependency is required for the supported cases.\n\nEach local operation is written after the local operations before it, and\neach remote operation after the remote operations before it. A remote\noperation is therefore carried forward through the local sequence: before it\nis compared with local operation k, it is moved past local operations 0..k-1.\n\nThe engine rewrites the formula of a conditional format that a row or\ncolumn edit moves, so such a rebase needs `initSheetwrite()` first.",
               "memberDocs": []
@@ -4475,7 +4475,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L399",
+              "source": "src/grid.ts#L392",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -4487,7 +4487,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L144",
+              "source": "src/document-protocol.ts#L142",
               "jsDocTags": [],
               "documentation": "Validate and merge transaction ceiling overrides without retaining the\ncaller-owned object. Every ceiling is an inclusive non-negative safe integer.",
               "memberDocs": []
@@ -4553,7 +4553,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L402",
+              "source": "src/row-bridge.ts#L403",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -4582,7 +4582,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L43",
+              "source": "src/row-bridge.ts#L42",
               "jsDocTags": [],
               "documentation": "A cell effect with semantic column and host row identity.",
               "memberDocs": []
@@ -4594,7 +4594,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L88",
+              "source": "src/row-bridge.ts#L87",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -4606,7 +4606,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L14",
+              "source": "src/row-bridge.ts#L13",
               "jsDocTags": [],
               "documentation": "Semantic column key accepted by the row bridge.",
               "memberDocs": []
@@ -4618,7 +4618,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L174",
+              "source": "src/row-bridge.ts#L173",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -4630,7 +4630,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L106",
+              "source": "src/row-bridge.ts#L105",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -4642,7 +4642,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L217",
+              "source": "src/row-bridge.ts#L216",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -4654,7 +4654,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L153",
+              "source": "src/row-bridge.ts#L152",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -4666,7 +4666,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L11",
+              "source": "src/row-bridge.ts#L10",
               "jsDocTags": [],
               "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
@@ -4678,7 +4678,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L19",
+              "source": "src/row-bridge.ts#L18",
               "jsDocTags": [],
               "documentation": "Context supplied when a canonical row insertion needs a host identity.",
               "memberDocs": []
@@ -4690,7 +4690,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L130",
+              "source": "src/row-bridge.ts#L129",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -4702,7 +4702,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L27",
+              "source": "src/row-bridge.ts#L26",
               "jsDocTags": [],
               "documentation": "Options for the framework-neutral, opt-in row bridge.",
               "memberDocs": [
@@ -4727,7 +4727,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L97",
+              "source": "src/row-bridge.ts#L96",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -4739,7 +4739,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L210",
+              "source": "src/row-bridge.ts#L209",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -4751,7 +4751,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L79",
+              "source": "src/row-bridge.ts#L78",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -4763,7 +4763,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L195",
+              "source": "src/row-bridge.ts#L194",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -4784,7 +4784,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L186",
+              "source": "src/row-bridge.ts#L185",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -4796,7 +4796,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L115",
+              "source": "src/row-bridge.ts#L114",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -4808,7 +4808,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L54",
+              "source": "src/row-bridge.ts#L53",
               "jsDocTags": [],
               "documentation": "The canonical transaction identity carried by each projected delta.",
               "memberDocs": []
@@ -4820,7 +4820,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1126",
+              "source": "src/row-bridge.ts#L1107",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -4832,7 +4832,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L166",
+              "source": "src/row-bridge.ts#L165",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -4856,7 +4856,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L109",
+              "source": "src/types/document.ts#L116",
               "jsDocTags": [],
               "documentation": "A collapsible row group (data-row range, end-inclusive), Sheets-style.",
               "memberDocs": []
@@ -4868,7 +4868,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L368",
+              "source": "src/types/document.ts#L375",
               "jsDocTags": [],
               "documentation": "Persistent display and grouping metadata for one document row.",
               "memberDocs": []
@@ -5168,7 +5168,7 @@
             {
               "name": "Sheet",
               "kind": "interface",
-              "signature": "export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }",
+              "signature": "export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
@@ -5249,6 +5249,10 @@
                   "documentation": "Persisted sort keys for the sheet's view."
                 },
                 {
+                  "name": "sortState",
+                  "documentation": "The worksheet `sortState` of an imported XLSX file. Excel writes it after\na sort whose cells it already moved, so Sheetwrite keeps it for export and\ndoes not apply it. Export writes it while its references lie inside the\nsheet; a view sort (`sortKeys`) replaces it."
+                },
+                {
                   "name": "tables",
                   "documentation": "Native workbook tables anchored to this stable worksheet identity."
                 },
@@ -5281,7 +5285,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L294",
+              "source": "src/types/document.ts#L301",
               "jsDocTags": [],
               "documentation": "Stable lifecycle rejection codes suitable for inline sheet-management UI.",
               "memberDocs": []
@@ -5337,11 +5341,11 @@
             {
               "name": "SheetSnapshot",
               "kind": "interface",
-              "signature": "export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }",
+              "signature": "export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; sortState?: WorkbookTableXmlElement; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; pivots?: PivotDefinition[]; cells: CellBlock[]; }",
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L405",
+              "source": "src/types/document.ts#L412",
               "jsDocTags": [],
               "documentation": "Serializable complete state for one workbook sheet.",
               "memberDocs": [
@@ -5352,6 +5356,10 @@
                 {
                   "name": "pivots",
                   "documentation": "Pivot tables anchored on this sheet."
+                },
+                {
+                  "name": "sortState",
+                  "documentation": "See `Sheet.sortState`."
                 },
                 {
                   "name": "visibility",
@@ -5431,7 +5439,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L469",
+              "source": "src/errors.ts#L483",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.\nThe message is cut to an 8 KiB UTF-8 budget, and so is the sum of the\ncontext strings, because both can quote host or file data.",
               "memberDocs": []
@@ -5520,7 +5528,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L170",
+              "source": "src/store.ts#L155",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5656,7 +5664,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L93",
+              "source": "src/store.ts#L85",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -5709,7 +5717,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L374",
+              "source": "src/types/document.ts#L381",
               "jsDocTags": [],
               "documentation": "Serializable cell value and optional style inside a snapshot block.",
               "memberDocs": []
@@ -5721,7 +5729,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L45",
+              "source": "src/persistence.ts#L42",
               "jsDocTags": [],
               "documentation": "Grid creation options accepted when hydrating a validated snapshot.",
               "memberDocs": []
@@ -5733,7 +5741,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L408",
+              "source": "src/document-protocol.ts#L406",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -5745,7 +5753,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L364",
+              "source": "src/document-protocol.ts#L362",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -5786,7 +5794,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L361",
+              "source": "src/document-protocol.ts#L359",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -5798,7 +5806,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L453",
+              "source": "src/document-protocol.ts#L451",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": [
@@ -5815,7 +5823,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L400",
+              "source": "src/document-protocol.ts#L398",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -5836,7 +5844,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L92",
+              "source": "src/types/document.ts#L99",
               "jsDocTags": [],
               "documentation": "One key of a multi-column sort, applied in array order (first = primary).",
               "memberDocs": []
@@ -5986,7 +5994,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L87",
+              "source": "src/sync.ts#L76",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
               "memberDocs": []
@@ -5998,7 +6006,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L213",
+              "source": "src/sync.ts#L305",
               "jsDocTags": [],
               "documentation": "Outcome of `SyncCoordinator.recoverConflict`.",
               "memberDocs": []
@@ -6010,7 +6018,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L196",
+              "source": "src/sync.ts#L288",
               "jsDocTags": [],
               "documentation": "Why a conflict cannot be recovered in place; the host reloads the document instead.",
               "memberDocs": []
@@ -6022,7 +6030,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L85",
+              "source": "src/sync.ts#L74",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -6034,7 +6042,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L264",
+              "source": "src/sync.ts#L356",
               "jsDocTags": [
                 "example",
                 "see"
@@ -6074,7 +6082,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L166",
+              "source": "src/sync.ts#L258",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -6084,9 +6092,9 @@
               "kind": "interface",
               "signature": "export interface SyncCoordinatorLimits { maxMutationIdBytes: number; maxOperationsPerVersion: number; maxVersionPayloadBytes: number; maxFutureVersionDistance: number; maxBufferedVersions: number; maxBufferedOperations: number; maxBufferedBytes: number; maxRecentAcknowledgements: number; maxBatchVersions: number; maxBatchBytes: number; maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }",
               "owners": [
-                "src/sync-protocol.ts"
+                "src/sync.ts"
               ],
-              "source": "src/sync-protocol.ts#L33",
+              "source": "src/sync.ts#L128",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -6151,7 +6159,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L141",
+              "source": "src/sync.ts#L233",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -6213,7 +6221,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L129",
+              "source": "src/sync.ts#L221",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -6225,7 +6233,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L97",
+              "source": "src/sync.ts#L86",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -6235,9 +6243,9 @@
               "kind": "interface",
               "signature": "export interface SyncPendingQueueLimits { maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }",
               "owners": [
-                "src/sync-protocol.ts"
+                "src/sync.ts"
               ],
-              "source": "src/sync-protocol.ts#L23",
+              "source": "src/sync.ts#L118",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -6260,9 +6268,9 @@
               "kind": "class",
               "signature": "class SyncProtocolError extends SheetwriteError { constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions); code: SyncProtocolErrorCode; name: \"SyncProtocolError\" }",
               "owners": [
-                "src/sync-protocol.ts"
+                "src/sync.ts"
               ],
-              "source": "src/sync-protocol.ts#L116",
+              "source": "src/sync.ts#L211",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -6272,9 +6280,9 @@
               "kind": "type",
               "signature": "export type SyncProtocolErrorCode = | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"invalid-batch\" | \"batch-limit\";",
               "owners": [
-                "src/sync-protocol.ts"
+                "src/sync.ts"
               ],
-              "source": "src/sync-protocol.ts#L95",
+              "source": "src/sync.ts#L190",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -6286,7 +6294,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L105",
+              "source": "src/sync.ts#L94",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -6319,7 +6327,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L121",
+              "source": "src/sync.ts#L110",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []
@@ -6677,7 +6685,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L124",
+              "source": "src/document-protocol.ts#L122",
               "jsDocTags": [],
               "documentation": "Successful byte/count inspection or one structured transaction rejection.",
               "memberDocs": []
@@ -6713,7 +6721,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L169",
+              "source": "src/document-protocol.ts#L167",
               "jsDocTags": [],
               "documentation": "Incrementally validate the operation count and exact encoded payload size\nwithout constructing a JSON string. Compact operation ranges are measured by\ntheir serialized fields; their logical cell area is deliberately irrelevant.",
               "memberDocs": []
@@ -6725,7 +6733,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3418",
+              "source": "src/document-protocol.ts#L3692",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -6737,7 +6745,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L70",
+              "source": "src/workbook-table.ts#L69",
               "jsDocTags": [],
               "documentation": "Validate and NFC-normalize an ECMA-compatible structured-reference name.",
               "memberDocs": []
@@ -6749,7 +6757,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L185",
+              "source": "src/types/document.ts#L192",
               "jsDocTags": [],
               "documentation": "Reject-or-warn policy attached to a data-validation rule.",
               "memberDocs": []
@@ -6761,7 +6769,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L377",
+              "source": "src/workbook-table.ts#L376",
               "jsDocTags": [],
               "documentation": "Validate one canonical table against sheet bounds and workbook-global identities.",
               "memberDocs": []
@@ -6773,7 +6781,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L172",
+              "source": "src/workbook-table.ts#L171",
               "jsDocTags": [],
               "documentation": "Validate inert table-rule trees before they enter snapshots or XML output.\nA whitelist prevents this persistence seam from becoming arbitrary markup.",
               "memberDocs": []
@@ -6806,7 +6814,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L318",
+              "source": "src/collaboration.ts#L316",
               "jsDocTags": [],
               "documentation": "Comment mutation paired with its assigned server version.",
               "memberDocs": []
@@ -6952,7 +6960,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L129",
+              "source": "src/types/document.ts#L136",
               "jsDocTags": [],
               "documentation": "Live workbook schema containing ordered sheets and the active sheet ID.",
               "memberDocs": [
@@ -6993,7 +7001,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L60",
+              "source": "src/document-protocol.ts#L58",
               "jsDocTags": [],
               "documentation": "Current workbook snapshot schema version accepted by Sheetwrite.",
               "memberDocs": []
@@ -7005,7 +7013,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L488",
+              "source": "src/types/document.ts#L497",
               "jsDocTags": [],
               "documentation": "Schema-versioned serializable workbook document.",
               "memberDocs": []
@@ -7103,7 +7111,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L37",
+              "source": "src/workbook-table.ts#L36",
               "jsDocTags": [],
               "documentation": "Stable reason code returned when a workbook table name is rejected.",
               "memberDocs": []
@@ -7115,7 +7123,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L65",
+              "source": "src/workbook-table.ts#L64",
               "jsDocTags": [],
               "documentation": "Locale-independent key used for table and table-column collision checks.",
               "memberDocs": []
@@ -7127,7 +7135,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L45",
+              "source": "src/workbook-table.ts#L44",
               "jsDocTags": [],
               "documentation": "Result of validating and NFC-normalizing a workbook table name.",
               "memberDocs": []
@@ -7151,7 +7159,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L16",
+              "source": "src/workbook-table.ts#L15",
               "jsDocTags": [],
               "documentation": "Resource ceilings for canonical workbook-table metadata and identifiers.",
               "memberDocs": []
@@ -7313,7 +7321,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L448",
+              "source": "src/types/document.ts#L457",
               "jsDocTags": [],
               "documentation": "What an opaque graph reads; any change to it drops the graph on save.",
               "memberDocs": [
@@ -7338,7 +7346,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L459",
+              "source": "src/types/document.ts#L468",
               "jsDocTags": [],
               "documentation": "One relationship from the package, workbook, or a sheet to a retained part graph.",
               "memberDocs": [
@@ -7371,7 +7379,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L437",
+              "source": "src/types/document.ts#L446",
               "jsDocTags": [],
               "documentation": "One retained OOXML part, kept as its original compressed ZIP payload so a\nsave copies it without inflating or recompressing. Runtime copies are frozen.",
               "memberDocs": [
@@ -7388,7 +7396,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L480",
+              "source": "src/types/document.ts#L489",
               "jsDocTags": [],
               "documentation": "Bounded, frozen record of the OOXML parts Sheetwrite does not model.",
               "memberDocs": [
@@ -7560,7 +7568,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1118",
+              "source": "src/row-bridge.ts#L1099",
               "jsDocTags": [
                 "example",
                 "see"
@@ -7920,7 +7928,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L513",
+              "source": "src/errors.ts#L527",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure\nenvelopes by shape: a string `name` and `message`, a non-empty string `code`\nand `operation`, and a JSON-safe `context` when present. The guard does not\ncheck `code` against a list, so a code from a newer Sheetwrite still passes;\nhandle unknown codes in the `default` branch of a `switch`.",
               "memberDocs": []
@@ -7944,7 +7952,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L402",
+              "source": "src/row-bridge.ts#L403",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -7973,7 +7981,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L43",
+              "source": "src/row-bridge.ts#L42",
               "jsDocTags": [],
               "documentation": "A cell effect with semantic column and host row identity.",
               "memberDocs": []
@@ -7985,7 +7993,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L88",
+              "source": "src/row-bridge.ts#L87",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -7997,7 +8005,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L14",
+              "source": "src/row-bridge.ts#L13",
               "jsDocTags": [],
               "documentation": "Semantic column key accepted by the row bridge.",
               "memberDocs": []
@@ -8009,7 +8017,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L174",
+              "source": "src/row-bridge.ts#L173",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -8021,7 +8029,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L106",
+              "source": "src/row-bridge.ts#L105",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -8033,7 +8041,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L217",
+              "source": "src/row-bridge.ts#L216",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -8045,7 +8053,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L153",
+              "source": "src/row-bridge.ts#L152",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -8057,7 +8065,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L11",
+              "source": "src/row-bridge.ts#L10",
               "jsDocTags": [],
               "documentation": "A stable host identity for one data-space row.",
               "memberDocs": []
@@ -8069,7 +8077,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L19",
+              "source": "src/row-bridge.ts#L18",
               "jsDocTags": [],
               "documentation": "Context supplied when a canonical row insertion needs a host identity.",
               "memberDocs": []
@@ -8081,7 +8089,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L130",
+              "source": "src/row-bridge.ts#L129",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -8093,7 +8101,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L27",
+              "source": "src/row-bridge.ts#L26",
               "jsDocTags": [],
               "documentation": "Options for the framework-neutral, opt-in row bridge.",
               "memberDocs": [
@@ -8118,7 +8126,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L97",
+              "source": "src/row-bridge.ts#L96",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -8130,7 +8138,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L210",
+              "source": "src/row-bridge.ts#L209",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -8142,7 +8150,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L79",
+              "source": "src/row-bridge.ts#L78",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -8154,7 +8162,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L195",
+              "source": "src/row-bridge.ts#L194",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -8175,7 +8183,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L186",
+              "source": "src/row-bridge.ts#L185",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -8187,7 +8195,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L115",
+              "source": "src/row-bridge.ts#L114",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -8199,7 +8207,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L54",
+              "source": "src/row-bridge.ts#L53",
               "jsDocTags": [],
               "documentation": "The canonical transaction identity carried by each projected delta.",
               "memberDocs": []
@@ -8211,7 +8219,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L1126",
+              "source": "src/row-bridge.ts#L1107",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -8223,7 +8231,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L166",
+              "source": "src/row-bridge.ts#L165",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -8259,7 +8267,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L469",
+              "source": "src/errors.ts#L483",
               "jsDocTags": [],
               "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.\nThe message is cut to an 8 KiB UTF-8 budget, and so is the sum of the\ncontext strings, because both can quote host or file data.",
               "memberDocs": []
@@ -8436,7 +8444,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L90",
+              "source": "src/indexeddb.ts#L106",
               "jsDocTags": [],
               "documentation": "Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;\nthe package's root entrypoint never evaluates IndexedDB globals.",
               "memberDocs": [
@@ -8453,7 +8461,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L26",
+              "source": "src/indexeddb.ts#L24",
               "jsDocTags": [],
               "documentation": "Typed IndexedDB failure raised by durable pending-commit storage.",
               "memberDocs": []
@@ -8465,7 +8473,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L14",
+              "source": "src/indexeddb.ts#L12",
               "jsDocTags": [],
               "documentation": "Stable category for an IndexedDB pending-storage failure.",
               "memberDocs": []
@@ -8477,7 +8485,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L40",
+              "source": "src/indexeddb.ts#L38",
               "jsDocTags": [],
               "documentation": "Database and store naming options for durable pending commits.",
               "memberDocs": []
@@ -8767,7 +8775,7 @@
               "owners": [
                 "src/version-history/codec.ts"
               ],
-              "source": "src/version-history/codec.ts#L72",
+              "source": "src/version-history/codec.ts#L71",
               "jsDocTags": [],
               "documentation": "Default byte, count, cadence, and retention bounds (decision recorded in #228).",
               "memberDocs": []
@@ -9050,7 +9058,7 @@
               "owners": [
                 "src/version-history/codec.ts"
               ],
-              "source": "src/version-history/codec.ts#L62",
+              "source": "src/version-history/codec.ts#L61",
               "jsDocTags": [],
               "documentation": "Expected archive failure; cancellation preserves the caller's abort reason.",
               "memberDocs": []
@@ -9062,7 +9070,7 @@
               "owners": [
                 "src/version-history/codec.ts"
               ],
-              "source": "src/version-history/codec.ts#L50",
+              "source": "src/version-history/codec.ts#L49",
               "jsDocTags": [],
               "documentation": "Stable failure category for history validation, storage, and replay.",
               "memberDocs": []
@@ -9817,7 +9825,7 @@
               "owners": [
                 "src/datasource-controller.ts"
               ],
-              "source": "src/datasource-controller.ts#L35",
+              "source": "src/datasource-controller.ts#L27",
               "jsDocTags": [],
               "documentation": "Installs a deterministic monotonic clock through the public testing entrypoint.",
               "memberDocs": []

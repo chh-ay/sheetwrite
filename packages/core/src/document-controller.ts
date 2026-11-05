@@ -1246,6 +1246,7 @@ export class DocumentController {
       protectedRanges: structuredClone(sheet.protectedRanges),
       notes: structuredClone(sheet.notes),
       sortKeys: structuredClone(sheet.sortKeys),
+      sortState: structuredClone(sheet.sortState),
       filters: structuredClone(sheet.filters),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(sheet.tables),

@@ -1663,6 +1663,11 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     }
   });
 
+  const sortState = ownValue(sheet, "sortState");
+  if (sortState !== undefined && !validWorkbookTableXmlElement(sortState, "sortState")) {
+    invalid(errors, `${path}.sortState`, "Sort state must be a valid sortState element");
+  }
+
   const filters = optionalArray(sheet, "filters", path, errors);
   filters?.forEach((entry, index) => {
     const filterPath = `${path}.filters[${index}]`;
