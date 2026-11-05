@@ -50,8 +50,39 @@ console.log(grid.aggregate(1, "sum")); // 195
 </details>
 
 Sheetwrite can sort, filter, hide, group, aggregate, import, and export the active
-sheet without rewriting the stored row data. Sorts and filters are display views:
-the store keeps a row-order permutation/subset and the renderer reads through it.
+sheet. An in-place sort rewrites the cells of a range. Display views sort and
+filter without rewriting the stored row data: the store keeps a row-order
+permutation/subset and the renderer reads through it.
+
+## Sort cells in place
+
+`store.sortRange` sorts the cells of a range as Excel's Sort does. The cells
+move to their new rows in one undoable transaction that collaborators receive
+as one change, so formulas, charts and other sheets read the sorted values.
+
+```ts compile title="Sort a range by its third column"
+import type { SheetwriteStore } from "@sheetwrite/core";
+
+function sortByRevenue(store: SheetwriteStore) {
+  return store.sortRange(
+    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+    [{ col: 2, ascending: false }],
+    { hasHeader: true }, // the first row stays in place
+  );
+}
+```
+
+- Values, formulas, cell styles, notes and one-row hyperlinks move with their
+  row. Row heights, hidden rows, conditional formats, validation rules and
+  protected ranges keep their addresses.
+- A formula in a moved row is adjusted for the move of its own row: relative
+  row references without a sheet name move with the row, so a reference to the
+  same row stays on that row. Absolute rows and references with a sheet name
+  stay. Formulas outside the range keep their references.
+- Hidden and filtered-out rows keep their place.
+- Merged cells of the same size sort as whole records; other merged layouts
+  reject the sort. A sort that would move only part of a spill range is
+  rejected. A sort in a table must cover the table body.
 
 ## Display views
 

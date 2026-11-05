@@ -251,7 +251,9 @@ impl CellStore {
 
     fn source_entry(&self, sheet: usize, key: (u32, u32), moved: MovedSource) -> FormulaEntry {
         match moved {
-            MovedSource::Formula(text) => self.parse_formula_entry(&text, sheet as u32, key.0, key.1),
+            MovedSource::Formula(text) => {
+                self.parse_formula_entry(&text, sheet as u32, key.0, key.1)
+            }
             MovedSource::Reference(target) => FormulaEntry::reference(
                 target,
                 &self.sheet_names[target.sheet as usize],

@@ -8,7 +8,7 @@ description: "InitOutput interface in @sheetwrite/wasm: Result of module initial
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L626"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L626</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L641"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L641</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -75,6 +75,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-new"><code>cellstore_new</code></a>
 <a href="#init-output-cellstore-paged-dirty-coordinates"><code>cellstore_pagedDirtyCoordinates</code></a>
 <a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
+<a href="#init-output-cellstore-permute-rows"><code>cellstore_permuteRows</code></a>
+<a href="#init-output-cellstore-permute-rows-losses"><code>cellstore_permuteRowsLosses</code></a>
 <a href="#init-output-cellstore-persisted-cell-data"><code>cellstore_persistedCellData</code></a>
 <a href="#init-output-cellstore-pin-read-window"><code>cellstore_pinReadWindow</code></a>
 <a href="#init-output-cellstore-pin-viewport-bands"><code>cellstore_pinViewportBands</code></a>
@@ -169,7 +171,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>155</span>
+## Members <span class="api-count" data-pagefind-ignore>157</span>
 
 <div class="api-member-list">
 
@@ -736,6 +738,24 @@ readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, num
 
 ```ts generated
 readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-permute-rows" data-pagefind-weight="1">
+<summary><code>cellstore_permuteRows</code></summary>
+
+```ts generated
+readonly cellstore_permuteRows: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-permute-rows-losses" data-pagefind-weight="1">
+<summary><code>cellstore_permuteRowsLosses</code></summary>
+
+```ts generated
+readonly cellstore_permuteRowsLosses: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
 ```
 
 </details>
@@ -1843,6 +1863,24 @@ export interface InitOutput {
     b: number,
   ) => [number, number];
   readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
+  readonly cellstore_permuteRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => number;
+  readonly cellstore_permuteRowsLosses: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => [number, number];
   readonly cellstore_persistedCellData: (
     a: number,
     b: number,

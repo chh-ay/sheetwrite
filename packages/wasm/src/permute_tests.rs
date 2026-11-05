@@ -94,7 +94,22 @@ fn references_keep_their_target() {
     store.set_number(sheet, 5, 3, 42.0, 0);
     store.set_formula(sheet, 0, 0, "=1", 0);
     assert_eq!(
-        store.set_block_packed(sheet, 1, 0, 1, 1, &[0], &[0.0], &[], &[0], &[0], &[], Vec::new(), &[0], &[sheet as u32, 5, 3]),
+        store.set_block_packed(
+            sheet,
+            1,
+            0,
+            1,
+            1,
+            &[0],
+            &[0.0],
+            &[],
+            &[0],
+            &[0],
+            &[],
+            Vec::new(),
+            &[0],
+            &[sheet as u32, 5, 3]
+        ),
         BLOCK_OK
     );
     store.recompute(sheet);
@@ -102,7 +117,10 @@ fn references_keep_their_target() {
     assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[1, 0]), BLOCK_OK);
     store.recompute(sheet);
 
-    assert_eq!(store.reference_target(sheet, 0, 0), Some(vec![sheet as u32, 5, 3]));
+    assert_eq!(
+        store.reference_target(sheet, 0, 0),
+        Some(vec![sheet as u32, 5, 3])
+    );
     assert_eq!(shown(&store, sheet, 0, 0), "42");
 }
 
@@ -127,8 +145,14 @@ fn an_order_that_is_not_a_permutation_changes_nothing() {
 
     assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[1, 1]), BLOCK_INVALID);
     assert_eq!(store.permute_rows(sheet, 0, 0, 1, &[0, 2]), BLOCK_INVALID);
-    assert_eq!(store.permute_rows(sheet, ROWS - 1, 0, 1, &[1, 0]), BLOCK_INVALID);
-    assert_eq!(store.permute_rows(sheet, 0, COLS, 1, &[1, 0]), BLOCK_INVALID);
+    assert_eq!(
+        store.permute_rows(sheet, ROWS - 1, 0, 1, &[1, 0]),
+        BLOCK_INVALID
+    );
+    assert_eq!(
+        store.permute_rows(sheet, 0, COLS, 1, &[1, 0]),
+        BLOCK_INVALID
+    );
 
     assert_eq!(column(&store, sheet, 0, 2), ["2", "1"]);
 }
@@ -185,5 +209,7 @@ fn losses_name_the_formulas_that_the_inverse_cannot_restore() {
     store.set_formula(sheet, 2, 0, "=B3", 0);
 
     assert_eq!(store.permute_rows_losses(sheet, 0, 0, 2, &[1, 2, 0]), [2]);
-    assert!(store.permute_rows_losses(sheet, 0, 0, 2, &[0, 0, 1]).is_empty());
+    assert!(store
+        .permute_rows_losses(sheet, 0, 0, 2, &[0, 0, 1])
+        .is_empty());
 }

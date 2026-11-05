@@ -523,10 +523,15 @@ export class SheetwriteStore implements Store {
    *
    * @example
    * ```ts
-   * store.sortRange(
-   *   { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
-   *   [{ col: 2, ascending: false }],
-   * );
+   * import type { SheetwriteStore } from "@sheetwrite/core";
+   *
+   * function sortByRevenue(store: SheetwriteStore) {
+   *   return store.sortRange(
+   *     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+   *     [{ col: 2, ascending: false }],
+   *     { hasHeader: true },
+   *   );
+   * }
    * ```
    */
   sortRange(

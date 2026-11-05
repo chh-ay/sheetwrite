@@ -93,6 +93,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-show-rows"><code>showRows</code></a>
 <a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
 <a href="#sheetwrite-store-sort-by-multi"><code>sortByMulti</code></a>
+<a href="#sheetwrite-store-sort-range"><code>sortRange</code></a>
 <a href="#sheetwrite-store-ungroup-rows"><code>ungroupRows</code></a>
 <a href="#sheetwrite-store-view-row-count"><code>viewRowCount</code></a>
 <a href="#sheetwrite-store-view-row-of"><code>viewRowOf</code></a>
@@ -100,7 +101,7 @@ async function total(workbook: Workbook) {
 <a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>65</span>
+## Members <span class="api-count" data-pagefind-ignore>66</span>
 
 <div class="api-member-list">
 
@@ -685,6 +686,35 @@ sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => ApplyTransactionResul
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-sort-range" data-pagefind-weight="1">
+<summary><code>sortRange</code> <span class="api-member-summary">Sort the rows of range in place, as Excel's Sort does: cells move with their row in one undoable transaction, and formulas follow Excel's rules for sorted rows.</span></summary>
+
+```ts generated
+sortRange: (range: Range, keys: readonly SortKey[], options?: { hasHeader?: boolean; }) => ApplyTransactionResult;
+```
+
+Sort the rows of `range` in place, as Excel's Sort does: cells move with
+their row in one undoable transaction, and formulas follow Excel's
+rules for sorted rows. Hidden and filtered-out rows keep their place.
+With `hasHeader`, the first row of `range` stays. A sort that would
+move part of a merged cell or spill range is rejected.
+
+### Examples
+
+```ts compile
+import type { SheetwriteStore } from "@sheetwrite/core";
+
+function sortByRevenue(store: SheetwriteStore) {
+  return store.sortRange(
+    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } },
+    [{ col: 2, ascending: false }],
+    { hasHeader: true },
+  );
+}
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-ungroup-rows" data-pagefind-weight="1">
 <summary><code>ungroupRows</code></summary>
 
@@ -904,6 +934,13 @@ class SheetwriteStore implements Store {
   sortByMulti: (
     sheet: SheetId,
     keys: readonly SortKey[],
+  ) => ApplyTransactionResult;
+  sortRange: (
+    range: Range,
+    keys: readonly SortKey[],
+    options?: {
+      hasHeader?: boolean;
+    },
   ) => ApplyTransactionResult;
   ungroupRows: (
     sheet: SheetId,

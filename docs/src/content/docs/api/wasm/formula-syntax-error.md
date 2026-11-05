@@ -8,7 +8,7 @@ description: "FormulaSyntaxError class in @sheetwrite/wasm: The first syntax err
 The first syntax error of a formula, as the engine's parser finds it.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L484"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L484</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/pkg/sheetwrite_wasm.d.ts#L499"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L499</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
