@@ -212,3 +212,23 @@ export function prepareEngineInstance(): Promise<defaultEngine.EngineInstance> {
 export function replaceEngineInstance(instance: defaultEngine.EngineInstance): void {
   engineInstance = instance;
 }
+
+/**
+ * Construct engine objects on a private `instance`, for example a disposable
+ * replay store. Its cell store then lives in that instance's linear memory, so
+ * retiring the instance returns the memory; the document engine does not grow.
+ * `build` must be synchronous: the document engine is selected again on return.
+ */
+export function buildOnEngineInstance<T>(
+  instance: defaultEngine.EngineInstance,
+  build: () => T,
+): T {
+  const documentInstance = getEngine();
+  engineInstance = instance;
+  try {
+    return build();
+  } finally {
+    // A trap inside `build` stops the engine; do not revive a stopped generation.
+    if (engineInstance === instance) engineInstance = documentInstance;
+  }
+}
