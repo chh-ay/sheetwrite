@@ -55,7 +55,7 @@ export type PersistenceErrorCode =
   | "not-found"
   | "commit-rejected";
 
-/** Typed failure of `createGridFromSnapshot` and `MemoryPersistenceAdapter`. */
+/** Typed failure of grid restore from a saved snapshot and of `MemoryPersistenceAdapter`. */
 export class PersistenceError extends SheetwriteError {
   override readonly name = "PersistenceError";
   declare readonly code: PersistenceErrorCode;
