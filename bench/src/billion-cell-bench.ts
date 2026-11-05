@@ -1339,6 +1339,7 @@ export async function runBillionCellBenchmark(): Promise<BillionCellBenchmarkArt
     scales,
     gate: { status, checks, failures },
   };
+  assertCapturedOnRunningMachine(artifact.toolchain);
   validateBillionCellBenchmark(artifact);
   return artifact;
 }
@@ -1379,6 +1380,27 @@ function nonNegativeInteger(value: unknown, label: string): number {
 function exact(value: unknown, expected: unknown, label: string): void {
   if (value !== expected) invalid(`${label} must equal ${String(expected)}`);
 }
+
+function nonEmptyString(value: unknown, label: string): void {
+  if (typeof value !== "string" || value.length === 0)
+    invalid(`${label} must be a non-empty string`);
+}
+
+/**
+ * Asserts that a new capture records the machine and toolchain it ran on.
+ *
+ * This check runs only at capture time. Committed evidence may come from another machine, so
+ * `validateBillionCellBenchmark` checks it against its own recorded toolchain instead.
+ */
+export function assertCapturedOnRunningMachine(
+  toolchain: BillionCellBenchmarkArtifact["toolchain"],
+): void {
+  exact(toolchain.bunVersion, Bun.version, "toolchain.bunVersion");
+  exact(toolchain.typescriptVersion, typeScriptManifest.version, "toolchain.typescriptVersion");
+  exact(toolchain.platform, process.platform, "toolchain.platform");
+  exact(toolchain.architecture, process.arch, "toolchain.architecture");
+}
+
 function validateRuntimeMemory(value: unknown, label: string): void {
   const runtime = record(value, label);
   for (const field of [
@@ -1512,10 +1534,10 @@ export function validateBillionCellBenchmark(
   exact(artifact.schemaVersion, BILLION_CELL_BENCHMARK_SCHEMA_VERSION, "schemaVersion");
   const toolchain = record(artifact.toolchain, "toolchain");
   exact(toolchain.runtime, "bun", "toolchain.runtime");
-  exact(toolchain.bunVersion, Bun.version, "toolchain.bunVersion");
-  exact(toolchain.typescriptVersion, typeScriptManifest.version, "toolchain.typescriptVersion");
-  exact(toolchain.platform, process.platform, "toolchain.platform");
-  exact(toolchain.architecture, process.arch, "toolchain.architecture");
+  nonEmptyString(toolchain.bunVersion, "toolchain.bunVersion");
+  nonEmptyString(toolchain.typescriptVersion, "toolchain.typescriptVersion");
+  nonEmptyString(toolchain.platform, "toolchain.platform");
+  nonEmptyString(toolchain.architecture, "toolchain.architecture");
   exact(
     toolchain.resourceSchemaVersion,
     RUNTIME_RESOURCE_SCHEMA_VERSION,
