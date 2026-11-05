@@ -170,6 +170,16 @@ fn trigonometry_and_numeral_functions_read_cells() {
 }
 
 #[test]
+fn counted_statistics_read_text_and_logical_values() {
+    assert_results(&[
+        ("=AVERAGEA(Data!D1:D3)", "2.5"),
+        ("=MAXA(Data!D2,-1)", "0"),
+        ("=VARPA(Data!A1:A3,TRUE)", "0.6875"),
+        ("=ROUND(STDEVA(\"2\",4),6)", "1.414214"),
+    ]);
+}
+
+#[test]
 fn whole_columns_and_rows_read_the_used_part_of_the_sheet() {
     assert_results(&[
         ("=SUM(C:C)", "15"),

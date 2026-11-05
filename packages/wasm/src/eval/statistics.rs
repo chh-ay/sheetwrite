@@ -7,6 +7,7 @@ use super::criteria::Criterion;
 use super::functions::{
     integer_arg, number_arg, numeric_entries, require_arity, FuncAccumulator, FuncValue,
 };
+use super::value::aggregate_number;
 
 const MAX_SELECTION_VALUES: usize = RANGE_CELL_LIMIT as usize;
 const MAX_CRITERIA_PAIRS: usize = 126;
@@ -33,6 +34,13 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::CountBlank => count_blank(values),
         Func::MaxIfs => conditional_extreme(values, true),
         Func::MinIfs => conditional_extreme(values, false),
+        Func::AverageA => aggregate_result(counted_average(values)),
+        Func::MaxA => aggregate_result(counted_extreme(values, true)),
+        Func::MinA => aggregate_result(counted_extreme(values, false)),
+        Func::StdevA => aggregate_result(counted_variance(values, true, true)),
+        Func::StdevPA => aggregate_result(counted_variance(values, false, true)),
+        Func::VarA => aggregate_result(counted_variance(values, true, false)),
+        Func::VarPA => aggregate_result(counted_variance(values, false, false)),
         _ => return None,
     };
     Some(result)
@@ -204,8 +212,16 @@ fn variance_result(
     standard_deviation: bool,
 ) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
+    variance(
+        &collect_numbers(values.entries())?,
+        sample,
+        standard_deviation,
+    )
+}
+
+fn variance(numbers: &[f64], sample: bool, standard_deviation: bool) -> Result<f64, FormulaError> {
     let mut moments = Moments::default();
-    for value in collect_numbers(values.entries())? {
+    for &value in numbers {
         moments.push(value)?;
     }
     let divisor = if sample {
@@ -225,6 +241,67 @@ fn variance_result(
     } else {
         variance
     })
+}
+
+/// The values of AVERAGEA, MAXA, MINA, STDEVA, STDEVPA, VARA and VARPA. A
+/// logical value counts as 1 or 0 and text in a reference as 0. Text typed
+/// as an argument is read as a number, and empty text is 0. Empty cells
+/// are skipped.
+fn counted_numbers(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
+    require_at_least_one_arg(values)?;
+
+    let entries = values.entries();
+
+    if entries.len() > MAX_SELECTION_VALUES {
+        return Err(FormulaError::Num);
+    }
+
+    let mut numbers = Vec::new();
+
+    for entry in entries {
+        let number = match &entry.value {
+            Value::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
+            Value::Text(_) if entry.from_range => Some(0.0),
+            Value::Text(text) if text.is_empty() => Some(0.0),
+            value => aggregate_number(value, entry.from_range)?,
+        };
+
+        if let Some(number) = number {
+            numbers.push(number);
+        }
+    }
+
+    Ok(numbers)
+}
+
+fn counted_average(values: &FuncAccumulator) -> Result<f64, FormulaError> {
+    let numbers = counted_numbers(values)?;
+
+    if numbers.is_empty() {
+        return Err(FormulaError::DivZero);
+    }
+
+    Ok(numbers.iter().sum::<f64>() / numbers.len() as f64)
+}
+
+/// MAXA and MINA: 0 when there is no value.
+fn counted_extreme(values: &FuncAccumulator, is_maximum: bool) -> Result<f64, FormulaError> {
+    let numbers = counted_numbers(values)?;
+    let extreme = if is_maximum {
+        numbers.iter().copied().reduce(f64::max)
+    } else {
+        numbers.iter().copied().reduce(f64::min)
+    };
+
+    Ok(extreme.unwrap_or(0.0))
+}
+
+fn counted_variance(
+    values: &FuncAccumulator,
+    sample: bool,
+    standard_deviation: bool,
+) -> Result<f64, FormulaError> {
+    variance(&counted_numbers(values)?, sample, standard_deviation)
 }
 
 fn geomean(values: &FuncAccumulator) -> Result<f64, FormulaError> {
@@ -571,6 +648,104 @@ mod tests {
         assert_eq!(
             apply(Func::MaxIfs, &shape_mismatch).unwrap(),
             Value::Error(FormulaError::Value)
+        );
+    }
+
+    /// The example tables of the Microsoft Support pages,
+    /// `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
+    /// Each data column is one range argument.
+    #[test]
+    fn counted_functions_match_the_microsoft_examples() {
+        let strength: Vec<Value> = [
+            1345.0, 1301.0, 1368.0, 1322.0, 1310.0, 1370.0, 1318.0, 1350.0, 1303.0, 1299.0,
+        ]
+        .map(Value::number)
+        .to_vec();
+        let averaged = vec![
+            Value::number(10.0),
+            Value::number(7.0),
+            Value::number(9.0),
+            Value::number(2.0),
+            Value::text("Not available"),
+        ];
+        let with_blank = vec![
+            Value::number(10.0),
+            Value::number(7.0),
+            Value::number(9.0),
+            Value::number(2.0),
+        ];
+        let maximum = vec![
+            Value::number(0.0),
+            Value::number(0.2),
+            Value::number(0.5),
+            Value::number(0.4),
+            Value::Bool(true),
+        ];
+        let minimum = vec![
+            Value::Bool(false),
+            Value::number(0.2),
+            Value::number(0.5),
+            Value::number(0.4),
+            Value::number(0.8),
+        ];
+        let cases: Vec<(Func, Vec<Vec<Value>>, f64, f64)> = vec![
+            (Func::AverageA, vec![averaged], 5.6, 1e-12),
+            // The page shows 5.6 for AVERAGEA(A2:A5,A7) with A7 empty, but
+            // its remarks say empty cells are skipped, which gives 28 / 4.
+            (
+                Func::AverageA,
+                vec![with_blank, vec![Value::Blank]],
+                7.0,
+                1e-12,
+            ),
+            (Func::MaxA, vec![maximum], 1.0, 0.0),
+            (Func::MinA, vec![minimum], 0.0, 0.0),
+            (Func::StdevA, vec![strength.clone()], 27.463_915_72, 5e-9),
+            (Func::StdevPA, vec![strength.clone()], 26.054_56, 5e-6),
+            (Func::VarA, vec![strength.clone()], 754.266_67, 5e-6),
+            (Func::VarPA, vec![strength], 678.84, 5e-3),
+        ];
+
+        for (func, args, expected, tolerance) in cases {
+            let Value::Number(actual) = result(func, &args) else {
+                panic!("{func:?} is not a number");
+            };
+
+            assert!((actual - expected).abs() <= tolerance, "{func:?}: {actual}");
+        }
+    }
+
+    #[test]
+    fn counted_functions_read_typed_text_and_logical_values() {
+        let mut values = FuncAccumulator::default();
+
+        for value in [Value::text("4"), Value::Bool(true), Value::text("")] {
+            values.push_scalar(value).unwrap();
+            values.finish_arg(1, 1).unwrap();
+        }
+
+        assert_eq!(
+            apply(Func::AverageA, &values),
+            Some(Value::number(5.0 / 3.0))
+        );
+        assert_eq!(apply(Func::MaxA, &values), Some(Value::number(4.0)));
+
+        let mut typed = FuncAccumulator::default();
+
+        typed.push_scalar(Value::text("x")).unwrap();
+        typed.finish_arg(1, 1).unwrap();
+
+        assert_eq!(
+            apply(Func::VarA, &typed),
+            Some(Value::Error(FormulaError::Value))
+        );
+        assert_eq!(
+            result(Func::AverageA, &[vec![Value::Blank]]),
+            Value::Error(FormulaError::DivZero)
+        );
+        assert_eq!(
+            result(Func::MinA, &[vec![Value::Blank]]),
+            Value::number(0.0)
         );
     }
 }
