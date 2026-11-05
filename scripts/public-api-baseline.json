@@ -30,9 +30,7 @@
     {
       "package": "@sheetwrite/charts",
       "entryPoint": "./register",
-      "exports": [
-        "registerChartsBackend"
-      ]
+      "exports": ["registerChartsBackend"]
     },
     {
       "package": "@sheetwrite/core",
@@ -486,10 +484,7 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./browser/history",
-      "exports": [
-        "IndexedDbHistoryStorage",
-        "IndexedDbHistoryStorageOptions"
-      ]
+      "exports": ["IndexedDbHistoryStorage", "IndexedDbHistoryStorageOptions"]
     },
     {
       "package": "@sheetwrite/core",
@@ -580,10 +575,7 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": [
-        "WorkerAcknowledgement",
-        "createWorkerMessageHandler"
-      ]
+      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -774,9 +766,7 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": [
-        "registerXlsxBackends"
-      ]
+      "exports": ["registerXlsxBackends"]
     }
   ]
 }

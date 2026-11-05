@@ -232,6 +232,10 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           move: (field, to, from, at) => move(pivot, fields, field, to, from, at),
           commit,
           distinctValues: (field) => distinctValues(pivot, field),
+          measureName: (measureId) =>
+            grid.store
+              .getWorkbook()
+              .dataModel?.measures?.find((measure) => measure.id === measureId)?.name ?? measureId,
           signal: lifetime.signal,
         }),
       );
@@ -271,6 +275,8 @@ interface AreaActions {
   move(field: number, to: PivotArea, from: PivotPlacement | null, at?: number): void;
   commit(next: PivotDefinition, focusKey?: string): void;
   distinctValues(field: number): CellScalar[];
+  /** The saved name of a measure, or its ID when the measure was removed. */
+  measureName(id: string): string;
   /** The panel's signal; an open menu stops listening on the document when it aborts. */
   signal: AbortSignal;
 }
@@ -300,12 +306,15 @@ function areaSection(
     const placement: PivotPlacement = { area, index };
     const item = document.createElement("li");
     item.className = "sheetwrite-panel-area-item";
-    item.draggable = true;
+    const value = area === "values" ? pivot.values[index] : undefined;
+    // A measure value has no source field, so it cannot move to another
+    // area or shift by field; the list can only remove it.
+    const isMeasure = value !== undefined && "measure" in value;
+    item.draggable = !isMeasure;
 
     const name = document.createElement("span");
     name.className = "sheetwrite-panel-field-name";
-    const value = area === "values" ? pivot.values[index] : undefined;
-    const measure = value && "measure" in value ? value.measure : undefined;
+    const measure = value && "measure" in value ? actions.measureName(value.measure) : undefined;
     const aggregation =
       value && "aggregation" in value
         ? AGGREGATION_LABELS.find(([key]) => key === value.aggregation)?.[1]
@@ -316,26 +325,39 @@ function areaSection(
       (aggregation === undefined ? header(field) : `${aggregation} of ${header(field)}`);
     item.appendChild(name);
 
-    const menuItems = (): PanelMenuItem[] => [
-      ...PIVOT_AREAS.map(([to, toLabel]) => ({
-        label: `Move to ${toLabel}`,
-        disabled: to === area,
-        run: () => actions.move(field, to, placement),
-      })),
-      {
-        label: "Move Up",
-        disabled: index === 0,
-        run: () =>
-          actions.commit(shiftField(pivot, placement, -1, noFacts), `${area}-${index - 1}-menu`),
-      },
-      {
-        label: "Move Down",
-        disabled: index === entries.length - 1,
-        run: () =>
-          actions.commit(shiftField(pivot, placement, 1, noFacts), `${area}-${index + 1}-menu`),
-      },
-      { label: "Remove", run: () => actions.commit(removeField(pivot, placement)) },
-    ];
+    const remove: PanelMenuItem = {
+      label: "Remove",
+      run: () => actions.commit(removeField(pivot, placement)),
+    };
+    const menuItems = (): PanelMenuItem[] =>
+      isMeasure
+        ? [remove]
+        : [
+            ...PIVOT_AREAS.map(([to, toLabel]) => ({
+              label: `Move to ${toLabel}`,
+              disabled: to === area,
+              run: () => actions.move(field, to, placement),
+            })),
+            {
+              label: "Move Up",
+              disabled: index === 0,
+              run: () =>
+                actions.commit(
+                  shiftField(pivot, placement, -1, noFacts),
+                  `${area}-${index - 1}-menu`,
+                ),
+            },
+            {
+              label: "Move Down",
+              disabled: index === entries.length - 1,
+              run: () =>
+                actions.commit(
+                  shiftField(pivot, placement, 1, noFacts),
+                  `${area}-${index + 1}-menu`,
+                ),
+            },
+            remove,
+          ];
     // The area is part of the name: a field can sit in two areas at once.
     const actionsLabel = `${name.textContent} in ${label} actions`;
     item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems, actions.signal));
@@ -366,10 +388,11 @@ function areaSection(
       item.appendChild(filterValues(pivot, index, field, header(field), actions));
     }
 
-    item.addEventListener("dragstart", (event) => {
-      actions.startDrag({ field, from: placement });
-      event.dataTransfer?.setData("text/plain", header(field));
-    });
+    if (!isMeasure)
+      item.addEventListener("dragstart", (event) => {
+        actions.startDrag({ field, from: placement });
+        event.dataTransfer?.setData("text/plain", header(field));
+      });
     item.addEventListener("dragend", () => actions.endDrag());
     list.appendChild(item);
   });
