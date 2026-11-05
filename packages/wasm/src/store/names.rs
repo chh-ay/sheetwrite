@@ -28,7 +28,7 @@ use super::{workbook_name_key, CellStore};
 use crate::calc::{
     invalidate_sheet_refs, parse, rename_sheet_refs, resolve_named_ranges, resolve_structured_refs,
     serialize, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef,
-    NamedRangeRef,
+    NamedRangeRef, RangeFlags, RefFlags,
 };
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
@@ -95,8 +95,9 @@ pub(crate) struct NamePlacement {
     /// itself unresolved differs where that name is not being expanded, so
     /// it is not reused.
     lowest_cut: Cell<usize>,
-    /// Whether the expansion in progress depends on the formula's sheet.
-    /// Only set while definitions are resolved for every sheet.
+    /// Whether the expansion in progress reads a name that some sheet
+    /// defines in its own scope. Only set while definitions are resolved for
+    /// every sheet.
     sheet_bound: Cell<bool>,
     /// Name keys that some sheet defines in its own scope, sorted. A
     /// workbook definition that uses one of them reads differently on that
@@ -279,7 +280,10 @@ impl CellStore {
             return Some(target.clone());
         }
         if let Some(target) = &definition.resolved {
-            return Some(bind_target(target, formula_sheet, depth, placement));
+            return Some(match target {
+                NameTarget::Range(range) => place_range(range.clone(), formula_sheet, depth),
+                _ => target.clone(),
+            });
         }
 
         let outer_positional = placement.positional.replace(definition.positional);
@@ -306,10 +310,7 @@ impl CellStore {
         placement.lowest_cut.set(outer_cut.min(cut));
 
         let target = match reference_target(&ast, &definition.name, scope, formula_sheet) {
-            Some(range) => {
-                note_sheet_bound(&range, formula_sheet, depth, placement);
-                NameTarget::Range(range)
-            }
+            Some(range) => place_range(range, formula_sheet, depth),
             None => NameTarget::Formula(Rc::new(bounded_expansion(&definition.name, ast))),
         };
         if positional && cut >= depth {
@@ -374,7 +375,7 @@ impl CellStore {
         let (row, col) = crate::eval::current_formula_origin().unwrap_or((0, 0));
         match self.name_target(name, sheet as u32, &NamePlacement::new(row, col))? {
             NameTarget::Formula(formula) => Some(formula),
-            NameTarget::Range(_) => None,
+            NameTarget::Range(_) | NameTarget::Reference(_) => None,
         }
     }
 
@@ -455,7 +456,7 @@ impl CellStore {
                     metadata.add_payload(expansion.name.len(), expansion.name.capacity());
                     expansion.expression.heap_memory_stats(metadata);
                 }
-                None => {}
+                Some(NameTarget::Reference(_)) | None => {}
             }
         }
     }
@@ -499,38 +500,36 @@ impl CellStore {
     }
 }
 
-/// `target` for a formula on `formula_sheet`: a reference target with no
-/// sheet takes the formula's sheet.
-fn bind_target(
-    target: &NameTarget,
-    formula_sheet: u32,
-    depth: usize,
-    placement: &NamePlacement,
-) -> NameTarget {
-    match target {
-        NameTarget::Range(range) if range.sheet == NO_SHEET => {
-            note_sheet_bound(range, formula_sheet, depth, placement);
-            NameTarget::Range(NamedRangeRef {
-                sheet: formula_sheet,
-                ..range.clone()
-            })
-        }
-        _ => target.clone(),
+/// A name's single reference for a formula on `formula_sheet`. A reference
+/// with no sheet takes the formula's sheet. While a definition is resolved for
+/// every sheet, it keeps no sheet at the top of that definition, which takes
+/// the sheet at bind, and stays a plain reference inside it, which reads the
+/// sheet of the formula that evaluates it.
+fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTarget {
+    if range.sheet != NO_SHEET {
+        return NameTarget::Range(range);
     }
-}
+    if formula_sheet == NO_SHEET && depth > 0 {
+        let absolute = RefFlags {
+            row_abs: true,
+            col_abs: true,
+        };
+        return NameTarget::Reference(Ast::Range(
+            range.row_start,
+            range.col_start,
+            range.row_end,
+            range.col_end,
+            RangeFlags {
+                start: absolute,
+                end: absolute,
+            },
+        ));
+    }
 
-/// A reference with no sheet inside another definition that is being
-/// resolved for every sheet makes that definition depend on the sheet. At
-/// the top of a definition it does not: it takes the sheet at bind.
-fn note_sheet_bound(
-    range: &NamedRangeRef,
-    formula_sheet: u32,
-    depth: usize,
-    placement: &NamePlacement,
-) {
-    if range.sheet == NO_SHEET && formula_sheet == NO_SHEET && depth > 0 {
-        placement.sheet_bound.set(true);
-    }
+    NameTarget::Range(NamedRangeRef {
+        sheet: formula_sheet,
+        ..range
+    })
 }
 
 /// The expansion of `name`, or a `#NUM!` in its place when it is larger than

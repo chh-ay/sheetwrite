@@ -256,10 +256,16 @@ fn a_workbook_name_without_a_sheet_reads_the_sheet_of_each_formula() {
     assert!(store.set_named_formula("FirstTwice", -1, "=$B$1*2"));
     assert!(store.set_named_formula("Column", -1, "=$A$1:$A$3"));
     assert!(store.set_named_formula("ColumnTotal", -1, "=SUM(Column)"));
+    assert!(store.set_named_formula("ColumnSecond", -1, "=INDEX(Column,2)"));
+    assert!(store.set_named_formula("ColumnHeight", -1, "=ROWS(Column)"));
+    assert!(store.set_named_formula("Alias", -1, "=Column"));
     for sheet in [data, other] {
         store.set_formula(sheet, 0, 4, "=First", 0);
         store.set_formula(sheet, 1, 4, "=FirstTwice", 0);
         store.set_formula(sheet, 2, 4, "=ColumnTotal", 0);
+        store.set_formula(sheet, 3, 4, "=ColumnSecond", 0);
+        store.set_formula(sheet, 4, 4, "=ColumnHeight", 0);
+        store.set_formula(sheet, 5, 4, "=SUM(Alias)", 0);
         store.recompute(sheet);
     }
 
@@ -269,6 +275,13 @@ fn a_workbook_name_without_a_sheet_reads_the_sheet_of_each_formula() {
     assert_eq!(number(&store, other, 0, 4), 7.0);
     assert_eq!(number(&store, other, 1, 4), 14.0);
     assert_eq!(number(&store, other, 2, 4), 15.0);
+    assert_eq!(number(&store, data, 3, 4), 2.0);
+    assert_eq!(number(&store, other, 3, 4), 5.0);
+    for sheet in [data, other] {
+        assert_eq!(number(&store, sheet, 4, 4), 3.0);
+    }
+    assert_eq!(number(&store, data, 5, 4), 6.0);
+    assert_eq!(number(&store, other, 5, 4), 15.0);
 }
 
 /// A workbook name that uses another name reads that sheet's own definition
