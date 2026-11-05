@@ -598,6 +598,7 @@ export class HistoryArchive {
         revision,
         checkpoint: checkpoint.checkpoint,
         tail: [],
+        checkpoints: [],
         time,
         activeMs: 0,
         automaticAt: 0,
@@ -680,6 +681,7 @@ export class HistoryArchive {
           ...head,
           checkpoint: checkpoint.checkpoint,
           tail: [],
+          checkpoints: [...head.checkpoints, checkpoint.checkpoint],
           checkpointAt: activeMs,
           checkpointTransactions: 0,
           checkpointLogBytes: 0,
@@ -689,7 +691,7 @@ export class HistoryArchive {
       let version: HistoryVersion | undefined;
       if (activeMs - current.automaticAt >= this.limits.automaticIntervalMs) {
         version = await this.version(head, "automatic", commit.authorId, commit.time);
-        head = { ...head, automaticAt: activeMs };
+        head = { ...head, automaticAt: activeMs, checkpoints: [] };
       }
 
       await this.publish(publication, head, version, signal);
@@ -711,6 +713,7 @@ export class HistoryArchive {
       time,
       checkpoint: head.checkpoint,
       tail: [...head.tail],
+      checkpoints: [...head.checkpoints],
       ...(name === undefined ? {} : { name }),
     };
 
@@ -738,7 +741,10 @@ export class HistoryArchive {
       }
 
       const version = await this.version(head, "named", authorId, time, name.trim());
-      await this.publish([], undefined, version, signal);
+
+      // The marker takes over the checkpoints since the previous one.
+      const next = head.checkpoints.length > 0 ? { ...head, checkpoints: [] } : undefined;
+      await this.publish([], next, version, signal);
 
       return version;
     });
