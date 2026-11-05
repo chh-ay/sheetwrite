@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Menu, X } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import {
@@ -23,8 +24,8 @@ import {
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { PackageCommand } from "./PackageCommand.js";
+import { SiteTopbar } from "./SiteTopbar.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
-import { ThemeToggle } from "./ThemeToggle.js";
 
 /**
  * Keep the sidebar only when it fits beside the reading panel; smaller
@@ -43,18 +44,6 @@ interface DocsShellProps {
    */
   reserveOutline?: boolean;
   title: string;
-}
-
-function Brand() {
-  return (
-    <Link aria-label="Sheetwrite home" className="sw-brand" to="/">
-      <svg aria-hidden="true" viewBox="0 0 32 32">
-        <rect height="26" rx="5" width="26" x="3" y="3" />
-        <path d="M3 11h26M11 3v26M20 11v18M11 20h18" />
-      </svg>
-      <span>Sheetwrite</span>
-    </Link>
-  );
 }
 
 function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
@@ -286,9 +275,7 @@ function NavigationDrawer({
           onClick={onDismiss}
           type="button"
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="m6 6 12 12M18 6 6 18" />
-          </svg>
+          <X aria-hidden="true" className="sw-icon" data-size="md" />
         </button>
       </div>
       <NavigationSections activeHref={activeHref} onNavigate={onDismiss} />
@@ -322,19 +309,6 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
         </Link>
       )}
     </nav>
-  );
-}
-
-/** The current version is one click from every page: it opens its release post. */
-function VersionLink() {
-  return (
-    <Link
-      aria-label={`Release notes for Sheetwrite ${LATEST_RELEASE.version}`}
-      className="sw-version-link"
-      to={releaseHref(LATEST_RELEASE.version)}
-    >
-      v{LATEST_RELEASE.version}
-    </Link>
   );
 }
 
@@ -376,9 +350,6 @@ export function DocsShell({
   const neighbours = documentNeighbours(activeHref);
 
   const release = releaseContext(activeHref);
-  // Release notes are their own header section; every other page is Docs.
-  const inReleases = activeHref?.startsWith(RELEASES_HREF) ?? false;
-
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -411,44 +382,9 @@ export function DocsShell({
       <a className="sw-skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="sw-docs-header">
-        <div className="sw-docs-header__brand">
-          <Brand />
-          <VersionLink />
-        </div>
-        <DocsSearch />
-        <div className="sw-docs-header__actions">
-          <nav aria-label="Product links" className="sw-docs-header__links">
-            <Link className="sw-docs-header__home" to="/">
-              Home
-            </Link>
-            <Link
-              activeOptions={{ exact: true }}
-              aria-current={inReleases ? undefined : "page"}
-              className="sw-docs-header__docs"
-              to="/docs/"
-            >
-              Docs
-            </Link>
-            <Link
-              aria-current={inReleases ? "page" : undefined}
-              className="sw-docs-header__releases"
-              to={RELEASES_HREF}
-            >
-              Releases
-            </Link>
-            <Link className="sw-docs-header__showcases" to="/showcases/">
-              Showcases
-            </Link>
-            <a
-              className="sw-docs-header__ai"
-              href="/llms.txt"
-              title="Curated documentation index for AI agents"
-            >
-              llms.txt
-            </a>
-          </nav>
-          <ThemeToggle />
+      <SiteTopbar
+        search={<DocsSearch />}
+        trailing={
           <button
             aria-controls={NAVIGATION_DIALOG_ID}
             aria-expanded={navigationOpen}
@@ -457,13 +393,11 @@ export function DocsShell({
             onClick={openNavigation}
             type="button"
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
+            <Menu aria-hidden="true" className="sw-icon" data-size="md" />
             <span className="sw-visually-hidden">Documentation menu</span>
           </button>
-        </div>
-      </header>
+        }
+      />
       <aside className="sw-sidebar">
         <NavigationSections activeHref={activeHref} />
       </aside>

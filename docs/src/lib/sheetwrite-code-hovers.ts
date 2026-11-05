@@ -503,6 +503,101 @@ function tagValueContents(value: string): ElementContent[] {
   return contents;
 }
 
+/** Reader-facing names of JSDoc tags; others show as `@name`. */
+const TAG_LABELS: Readonly<Record<string, string>> = {
+  defaultValue: "Default",
+  deprecated: "Deprecated",
+  example: "Example",
+  param: "Parameter",
+  remarks: "Remarks",
+  returns: "Returns",
+  see: "See also",
+  throws: "Throws",
+};
+
+function tagLabel(name: string): Element {
+  return h("span.sw-code-popover__tag-name", TAG_LABELS[name] ?? `@${name}`);
+}
+
+function exampleTag(value: string, rendered: RenderedHover): Element {
+  const code = rendered.examples?.get(value) ?? [
+    { type: "text" as const, value: exampleCode(value) },
+  ];
+  return h("span.sw-code-popover__tag.sw-code-popover__tag--example", [
+    tagLabel("example"),
+    h("code.sw-code-popover__example", structuredClone(code)),
+  ]);
+}
+
+/** Every `@see` of a symbol on one row: a label, then the targets separated by commas. */
+function seeAlsoTag(values: readonly string[], rendered: RenderedHover): Element {
+  const targets = values.flatMap((value, index): ElementContent[] => [
+    ...(index > 0 ? [{ type: "text" as const, value: ", " }] : []),
+    ...(rendered.seeRoutes?.has(value)
+      ? [
+          h(
+            "a.sw-code-popover__tag-link",
+            { href: rendered.seeRoutes.get(value) },
+            cleanDocumentation(value),
+          ),
+        ]
+      : tagValueContents(value)),
+  ]);
+  return h("span.sw-code-popover__tag", [tagLabel("see"), ...targets]);
+}
+
+/** Examples and other tags in source order, then one "See also" row. */
+function panelTags(rendered: RenderedHover): Element[] {
+  const seeAlso: string[] = [];
+  const tags: Element[] = [];
+  for (const [name, value] of rendered.tags) {
+    if (name === "see" && value) seeAlso.push(value);
+    else if (name === "example" && value) tags.push(exampleTag(value, rendered));
+    else
+      tags.push(h("span.sw-code-popover__tag", [tagLabel(name), ...tagValueContents(value ?? "")]));
+  }
+  if (seeAlso.length > 0) tags.push(seeAlsoTag(seeAlso, rendered));
+  return tags;
+}
+
+/**
+ * The hover panel: a visually hidden plain signature for screen readers,
+ * the highlighted signature at two widths, the docs, the tags and the link to
+ * the API reference. `dedupe-code-popovers.ts` moves it into the page's store.
+ */
+function popoverPanel(rendered: RenderedHover, popoverId: string): Element {
+  const tags = panelTags(rendered);
+  return h(
+    "span.sw-code-popover__panel",
+    {
+      id: popoverId,
+      role: "tooltip",
+      dataSwCodePopoverPanel: "",
+      // Popover text is preview chrome; indexing it lets giant embedded
+      // declarations (e.g. Grid) hijack search rankings on every page.
+      dataPagefindIgnore: "",
+    },
+    [
+      h("span.sw-code-popover__accessible-signature", rendered.accessibleSignature),
+      h(
+        "span.sw-code-popover__signature.sw-code-popover__signature--wide",
+        { ariaHidden: "true" },
+        rendered.wideSignature,
+      ),
+      h(
+        "span.sw-code-popover__signature.sw-code-popover__signature--narrow",
+        { ariaHidden: "true" },
+        rendered.narrowSignature,
+      ),
+      rendered.docs ? h("span.sw-code-popover__docs", cleanDocumentation(rendered.docs)) : [],
+      tags.length > 0 ? h("span.sw-code-popover__tags", tags) : [],
+      rendered.referenceRoute
+        ? h("a.sw-code-popover__link", { href: rendered.referenceRoute }, "API reference")
+        : [],
+    ],
+  );
+}
+
 class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   override readonly name = "sheetwrite-code-hover";
 
@@ -520,103 +615,22 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   }
 
   override render({ nodesToTransform }: AnnotationRenderOptions): Element[] {
-    const kind = this.rendered.docs
-      ? "documented"
-      : this.rendered.referenceRoute
-        ? "reference"
-        : "type";
+    const { docs, navigable, referenceRoute } = this.rendered;
+    const kind = docs ? "documented" : referenceRoute ? "reference" : "type";
+    const isLink = navigable === true && referenceRoute !== undefined;
     return nodesToTransform.map((node) =>
       h("span.sw-code-popover", [
         h(
-          this.rendered.navigable && this.rendered.referenceRoute
-            ? "a.sw-code-popover__trigger"
-            : "span.sw-code-popover__trigger",
+          isLink ? "a.sw-code-popover__trigger" : "span.sw-code-popover__trigger",
           {
-            ...(this.rendered.navigable && this.rendered.referenceRoute
-              ? { href: this.rendered.referenceRoute }
-              : { tabIndex: 0 }),
+            ...(isLink ? { href: referenceRoute } : { tabIndex: 0 }),
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
             dataHoverKind: kind,
           },
           [node],
         ),
-        h(
-          "span.sw-code-popover__panel",
-          {
-            id: this.popoverId,
-            role: "tooltip",
-            dataSwCodePopoverPanel: "",
-            // Popover text is preview chrome; indexing it lets giant embedded
-            // declarations (e.g. Grid) hijack search rankings on every page.
-            dataPagefindIgnore: "",
-          },
-          [
-            h("span.sw-code-popover__accessible-signature", this.rendered.accessibleSignature),
-            h(
-              "span.sw-code-popover__signature.sw-code-popover__signature--wide",
-              { ariaHidden: "true" },
-              this.rendered.wideSignature,
-            ),
-            h(
-              "span.sw-code-popover__signature.sw-code-popover__signature--narrow",
-              { ariaHidden: "true" },
-              this.rendered.narrowSignature,
-            ),
-            this.rendered.docs
-              ? h("span.sw-code-popover__docs", cleanDocumentation(this.rendered.docs))
-              : [],
-            this.rendered.tags.length > 0
-              ? h(
-                  "span.sw-code-popover__tags",
-                  this.rendered.tags.map(([name, value]) =>
-                    name === "example" && value
-                      ? h("span.sw-code-popover__tag.sw-code-popover__tag--example", [
-                          h("span.sw-code-popover__tag-name", "Example"),
-                          h(
-                            "code.sw-code-popover__example",
-                            structuredClone(
-                              this.rendered.examples?.get(value) ?? [
-                                {
-                                  type: "text" as const,
-                                  value: exampleCode(value),
-                                },
-                              ],
-                            ),
-                          ),
-                        ])
-                      : h("span.sw-code-popover__tag", [
-                          h(
-                            "span.sw-code-popover__tag-name",
-                            name === "see" ? "See also" : `@${name}`,
-                          ),
-                          ...(value ? [{ type: "text", value: " " } as ElementContent] : []),
-                          ...(value
-                            ? name === "see" && this.rendered.seeRoutes?.has(value)
-                              ? [
-                                  h(
-                                    "a.sw-code-popover__tag-link",
-                                    {
-                                      href: this.rendered.seeRoutes.get(value),
-                                    },
-                                    cleanDocumentation(value),
-                                  ),
-                                ]
-                              : tagValueContents(value)
-                            : []),
-                        ]),
-                  ),
-                )
-              : [],
-            this.rendered.referenceRoute
-              ? h(
-                  "a.sw-code-popover__link",
-                  { href: this.rendered.referenceRoute },
-                  "API reference →",
-                )
-              : [],
-          ],
-        ),
+        popoverPanel(this.rendered, this.popoverId),
       ]),
     );
   }

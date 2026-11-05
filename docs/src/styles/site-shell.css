@@ -2,52 +2,12 @@
 /* An open reading layout: the page is one surface, and hairlines (not boxed
    cards) separate navigation, text and outline. */
 .sw-docs {
-  --sw-sidebar-width: 16.5rem;
-  --sw-header-height: 4rem;
-  --sw-content-width: 52rem;
+  /* The on-page outline column beside the article on wide screens. */
+  --sw-docs-outline-width: 14rem;
   min-height: 100vh;
-  padding-top: var(--sw-header-height);
   background: var(--sw-surface-1);
 }
 
-.sw-docs-header {
-  position: fixed;
-  z-index: 50;
-  inset: 0 0 auto;
-  display: grid;
-  grid-template-columns: calc(var(--sw-sidebar-width) - 2rem) minmax(12rem, 28rem) 1fr;
-  align-items: center;
-  gap: var(--sw-space-6);
-  height: var(--sw-header-height);
-  padding: 0 var(--sw-space-6);
-  border-bottom: 1px solid var(--sw-border);
-  background: color-mix(in srgb, var(--sw-surface-1) 86%, transparent);
-  backdrop-filter: saturate(1.4) blur(14px);
-}
-
-.sw-docs-header__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-  min-width: 0;
-}
-/* The version reads as a quiet tag beside the wordmark and opens its notes. */
-.sw-version-link {
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-pill);
-  padding: var(--sw-space-0-5) var(--sw-space-2);
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    color 140ms ease,
-    border-color 140ms ease;
-}
-.sw-version-link:hover {
-  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
-  color: var(--sw-accent-strong);
-}
 /* Release post: date and steps to the newer and older posts, under the title. */
 .sw-release-strip {
   display: flex;
@@ -72,39 +32,6 @@
   background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
   font-size: var(--sw-text-eyebrow);
   font-weight: var(--sw-weight-semibold);
-}
-.sw-docs-header__actions,
-.sw-docs-header__links {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-1-5);
-}
-.sw-docs-header__actions {
-  justify-content: flex-end;
-}
-.sw-docs-header__links > a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.5rem;
-  padding: 0 var(--sw-space-3);
-  border-radius: var(--sw-radius-md);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-medium);
-  text-decoration: none;
-  transition:
-    color 140ms ease,
-    background-color 140ms ease;
-}
-.sw-docs-header__links > a:hover {
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-}
-/* The header marks the section of the page: Releases for release notes,
-   Docs for every other docs page. */
-.sw-docs-header__links > a[aria-current="page"] {
-  color: var(--sw-accent-strong);
-  background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
 }
 /* The newest release opens the sidebar, above the section groups. */
 .sw-sidebar__nav a.sw-release-card {
@@ -160,11 +87,6 @@
   color: var(--sw-accent-strong);
   font-size: var(--sw-text-caption);
   font-weight: var(--sw-weight-semibold);
-}
-.sw-docs .sw-search-button {
-  height: 2.6rem;
-  border-radius: var(--sw-radius-md);
-  font-size: var(--sw-text-small);
 }
 .sw-nav-toggle {
   display: none;
@@ -343,18 +265,16 @@
   text-transform: uppercase;
 }
 
-/* Text and outline stay a fixed width and center in the space right of the
-   sidebar; the padding absorbs extra width on large screens. */
+/* The reading column keeps the content width and centers in the space right
+   of the sidebar; wide screens add the outline as a second column. */
 .sw-document {
-  width: calc(100% - var(--sw-sidebar-width));
-  margin: 0 0 0 var(--sw-sidebar-width);
-  padding: var(--sw-space-12)
-    max(
-      clamp(var(--sw-space-6), 5vw, var(--sw-space-20)),
-      (100% - var(--sw-sidebar-width) - var(--sw-space-section)) / 2
-    )
-    var(--sw-space-16);
+  display: grid;
+  grid-template-columns: minmax(0, var(--sw-content-width));
+  justify-content: center;
+  align-content: start;
   min-width: 0;
+  margin-left: var(--sw-sidebar-width);
+  padding: var(--sw-space-12) var(--sw-page-gutter) var(--sw-space-16);
 }
 .sw-document__header {
   margin-bottom: var(--sw-space-10);
@@ -966,44 +886,31 @@ html:has(.sw-nav-dialog[open]) {
 
 @media (min-width: 88rem) {
   .sw-docs:not(.sw-docs--overview) .sw-document {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 13rem;
-    gap: 0 var(--sw-space-16);
-    /* Keep the 70rem reading area; the outline gets its own 16.5rem. */
-    padding-inline: max(
-      clamp(var(--sw-space-6), 5vw, var(--sw-space-20)),
-      (100% - var(--sw-sidebar-width) - var(--sw-space-section)) / 2
-    );
+    grid-template-columns: minmax(0, var(--sw-content-width)) var(--sw-docs-outline-width);
+    column-gap: var(--sw-space-16);
   }
-  .sw-document > .sw-document__header,
-  .sw-document > .sw-symbol-filter,
-  .sw-document > .sw-prose,
-  .sw-document > .sw-document__footer {
+  .sw-document > :not(.sw-toc) {
     grid-column: 1;
-    min-width: 0;
   }
   .sw-toc {
     display: block;
     position: sticky;
-    top: calc(var(--sw-header-height) + 2rem);
+    top: calc(var(--sw-header-height) + var(--sw-space-8));
     grid-column: 2;
-    grid-row: 1 / span 4;
+    /* Spans every row of the reading column, so it sticks for the whole page. */
+    grid-row: 1 / span 8;
     align-self: start;
-    max-height: calc(100vh - var(--sw-header-height) - 4rem);
+    max-height: calc(100vh - var(--sw-header-height) - var(--sw-space-16));
     overflow-y: auto;
     scrollbar-gutter: stable;
-    border-left: 1px solid var(--sw-border);
-    padding-left: 0;
     scrollbar-width: thin;
+    border-left: var(--sw-border-width) solid var(--sw-border);
   }
   .sw-document > .sw-toc-inline {
     display: none;
   }
 }
 @media (max-width: 75rem) {
-  .sw-docs-header {
-    grid-template-columns: auto minmax(10rem, 1fr) auto;
-  }
   .sw-doc-frameworks {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1022,50 +929,17 @@ html:has(.sw-nav-dialog[open]) {
   .sw-nav-toggle {
     display: inline-grid;
   }
-  .sw-docs-header {
-    padding-inline: var(--sw-space-4);
-    gap: var(--sw-space-4);
-  }
   .sw-document {
-    width: 100%;
-    margin: 0;
-    padding: var(--sw-space-8) clamp(var(--sw-space-5), 5vw, var(--sw-space-12)) var(--sw-space-12);
-  }
-  .sw-docs-header__links > .sw-docs-header__ai {
-    display: none;
+    margin-left: 0;
+    padding: var(--sw-space-8) var(--sw-page-gutter) var(--sw-space-12);
   }
 }
 @media (max-width: 42rem) {
-  .sw-docs {
-    --sw-header-height: 4rem;
-  }
-  .sw-docs-header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--sw-space-3);
-    padding-inline: var(--sw-space-3);
-  }
-  .sw-docs .sw-brand span,
   .sw-docs .sw-search-button kbd {
     display: none;
   }
-  .sw-docs-header__links > .sw-docs-header__showcases,
-  .sw-docs-header__links > .sw-docs-header__releases,
-  .sw-docs-header__links > .sw-docs-header__docs {
-    display: none;
-  }
-  .sw-docs-header__links > .sw-docs-header__home {
-    padding: 0 var(--sw-space-2);
-    min-height: 2.35rem;
-  }
-  .sw-docs-header__actions {
-    gap: var(--sw-space-0-5);
-  }
-  .sw-docs .sw-search-button {
-    padding-inline: var(--sw-space-2);
-    font-size: var(--sw-text-caption);
-  }
   .sw-document {
-    padding: var(--sw-space-6) var(--sw-space-4) var(--sw-space-12);
+    padding-top: var(--sw-space-6);
   }
   .sw-document__header h1 {
     font-size: var(--sw-text-h2);

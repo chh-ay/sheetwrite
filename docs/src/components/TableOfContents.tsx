@@ -42,6 +42,9 @@ export function useDocumentOutline(): readonly OutlineItem[] {
         // A filtered-out group hides its heading; a link to it would go nowhere.
         if (node.hidden) continue;
         const isMember = node.tagName === "DETAILS";
+        // A member's own "Examples" and "See also" sit inside its collapsed
+        // row; listed bare they repeat dozens of times without their member.
+        if (!isMember && node.parentElement?.closest("details.api-member") != null) continue;
         // Member rows: only the name code, never the trailing doc summary.
         // Headings: own text minus decorations like the .api-count chip.
         const label = (

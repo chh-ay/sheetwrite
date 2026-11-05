@@ -15,6 +15,8 @@ import { autoUpdate, computePosition, flip, offset, shift, size } from "@floatin
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
 const STORE_SELECTOR = "template.sw-code-popover-store";
 const CODE_BLOCK_SELECTOR = ".expressive-code pre";
+/** The sticky site header; panels never open underneath it. */
+const HEADER_SELECTOR = ".sw-header";
 /** Marks the trigger whose panel is open. */
 const OPEN_ATTRIBUTE = "data-popover-open";
 /** Marks the other mentions of the open trigger's symbol in the same code block. */
@@ -126,19 +128,28 @@ function scheduleClose(): void {
   }, CLOSE_DELAY_MS);
 }
 
+/** The viewport edge the panel keeps clear of, below the sticky site header. */
+function viewportPadding(): { top: number; right: number; bottom: number; left: number } {
+  const headerBottom = document.querySelector(HEADER_SELECTOR)?.getBoundingClientRect().bottom ?? 0;
+  return {
+    top: Math.max(0, headerBottom) + VIEWPORT_PADDING_PX,
+    right: VIEWPORT_PADDING_PX,
+    bottom: VIEWPORT_PADDING_PX,
+    left: VIEWPORT_PADDING_PX,
+  };
+}
+
 async function positionPopover(trigger: HTMLElement, panel: HTMLElement): Promise<void> {
+  const padding = viewportPadding();
   const { x, y, placement } = await computePosition(trigger, panel, {
     strategy: "fixed",
     placement: "bottom-start",
     middleware: [
       offset(PANEL_OFFSET_PX),
-      flip({
-        padding: VIEWPORT_PADDING_PX,
-        fallbackPlacements: ["top-start", "bottom-end", "top-end"],
-      }),
-      shift({ padding: VIEWPORT_PADDING_PX }),
+      flip({ padding, fallbackPlacements: ["top-start", "bottom-end", "top-end"] }),
+      shift({ padding }),
       size({
-        padding: VIEWPORT_PADDING_PX,
+        padding,
         apply({ availableHeight, availableWidth, elements }) {
           Object.assign(elements.floating.style, {
             maxWidth: `${Math.min(PANEL_MAX_WIDTH_PX, availableWidth)}px`,
