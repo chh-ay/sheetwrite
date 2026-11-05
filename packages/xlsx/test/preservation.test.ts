@@ -383,10 +383,19 @@ describe("XLSX unmodelled-part preservation", () => {
     const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
     const source = snapshot.workbook.xlsxSource;
     if (!source) throw new Error("picture.xlsx kept no graphs");
-    const relationships = strToU8(
-      `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}"><Relationship Id="rId1" Type="${PACKAGE_RELATIONSHIPS}/image" Target="../worksheets/sheet1.xml"/></Relationships>`,
-    );
-    const outside = deflateSync(relationships);
+    const relationshipsTo = (target: string) =>
+      strToU8(
+        `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}"><Relationship Id="rId1" Type="${PACKAGE_RELATIONSHIPS}/image" Target="${target}"/></Relationships>`,
+      );
+    const withRelationships =
+      (relationships: Uint8Array) =>
+      (part: XlsxSourceSnapshot["parts"][number]): XlsxSourceSnapshot["parts"][number] => ({
+        ...part,
+        method: 8,
+        crc32: Bun.hash.crc32(relationships),
+        uncompressedSize: relationships.byteLength,
+        data: Buffer.from(deflateSync(relationships)).toString("base64"),
+      });
     const tampered: [
       string,
       (part: XlsxSourceSnapshot["parts"][number]) => XlsxSourceSnapshot["parts"][number],
@@ -397,13 +406,11 @@ describe("XLSX unmodelled-part preservation", () => {
       ],
       [
         "xl/drawings/_rels/drawing1.xml.rels",
-        (part) => ({
-          ...part,
-          method: 8,
-          crc32: Bun.hash.crc32(relationships),
-          uncompressedSize: relationships.byteLength,
-          data: Buffer.from(outside).toString("base64"),
-        }),
+        withRelationships(relationshipsTo("../worksheets/sheet1.xml")),
+      ],
+      [
+        "xl/drawings/_rels/drawing1.xml.rels",
+        withRelationships(relationshipsTo("../../../../escaped.xml")),
       ],
     ];
     for (const [name, tamper] of tampered) {
@@ -422,6 +429,31 @@ describe("XLSX unmodelled-part preservation", () => {
       );
       expect(packageProblems(saved)).toEqual([]);
     }
+  });
+
+  it("escapes a retained part's content type in the package content types", async () => {
+    const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
+    const source = snapshot.workbook.xlsxSource;
+    if (!source) throw new Error("picture.xlsx kept no graphs");
+    const drawing = "xl/drawings/drawing1.xml";
+    const persisted: WorkbookSnapshot = JSON.parse(JSON.stringify(snapshot));
+    persisted.workbook.xlsxSource = {
+      ...source,
+      parts: source.parts.map((part) =>
+        part.name === drawing ? { ...part, contentType: "application/x-a&b" } : part,
+      ),
+    };
+
+    const saved = await toXlsxWorkbook(persisted);
+
+    const contentTypes = strFromU8(unzipSync(saved)["[Content_Types].xml"] ?? new Uint8Array());
+    expect(contentTypes).toContain(
+      `<Override PartName="/${drawing}" ContentType="application/x-a&amp;b"/>`,
+    );
+    const reopened = await fromXlsxWorkbook(saved);
+    expect(reopened.workbook.xlsxSource?.parts.find((part) => part.name === drawing)).toMatchObject(
+      { contentType: "application/x-a&b" },
+    );
   });
 
   it("keeps charts and images through a JSON persistence reload of a store", async () => {
