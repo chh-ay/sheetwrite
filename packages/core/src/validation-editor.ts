@@ -1,5 +1,5 @@
 import type { EditNavigate, EditRect } from "./editor.js";
-import { menuKeyTarget } from "./menu-keys.js";
+import { menuKeyTarget } from "./menu-surface.js";
 import type { CellScalar } from "./types/cell.js";
 import type { DataValidationRule } from "./types/document.js";
 import type { Theme } from "./types/render.js";

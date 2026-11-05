@@ -2,7 +2,7 @@ import { type ActionFeedback, actionFeedbackFor } from "./action-feedback.js";
 import type { IconName } from "./icons/icon-names.js";
 import { iconNode } from "./icons/resolve.js";
 import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
-import { menuKeyTarget } from "./menu-keys.js";
+import { menuKeyTarget } from "./menu-surface.js";
 import { pivotAt } from "./panels/panel-loader.js";
 import type {
   ContextMenuActionName,

@@ -1,4 +1,4 @@
-import { menuKeyTarget } from "../menu-keys.js";
+import { menuKeyTarget } from "../menu-surface.js";
 // A menu button for panel rows: the keyboard path for what drag and drop
 // does. The menu opens below its button inside the panel, so the panel's
 // scrolling and clipping apply to it.

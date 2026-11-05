@@ -5,7 +5,7 @@
 // the element; the ribbon never positions itself.
 
 import { iconNode } from "../icons/resolve.js";
-import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-keys.js";
+import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-surface.js";
 import { Scope } from "../scope.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
 import {

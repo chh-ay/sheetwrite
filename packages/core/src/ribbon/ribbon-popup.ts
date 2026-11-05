@@ -3,8 +3,13 @@
 // list of its own, as in Excel. Every surface shares the same dismissal,
 // placement and focus-return rules.
 
-import { TWO_AXIS_STEPS, type MenuKeyOptions, menuKeyTarget } from "../menu-keys.js";
-import { type PopupPlacement, popupPosition } from "../popup-placement.js";
+import {
+  type MenuKeyOptions,
+  menuKeyTarget,
+  type PopupPlacement,
+  popupPosition,
+  TWO_AXIS_STEPS,
+} from "../menu-surface.js";
 
 /** Popups open under their trigger, with a gap so the two never read as one surface. */
 const POPUP_PLACEMENT: PopupPlacement = { side: "below", gap: 4 };

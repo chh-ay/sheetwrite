@@ -1,4 +1,4 @@
-import { POPUP_VIEWPORT_MARGIN } from "./popup-placement.js";
+import { POPUP_VIEWPORT_MARGIN } from "./menu-surface.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";

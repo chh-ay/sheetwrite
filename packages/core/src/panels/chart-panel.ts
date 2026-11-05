@@ -5,7 +5,7 @@
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import { iconNode } from "../icons/resolve.js";
-import { TWO_AXIS_STEPS, menuKeyTarget } from "../menu-keys.js";
+import { TWO_AXIS_STEPS, menuKeyTarget } from "../menu-surface.js";
 import type {
   ChartDefinition,
   ChartKind,

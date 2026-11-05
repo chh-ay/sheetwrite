@@ -1,5 +1,10 @@
-import { HORIZONTAL_STEPS, type MenuKeyOptions, menuKeyTarget } from "./menu-keys.js";
-import { type PopupPlacement, popupPosition } from "./popup-placement.js";
+import {
+  HORIZONTAL_STEPS,
+  type MenuKeyOptions,
+  menuKeyTarget,
+  type PopupPlacement,
+  popupPosition,
+} from "./menu-surface.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";

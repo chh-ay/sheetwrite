@@ -1,9 +1,10 @@
 import { createChartRenderer } from "./chart-backend.js";
-import { chartKindName } from "./chart-kinds.js";
+import { CHART_KIND_LABELS } from "./chart-definition.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type {
   ChartAnchor,
   ChartDefinition,
+  ChartKind,
   ChartRef,
   ChartRenderer,
   MountedChart,
@@ -22,6 +23,11 @@ const HIDDEN_ROW_WALK_LIMIT = 4_096;
 const WHEEL_LINE_PX = 16;
 /** Pixels that one wheel "page" scrolls when the browser reports page deltas. */
 const WHEEL_PAGE_PX = 400;
+
+/** Name of a chart kind as screen readers and the plain frame say it, such as "Column chart". */
+function chartName(kind: ChartKind): string {
+  return `${CHART_KIND_LABELS[kind]} chart`;
+}
 
 /** Resize handle directions: the sign of each axis the handle moves. */
 const HANDLES = [
@@ -121,7 +127,7 @@ interface ResolvedAnchor {
 /** Accessible name of a chart object: its title and its kind. */
 function chartObjectLabel(chart: ChartDefinition): string {
   const title = chart.title?.trim();
-  return title ? `${title}, ${chartKindName(chart.kind).toLowerCase()}` : chartKindName(chart.kind);
+  return title ? `${title}, ${chartName(chart.kind).toLowerCase()}` : chartName(chart.kind);
 }
 
 /**
@@ -313,7 +319,7 @@ export class ObjectLayer {
       entry.frame.setAttribute("aria-label", label);
     }
     // Without a renderer the frame shows the title, else the kind, so a chart is never blank.
-    const text = chart.title?.trim() || chartKindName(chart.kind);
+    const text = chart.title?.trim() || chartName(chart.kind);
     if (entry.fallbackTitle && entry.fallbackTitle.textContent !== text) {
       entry.fallbackTitle.textContent = text;
     }

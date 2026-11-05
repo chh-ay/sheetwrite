@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { POPUP_VIEWPORT_MARGIN } from "../src/popup-placement.js";
+import { POPUP_VIEWPORT_MARGIN } from "../src/menu-surface.js";
 import { type SheetTabRecord, SheetTabs, type SheetTabsOptions } from "../src/sheet-tabs.js";
 import type { SheetLifecycleResult } from "../src/types/grid.js";
 

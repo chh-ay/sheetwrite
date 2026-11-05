@@ -13524,7 +13524,7 @@ Maximum serialized formula predicate source; parsing/evaluation stays bounded pe
 ##### `MAX_CONDITIONAL_FORMAT_RULES` — variable
 
 ```ts
-number
+32
 ```
 
 Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask.

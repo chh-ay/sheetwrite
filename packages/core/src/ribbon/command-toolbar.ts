@@ -4,7 +4,7 @@
 
 import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
-import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-keys.js";
+import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-surface.js";
 import { Scope } from "../scope.js";
 import type {
   CommandFlags,

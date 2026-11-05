@@ -3278,7 +3278,7 @@
               "owners": [
                 "src/conditional-format.ts"
               ],
-              "source": "src/conditional-format.ts#L9",
+              "source": "src/conditional-format.ts#L8",
               "jsDocTags": [],
               "documentation": "Maximum serialized formula predicate source; parsing/evaluation stays bounded per visible cell.",
               "memberDocs": []
@@ -3286,11 +3286,11 @@
             {
               "name": "MAX_CONDITIONAL_FORMAT_RULES",
               "kind": "variable",
-              "signature": "number",
+              "signature": "32",
               "owners": [
                 "src/conditional-format.ts"
               ],
-              "source": "src/conditional-format.ts#L6",
+              "source": "src/conditional-format.ts#L5",
               "jsDocTags": [],
               "documentation": "Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask.",
               "memberDocs": []
