@@ -3869,16 +3869,16 @@ export class StoreDataEngine {
           (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
             namedRange.range?.sheet === sheet.id,
         )
-        .map((namedRange) => structuredClone(namedRange)),
+        .map((namedRange) => cloneJsonValue(namedRange)),
       validationRules: cloneJsonValue(sheet.validationRules) ?? [],
       protectedRanges: cloneJsonValue(sheet.protectedRanges) ?? [],
       notes: cloneJsonValue(sheet.notes) ?? [],
-      conditionalFormats: structuredClone(sheet.conditionalFormats ?? []),
+      conditionalFormats: cloneJsonValue(sheet.conditionalFormats ?? []),
       hyperlinks: this.workbook.sheets.map(
         (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
       ),
       // Only a column move puts table metadata back; see `restoreMovedTables`.
-      tables: axis === "column" ? structuredClone(sheet.tables ?? []) : [],
+      tables: axis === "column" ? cloneJsonValue(sheet.tables ?? []) : [],
       charts: this.captureCharts(),
     };
   }
