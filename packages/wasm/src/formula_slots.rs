@@ -288,8 +288,7 @@ impl FormulaStore {
         Some(id)
     }
 
-    // Most source writes replace a live formula or reuse a slot.
-    #[cold]
+    /// Loading grows the store by one slot per new formula.
     #[inline(never)]
     fn grow_slot_family(&mut self, location: AbsCellKey, entry: FormulaEntry) -> Option<FormulaId> {
         let index = self.locations.len();
@@ -302,7 +301,16 @@ impl FormulaStore {
             if self.entries.capacity() == 0 {
                 self.entries.reserve_exact(MIN_SLOT_GROWTH);
             }
-            self.entries.push(Vec::with_capacity(MIN_SLOT_GROWTH));
+
+            // A small workbook grows its only page entry by entry. A workbook
+            // that filled a page reserves each later page once, so loading
+            // does not move entries through repeated page growth.
+            let capacity = if self.entries.is_empty() {
+                MIN_SLOT_GROWTH
+            } else {
+                SLOT_PAGE_LEN
+            };
+            self.entries.push(Vec::with_capacity(capacity));
         }
 
         let page = self.entries.last_mut()?;
