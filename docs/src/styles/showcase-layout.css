@@ -164,6 +164,25 @@
   }
 }
 
+/* Status badges keep their own width inside a control group. */
+.sw-showcase__control-body > .sw-badge {
+  justify-self: start;
+}
+
+/* Tablets: the panel spans the stage under the demo, so its groups sit in
+   two columns instead of stretching each row across the page. */
+@media (min-width: 52rem) and (max-width: 71.99rem) {
+  .sw-showcase__controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sw-space-8);
+  }
+
+  .sw-showcase__control-group + .sw-showcase__control-group {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
 /* Desktop: the control panel sits beside the demo and stays in view. */
 @media (min-width: 72rem) {
   .sw-showcase__stage[data-has-controls="true"] {
