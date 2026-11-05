@@ -3,9 +3,9 @@
   "testSet": {
     "version": 1,
     "libraryVersion": "0.6.1",
-    "checksum": "330aa3e2d3f96b2306934263b74f3fb26a5994b246bdcae6c6c00fa79d92b20a",
+    "checksum": "52674d23572aaad8434277dc776da15d630e3592a015fb600e6bd4152359da14",
     "totalTests": 2350,
-    "publishedExamples": 188,
+    "publishedExamples": 195,
     "formulaTests": 2000,
     "editSequenceTests": 250,
     "workbookTests": 100,
@@ -682,6 +682,34 @@
       {
         "value": "function:PPMT",
         "label": "Function · PPMT"
+      },
+      {
+        "value": "function:AVERAGEA",
+        "label": "Function · AVERAGEA"
+      },
+      {
+        "value": "function:MAXA",
+        "label": "Function · MAXA"
+      },
+      {
+        "value": "function:MINA",
+        "label": "Function · MINA"
+      },
+      {
+        "value": "function:STDEVA",
+        "label": "Function · STDEVA"
+      },
+      {
+        "value": "function:STDEVPA",
+        "label": "Function · STDEVPA"
+      },
+      {
+        "value": "function:VARA",
+        "label": "Function · VARA"
+      },
+      {
+        "value": "function:VARPA",
+        "label": "Function · VARPA"
       },
       {
         "value": "operator:subtract",
@@ -7430,7 +7458,224 @@
       "observations": []
     },
     {
+      "position": 990,
+      "id": "formula.function.averagea.normal.1",
+      "label": "AVERAGEA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:AVERAGEA",
+      "featureLabel": "Function · AVERAGEA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=AVERAGEA(1,TRUE)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "e0b18748e4109c86070c85c922ec29e77e7c818d18f37adb67d6d98b186de9cd",
+      "observations": []
+    },
+    {
       "position": 996,
+      "id": "formula.function.maxa.normal.1",
+      "label": "MAXA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:MAXA",
+      "featureLabel": "Function · MAXA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=MAXA(-1,TRUE)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "fd0df7dd6e5adf4c4416e9b0a7077b01a64b7a877673bffef009da5ca29f9cca",
+      "observations": []
+    },
+    {
+      "position": 1002,
+      "id": "formula.function.mina.normal.1",
+      "label": "MINA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:MINA",
+      "featureLabel": "Function · MINA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=MINA(2,TRUE)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "1be977bcc155d6d57731cb57cb802fc2a536a3b82636b961add0f12d004a9185",
+      "observations": []
+    },
+    {
+      "position": 1008,
+      "id": "formula.function.stdeva.normal.1",
+      "label": "STDEVA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:STDEVA",
+      "featureLabel": "Function · STDEVA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=STDEVA(1,3)=SQRT(2)",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "89ae5d2967bc4a3de39fa629a09c41f4bb7866277687529d35e898e8c38edb2c",
+      "observations": []
+    },
+    {
+      "position": 1014,
+      "id": "formula.function.stdevpa.normal.1",
+      "label": "STDEVPA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:STDEVPA",
+      "featureLabel": "Function · STDEVPA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=STDEVPA(1,3)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "29ea9fc73864ec93d5052dc0b1cbd26fb67694f4f74a90d1293e276b3375b0cb",
+      "observations": []
+    },
+    {
+      "position": 1020,
+      "id": "formula.function.vara.normal.1",
+      "label": "VARA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:VARA",
+      "featureLabel": "Function · VARA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=VARA(1,3)=2",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "5f04eae9f65bfceb6edc2fbc01988d69beb7ac5f86843c5a4eb3ff9823a1f05e",
+      "observations": []
+    },
+    {
+      "position": 1026,
+      "id": "formula.function.varpa.normal.1",
+      "label": "VARPA · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "statistical",
+      "behavior": "shared",
+      "featureValue": "function:VARPA",
+      "featureLabel": "Function · VARPA",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=VARPA(1,3)=1",
+      "target": "D4",
+      "inputs": [],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 9,
+      "evidenceIndex": 11,
+      "testChecksum": "4384e494fa81c9266a93fe5c71d02cacbd58c789b8beeda70afd0339315c99a1",
+      "observations": []
+    },
+    {
+      "position": 1038,
       "id": "formula.operator.subtract.normal.1",
       "label": "subtract · Normal",
       "kind": "formula",
@@ -7461,7 +7706,7 @@
       "observations": []
     },
     {
-      "position": 1008,
+      "position": 1050,
       "id": "formula.operator.divide.normal.1",
       "label": "divide · Normal",
       "kind": "formula",
@@ -7492,7 +7737,7 @@
       "observations": []
     },
     {
-      "position": 1014,
+      "position": 1056,
       "id": "formula.operator.power.normal.1",
       "label": "power · Normal",
       "kind": "formula",
@@ -7523,7 +7768,7 @@
       "observations": []
     },
     {
-      "position": 1020,
+      "position": 1062,
       "id": "formula.operator.concatenate.normal.1",
       "label": "concatenate · Normal",
       "kind": "formula",
@@ -7554,7 +7799,7 @@
       "observations": []
     },
     {
-      "position": 1026,
+      "position": 1068,
       "id": "formula.operator.equal.normal.1",
       "label": "equal · Normal",
       "kind": "formula",
@@ -7585,7 +7830,7 @@
       "observations": []
     },
     {
-      "position": 1032,
+      "position": 1074,
       "id": "formula.operator.not-equal.normal.1",
       "label": "not-equal · Normal",
       "kind": "formula",
@@ -7616,7 +7861,7 @@
       "observations": []
     },
     {
-      "position": 1038,
+      "position": 1080,
       "id": "formula.operator.less-than.normal.1",
       "label": "less-than · Normal",
       "kind": "formula",
@@ -7647,7 +7892,7 @@
       "observations": []
     },
     {
-      "position": 1044,
+      "position": 1086,
       "id": "formula.operator.less-than-or-equal.normal.1",
       "label": "less-than-or-equal · Normal",
       "kind": "formula",
@@ -7678,7 +7923,7 @@
       "observations": []
     },
     {
-      "position": 1050,
+      "position": 1092,
       "id": "formula.operator.greater-than.normal.1",
       "label": "greater-than · Normal",
       "kind": "formula",
@@ -7709,7 +7954,7 @@
       "observations": []
     },
     {
-      "position": 1056,
+      "position": 1098,
       "id": "formula.operator.greater-than-or-equal.normal.1",
       "label": "greater-than-or-equal · Normal",
       "kind": "formula",
@@ -7740,7 +7985,7 @@
       "observations": []
     },
     {
-      "position": 1062,
+      "position": 1104,
       "id": "formula.operator.percent.normal.1",
       "label": "percent · Normal",
       "kind": "formula",
@@ -7771,7 +8016,7 @@
       "observations": []
     },
     {
-      "position": 1068,
+      "position": 1110,
       "id": "formula.operator.unary-plus.normal.1",
       "label": "unary-plus · Normal",
       "kind": "formula",
@@ -7802,7 +8047,7 @@
       "observations": []
     },
     {
-      "position": 1074,
+      "position": 1116,
       "id": "formula.operator.unary-minus.normal.1",
       "label": "unary-minus · Normal",
       "kind": "formula",
@@ -7833,7 +8078,7 @@
       "observations": []
     },
     {
-      "position": 1080,
+      "position": 1122,
       "id": "formula.operator.intersection.normal.1",
       "label": "intersection · Normal",
       "kind": "formula",
@@ -7889,7 +8134,7 @@
       "observations": []
     },
     {
-      "position": 1086,
+      "position": 1128,
       "id": "formula.operator.union.normal.1",
       "label": "union · Normal",
       "kind": "formula",
