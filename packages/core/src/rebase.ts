@@ -251,6 +251,7 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "setRange":
     case "setBlock":
     case "restoreBlock":
+    case "permuteRows":
       return { op: "clearRange", range: operation.range };
     case "addSheet":
       // Carries no coordinates; lifecycle checks read the original operation.
@@ -363,7 +364,8 @@ function transformDirectTarget(
     case "setBlock":
     case "restoreBlock":
     case "setRangeStyle":
-    case "clearRange": {
+    case "clearRange":
+    case "permuteRows": {
       const range = transformRange(operation.range, change);
       if (!range) return overlappingStructure(operation.op);
       operation.range = range;
@@ -854,6 +856,9 @@ function operationContainsFormula(
       return operation.cells.some((cell) => cell.value.kind === "formula");
     case "setBlock":
       return (operation.block.formulas?.length ?? 0) > 0;
+    // A sort adjusts the formulas of moved rows, so it carries formula text.
+    case "permuteRows":
+      return true;
     case "restoreBlock":
       return (restoreBlock(operation).formulas?.length ?? 0) > 0;
     case "addSheet":
@@ -986,6 +991,7 @@ function operationTouchesSheet(
 
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return operation.range.sheet === sheet;
 
     case "addTable":
@@ -1059,6 +1065,7 @@ function mutationRanges(operation: DocumentOp): Range[] {
     case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
+    case "permuteRows":
       return [operation.range];
 
     case "addMerge":

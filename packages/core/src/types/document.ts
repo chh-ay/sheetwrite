@@ -271,6 +271,8 @@ export type CommitReason =
   | "style"
   /** Find-and-replace. */
   | "replace"
+  /** In-place sort that moves the rows of a range. */
+  | "sort"
   | "undo"
   | "redo"
   /** `store.applyTransaction` from host code / unclassified. */
@@ -514,6 +516,12 @@ export type DocumentOp =
     }
   | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null }
   | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean }
+  /**
+   * Move the rows of `range` by a permutation, as an in-place sort does. Target
+   * row offset `i` receives the cells of source row offset `order[i]`. `order`
+   * holds one little-endian `u32` per row of `range`, in base64.
+   */
+  | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string }
   | { op: "addRows"; sheet: SheetId; at: number; count: number }
   | { op: "removeRows"; sheet: SheetId; at: number; count: number }
   | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number }
