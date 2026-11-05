@@ -161,7 +161,8 @@ pub(crate) struct CellStorage {
     payload: Vec<u64>,
     /// Host style-dictionary id; `0` means "no explicit style".
     style: Vec<u32>,
-    paged: Option<PagedStorage>,
+    /// Boxed so a dense sheet carries one pointer for it.
+    paged: Option<Box<PagedStorage>>,
     /// Makes invalidation constant-time for literal-only sheets.
     dense_calculated_cells: usize,
 }
@@ -225,7 +226,11 @@ impl CellStorage {
             kind: Vec::new(),
             payload: Vec::new(),
             style: Vec::new(),
-            paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)?),
+            paged: Some(Box::new(PagedStorage::new(
+                chunk_rows,
+                byte_budget,
+                max_dirty_cells,
+            )?)),
             dense_calculated_cells: 0,
         })
     }
@@ -533,7 +538,7 @@ impl CellStorage {
     pub(crate) fn dirty_coordinates(&self) -> Vec<f64> {
         self.paged
             .as_ref()
-            .map_or_else(Vec::new, PagedStorage::dirty_coordinates)
+            .map_or_else(Vec::new, |paged| paged.dirty_coordinates())
     }
 
     pub(crate) fn mark_range_clean(
@@ -661,7 +666,7 @@ impl CellStorage {
 
         self.row_count = new_rows;
         self.n_cols = new_cols;
-        self.paged = Some(next);
+        self.paged = Some(Box::new(next));
     }
 
     /// Whether the grid can take `rows` rows of `cols` columns. A dense grid

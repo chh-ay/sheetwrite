@@ -9,7 +9,6 @@
 
 use super::{EvalPass, LiteralSources};
 
-use crate::cells::CellRun;
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT};
@@ -129,16 +128,7 @@ impl<'a> RangeReader<'a> {
                 self.dense_value_at(self.row, self.col, pass)
             }
         } else {
-            let run = self.paged_run_at(index);
-            if !run.is_loaded(index) {
-                return Err(FormulaError::Loading);
-            }
-            if run.source(index).0 == KIND_EMPTY && run.resolved(index).0 == KIND_EMPTY {
-                Value::Blank
-            } else {
-                self.store
-                    .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
-            }
+            self.paged_value_at(index, pass)?
         };
 
         self.col += 1;
@@ -175,7 +165,14 @@ impl<'a> RangeReader<'a> {
         }
     }
 
-    fn paged_run_at(&mut self, index: usize) -> CellRun<'a> {
+    /// The value of a paged cell, or `Loading` when it is not resident. Out
+    /// of line so dense walks keep a small loop body.
+    #[inline(never)]
+    fn paged_value_at(
+        &mut self,
+        index: usize,
+        pass: &mut EvalPass<'_>,
+    ) -> Result<Value, FormulaError> {
         if self.row >= self.tile_end_row {
             self.data
                 .cells
@@ -183,7 +180,18 @@ impl<'a> RangeReader<'a> {
             self.tile_end_row = self.data.cells.next_page_row(self.row);
         }
 
-        self.data.cells.tile_run(index, index + 1)
+        let run = self.data.cells.tile_run(index, index + 1);
+        if !run.is_loaded(index) {
+            return Err(FormulaError::Loading);
+        }
+
+        if run.source(index).0 == KIND_EMPTY && run.resolved(index).0 == KIND_EMPTY {
+            return Ok(Value::Blank);
+        }
+
+        Ok(self
+            .store
+            .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1))
     }
 }
 

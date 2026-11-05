@@ -730,7 +730,9 @@ impl PagedStorage {
         self.dirty_slot(row, col).is_some()
     }
 
-    /// `(kind, payload, style, loaded, dirty)` of one source cell.
+    /// `(kind, payload, style, loaded, dirty)` of one source cell. Out of line
+    /// so the dense branches of the cell accessors stay small.
+    #[inline(never)]
     pub(super) fn read(&self, row: usize, col: usize) -> (u8, u64, u32, bool, bool) {
         if let Some(slot) = self.dirty_slot(row, col) {
             let cell = &self.slots[slot as usize];
@@ -766,6 +768,7 @@ impl PagedStorage {
 
     /// The clean page, dirty block and calculated block around (`row`, `col`).
     /// A run over it records one access to the clean page when `touch` is set.
+    #[inline(never)]
     pub(super) fn run_view(&self, row: usize, col: usize, touch: bool) -> RunView<'_> {
         let (page, _) = self.split(row);
         let page_id = self.page_id(col, page);
@@ -1245,6 +1248,7 @@ impl PagedStorage {
         1 << self.calculated_shift
     }
 
+    #[inline(never)]
     pub(super) fn calculated_at(&self, row: usize, col: usize) -> Option<(u8, u64)> {
         let (index, offset) = self.calculated_split(row);
         let block = self.calculated.get(col, index);
@@ -1574,6 +1578,7 @@ impl PagedStorage {
 
     pub(super) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let indexes = stats.owner_mut(PAGED_INDEXES);
+        indexes.add_vec::<Self>(1, 1);
         self.pages.add_memory_stats(indexes);
         indexes.add_vec::<PageRecord>(self.records.len(), self.records.capacity());
         indexes.add_vec::<CleanPage>(self.clean.len(), self.clean.capacity());

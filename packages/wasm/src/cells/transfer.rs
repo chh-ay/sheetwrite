@@ -32,7 +32,7 @@ impl CellStorage {
         }
 
         let paged = if input.bool()? {
-            Some(PagedStorage::read_transfer(input)?)
+            Some(Box::new(PagedStorage::read_transfer(input)?))
         } else {
             if n_cols.checked_mul(row_count) != Some(kind.len()) {
                 return Err("invalid transferred dense dimensions".into());
