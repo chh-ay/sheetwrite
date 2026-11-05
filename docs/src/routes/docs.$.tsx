@@ -10,7 +10,8 @@ import {
   documentComponentForSplat,
   normalizeDocumentHref,
 } from "../lib/content.js";
-import { forwardedHeading, MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
+import { forwardedHeading } from "../lib/moved-headings.js";
+import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageMeta, pageTitle } from "../lib/seo.js";
