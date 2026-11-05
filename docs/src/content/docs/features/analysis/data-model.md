@@ -151,4 +151,4 @@ A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A
 
 ## XLSX files
 
-Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model: Excel opens the file without it, and shows a pivot over related tables as the values that Export XLSX wrote. See [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/#excel-data-model).
+Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model, so Excel opens the file without relationships and shows no output for a pivot over related tables. See [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/#excel-data-model).

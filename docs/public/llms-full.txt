@@ -8357,7 +8357,7 @@ Kept parts retain their names and their own `.rels` bytes. New workbook, sheet a
 
 ### Excel data model
 
-Excel keeps its data model in a binary part (`powerPivotData`, [MS-XLDM]) that Sheetwrite does not read or write. Import drops that part with a warning, and reads the model's active relationships from `x15:dataModel` in `workbook.xml` ([MS-XLSX] 2.6.128–2.6.132). A relationship whose two model tables load worksheet tables becomes a [data model](https://www.sheetwrite.dev/docs/features/analysis/data-model/) relationship; each other relationship is reported. Sheetwrite relationships and pivots over related tables round-trip through Sheetwrite metadata. Excel opens an exported file without a data model, so it shows pivots over related tables as the values that Export XLSX wrote.
+Excel keeps its data model in a binary part (`powerPivotData`, [MS-XLDM]) that Sheetwrite does not read or write. Import drops that part with a warning, and reads the model's active relationships from `x15:dataModel` in `workbook.xml` ([MS-XLSX] 2.6.128–2.6.132). A relationship whose two model tables load worksheet tables becomes a [data model](https://www.sheetwrite.dev/docs/features/analysis/data-model/) relationship; each other relationship is reported. Sheetwrite relationships and pivots over related tables round-trip through Sheetwrite metadata. Excel opens an exported file without a data model, so it shows no output for a pivot over related tables.
 
 ## Edits, undo and snapshots
 
@@ -11097,7 +11097,7 @@ A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A
 
 ## XLSX files
 
-Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model: Excel opens the file without it, and shows a pivot over related tables as the values that Export XLSX wrote. See [Kept parts and round trips](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/#excel-data-model).
+Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model, so Excel opens the file without relationships and shows no output for a pivot over related tables. See [Kept parts and round trips](https://www.sheetwrite.dev/docs/import-export/kept-parts-and-round-trips/#excel-data-model).
 
 <a id="import-and-export"></a>
 
