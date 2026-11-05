@@ -2,6 +2,7 @@ import { cellA1, createGrid, type DocumentOp, type Grid } from "@sheetwrite/core
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { HighlightedCode } from "../components/HighlightedCode.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
 import { errorText } from "../lib/errors.js";
@@ -348,7 +349,7 @@ export default function FormulasShowcase() {
               </p>
               <h3>{panel.title}</h3>
               <p>{panel.explanation}</p>
-              <code>{panel.formula}</code>
+              <HighlightedCode code={panel.formula} language="formula" />
             </article>
 
             <form

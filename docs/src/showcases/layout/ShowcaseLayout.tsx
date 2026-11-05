@@ -1,6 +1,6 @@
-import { ArrowRight, BookOpen, Code } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 
+import { Icon } from "../../components/Icon.js";
 import { SiteTopbar } from "../../components/SiteTopbar.js";
 import type { CapabilityOwnerId } from "../capabilities.js";
 
@@ -120,14 +120,14 @@ function ShowcaseCodeBlock({
     <section aria-labelledby="showcase-code-title" className="sw-showcase__code">
       <header className="sw-showcase__section-header">
         <h2 className="sw-showcase__section-title" id="showcase-code-title">
-          <Code aria-hidden="true" className="sw-icon" />
+          <Icon name="code" size="md" />
           {code.title}
         </h2>
         {guide !== undefined && (
           <a className="sw-link-arrow" href={guide.href}>
-            <BookOpen aria-hidden="true" className="sw-icon" />
+            <Icon name="book" />
             {guide.label}
-            <ArrowRight aria-hidden="true" className="sw-icon" />
+            <Icon name="arrow-right" />
           </a>
         )}
       </header>
@@ -167,7 +167,7 @@ export interface ShowcaseSectionProps {
 /** A section of explanation after the demo and its code. */
 export function ShowcaseSection({ id, title, children }: ShowcaseSectionProps) {
   return (
-    <section aria-labelledby={id} className="sw-showcase__section">
+    <section aria-labelledby={id} className="sw-showcase__section sw-prose">
       <h2 className="sw-showcase__section-title" id={id}>
         {title}
       </h2>

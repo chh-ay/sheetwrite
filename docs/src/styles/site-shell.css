@@ -351,7 +351,7 @@
   padding: var(--sw-space-12)
     max(
       clamp(var(--sw-space-6), 5vw, var(--sw-space-20)),
-      (100% - var(--sw-sidebar-width) - var(--sw-space-section)) / 2
+      (100% - var(--sw-sidebar-width) - var(--sw-docs-frame)) / 2
     )
     var(--sw-space-16);
   min-width: 0;
@@ -972,7 +972,7 @@ html:has(.sw-nav-dialog[open]) {
     /* Keep the 70rem reading area; the outline gets its own 16.5rem. */
     padding-inline: max(
       clamp(var(--sw-space-6), 5vw, var(--sw-space-20)),
-      (100% - var(--sw-sidebar-width) - var(--sw-space-section)) / 2
+      (100% - var(--sw-sidebar-width) - var(--sw-docs-frame-wide)) / 2
     );
   }
   .sw-document > .sw-document__header,

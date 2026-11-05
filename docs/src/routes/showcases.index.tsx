@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { HighlightedCode } from "../components/HighlightedCode.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
 import landingBench from "../generated/landing-bench.json";
@@ -242,9 +243,11 @@ function CollaborationScene() {
 function FormulasScene() {
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--formulas">
-      <code className="sw-hub-spill__formula">
-        =GROUPBY(<em>region</em>, <em>revenue</em>, SUM)
-      </code>
+      <HighlightedCode
+        className="sw-hub-spill__formula"
+        code="=GROUPBY(region, revenue, SUM)"
+        language="formula"
+      />
       <span className="sw-hub-spill">
         {[
           ["Americas", "10.9M"],
@@ -478,7 +481,7 @@ function SpreadsheetScene() {
         </span>
         <span className="sw-hub-ribbon__formula">
           <code>G50</code>
-          <code>=SUM(G2:G49)</code>
+          <HighlightedCode code="=SUM(G2:G49)" language="formula" />
         </span>
       </span>
       <span className="sw-hub-scene__caption">ribbon · formula bar · tabs · folds when narrow</span>

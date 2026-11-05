@@ -1,5 +1,6 @@
 import { ExpressiveCodeTheme } from "@expressive-code/core";
 
+import { CODE_ROLES, type CodeRole } from "./code-roles.ts";
 import { type SiteTheme, themeTokens, tokenColour } from "./design-tokens.ts";
 
 /**
@@ -8,21 +9,6 @@ import { type SiteTheme, themeTokens, tokenColour } from "./design-tokens.ts";
  * and only the lightness changes, so a reader who switches themes sees the
  * same colour for the same kind of token.
  */
-
-/** Syntax roles; each has a `--sw-code-<role>` token in both themes. */
-export const CODE_ROLES = [
-  "comment",
-  "keyword",
-  "function",
-  "string",
-  "number",
-  "type",
-  "property",
-  "punctuation",
-] as const;
-
-/** One syntax role. */
-export type CodeRole = (typeof CODE_ROLES)[number];
 
 /**
  * TextMate scopes for each role, covering TS, JS, JSX, Vue, Svelte, shell,
@@ -179,4 +165,4 @@ export const FORMULA_LANGUAGE = {
     operator: { name: "keyword.operator.formula", match: "<>|<=|>=|[-+*/^&=<>%@:]" },
     punctuation: { name: "punctuation.separator.formula", match: "[(),;{}]" },
   },
-} as const;
+};
