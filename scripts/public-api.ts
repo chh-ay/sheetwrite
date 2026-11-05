@@ -10,7 +10,7 @@ import { API, type Project, type Symbol as ApiSymbol } from "typescript/unstable
 
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 import {
-  checkIntentionalExports,
+  checkPublicApiBaseline,
   readPublicApiBaseline,
   validateManifest,
   writePublicApiBaseline,
@@ -76,6 +76,7 @@ export interface ApiIssue {
     | "malformed-report"
     | "missing-documentation"
     | "missing-export"
+    | "changed-signature"
     | "parse-error"
     | "removed-export"
     | "unclassified-entry"
@@ -687,14 +688,11 @@ if (import.meta.main) {
   } else if (mode === "baseline") {
     if (result.issues.length > 0) throw new Error(formatIssues(result.issues));
     const baseline = await writePublicApiBaseline(repositoryRoot, result.manifest);
-    const exportCount = baseline.intentionalExports.reduce(
-      (count, entry) => count + entry.exports.length,
-      0,
-    );
+    const exportCount = Object.keys(baseline.exports).length;
     process.stdout.write(`Public API baseline lists ${exportCount} exports\n`);
   } else {
     const baseline = await readPublicApiBaseline(repositoryRoot);
-    const issues = [...result.issues, ...checkIntentionalExports(result.manifest, baseline)];
+    const issues = [...result.issues, ...checkPublicApiBaseline(result.manifest, baseline)];
     if (issues.length > 0) throw new Error(formatIssues(issues));
     process.stdout.write("Public API policy check passed\n");
   }

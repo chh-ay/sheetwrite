@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ApiIssue, PublicApiManifest } from "./public-api.js";
+import type { ApiExport, ApiIssue, PublicApiManifest } from "./public-api.js";
 
 export function validateManifest(value: unknown): ApiIssue[] {
   const malformed = (message: string): ApiIssue[] => [
@@ -57,54 +58,39 @@ export function validateManifest(value: unknown): ApiIssue[] {
   }
   return [];
 }
-export interface PublicApiBaselineEntry {
-  package: string;
-  entryPoint: string;
-  exports: string[];
-}
-
 /**
  * The reviewed public surface: every export of every TypeScript entry point,
- * by name. The file holds one export per line, sorted by package, entry point
- * and name, so pull requests that add different exports change different
- * lines and merge cleanly.
+ * keyed `package#entryPoint#name`, with a short digest of its kind and
+ * declaration text. The file holds one export per line, sorted by key, so
+ * pull requests that add or change different exports change different lines
+ * and merge cleanly, and a changed signature shows as its own changed line.
  */
 export interface PublicApiBaseline {
-  schemaVersion: 3;
+  schemaVersion: 4;
   manifestFormatVersion: PublicApiManifest["formatVersion"];
-  intentionalExports: PublicApiBaselineEntry[];
+  exports: Record<string, string>;
 }
 
 const PUBLIC_API_BASELINE_PATH = "scripts/public-api-baseline.json";
 const BASELINE_COMMAND = "bun run api:baseline";
-
-export function publicApiEntryKey(packageName: string, entryPoint: string): string {
-  return `${packageName}\0${entryPoint}`;
-}
+const SIGNATURE_DIGEST_LENGTH = 12;
+const SIGNATURE_DIGEST = new RegExp(`^[0-9a-f]{${SIGNATURE_DIGEST_LENGTH}}$`);
 
 function invalidBaseline(reason: string): TypeError {
   return new TypeError(`Invalid public API baseline artifact: ${reason}`);
 }
 
-function parseBaselineEntry(entry: unknown): PublicApiBaselineEntry {
-  if (
-    typeof entry !== "object" ||
-    entry === null ||
-    !("package" in entry) ||
-    typeof entry.package !== "string" ||
-    !("entryPoint" in entry) ||
-    typeof entry.entryPoint !== "string" ||
-    !("exports" in entry) ||
-    !Array.isArray(entry.exports) ||
-    entry.exports.some((name: unknown) => typeof name !== "string")
-  ) {
-    throw invalidBaseline("an entry needs a package, an entry point and export names");
-  }
-  const names = entry.exports as string[];
-  if (new Set(names).size !== names.length || names.join("\0") !== [...names].sort().join("\0")) {
-    throw invalidBaseline(`${entry.package} ${entry.entryPoint} exports are not sorted and unique`);
-  }
-  return { package: entry.package, entryPoint: entry.entryPoint, exports: [...names] };
+/** The baseline key of one export: `package#entryPoint#name`. */
+export function publicApiExportKey(packageName: string, entryPoint: string, name: string): string {
+  return `${packageName}#${entryPoint}#${name}`;
+}
+
+/** Short digest of an export's kind and declaration text; documentation does not count. */
+export function signatureDigest(apiExport: Pick<ApiExport, "kind" | "signature">): string {
+  return createHash("sha256")
+    .update(`${apiExport.kind}\n${apiExport.signature}`)
+    .digest("hex")
+    .slice(0, SIGNATURE_DIGEST_LENGTH);
 }
 
 export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
@@ -112,22 +98,32 @@ export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
     typeof value !== "object" ||
     value === null ||
     !("schemaVersion" in value) ||
-    value.schemaVersion !== 3 ||
+    value.schemaVersion !== 4 ||
     !("manifestFormatVersion" in value) ||
     value.manifestFormatVersion !== 2 ||
-    !("intentionalExports" in value) ||
-    !Array.isArray(value.intentionalExports)
+    !("exports" in value) ||
+    typeof value.exports !== "object" ||
+    value.exports === null ||
+    Array.isArray(value.exports)
   ) {
-    throw invalidBaseline(
-      "expected schemaVersion 3, manifestFormatVersion 2 and intentionalExports",
-    );
+    throw invalidBaseline("expected schemaVersion 4, manifestFormatVersion 2 and exports");
   }
-  const entries = value.intentionalExports.map(parseBaselineEntry);
-  const keys = entries.map((entry) => publicApiEntryKey(entry.package, entry.entryPoint));
-  if (new Set(keys).size !== keys.length || keys.join("\0") !== [...keys].sort().join("\0")) {
-    throw invalidBaseline("entries are not sorted and unique by package and entry point");
+  const exports: Record<string, string> = {};
+  for (const [key, digest] of Object.entries(value.exports)) {
+    if (
+      key.split("#").length !== 3 ||
+      typeof digest !== "string" ||
+      !SIGNATURE_DIGEST.test(digest)
+    ) {
+      throw invalidBaseline(`${key} needs a package#entryPoint#name key and a signature digest`);
+    }
+    exports[key] = digest;
   }
-  return { schemaVersion: 3, manifestFormatVersion: 2, intentionalExports: entries };
+  const keys = Object.keys(exports);
+  if (keys.join("\0") !== [...keys].sort().join("\0")) {
+    throw invalidBaseline("exports are not sorted by key");
+  }
+  return { schemaVersion: 4, manifestFormatVersion: 2, exports };
 }
 
 /** The file text: two-space JSON, which puts every export on its own line. */
@@ -145,27 +141,25 @@ export async function readPublicApiBaseline(repositoryRoot: string): Promise<Pub
   return baseline;
 }
 
-/** The baseline that accepts the manifest's exports as they are. */
+/** The baseline that accepts the manifest's exports and signatures as they are. */
 export function baselineFromManifest(manifest: PublicApiManifest): PublicApiBaseline {
-  const entries = manifest.packages.flatMap((pkg) =>
-    pkg.entryPoints
-      .filter((entry) => entry.kind === "typescript" && entry.exports.length > 0)
-      .map((entry) => ({
-        package: pkg.name,
-        entryPoint: entry.subpath,
-        exports: entry.exports.map((apiExport) => apiExport.name).sort(),
-      })),
-  );
-  entries.sort((left, right) =>
-    publicApiEntryKey(left.package, left.entryPoint) <
-    publicApiEntryKey(right.package, right.entryPoint)
-      ? -1
-      : 1,
-  );
+  const entries: [string, string][] = [];
+  for (const pkg of manifest.packages) {
+    for (const entry of pkg.entryPoints) {
+      if (entry.kind !== "typescript") continue;
+      for (const apiExport of entry.exports) {
+        entries.push([
+          publicApiExportKey(pkg.name, entry.subpath, apiExport.name),
+          signatureDigest(apiExport),
+        ]);
+      }
+    }
+  }
+  entries.sort(([left], [right]) => (left < right ? -1 : 1));
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     manifestFormatVersion: manifest.formatVersion,
-    intentionalExports: entries,
+    exports: Object.fromEntries(entries),
   };
 }
 
@@ -181,54 +175,59 @@ export async function writePublicApiBaseline(
   return baseline;
 }
 
+function baselineIssue(code: ApiIssue["code"], key: string, problem: string): ApiIssue {
+  const [packageName = "", entryPoint = "", symbol = ""] = key.split("#");
+  return {
+    code,
+    message: `${packageName} ${entryPoint} ${symbol} ${problem}; review it, then run \`${BASELINE_COMMAND}\``,
+    package: packageName,
+    entryPoint,
+    symbol,
+  };
+}
+
 /**
- * Compares the built API with the reviewed list, by name: an export the list
- * does not hold, and a listed export the packages no longer have, are both
- * issues until the list is updated in the same change.
+ * Compares the built API with the reviewed baseline: an export the baseline
+ * does not list, a listed export the packages no longer have, and an export
+ * whose declaration changed are all issues until the baseline is updated in
+ * the same change.
  */
-export function checkIntentionalExports(
+export function checkPublicApiBaseline(
   manifest: PublicApiManifest,
   baseline: PublicApiBaseline,
 ): ApiIssue[] {
-  const listed = new Map(
-    baseline.intentionalExports.map((entry) => [
-      publicApiEntryKey(entry.package, entry.entryPoint),
-      entry,
-    ]),
-  );
-  const built = baselineFromManifest(manifest).intentionalExports;
+  const built = baselineFromManifest(manifest).exports;
   const issues: ApiIssue[] = [];
-  for (const entry of built) {
-    const key = publicApiEntryKey(entry.package, entry.entryPoint);
-    const reviewed = new Set(listed.get(key)?.exports ?? []);
-    listed.delete(key);
-    for (const name of entry.exports) {
-      if (reviewed.delete(name)) continue;
-      issues.push({
-        code: "unlisted-export",
-        message: `${entry.package} ${entry.entryPoint} exports ${name}, which ${PUBLIC_API_BASELINE_PATH} does not list; review it, then run \`${BASELINE_COMMAND}\``,
-        package: entry.package,
-        entryPoint: entry.entryPoint,
-        symbol: name,
-      });
+  for (const [key, digest] of Object.entries(built)) {
+    const reviewed = baseline.exports[key];
+    if (reviewed === undefined) {
+      issues.push(
+        baselineIssue(
+          "unlisted-export",
+          key,
+          `is exported but ${PUBLIC_API_BASELINE_PATH} does not list it`,
+        ),
+      );
+    } else if (reviewed !== digest) {
+      issues.push(
+        baselineIssue(
+          "changed-signature",
+          key,
+          `changed its declaration (${reviewed} -> ${digest})`,
+        ),
+      );
     }
-    for (const name of reviewed)
-      issues.push(removedExportIssue(entry.package, entry.entryPoint, name));
   }
-  for (const entry of listed.values()) {
-    for (const name of entry.exports) {
-      issues.push(removedExportIssue(entry.package, entry.entryPoint, name));
+  for (const key of Object.keys(baseline.exports)) {
+    if (built[key] === undefined) {
+      issues.push(
+        baselineIssue(
+          "removed-export",
+          key,
+          `is listed in ${PUBLIC_API_BASELINE_PATH} but no longer exported`,
+        ),
+      );
     }
   }
   return issues;
-}
-
-function removedExportIssue(packageName: string, entryPoint: string, name: string): ApiIssue {
-  return {
-    code: "removed-export",
-    message: `${PUBLIC_API_BASELINE_PATH} lists ${packageName} ${entryPoint} ${name}, which the package no longer exports; review it, then run \`${BASELINE_COMMAND}\``,
-    package: packageName,
-    entryPoint,
-    symbol: name,
-  };
 }

@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import {
   baselineFromManifest,
-  checkIntentionalExports,
+  checkPublicApiBaseline,
   readPublicApiBaseline,
   writePublicApiBaseline,
 } from "./public-api-baseline.js";
@@ -242,7 +242,7 @@ export class LegacyFailure extends RangeError {}`,
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "duplicate-export" }));
   });
 
-  it("writes one export per line and reads the list back", async () => {
+  it("writes one export and signature digest per line and reads them back", async () => {
     const root = await fixture();
     const { manifest } = await analyzePublicApi(root);
     await mkdir(join(root, "scripts"), { recursive: true });
@@ -252,45 +252,90 @@ export class LegacyFailure extends RangeError {}`,
     expect(await readPublicApiBaseline(root)).toEqual(written);
     const text = await readFile(join(root, "scripts/public-api-baseline.json"), "utf8");
     for (const name of ["DataSource", "DocumentOp", "toXlsxTable"]) {
-      expect(text).toContain(`\n        "${name}"`);
+      expect(text).toMatch(
+        new RegExp(`\\n    "@sheetwrite/core#\\.#${name}": "[0-9a-f]{12}",?\\n`),
+      );
     }
   });
 
-  it("rejects malformed baseline artifacts and lists that are not one export per line", async () => {
+  it("rejects malformed baselines and files that are not one export per line", async () => {
     const root = await fixture();
     const path = join(root, "scripts/public-api-baseline.json");
     await mkdir(join(root, "scripts"), { recursive: true });
-    const entry = { package: "@sheetwrite/core", entryPoint: ".", exports: ["Box", "Store"] };
-    const baseline = { schemaVersion: 3, manifestFormatVersion: 2, intentionalExports: [entry] };
+    const exports = {
+      "@sheetwrite/core#.#Box": "0123456789ab",
+      "@sheetwrite/core#.#Store": "ba9876543210",
+    };
+    const baseline = { schemaVersion: 4, manifestFormatVersion: 2, exports };
 
-    await writeFile(path, `${JSON.stringify({ ...baseline, schemaVersion: 2 }, null, 2)}\n`);
+    await writeFile(path, `${JSON.stringify({ ...baseline, schemaVersion: 3 }, null, 2)}\n`);
     await expect(readPublicApiBaseline(root)).rejects.toThrow(
       "Invalid public API baseline artifact",
     );
-    const unsorted = { ...entry, exports: ["Store", "Box"] };
-    await writeFile(
-      path,
-      `${JSON.stringify({ ...baseline, intentionalExports: [unsorted] }, null, 2)}\n`,
-    );
-    await expect(readPublicApiBaseline(root)).rejects.toThrow("not sorted and unique");
+    const unsorted = {
+      "@sheetwrite/core#.#Store": "ba9876543210",
+      "@sheetwrite/core#.#Box": "0123456789ab",
+    };
+    await writeFile(path, `${JSON.stringify({ ...baseline, exports: unsorted }, null, 2)}\n`);
+    await expect(readPublicApiBaseline(root)).rejects.toThrow("not sorted");
     await writeFile(path, `${JSON.stringify(baseline)}\n`);
     await expect(readPublicApiBaseline(root)).rejects.toThrow("not one export per line");
   });
 
-  it("reports exports missing from the list and listed exports the package dropped", async () => {
+  it("reports unlisted, removed and changed exports", async () => {
     const { manifest } = await analyzePublicApi(await fixture());
     const baseline = baselineFromManifest(manifest);
-    expect(checkIntentionalExports(manifest, baseline)).toEqual([]);
+    expect(checkPublicApiBaseline(manifest, baseline)).toEqual([]);
 
     const renamed = await analyzePublicApi(
       await fixture(
         canonicalDeclarations.replace("interface DataSource", "interface DataProvider"),
       ),
     );
-    const issues = checkIntentionalExports(renamed.manifest, baseline);
-    expect(issues.map((issue) => [issue.code, issue.symbol])).toEqual([
+    expect(
+      checkPublicApiBaseline(renamed.manifest, baseline).map((issue) => [issue.code, issue.symbol]),
+    ).toEqual([
       ["unlisted-export", "DataProvider"],
       ["removed-export", "DataSource"],
     ]);
   });
+
+  it("detects optionality, union and generic-constraint drift but not documentation edits", async () => {
+    const baseline = baselineFromManifest((await analyzePublicApi(await fixture())).manifest);
+    const mutations: Array<[string, string]> = [
+      [
+        canonicalDeclarations.replace("getRows(request: unknown)", "getRows?(request: unknown)"),
+        "DataSource",
+      ],
+      [
+        canonicalDeclarations.replace(
+          'export type DocumentOp = { op: "set" };',
+          'export type DocumentOp = { op: "set" } | { op: "clear" };',
+        ),
+        "DocumentOp",
+      ],
+      [
+        canonicalDeclarations.replace(
+          "Box<T extends string = string>",
+          "Box<T extends string | number = string>",
+        ),
+        "Box",
+      ],
+    ];
+    for (const [declarations, symbol] of mutations) {
+      const { manifest } = await analyzePublicApi(await fixture(declarations));
+      expect(checkPublicApiBaseline(manifest, baseline)).toContainEqual(
+        expect.objectContaining({ code: "changed-signature", symbol }),
+      );
+    }
+    const redocumented = await analyzePublicApi(
+      await fixture(
+        canonicalDeclarations.replace(
+          "/** Canonical document operation. */",
+          "/** Changed document operation. */",
+        ),
+      ),
+    );
+    expect(checkPublicApiBaseline(redocumented.manifest, baseline)).toEqual([]);
+  }, 20_000);
 });
