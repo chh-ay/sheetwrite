@@ -43,6 +43,8 @@ Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs f
 
 The landing page's first-load size comes from the committed `scripts/size-report.json`. It is release evidence: the package size history pull request that publication opens refreshes it from the CI run of the published commit, so pull requests do not commit it.
 
+Behavior that only desktop Excel can confirm is listed in [Excel checks](docs/contributing/excel-checks.md), with the input files, the steps and the expected results. A pull request that adds such a check adds it there instead of claiming Excel verification.
+
 ## Code style
 
 `bun fmt` (configured by `.oxfmtrc.json`) and rustfmt own formatting. Run
