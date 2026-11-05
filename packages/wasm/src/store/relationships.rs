@@ -4,7 +4,7 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use super::{CellStore, TableDefinition};
+use super::{CellStore, TableColumnDefinition, TableDefinition};
 use crate::data_model::{is_blank_key, KeyIndex, KeyProblem, NO_MATCH};
 use crate::eval::settled_cell_value;
 
@@ -64,14 +64,19 @@ impl KeyColumn {
             .iter()
             .find(|column| column.id == column_id)
             .ok_or(RelationshipError::MissingColumn)?;
+        Ok(Self::at(table, column))
+    }
+
+    /// The data rows of `column`, which belongs to `table`.
+    pub(super) fn at(table: &TableDefinition, column: &TableColumnDefinition) -> Self {
         let first_row = table.row_start + u32::from(table.header_row);
         let end = table.row_end + 1 - u32::from(table.totals_row);
-        Ok(Self {
+        Self {
             sheet: table.sheet as usize,
             first_row,
             rows: end.saturating_sub(first_row),
             col: column.col,
-        })
+        }
     }
 }
 
@@ -135,12 +140,7 @@ impl CellStore {
             return Vec::new();
         };
         let record = match self.relationship_index(relationship) {
-            Ok(index) => [
-                STATUS_OK,
-                NO_ROW,
-                NO_ROW,
-                self.unmatched_keys(relationship, &index),
-            ],
+            Ok((index, many)) => [STATUS_OK, NO_ROW, NO_ROW, self.unmatched_keys(many, &index)],
             Err(RelationshipError::MissingTable) => [STATUS_MISSING_TABLE, NO_ROW, NO_ROW, 0],
             Err(RelationshipError::MissingColumn) => [STATUS_MISSING_COLUMN, NO_ROW, NO_ROW, 0],
             Err(RelationshipError::Keys(KeyProblem::OneSideType { row })) => {
@@ -158,12 +158,16 @@ impl CellStore {
 }
 
 impl CellStore {
+    /// The table with stable ID `id`. Tables are keyed by name, so this scans.
+    #[inline(never)]
+    pub(super) fn table_by_id(&self, id: &str) -> Option<&TableDefinition> {
+        self.tables.values().find(|table| table.id == id)
+    }
+
     /// The key column `column` names, if its table and column exist.
     pub(crate) fn key_column(&self, column: &ColumnRef) -> Result<KeyColumn, RelationshipError> {
         let table = self
-            .tables
-            .values()
-            .find(|table| table.id == column.table)
+            .table_by_id(&column.table)
             .ok_or(RelationshipError::MissingTable)?;
         KeyColumn::of(table, &column.column)
     }
@@ -180,28 +184,27 @@ impl CellStore {
     }
 
     /// Builds the one-side key index of `relationship` and checks both key
-    /// columns. The index lives only as long as its caller keeps it.
+    /// columns. Returns the index with the many-side key column. The index
+    /// lives only as long as its caller keeps it.
     pub(crate) fn relationship_index(
         &self,
         relationship: &Relationship,
-    ) -> Result<KeyIndex, RelationshipError> {
+    ) -> Result<(KeyIndex, KeyColumn), RelationshipError> {
         let one = self.key_column(&relationship.to)?;
         let many = self.key_column(&relationship.from)?;
-        KeyIndex::build(
+        let index = KeyIndex::build(
             one.rows,
             |row| self.key_value(one, row),
             many.rows,
             |row| self.key_value(many, row),
         )
-        .map_err(RelationshipError::Keys)
+        .map_err(RelationshipError::Keys)?;
+        Ok((index, many))
     }
 
-    /// Counts the non-blank many-side keys of `relationship` that `index`
+    /// Counts the non-blank keys in the many-side column `many` that `index`
     /// does not hold. Error keys count: they match no row.
-    fn unmatched_keys(&self, relationship: &Relationship, index: &KeyIndex) -> u32 {
-        let Ok(many) = self.key_column(&relationship.from) else {
-            return 0;
-        };
+    fn unmatched_keys(&self, many: KeyColumn, index: &KeyIndex) -> u32 {
         let mut scratch = Vec::new();
         let mut unmatched = 0;
         for row in 0..many.rows {

@@ -13,7 +13,6 @@
 
 use std::collections::BTreeMap;
 use std::mem::size_of;
-use std::rc::Rc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
@@ -47,6 +46,9 @@ const SOURCE_TABLE: u32 = 1;
 const SOURCE_INVALID: u32 = 2;
 const SOURCE_MODEL: u32 = 3;
 
+/// Most fields of a model source; twin of `MAX_PIVOT_FIELD_ENTRIES` in
+/// `packages/core/src/pivot.ts`.
+const MAX_MODEL_FIELDS: usize = 256;
 /// Unused bound slots after a table id, and after the absent-string slot of
 /// an invalid source, so every source takes the slots of a range (sheet,
 /// r0, c0, r1, c1). Twins of `TABLE_SOURCE_PADDING` and
@@ -208,18 +210,18 @@ impl Payload<'_> {
             }
             SOURCE_MODEL => {
                 let table = self.text()?;
+                // Two string slots per field; core bounds fields like other lists.
                 let count = self.count(2)?;
-                if count > 256 {
+                if count > MAX_MODEL_FIELDS {
                     return None;
                 }
-                let fields = (0..count)
-                    .map(|_| {
-                        Some(ColumnRef {
-                            table: self.text()?,
-                            column: self.text()?,
-                        })
-                    })
-                    .collect::<Option<Vec<_>>>()?;
+
+                let mut fields = Vec::with_capacity(count);
+                for _ in 0..count {
+                    let table = self.text()?;
+                    let column = self.text()?;
+                    fields.push(ColumnRef { table, column });
+                }
                 Some(SourceRef::Model { table, fields })
             }
             SOURCE_INVALID => {
@@ -500,8 +502,10 @@ struct Pivot {
     cache: Option<PivotCache>,
     /// The source the cache holds.
     source: Option<SourceRect>,
-    /// Related table rectangles, shared with the overlap checker; no key indexes.
-    related: Option<Rc<[SourceRect]>>,
+    /// Every table rectangle a model pivot reads, base table first; edits in
+    /// them rebuild it. A pivot that writes into one of them shows
+    /// `#CYCLE!` through the settle rounds. No key index is kept.
+    related: Option<Box<[SourceRect]>>,
     /// The layout of the installed output.
     layout: Option<PivotLayout>,
     error: Option<FormulaError>,
@@ -557,12 +561,11 @@ impl Pivot {
 }
 
 /// Where a pivot reads and writes, for the overlap check.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct Footprint {
     owner: usize,
     source: Option<SourceRect>,
     attempt: Option<SpillRange>,
-    related: Option<Rc<[SourceRect]>>,
 }
 
 /// Every pivot of the workbook by owning sheet, in the order the host sent
@@ -618,7 +621,6 @@ impl PivotRegistry {
                     owner,
                     source: pivot.source,
                     attempt: pivot.attempt,
-                    related: pivot.related.clone(),
                 })
             }));
     }
@@ -634,26 +636,21 @@ fn meets_upstream_source(footprints: &[Footprint], index: usize, range: SpillRan
     let mut next = 0;
     while let Some(&current) = upstream.get(next) {
         next += 1;
-        let sources = footprints[current].source.into_iter().chain(
-            footprints[current]
-                .related
-                .iter()
-                .flat_map(|rects| rects.iter().copied()),
-        );
-        for source in sources {
-            if source.sheet == owner && source.meets(range) {
-                return true;
-            }
-            for (other, footprint) in footprints.iter().enumerate() {
-                if !seen[other]
-                    && footprint.owner == source.sheet
-                    && footprint
-                        .attempt
-                        .is_some_and(|attempt| source.meets(attempt))
-                {
-                    seen[other] = true;
-                    upstream.push(other);
-                }
+        let Some(source) = footprints[current].source else {
+            continue;
+        };
+        if source.sheet == owner && source.meets(range) {
+            return true;
+        }
+        for (other, footprint) in footprints.iter().enumerate() {
+            if !seen[other]
+                && footprint.owner == source.sheet
+                && footprint
+                    .attempt
+                    .is_some_and(|attempt| source.meets(attempt))
+            {
+                seen[other] = true;
+                upstream.push(other);
             }
         }
     }
@@ -853,11 +850,7 @@ impl CellStore {
                 ))
             }
             SourceRef::Table(id) | SourceRef::Model { table: id, .. } => {
-                let table = self
-                    .tables
-                    .values()
-                    .find(|table| &table.id == id)
-                    .ok_or(FormulaError::Ref)?;
+                let table = self.table_by_id(id).ok_or(FormulaError::Ref)?;
                 Ok((SourceRect::table(table), Some(&table.columns)))
             }
             SourceRef::Invalid => Err(FormulaError::Ref),
@@ -879,47 +872,31 @@ impl CellStore {
 
         for (&owner, pivots) in &mut registry.sheets {
             for pivot in pivots {
-                if let Some(rect) = pivot.source {
+                // The cache tracks its own source row by row. A model's other
+                // tables (after the base, which equals `source`) only rebuild.
+                let skip = usize::from(pivot.source.is_some());
+                let related = pivot
+                    .related
+                    .iter()
+                    .flat_map(|rects| rects.iter().skip(skip));
+                let mut dependency_changes = Pending::default();
+                for (index, &rect) in pivot.source.iter().chain(related).enumerate() {
+                    let pending = if index < skip {
+                        &mut pivot.pending
+                    } else {
+                        &mut dependency_changes
+                    };
                     capture_source(
                         &self.sheets[rect.sheet],
                         rect,
                         finished(rect.sheet),
                         affected,
-                        &mut pivot.pending,
+                        pending,
                         &self.formula_slots,
                     );
                 }
-                if matches!(pivot.saved.source, SourceRef::Model { .. }) {
-                    let mut dependency_changes = Pending::default();
-                    if let Some(related) = &pivot.related {
-                        for &rect in related.iter().skip(1) {
-                            capture_source(
-                                &self.sheets[rect.sheet],
-                                rect,
-                                finished(rect.sheet),
-                                affected,
-                                &mut dependency_changes,
-                                &self.formula_slots,
-                            );
-                        }
-                    } else {
-                        // A failed initial key check still reads its dimension tables,
-                        // so fixing a key must wake it without a saved row map.
-                        for table in self.tables.values() {
-                            let rect = SourceRect::table(table);
-                            capture_source(
-                                &self.sheets[rect.sheet],
-                                rect,
-                                finished(rect.sheet),
-                                affected,
-                                &mut dependency_changes,
-                                &self.formula_slots,
-                            );
-                        }
-                    }
-                    if !dependency_changes.is_empty() {
-                        pivot.pending.rebuild = true;
-                    }
+                if !dependency_changes.is_empty() {
+                    pivot.pending.rebuild = true;
                 }
 
                 if let Some(attempt) = pivot.attempt.filter(|_| finished(owner)) {
@@ -1028,7 +1005,6 @@ impl CellStore {
         let refreshed = self.refresh_pivot_cache(pivot);
         pivot.pending.clear();
         footprints[index].source = pivot.source;
-        footprints[index].related = pivot.related.clone();
         if let Err(error) = refreshed {
             footprints[index].attempt = None;
             return self.show_pivot_error(owner, pivot, error, None);
@@ -1092,18 +1068,23 @@ impl CellStore {
     /// otherwise updates the pending rows and headers. Leaves the pending
     /// work for the caller to clear.
     fn refresh_pivot_cache(&self, pivot: &mut Pivot) -> Result<(), FormulaError> {
-        let source = match self.read_pivot_source(&pivot.saved.source) {
+        let mut source = match self.read_pivot_source(&pivot.saved.source) {
             Ok(source) => source,
             Err(error) => {
                 pivot.cache = None;
+                pivot.source = None;
+                // A failed model still reads its tables, so fixing a key or
+                // a missing table must wake it.
+                pivot.related = matches!(pivot.saved.source, SourceRef::Model { .. })
+                    .then(|| self.tables.values().map(SourceRect::table).collect());
                 return Err(error);
             }
         };
         let rect = source.rect;
         pivot.related = source
             .model
-            .as_ref()
-            .map(|model| model.dependencies.clone());
+            .as_mut()
+            .map(|model| std::mem::take(&mut model.dependencies));
 
         let pending = &mut pivot.pending;
         match pivot.cache.as_mut() {

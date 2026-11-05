@@ -1,25 +1,20 @@
 //! A pivot source that reads a lookup-flattened model without copying columns.
 //!
-//! Relationships are traversed from many to one. Only paths used by fields
-//! build key indexes. The indexes and lookup scratch have one refresh lifetime;
-//! no index or row map is retained between recomputes.
+//! Relationships are followed from the many side to the one side. Only the
+//! hops that fields use build key indexes. The indexes and lookup scratch
+//! live for one cache build; no index or row map is kept between recomputes.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use super::pivots::SourceRect;
-use super::relationships::{ColumnRef, KeyColumn, Relationship, RelationshipError};
+use super::relationships::{ColumnRef, KeyColumn, RelationshipError};
 use super::CellStore;
 use crate::data_model::{KeyIndex, NO_MATCH};
 use crate::types::{FormulaError, Value};
 
-struct Route<'a> {
-    table: &'a str,
-    parent: usize,
-    relationship: Option<&'a Relationship>,
-}
-
+/// One many-to-one step from the table of route `parent`.
 struct Hop {
+    parent: usize,
     from: KeyColumn,
     index: KeyIndex,
 }
@@ -27,20 +22,22 @@ struct Hop {
 struct Field<'a> {
     column: KeyColumn,
     name: &'a str,
-    /// Hop indexes in many-to-one order, starting at the base table.
-    path: Vec<usize>,
+    /// Route of the field's table; route 0 is the base table.
+    route: usize,
 }
 
-/// Settled values of a model pivot's virtual fields, one row per base row.
-/// Missing matches and blank keys produce blank fields; a many-side key error
-/// propagates to the related field, just as in a flattened lookup column.
+/// Settled values of a model pivot's fields, one row per base row. An
+/// unmatched or blank key gives a blank field; a many-side key error gives
+/// that error, as a lookup-flattened column would.
 pub(super) struct ModelSource<'a> {
     store: &'a CellStore,
     fields: Vec<Field<'a>>,
-    hops: Vec<Hop>,
+    /// The hop into each route's table; `None` for the base table and for
+    /// tables that no field reads.
+    hops: Vec<Option<Hop>>,
     scratch: RefCell<Vec<u8>>,
-    /// All table rectangles the source reads, including intermediate tables.
-    pub(super) dependencies: Rc<[SourceRect]>,
+    /// Every table rectangle the source reads, base table first.
+    pub(super) dependencies: Box<[SourceRect]>,
 }
 
 impl<'a> ModelSource<'a> {
@@ -49,98 +46,76 @@ impl<'a> ModelSource<'a> {
         base: &'a str,
         columns: &'a [ColumnRef],
     ) -> Result<Self, FormulaError> {
-        let mut routes = vec![Route {
-            table: base,
-            parent: 0,
-            relationship: None,
-        }];
+        // Breadth-first over many-to-one relationships. Core admits no cycle,
+        // so each reachable table has exactly one route.
         let relationships = store
             .relationships
             .as_deref()
-            .map(Vec::as_slice)
-            .unwrap_or(&[]);
+            .map_or(&[][..], Vec::as_slice);
+        let mut routes = vec![(base, 0, None)];
         let mut next = 0;
         while next < routes.len() {
             for relationship in relationships {
-                if relationship.from.table == routes[next].table
-                    && !routes
-                        .iter()
-                        .any(|route| route.table == relationship.to.table)
+                let to = relationship.to.table.as_str();
+                if relationship.from.table == routes[next].0
+                    && !routes.iter().any(|route| route.0 == to)
                 {
-                    routes.push(Route {
-                        table: &relationship.to.table,
-                        parent: next,
-                        relationship: Some(relationship),
-                    });
+                    routes.push((to, next, Some(relationship)));
                 }
             }
             next += 1;
         }
 
-        let base_table = store
-            .tables
-            .values()
-            .find(|table| table.id == base)
-            .ok_or(FormulaError::Ref)?;
+        let base_table = store.table_by_id(base).ok_or(FormulaError::Ref)?;
         let mut dependencies = vec![SourceRect::table(base_table)];
-        let mut hops = Vec::new();
-        let mut hop_ids = vec![None; routes.len()];
+        let mut hops: Vec<Option<Hop>> = routes.iter().map(|_| None).collect();
         let mut fields = Vec::with_capacity(columns.len());
         for column in columns {
-            let mut route = routes
+            let route = routes
                 .iter()
-                .position(|route| route.table == column.table)
+                .position(|route| route.0 == column.table)
                 .ok_or(FormulaError::Ref)?;
-            let table = store
-                .tables
-                .values()
-                .find(|table| table.id == column.table)
-                .ok_or(FormulaError::Ref)?;
+            let table = store.table_by_id(&column.table).ok_or(FormulaError::Ref)?;
             let definition = table
                 .columns
                 .iter()
                 .find(|field| field.id == column.column)
                 .ok_or(FormulaError::Ref)?;
-            let resolved = store.key_column(column).map_err(model_error)?;
-            let mut path = Vec::new();
-            while let Some(relationship) = routes[route].relationship {
-                let hop = match hop_ids[route] {
-                    Some(hop) => hop,
-                    None => {
-                        let from = store.key_column(&relationship.from).map_err(model_error)?;
-                        let index = store
-                            .relationship_index(relationship)
-                            .map_err(model_error)?;
-                        let one = store
-                            .tables
-                            .values()
-                            .find(|table| table.id == relationship.to.table)
-                            .ok_or(FormulaError::Ref)?;
-                        dependencies.push(SourceRect::table(one));
-                        let hop = hops.len();
-                        hops.push(Hop { from, index });
-                        hop_ids[route] = Some(hop);
-                        hop
-                    }
-                };
-                path.push(hop);
-                route = routes[route].parent;
-            }
-            path.reverse();
             fields.push(Field {
-                column: resolved,
+                column: KeyColumn::at(table, definition),
                 name: &definition.name,
-                path,
+                route,
             });
+
+            let mut step = route;
+            while let (Some(relationship), None) = (routes[step].2, &hops[step]) {
+                let one = store
+                    .table_by_id(&relationship.to.table)
+                    .ok_or(FormulaError::Ref)?;
+                dependencies.push(SourceRect::table(one));
+                let (index, from) = store
+                    .relationship_index(relationship)
+                    .map_err(model_error)?;
+                hops[step] = Some(Hop {
+                    parent: routes[step].1,
+                    from,
+                    index,
+                });
+                step = routes[step].1;
+            }
         }
 
         Ok(Self {
             store,
             fields,
             hops,
-            dependencies: dependencies.into(),
             scratch: RefCell::new(Vec::new()),
+            dependencies: dependencies.into(),
         })
+    }
+
+    pub(super) fn width(&self) -> usize {
+        self.fields.len()
     }
 
     pub(super) fn header(&self, field: usize) -> Value {
@@ -149,28 +124,35 @@ impl<'a> ModelSource<'a> {
             .map_or(Value::Blank, |field| Value::text(field.name))
     }
 
-    pub(super) fn width(&self) -> usize {
-        self.fields.len()
-    }
-
     pub(super) fn value(&self, row: usize, field: usize) -> Value {
         let Some(field) = self.fields.get(field) else {
             return Value::Error(FormulaError::Ref);
         };
-        let mut matched = row as u32;
-        let mut scratch = self.scratch.borrow_mut();
-        for &hop in &field.path {
-            let hop = &self.hops[hop];
-            let key = self.store.key_value(hop.from, matched);
-            if let Value::Error(_) = key {
-                return key;
-            }
-            matched = hop.index.find(&key, &mut scratch);
-            if matched == NO_MATCH {
-                return Value::Blank;
-            }
+
+        match self.row_in(field.route, row as u32) {
+            Ok(matched) => self.store.key_value(field.column, matched),
+            Err(value) => value,
         }
-        self.store.key_value(field.column, matched)
+    }
+
+    /// The row of route `route`'s table that base row `row` reaches, or the
+    /// value the field shows instead: blank for no match, or the key error.
+    fn row_in(&self, route: usize, row: u32) -> Result<u32, Value> {
+        let Some(hop) = &self.hops[route] else {
+            return Ok(row);
+        };
+
+        let key = self
+            .store
+            .key_value(hop.from, self.row_in(hop.parent, row)?);
+        if matches!(key, Value::Error(_)) {
+            return Err(key);
+        }
+
+        match hop.index.find(&key, &mut self.scratch.borrow_mut()) {
+            NO_MATCH => Err(Value::Blank),
+            matched => Ok(matched),
+        }
     }
 }
 
