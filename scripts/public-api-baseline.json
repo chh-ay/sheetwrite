@@ -388,7 +388,7 @@
     "@sheetwrite/core#.#resolveTransactionResourceLimits": "be50832da0c8",
     "@sheetwrite/core#.#rowBridgeTransactionId": "af24140c3b65",
     "@sheetwrite/core#.#sanitizeCellHyperlink": "57ea49ae67d3",
-    "@sheetwrite/core#.#sanitizeHyperlinkStyle": "9a6fb6ca6254",
+    "@sheetwrite/core#.#sanitizeCellStyle": "9a6fb6ca6254",
     "@sheetwrite/core#.#serialToDate": "abaf124406e1",
     "@sheetwrite/core#.#setChartRendererFactory": "ad0d7b2ac998",
     "@sheetwrite/core#.#setChartViewProviderFactory": "a76c053be9d1",
