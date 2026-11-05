@@ -318,3 +318,39 @@ fn malformed_or_hostile_text_fails_without_evaluation() {
     assert!(queries.is_empty());
     assert_eq!(unsupported[0].reason, "limit");
 }
+
+#[test]
+fn query_lists_round_trip_through_host_lanes() {
+    let mut queries = fixtures();
+    queries[1].output = Some(String::from("Regions table"));
+
+    let mut writer = super::PlanWriter::default();
+    super::encode_queries(&queries, &mut writer);
+    let writer = writer.finish();
+    let decoded = super::decode_queries(
+        crate::plan_wire::PlanWire {
+            codes: &writer.codes,
+            numbers: &writer.numbers,
+            text: &writer.text,
+            offsets: &writer.offsets,
+        },
+        &crate::plan::Limits::default(),
+    )
+    .unwrap();
+
+    assert_eq!(format!("{decoded:?}"), format!("{queries:?}"));
+
+    let mut padded = writer.codes.clone();
+    padded.push(0);
+    let issue = super::decode_queries(
+        crate::plan_wire::PlanWire {
+            codes: &padded,
+            numbers: &writer.numbers,
+            text: &writer.text,
+            offsets: &writer.offsets,
+        },
+        &crate::plan::Limits::default(),
+    )
+    .unwrap_err();
+    assert_eq!(issue.code, "definition");
+}
