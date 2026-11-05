@@ -35,6 +35,7 @@ import {
   validateSheetName,
   validateWorkbookTableName,
   validWorkbookTableXmlElement,
+  withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
 import { parseCellRect, parseCellReference } from "./cell-reference.js";
@@ -48,7 +49,11 @@ import {
   META_MARKER,
   META_STEM,
 } from "./format.js";
-import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
+import {
+  convertFormulaSources,
+  formulaContainsExternalReference,
+  workbookFormulaSources,
+} from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
@@ -60,7 +65,11 @@ import {
   validateCodecSnapshot,
   type XlsxCodecContext,
 } from "./resources.js";
-import { shiftCellReferencesInText, translateSharedFormula } from "./shared-formula.js";
+import {
+  expandSharedFormulas,
+  type SharedFormulaGroup,
+  type SharedFormulaMember,
+} from "./shared-formula.js";
 import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
@@ -87,12 +96,17 @@ interface ColumnCells {
 }
 
 /** A shared-formula cell whose master may follow it in the worksheet. */
-interface PendingSharedFormula {
-  readonly cell: SnapshotCell;
+interface PendingSharedFormula extends SharedFormulaMember {
+  /** The group's `si` index. */
   readonly index: string;
-  readonly address: string;
-  /** Formula text the writer put on this cell too; Excel ignores it unless the master does not lex. */
-  readonly ownFormula: string | undefined;
+}
+
+/** The text and position of a shared formula's master cell. */
+interface SharedFormulaMaster {
+  formula: string;
+  row: number;
+  col: number;
+  authoritative: boolean;
 }
 
 const INITIAL_STYLE_INDEX_CAPACITY = 1_024;
@@ -161,6 +175,8 @@ interface ParsedSheet {
   readonly cells: SnapshotCell[];
   readonly cellStyles: CellStyleIndices;
   readonly columnCells: ReadonlyMap<number, ColumnCells>;
+  /** Shared formulas, expanded by the engine once every sheet is read. */
+  readonly sharedFormulas: readonly SharedFormulaGroup[];
   readonly rowCount: number;
   readonly columnCount: number;
   readonly conditionalFormats: ConditionalFormatRule[];
@@ -258,36 +274,72 @@ function uniqueSheetId(name: string, order: number, used: Set<string>): string {
 }
 
 /**
- * A shared-formula cell's own formula, expanded from its group's master.
- *
- * A master that does not lex has no copy rule, since the engine cannot parse
- * it either. Then the cell keeps the formula text its writer stored on it, if
- * any, and otherwise gets the reader's former text scan, which moves plain
- * cell references. Either way the result may differ from what Excel shows, so
- * the cell gets an `unsupported-feature` warning instead of a silently wrong
- * or unshifted formula.
+ * The sidecar sheet that holds each worksheet's Sheetwrite metadata, by
+ * worksheet order. A worksheet takes the sidecar sheet of the same name
+ * first; a worksheet without one then takes the sidecar sheet at its order,
+ * if no other worksheet claimed it (a renamed sheet). Each sidecar sheet and
+ * each sheet ID is claimed at most once, so a sheet inserted before a known
+ * sheet gets a new identity.
  */
-function expandSharedFormula(
-  master: { readonly formula: string; readonly row: number; readonly col: number },
-  pending: PendingSharedFormula,
+function claimSidecarSheets(
+  sources: readonly ParsedSheet[],
+  metadata: WorkbookSnapshot | null,
   context: XlsxCodecContext,
-  sheet: string,
-): string {
-  const rowDelta = pending.cell.rowOffset - master.row;
-  const colDelta = pending.cell.colOffset - master.col;
-  const expanded = translateSharedFormula(master.formula, rowDelta, colDelta);
-  if (expanded !== undefined) return expanded;
+): (SheetSnapshot | undefined)[] {
+  const claims: (SheetSnapshot | undefined)[] = sources.map(() => undefined);
+  if (!metadata) return claims;
 
-  emitWarning(context, {
-    code: "unsupported-feature",
-    message:
-      pending.ownFormula === undefined
-        ? "Shared formula master does not parse; its cell references were moved by a text scan"
-        : "Shared formula master does not parse; the cell keeps its own formula text",
-    sheet,
-    cell: pending.address,
+  const claimedIds = new Set<string>();
+  const claim = (order: number, meta: SheetSnapshot | undefined): boolean => {
+    if (!meta || claimedIds.has(meta.id)) return false;
+    claimedIds.add(meta.id);
+    claims[order] = meta;
+    return true;
+  };
+
+  sources.forEach((source, order) => {
+    const key = sheetNameKey(source.name);
+    claim(
+      order,
+      metadata.sheets.find((candidate) => sheetNameKey(candidate.name) === key),
+    );
   });
-  return pending.ownFormula ?? shiftCellReferencesInText(master.formula, rowDelta, colDelta);
+
+  sources.forEach((source, order) => {
+    if (claims[order]) return;
+    const ordinal = metadata.sheets.find((candidate) => candidate.order === order);
+    if (!claim(order, ordinal)) return;
+    emitWarning(context, {
+      code: "invalid-metadata",
+      message: `Reconciled renamed worksheet ${source.name} to sidecar identity by stable ordinal`,
+      sheet: source.name,
+    });
+  });
+
+  return claims;
+}
+
+/** Group each sheet's shared-formula cells under their master. */
+function sharedFormulaGroups(
+  pending: readonly PendingSharedFormula[],
+  masters: ReadonlyMap<string, SharedFormulaMaster>,
+  sheet: string,
+): SharedFormulaGroup[] {
+  const groups = new Map<string, SharedFormulaGroup & { members: SharedFormulaMember[] }>();
+  for (const member of pending) {
+    let group = groups.get(member.index);
+    if (!group) {
+      const master = masters.get(member.index);
+      if (!master) {
+        return readerFailure(`shared formula ${member.index} at ${member.address} has no master`);
+      }
+
+      group = { sheet, formula: master.formula, row: master.row, col: master.col, members: [] };
+      groups.set(member.index, group);
+    }
+    group.members.push(member);
+  }
+  return [...groups.values()];
 }
 
 function parseSharedStrings(
@@ -1199,10 +1251,7 @@ async function parseSheet(
   const cellStyles = new CellStyleIndices();
   const columnCells = new Map<number, ColumnCells>();
   const pendingSharedFormulas: PendingSharedFormula[] = [];
-  const sharedMasters = new Map<
-    string,
-    { formula: string; row: number; col: number; authoritative: boolean }
-  >();
+  const sharedMasters = new Map<string, SharedFormulaMaster>();
   let inferredRow = 0;
   let maxRow = -1;
   let maxCol = -1;
@@ -1425,28 +1474,7 @@ async function parseSheet(
     );
   }
   readColumnStyles(root);
-  for (const pending of pendingSharedFormulas) {
-    const master = sharedMasters.get(pending.index);
-    if (!master) {
-      return readerFailure(`shared formula ${pending.index} at ${pending.address} has no master`);
-    }
-    const { rowOffset: row, colOffset: col } = pending.cell;
-    const formula =
-      row === master.row && col === master.col
-        ? master.formula
-        : expandSharedFormula(master, pending, context, reference.name);
-    if (formulaContainsExternalReference(formula)) {
-      emitWarning(context, {
-        code: "external-formula",
-        message: "External shared formula was neutralized as inert text",
-        sheet: reference.name,
-        cell: pending.address,
-      });
-      pending.cell.value = { kind: "literal", value: `=${formula}` };
-    } else {
-      pending.cell.value = { kind: "formula", src: `=${formula}` };
-    }
-  }
+  const sharedFormulas = sharedFormulaGroups(pendingSharedFormulas, sharedMasters, reference.name);
   const dimension = xmlAttribute(
     xmlChild(root, "dimension") ?? { attributes: {}, children: [], name: "", text: "" },
     "ref",
@@ -1629,6 +1657,7 @@ async function parseSheet(
     cells,
     cellStyles,
     columnCells,
+    sharedFormulas,
     rowCount: Math.max(0, maxRow + 1),
     columnCount: Math.max(1, maxCol + 1),
     columns,
@@ -1759,12 +1788,13 @@ function hasCustomXml(packageFile: OpcPackage): boolean {
   );
 }
 
-function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnapshot): void {
+/** Restore sidecar cell fields from the sidecar sheet each worksheet claimed, by sheet order. */
+function restoreSidecarFields(
+  snapshot: WorkbookSnapshot,
+  claims: readonly (SheetSnapshot | undefined)[],
+): void {
   for (const sheet of snapshot.sheets) {
-    const meta =
-      metadata.sheets.find(
-        (candidate) => sheetNameKey(candidate.name) === sheetNameKey(sheet.name),
-      ) ?? metadata.sheets.find((candidate) => candidate.order === sheet.order);
+    const meta = claims[sheet.order];
     if (!meta || sheet.cells.length === 0) continue;
     // Index the sidecar, which holds only the cells it restores, so the sheet's
     // cells are scanned once instead of indexed.
@@ -2010,6 +2040,40 @@ function claimColumnKey(stem: string, keys: Set<string>): string {
   return key;
 }
 
+/**
+ * Expand shared formulas, then convert every formula source to editor
+ * spelling, in one engine session. A workbook without formulas leaves the
+ * engine unloaded.
+ */
+async function importWorkbookFormulas(
+  snapshot: WorkbookSnapshot,
+  sharedFormulas: readonly SharedFormulaGroup[],
+  context: XlsxCodecContext,
+): Promise<void> {
+  if (sharedFormulas.length === 0 && workbookFormulaSources(snapshot).length === 0) return;
+
+  const converted = await withXlsxFormulaEngine((engine) => {
+    expandSharedFormulas(engine, sharedFormulas, context);
+    return convertFormulaSources(engine, workbookFormulaSources(snapshot), "import");
+  });
+  for (const sheet of snapshot.sheets) {
+    for (const block of sheet.cells) {
+      for (const cell of block.cells) {
+        if (cell.value.kind !== "formula") continue;
+        const source = converted.get(cell.value.src);
+        if (source === undefined) throw new Error("Missing imported cell formula");
+        cell.value.src = source;
+      }
+    }
+  }
+  for (const named of snapshot.workbook.namedRanges ?? []) {
+    if (named.formula === undefined) continue;
+    const source = converted.get(named.formula);
+    if (source === undefined) throw new Error("Missing imported defined-name formula");
+    named.formula = source;
+  }
+}
+
 /** Grow `sheet` so that `row` and `col` lie inside it; references may point past the cells. */
 function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
   sheet.rowCount = Math.max(sheet.rowCount, row + 1);
@@ -2181,25 +2245,15 @@ export async function readWorkbook(
       );
     }
   }
-  const usedIds = new Set<string>();
   const sheetIds = new Map<string, string>();
-  const resolvedMetadata = sourceSheets.map((source, order) => {
-    const exact = metadata?.sheets.find(
-      (candidate) => sheetNameKey(candidate.name) === sheetNameKey(source.name),
-    );
-    const ordinal = metadata?.sheets.find((candidate) => candidate.order === order);
-    if (!exact && ordinal) {
-      emitWarning(context, {
-        code: "invalid-metadata",
-        message: `Reconciled renamed worksheet ${source.name} to sidecar identity by stable ordinal`,
-        sheet: source.name,
-      });
-    }
-    return exact ?? ordinal;
-  });
+  const resolvedMetadata = claimSidecarSheets(sourceSheets, metadata, context);
+  const usedIds = new Set<string>();
+  for (const meta of resolvedMetadata) {
+    if (meta) usedIds.add(meta.id);
+  }
+
   const resolvedIds = sourceSheets.map((source, order) => {
     const id = resolvedMetadata[order]?.id ?? uniqueSheetId(source.name, order, usedIds);
-    usedIds.add(id);
     sheetIds.set(sheetNameKey(source.name), id);
     return id;
   });
@@ -2539,7 +2593,12 @@ export async function readWorkbook(
     },
     sheets,
   };
-  if (metadata) restoreSidecarFields(snapshot, metadata);
+  await importWorkbookFormulas(
+    snapshot,
+    sourceSheets.flatMap((source) => source.sharedFormulas),
+    context,
+  );
+  restoreSidecarFields(snapshot, resolvedMetadata);
   const sheetParts = sourceReferences.map((reference) => reference.relationship.target);
   const modelledPivotParts = await readPivots(
     packageFile,
@@ -2565,23 +2624,6 @@ export async function readWorkbook(
   if (sidecarQueries?.length || hasCustomXml(packageFile)) {
     const { readPowerQuery } = await import("./power-query.js");
     await readPowerQuery(packageFile, snapshot, sidecarQueries, context);
-  }
-  const formulas = await convertWorkbookFormulas(snapshot, "import");
-  for (const sheet of snapshot.sheets) {
-    for (const block of sheet.cells) {
-      for (const cell of block.cells) {
-        if (cell.value.kind !== "formula") continue;
-        const source = formulas.get(cell.value.src);
-        if (source === undefined) throw new Error("Missing imported cell formula");
-        cell.value.src = source;
-      }
-    }
-  }
-  for (const named of snapshot.workbook.namedRanges ?? []) {
-    if (named.formula === undefined) continue;
-    const source = formulas.get(named.formula);
-    if (source === undefined) throw new Error("Missing imported defined-name formula");
-    named.formula = source;
   }
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {

@@ -6,10 +6,10 @@ import type {
   WorkbookSnapshot,
   XlsxWorkbookWarning,
 } from "@sheetwrite/core";
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
-import { rawXlsx, worksheet } from "./raw-opc.js";
+import { rawXlsx, TRANSITIONAL_REL, worksheet } from "./raw-opc.js";
 
 function sheet(
   id: string,
@@ -126,5 +126,44 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       }),
     );
     expect(hiddenActiveImport.workbook.activeSheet).toBe(hiddenActiveImport.sheets[1]!.id);
+  });
+
+  it("gives a sheet inserted before a known sheet its own identity", async () => {
+    const known: SheetSnapshot = {
+      ...sheet("data", "Report", 0),
+      columns: [{ key: "amount", header: "Amount", width: 80, type: "number" }],
+    };
+    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot([known])));
+    const text = (name: string) => strFromU8(parts[name] ?? new Uint8Array());
+    const resaved = {
+      ...parts,
+      "xl/workbook.xml": strToU8(
+        text("xl/workbook.xml").replace(
+          "<sheets>",
+          '<sheets><sheet name="Data" sheetId="9" r:id="rId9"/>',
+        ),
+      ),
+      "xl/_rels/workbook.xml.rels": strToU8(
+        text("xl/_rels/workbook.xml.rels").replace(
+          "</Relationships>",
+          `<Relationship Id="rId9" Type="${TRANSITIONAL_REL}/worksheet" Target="worksheets/sheet9.xml"/></Relationships>`,
+        ),
+      ),
+      "[Content_Types].xml": strToU8(
+        text("[Content_Types].xml").replace(
+          "</Types>",
+          '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+        ),
+      ),
+      "xl/worksheets/sheet9.xml": strToU8(worksheet("<sheetData/>")),
+    };
+
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(zipSync(resaved));
+    const [inserted, report] = imported.sheets;
+    expect(report).toMatchObject({ id: "data", name: "Report" });
+    expect(report?.columns[0]?.key).toBe("amount");
+    expect(inserted?.name).toBe("Data");
+    expect(inserted?.id).not.toBe("data");
+    expect(inserted?.columns[0]?.key).toBe("column1");
   });
 });

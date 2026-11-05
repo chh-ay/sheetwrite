@@ -324,6 +324,61 @@ describe("native XLSX workbook tables", () => {
     expect(saved).not.toContain("WEBSERVICE");
   });
 
+  it("keeps formulas whose table columns have numeric or file-like names", async () => {
+    const header = (ref: string, text: string) =>
+      `<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`;
+    const sheetXml = worksheet(
+      "<sheetData>" +
+        `<row r="1">${header("A1", "2023")}${header("B1", "report.xlsx")}<c r="C1"><f>SUM(Sales[2023])</f></c><c r="D1"><f>[1]Data!A1</f></c></row>` +
+        '<row r="2"><c r="A2"><v>5</v></c><c r="B2"><v>1</v></c><c r="C2"><f>SUM(Sales[report.xlsx])</f></c><c r="D2"><f>[Budget.xlsx]Data!A1</f></c></row>' +
+        '<row r="3"><c r="A3"><v>7</v></c><c r="B3"><v>2</v></c><c r="C3"><f>Sales[[#Headers],[2023]]</f></c><c r="D3"><f>\'C:\\Books\\[Budget.xlsx]Data\'!A1</f></c></row>' +
+        '</sheetData><tableParts count="1"><tablePart r:id="rId1"/></tableParts>',
+    );
+    const tableXml = `<table xmlns="${TRANSITIONAL_MAIN}" id="1" displayName="Sales" ref="A1:B3"><tableColumns count="2"><tableColumn id="1" name="2023"/><tableColumn id="2" name="report.xlsx"><calculatedColumnFormula>Sales[[#This Row],[2023]]+1</calculatedColumnFormula></tableColumn></tableColumns></table>`;
+    const bytes = rawXlsx({
+      sheets: [
+        {
+          name: "Raw",
+          xml: sheetXml,
+          relationships: `<Relationship Id="rId1" Type="${TRANSITIONAL_REL}/table" Target="../tables/table1.xml"/>`,
+        },
+      ],
+      extraOverrides: [
+        `<Override PartName="/xl/tables/table1.xml" ContentType="${TABLE_CONTENT}"/>`,
+      ],
+      extraFiles: { "xl/tables/table1.xml": tableXml },
+    });
+
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
+    const values = new Map(
+      (imported.sheets[0]?.cells[0]?.cells ?? []).map((cell) => [
+        `${cell.rowOffset},${cell.colOffset}`,
+        cell.value,
+      ]),
+    );
+    expect(values.get("0,2")).toEqual({ kind: "formula", src: "=SUM(Sales[2023])" });
+    expect(values.get("1,2")).toEqual({ kind: "formula", src: "=SUM(Sales[report.xlsx])" });
+    expect(values.get("2,2")).toEqual({ kind: "formula", src: "=Sales[[#Headers],[2023]]" });
+    expect(values.get("0,3")).toEqual({ kind: "literal", value: "=[1]Data!A1" });
+    expect(values.get("1,3")).toEqual({ kind: "literal", value: "=[Budget.xlsx]Data!A1" });
+    expect(values.get("2,3")).toEqual({
+      kind: "literal",
+      value: "='C:\\Books\\[Budget.xlsx]Data'!A1",
+    });
+    expect(imported.sheets[0]?.tables?.[0]?.columns[1]?.calculatedColumnFormula?.text).toBe(
+      "Sales[[#This Row],[2023]]+1",
+    );
+
+    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
+    const saved = partText(parts, "xl/worksheets/sheet1.xml");
+    expect(saved).toContain("<f>SUM(Sales[2023])</f>");
+    expect(saved).toContain("<f>SUM(Sales[report.xlsx])</f>");
+    expect(saved).toContain("<f>Sales[[#Headers],[2023]]</f>");
+    expect(partText(parts, "xl/tables/table1.xml")).toContain(
+      "<calculatedColumnFormula>Sales[[#This Row],[2023]]+1</calculatedColumnFormula>",
+    );
+  });
+
   it("drops a native table that collides with a defined name and emits an exact ambiguity warning", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const bytes = nativeTablePackage(
