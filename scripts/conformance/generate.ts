@@ -234,6 +234,12 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ISNUMBER: { empty: "NOT(ISNUMBER(C1))", error: "NOT(ISNUMBER(1/0))" },
   ISTEXT: { error: "NOT(ISTEXT(1/0))" },
   ISLOGICAL: { error: "NOT(ISLOGICAL(1/0))" },
+  "ERROR.TYPE": {
+    empty: "ISNA(ERROR.TYPE(C1))",
+    mixed: "ISNA(ERROR.TYPE(C1))",
+    boundary: "ISNA(ERROR.TYPE(C1))",
+    "range-array": "ISNA(ERROR.TYPE(C1:C2))",
+  },
   COUNTA: { mixed: "COUNTA(C1,2,3)=3" },
   COUNTBLANK: { empty: "COUNTBLANK(C1)=1", mixed: "COUNTBLANK(C1)=0" },
   SUMPRODUCT: { empty: "SUMPRODUCT(C1,2,2,4)=0", mixed: "SUMPRODUCT(C1,2,2,4)=32" },
