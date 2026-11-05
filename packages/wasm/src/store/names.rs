@@ -229,7 +229,7 @@ impl CellStore {
         let mut scoped = (None, key);
         for (sheet, _) in (0u32..).zip(&self.sheet_names) {
             scoped.0 = Some(sheet);
-            if self.defined_names.get(&scoped).is_some() {
+            if self.defined_names.contains_key(&scoped) {
                 placement.sheet_bound.set(true);
                 break;
             }
