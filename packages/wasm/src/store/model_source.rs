@@ -57,7 +57,8 @@ impl<'a> ModelSource<'a> {
         while next < routes.len() {
             for relationship in relationships {
                 let to = relationship.to.table.as_str();
-                if relationship.from.table == routes[next].0
+                if !relationship.is_measure()
+                    && relationship.from.table == routes[next].0
                     && !routes.iter().any(|route| route.0 == to)
                 {
                     routes.push((to, next, Some(relationship)));

@@ -26,7 +26,11 @@ import {
 } from "../dashboard.js";
 import {
   type DataModelIssue,
+  findMeasure,
   findRelationship,
+  validateMeasureAdmission,
+  withMeasure,
+  withoutMeasure,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -203,7 +207,7 @@ import {
 import { SheetRegistry } from "./sheet-registry.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
-import type { RecomputingCellStore } from "./wasm-contract.js";
+import type { PivotOutputCells, RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
 import {
   KIND_BOOL,
@@ -231,7 +235,7 @@ const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
 const PIVOT_STATUS_STRIDE = 7;
 
 /** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
-const PIVOT_ERRORS: readonly string[] = [
+export const PIVOT_ERRORS: readonly string[] = [
   "#CYCLE!",
   "#DIV/0!",
   "#REF!",
@@ -1160,9 +1164,11 @@ export class StoreDataEngine {
   }
 
   /**
-   * Sends every relationship of `model` to an engine that checks keys.
-   * Returns false when the engine refuses them; an engine without the call
-   * keeps them only in the workbook.
+   * Sends every relationship and measure of `model` to an engine that
+   * computes model pivots. A measure travels as a relationship record with
+   * an empty one-side table: `[id, homeTable, formula, "", name]`. Returns
+   * false when the engine refuses them; an engine without the call keeps
+   * them only in the workbook.
    */
   private syncRelationships(
     model: DataModel | undefined,
@@ -1176,6 +1182,9 @@ export class StoreDataEngine {
       relationship.to.table,
       relationship.to.column,
     ]);
+    for (const measure of model?.measures ?? []) {
+      strings.push(measure.id, measure.table, measure.formula, "", measure.name);
+    }
     return wasm.setRelationships(strings);
   }
 
@@ -1825,13 +1834,9 @@ export class StoreDataEngine {
       };
     }
 
-    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
-    const window = this.getDataWindow(
-      sheet,
-      { start: record.row, end: record.row + record.rows },
-      cols,
-    );
-    const cells = Array.from(window.values);
+    const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
+    // A dashboard has no cells: its view reads the output with `dashboardPivotOutput`.
+    const cells = isDashboard(owner) ? [] : this.pivotWindowCells(sheet, record);
     return {
       status: "ok",
       anchor: { sheet, row: record.row, col: record.col },
@@ -1841,6 +1846,30 @@ export class StoreDataEngine {
       labelCols: record.labelCols,
       cells,
     };
+  }
+
+  /** Output cells that a worksheet pivot placed, read from the sheet. */
+  private pivotWindowCells(sheet: SheetId, record: PivotStatusRecord): CellScalar[] {
+    const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
+    const window = this.getDataWindow(
+      sheet,
+      { start: record.row, end: record.row + record.rows },
+      cols,
+    );
+    return Array.from(window.values);
+  }
+
+  /**
+   * The engine output of a pivot on a dashboard, which places none in cells;
+   * the caller frees it. Null on the default engine or for an unknown pivot.
+   */
+  dashboardPivotOutput(sheet: SheetId, id: string): PivotOutputCells | null {
+    const index =
+      this.workbook.sheets
+        .find((candidate) => candidate.id === sheet)
+        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+    if (index < 0 || !this.wasm.pivotOutput) return null;
+    return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
 
   /**
@@ -3728,6 +3757,26 @@ export class StoreDataEngine {
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
+        return true;
+      }
+
+      case "setMeasure":
+      case "removeMeasure": {
+        const current = this.workbook.dataModel;
+        if (patch.op === "setMeasure") {
+          const issues: DataModelIssue[] = [];
+          validateMeasureAdmission(patch.measure, current, this.workbook.sheets, issues);
+          if (issues.length > 0) return false;
+        } else if (!findMeasure(current, patch.id)) {
+          return false;
+        }
+
+        const model =
+          patch.op === "setMeasure"
+            ? withMeasure(current, patch.measure)
+            : withoutMeasure(current, patch.id);
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 

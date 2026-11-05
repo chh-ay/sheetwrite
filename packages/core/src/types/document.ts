@@ -12,7 +12,7 @@ import type {
 import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 import type { Dashboard, DashboardItem, SheetKind } from "./dashboard.js";
-import type { DataModel, TableRelationship } from "./data-model.js";
+import type { DataModel, Measure, TableRelationship } from "./data-model.js";
 import type { PivotDefinition } from "./pivot.js";
 import type { SavedQuery } from "./query.js";
 import type { WorkbookTable, WorkbookTablePatch, WorkbookTableXmlElement } from "./table.js";
@@ -601,6 +601,10 @@ export type DocumentOp =
   /** Insert or replace the relationship with `relationship.id`. */
   | { op: "setRelationship"; relationship: TableRelationship }
   | { op: "removeRelationship"; id: string }
+  /** Insert or replace a model measure by its stable identity. */
+  | { op: "setMeasure"; measure: Measure }
+  /** Remove a measure while keeping pivot references for undo. */
+  | { op: "removeMeasure"; id: string }
   /** Insert or replace the saved query with `query.id`. */
   | { op: "setQuery"; query: SavedQuery }
   /** Remove a saved query; its output table and values stay. */

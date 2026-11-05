@@ -28,12 +28,29 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
     /** Full engine only: source fields of the pivot at `index` in the sheet's payload. */
     pivotFields?(sheet: number, index: number): PivotFieldList;
 
-    /** Full engine only: replace every relationship; five IDs each (`setRelationships`). */
+    /** Full engine only: the output cells of a pivot on a dashboard, which places none in cells. */
+    pivotOutput?(sheet: number, index: number): PivotOutputCells;
+
+    /**
+     * Full engine only: replace every relationship and measure; five strings
+     * each (`setRelationships`).
+     */
     setRelationships?(strings: string[]): boolean;
 
     /** Full engine only: `[code, firstRow, secondRow, unmatched]`, empty for an unknown ID. */
     relationshipStatus?(id: string): Uint32Array;
   };
+
+/** Dashboard pivot output in row-major order; free after reading. */
+export interface PivotOutputCells {
+  /** 0 blank, 1 number, 2 text, 3 boolean, 4 error. */
+  kinds(): Uint8Array;
+  /** Per cell: the number, the boolean as 0 or 1, or the error slot. */
+  numbers(): Float64Array;
+  /** The text cells, in order. */
+  texts(): string[];
+  free(): void;
+}
 
 /** Source fields reported by the full engine; free after reading. */
 interface PivotFieldList {

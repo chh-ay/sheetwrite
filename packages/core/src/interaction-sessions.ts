@@ -2,6 +2,7 @@ import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
+import { isDashboard } from "./dashboard.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
@@ -805,6 +806,14 @@ export class InteractionSessions {
     const key = e.key.toLowerCase();
 
     const action = this.deps.keymap().action(e);
+    // A dashboard has no cells: of the grid keys, only undo and redo act on it.
+    if (isDashboard(this.deps.sheet())) {
+      if (action !== "undo" && action !== "redo") return;
+      e.preventDefault();
+      if (action === "undo") this.deps.undo();
+      else this.deps.redo();
+      return;
+    }
     if (action) {
       e.preventDefault();
       switch (action) {

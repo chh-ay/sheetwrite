@@ -22,13 +22,13 @@ import type {
   XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 import {
-  convertXlsxFormulas,
   fromCsv,
   fromXlsxWorkbook,
   parseCsv,
   toCsv,
   toTsv,
   toXlsxWorkbook,
+  withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
 import compressionRatioUrl from "../../../../packages/xlsx/test/fixtures/compression-ratio.xlsx?url";
@@ -770,9 +770,11 @@ interface StoredFormula {
  * `_xlfn.ANCHORARRAY(A1)` form of `A1#`, so the page applies no second rule.
  */
 async function withEditorSpelling(stored: string[]): Promise<StoredFormula[]> {
-  const editor = await convertXlsxFormulas(
-    stored.map((text) => `=${text}`),
-    "import",
+  const editor = await withXlsxFormulaEngine((engine) =>
+    engine.convert(
+      stored.map((text) => `=${text}`),
+      "import",
+    ),
   );
 
   return stored.map((text, index) => ({ stored: text, editor: editor[index] ?? `=${text}` }));

@@ -23,6 +23,8 @@ import {
   setFilterValues,
   setSortOrder,
   shiftField,
+  compareScalars,
+  scalarLabel,
   sourceDataRange,
   baseTable,
   relatedTables,
@@ -51,7 +53,6 @@ const NEEDS_FULL_ENGINE =
 const MISSING_PIVOT = "This pivot table no longer exists.";
 const TOO_MANY_VALUES = `This field has more than ${MAX_FILTER_VALUES.toLocaleString("en-US")} values, so it cannot be a filter.`;
 const EMPTY_AREA = "Drag fields here";
-const BLANK_LABEL = "(blank)";
 
 /** What a drag carries: a source field, or an entry that leaves its area. */
 interface DragState {
@@ -66,27 +67,6 @@ export function pivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true)
     focus,
     render: (body) => renderPivotPanel(body, grid, sheet, id),
   };
-}
-
-/** Sort order of filter values: numbers, then text, then logicals, then blank. */
-function compareScalars(a: CellScalar, b: CellScalar): number {
-  const rank = (value: CellScalar): number =>
-    typeof value === "number"
-      ? 0
-      : typeof value === "string"
-        ? 1
-        : typeof value === "boolean"
-          ? 2
-          : 3;
-  const byRank = rank(a) - rank(b);
-  if (byRank !== 0) return byRank;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
-  return Number(a) - Number(b);
-}
-
-function scalarLabel(value: CellScalar): string {
-  return value === null || value === "" ? BLANK_LABEL : String(value);
 }
 
 function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: string): () => void {
@@ -312,6 +292,10 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           move: (field, to, from, at) => move(pivot, fields, field, to, from, at),
           commit,
           distinctValues: (field) => distinctValues(pivot, field),
+          measureName: (measureId) =>
+            grid.store
+              .getWorkbook()
+              .dataModel?.measures?.find((measure) => measure.id === measureId)?.name ?? measureId,
           signal: lifetime.signal,
         }),
       );
@@ -352,6 +336,8 @@ interface AreaActions {
   move(field: number, to: PivotArea, from: PivotPlacement | null, at?: number): void;
   commit(next: PivotDefinition, focusKey?: string): void;
   distinctValues(field: number): CellScalar[];
+  /** The saved name of a measure, or its ID when the measure was removed. */
+  measureName(id: string): string;
   /** The panel's signal; an open menu stops listening on the document when it aborts. */
   signal: AbortSignal;
 }
@@ -381,43 +367,64 @@ function areaSection(
     const placement: PivotPlacement = { area, index };
     const item = document.createElement("li");
     item.className = "sheetwrite-panel-area-item";
-    item.draggable = true;
+    const value = area === "values" ? pivot.values[index] : undefined;
+    // A measure value has no source field, so it cannot move to another
+    // area or shift by field; the list can only remove it.
+    const isMeasure = value !== undefined && "measure" in value;
+    item.draggable = !isMeasure;
 
     const name = document.createElement("span");
     name.className = "sheetwrite-panel-field-name";
-    const value = area === "values" ? pivot.values[index] : undefined;
-    const aggregation = AGGREGATION_LABELS.find(([key]) => key === value?.aggregation)?.[1];
+    const measure = value && "measure" in value ? actions.measureName(value.measure) : undefined;
+    const aggregation =
+      value && "aggregation" in value
+        ? AGGREGATION_LABELS.find(([key]) => key === value.aggregation)?.[1]
+        : undefined;
     name.textContent =
       value?.name ??
+      measure ??
       (aggregation === undefined ? header(field) : `${aggregation} of ${header(field)}`);
     item.appendChild(name);
 
-    const menuItems = (): PanelMenuItem[] => [
-      ...PIVOT_AREAS.map(([to, toLabel]) => ({
-        label: `Move to ${toLabel}`,
-        disabled: to === area,
-        run: () => actions.move(field, to, placement),
-      })),
-      {
-        label: "Move Up",
-        disabled: index === 0,
-        run: () =>
-          actions.commit(shiftField(pivot, placement, -1, noFacts), `${area}-${index - 1}-menu`),
-      },
-      {
-        label: "Move Down",
-        disabled: index === entries.length - 1,
-        run: () =>
-          actions.commit(shiftField(pivot, placement, 1, noFacts), `${area}-${index + 1}-menu`),
-      },
-      { label: "Remove", run: () => actions.commit(removeField(pivot, placement)) },
-    ];
+    const remove: PanelMenuItem = {
+      label: "Remove",
+      run: () => actions.commit(removeField(pivot, placement)),
+    };
+    const menuItems = (): PanelMenuItem[] =>
+      isMeasure
+        ? [remove]
+        : [
+            ...PIVOT_AREAS.map(([to, toLabel]) => ({
+              label: `Move to ${toLabel}`,
+              disabled: to === area,
+              run: () => actions.move(field, to, placement),
+            })),
+            {
+              label: "Move Up",
+              disabled: index === 0,
+              run: () =>
+                actions.commit(
+                  shiftField(pivot, placement, -1, noFacts),
+                  `${area}-${index - 1}-menu`,
+                ),
+            },
+            {
+              label: "Move Down",
+              disabled: index === entries.length - 1,
+              run: () =>
+                actions.commit(
+                  shiftField(pivot, placement, 1, noFacts),
+                  `${area}-${index + 1}-menu`,
+                ),
+            },
+            remove,
+          ];
     // The area is part of the name: a field can sit in two areas at once.
     const actionsLabel = `${name.textContent} in ${label} actions`;
     item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems, actions.signal));
 
-    if (area === "values") {
-      const select = selectOf(AGGREGATION_LABELS, value?.aggregation ?? "SUM");
+    if (area === "values" && value && "aggregation" in value) {
+      const select = selectOf(AGGREGATION_LABELS, value.aggregation);
       select.className = "sheetwrite-panel-control";
       select.dataset.focusKey = `${area}-${index}-aggregation`;
       select.setAttribute("aria-label", `Summarize ${header(field)} by`);
@@ -438,14 +445,15 @@ function areaSection(
         actions.commit(setSortOrder(pivot, area, field, select.value === "descending")),
       );
       item.appendChild(select);
-    } else {
+    } else if (area === "filters") {
       item.appendChild(filterValues(pivot, index, field, header(field), actions));
     }
 
-    item.addEventListener("dragstart", (event) => {
-      actions.startDrag({ field, from: placement });
-      event.dataTransfer?.setData("text/plain", header(field));
-    });
+    if (!isMeasure)
+      item.addEventListener("dragstart", (event) => {
+        actions.startDrag({ field, from: placement });
+        event.dataTransfer?.setData("text/plain", header(field));
+      });
     item.addEventListener("dragend", () => actions.endDrag());
     list.appendChild(item);
   });

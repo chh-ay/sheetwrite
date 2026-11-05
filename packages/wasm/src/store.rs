@@ -31,6 +31,10 @@ use crate::types::{
 use crate::window::ConditionalRules;
 
 mod hidden_rows;
+#[cfg(all(test, feature = "analysis"))]
+mod measure_tests;
+#[cfg(feature = "analysis")]
+mod measures;
 #[cfg(feature = "analysis")]
 mod model_source;
 mod names;
@@ -284,6 +288,12 @@ pub struct CellStore {
     /// has the field, so the default engine store does not grow.
     #[cfg(feature = "host-functions")]
     pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
+    /// Weak index of the literal REGEX patterns this store's formulas share.
+    /// `None` until a formula uses one, and only the full engine has it. A
+    /// `Cell` adds one pointer to the store, so readers take the index out
+    /// and put it back.
+    #[cfg(feature = "analysis")]
+    regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
     defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
     tables: HashMap<String, TableDefinition>,
@@ -393,6 +403,8 @@ impl CellStore {
             conditional_rules: ConditionalRules::default(),
             #[cfg(feature = "host-functions")]
             custom_functions: None,
+            #[cfg(feature = "analysis")]
+            regex_patterns: std::cell::Cell::new(None),
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
@@ -3302,6 +3314,11 @@ impl CellStore {
                 .add_payload(bytes, bytes);
             results.add_memory_stats(&mut stats);
         }
+        #[cfg(feature = "analysis")]
+        if let Some(patterns) = self.regex_patterns.take() {
+            patterns.add_memory_stats(stats.owner_mut(crate::memory::FORMULAS));
+            self.regex_patterns.set(Some(patterns));
+        }
 
         self.graph.add_memory_stats(&mut stats);
         self.conditional_rules.add_memory_stats(&mut stats);
@@ -3644,7 +3661,21 @@ impl CellStore {
             );
         }
 
+        #[cfg(feature = "analysis")]
+        let ast = self.bind_regex_patterns(source, ast);
         Ok(ast)
+    }
+
+    /// Points the literal REGEX patterns of a new formula at the patterns the
+    /// store's formulas share, so formulas with one pattern compile it once.
+    #[cfg(feature = "analysis")]
+    fn bind_regex_patterns(&self, source: &str, mut ast: Ast) -> Ast {
+        if crate::eval::regex_patterns::may_call_regex(source) {
+            let mut patterns = self.regex_patterns.take().unwrap_or_default();
+            patterns.bind(&mut ast);
+            self.regex_patterns.set(Some(patterns));
+        }
+        ast
     }
 
     /// Resolve the sheet names of a parsed formula to stable handles.
