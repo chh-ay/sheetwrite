@@ -284,6 +284,39 @@ async function refreshSales(grid: Grid) {
 - Saved locators are public. A locator with a user name or password is
   rejected, and credentials stay in the host's callback.
 
+### Query commands in the ribbon
+
+While a query session is alive, the ribbon, the compact ribbon and the toolbar
+show three Data commands. `session.dispose()` removes them again.
+
+| Command | Ribbon place | What it does |
+| --- | --- | --- |
+| Get Data | Data › Get & Transform Data | Opens Queries & Connections with an empty query form. |
+| Refresh All | Data › Queries & Connections | Runs `refreshAll`. Press it again while the refresh runs to cancel it. |
+| Queries & Connections | Data › Queries & Connections | Lists the saved queries, to refresh, edit, rename, remove or select the output table of each. |
+
+The panel loads as its own chunk the first time it opens. Its form saves
+through `define`, so the engine checks the plan first. Each step is one line
+that names columns as they are before the step:
+
+| Step | Line |
+| --- | --- |
+| Filter rows | `Total >= 100`, `Region is null`, `Region contains "North"`, `not …` |
+| Choose columns | `Region, Total` |
+| Rename columns | `Total -> Amount` |
+| Change type | `Total: number`, or `Total: number or null` to make failed conversions null |
+| Merge queries | `Regions (left) on Region = Code` |
+| Group by | `Region: Total = sum(Amount), Rows = countRows()` |
+| Unpivot columns | `Jan, Feb -> Month, Value` |
+
+Names with spaces or symbols go in double quotes. A read-only grid keeps the
+commands; the grid rejects the write and the panel or the status line shows why.
+
+An XLSX file can hold Power Query members that the engine cannot run. When the
+file was imported with a Power Query codec, the panel lists them as read-only entries with the reason. They stay in the file
+unchanged while the saved queries are not edited; after an edit, the next XLSX
+save drops them (see [Power Query in XLSX](#power-query-in-xlsx)).
+
 ## Power Query in XLSX
 
 Pass a Power Query codec to XLSX export and import to write saved queries as

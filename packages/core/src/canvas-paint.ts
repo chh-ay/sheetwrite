@@ -35,7 +35,7 @@ type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
  * Build the per-frame merge lookup. Every covered cell of every merge that
  * intersects the painted window maps to its `MergeRect`, keyed
  * `row * MERGE_KEY_STRIDE + col`. Populating only the window bounds the map to
- * `merges × visible-cells`, turning the per-cell `mergeAt` scan into an O(1)
+ * `merges × visible-cells`, so each painted cell finds its merge with one
  * `Map.get`. Returns `undefined` when there is nothing to cover (the fast path).
  */
 function buildMergeMap(

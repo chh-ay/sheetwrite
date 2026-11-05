@@ -6,8 +6,9 @@ import {
 } from "./delimited-text.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 
-// Values beginning with any of these are neutralized on paste so a pasted
-// "=cmd|..." or "+...", "-...", "@..." can't become an executable formula.
+// Text beginning with `=`, `+`, `-`, `@`, tab or carriage return gets a leading
+// apostrophe wherever Sheetwrite hands text to another application (clipboard
+// TSV and HTML, CSV export), so "=cmd|..." cannot run as a formula there.
 const INJECTION = /^[=+\-@\t\r]/;
 
 export function neutralizeInjection(value: string): string {
@@ -57,9 +58,10 @@ export interface ClipboardCell {
 
 /**
  * Richer-than-TSV snapshot captured on every copy/cut. Paste reuses it —
- * re-anchoring formulas and carrying styles — when the system clipboard still
- * holds the {@link ClipboardSnapshot.tsv} this snapshot wrote; otherwise paste
- * falls back to parsing whatever external TSV the system clipboard now holds.
+ * re-anchoring formulas and carrying styles — only when the clipboard payload
+ * carries the unguessable in-memory token the controller wrote with it. Any
+ * other payload, including a Sheetwrite payload with a different token, pastes
+ * as inert external data.
  */
 export interface ClipboardSnapshot {
   /** Top-left source cell in data coordinates — the formula re-anchor origin. */
@@ -68,7 +70,7 @@ export interface ClipboardSnapshot {
   cells: ClipboardCell[][];
   /** Fully-contained source hyperlinks; source ranges retain stable data coordinates. */
   hyperlinks: CellHyperlink[];
-  /** The exact TSV written to the system clipboard; the paste-time identity check. */
+  /** The TSV written to the system clipboard as its plain-text flavor. */
   tsv: string;
   /** True when produced by cut: formulas paste verbatim (Sheets shifts on copy, not cut). */
   cut: boolean;

@@ -6,6 +6,7 @@
 
 import { iconNode } from "../icons/resolve.js";
 import { HORIZONTAL_STEPS, menuKeyTarget } from "../menu-surface.js";
+import { onQueryCommandsChange } from "../query-commands.js";
 import { Scope } from "../scope.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
 import {
@@ -153,6 +154,10 @@ export class Ribbon {
 
     this.lifetime.add(
       grid.on("command-state-change", (event) => this.refresh((command) => event.states[command])),
+    );
+    // A query session connects after the grid exists, and its commands appear then.
+    this.lifetime.add(
+      onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
     );
     // Absent in some test environments; the ribbon then never shrinks groups.
     if (typeof ResizeObserver === "function") {

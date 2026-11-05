@@ -25,7 +25,6 @@ function validationLabel(value: CellScalar): string {
 export class ValidationEditor {
   private readonly host: HTMLElement;
   private root: HTMLElement | null = null;
-  private cell: { row: number; col: number } | null = null;
   private options: BeginValidationEditOptions | null = null;
   private values: readonly CellScalar[] = [];
   private activeIndex = 0;
@@ -41,17 +40,12 @@ export class ValidationEditor {
     return this.root !== null;
   }
 
-  get editingCell(): { row: number; col: number } | null {
-    return this.cell;
-  }
-
   begin(options: BeginValidationEditOptions): void {
     this.cancel(false);
     const condition = options.rule.condition;
     if (condition.kind !== "list" && condition.kind !== "checkbox") return;
 
     this.options = options;
-    this.cell = { row: options.row, col: options.col };
     if (condition.kind === "list") this.beginList(options, condition.values);
     else this.beginCheckbox(options);
     this.position(options.rect);
@@ -70,7 +64,6 @@ export class ValidationEditor {
     const options = this.options;
     const root = this.root;
     this.root = null;
-    this.cell = null;
     this.options = null;
     this.values = [];
     this.activeIndex = 0;

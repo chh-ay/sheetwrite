@@ -168,6 +168,7 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 
+export { type QueryCommands, registerQueryCommands } from "./query-commands.js";
 export {
   type DocumentRebaseResult,
   type RebaseConflict,
@@ -443,6 +444,7 @@ export type {
   XlsxSourceGraph,
   XlsxSourcePart,
   XlsxSourceSnapshot,
+  XlsxUnsupportedQuery,
 } from "./types.js";
 
 export {

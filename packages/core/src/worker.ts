@@ -91,13 +91,11 @@ type WorkerMessage =
 const NO_RENDERERS: ReadonlyMap<string, CellRenderer> = new Map();
 
 /**
- * Hard cap on the pool-id→string cache, mirroring `SheetwriteStore`. A full-sheet
- * sweep would otherwise grow it to O(distinct strings), duplicating the WASM
- * string pool on the JS heap. At the cap we drop it wholesale and re-warm from
- * this frame's `stringPoolUpdate*` payload — cheap and self-healing.
+ * Hard cap on the worker's pool-id→string cache, tuned separately from the
+ * window reader's cap on the main thread. A full-sheet sweep would otherwise
+ * grow it to one entry per distinct string; at the cap it is dropped and
+ * re-warmed from the frame's `stringPoolUpdate*` payload.
  */
-// Kept independent from the host reader's cache cap:
-// each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 
 interface WorkerRuntimeState extends PaintTarget<OffscreenCanvas> {

@@ -42,6 +42,8 @@ const PANEL_MARKER = "sheetwrite-panel-section";
 // Text that only the Sort panel renders. The Sort panel is a chunk of its own,
 // apart from the other side panels, so it loads only when it opens.
 const SORT_PANEL_MARKER = "My data has headers";
+// The Queries & Connections panel is its own chunk too; its section title survives minifiers.
+const QUERY_PANEL_MARKER = "Kept from the file";
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
@@ -51,6 +53,7 @@ const REPLACEMENT_MARKER = "Disconnect collaboration before import";
 const chromeChunks = [];
 const panelChunks = [];
 const sortPanelChunks = [];
+const queryPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const workers = [];
@@ -58,7 +61,8 @@ const documentChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
-  if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
+  if (code.includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(file);
+  else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
   else if (code.includes(FUNCTION_TABLE_MARKER)) functionTableChunks.push(file);
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
@@ -81,6 +85,8 @@ if (panelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
 if (sortPanelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sortPanelChunks.length}`);
+if (queryPanelChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack query panel chunk, got ${queryPanelChunks.length}`);
 if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (functionTableChunks.length !== 1) {
@@ -99,6 +105,9 @@ if (mainCode.includes(PANEL_MARKER)) {
 }
 if (mainCode.includes(SORT_PANEL_MARKER)) {
   throw new Error("The Sort panel is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(QUERY_PANEL_MARKER)) {
+  throw new Error("The query panel is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
@@ -134,6 +143,7 @@ const assets = publicFiles.map((file) => {
       chromeChunks,
       panelChunks,
       sortPanelChunks,
+      queryPanelChunks,
       functionTableChunks,
       findChunks,
       documentChunks,

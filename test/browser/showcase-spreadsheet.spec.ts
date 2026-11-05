@@ -203,3 +203,42 @@ test("automatic ribbon layout follows host width until the user chooses a mode",
   await page.getByRole("button", { name: "Wide" }).click();
   await expect(ribbon).toHaveAttribute("data-mode", "compact");
 });
+
+for (const mode of ["full", "compact"] as const) {
+  test(`${mode} ribbon runs the Data query commands by keyboard`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 1_600, height: 900 });
+    await open(page);
+    // The session connects after the shell is shown and loads the saved query's table.
+    await expect.poll(async () => (await cell(page, "targets", 1, 0)).resolved).toBe("North");
+    expect((await cell(page, "targets", 4, 0)).resolved).toBeNull();
+
+    const ribbon = page.getByRole("region", { name: "Ribbon" });
+    if (mode === "compact") await ribbon.getByRole("button", { name: "Compact ribbon" }).click();
+    await expect(ribbon).toHaveAttribute("data-mode", mode);
+    await ribbon.getByRole("tab", { name: "Data", exact: true }).click();
+
+    const refreshAll = ribbon.getByRole("button", { name: "Refresh All", exact: true });
+    await refreshAll.focus();
+    await refreshAll.press("Enter");
+    const status = page.locator(".sheetwrite-action-status");
+    await expect(status).toHaveText("Queries refreshed.");
+
+    const queries = ribbon.getByRole("button", { name: "Queries & Connections", exact: true });
+    await queries.focus();
+    await queries.press("Enter");
+    const panel = page.locator(".sheetwrite-panel");
+    await expect(panel.getByText("Regional targets", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Refresh All", exact: true })).toBeVisible();
+
+    await ribbon.getByRole("button", { name: "Get Data", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Name", exact: true })).toBeFocused();
+
+    // A read-only grid keeps the commands, and the refresh reports the rejected write.
+    await page.evaluate(() => window.__sheetwriteSpreadsheetGrid?.setReadOnly(true));
+    await refreshAll.click();
+    await expect(status).not.toHaveText(/Queries refreshed\.|Refreshing queries/u);
+    expect(errors).toEqual([]);
+  });
+}
