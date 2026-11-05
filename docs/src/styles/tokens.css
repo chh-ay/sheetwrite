@@ -110,11 +110,12 @@
   --sw-focus-ring-width: 2px;
 
   /* ── Icons ────────────────────────────────────────────────────────────
-     One set (Lucide), one stroke, three sizes on a 4 px grid. */
+     The Sheetwrite sprite (src/icons/sprite.svg): one stroke, three sizes on
+     a 4 px grid, and one accent colour for the selected part of an icon. */
   --sw-icon-sm: 1rem;
   --sw-icon-md: 1.25rem;
   --sw-icon-lg: 1.5rem;
-  --sw-icon-stroke: 1.75;
+  --sw-icon-stroke: 2;
 
   /* ── Motion ───────────────────────────────────────────────────────── */
   --sw-motion-fast: 120ms;
@@ -131,6 +132,9 @@
   --sw-header-height: 4rem;
   --sw-sidebar-width: 17.5rem;
   --sw-content-width: 51rem;
+  /* The docs reading area beside the sidebar, without and with the outline. */
+  --sw-docs-frame: 70rem;
+  --sw-docs-frame-wide: 86.5rem;
   --sw-page-gutter: clamp(1rem, 4vw, 4rem);
   --sw-page-max: 92rem;
   --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
@@ -175,6 +179,9 @@
   --sw-accent-strong: #005a3d;
   --sw-accent-soft: #d6f5e6;
   --sw-accent-ink: #ffffff;
+  /* The icon accent: a brighter brand green for the selected part of an
+     icon; a graphic, so it clears 3:1 on every surface. */
+  --sw-icon-accent: #00936a;
   /* Secondary brand: violet, for highlights that must not read as success. */
   --sw-violet: #6a32d8;
   --sw-violet-soft: #ece4ff;
@@ -251,6 +258,7 @@
   --sw-accent-strong: #7eeabd;
   --sw-accent-soft: #0b3a2a;
   --sw-accent-ink: #03190f;
+  --sw-icon-accent: #3edc9b;
   --sw-violet: #b69cff;
   --sw-violet-soft: #2a1f4d;
 

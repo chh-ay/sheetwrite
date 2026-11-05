@@ -24,6 +24,7 @@ import {
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { HighlightedCode } from "../components/HighlightedCode.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
@@ -343,7 +344,11 @@ function ExpectedValue({ result, testId }: { result: CheckedValue; testId?: stri
       </p>
     );
   }
-  return <pre data-testid={testId}>{JSON.stringify(result, null, 2)}</pre>;
+  return (
+    <pre data-testid={testId}>
+      <HighlightedCode code={JSON.stringify(result, null, 2)} language="json" />
+    </pre>
+  );
 }
 
 interface ChoiceOption {
@@ -2602,7 +2607,12 @@ function CompatibilityResultDetail({
               .join(", ")}
             .
           </p>
-          <pre>{JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}</pre>
+          <pre>
+            <HighlightedCode
+              code={JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}
+              language="json"
+            />
+          </pre>
         </aside>
       )}
 
@@ -2612,7 +2622,7 @@ function CompatibilityResultDetail({
         </h4>
         {selectedResult.formula && (
           <p>
-            Formula <code>{selectedResult.formula}</code>
+            Formula <HighlightedCode code={selectedResult.formula} language="formula" />
             {selectedResult.target ? (
               <>
                 {" "}
@@ -2637,7 +2647,10 @@ function CompatibilityResultDetail({
         ) : null}
         {selectedResult.operations && (
           <pre data-testid="compatibility-workbook-preview">
-            {JSON.stringify(selectedResult.operations, null, 2)}
+            <HighlightedCode
+              code={JSON.stringify(selectedResult.operations, null, 2)}
+              language="json"
+            />
           </pre>
         )}
         <dl>
@@ -2825,7 +2838,9 @@ function TestedAppResult({
         observation?.result && (
           <details>
             <summary>Technical captured result</summary>
-            <pre>{JSON.stringify(observation.result, null, 2)}</pre>
+            <pre>
+              <HighlightedCode code={JSON.stringify(observation.result, null, 2)} language="json" />
+            </pre>
           </details>
         )
       )}
