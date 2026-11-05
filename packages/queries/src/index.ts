@@ -1,7 +1,23 @@
+import type { Grid } from "@sheetwrite/core";
+
 import type { SyncInitInput } from "../pkg/sheetwrite_queries.js";
+import { connect } from "./connect.js";
+import type { QuerySession, QuerySessionOptions } from "./session.js";
 import type { QueryEngine } from "./types.js";
 
 export { QueryError } from "./errors.js";
+export type {
+  QueryDefinitionResult,
+  QueryFetchContext,
+  QueryFetchRequest,
+  QueryFetchResult,
+  QueryFetchSource,
+  QueryOutputBlock,
+  QueryRefreshOptions,
+  QueryRefreshResult,
+  QuerySession,
+  QuerySessionOptions,
+} from "./session.js";
 export type {
   QueryAggregate,
   QueryBatch,
@@ -54,4 +70,33 @@ export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise
   await wasm.default(options.wasm === undefined ? undefined : { module_or_path: options.wasm });
 
   return createEngine(wasm);
+}
+
+/**
+ * The one registration call for workbook queries: loads the engine and binds
+ * saved queries of `grid` to the host's `fetchSource`. Workbooks that never
+ * call it load no query code or WASM.
+ *
+ * @example
+ * ```ts
+ * import type { Grid } from "@sheetwrite/core";
+ * import { createQuerySession } from "@sheetwrite/queries";
+ *
+ * async function refreshSales(grid: Grid) {
+ *   const session = await createQuerySession(grid, {
+ *     fetchSource: async (request, { signal }) => {
+ *       const response = await fetch(`/sources/${request.sourceId}`, { signal });
+ *       return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+ *     },
+ *   });
+ *
+ *   return session.refreshAll();
+ * }
+ * ```
+ */
+export async function createQuerySession(
+  grid: Grid,
+  options: QuerySessionOptions & QueryEngineOptions,
+): Promise<QuerySession> {
+  return connect(grid, options, await loadQueryEngine(options));
 }

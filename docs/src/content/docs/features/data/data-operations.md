@@ -219,6 +219,59 @@ The host owns source fetching and credentials. These entry points accept bytes
 or typed batches; they never fetch a URL. See the
 [query package reference](/docs/api/queries/) for the full interface.
 
+## Saved queries and refresh
+
+A workbook can save queries in `workbook.queries`. Each saved query has a source,
+its steps, and an optional output table. `createQuerySession` is the only call
+that loads the query engine. It binds the saved queries of one grid to the
+host's `fetchSource` callback.
+
+```ts compile title="Refresh saved queries through host fetch"
+import type { Grid } from "@sheetwrite/core";
+import { createQuerySession } from "@sheetwrite/queries";
+
+async function refreshSales(grid: Grid) {
+  const session = await createQuerySession(grid, {
+    // The host applies its own credentials and network policy here.
+    fetchSource: async (request, { signal }) => {
+      const response = await fetch(`/sources/${request.sourceId}`, { signal });
+      return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+    },
+  });
+
+  session.define({
+    id: "sales",
+    name: "Sales",
+    source: {
+      kind: "csv",
+      sourceId: "sales-feed",
+      columns: [
+        { id: "region", name: "Region", type: "text" },
+        { id: "total", name: "Total", type: "number" },
+      ],
+    },
+    steps: [{ kind: "filter", predicate: { kind: "compare", column: "total", op: "gt", value: 0 } }],
+    output: { table: "sales", tableName: "Sales", anchor: { sheet: "sheet1", row: 0, col: 0 } },
+  });
+
+  return session.refresh("sales");
+}
+```
+
+- `define` runs the plan on zero-row inputs in the engine before it saves, so a
+  missing column or a wrong type is reported as `invalid` and nothing is saved.
+- `refresh` loads the query and every query it joins, then writes the output
+  table in one undoable transaction. `refreshAll` writes every output table in
+  one transaction, or none if any query fails.
+- The output table holds the saved values. Formulas and pivots read it as an
+  ordinary table. Undo and redo restore the recorded values without another
+  fetch. Synced peers receive the written values and never fetch.
+- A refresh is `stale` if a definition or its output table changes while the
+  sources load. Growth into non-empty cells, or into another table, is
+  `blocked`. In both cases nothing is written.
+- Saved locators are public. A locator with a user name or password is
+  rejected, and credentials stay in the host's callback.
+
 ## See also
 
 - [Interaction](/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.

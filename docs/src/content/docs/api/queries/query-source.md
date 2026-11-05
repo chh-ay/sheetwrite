@@ -8,7 +8,7 @@ description: "QuerySource type in @sheetwrite/queries: Host-owned UTF-8 bytes ar
 Host-owned UTF-8 bytes are parsed against an explicit schema, without type guessing.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L30"><code>packages/queries/src/types.ts#L30</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L32"><code>packages/queries/src/types.ts#L32</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

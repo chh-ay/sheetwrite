@@ -471,6 +471,11 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       // A relationship is a link between tables; it writes no cell.
       return;
 
+    case "setQuery":
+    case "removeQuery":
+      // A definition writes no cell; a refresh writes cells through ordinary range ops.
+      return;
+
     default: {
       const unhandled: never = patch;
       return unhandled;

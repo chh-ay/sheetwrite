@@ -323,6 +323,8 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setCalculation":
     case "setRelationship":
     case "removeRelationship":
+    case "setQuery":
+    case "removeQuery":
       return null;
     case "addSheet":
       return patch.sheet.id;

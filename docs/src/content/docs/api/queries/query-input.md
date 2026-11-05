@@ -8,7 +8,7 @@ description: "QueryInput interface in @sheetwrite/queries: One execution-local n
 One execution-local named input, consumed by join steps without a result cache.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L150"><code>packages/queries/src/types.ts#L150</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/queries/src/types.ts#L91"><code>packages/queries/src/types.ts#L91</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

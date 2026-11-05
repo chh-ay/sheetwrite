@@ -4540,6 +4540,59 @@ The host owns source fetching and credentials. These entry points accept bytes
 or typed batches; they never fetch a URL. See the
 [query package reference](https://www.sheetwrite.dev/docs/api/queries/) for the full interface.
 
+## Saved queries and refresh
+
+A workbook can save queries in `workbook.queries`. Each saved query has a source,
+its steps, and an optional output table. `createQuerySession` is the only call
+that loads the query engine. It binds the saved queries of one grid to the
+host's `fetchSource` callback.
+
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { createQuerySession } from "@sheetwrite/queries";
+
+async function refreshSales(grid: Grid) {
+  const session = await createQuerySession(grid, {
+    // The host applies its own credentials and network policy here.
+    fetchSource: async (request, { signal }) => {
+      const response = await fetch(`/sources/${request.sourceId}`, { signal });
+      return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+    },
+  });
+
+  session.define({
+    id: "sales",
+    name: "Sales",
+    source: {
+      kind: "csv",
+      sourceId: "sales-feed",
+      columns: [
+        { id: "region", name: "Region", type: "text" },
+        { id: "total", name: "Total", type: "number" },
+      ],
+    },
+    steps: [{ kind: "filter", predicate: { kind: "compare", column: "total", op: "gt", value: 0 } }],
+    output: { table: "sales", tableName: "Sales", anchor: { sheet: "sheet1", row: 0, col: 0 } },
+  });
+
+  return session.refresh("sales");
+}
+```
+
+- `define` runs the plan on zero-row inputs in the engine before it saves, so a
+missing column or a wrong type is reported as `invalid` and nothing is saved.
+- `refresh` loads the query and every query it joins, then writes the output
+table in one undoable transaction. `refreshAll` writes every output table in
+one transaction, or none if any query fails.
+- The output table holds the saved values. Formulas and pivots read it as an
+ordinary table. Undo and redo restore the recorded values without another
+fetch. Synced peers receive the written values and never fetch.
+- A refresh is `stale` if a definition or its output table changes while the
+sources load. Growth into non-empty cells, or into another table, is
+`blocked`. In both cases nothing is written.
+- Saved locators are public. A locator with a user name or password is
+rejected, and credentials stay in the host's callback.
+
 ## See also
 
 - [Interaction](https://www.sheetwrite.dev/docs/features/grid/selection-and-keyboard/) for clipboard TSV and the toolbar sort control.
@@ -4965,11 +5018,13 @@ Open an archive with a stable `documentId` and storage adapter. Call `initialize
 once with a fully loaded, committed `WorkbookSnapshot` and its creation time.
 On restart, `HistoryArchive.open` reads only the durable recorder cursor.
 
-Pass each **committed**, ordered transaction to `record`. A `HistoryCommit` carries
+Pass each **committed**, ordered transaction to `record`. A `CommittedTransaction` carries
 `baseRevision`, `revision`, `mutationId`, `authorId`, `time`, and `operations`.
 Do not record optimistic grid change events. The document authority must confirm
-the revision and author first. A local persistence adapter can be the authority
-for a standalone workbook. This module does not replace `SyncCoordinator` or the
+the revision and author first. `HistoryArchive` implements `CommitJournal`, so the
+reference `MemoryPersistenceAdapter.recordHistory` can record each commit as part of
+it; see [Authors and version history](https://www.sheetwrite.dev/docs/features/collaboration/#authors-and-version-history)
+for the server contract. This module does not replace `SyncCoordinator` or the
 durable pending queue.
 
 The second argument to `record` is a snapshot provider. It runs only when a
@@ -7285,6 +7340,31 @@ window.addEventListener("offline", () => sync.setOnline(false));
 ```
 
 IndexedDB record migration is versioned. Unsupported future schemas, blocked upgrades, quota exhaustion, transaction failures, and aborts surface as typed `IndexedDbPendingCommitStorageError` codes. Core continues to work without IndexedDB when no durable adapter is supplied.
+
+## Authors and version history
+
+Set `authorId` in `SyncCoordinatorOptions` to the authenticated ID of the person who edits through the grid. Each new pending commit carries it in `PendingCommit.authorId`, and `IndexedDbPendingCommitStorage` stores it, so a commit restored after a reload keeps the author it was made with. The server must confirm or replace the ID from its own authentication; it must never trust it alone.
+
+A server that records history writes each committed transaction, with its author and commit time, to the history journal in the same database transaction as the operation log, or to a durable transactional outbox in that transaction. Acknowledge the commit only after that write. A journal written from a client event can miss a committed version, so it is not a durable record.
+
+When the server publishes a version, set `VersionedOperation.authorId` and `committedAt`. `SyncCoordinator` validates both, keeps them on `remote-applied` events, and rejects an atomic batch whose members name different authors.
+
+`MemoryPersistenceAdapter.recordHistory(documentId, journal)` is the reference for this contract. It calls the journal as the last step of each commit; when the journal rejects, the commit is not applied, published or acknowledged, and the client keeps it pending. `HistoryArchive` from `@sheetwrite/core/history` implements `CommitJournal`:
+
+```ts
+import { MemoryPersistenceAdapter } from "@sheetwrite/core";
+import { HistoryArchive, MemoryHistoryStorage } from "@sheetwrite/core/history";
+
+const authority = new MemoryPersistenceAdapter(snapshot);
+const archive = await HistoryArchive.open({
+  documentId: "workbook-42",
+  storage: new MemoryHistoryStorage(),
+});
+await archive.initialize(snapshot, Date.now());
+authority.recordHistory("workbook-42", archive);
+```
+
+While a journal is attached, a commit without `authorId` is rejected with `commit-rejected`.
 
 ## Remote operations and version gaps
 
@@ -11872,6 +11952,18 @@ export interface CommentThread { id: string; documentId: string; anchor: Comment
 
 Versioned discussion anchored to a document location.
 
+##### `CommitJournal` — interface
+
+```ts
+export interface CommitJournal { record(commit: CommittedTransaction, capture: () => WorkbookSnapshot): Promise<void>; }
+```
+
+Durable record of committed transactions, written as part of the commit:
+when `record` rejects, the authority does not publish or acknowledge the
+commit. `capture` returns the committed document after the transaction and
+is called only when the journal needs a checkpoint. `HistoryArchive` from
+`@sheetwrite/core/history` implements this interface.
+
 ##### `CommitReason` — type
 
 ```ts
@@ -11881,6 +11973,23 @@ export type CommitReason = | "edit-blur" | "edit-enter" | "edit-tab" | "edit-pro
 The gesture/operation that produced a committed transaction. Consumers
 switching on reasons MUST keep a default branch — the union grows with new
 mutation features.
+
+##### `CommittedTransaction` — interface
+
+```ts
+export interface CommittedTransaction { baseRevision: number; revision: number; mutationId: string; authorId: string; time: number; operations: readonly DocumentOp[]; }
+```
+
+One transaction as the document authority committed it: its revisions, its
+author and its time. History archives record these, never optimistic edits.
+
+Members:
+- `authorId` — Authenticated ID of the person who made the change, at most 256 code units.
+- `baseRevision` — Revision the transaction applies to.
+- `mutationId` — Stable mutation ID of the commit, at most 256 code units.
+- `operations` — The committed document operations, in order.
+- `revision` — Revision after the transaction; an atomic batch advances up to 16 revisions.
+- `time` — Commit time in milliseconds since the epoch; never before the previous commit.
 
 ##### `ConditionalFormatPredicate` — type
 
@@ -12354,7 +12463,7 @@ Diff two validated phases of the same operation by exclusive resource owner.
 ##### `DocumentOp` — type
 
 ```ts
-export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
+export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "permuteRows"; range: Range; encoding: "u32le-base64-v1"; order: string } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setRelationship"; relationship: TableRelationship } | { op: "removeRelationship"; id: string } | { op: "setQuery"; query: SavedQuery } | { op: "removeQuery"; id: string } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string } | { op: "setPivot"; sheet: SheetId; pivot: PivotDefinition } | { op: "removePivot"; sheet: SheetId; id: string };
 ```
 
 Exhaustive serializable operation union for workbook mutations.
@@ -13270,7 +13379,7 @@ Largest iteration count Excel accepts.
 ##### `MemoryPersistenceAdapter` — class
 
 ```ts
-class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }
+class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; recordHistory: (documentId: string, journal: CommitJournal) => void }
 ```
 
 Executable database-neutral reference adapter for tests, demos, and local workflows.
@@ -13279,6 +13388,12 @@ Members:
 - `commitBatch` — Validate every member version against the default sync limits, apply the
 members in order to one scratch store, and publish all of them only when
 every member applied.
+- `recordHistory` — Record every later commit of `documentId` in `journal`, as part of the
+commit: if the journal rejects, the commit is not applied, published or
+acknowledged, and the client keeps it pending. While a journal is
+attached, a commit without `authorId` is rejected. The journal must
+already describe the current version, for example a `HistoryArchive`
+initialized with the loaded snapshot.
 
 ##### `MergeRange` — interface
 
@@ -13452,12 +13567,15 @@ to a text literal.
 ##### `PendingCommit` — interface
 
 ```ts
-export interface PendingCommit { documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }
+export interface PendingCommit { documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; readonly authorId?: string; }
 ```
 
 Immutable local operation batch awaiting a host acknowledgement.
 
 Members:
+- `authorId` — Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.
 - `versionOperationCounts` — Present only when the operations are too large for one server version.
 Each entry is the operation count of one consecutive version of an atomic
 batch, in order; the counts add up to `operations.length`. A server
@@ -13520,12 +13638,15 @@ than one version when the adapter does not implement this method.
 ##### `PersistenceBatchCommitRequest` — interface
 
 ```ts
-export interface PersistenceBatchCommitRequest { readonly versionOperationCounts: readonly number[]; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; signal?: AbortSignal; }
+export interface PersistenceBatchCommitRequest { readonly versionOperationCounts: readonly number[]; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly authorId?: string; signal?: AbortSignal; }
 ```
 
 Cancellable commit of one atomic batch that spans several server versions.
 
 Members:
+- `authorId` — Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.
 - `versionOperationCounts` — Present only when the operations are too large for one server version.
 Each entry is the operation count of one consecutive version of an atomic
 batch, in order; the counts add up to `operations.length`. A server
@@ -13534,12 +13655,15 @@ applies and publishes all of these versions, or none of them.
 ##### `PersistenceCommitRequest` — interface
 
 ```ts
-export interface PersistenceCommitRequest { signal?: AbortSignal; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }
+export interface PersistenceCommitRequest { signal?: AbortSignal; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; readonly authorId?: string; }
 ```
 
 Cancellable pending commit submitted to a persistence adapter.
 
 Members:
+- `authorId` — Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.
 - `versionOperationCounts` — Present only when the operations are too large for one server version.
 Each entry is the operation count of one consecutive version of an atomic
 batch, in order; the counts add up to `operations.length`. A server
@@ -13809,6 +13933,14 @@ export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny
 
 Host-owned client UX permission callback for protected mutations.
 
+##### `QueryAggregate` — interface
+
+```ts
+export interface QueryAggregate { readonly id: string; readonly name: string; readonly op: "countRows" | "count" | "sum" | "average" | "min" | "max"; readonly column?: string; }
+```
+
+Column is required except for countRows; numeric aggregates ignore nulls.
+
 ##### `QueryCapability` — type
 
 ```ts
@@ -13816,6 +13948,47 @@ export type QueryCapability = | { status: "complete" } | { status: "incomplete";
 ```
 
 Whether a query is complete for the currently loaded datasource pages.
+
+##### `QueryColumnSpec` — interface
+
+```ts
+export interface QueryColumnSpec { readonly id: string; readonly name: string; readonly type: QueryColumnType; }
+```
+
+Stable identity is separate from the field name used by source records.
+
+##### `QueryColumnType` — type
+
+```ts
+export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime" | "mixed";
+```
+
+Physical column types; mixed columns use compact typed payload lanes.
+
+##### `QueryJoinKind` — type
+
+```ts
+export type QueryJoinKind = | "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
+```
+
+Join kinds retain duplicate matches and match null keys to null keys.
+
+##### `QueryPredicate` — type
+
+```ts
+export type QueryPredicate = | { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string } | { readonly kind: "contains"; readonly column: string; readonly text: string } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: "not"; readonly predicate: QueryPredicate };
+```
+
+Data-only predicate trees use M null logic; only logical true selects a row.
+
+##### `QueryStep` — type
+
+```ts
+export type QueryStep = | { readonly kind: "filter"; readonly predicate: QueryPredicate } | { readonly kind: "select"; readonly columns: readonly string[] } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };
+```
+
+Saved step order is execution order; each column reference is a stable identity.
+In a saved query, a join `input` is the ID of another saved query.
 
 ##### `Range` — interface
 
@@ -14189,7 +14362,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -14370,6 +14543,44 @@ Sanitize one untrusted clipboard/snapshot value without cloning its object graph
 ```
 
 Convert an untrusted style into one bounded, plain renderer-safe value.
+
+##### `SavedQuery` — interface
+
+```ts
+export interface SavedQuery { readonly id: string; readonly name: string; readonly source: SavedQuerySource; readonly steps: readonly QueryStep[]; readonly output?: SavedQueryOutput; }
+```
+
+One saved, refreshable query. Definitions never contain host credentials.
+
+Members:
+- `id` — Stable identity, unique in the workbook.
+- `name` — Display name, unique in the workbook when ASCII letter case is ignored.
+- `output` — Absent for a query that only feeds other queries.
+
+##### `SavedQueryOutput` — interface
+
+```ts
+export interface SavedQueryOutput { readonly table: WorkbookTableId; readonly tableName: string; readonly anchor: CellAddress; }
+```
+
+The workbook table that holds a query's last refreshed values. Its top-left
+cell is `anchor`; the first row is the header row. The table cells are the
+saved result, so a workbook without the query engine still reads them.
+
+Members:
+- `table` — Stable `WorkbookTable.id`; refresh creates the table if it is absent.
+- `tableName` — Structured-reference name used when refresh creates the table.
+
+##### `SavedQuerySource` — type
+
+```ts
+export type SavedQuerySource = | { readonly kind: "csv"; readonly sourceId: string; readonly locator?: string; readonly columns: readonly QueryColumnSpec[]; readonly delimiter?: number; readonly headers?: boolean; readonly emptyIsNull?: boolean; } | { readonly kind: "json"; readonly sourceId: string; readonly locator?: string; readonly columns: readonly QueryColumnSpec[]; readonly path?: readonly string[]; } | { readonly kind: "host"; readonly sourceId: string; readonly columns: readonly QueryColumnSpec[]; };
+```
+
+Where a saved query reads its data. The host's fetch callback resolves
+`sourceId` to bytes or batches and applies any credentials itself. A
+`locator` is a public, credential-free address such as an `https` URL;
+it never holds tokens, signed parameters or passwords.
 
 ##### `SearchOptions` — interface
 
@@ -15077,12 +15288,16 @@ reload-requiring protocol violation and its operations are never reapplied.
 ##### `SyncCoordinatorOptions` — interface
 
 ```ts
-export interface SyncCoordinatorOptions { documentId: string; serverVersion: number; createMutationId?: () => string; pendingStorage?: PendingCommitStorage; initialConnection?: "offline" | "online"; recoverVersionGap?: ( request: SyncVersionGapRequest, ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>; limits?: Partial<SyncCoordinatorLimits>; }
+export interface SyncCoordinatorOptions { documentId: string; serverVersion: number; createMutationId?: () => string; pendingStorage?: PendingCommitStorage; initialConnection?: "offline" | "online"; authorId?: string; recoverVersionGap?: ( request: SyncVersionGapRequest, ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>; limits?: Partial<SyncCoordinatorLimits>; }
 ```
 
 Document, version, durability, and online options for synchronization.
 
 Members:
+- `authorId` — Authenticated ID of the person editing through this grid. Each new pending
+commit carries it to the authority, which records it in history. Restored
+commits keep the author they were made with. At most `maxMutationIdBytes`
+UTF-8 bytes.
 - `limits` — Positive safe-integer overrides merged over `DEFAULT_SYNC_COORDINATOR_LIMITS`.
 - `recoverVersionGap` — Optional host recovery hook. Return the missing ordered operations, or a
 snapshot for the host to remount before calling `resumeAfterReload`.
@@ -15090,12 +15305,15 @@ snapshot for the host to remount before calling `resumeAfterReload`.
 ##### `SyncMutationRecord` — interface
 
 ```ts
-export interface SyncMutationRecord { status: SyncMutationStatus; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }
+export interface SyncMutationRecord { status: SyncMutationStatus; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; readonly authorId?: string; }
 ```
 
 Pending commit paired with its current synchronization status.
 
 Members:
+- `authorId` — Authenticated ID of the person who made the change, from
+`SyncCoordinatorOptions.authorId`. The authority confirms or replaces it
+before it records history. At most `maxMutationIdBytes` UTF-8 bytes.
 - `versionOperationCounts` — Present only when the operations are too large for one server version.
 Each entry is the operation count of one consecutive version of an atomic
 batch, in order; the counts add up to `operations.length`. A server
@@ -15515,15 +15733,17 @@ Comment mutation paired with its assigned server version.
 ##### `VersionedOperation` — interface
 
 ```ts
-export interface VersionedOperation { version: number; readonly operations: readonly DocumentOp[]; clientMutationId?: string; batch?: VersionBatchMember; }
+export interface VersionedOperation { version: number; readonly operations: readonly DocumentOp[]; clientMutationId?: string; batch?: VersionBatchMember; authorId?: string; committedAt?: number; }
 ```
 
 Remote document operations paired with a contiguous server version.
 
 Members:
+- `authorId` — Author the authority recorded for this version; every batch member carries the same one.
 - `batch` — Present when this version is one member of an atomic batch. Every member
 carries the same `clientMutationId` and `count`. Receivers apply the batch
 only after its last member arrives.
+- `committedAt` — Authority commit time, in milliseconds since the epoch.
 
 ##### `VisibleWindowView` — interface
 
@@ -15578,7 +15798,7 @@ One retained-memory owner reported by the WASM cell store.
 ##### `Workbook` — interface
 
 ```ts
-export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; }
+export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; queries?: SavedQuery[]; }
 ```
 
 Live workbook schema containing ordered sheets and the active sheet ID.
@@ -15588,6 +15808,7 @@ Members:
 - `calculation` — Iterative calculation options; absent means the defaults.
 - `dataModel` — Relationships between workbook tables; absent means none.
 - `namedRanges` — Formula names shared by the workbook or shadowed within a sheet scope.
+- `queries` — Saved refreshable queries; absent means none.
 - `sheets` — Sheets in display/tab order.
 - `xlsxSource` — Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them.
 
@@ -15602,7 +15823,7 @@ Current workbook snapshot schema version accepted by Sheetwrite.
 ##### `WorkbookSnapshot` — interface
 
 ```ts
-export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; }; sheets: SheetSnapshot[]; }
+export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; calculation?: CalculationSettings; dataModel?: DataModel; queries?: SavedQuery[]; }; sheets: SheetSnapshot[]; }
 ```
 
 Schema-versioned serializable workbook document.
@@ -16238,7 +16459,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "relationship" | "query" | "chart" | "pivot"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -16746,7 +16967,7 @@ Default byte, count, cadence, and retention bounds (decision recorded in #228).
 ##### `HistoryArchive` — class
 
 ```ts
-class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: HistoryCommit, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }
+class HistoryArchive { constructor(options: HistoryArchiveOptions, limits: Readonly<HistoryLimits>, manifest: HistoryManifest); deleteVersion: (id: string, signal?: AbortSignal) => Promise<void>; initialize: (snapshot: WorkbookSnapshot, time: number, signal?: AbortSignal) => Promise<void>; listVersions: (options?: ListVersionsOptions) => Promise<HistoryListPage>; prune: (options?: PruneOptions) => Promise<void>; readVersion: (id: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>; record: (commit: CommittedTransaction, capture?: HistorySnapshotProvider, signal?: AbortSignal) => Promise<void>; saveVersion: (name: string, authorId: string, time: number, signal?: AbortSignal) => Promise<HistoryVersion>; storageUsage: (signal?: AbortSignal) => Promise<HistoryStorageUsage>; static open: (options: HistoryArchiveOptions, signal?: AbortSignal) => Promise<HistoryArchive> }
 ```
 
 Opt-in archive of named and automatic versions for one document. It stores
@@ -16780,22 +17001,6 @@ export interface HistoryArchiveOptions { documentId: string; storage: HistorySto
 ```
 
 Host-controlled archive configuration. No history is created until explicitly opened.
-
-##### `HistoryCommit` — interface
-
-```ts
-export interface HistoryCommit { baseRevision: number; revision: number; mutationId: string; authorId: string; time: number; operations: readonly DocumentOp[]; }
-```
-
-One committed transaction, confirmed by the document authority; never an optimistic local edit.
-
-Members:
-- `authorId` — Authenticated ID of the person who made the change, at most 256 code units.
-- `baseRevision` — Revision the transaction applies to; equals the archive head.
-- `mutationId` — Stable mutation ID from the commit, at most 256 code units.
-- `operations` — The committed document operations, in order.
-- `revision` — Revision after the transaction; an atomic batch can advance up to 16 revisions.
-- `time` — Commit time in milliseconds since the epoch; never before the previous commit.
 
 ##### `HistoryError` — class
 
@@ -17813,6 +18018,32 @@ Declaration target: `./dist/index.d.ts`
 Source entry: `src/index.ts`
 Page: https://www.sheetwrite.dev/docs/api/queries/
 
+##### `createQuerySession` — function
+
+```ts
+(grid: Grid, options: QuerySessionOptions & QueryEngineOptions): Promise<QuerySession>
+```
+
+The one registration call for workbook queries: loads the engine and binds
+saved queries of `grid` to the host's `fetchSource`. Workbooks that never
+call it load no query code or WASM.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { createQuerySession } from "@sheetwrite/queries";
+
+async function refreshSales(grid: Grid) {
+ const session = await createQuerySession(grid, {
+ fetchSource: async (request, { signal }) => {
+ const response = await fetch(`/sources/${request.sourceId}`, { signal });
+ return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+ },
+ });
+
+ return session.refreshAll();
+}
+```
+
 ##### `loadQueryEngine` — function
 
 ```ts
@@ -17877,6 +18108,14 @@ export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime
 
 Physical column types; mixed columns use compact typed payload lanes.
 
+##### `QueryDefinitionResult` — type
+
+```ts
+export type QueryDefinitionResult = | { readonly status: "invalid"; readonly diagnostic: QueryDiagnostic } | ApplyTransactionResult;
+```
+
+A definition the engine rejects, or the store's transaction result.
+
 ##### `QueryDiagnostic` — interface
 
 ```ts
@@ -17919,6 +18158,42 @@ Fatal source or plan failure; cell-level errors stay in the returned column lane
 Members:
 - `new` — Diagnostic codes remain stable even when their human-readable context changes.
 
+##### `QueryFetchContext` — interface
+
+```ts
+export interface QueryFetchContext { readonly signal: AbortSignal; }
+```
+
+The signal aborts when the refresh is cancelled or the session is disposed.
+
+##### `QueryFetchRequest` — interface
+
+```ts
+export interface QueryFetchRequest { readonly queryId: string; readonly sourceId: string; readonly kind: SavedQuerySource["kind"]; readonly locator?: string; }
+```
+
+What the host must load for one saved query. It never carries credentials.
+
+Members:
+- `locator` — Public, credential-free locator from the saved definition, if any.
+- `sourceId` — Host-defined source identity; the host maps it to its own credentials and policy.
+
+##### `QueryFetchResult` — type
+
+```ts
+export type QueryFetchResult = | { readonly kind: "bytes"; readonly bytes: Uint8Array } | { readonly kind: "batch"; readonly batch: QueryBatch };
+```
+
+CSV and JSON sources return bytes; host sources return typed batches.
+
+##### `QueryFetchSource` — type
+
+```ts
+export type QueryFetchSource = ( request: QueryFetchRequest, context: QueryFetchContext, ) => Promise<QueryFetchResult>;
+```
+
+The only path to source data; the session never calls a global `fetch`.
+
 ##### `QueryInput` — interface
 
 ```ts
@@ -17930,7 +18205,7 @@ One execution-local named input, consumed by join steps without a result cache.
 ##### `QueryJoinKind` — type
 
 ```ts
-export type QueryJoinKind = | "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
+export type QueryJoinKind = "inner" | "left" | "right" | "full" | "leftSemi" | "rightSemi" | "leftAnti" | "rightAnti";
 ```
 
 Join kinds retain duplicate matches and match null keys to null keys.
@@ -17958,13 +18233,60 @@ Members:
 - `indexes` — Index in the typed lane selected by the row's tag.
 - `tags` — 0 = null, 1 = number, 2 = logical, 3 = text, 4 = date, 5 = dateTime, 6 = error.
 
+##### `QueryOutputBlock` — type
+
+```ts
+export type QueryOutputBlock = "missing-sheet" | "too-wide" | "occupied";
+```
+
+Why an output table could not be written without touching unrelated cells.
+
 ##### `QueryPredicate` — type
 
 ```ts
-export type QueryPredicate = | { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string } | { readonly kind: "contains"; readonly column: string; readonly text: string } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[] } | { readonly kind: "not"; readonly predicate: QueryPredicate };
+export type QueryPredicate = { readonly kind: "compare"; readonly column: string; readonly op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte"; readonly value: string | number | boolean | null; } | { readonly kind: "isNull"; readonly column: string; } | { readonly kind: "contains"; readonly column: string; readonly text: string; } | { readonly kind: "and" | "or"; readonly predicates: readonly QueryPredicate[]; } | { readonly kind: "not"; readonly predicate: QueryPredicate; };
 ```
 
 Data-only predicate trees use M null logic; only logical true selects a row.
+
+##### `QueryRefreshOptions` — interface
+
+```ts
+export interface QueryRefreshOptions { readonly signal?: AbortSignal; }
+```
+
+The signal cancels a pending refresh before it writes anything.
+
+##### `QueryRefreshResult` — type
+
+```ts
+export type QueryRefreshResult = | { readonly status: "applied"; readonly transaction: ApplyTransactionResult } | { readonly status: "failed"; readonly queryId: string; readonly diagnostic: QueryDiagnostic } | { readonly status: "blocked"; readonly queryId: string; readonly reason: QueryOutputBlock } | { readonly status: "missing"; readonly queryId: string } | { readonly status: "stale" } | { readonly status: "aborted" } | { readonly status: "rejected"; readonly transaction: ApplyTransactionResult };
+```
+
+One refresh commits every requested output in one transaction, or none.
+
+##### `QuerySession` — interface
+
+```ts
+export interface QuerySession { define(query: SavedQuery): QueryDefinitionResult; remove(id: string): ApplyTransactionResult; refresh(id: string, options?: QueryRefreshOptions): Promise<QueryRefreshResult>; refreshAll(options?: QueryRefreshOptions): Promise<QueryRefreshResult>; dispose(): void; }
+```
+
+Defines, removes and refreshes the saved queries of one grid.
+
+Members:
+- `define` — Checks the plan in the engine, then saves it as one undoable change.
+- `dispose` — Aborts pending refreshes; later calls are rejected.
+- `refresh` — Refreshes one query and the queries it joins, as one undoable change.
+- `refreshAll` — Refreshes every query with an output table, as one undoable change.
+- `remove` — Removes a saved query; its output table and values stay.
+
+##### `QuerySessionOptions` — interface
+
+```ts
+export interface QuerySessionOptions { readonly fetchSource: QueryFetchSource; readonly limits?: Partial<QueryLimits>; }
+```
+
+Host I/O for a session; the engine limits apply to every parse and execution.
 
 ##### `QuerySource` — type
 
@@ -17977,10 +18299,11 @@ Host-owned UTF-8 bytes are parsed against an explicit schema, without type guess
 ##### `QueryStep` — type
 
 ```ts
-export type QueryStep = | { readonly kind: "filter"; readonly predicate: QueryPredicate } | { readonly kind: "select"; readonly columns: readonly string[] } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[] } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string }; readonly value: { readonly id: string; readonly name: string }; };
+export type QueryStep = { readonly kind: "filter"; readonly predicate: QueryPredicate; } | { readonly kind: "select"; readonly columns: readonly string[]; } | { readonly kind: "rename"; readonly columns: readonly (readonly [id: string, name: string])[]; } | { readonly kind: "changeType"; readonly column: string; readonly type: QueryColumnType; readonly onError: "error" | "null"; } | { readonly kind: "join"; readonly input: string; readonly keys: readonly (readonly [left: string, right: string])[]; readonly join: QueryJoinKind; } | { readonly kind: "group"; readonly keys: readonly string[]; readonly aggregates: readonly QueryAggregate[]; } | { readonly kind: "unpivot"; readonly columns: readonly string[]; readonly attribute: { readonly id: string; readonly name: string; }; readonly value: { readonly id: string; readonly name: string; }; };
 ```
 
 Saved step order is execution order; each column reference is a stable identity.
+In a saved query, a join `input` is the ID of another saved query.
 
 #### `@sheetwrite/queries/wasm` — asset
 

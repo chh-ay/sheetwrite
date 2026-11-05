@@ -87,11 +87,13 @@ Open an archive with a stable `documentId` and storage adapter. Call `initialize
 once with a fully loaded, committed `WorkbookSnapshot` and its creation time.
 On restart, `HistoryArchive.open` reads only the durable recorder cursor.
 
-Pass each **committed**, ordered transaction to `record`. A `HistoryCommit` carries
+Pass each **committed**, ordered transaction to `record`. A `CommittedTransaction` carries
 `baseRevision`, `revision`, `mutationId`, `authorId`, `time`, and `operations`.
 Do not record optimistic grid change events. The document authority must confirm
-the revision and author first. A local persistence adapter can be the authority
-for a standalone workbook. This module does not replace `SyncCoordinator` or the
+the revision and author first. `HistoryArchive` implements `CommitJournal`, so the
+reference `MemoryPersistenceAdapter.recordHistory` can record each commit as part of
+it; see [Authors and version history](/docs/features/collaboration/#authors-and-version-history)
+for the server contract. This module does not replace `SyncCoordinator` or the
 durable pending queue.
 
 The second argument to `record` is a snapshot provider. It runs only when a
