@@ -1,5 +1,6 @@
 import { boundedJsonByteLength } from "./errors.js";
 import { decodeRestoreBlockPayload } from "./restore-block-codec.js";
+import { normalizedRange } from "./store/ranges.js";
 import type { Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
@@ -88,17 +89,7 @@ function prepare(
   return {
     stamp: revision,
     block,
-    range: {
-      sheet: operation.range.sheet,
-      start: {
-        row: Math.min(operation.range.start.row, operation.range.end.row),
-        col: Math.min(operation.range.start.col, operation.range.end.col),
-      },
-      end: {
-        row: Math.max(operation.range.start.row, operation.range.end.row),
-        col: Math.max(operation.range.start.col, operation.range.end.col),
-      },
-    },
+    range: normalizedRange(operation.range),
     requiredSheets: [],
     containsFormula: false,
     containsReference: false,

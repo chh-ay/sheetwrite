@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 
+import { MAX_ATOMIC_BATCH_VERSIONS } from "../src/atomic-batch.js";
 import {
   createGridFromSnapshot,
   initSheetwrite,
@@ -449,6 +450,14 @@ describe("durable offline sync", () => {
       sparseCounts[2] = 1;
       await expect(
         reopenedStorage.put({ ...pending, versionOperationCounts: sparseCounts }),
+      ).rejects.toMatchObject({ code: "transaction" });
+      const tooManyVersions = MAX_ATOMIC_BATCH_VERSIONS + 1;
+      await expect(
+        reopenedStorage.put({
+          ...pending,
+          operations: Array.from({ length: tooManyVersions }, () => setValue(9)),
+          versionOperationCounts: Array.from({ length: tooManyVersions }, () => 1),
+        }),
       ).rejects.toMatchObject({ code: "transaction" });
       expect(await reopenedStorage.load("offline-doc", loadOptions)).toEqual([]);
     } finally {

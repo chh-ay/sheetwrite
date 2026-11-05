@@ -1,5 +1,6 @@
+import { validVersionOperationCounts } from "./atomic-batch.js";
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
-import { compareCodeUnits } from "./plain-data.js";
+import { cloneJsonValue, compareCodeUnits } from "./plain-data.js";
 import type { PendingCommitLoadOptions, PendingCommitStorage } from "./sync.js";
 import type { PendingCommit } from "./types/transaction.js";
 
@@ -60,30 +61,12 @@ function storedOptionalFields(
 
 function assertVersionOperationCounts(commit: PendingCommit): void {
   const counts = commit.versionOperationCounts;
-  if (counts === undefined) return;
-  let total = 0;
-  let valid = Array.isArray(counts) && counts.length >= 2;
-  if (valid) {
-    for (let index = 0; index < counts.length; index++) {
-      const count = counts[index];
-      if (
-        !Object.hasOwn(counts, index) ||
-        count === undefined ||
-        !Number.isSafeInteger(count) ||
-        count <= 0
-      ) {
-        valid = false;
-        break;
-      }
-      total += count;
-    }
-  }
-  if (!valid || total !== commit.operations.length) {
-    throw new IndexedDbPendingCommitStorageError(
-      "transaction",
-      "Pending queue record has invalid atomic batch version operation counts",
-    );
-  }
+  if (counts === undefined || validVersionOperationCounts(counts, commit.operations.length)) return;
+
+  throw new IndexedDbPendingCommitStorageError(
+    "transaction",
+    "Pending queue record has invalid atomic batch version operation counts",
+  );
 }
 
 interface QueueMeta {
@@ -697,8 +680,4 @@ function storageError(error: unknown, message: string): IndexedDbPendingCommitSt
   const code: IndexedDbPendingCommitStorageErrorCode =
     name === "QuotaExceededError" ? "quota" : name === "AbortError" ? "aborted" : "transaction";
   return new IndexedDbPendingCommitStorageError(code, message, { cause: error });
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }

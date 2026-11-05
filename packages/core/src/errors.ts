@@ -1,3 +1,6 @@
+import { measureJson, type JsonMeasureOptions } from "./json-bytes.js";
+import { utf8ByteLength } from "./utf8.js";
+
 /**
  * Stable discriminator for every consumer-visible Sheetwrite failure. Messages
  * are diagnostic and are not API contracts. Each `SheetwriteError` subclass
@@ -259,23 +262,6 @@ interface ContextInspection {
   readonly active: WeakSet<object>;
   readonly clones?: WeakMap<object, MutableContextContainer>;
   readonly snapshots?: MutableContextContainer[];
-}
-
-function utf8ByteLength(text: string): number {
-  let bytes = 0;
-  for (let index = 0; index < text.length; index += 1) {
-    const unit = text.charCodeAt(index);
-    if (unit <= 0x7f) bytes += 1;
-    else if (unit <= 0x7ff) bytes += 2;
-    else if (unit >= 0xd800 && unit < LOW_SURROGATE_MIN) {
-      const next = text.charCodeAt(index + 1);
-      if (next >= LOW_SURROGATE_MIN && next <= LOW_SURROGATE_MAX) {
-        bytes += 4;
-        index += 1;
-      } else bytes += 3;
-    } else bytes += 3;
-  }
-  return bytes;
 }
 
 /**
@@ -606,188 +592,17 @@ export class JsonByteLengthError extends SheetwriteError {
   }
 }
 
-export interface JsonByteLengthOptions {
-  /** Match JSON object encoding by omitting own properties whose value is undefined. */
-  omitUndefinedProperties?: boolean;
-}
-
-/** Computes exact JSON UTF-8 bytes without constructing the encoded payload. */
+/** Exact JSON UTF-8 bytes of `value`, computed without building the encoded payload. */
 export function boundedJsonByteLength(
   value: unknown,
   limit: number,
-  options: JsonByteLengthOptions = {},
+  options: JsonMeasureOptions = {},
 ): number {
-  let bytes = 0;
-  const ancestors = new Set<object>();
-  const add = (amount: number): void => {
-    bytes += amount;
-    if (bytes > limit) {
-      throw new JsonByteLengthError(
-        "payload-limit",
-        `Encoded JSON exceeds the ${limit} byte limit`,
-        bytes,
-        limit,
-      );
-    }
-  };
+  const { bytes, issue } = measureJson(value, limit, options);
+  if (issue === undefined) return bytes;
 
-  const addString = (input: string): void => {
-    add(2);
-    let index = 0;
-    while (index < input.length) {
-      const code = input.charCodeAt(index);
-      if (code >= 0x20 && code <= 0x7f && code !== 0x22 && code !== 0x5c) {
-        // Batch plain ASCII, but stop scanning at the first overflowing byte.
-        const runLimit = Math.min(input.length, index + Math.floor(limit - bytes) + 1);
-        let runEnd = index + 1;
-        while (runEnd < runLimit) {
-          const next = input.charCodeAt(runEnd);
-          if (next < 0x20 || next > 0x7f || next === 0x22 || next === 0x5c) break;
-          runEnd += 1;
-        }
-
-        add(runEnd - index);
-        index = runEnd;
-        continue;
-      }
-
-      if (
-        code === 0x22 ||
-        code === 0x5c ||
-        code === 0x08 ||
-        code === 0x09 ||
-        code === 0x0a ||
-        code === 0x0c ||
-        code === 0x0d
-      ) {
-        add(2);
-      } else if (code < 0x20) {
-        add(6);
-      } else if (code <= 0x7ff) {
-        add(2);
-      } else if (code >= 0xd800 && code <= 0xdbff) {
-        const next = input.charCodeAt(index + 1);
-        if (next >= 0xdc00 && next <= 0xdfff) {
-          add(4);
-          index += 1;
-        } else {
-          add(6);
-        }
-      } else if (code >= 0xdc00 && code <= 0xdfff) {
-        add(6);
-      } else {
-        add(3);
-      }
-
-      index += 1;
-    }
-  };
-
-  const visit = (input: unknown): void => {
-    if (input === null) {
-      add(4);
-      return;
-    }
-
-    if (typeof input === "string") {
-      addString(input);
-      return;
-    }
-
-    if (typeof input === "boolean") {
-      add(input ? 4 : 5);
-      return;
-    }
-
-    if (typeof input === "number") {
-      if (!Number.isFinite(input)) {
-        throw new JsonByteLengthError("invalid-operations", "JSON numbers must be finite");
-      }
-
-      // JSON encodes a finite number as its ToString, so no JSON machinery is needed.
-      add(String(input).length);
-      return;
-    }
-
-    if (typeof input !== "object") {
-      throw new JsonByteLengthError("invalid-operations", "Value is not JSON-safe");
-    }
-
-    if (ancestors.has(input)) {
-      throw new JsonByteLengthError("invalid-operations", "JSON values cannot contain cycles");
-    }
-
-    ancestors.add(input);
-    if (Array.isArray(input)) {
-      if (Object.getPrototypeOf(input) !== Array.prototype) {
-        throw new JsonByteLengthError("invalid-operations", "Arrays must use Array prototype");
-      }
-
-      add(2);
-      for (let index = 0; index < input.length; index++) {
-        if (index > 0) add(1);
-        const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
-        if (!descriptor?.enumerable || !("value" in descriptor)) {
-          throw new JsonByteLengthError("invalid-operations", "Arrays cannot be sparse");
-        }
-
-        visit(descriptor.value);
-      }
-
-      for (const key in input) {
-        const index = Number(key);
-        if (
-          !Number.isSafeInteger(index) ||
-          index < 0 ||
-          String(index) !== key ||
-          index >= input.length
-        ) {
-          throw new JsonByteLengthError(
-            "invalid-operations",
-            "Arrays cannot contain named properties",
-          );
-        }
-      }
-
-      ancestors.delete(input);
-      return;
-    }
-
-    if (Object.getPrototypeOf(input) !== Object.prototype) {
-      throw new JsonByteLengthError(
-        "invalid-operations",
-        "JSON values must contain only plain objects",
-      );
-    }
-
-    const record = input as Record<string, unknown>;
-    // Any own property named toJSON is rejected, whatever its descriptor says.
-    if (Object.hasOwn(record, "toJSON")) {
-      throw new JsonByteLengthError("invalid-operations", "JSON values cannot define toJSON");
-    }
-
-    add(2);
-    let first = true;
-    for (const key in record) {
-      const descriptor = Object.getOwnPropertyDescriptor(record, key);
-      if (!descriptor?.enumerable || !("value" in descriptor)) {
-        throw new JsonByteLengthError(
-          "invalid-operations",
-          "JSON fields must be enumerable data properties",
-        );
-      }
-
-      if (descriptor.value === undefined && options.omitUndefinedProperties) continue;
-      if (!first) add(1);
-      first = false;
-      addString(key);
-      add(1);
-      visit(descriptor.value);
-    }
-
-    ancestors.delete(input);
-  };
-
-  visit(value);
-  return bytes;
+  if (issue.kind === "limit") {
+    throw new JsonByteLengthError("payload-limit", issue.message, bytes, limit);
+  }
+  throw new JsonByteLengthError("invalid-operations", issue.message);
 }

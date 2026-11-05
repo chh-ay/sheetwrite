@@ -1,4 +1,3 @@
-import { unknownSheetError } from "../errors.js";
 import { consumeSourceSnapshot } from "../reference.js";
 import type {
   BoundaryResourceAccounting,
@@ -7,8 +6,16 @@ import type {
 import { restoreBlockFacts } from "../restore-block.js";
 import { applySheetLifecycleOperation, createSheetLifecycleState } from "../sheet-lifecycle.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
-import type { DocumentOp, MutationIssue, Workbook } from "../types/document.js";
-import { integerAt, moveIndex, normalizedRange, patchSheetId } from "./ranges.js";
+import type { DocumentOp, MutationIssue } from "../types/document.js";
+import {
+  deleteRemap,
+  insertRemap,
+  integerAt,
+  moveRemap,
+  normalizedRange,
+  patchSheetId,
+} from "./ranges.js";
+import { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 export interface PagedDirtyPreflightStats {
@@ -48,8 +55,7 @@ function parseCellKey(key: string): CellAddress {
 export class PagedDirtyPreflight {
   constructor(
     private wasm: RecomputingCellStore,
-    private readonly workbook: Workbook,
-    private readonly handles: ReadonlyMap<SheetId, number>,
+    private readonly sheets: SheetRegistry,
     private readonly sheetIdsByHandle: readonly SheetId[],
     private readonly stats: PagedDirtyPreflightStats,
     private readonly boundaryAccounting: BoundaryResourceAccounting,
@@ -59,12 +65,6 @@ export class PagedDirtyPreflight {
 
   replaceEngine(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
-  }
-
-  private handleOf(sheet: SheetId): number {
-    const handle = this.handles.get(sheet);
-    if (handle === undefined) throw unknownSheetError(sheet);
-    return handle;
   }
 
   private noteRangeMutationFfi(operation: RuntimeResourceOperation | null): void {
@@ -81,8 +81,8 @@ export class PagedDirtyPreflight {
     const referenceSimulationLimit = this.referenceSimulationLimit;
     const wasmIndexLimit = 0xffff_ffff;
     const states = new Map<SheetId, PagedDirtyPreflightState>();
-    const sheetLifecycle = createSheetLifecycleState(this.workbook.sheets);
-    const referenceLifecycle = createSheetLifecycleState(this.workbook.sheets);
+    const sheetLifecycle = createSheetLifecycleState(this.sheets.workbook.sheets);
+    const referenceLifecycle = createSheetLifecycleState(this.sheets.workbook.sheets);
     const applicableRemove = patches.map((patch) => {
       const lifecycle = applySheetLifecycleOperation(referenceLifecycle, patch);
       return patch.op === "removeSheet" && lifecycle?.ok === true;
@@ -114,14 +114,18 @@ export class PagedDirtyPreflight {
       if (virtualRefs) return virtualRefs;
 
       const refs = new Map<string, CellAddress>();
-      for (const sheet of this.workbook.sheets) {
-        if (!this.handles.has(sheet.id) || sheet.rowCount === 0 || sheet.columns.length === 0) {
+      for (const sheet of this.sheets.workbook.sheets) {
+        if (
+          !this.sheets.handles.has(sheet.id) ||
+          sheet.rowCount === 0 ||
+          sheet.columns.length === 0
+        ) {
           continue;
         }
 
         this.noteRangeMutationFfi(resourceOperation);
         const snapshot = this.wasm.captureReferences(
-          this.handleOf(sheet.id),
+          this.sheets.handleOf(sheet.id),
           referenceSimulationLimit - refs.size,
         );
         if (!snapshot) {
@@ -235,17 +239,16 @@ export class PagedDirtyPreflight {
     const stateFor = (sheet: SheetId) => {
       const existing = states.get(sheet);
       if (existing) return existing;
-      if (!this.handles.has(sheet)) return undefined;
+      if (!this.sheets.handles.has(sheet)) return undefined;
 
-      const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-      if (!meta) throw unknownSheetError(sheet);
+      const meta = this.sheets.sheetMeta(sheet);
 
       const state: PagedDirtyPreflightState = {
-        handle: this.handleOf(sheet),
+        handle: this.sheets.handleOf(sheet),
         rows: meta.rowCount,
         cols: meta.columns.length,
         columnKeys: meta.columns.map((column) => column.key),
-        dirty: this.wasm.pagedStats(this.handleOf(sheet))[2] ?? 0,
+        dirty: this.wasm.pagedStats(this.sheets.handleOf(sheet))[2] ?? 0,
         additional: 0,
         existing: null,
         seen: new Set<string>(),
@@ -472,7 +475,7 @@ export class PagedDirtyPreflight {
         if (!trackVirtualRefs && virtualRefs === null) {
           this.noteRangeMutationFfi(resourceOperation);
           const sources = this.wasm.referencesTargeting(
-            this.handleOf(patch.sheet),
+            this.sheets.handleOf(patch.sheet),
             referenceSimulationLimit,
           );
           if (!sources) {
@@ -539,31 +542,26 @@ export class PagedDirtyPreflight {
         const state = stateFor(sheet);
         if (!state) continue;
         const keep = (index: number) => index;
+        const rebaseAxes = (
+          rowAt: (row: number) => number | null,
+          colAt: (col: number) => number | null,
+        ): void => {
+          rebaseState(state, rowAt, colAt);
+          rebaseVirtualRefs(sheet, rowAt, colAt);
+        };
         if (patch.op === "addRows") {
           if (patch.at > state.rows || patch.count > wasmIndexLimit - state.rows) {
             return invalid(operationIndex, "addRows exceeds the current sheet bounds");
           }
 
-          rebaseState(state, (row) => (row >= patch.at ? row + patch.count : row), keep);
-          rebaseVirtualRefs(sheet, (row) => (row >= patch.at ? row + patch.count : row), keep);
+          rebaseAxes(insertRemap(patch.at, patch.count), keep);
           state.rows += patch.count;
         } else if (patch.op === "removeRows") {
           if (patch.at > state.rows || patch.count > state.rows - patch.at) {
             return invalid(operationIndex, "removeRows exceeds the current sheet bounds");
           }
 
-          rebaseState(
-            state,
-            (row) =>
-              row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
-            keep,
-          );
-          rebaseVirtualRefs(
-            sheet,
-            (row) =>
-              row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
-            keep,
-          );
+          rebaseAxes(deleteRemap(patch.at, patch.count), keep);
           state.rows -= patch.count;
         } else if (patch.op === "moveRows") {
           if (
@@ -574,12 +572,7 @@ export class PagedDirtyPreflight {
             return invalid(operationIndex, "moveRows exceeds the current sheet bounds");
           }
 
-          rebaseState(state, (row) => moveIndex(row, patch.from, patch.count, patch.to), keep);
-          rebaseVirtualRefs(
-            sheet,
-            (row) => moveIndex(row, patch.from, patch.count, patch.to),
-            keep,
-          );
+          rebaseAxes(moveRemap(patch.from, patch.count, patch.to), keep);
         } else if (patch.op === "addColumns") {
           const insertedKeys = patch.columns.map((column) => column.key);
           if (
@@ -592,10 +585,7 @@ export class PagedDirtyPreflight {
             return invalid(operationIndex, "addColumns exceeds the current sheet bounds");
           }
 
-          rebaseState(state, keep, (col) => (col >= patch.at ? col + patch.columns.length : col));
-          rebaseVirtualRefs(sheet, keep, (col) =>
-            col >= patch.at ? col + patch.columns.length : col,
-          );
+          rebaseAxes(keep, insertRemap(patch.at, patch.columns.length));
           state.cols += patch.columns.length;
           state.columnKeys.splice(patch.at, 0, ...insertedKeys);
         } else if (patch.op === "removeColumns") {
@@ -607,12 +597,7 @@ export class PagedDirtyPreflight {
             return invalid(operationIndex, "removeColumns exceeds the current sheet bounds");
           }
 
-          rebaseState(state, keep, (col) =>
-            col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
-          );
-          rebaseVirtualRefs(sheet, keep, (col) =>
-            col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
-          );
+          rebaseAxes(keep, deleteRemap(patch.at, patch.count));
           state.cols -= patch.count;
           state.columnKeys.splice(patch.at, patch.count);
         } else {
@@ -624,10 +609,7 @@ export class PagedDirtyPreflight {
             return invalid(operationIndex, "moveColumns exceeds the current sheet bounds");
           }
 
-          rebaseState(state, keep, (col) => moveIndex(col, patch.from, patch.count, patch.to));
-          rebaseVirtualRefs(sheet, keep, (col) =>
-            moveIndex(col, patch.from, patch.count, patch.to),
-          );
+          rebaseAxes(keep, moveRemap(patch.from, patch.count, patch.to));
           const movedKeys = state.columnKeys.splice(patch.from, patch.count);
           state.columnKeys.splice(patch.to, 0, ...movedKeys);
         }

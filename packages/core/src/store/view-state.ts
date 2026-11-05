@@ -1,9 +1,11 @@
-import { SheetwriteError, unknownSheetError } from "../errors.js";
+import { SheetwriteError } from "../errors.js";
+import { cloneJsonValue } from "../plain-data.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
-import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/document.js";
+import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
+import { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import { KIND_NUMBER, KIND_STRING, KIND_BOOL } from "./wire-tags.js";
 
@@ -70,10 +72,9 @@ export class StoreViewState {
 
   constructor(
     private wasm: RecomputingCellStore,
-    private readonly workbook: Workbook,
-    private readonly handles: ReadonlyMap<SheetId, number>,
+    private readonly sheets: SheetRegistry,
   ) {
-    this.engineHiddenRows = new EngineHiddenRows(wasm, workbook, handles);
+    this.engineHiddenRows = new EngineHiddenRows(wasm, sheets.workbook, sheets.handles);
   }
 
   replaceEngine(wasm: RecomputingCellStore): void {
@@ -110,13 +111,13 @@ export class StoreViewState {
 
     const order = this.orderBySheet.get(sheet);
     if (!order) {
-      const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
+      const meta = this.sheets.workbook.sheets.find((candidate) => candidate.id === sheet);
       return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
     }
 
     let index = this.rowIndexBySheet.get(sheet);
     if (!index?.valid) {
-      const meta = this.sheetMeta(sheet);
+      const meta = this.sheets.sheetMeta(sheet);
       if (dataRow >= meta.rowCount) return null;
       index = this.rebuildRowIndex(sheet, order, meta.rowCount, index);
     }
@@ -151,18 +152,18 @@ export class StoreViewState {
   }
 
   rowGroups(sheet: SheetId): readonly RowGroup[] {
-    return this.sheetMeta(sheet).rowGroups ?? EMPTY_GROUPS;
+    return this.sheets.sheetMeta(sheet).rowGroups ?? EMPTY_GROUPS;
   }
 
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
-    const handle = this.handleOf(sheet);
+    const handle = this.sheets.handleOf(sheet);
     const order = this.orderBySheet.get(sheet);
     if (order) return this.wasm.dataEdgeOrdered(handle, order, row, col, dRow, dCol);
     return this.wasm.dataEdge(handle, row, col, dRow, dCol);
   }
 
   viewRowCount(sheet: SheetId): number {
-    return this.orderBySheet.get(sheet)?.length ?? this.sheetMeta(sheet).rowCount;
+    return this.orderBySheet.get(sheet)?.length ?? this.sheets.sheetMeta(sheet).rowCount;
   }
 
   hasView(sheet: SheetId): boolean {
@@ -171,7 +172,7 @@ export class StoreViewState {
 
   /** Refresh state after row/group/query metadata has been applied to the workbook. */
   metadataChanged(sheet: SheetId): void {
-    const meta = this.sheetMeta(sheet);
+    const meta = this.sheets.sheetMeta(sheet);
     const state = this.ensureState(sheet);
 
     state.sortKeys = meta.sortKeys?.map((key) => ({ ...key })) ?? [];
@@ -190,7 +191,7 @@ export class StoreViewState {
    * edit. A sheet without them keeps no view state.
    */
   sheetLoaded(sheet: SheetId): void {
-    const meta = this.sheetMeta(sheet);
+    const meta = this.sheets.sheetMeta(sheet);
     if (
       (meta.hiddenRows?.size ?? 0) > 0 ||
       (meta.rowGroups?.length ?? 0) > 0 ||
@@ -211,7 +212,7 @@ export class StoreViewState {
   rowsChanged(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
     if (state) {
-      const meta = this.sheetMeta(sheet);
+      const meta = this.sheets.sheetMeta(sheet);
       meta.sortKeys = [];
       meta.filters = [];
       state.sortKeys = [];
@@ -227,7 +228,7 @@ export class StoreViewState {
   columnsChanged(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
     if (state) {
-      const meta = this.sheetMeta(sheet);
+      const meta = this.sheets.sheetMeta(sheet);
       meta.sortKeys = [];
       meta.filters = [];
       state.sortKeys = [];
@@ -301,7 +302,7 @@ export class StoreViewState {
   }
 
   distinctValues(sheet: SheetId, col: number, limit: number): CellScalar[] {
-    const column = this.wasm.distinctValues(this.handleOf(sheet), col, limit);
+    const column = this.wasm.distinctValues(this.sheets.handleOf(sheet), col, limit);
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
     const texts = column.takeTexts();
@@ -324,7 +325,7 @@ export class StoreViewState {
   private recompute(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
     const hidden = state ? this.hiddenRowSet(state) : null;
-    const rowCount = this.sheetMeta(sheet).rowCount;
+    const rowCount = this.sheets.sheetMeta(sheet).rowCount;
 
     if (
       state === undefined ||
@@ -336,7 +337,7 @@ export class StoreViewState {
     }
 
     const hasSort = state.sortKeys.length > 0;
-    const handle = this.handleOf(sheet);
+    const handle = this.sheets.handleOf(sheet);
     let survivors: Uint32Array | null =
       state.filters.size > 0 ? this.runFilters(handle, state.filters) : null;
     this.engineHiddenRows.viewChanged(sheet, survivors, rowCount);
@@ -477,7 +478,7 @@ export class StoreViewState {
   private ensureState(sheet: SheetId): ViewState {
     let state = this.stateBySheet.get(sheet);
     if (!state) {
-      const meta = this.sheetMeta(sheet);
+      const meta = this.sheets.sheetMeta(sheet);
       state = {
         sortKeys: meta.sortKeys?.map((key) => ({ ...key })) ?? [],
         filters: new Map(meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? []),
@@ -583,7 +584,7 @@ export class StoreViewState {
     const index = this.rowIndexBySheet.get(sheet);
     if (!index) return;
 
-    const shape = packedIndexShape(this.sheetMeta(sheet).rowCount, order.length);
+    const shape = packedIndexShape(this.sheets.sheetMeta(sheet).rowCount, order.length);
     if (index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
       this.rowIndexBySheet.delete(sheet);
     } else {
@@ -595,20 +596,4 @@ export class StoreViewState {
     this.orderBySheet.delete(sheet);
     this.rowIndexBySheet.delete(sheet);
   }
-
-  private handleOf(sheet: SheetId): number {
-    const handle = this.handles.get(sheet);
-    if (handle === undefined) throw unknownSheetError(sheet);
-    return handle;
-  }
-
-  private sheetMeta(sheet: SheetId) {
-    const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    if (!meta) throw unknownSheetError(sheet);
-    return meta;
-  }
-}
-
-function cloneJsonValue<T>(value: T): T {
-  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 }
