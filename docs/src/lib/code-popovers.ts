@@ -95,9 +95,11 @@ function openPopover(trigger: HTMLElement, panel: HTMLElement): void {
   if (activePopover?.trigger === trigger) return;
 
   closePopover();
+
   const home = document.createComment("code popover");
   panel.before(home);
   document.body.append(panel);
+
   panel.hidden = false;
   panel.setAttribute("aria-hidden", "false");
   trigger.setAttribute("data-popover-open", "true");
@@ -116,6 +118,7 @@ export function initializeCodePopovers(root: ParentNode = document): void {
     const panelId = trigger.dataset.swCodePopoverTrigger;
     const panel = panelId ? document.getElementById(panelId) : null;
     if (!(panel instanceof HTMLElement)) continue;
+
     initializedTriggers.add(trigger);
     trigger.addEventListener("pointerenter", () => openPopover(trigger, panel));
     trigger.addEventListener("pointerleave", () => scheduleClose(trigger, panel));

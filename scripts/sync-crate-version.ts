@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "..");
 const crate = resolve(root, "packages/wasm");
 
-/** Keep both Rust crates on the fixed version of the published engine packages. */
+/** Keep every Rust crate on the fixed version of the published engine packages. */
 export async function syncCrateVersion(): Promise<string> {
   const { version } = JSON.parse(await readFile(resolve(crate, "package.json"), "utf8")) as {
     version: string;
@@ -21,6 +21,16 @@ export async function syncCrateVersion(): Promise<string> {
   await replaceVersion(
     resolve(crate, "Cargo.lock"),
     /(name = "sheetwrite-wasm"\nversion = ")[^"]+"/,
+    version,
+  );
+  await replaceVersion(
+    resolve(crate, "history/Cargo.toml"),
+    /(\[package\]\nname = "sheetwrite-history"\nversion = ")[^"]+"/,
+    version,
+  );
+  await replaceVersion(
+    resolve(crate, "history/Cargo.lock"),
+    /(name = "sheetwrite-history"\nversion = ")[^"]+"/,
     version,
   );
   await replaceVersion(

@@ -10,6 +10,7 @@ dist/
 # Rust / WASM
 target/
 packages/wasm/pkg/
+packages/wasm/pkg-history/
 packages/formulas/pkg/
 packages/queries/pkg/
 # Copied from packages/wasm by the formulas build (scripts/wasm-factory.ts).

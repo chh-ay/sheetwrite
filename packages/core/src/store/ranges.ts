@@ -392,40 +392,52 @@ export function rangeContains(range: Range, addr: CellAddress): boolean {
   );
 }
 
-export function rebaseRangeRows<T extends { range: Range }>(
-  item: T,
-  sheet: SheetId,
-  remap: (row: number) => number | null,
-): T | null {
-  if (item.range.sheet !== sheet) return item;
-  const span = remapSpan(item.range.start.row, item.range.end.row, remap);
+/** A row or column axis of a sheet. */
+export type SheetAxis = "row" | "column";
+
+/** `range` with its `axis` span remapped; null when the remap removes the whole span. */
+export function rebaseRangeSpan(
+  range: Range,
+  axis: SheetAxis,
+  remap: (index: number) => number | null,
+): Range | null {
+  const key = axis === "row" ? "row" : "col";
+  const span = remapSpan(range.start[key], range.end[key], remap);
   if (!span) return null;
+
   return {
-    ...item,
-    range: {
-      ...item.range,
-      start: { ...item.range.start, row: span[0] },
-      end: { ...item.range.end, row: span[1] },
-    },
+    ...range,
+    start: { ...range.start, [key]: span[0] },
+    end: { ...range.end, [key]: span[1] },
   };
 }
 
-export function rebaseRangeCols<T extends { range: Range }>(
+/** `item` with its range rebased along `axis` when it lies on `sheet`; null when the remap removes it. */
+export function rebaseRangeAxis<T extends { range: Range }>(
   item: T,
   sheet: SheetId,
-  remap: (col: number) => number | null,
+  axis: SheetAxis,
+  remap: (index: number) => number | null,
 ): T | null {
   if (item.range.sheet !== sheet) return item;
-  const span = remapSpan(item.range.start.col, item.range.end.col, remap);
-  if (!span) return null;
-  return {
-    ...item,
-    range: {
-      ...item.range,
-      start: { ...item.range.start, col: span[0] },
-      end: { ...item.range.end, col: span[1] },
-    },
-  };
+
+  const range = rebaseRangeSpan(item.range, axis, remap);
+  return range ? { ...item, range } : null;
+}
+
+/** Every item rebased with `rebaseRangeAxis`, dropping the removed ones. */
+export function rebaseRangeItems<T extends { range: Range }>(
+  items: readonly T[],
+  sheet: SheetId,
+  axis: SheetAxis,
+  remap: (index: number) => number | null,
+): T[] {
+  const rebased: T[] = [];
+  for (const item of items) {
+    const next = rebaseRangeAxis(item, sheet, axis, remap);
+    if (next) rebased.push(next);
+  }
+  return rebased;
 }
 
 export function remapSpan(
@@ -453,6 +465,21 @@ export function remapSpan(
     }
   }
   return [Math.min(mappedStart, mappedEnd), Math.max(mappedStart, mappedEnd)];
+}
+
+/** Old-to-new index map of an insert of `count` indexes at `at`. */
+export function insertRemap(at: number, count: number): (index: number) => number {
+  return (index) => (index >= at ? index + count : index);
+}
+
+/** Old-to-new index map of a delete of `count` indexes at `at`; a deleted index maps to null. */
+export function deleteRemap(at: number, count: number): (index: number) => number | null {
+  return (index) => (index < at ? index : index < at + count ? null : index - count);
+}
+
+/** Old-to-new index map of a move of `count` indexes from `from` to `to`. */
+export function moveRemap(from: number, count: number, to: number): (index: number) => number {
+  return (index) => moveIndex(index, from, count, to);
 }
 
 export function moveIndex(index: number, from: number, count: number, to: number): number {

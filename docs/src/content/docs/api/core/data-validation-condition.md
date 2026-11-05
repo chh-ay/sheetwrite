@@ -11,7 +11,7 @@ Serializable condition enforced by a data-validation rule.
 operator itself is significant; comparison and legacy bounds are mutually exclusive.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L217"><code>packages/core/src/types/document.ts#L217</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/document.ts#L224"><code>packages/core/src/types/document.ts#L224</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>

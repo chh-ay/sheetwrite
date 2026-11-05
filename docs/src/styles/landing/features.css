@@ -1,0 +1,666 @@
+/* ---- Feature cards --------------------------------------------------------- */
+
+.sw-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Eight cards fill two rows of four; six fill two rows of three. `:where`
+   keeps this at the plain list's specificity, so the narrower media rules
+   below still win by source order. */
+.sw-features:where(:has(> li:nth-child(8))) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.sw-features > li {
+  display: flex;
+  min-width: 0;
+}
+
+.sw-features a {
+  display: grid;
+  width: 100%;
+  grid-template-rows: auto auto 1fr auto;
+  overflow: clip;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+  color: var(--sw-fg);
+  text-decoration: none;
+  transition:
+    border-color var(--sw-demo-transition),
+    translate var(--sw-demo-transition);
+}
+
+.sw-features a:hover {
+  border-color: var(--sw-accent);
+  translate: 0 -3px;
+}
+
+.sw-features__art {
+  display: block;
+  height: 9.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--sw-border);
+  background: color-mix(in srgb, var(--sw-surface-0) 70%, transparent);
+}
+
+.sw-features__art .fg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sw-features strong {
+  padding: 1.15rem 1.25rem 0;
+  color: var(--sw-fg-strong);
+  font: 650 1.15rem / 1.25 var(--sw-font-display);
+}
+
+.sw-features__summary {
+  padding: 0.5rem 1.25rem 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+  line-height: 1.55;
+}
+
+.sw-features__cta {
+  padding: 1rem 1.25rem 1.15rem;
+  color: var(--sw-accent-strong);
+  font-size: var(--sw-type-sm);
+  font-weight: 650;
+}
+
+/* Glyph parts (base = finished state). */
+.fg text {
+  font: 600 10px var(--sw-font-mono);
+}
+
+.fg .fg-result {
+  fill: var(--sw-fg);
+  font-size: 8px;
+}
+
+.fg-snapshot-lines {
+  fill: none;
+  stroke: var(--sw-accent-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.fg-tile {
+  fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
+}
+
+.fg-tile[data-path] {
+  fill: color-mix(in srgb, var(--sw-accent) 30%, transparent);
+}
+
+.fg-viewport {
+  fill: color-mix(in srgb, var(--sw-accent) 12%, transparent);
+  stroke: var(--sw-accent-strong);
+  stroke-width: 2;
+  transform: translateX(192px);
+}
+
+.fg-anchor {
+  fill: color-mix(in srgb, var(--sw-accent) 18%, transparent);
+  stroke: var(--sw-accent);
+}
+
+.fg .fg-code {
+  fill: var(--sw-accent-strong);
+  font-size: 11px;
+}
+
+.fg-spill-row rect {
+  fill: color-mix(in srgb, var(--sw-fg) 10%, transparent);
+}
+
+.fg-spill-edge {
+  fill: none;
+  stroke: var(--sw-accent);
+  stroke-dasharray: 4 3;
+}
+
+.fg .fg-tag {
+  fill: var(--sw-fg-dim);
+  text-anchor: middle;
+}
+
+.fg-cell {
+  fill: color-mix(in srgb, var(--sw-fg) 6%, transparent);
+  stroke: var(--sw-border);
+}
+
+.fg-edit[data-client="a"] {
+  fill: color-mix(in srgb, var(--sw-accent) 34%, transparent);
+}
+
+.fg-edit[data-client="b"] {
+  fill: color-mix(in srgb, var(--sw-demo-danger) 34%, transparent);
+}
+
+.fg-cursor[data-client="a"] {
+  fill: var(--sw-accent-strong);
+}
+
+.fg-cursor[data-client="b"] {
+  fill: var(--sw-demo-danger);
+}
+
+.fg-version rect {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+
+.fg .fg-version text {
+  fill: var(--sw-fg);
+  text-anchor: middle;
+}
+
+.fg-snapshot {
+  fill: color-mix(in srgb, var(--sw-accent) 24%, transparent);
+  stroke: var(--sw-accent);
+}
+
+.fg-commit rect {
+  fill: color-mix(in srgb, var(--sw-demo-warn) 28%, transparent);
+  stroke: var(--sw-demo-warn);
+}
+
+.fg-reload path {
+  fill: none;
+  stroke: var(--sw-fg-muted);
+  stroke-linecap: round;
+  stroke-width: 2.5;
+}
+
+.fg-reload .fg-reload-head {
+  fill: var(--sw-fg-muted);
+  stroke: none;
+}
+
+/* Spin about the circle's centre (RELOAD in FeatureGlyph.tsx), not the
+   bounding box, which the arrowhead pushes off centre. */
+.fg-reload {
+  transform-box: view-box;
+  transform-origin: 202px 54px;
+}
+
+.fg-file path:first-child {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-fg-muted);
+  stroke-width: 1.5;
+}
+
+.fg .fg-file text {
+  fill: var(--sw-fg);
+  text-anchor: middle;
+}
+
+.fg-arrow {
+  fill: none;
+  stroke: var(--sw-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.fg-mini-grid rect {
+  fill: color-mix(in srgb, var(--sw-accent) 22%, transparent);
+}
+
+.fg-check {
+  fill: none;
+  stroke: var(--sw-accent-strong);
+  stroke-dasharray: 30;
+  stroke-dashoffset: 0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.fg-host-row {
+  transform: translateY(var(--from));
+}
+
+.fg-id {
+  fill: color-mix(in srgb, var(--sw-accent) 18%, transparent);
+  stroke: var(--sw-accent);
+}
+
+.fg .fg-host-row text {
+  fill: var(--sw-accent-strong);
+  text-anchor: middle;
+}
+
+.fg-bar {
+  fill: color-mix(in srgb, var(--sw-fg) 16%, transparent);
+}
+
+.fg .fg-tab {
+  fill: var(--sw-fg-muted);
+  font: 600 8px var(--sw-font-body);
+  text-anchor: middle;
+}
+
+.fg-tab-line {
+  fill: var(--sw-accent-strong);
+}
+
+.fg-ribbon,
+.fg-formula,
+.fg-namebox {
+  fill: color-mix(in srgb, var(--sw-fg) 5%, transparent);
+  stroke: var(--sw-border);
+}
+
+.fg-ribbon-button,
+.fg-ribbon-group {
+  fill: color-mix(in srgb, var(--sw-fg) 16%, transparent);
+}
+
+.fg-ribbon-button[data-press] {
+  fill: var(--sw-accent);
+}
+
+.fg .fg-fx {
+  fill: var(--sw-fg-dim);
+  font: italic 600 8px var(--sw-font-body);
+}
+
+.fg-sheet-tab {
+  fill: color-mix(in srgb, var(--sw-fg) 12%, transparent);
+}
+
+.fg-sheet-tab[data-active] {
+  fill: var(--sw-accent);
+}
+
+.fg-axis {
+  fill: none;
+  stroke: var(--sw-border-strong);
+}
+
+.fg-chart-bar {
+  fill: color-mix(in srgb, var(--sw-accent) 60%, transparent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.fg-chart-bar[data-edited] {
+  fill: var(--sw-accent-strong);
+}
+
+.fg-cell[data-edited] {
+  fill: color-mix(in srgb, var(--sw-accent) 26%, transparent);
+}
+
+/* Glyph animations: a six-second loop per card. */
+.sw-features
+  :where(
+    .fg-tile[data-path],
+    .fg-viewport,
+    .fg-spill-row,
+    .fg-spill-edge,
+    .fg-cursor,
+    .fg-edit,
+    .fg-version,
+    .fg-commit,
+    .fg-reload,
+    .fg-file,
+    .fg-mini-grid,
+    .fg-check,
+    .fg-host-row,
+    .fg-tab-line,
+    .fg-ribbon-button[data-press],
+    .fg-chart-bar,
+    .fg-cell[data-edited]
+  ) {
+  animation: 6s cubic-bezier(0.45, 0, 0.25, 1) infinite both;
+}
+
+.sw-features .fg-tile[data-path] {
+  animation-name: fg-lit;
+  animation-delay: calc(var(--i) * 0.5s);
+}
+
+.sw-features .fg-viewport {
+  animation-name: fg-sweep;
+}
+
+.sw-features .fg-spill-row {
+  animation-name: fg-appear;
+  animation-delay: calc(0.6s + var(--i) * 0.3s);
+}
+
+.sw-features .fg-spill-edge {
+  animation-name: fg-edge;
+}
+
+.sw-features .fg-cursor[data-client="a"] {
+  animation-name: fg-cursor-a;
+}
+
+.sw-features .fg-cursor[data-client="b"] {
+  animation-name: fg-cursor-b;
+}
+
+.sw-features .fg-edit[data-client="a"] {
+  animation-name: fg-edit-a;
+}
+
+.sw-features .fg-edit[data-client="b"] {
+  animation-name: fg-edit-b;
+}
+
+.sw-features .fg-version {
+  animation-name: fg-appear;
+  animation-delay: calc(1.2s + var(--i) * 0.9s);
+}
+
+.sw-features .fg-commit {
+  animation-name: fg-commit;
+  animation-delay: calc(var(--i) * 0.35s);
+}
+
+.sw-features .fg-reload {
+  animation-name: fg-reload;
+}
+
+.sw-features .fg-file[data-side="in"] {
+  animation-name: fg-file-in;
+}
+
+.sw-features .fg-mini-grid {
+  animation-name: fg-grid-flash;
+}
+
+.sw-features .fg-file[data-side="out"] {
+  animation-name: fg-file-out;
+}
+
+.sw-features .fg-check {
+  animation-name: fg-check;
+}
+
+.sw-features .fg-host-row {
+  animation-name: fg-sort;
+}
+
+.sw-features .fg-tab-line {
+  animation-name: fg-tabs;
+}
+
+.sw-features .fg-ribbon-button[data-press] {
+  animation-name: fg-appear;
+  animation-delay: 1.6s;
+}
+
+.sw-features .fg-chart-bar {
+  animation-name: fg-grow;
+  animation-delay: calc(var(--i) * 0.2s);
+}
+
+.sw-features .fg-chart-bar[data-edited] {
+  animation-name: fg-follow;
+  animation-delay: 0s;
+}
+
+.sw-features .fg-cell[data-edited] {
+  animation-name: fg-edit-a;
+}
+
+@keyframes fg-tabs {
+  0%,
+  25% {
+    transform: none;
+  }
+  33%,
+  58% {
+    transform: translateX(44px);
+  }
+  66%,
+  92% {
+    transform: translateX(88px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes fg-grow {
+  0% {
+    transform: scaleY(0.15);
+  }
+  30%,
+  100% {
+    transform: none;
+  }
+}
+
+/* The edited bar grows in shorter, then rises when its cell changes. */
+@keyframes fg-follow {
+  0% {
+    transform: scaleY(0.12);
+  }
+  25%,
+  45% {
+    transform: scaleY(0.7);
+  }
+  60%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes fg-lit {
+  0% {
+    fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
+  }
+  4% {
+    fill: var(--sw-accent);
+  }
+  20% {
+    fill: color-mix(in srgb, var(--sw-accent) 30%, transparent);
+  }
+  60%,
+  100% {
+    fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
+  }
+}
+
+@keyframes fg-sweep {
+  0%,
+  6% {
+    transform: none;
+  }
+  80%,
+  100% {
+    transform: translateX(192px);
+  }
+}
+
+@keyframes fg-appear {
+  0% {
+    opacity: 0.3;
+  }
+  8%,
+  80% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes fg-edge {
+  0%,
+  40% {
+    opacity: 0;
+  }
+  48%,
+  85% {
+    opacity: 1;
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fg-cursor-a {
+  0% {
+    transform: translate(-50px, 30px);
+  }
+  20%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes fg-cursor-b {
+  0%,
+  30% {
+    transform: translate(10px, -50px);
+  }
+  50%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes fg-edit-a {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  25%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fg-edit-b {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  55%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fg-commit {
+  0% {
+    opacity: 0.25;
+    transform: none;
+  }
+  8%,
+  55% {
+    opacity: 1;
+    transform: none;
+  }
+  70% {
+    opacity: 0.25;
+    transform: none;
+  }
+  100% {
+    opacity: 0.25;
+    transform: none;
+  }
+}
+
+@keyframes fg-reload {
+  0%,
+  72% {
+    transform: none;
+  }
+  92%,
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fg-file-in {
+  0% {
+    opacity: 0.45;
+    transform: translateX(-4px);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes fg-grid-flash {
+  0%,
+  22% {
+    opacity: 0.4;
+  }
+  30%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes fg-file-out {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  50%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fg-check {
+  0%,
+  55% {
+    stroke-dashoffset: 30;
+  }
+  65%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fg-sort {
+  0%,
+  18% {
+    transform: translateY(var(--from));
+  }
+  36%,
+  70% {
+    transform: translateY(var(--to));
+  }
+  88%,
+  100% {
+    transform: translateY(var(--from));
+  }
+}

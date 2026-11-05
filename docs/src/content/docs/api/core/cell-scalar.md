@@ -52,6 +52,6 @@ export type CellScalar = string | number | boolean | null;
 <li><a href="/docs/api/core/data-cell/"><code>DataCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/data-validation-condition/"><code>DataValidationCondition</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 38 more</li>
+<li class="api-consumer-more">and 39 more</li>
 </ul>
 </div>

@@ -3,7 +3,7 @@ title: "Lookup and reference functions"
 description: "Every lookup and reference formula function, its engine build, and its signature, semantic, dialect, and implementation profiles."
 ---
 
-This page lists the 17 functions of the lookup and reference family. Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
+This page lists the 18 functions of the lookup and reference family. Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb). The [formula function contract](/docs/reference/formula-functions/) has every family, the engine builds, and the evaluation limits.
 
 ## Functions
 
@@ -29,6 +29,7 @@ This page lists the 17 functions of the lookup and reference family. Taxonomy/so
 <tr data-formula-name="AREAS" data-engine="default"><td><code>AREAS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-operators">Dialect: <code>excel-reference-operators</code></a><br /><a href="#implementation-implemented-reference-operators">Implementation: <code>implemented-reference-operators</code></a></details></td></tr>
 <tr data-formula-name="FORMULATEXT" data-engine="default"><td><code>FORMULATEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-required-reference">Signature: <code>required-reference</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-reference-information">Dialect: <code>excel-reference-information</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
 <tr data-formula-name="HYPERLINK" data-engine="default"><td><code>HYPERLINK</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-hyperlink">Signature: <code>hyperlink</code></a><br /><a href="#semantics-hyperlink-display">Semantics: <code>hyperlink-display</code></a><br /><a href="#dialect-excel-hyperlink-value">Dialect: <code>excel-hyperlink-value</code></a><br /><a href="#implementation-implemented-reference-information">Implementation: <code>implemented-reference-information</code></a></details></td></tr>
+<tr data-formula-name="LOOKUP" data-engine="default"><td><code>LOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-vector-lookup">Signature: <code>vector-lookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
 </tbody></table>
 
 </section>
@@ -195,6 +196,18 @@ Return shape: `scalar`.
 
 </details>
 
+<details id="signature-vector-lookup"><summary>Signature: vector-lookup</summary>
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `lookupValue` | yes | none | `scalar`, `reference` | `once` |
+| `lookupVector` | yes | none | `range`, `array`, `reference` | `once` |
+| `resultVector` | no | none | `range`, `array`, `reference` | `once` |
+
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guides' function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -324,7 +337,7 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/mod.rs)<br />[`packages/wasm/src/eval/functions.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/functions.rs)<br />[`packages/wasm/src/eval/math.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math.rs)<br />[`packages/wasm/src/eval/math/trigonometry.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/trigonometry.rs)<br />[`packages/wasm/src/eval/math/numerals.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/math/numerals.rs)<br />[`packages/wasm/src/eval/statistics.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/statistics.rs)<br />[`packages/wasm/src/eval/lookup.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/lookup.rs)<br />[`packages/wasm/src/eval/array.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/array.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 
@@ -357,7 +370,7 @@ Limitations: HYPERLINK returns its display value: the friendly name, or the link
 | Layer | Status and source/evidence |
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/calc.rs) |
-| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/info.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/info.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/eval/info.rs)<br />[`packages/wasm/src/store.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/store.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/test/formula-assist.test.ts) |
 

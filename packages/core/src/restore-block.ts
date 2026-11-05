@@ -1,10 +1,11 @@
 import { deflateSync } from "fflate";
 
 import { validateDocumentOperationShape } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import {
+  assertRestoreBlockCells,
+  assertRestoreBlockFits,
   invalidRestoreBlock,
-  MAX_RESTORE_BLOCK_CELLS,
   MAX_RESTORE_BLOCK_DECODED_BYTES,
   restoreBlockLimit,
 } from "./restore-block-codec.js";
@@ -16,21 +17,9 @@ export { MAX_RESTORE_BLOCK_DECODED_BYTES };
 
 type RestoreBlock = Extract<DocumentOp, { op: "restoreBlock" }>;
 
-function assertCellLimit(block: PackedCellBlock): void {
-  if (block.rowCount > Math.floor(MAX_RESTORE_BLOCK_CELLS / block.colCount)) {
-    throw restoreBlockLimit("Restore block exceeds the cell limit");
-  }
-}
-
 function assertBlock(range: Range, block: PackedCellBlock): void {
-  assertCellLimit(block);
+  assertRestoreBlockFits(range, block);
   if (validateDocumentOperationShape({ op: "setBlock", range, block }).length)
-    invalidRestoreBlock();
-  if (
-    block.rowCount !== Math.abs(range.end.row - range.start.row) + 1 ||
-    block.colCount !== Math.abs(range.end.col - range.start.col) + 1 ||
-    (block.styleIds !== undefined && block.styleTable === undefined)
-  )
     invalidRestoreBlock();
 }
 
@@ -56,7 +45,7 @@ export function encodeMeasuredRestoreBlock(
   block: PackedCellBlock,
   decodedBytes: number | undefined,
 ): RestoreBlock {
-  assertCellLimit(block);
+  assertRestoreBlockCells(block);
   if (decodedBytes !== undefined && decodedBytes > MAX_RESTORE_BLOCK_DECODED_BYTES) {
     throw restoreBlockLimit("Restore block exceeds the decoded byte limit");
   }

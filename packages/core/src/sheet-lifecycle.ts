@@ -80,6 +80,7 @@ function addSheetSnapshotIssue(
     protectedRanges: snapshot.protectedRanges,
     notes: snapshot.notes,
     sortKeys: snapshot.sortKeys,
+    sortState: snapshot.sortState,
     filters: snapshot.filters,
     tables: snapshot.tables,
   };

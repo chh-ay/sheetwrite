@@ -1,4 +1,5 @@
 import { SheetwriteError } from "./errors.js";
+import { utf8ByteLength, utf8CodePointBytes, utf8CodePointUnits } from "./utf8.js";
 /** Resource ceilings shared by synchronous CSV and TSV parsing and encoding. */
 export interface DelimitedTextResourceLimits {
   /** Input string size in UTF-8 bytes; defaults to 32 MiB. */
@@ -141,39 +142,6 @@ const BOM_CODE_UNIT = 0xfeff;
 /** Records scanned or encoded between two abort checks; never one check per field. */
 const ABORT_CHECK_RECORDS = 1024;
 
-function utf8WidthAt(text: string, index: number): { bytes: number; advance: number } {
-  const first = text.charCodeAt(index);
-  if (first <= ASCII_MAX_CODE_UNIT) return { bytes: 1, advance: 1 };
-  if (first <= 0x7ff) return { bytes: 2, advance: 1 };
-  if (first >= 0xd800 && first <= 0xdbff) {
-    const second = text.charCodeAt(index + 1);
-    if (second >= 0xdc00 && second <= 0xdfff) return { bytes: 4, advance: 2 };
-  }
-  return { bytes: 3, advance: 1 };
-}
-
-function boundedUtf8InputBytes(text: string, limit: number): number {
-  let bytes = 0;
-  for (let index = 0; index < text.length;) {
-    const code = text.charCodeAt(index);
-    if (code <= ASCII_MAX_CODE_UNIT) {
-      // A run of ASCII code units is one byte each, so it can cross the ceiling
-      // by at most one; report the same first-exceeded value as a per-unit loop.
-      let end = index + 1;
-      while (end < text.length && text.charCodeAt(end) <= ASCII_MAX_CODE_UNIT) end += 1;
-      bytes += end - index;
-      if (bytes > limit) return limit + 1;
-      index = end;
-      continue;
-    }
-    const width = utf8WidthAt(text, index);
-    bytes += width.bytes;
-    if (bytes > limit) return bytes;
-    index += width.advance;
-  }
-  return bytes;
-}
-
 function failResource(
   resource: keyof DelimitedTextResourceLimits,
   limit: number,
@@ -234,7 +202,7 @@ export function scanDelimitedText(
   signal: AbortSignal | undefined,
 ): void {
   signal?.throwIfAborted();
-  const inputBytes = boundedUtf8InputBytes(text, limits.maxInputBytes);
+  const inputBytes = utf8ByteLength(text, limits.maxInputBytes);
   if (inputBytes > limits.maxInputBytes) {
     failResource("maxInputBytes", limits.maxInputBytes, inputBytes, "parse");
   }
@@ -297,13 +265,13 @@ export function scanDelimitedText(
   };
 
   const countFieldCodePoint = (): void => {
-    const width = utf8WidthAt(text, index);
-    fieldBytes += width.bytes;
+    const width = utf8CodePointBytes(text, index);
+    fieldBytes += width;
     if (fieldBytes > limits.maxFieldBytes) {
       failResource("maxFieldBytes", limits.maxFieldBytes, fieldBytes, "parse");
     }
     fieldPresent = true;
-    index += width.advance;
+    index += utf8CodePointUnits(width);
   };
 
   while (index < text.length) {
@@ -445,8 +413,8 @@ function planEncodedField(
   let quote = forceQuote;
   for (let index = 0; index < text.length;) {
     const ch = text[index]!;
-    const width = utf8WidthAt(text, index);
-    bytes += width.bytes;
+    const width = utf8CodePointBytes(text, index);
+    bytes += width;
     if (bytes > limits.maxFieldBytes) {
       failResource("maxFieldBytes", limits.maxFieldBytes, bytes, operation);
     }
@@ -456,7 +424,7 @@ function planEncodedField(
     } else if (ch === delimiter || ch === "\r" || ch === "\n") {
       quote = true;
     }
-    index += width.advance;
+    index += utf8CodePointUnits(width);
   }
   return { text, quote, quoteCount, bytes };
 }

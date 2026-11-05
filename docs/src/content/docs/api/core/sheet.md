@@ -28,6 +28,7 @@ Workbook sheet schema used when creating a live grid.
 <a href="#sheet-protected-ranges"><code>protectedRanges</code></a>
 <a href="#sheet-notes"><code>notes</code></a>
 <a href="#sheet-sort-keys"><code>sortKeys</code></a>
+<a href="#sheet-sort-state"><code>sortState</code></a>
 <a href="#sheet-filters"><code>filters</code></a>
 <a href="#sheet-merges"><code>merges</code></a>
 <a href="#sheet-frozen-rows"><code>frozenRows</code></a>
@@ -37,7 +38,7 @@ Workbook sheet schema used when creating a live grid.
 <a href="#sheet-pivots"><code>pivots</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>23</span>
+## Members <span class="api-count" data-pagefind-ignore>24</span>
 
 <div class="api-member-list">
 
@@ -185,6 +186,19 @@ sortKeys?: SortKey[];
 
 </details>
 
+<details class="api-member" id="sheet-sort-state" data-pagefind-weight="1">
+<summary><code>sortState</code> <span class="api-member-summary">The worksheet sortState of an imported XLSX file.</span></summary>
+
+```ts generated
+sortState?: WorkbookTableXmlElement;
+```
+
+<p class="api-member-doc">The worksheet `sortState` of an imported XLSX file. Excel writes it after
+a sort whose cells it already moved, so Sheetwrite keeps it for export and
+does not apply it. Export writes it while its references lie inside the
+sheet; a view sort (`sortKeys`) replaces it.</p>
+</details>
+
 <details class="api-member" id="sheet-filters" data-pagefind-weight="1">
 <summary><code>filters</code> <span class="api-member-summary">Persisted column filters as JSON-safe index/value tuples.</span></summary>
 
@@ -272,6 +286,7 @@ export interface Sheet {
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
+  sortState?: WorkbookTableXmlElement;
   filters?: Array<[col: number, filter: ColumnFilter]>;
   merges?: MergeRange[];
   frozenRows?: number;

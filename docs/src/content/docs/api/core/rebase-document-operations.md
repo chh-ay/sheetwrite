@@ -20,7 +20,7 @@ The engine rewrites the formula of a conditional format that a row or
 column edit moves, so such a rebase needs `initSheetwrite()` first.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/rebase.ts#L63"><code>packages/core/src/rebase.ts#L63</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/rebase.ts#L65"><code>packages/core/src/rebase.ts#L65</code></a></dd></div>
 </dl>
 
 ## Declaration
