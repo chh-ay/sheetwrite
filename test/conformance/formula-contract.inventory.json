@@ -73,6 +73,11 @@
       "title": "Database",
       "source": "microsoft-excel-functions",
       "section": "Database functions"
+    },
+    "engineering": {
+      "title": "Engineering",
+      "source": "microsoft-excel-functions",
+      "section": "Engineering functions"
     }
   },
   "signatureProfiles": {
@@ -3953,6 +3958,101 @@
         }
       ],
       "returns": "scalar"
+    },
+    "base-places": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "places",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "bit-shift": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "shiftAmount",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "delta": {
+      "arguments": [
+        {
+          "name": "number1",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "number2",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "gestep": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "step",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "erf": {
+      "arguments": [
+        {
+          "name": "lowerLimit",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "upperLimit",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -5125,6 +5225,51 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-engineering": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -5291,6 +5436,14 @@
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "CHITEST and paired TTEST skip pairs where either value is not a number. TTEST type 3 uses Welch's degrees of freedom without rounding."
+      ]
+    },
+    "analysis-engineering": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
       ]
     }
   },
@@ -5663,6 +5816,24 @@
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/hypothesis.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-engineering": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/engineering.rs"]
       },
       "assist": {
         "status": "implemented",
@@ -9868,6 +10039,282 @@
       "semantics": "analysis-descriptive",
       "dialects": "analysis-hypothesis",
       "implementation": "analysis-hypothesis",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BIN2DEC",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BIN2HEX",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BIN2OCT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BITAND",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BITLSHIFT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "bit-shift",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BITOR",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BITRSHIFT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "bit-shift",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BITXOR",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DEC2BIN",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DEC2HEX",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DEC2OCT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DELTA",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "delta",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERF",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "erf",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERF.PRECISE",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERFC",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ERFC.PRECISE",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GESTEP",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "gestep",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HEX2BIN",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HEX2DEC",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HEX2OCT",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "OCT2BIN",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "OCT2DEC",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "OCT2HEX",
+      "aliases": [],
+      "family": "engineering",
+      "contractStatus": "supported",
+      "signature": "base-places",
+      "semantics": "analysis-engineering",
+      "dialects": "analysis-engineering",
+      "implementation": "analysis-engineering",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }
