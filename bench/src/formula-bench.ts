@@ -2794,6 +2794,16 @@ export function validateFormulaCapture(
   }
 }
 
+/**
+ * A recorded full capture, such as the shared capture inside full-engine
+ * evidence. It may predate workloads added to the matrix since, under the
+ * same rule as a regression baseline: every core workload is listed and no
+ * key is outside the current full matrix.
+ */
+export function validateRecordedFormulaCapture(capture: FormulaBenchmarkResult): void {
+  validateFormulaEvidence(capture, capture.mode, false, regressionBaselineWorkloadKeys(capture));
+}
+
 function validateCurrentCaptureProvenance(
   result: CompleteFormulaBenchmarkResult,
   capture: FormulaCaptureKind,
