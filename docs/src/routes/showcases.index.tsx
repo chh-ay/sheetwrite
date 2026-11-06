@@ -5,7 +5,7 @@ import { Icon } from "../components/Icon.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
 import landingBench from "../generated/landing-bench.json";
-import { opensFreshDocument } from "../lib/navigation.js";
+import { opensFreshDocument } from "../lib/site-links.js";
 import { pageMeta } from "../lib/seo.js";
 import { CAPABILITY_OWNERS, type CapabilityOwnerId } from "../showcases/hub-inventory.js";
 

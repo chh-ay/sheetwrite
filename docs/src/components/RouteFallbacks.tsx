@@ -1,8 +1,14 @@
 import { type ErrorComponentProps, Link, useLocation, useRouter } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 
-import { DocsShell } from "./DocsShell.js";
 import { SiteTopbar } from "./SiteTopbar.js";
+
+/**
+ * The documentation layout, for errors on documentation pages. Loaded with the
+ * error, so pages outside the documentation never load the docs shell and its
+ * navigation for a fallback they rarely show.
+ */
+const DocsShell = lazy(async () => ({ default: (await import("./DocsShell.js")).DocsShell }));
 
 /** Site page for any URL without a route. Documentation URLs have their own. */
 export function SiteNotFound() {
@@ -47,9 +53,11 @@ export function SiteError({ error, reset }: ErrorComponentProps) {
   );
   if (pathname.startsWith("/docs/")) {
     return (
-      <DocsShell activeHref="" description={message} title="This page stopped working">
-        <div role="alert">{actions}</div>
-      </DocsShell>
+      <Suspense fallback={null}>
+        <DocsShell activeHref="" description={message} title="This page stopped working">
+          <div role="alert">{actions}</div>
+        </DocsShell>
+      </Suspense>
     );
   }
   return (

@@ -9,8 +9,6 @@ import {
   documentComponentForSplat,
   normalizeDocumentHref,
 } from "../lib/content.js";
-import { forwardedHeading } from "../lib/moved-headings.js";
-import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
@@ -33,6 +31,8 @@ const DOCUMENT_COMPONENTS: DocumentComponents = {
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
     const href = normalizeDocumentHref(params._splat);
+    // The moved-page table loads with the loader, not with every page's script.
+    const { MOVED_PAGES } = await import("../lib/moved-pages.js");
     const moved = MOVED_PAGES[href];
     if (moved !== undefined) {
       return {
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/docs/$")({
         outline: [],
         stylesheets: [],
         moved: href,
+        movedTo: moved.to,
         href,
       };
     }
@@ -56,6 +57,7 @@ export const Route = createFileRoute("/docs/$")({
       outline: document.outline ?? [],
       stylesheets: document.stylesheets,
       moved: undefined,
+      movedTo: undefined,
       href,
     };
   },
@@ -100,10 +102,12 @@ export const Route = createFileRoute("/docs/$")({
  * fragment to the page that holds that heading now. The page has no
  * `data-pagefind-body`, so search never lists it.
  */
-function MovedDocument({ from }: Readonly<{ from: string }>) {
-  const target = MOVED_PAGES[from]?.to ?? "/docs/";
+function MovedDocument({ from, target }: Readonly<{ from: string; target: string }>) {
   useEffect(() => {
-    window.location.replace(movedPageTarget(from, window.location.hash) ?? target);
+    const hash = window.location.hash;
+    void import("../lib/moved-pages.js").then(({ movedPageTarget }) => {
+      window.location.replace(movedPageTarget(from, hash) ?? target);
+    });
   }, [from, target]);
   return (
     <main className="sw-document" id="main-content">
@@ -137,17 +141,26 @@ function DocumentRoute() {
   const href = useLocation({ select: (location) => location.href });
   useEffect(() => {
     void href;
+    const hash = window.location.hash;
+    if (hash === "") return;
     // An old URL redirects here with its old #fragment; send that heading on.
-    const forwarded = forwardedHeading(activeHref, window.location.hash);
-    if (forwarded !== undefined) {
-      window.location.replace(forwarded);
-      return;
-    }
-    revealAnchoredMember();
+    // The table of moved headings loads only for a URL with a fragment.
+    let current = true;
+    void import("../lib/moved-headings.js").then(({ forwardedHeading }) => {
+      if (!current) return;
+      const forwarded = forwardedHeading(activeHref, hash);
+      if (forwarded !== undefined) window.location.replace(forwarded);
+      else revealAnchoredMember();
+    });
+    return () => {
+      current = false;
+    };
   }, [href, activeHref]);
   const metadata = Route.useLoaderData();
   const Content = documentComponentForSplat(params._splat);
-  if (metadata.moved !== undefined) return <MovedDocument from={metadata.moved} />;
+  if (metadata.moved !== undefined) {
+    return <MovedDocument from={metadata.moved} target={metadata.movedTo ?? "/docs/"} />;
+  }
   if (Content === undefined) return <DocumentNotFound />;
 
   return (
