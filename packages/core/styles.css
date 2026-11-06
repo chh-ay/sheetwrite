@@ -2565,3 +2565,16 @@ textarea.sheetwrite-ribbon-field {
   margin: 0 0 8px;
   color: var(--sheetwrite-widget-muted, #6b7280);
 }
+
+/* A value field's Number Format form in the pivot field list. */
+.sheetwrite-panel-format {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+}
+
+.sheetwrite-panel-format input {
+  flex: 1;
+  min-width: 0;
+}
