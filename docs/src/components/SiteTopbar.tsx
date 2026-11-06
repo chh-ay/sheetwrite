@@ -7,6 +7,12 @@ import { BrandMark } from "./BrandMark.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";
+/**
+ * The router marks any link whose path prefixes the URL as the current page
+ * (`/docs/` on every release note). The section marker below is the only
+ * source of `aria-current`, so the router matches exact paths only.
+ */
+const EXACT = { exact: true } as const;
 
 /** Props of {@link SiteTopbar}. */
 interface SiteTopbarProps {
@@ -51,13 +57,21 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
         <span>Sheetwrite</span>
       </Link>
       <nav aria-label="Site" className="sw-header__nav">
-        <Link aria-current={marker("docs", "/docs/")} to="/docs/">
+        <Link activeOptions={EXACT} aria-current={marker("docs", "/docs/")} to="/docs/">
           Docs
         </Link>
-        <Link aria-current={marker("showcases", "/showcases/")} to="/showcases/">
+        <Link
+          activeOptions={EXACT}
+          aria-current={marker("showcases", "/showcases/")}
+          to="/showcases/"
+        >
           Showcases
         </Link>
-        <Link aria-current={marker("releases", RELEASES_HREF)} to={RELEASES_HREF}>
+        <Link
+          activeOptions={EXACT}
+          aria-current={marker("releases", RELEASES_HREF)}
+          to={RELEASES_HREF}
+        >
           Releases
           <span className="sw-header__version">v{LATEST_RELEASE.version}</span>
         </Link>
