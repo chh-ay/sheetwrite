@@ -213,6 +213,72 @@ it("shows measure values in a dashboard pivot, equal to the same pivot on a work
   expect(onDashboard?.cells).toContain(8);
 });
 
+it("charts only the chosen values of a dashboard pivot, measures included, as the pivot computes them", async () => {
+  const input = snapshot();
+  input.workbook.dataModel = {
+    relationships: [],
+    measures: [
+      { id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" },
+      {
+        id: "share",
+        name: "Share",
+        table: "orders",
+        formula: "=SUM(Orders[Amount])/CALCULATE(SUM(Orders[Amount]), ALL(Orders[Region]))",
+      },
+    ],
+  };
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [
+    {
+      id: "on-dashboard",
+      name: "By region",
+      source: {
+        model: {
+          table: "orders",
+          fields: [
+            { table: "orders", column: "region" },
+            { table: "orders", column: "amount" },
+          ],
+        },
+      },
+      anchor: { row: 0, col: 0 },
+      rows: [0],
+      columns: [],
+      values: [{ field: 1, aggregation: "SUM" }, { measure: "twice" }, { measure: "share" }],
+    },
+  ];
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
+  expect(insertPivotChart(grid, "column")).toBe(true);
+  const chart = grid.getCharts("dash")[0];
+  if (chart === undefined) throw new Error("the chart was inserted");
+  const points = () =>
+    resolveChartView(grid.store, "dash", chart.id)?.series.map((series) => [
+      series.name,
+      series.categories,
+      series.values,
+    ]);
+
+  // Orders: East 1 and 3, West 2. Each point is the pivot's cell for its region.
+  expect(grid.setChart({ ...chart, pivotValues: [1, 2] }, "dash").status).toBe("applied");
+  expect(points()).toEqual([
+    ["Twice", ["East", "West"], [8, 4]],
+    ["Share", ["East", "West"], [4 / 6, 2 / 6]],
+  ]);
+  expect(grid.setChart({ ...chart, pivotValues: [2] }, "dash").status).toBe("applied");
+  expect(points()).toEqual([["Share", ["East", "West"], [4 / 6, 2 / 6]]]);
+
+  grid.undo();
+  expect(grid.getCharts("dash")[0]?.pivotValues).toEqual([1, 2]);
+  grid.undo();
+  expect(points()?.map(([name]) => name)).toEqual(["Sum of Amount", "Twice", "Share"]);
+});
+
 it("shows a value field's number format in the dashboard view", async () => {
   const input = snapshot();
   const dash = input.sheets[1];
