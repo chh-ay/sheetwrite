@@ -24,6 +24,7 @@ import { contentPathForRoute } from "./docs-content-checks.js";
 import { entryLabel, entrySlug } from "./docs-paths.js";
 import {
   exists,
+  frontmatter,
   type MarkdownDocument,
   MIGRATION_ROUTES,
   PACKAGE_DIRECTORIES,
@@ -43,10 +44,6 @@ function packageSourcePath(packageName: string, source: string): string {
   if (packageDirectory === undefined) return source;
   const normalized = posix(normalize(join(packageDirectory, file)));
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
-}
-
-export function frontmatter(title: string, description: string): string {
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
 }
 
 interface DeclarationMember {

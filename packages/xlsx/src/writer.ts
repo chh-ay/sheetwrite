@@ -23,13 +23,23 @@ import { areaA1 } from "./cell-reference.js";
 import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
 import { DRAWING_REL } from "./chart-xml.js";
 import {
+  EXTERNAL_LINK_CONTENT,
+  EXTERNAL_LINK_REL,
+  ExternalLinkExport,
+  externalLinkPartXml,
+} from "./external-links.js";
+import {
   columnWidthCharacters,
   MAIN_NS,
   META_MARKER,
   META_STEM,
   RELATIONSHIPS_NS,
 } from "./format.js";
-import { convertWorkbookFormulas, formulaContainsExternalReference } from "./formula.js";
+import {
+  convertWorkbookFormulas,
+  formulaCallsExternalData,
+  formulaContainsExternalReference,
+} from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
 import {
@@ -50,6 +60,7 @@ import { StylesRegistry } from "./styles.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import { writeZip, zipChunks, type ZipPart } from "./zip.js";
 
+const TEXT_ENCODER = new TextEncoder();
 const OFFICE_DOCUMENT_REL = `${RELATIONSHIPS_NS}/officeDocument`;
 const WORKSHEET_REL = `${RELATIONSHIPS_NS}/worksheet`;
 const STYLES_REL = `${RELATIONSHIPS_NS}/styles`;
@@ -106,8 +117,16 @@ export interface WorkbookWriteHook {
   readonly workbookRelationships?: readonly ExtraRelationship[];
   readonly contentTypeOverrides?: readonly ContentTypeOverride[];
   readonly contentTypeDefaults?: readonly { extension: string; contentType: string }[];
-  /** `<pivotCache>` elements for `workbookRelationships`; the writer wraps them in `<pivotCaches>`. */
-  workbookXml?(ids: readonly string[]): { pivotCaches?: readonly string[] };
+  /** Books of the kept external link parts, in the order formulas number them. */
+  readonly externalBooks?: readonly string[];
+  /**
+   * `<pivotCache>` and `<externalReference>` elements for `workbookRelationships`;
+   * the writer wraps them in `<pivotCaches>` and `<externalReferences>`.
+   */
+  workbookXml?(ids: readonly string[]): {
+    pivotCaches?: readonly string[];
+    externalReferences?: readonly string[];
+  };
   sheet?(
     sheet: SheetSnapshot,
     part: { sheetNumber: number; name: string },
@@ -402,7 +421,7 @@ function cellXml(
           ? value.src.slice(1)
           : value.src
         : formulaForReference(snapshot, value);
-    if (formulaContainsExternalReference(formula)) {
+    if (formulaCallsExternalData(formula)) {
       emitWarning(context, {
         code: "external-formula",
         message: "External-data formula was neutralized as inert text on export",
@@ -415,6 +434,7 @@ function cellXml(
       const converted = context.formulas?.get(value.src);
       if (converted === undefined) throw new Error("Cell formula was not converted");
       formula = converted.startsWith("=") ? converted.slice(1) : converted;
+      formula = context.externalFormula?.(formula) ?? formula;
     }
     return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(formula))}</f></c>`;
   }
@@ -1089,6 +1109,7 @@ function workbookXml(
   metadataName: string,
   context: XlsxCodecContext,
   pivotCaches: readonly string[],
+  externalReferences: readonly string[],
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
@@ -1124,6 +1145,10 @@ function workbookXml(
   xml.append(
     `<sheet name="${escapeXml(encodeXstring(metadataName))}" sheetId="${ordered.length + 1}" state="veryHidden" r:id="rId${ordered.length + 1}"/></sheets>`,
   );
+  // CT_Workbook places `<externalReferences>` after `<sheets>`, before `<definedNames>`.
+  if (externalReferences.length > 0) {
+    xml.append(`<externalReferences>${externalReferences.join("")}</externalReferences>`);
+  }
   if (snapshot.workbook.namedRanges?.length) {
     xml.append("<definedNames>");
     for (const named of snapshot.workbook.namedRanges) {
@@ -1136,6 +1161,7 @@ function workbookXml(
         const converted = context.formulas?.get(named.formula);
         if (converted === undefined) throw new Error("Defined-name formula was not converted");
         source = converted.replace(/^=/, "");
+        source = context.externalFormula?.(source) ?? source;
       } else {
         const range = named.range;
         const sheet = snapshot.sheets.find((candidate) => candidate.id === range.sheet);
@@ -1193,10 +1219,15 @@ function* writeWorkbookParts(
   }
   snapshot = checked.value;
   const hook = resolveHook?.(snapshot);
+  const links = new ExternalLinkExport(
+    snapshot.workbook.externalLinks ?? [],
+    hook?.externalBooks ?? [],
+  );
+  context.externalFormula = (formula) => links.fileFormula(formula);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
-  const pivots = preparePivots(snapshot, ordered, context);
-  const metadataName = metadataSheetName(snapshot);
   const styles = new StylesRegistry(context);
+  const pivots = preparePivots(snapshot, ordered, styles, context);
+  const metadataName = metadataSheetName(snapshot);
   const overrides: ContentTypeOverride[] = [
     { part: "xl/workbook.xml", contentType: WORKBOOK_CONTENT },
     { part: "xl/styles.xml", contentType: STYLES_CONTENT },
@@ -1281,6 +1312,24 @@ function* writeWorkbookParts(
     workbookRelationships.push({ ...relationship, id });
     return id;
   });
+  // A defined name can name a book that no cell names, so its link is known before the parts.
+  for (const named of snapshot.workbook.namedRanges ?? []) {
+    if (named.range === undefined) links.fileFormula(context.formulas?.get(named.formula) ?? "");
+  }
+  const externalReferences = [...(hook?.workbookXml?.(extraIds).externalReferences ?? [])];
+  for (const [index, link] of links.written.entries()) {
+    const id = `rId${metadataNumber + 2 + extraIds.length + pivotIds.length + index}`;
+    const name = `externalLinks/sheetwriteLink${index + 1}.xml`;
+    const xml = externalLinkPartXml(link);
+    yield { name: `xl/${name}`, data: TEXT_ENCODER.encode(xml.part) };
+    yield {
+      name: `xl/externalLinks/_rels/sheetwriteLink${index + 1}.xml.rels`,
+      data: TEXT_ENCODER.encode(xml.relationships),
+    };
+    overrides.push({ part: `xl/${name}`, contentType: EXTERNAL_LINK_CONTENT });
+    workbookRelationships.push({ id, type: EXTERNAL_LINK_REL, target: name });
+    externalReferences.push(`<externalReference r:id="${id}"/>`);
+  }
   const pivotCaches = [
     ...(hook?.workbookXml?.(extraIds).pivotCaches ?? []),
     ...(pivots?.pivotCaches(pivotIds) ?? []),
@@ -1288,7 +1337,7 @@ function* writeWorkbookParts(
   yield { name: "xl/styles.xml", data: styles.toXml() };
   yield {
     name: "xl/workbook.xml",
-    data: workbookXml(snapshot, ordered, metadataName, context, pivotCaches),
+    data: workbookXml(snapshot, ordered, metadataName, context, pivotCaches, externalReferences),
   };
   yield {
     name: "xl/_rels/workbook.xml.rels",

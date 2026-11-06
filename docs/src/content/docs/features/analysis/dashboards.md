@@ -1,14 +1,15 @@
 ---
 title: Dashboards
-description: "Arrange pivots and slicers on a dashboard sheet with a grid layout that is saved, undone and synchronized."
+description: "Arrange pivots, slicers and PivotCharts on a dashboard sheet with a grid layout that is saved, undone and synchronized."
 ---
 
 A dashboard is a sheet of the workbook with `kind: "dashboard"`. It has a tab, a name, an order and a visibility like a worksheet, but it has no cells, rows or columns. It holds items on a grid of 12 columns:
 
 - a **pivot** item shows a pivot of the same sheet,
-- a **slicer** item lists the values of one table column and holds the values that pass.
+- a **slicer** item lists the values of one table column and holds the values that pass,
+- a **chart** item shows a chart of the same sheet over one of its pivots, as an Excel PivotChart does.
 
-Slicer filtering, charts and KPI cards follow in later releases ([#231](https://github.com/chh-ay/sheetwrite/issues/231)).
+KPI cards follow in a later release ([#231](https://github.com/chh-ay/sheetwrite/issues/231)).
 
 ## Add a dashboard
 
@@ -113,10 +114,28 @@ Items do not overlap, and a dashboard holds at most 64 items. They are kept in r
 
 While a dashboard is the active sheet, the grid shows its items over the cells. The toolbar, the side panel and the sheet tabs stay as they are. The view loads as its own chunk the first time a dashboard is shown.
 
-- A pivot item shows the pivot's result as a table. Pivots on a dashboard compute without placing output in cells. With the default engine, the item says that it needs the full engine.
+- A pivot item shows the pivot's result as a table, with each value field's number format. Pivots on a dashboard compute without placing output in cells. With the default engine, the item says that it needs the full engine.
 - A slicer item lists the values of its column. A click keeps one value, and Ctrl or Cmd with a click adds or removes a value; a slicer always keeps at least one value. **Clear** keeps every value. Each change is saved with the item.
 - Drag an item's header to move it, and drag its bottom-right corner to resize it. With the keyboard, open the item's actions menu, choose **Move** or **Resize**, then use the arrow keys; Enter or Escape ends. Each drop or arrow step is one undo step. A place that another item holds is refused, and the view says so.
 - In a read-only grid, items cannot move, resize or change.
+
+## Slicers
+
+**Insert › Filters › Slicer** shows on a dashboard. It opens the Insert Slicers list, where each checked table column becomes a slicer in the next free place, in one undo step.
+
+The slicers of a dashboard filter its pivots together. A slicer on a column of table T filters every pivot whose table is T, or a table that reaches T through many-to-one relationships, as an Excel slicer filters the PivotTables connected to it. The filter goes from the one side to the many side, never back. A slicer whose table a pivot cannot reach does not filter it. Slicer filters are added to each pivot's own report filters when the pivot computes; the saved definitions do not change.
+
+In an editable grid, a slicer selection is a saved, synced change of its item, so it is one undo step. In a read-only grid, a slicer filters only that viewer's view: it makes no document change and no undo step.
+
+A slicer dims each value that no row has under the other slicers, and the value stays selectable, as Excel's "Visually indicate items with no data" does. The slicer's actions menu has **Dim Items with No Data**, **Hide Items with No Data** and **Show Items with No Data**, each a saved change. In the API, set `itemsWithNoData` on the slicer item to `"hide"` to hide those values (Excel's "Hide items with no data"), or to `"show"` to show every value plainly.
+
+The dashboard view applies the slicers, so they filter once a dashboard has been shown.
+
+## PivotCharts
+
+**Insert › Charts › PivotChart** shows on a dashboard. It adds a chart of the chosen type over the focused pivot item, or else the first pivot, and an item that shows the chart in the next free place, in one undo step. Removing the item removes its chart too.
+
+The chart is a `ChartDefinition` with `pivot` set to the ID of a pivot on the same dashboard, and an empty `series` list. As in Excel, the row items are the categories and each value field, for each column item, is one series. Subtotals and grand totals are not points. The slicers filter the chart as they filter its pivot, and the chart follows each recalculation. Charts need `@sheetwrite/charts`: without it, the item says so.
 
 ## Undo and collaboration
 

@@ -15,12 +15,14 @@ import type {
   followChart,
   insertChart,
   insertPivot,
+  insertPivotChart,
   openChartPanel,
   openDataModelPanel,
   openExplainPanel,
   openNamePanel,
   openPivotPanel,
   openQueryPanel,
+  openSlicerPanel,
   openSortPanel,
   syncPivotPanel,
 } from "./panel-controller.js";
@@ -30,12 +32,14 @@ interface PanelController {
   followChart: typeof followChart;
   insertChart: typeof insertChart;
   insertPivot: typeof insertPivot;
+  insertPivotChart: typeof insertPivotChart;
   openChartPanel: typeof openChartPanel;
   openDataModelPanel: typeof openDataModelPanel;
   openExplainPanel: typeof openExplainPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
   openQueryPanel: typeof openQueryPanel;
+  openSlicerPanel: typeof openSlicerPanel;
   openSortPanel: typeof openSortPanel;
   syncPivotPanel: typeof syncPivotPanel;
 }

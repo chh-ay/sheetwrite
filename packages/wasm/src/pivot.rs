@@ -26,6 +26,7 @@ use rustc_hash::{FxHashMap, FxHasher};
 use crate::eval::analysis::grouping::{
     compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL,
 };
+use crate::float_text::NumberText;
 use crate::store::pivot_output::MAX_PIVOT_OUTPUT_CELLS;
 use crate::types::{FormulaError, Value};
 
@@ -147,7 +148,7 @@ fn fold_case(text: &str, folded: &mut String) {
 /// A keep-list: a row stays when its value equals one of `keep`.
 #[derive(Clone, Debug)]
 pub(crate) struct PivotFilter {
-    field: usize,
+    pub(crate) field: usize,
     keep: Vec<Value>,
     /// Indices into `keep` by key bucket, built once so checking a row costs
     /// one bucket lookup instead of a scan of every kept value. Kept values
@@ -187,7 +188,7 @@ impl PivotFilter {
     }
 
     /// Whether `value` passes; `folded` is a reused case-fold buffer.
-    fn keeps(&self, value: &Value, folded: &mut String) -> bool {
+    pub(crate) fn keeps(&self, value: &Value, folded: &mut String) -> bool {
         let indices = match value {
             Value::Text(text) if !text.is_empty() => {
                 fold_case(text, folded);
@@ -1114,7 +1115,7 @@ impl PivotLayout {
 pub(crate) fn field_name(header: &Value, field: usize) -> String {
     match header {
         Value::Text(text) if !text.is_empty() => text.to_string(),
-        Value::Number(number) => number.to_string(),
+        Value::Number(number) => NumberText::of(*number).as_str().to_string(),
         Value::Bool(true) => "TRUE".into(),
         Value::Bool(false) => "FALSE".into(),
         _ => format!("Column{}", field + 1),
@@ -1213,17 +1214,35 @@ struct CellScratch {
     cell_of_row: Vec<u32>,
     /// Base rows grouped by cell.
     order: Vec<u32>,
+    /// The axis depths of the current pass.
+    depths: (u32, u32),
+    /// Also visit cells with no base rows, for measures over other tables.
+    include_empty: bool,
 }
 
 impl CellScratch {
-    fn new(cells: usize, rows: usize) -> Self {
+    fn new(cells: usize, rows: usize, include_empty: bool) -> Self {
         Self {
             starts: vec![0; cells + 1],
             next: Vec::with_capacity(cells + 1),
             cell_of_row: vec![NO_GROUP; rows],
             order: vec![0; rows],
+            depths: (0, 0),
+            include_empty,
         }
     }
+}
+
+/// One measure value cell of a pivot output and its filter context.
+pub(crate) struct MeasureCell<'a> {
+    /// Row-major offset of the cell in the output.
+    pub(crate) offset: usize,
+    /// Value-field slot of the measure.
+    pub(crate) slot: usize,
+    /// Base rows of the cell, ascending.
+    pub(crate) rows: &'a [u32],
+    /// The row and column groups of the cell.
+    pub(crate) groups: (u32, u32),
 }
 
 fn pair_key(row_group: u32, col_group: u32) -> u64 {
@@ -1246,16 +1265,42 @@ impl PivotCache {
         }
     }
 
-    /// Calls `evaluate(offset, slot, rows)` for every measure cell of
-    /// `layout`, where `rows` (ascending) are the base rows of that cell's
-    /// filter context. For each pair of axis depths, every leaf group maps
-    /// to the output position of its ancestor at that depth, and one
-    /// counting pass over the rows lists each cell's rows together.
+    /// The definition the cache was built from, without measure values.
+    pub(crate) fn definition(&self) -> &PivotDefinition {
+        &self.definition
+    }
+
+    /// Depth of a row (`on_rows`) or column group: 0 for the grand total.
+    pub(crate) fn group_depth(&self, on_rows: bool, group: u32) -> usize {
+        self.axis(on_rows).groups[group as usize].depth as usize
+    }
+
+    /// The label of a row or column group's ancestor at axis level `level`,
+    /// which must be below the group's depth.
+    pub(crate) fn path_label(&self, on_rows: bool, group: u32, level: usize) -> Value {
+        self.axis(on_rows).level_label(group, level)
+    }
+
+    fn axis(&self, on_rows: bool) -> &Axis {
+        if on_rows {
+            &self.row_axis
+        } else {
+            &self.col_axis
+        }
+    }
+
+    /// Calls `evaluate` for every measure cell of `layout` with the base
+    /// rows of that cell's filter context. For each pair of axis depths,
+    /// every leaf group maps to the output position of its ancestor at that
+    /// depth, and one counting pass over the rows lists each cell's rows
+    /// together. Cells with no base rows are visited only with
+    /// `include_empty`.
     #[inline(never)]
     pub(crate) fn visit_measure_cells(
         &self,
         layout: &PivotLayout,
-        evaluate: &mut dyn FnMut(usize, usize, &[u32]),
+        include_empty: bool,
+        evaluate: &mut dyn FnMut(&MeasureCell<'_>),
     ) {
         if layout.header_rows == 0 || !self.outputs.iter().any(|value| value.measure.is_some()) {
             return;
@@ -1266,7 +1311,11 @@ impl PivotCache {
         // Cell index `row position * width + column position` stays under
         // the output cell bound, so it fits in `u32`.
         let width = layout.col_groups.len();
-        let mut scratch = CellScratch::new(layout.row_groups.len() * width, self.row_leaf.len());
+        let mut scratch = CellScratch::new(
+            layout.row_groups.len() * width,
+            self.row_leaf.len(),
+            include_empty,
+        );
 
         for row_depth in 0..=self.row_axis.width as u32 {
             let row_cells =
@@ -1275,6 +1324,7 @@ impl PivotCache {
                 let col_cells =
                     self.ancestor_positions(&self.col_axis, col_depth, &col_positions, false);
                 scratch.starts.fill(0);
+                scratch.depths = (row_depth, col_depth);
                 for (row, cell) in scratch.cell_of_row.iter_mut().enumerate() {
                     let row_leaf = self.row_leaf[row];
                     *cell = NO_GROUP;
@@ -1299,13 +1349,15 @@ impl PivotCache {
         &self,
         layout: &PivotLayout,
         scratch: &mut CellScratch,
-        evaluate: &mut dyn FnMut(usize, usize, &[u32]),
+        evaluate: &mut dyn FnMut(&MeasureCell<'_>),
     ) {
         let CellScratch {
             starts,
             next,
             cell_of_row,
             order,
+            depths,
+            include_empty,
         } = scratch;
         for index in 1..starts.len() {
             starts[index] += starts[index - 1];
@@ -1321,7 +1373,14 @@ impl PivotCache {
         let width = layout.col_groups.len();
         for cell in 0..starts.len() - 1 {
             let rows = &order[starts[cell] as usize..starts[cell + 1] as usize];
-            if rows.is_empty() {
+            let groups = (
+                layout.row_groups[cell / width],
+                layout.col_groups[cell % width],
+            );
+            let shown_here = self.row_axis.groups[groups.0 as usize].depth == depths.0
+                && self.col_axis.groups[groups.1 as usize].depth == depths.1
+                && self.shows_values(groups.0);
+            if rows.is_empty() && !(*include_empty && shown_here) {
                 continue;
             }
             let offset = (layout.header_rows + cell / width) * layout.cols
@@ -1329,7 +1388,12 @@ impl PivotCache {
                 + (cell % width) * layout.value_slots;
             for (slot, value) in self.outputs.iter().enumerate() {
                 if value.measure.is_some() {
-                    evaluate(offset + slot, slot, rows);
+                    evaluate(&MeasureCell {
+                        offset: offset + slot,
+                        slot,
+                        rows,
+                        groups,
+                    });
                 }
             }
         }
@@ -1842,11 +1906,14 @@ impl PivotCache {
     /// and one of its keys; the fields named on each axis must be its outer
     /// levels, so they name a group the output shows. Anything the output
     /// does not show is `#REF!`, as in Excel. Names compare without case.
+    /// The cache holds no measure values, so `measure_value(offset)` reads
+    /// the written output cell of a measure.
     pub(crate) fn data_value(
         &self,
         layout: &PivotLayout,
         data_field: &str,
         items: &[(String, Value)],
+        measure_value: &dyn Fn(usize) -> Value,
     ) -> Result<Value, FormulaError> {
         let definition = &self.definition;
         let wanted = data_field.to_lowercase();
@@ -1887,7 +1954,12 @@ impl PivotCache {
             + layout.label_cols
             + col * layout.value_slots
             + slot;
-        match self.cell(layout, offset) {
+        let value = if self.outputs[slot].measure.is_some() {
+            measure_value(offset)
+        } else {
+            self.cell(layout, offset)
+        };
+        match value {
             Value::Blank => Err(FormulaError::Ref),
             value => Ok(value),
         }

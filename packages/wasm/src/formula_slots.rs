@@ -407,6 +407,12 @@ impl FormulaStore {
         self.track(id);
     }
 
+    /// Whether any formula calls a volatile function, including the runtime
+    /// references `OFFSET` and `INDIRECT`.
+    pub(crate) fn has_volatile(&self) -> bool {
+        !self.volatile.is_empty()
+    }
+
     /// Select edit-barrier seeds without walking the formula syntax tree.
     pub(crate) fn is_volatile(&self, id: FormulaId) -> bool {
         self.volatile.contains(id)
