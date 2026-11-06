@@ -143,6 +143,7 @@ function content(chart: WorkbookSnapshot["sheets"][number]["charts"]): Dashboard
                 name: "Sum of Amount",
                 values: [2],
                 categories: ["West"],
+                categoryLevels: [],
                 numberFormats: ["0.00"],
                 categoryFormats: [null],
                 numberLocale: null,
@@ -168,7 +169,7 @@ async function exported(dashboards?: DashboardExport[]) {
   return { bytes, warnings, files: unzipSync(bytes) };
 }
 
-it("writes a dashboard as a worksheet of its values and a chart with literal data", async () => {
+it("writes a dashboard as a worksheet of its values and a chart that reads the pivot item's cells", async () => {
   const { files, warnings } = await exported(content(snapshot().sheets[1]?.charts));
 
   const sheet = strFromU8(files["xl/worksheets/sheet2.xml"] ?? new Uint8Array());
@@ -185,15 +186,17 @@ it("writes a dashboard as a worksheet of its values and a chart with literal dat
   // No native pivot: the dashboard's pivot stays in metadata.
   expect(Object.keys(files).filter((name) => name.startsWith("xl/pivotTables/"))).toEqual([]);
 
+  // The chart reads West and 2 where the pivot item wrote them, with the values as its cache.
   const chartPart = Object.keys(files).find((name) => name.startsWith("xl/charts/"));
   const chart = strFromU8(files[chartPart ?? ""] ?? new Uint8Array());
   expect(chart).toContain(
-    '<c:cat><c:strLit><c:ptCount val="1"/><c:pt idx="0"><c:v>West</c:v></c:pt></c:strLit></c:cat>',
+    '<c:cat><c:strRef><c:f>&apos;Dash&apos;!$A$3:$A$3</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>West</c:v></c:pt></c:strCache></c:strRef></c:cat>',
   );
   expect(chart).toContain(
-    '<c:val><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="1"/><c:pt idx="0"><c:v>2</c:v></c:pt></c:numLit></c:val>',
+    '<c:val><c:numRef><c:f>&apos;Dash&apos;!$B$3:$B$3</c:f><c:numCache><c:formatCode>0.00</c:formatCode><c:ptCount val="1"/><c:pt idx="0"><c:v>2</c:v></c:pt></c:numCache></c:numRef></c:val>',
   );
-  expect(chart).not.toContain("<c:f>");
+  // The dashboard has no native pivot, so the chart is not a PivotChart in Excel.
+  expect(chart).not.toContain("<c:pivotSource>");
 
   expect(warnings.map((warning) => warning.message)).toEqual([
     "Dashboard sheets were written as worksheets of their current values and charts; they are interactive only in Sheetwrite",

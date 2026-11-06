@@ -40,7 +40,7 @@ if (!host) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
 // Pivot tables need the full engine.
-await initSheetwrite(undefined, await import("@sheetwrite/formulas"));
+await initSheetwrite({ engine: await import("@sheetwrite/formulas") });
 
 const workbook: Workbook = {
   activeSheet: "summary",

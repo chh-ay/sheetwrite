@@ -188,42 +188,50 @@ function chartKind(plot: XmlElement): ChartKind | undefined {
 }
 
 /**
- * Axis titles by axis role. The plot lists the category (or scatter X) axis
+ * Axis titles by axis role, and Excel's Multi-level Category Labels setting
+ * of the category axis. The plot lists the category (or scatter X) axis
  * first. A bar chart draws that axis on the left, where the renderer draws
  * `yTitle`. Producers disagree on `c:axPos` for bar charts, so it is not read.
  */
-function axisTitles(
+function readAxes(
   plotArea: XmlElement,
   plot: XmlElement,
   kind: ChartKind,
 ): ChartDefinition["axes"] {
-  const titleOf = (axisId: XmlElement | undefined) => {
+  const axisOf = (axisId: XmlElement | undefined) => {
     const id = axisId && xmlAttribute(axisId, "val");
-    const axis = plotArea.children.find(
+    return plotArea.children.find(
       (entry) =>
         ["catAx", "dateAx", "valAx"].includes(xmlLocalName(entry.name)) &&
         valueOf(entry, "axId") === id,
     );
-    return chartText(axis && xmlChild(axis, "title"));
   };
 
   const [first, second] = xmlChildren(plot, "axId");
-  const categoryTitle = titleOf(first);
-  const valueTitle = titleOf(second);
+  const categoryAxis = axisOf(first);
+  const categoryTitle = chartText(categoryAxis && xmlChild(categoryAxis, "title"));
+  const valueAxis = axisOf(second);
+  const valueTitle = chartText(valueAxis && xmlChild(valueAxis, "title"));
   const xTitle = kind === "bar" ? valueTitle : categoryTitle;
   const yTitle = kind === "bar" ? categoryTitle : valueTitle;
-  if (xTitle === undefined && yTitle === undefined) return undefined;
+  // A CT_Boolean without `val` is true.
+  const flat = categoryAxis && xmlChild(categoryAxis, "noMultiLvlLbl");
+  const flatLabels =
+    flat !== undefined && ["1", "true", undefined].includes(xmlAttribute(flat, "val"));
+  if (xTitle === undefined && yTitle === undefined && !flatLabels) return undefined;
   return {
     ...(xTitle === undefined ? {} : { xTitle }),
     ...(yTitle === undefined ? {} : { yTitle }),
+    ...(flatLabels ? { multiLevelLabels: false } : {}),
   };
 }
 
 /**
  * The chart before model validation, or undefined when its DrawingML has no
  * model equivalent. A chart over a pivot that Sheetwrite wrote (`pivot` from
- * the authored chart) holds the pivot's values as literal data, so it keeps
- * no series and reads the pivot again.
+ * the authored chart) holds the pivot's values, so it keeps no series and
+ * reads the pivot again; it may be an Excel PivotChart of a native pivot.
+ * Other PivotCharts stay preserved.
  */
 function readDefinition(
   root: XmlElement,
@@ -234,7 +242,8 @@ function readDefinition(
 ): ChartDefinition | undefined {
   const chart = xmlChild(root, "chart");
   const plotArea = chart && xmlChild(chart, "plotArea");
-  if (!chart || !plotArea || xmlChild(root, "pivotSource")) return undefined;
+  const pivotChart = xmlChild(root, "pivotSource") !== undefined;
+  if (!chart || !plotArea || (pivotChart && pivot?.pivot === undefined)) return undefined;
 
   // Combination charts hold several plots; the model has one kind per chart.
   const plots = plotArea.children.filter((node) => xmlLocalName(node.name).endsWith("Chart"));
@@ -255,7 +264,7 @@ function readDefinition(
   const legend: ChartDefinition["legend"] = legendNode
     ? (Object.entries(LEGEND_POSITIONS).find(([code]) => code === position)?.[1] ?? DEFAULT_LEGEND)
     : "none";
-  const axes = axisTitles(plotArea, plot, kind);
+  const axes = readAxes(plotArea, plot, kind);
   return {
     id,
     kind,

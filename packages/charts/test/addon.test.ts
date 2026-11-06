@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 
 import {
   createGrid,
@@ -6,25 +6,28 @@ import {
   isSheetwriteError,
   openChartViews,
   SheetwriteStore,
-  setChartRendererFactory,
-  setChartViewProviderFactory,
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 
+import { chartsAddon } from "../src/index.js";
 import { chartWorkbook, SALES, setCell } from "./fixtures.js";
-
-beforeAll(async () => {
-  await initSheetwrite();
-});
 
 const stores: SheetwriteStore[] = [];
 
 afterEach(() => {
-  setChartViewProviderFactory(null);
-  setChartRendererFactory(null);
-
   for (const store of stores.splice(0)) store.dispose();
 });
+
+/** Resolves with the first value `read` returns, checking after each task; the drawing code loads asynchronously. */
+async function until<T>(read: () => T | null | undefined): Promise<T> {
+  const MAX_TASKS = 50;
+  for (let task = 0; task < MAX_TASKS; task++) {
+    const value = read();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error("the value did not appear");
+}
 
 function openFailure(store: SheetwriteStore): unknown {
   try {
@@ -36,14 +39,12 @@ function openFailure(store: SheetwriteStore): unknown {
   return null;
 }
 
-describe("charts package registration", () => {
-  it("reports a missing chart backend as a typed failure until registration", async () => {
+describe("charts add-on", () => {
+  it("reports a missing chart backend as a typed failure until the add-on is installed", async () => {
+    await initSheetwrite();
     const store = new SheetwriteStore(chartWorkbook());
     stores.push(store);
-    setChartViewProviderFactory(null);
 
-    // Dynamic import is the behavior under test: loading the root must not register.
-    await import("../src/index.js");
     const failure = openFailure(store);
 
     expect(isSheetwriteError(failure)).toBe(true);
@@ -55,14 +56,11 @@ describe("charts package registration", () => {
     });
   });
 
-  it("opens live chart views after registration", async () => {
+  it("opens live chart views after initSheetwrite installs it", async () => {
+    await initSheetwrite({ addons: [chartsAddon()] });
     const store = new SheetwriteStore(chartWorkbook());
     stores.push(store);
 
-    // Dynamic, like above: a static import would load the root before the first test runs.
-    const charts = await import("../src/index.js");
-
-    charts.registerChartsBackend();
     setCell(store, 0, 0, 4);
     const views = openChartViews(store);
 
@@ -73,9 +71,8 @@ describe("charts package registration", () => {
     }
   });
 
-  it("draws the charts of a grid after registration", async () => {
-    const charts = await import("../src/index.js");
-    charts.registerChartsBackend();
+  it("draws the charts of a grid created after install once the drawing code loads", async () => {
+    await initSheetwrite({ addons: [chartsAddon()] });
     const restoreCanvas = installCanvasTestStubs();
     const host = document.createElement("div");
     document.body.append(host);
@@ -85,29 +82,13 @@ describe("charts package registration", () => {
     });
 
     try {
-      expect(host.querySelector(".sheetwrite-chart")?.getAttribute("role")).toBe("img");
+      const chart = await until(() => host.querySelector(".sheetwrite-chart"));
+      expect(chart.getAttribute("role")).toBe("img");
       expect(host.querySelector(".sheetwrite-object-fallback")).toBeNull();
     } finally {
       grid.destroy();
       host.remove();
       restoreCanvas();
-    }
-  });
-
-  it("registers the backend when a host only imports the register entry", async () => {
-    const store = new SheetwriteStore(chartWorkbook());
-    stores.push(store);
-    setChartViewProviderFactory(null);
-
-    // The side effect runs on first evaluation, so no other test may import this entry.
-    await import("../src/register.js");
-    setCell(store, 0, 0, 7);
-    const views = openChartViews(store);
-
-    try {
-      expect(views.get(SALES)?.series[0]?.values).toEqual([7, null, null]);
-    } finally {
-      views.dispose();
     }
   });
 });

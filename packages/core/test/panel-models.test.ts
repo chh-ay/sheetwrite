@@ -214,6 +214,47 @@ describe("values of a chart over a pivot", () => {
       ],
     );
   });
+
+  it("fills the category levels from the outer row fields, outermost first", () => {
+    // Year, then region, then segment, in tabular layout: a repeated outer label is blank.
+    const output = {
+      rows: 6,
+      cols: 4,
+      headerRows: 1,
+      labelCols: 3,
+      cells: [
+        ...["Year", "Region", "Segment", "Sum of Amount"],
+        ...[2024, "East", "Online", 1],
+        ...[null, null, "Retail", 2],
+        ...[null, "West", "Retail", 3],
+        ...[2025, "West", "Retail", 4],
+        ...[null, null, "Online", 5],
+      ],
+    };
+    const [series] = pivotChartView(chart, output, []).series;
+
+    expect(series?.categories).toEqual(["Online", "Retail", "Retail", "Retail", "Online"]);
+    // West under 2025 starts a new group because the year group starts there.
+    expect(series?.categoryLevels).toEqual([
+      { labels: [2024, null, null, 2025, null], formats: [null, null, null, null, null] },
+      { labels: ["East", null, "West", "West", null], formats: [null, null, null, null, null] },
+    ]);
+    expect(series?.values).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("keeps one category level for a pivot with one row field", () => {
+    const output = {
+      rows: 3,
+      cols: 2,
+      headerRows: 1,
+      labelCols: 1,
+      cells: ["Region", "Sum of Amount", "East", 1, "West", 2],
+    };
+    const [series] = pivotChartView(chart, output, []).series;
+
+    expect(series?.categories).toEqual(["East", "West"]);
+    expect(series?.categoryLevels).toEqual([]);
+  });
 });
 
 describe("measures in the field list and the Measures panel", () => {

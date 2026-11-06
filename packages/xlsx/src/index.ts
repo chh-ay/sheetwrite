@@ -1,4 +1,4 @@
-export { registerXlsxBackends } from "./registration.js";
+export { xlsxAddon } from "./addon.js";
 export {
   buildXlsxModel,
   sheetwriteTableExportBackend,

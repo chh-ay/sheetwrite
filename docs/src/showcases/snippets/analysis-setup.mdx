@@ -1,7 +1,9 @@
 ```ts
 // Pivot tables need the full engine; charts draw through their package
-await initSheetwrite(undefined, await import("@sheetwrite/formulas"));
-registerChartsBackend();
+await initSheetwrite({
+  engine: await import("@sheetwrite/formulas"),
+  addons: [chartsAddon()],
+});
 
 grid.setPivot({ id, source, anchor,
   rows: [MONTH], columns: [REGION],

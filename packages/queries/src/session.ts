@@ -2,6 +2,7 @@ import type {
   ApplyTransactionResult,
   DocumentOp,
   Grid,
+  QueryCommands,
   Range,
   SavedQuery,
   SavedQueryOutput,
@@ -10,7 +11,6 @@ import type {
   Workbook,
   WorkbookTable,
 } from "@sheetwrite/core";
-import { registerQueryCommands } from "@sheetwrite/core";
 
 import { sessionCommands } from "./commands.js";
 import { QueryError } from "./errors.js";
@@ -342,11 +342,15 @@ function planOutput(
   return { range, patches };
 }
 
-/** Builds a session over an already loaded engine; the package entry points load it. */
+/**
+ * Builds a session over an already loaded engine; the queries add-on loads it.
+ * `registerCommands` shows the grid's Data commands while the session lives.
+ */
 export function createSessionWithEngine(
   grid: Grid,
   engine: QueryEngine,
   options: QuerySessionOptions,
+  registerCommands: (commands: QueryCommands) => () => void,
 ): QuerySession {
   const lifetime = new AbortController();
 
@@ -508,7 +512,7 @@ export function createSessionWithEngine(
 
   // The grid's Get Data, Refresh All and Queries & Connections commands appear
   // while this session is alive.
-  const unregister = registerQueryCommands(grid, sessionCommands(session));
+  const unregister = registerCommands(sessionCommands(session));
 
   return session;
 }

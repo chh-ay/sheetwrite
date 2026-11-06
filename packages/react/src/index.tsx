@@ -134,6 +134,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
       mutationPolicy,
       transactionResourceLimits,
       hyperlinkActivation,
+      addons,
       renderers,
       editors,
       overscan,

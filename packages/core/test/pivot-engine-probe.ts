@@ -13,7 +13,7 @@ import {
 import type { DocumentOp, PivotDefinition } from "../src/index.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const restore = installCanvasTestStubs();
 const host = document.createElement("div");
 document.body.appendChild(host);

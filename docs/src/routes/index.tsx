@@ -396,8 +396,8 @@ function Landing() {
               <pre className="sw-lp-engines__code">
                 <code>
                   <span className="sw-code-keyword">await</span>{" "}
-                  <span className="sw-code-function">initSheetwrite</span>(
-                  <span className="sw-code-number">undefined</span>, formulas);
+                  <span className="sw-code-function">initSheetwrite</span>
+                  {"({ engine: formulas });"}
                 </code>
               </pre>
             </article>

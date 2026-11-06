@@ -138,9 +138,9 @@ export type GridPresentation = "spreadsheet" | "data-grid";
 
 /** Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`. */
 export interface GridActions {
-  /** Open the configured version history panel. Requires `GridConfig.history`. */
+  /** Open the version history panel. Requires the history add-on for this grid. */
   versionHistory(): void;
-  /** Open the configured named-version form. Requires `GridConfig.history`. */
+  /** Open the named-version form. Requires the history add-on for this grid. */
   saveVersion(): void;
   /** Add a dashboard sheet named `DashboardN` and show it, as Insert › New Dashboard does. */
   newDashboard(): void;
@@ -571,11 +571,6 @@ export interface GridConfig {
    * toolbar instead.
    */
   ribbon?: boolean | RibbonConfig;
-  /**
-   * Optional history command capability, supplied by `createHistoryCommands`
-   * from `@sheetwrite/core/history`. No history code loads until it is invoked.
-   */
-  history?: (grid: Grid, action: "open" | "save") => void;
   /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
   icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
@@ -597,6 +592,9 @@ export interface GridConfig {
    */
   keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
+
+/** Per-grid add-on settings, keyed by add-on name. */
+export type SheetwriteAddonSettings = Readonly<Record<string, unknown>>;
 
 /**
  * Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
@@ -685,6 +683,11 @@ export interface GridOptions {
   minColumns?: number;
   /** Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false. */
   config?: GridConfig;
+  /**
+   * Settings for add-ons installed by `initSheetwrite({ addons })`, keyed by
+   * add-on name. A name that was not installed rejects.
+   */
+  addons?: SheetwriteAddonSettings;
 }
 
 /** Case, whole-cell, sheet, and column constraints for grid search. */
@@ -1070,15 +1073,14 @@ export interface Grid {
    */
   exportCsv(filename: string): void;
   /**
-   * Download the active sheet through the registered XLSX backend.
+   * Download the active sheet through the installed XLSX add-on.
    *
    * @example
    * ```ts
    * import type { Grid } from "@sheetwrite/core";
-   * import { registerXlsxBackends } from "@sheetwrite/xlsx";
    *
+   * // Requires `initSheetwrite({ addons: [xlsxAddon()] })` from `@sheetwrite/xlsx`.
    * async function downloadXlsx(grid: Grid) {
-   *   await registerXlsxBackends();
    *   await grid.exportXlsx("sales.xlsx");
    * }
    * ```

@@ -235,19 +235,24 @@ head is leased for the call, so a concurrent prune cannot remove its records.
 
 ### Version history panel
 
-Pass `createHistoryCommands` from `@sheetwrite/core/history` as `GridConfig.history`
+Install `historyAddon()` from `@sheetwrite/core/history` and give a grid its
+archive and author in `createGrid(host, { addons: { history: { archive, authorId } } })`
 to show Review › **Version History** and **Save Version** in the full ribbon, the
-compact ribbon and the toolbar. The grid's first paint does not change: the panel
-loads as a separate chunk on the first command.
+compact ribbon and the toolbar. Options given to `historyAddon({ ... })` apply to
+every grid, and a grid's settings replace them field by field. The grid's first
+paint does not change: the panel loads as a separate chunk on the first command.
 
 ```ts compile title="Opt in to the version history commands"
-import { createGrid } from "@sheetwrite/core";
-import { createHistoryCommands, type HistoryArchive } from "@sheetwrite/core/history";
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import { historyAddon, type HistoryArchive } from "@sheetwrite/core/history";
+
+await initSheetwrite({ addons: [historyAddon()] });
 
 function mount(host: HTMLElement, archive: HistoryArchive, authorId: string) {
   return createGrid(host, {
     workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "Sheet1", rowCount: 10, columns: [] }] },
-    config: { ribbon: true, history: createHistoryCommands({ archive, authorId }) },
+    config: { ribbon: true },
+    addons: { history: { archive, authorId } },
   });
 }
 ```

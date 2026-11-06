@@ -38,16 +38,14 @@ export interface XlsxWorkbookBackend { toXlsxWorkbook(): Promise<Uint8Array>; }
 export declare function toXlsxTable(): Promise<Uint8Array>;
 /** Imports a table through the registered backend. */
 export declare function fromXlsxTable(): Promise<unknown>;
-/** Registers table export. */
-export declare function setXlsxTableExportBackend(backend: XlsxTableExportBackend): void;
-/** Registers table import. */
-export declare function setXlsxTableImportBackend(backend: XlsxTableImportBackend): void;
+/** Optional package installed by initSheetwrite. */
+export interface SheetwriteAddon { name: string; setup(context: unknown): void; }
+/** Loads the engine and installs add-ons. */
+export declare function initSheetwrite(options?: { addons?: SheetwriteAddon[] }): Promise<void>;
 /** Exports a workbook through the registered backend. */
 export declare function toXlsxWorkbook(): Promise<Uint8Array>;
 /** Imports a workbook through the registered backend. */
 export declare function fromXlsxWorkbook(): Promise<unknown>;
-/** Registers workbook interchange. */
-export declare function setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): void;
 /** Generic public fixture type. */
 export interface Box<T extends string = string> { value: T; }
 `;
