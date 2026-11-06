@@ -22,6 +22,7 @@
     "bench:release": "bun run src/release-capture.ts",
     "bench:release:smoke": "bun run src/release-capture.ts --smoke",
     "bench:release:machine": "bun run src/machine-capture.ts",
+    "bench:engine-comparison": "bun run src/engine-comparison.ts",
     "bench:prefetch": "bun run src/datasource-prefetch-bench.ts",
     "bench:billion-cell": "bun run src/billion-cell-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
