@@ -38,6 +38,10 @@ export interface ShowcaseLayoutProps {
   readonly facts?: readonly ShowcaseFact[];
   /** Accessible name of the demo region. */
   readonly demoLabel: string;
+  /** The workbook or app the demo shows, named in a window bar above it. */
+  readonly demoTitle?: string;
+  /** Small controls that belong to the demo window itself (a width toggle, a status). */
+  readonly demoActions?: ReactNode;
   /** The live demo: the page's main element, given the full stage width. */
   readonly demo: ReactNode;
   /** The side panel: one or more {@link ShowcaseControlGroup}s. */
@@ -60,6 +64,8 @@ export function ShowcaseLayout({
   task,
   facts = [],
   demoLabel,
+  demoTitle,
+  demoActions,
   demo,
   controls,
   code,
@@ -80,6 +86,15 @@ export function ShowcaseLayout({
         </header>
         <div className="sw-showcase__stage" data-has-controls={controls !== undefined}>
           <section aria-label={demoLabel} className="sw-showcase__demo">
+            {demoTitle !== undefined && (
+              <header className="sw-showcase__demo-bar">
+                <span className="sw-showcase__demo-title">
+                  <Icon name="sheet" />
+                  {demoTitle}
+                </span>
+                {demoActions}
+              </header>
+            )}
             {demo}
           </section>
           {controls !== undefined && (
@@ -218,5 +233,57 @@ export function ShowcaseStatus({
     <span aria-live="polite" className="sw-badge" data-tone={STATUS_BADGE_TONE[tone]} role="status">
       {children}
     </span>
+  );
+}
+
+/** One step of a showcase's walkthrough: what to do, how, and what happens. */
+export interface ShowcaseStep {
+  readonly action: string;
+  readonly how: ReactNode;
+  readonly result: ReactNode;
+  /** A control that performs or prepares the step, such as "Go to the order". */
+  readonly control?: ReactNode;
+}
+
+/** The "Try it" walkthrough in the side panel: numbered steps with their results. */
+export function ShowcaseSteps({ steps }: { readonly steps: readonly ShowcaseStep[] }) {
+  return (
+    <ol className="sw-showcase__steps">
+      {steps.map((step) => (
+        <li key={step.action}>
+          <strong>{step.action}</strong>
+          <span>{step.how}</span>
+          {step.control}
+          <span className="sw-showcase__step-result">
+            <Icon name="arrow-right" />
+            {step.result}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** One keyboard shortcut and what it does. */
+export interface ShowcaseKey {
+  readonly keys: readonly string[];
+  readonly does: string;
+}
+
+/** The demo's keyboard model, as key caps beside what each does. */
+export function ShowcaseKeys({ keys }: { readonly keys: readonly ShowcaseKey[] }) {
+  return (
+    <dl className="sw-showcase__keys">
+      {keys.map((entry) => (
+        <div key={entry.does}>
+          <dt>
+            {entry.keys.map((key) => (
+              <kbd key={key}>{key}</kbd>
+            ))}
+          </dt>
+          <dd>{entry.does}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

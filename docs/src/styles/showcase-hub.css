@@ -968,6 +968,17 @@
   border-right: 0;
 }
 
+/* Like the real ribbon, the miniature folds its last groups when narrow. */
+@media (max-width: 30rem) {
+  .sw-hub-ribbon__groups > span:nth-child(n + 5) {
+    display: none;
+  }
+
+  .sw-hub-ribbon__groups > span:nth-child(4) {
+    border-right: 0;
+  }
+}
+
 .sw-hub-ribbon__groups b {
   width: 100%;
   height: 1.4rem;
