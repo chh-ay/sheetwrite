@@ -833,6 +833,7 @@
   }
 
   .sw-vw-stagewrap {
+    height: auto;
     min-height: 24rem;
   }
 
