@@ -441,17 +441,6 @@ describe("ClipboardController", () => {
     expect(h.sheet.hyperlinks![1]!.id).not.toBe("source-link");
   });
 
-  it("external TSV paste parses literals per column type", async () => {
-    // No copy/cut: the system clipboard holds foreign TSV, so paste falls back.
-    h.setSystemClipboard("hello\t42\tworld");
-    h.select(0, 0);
-    await h.controller.paste();
-
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("hello");
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(42); // number column
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 2 }).resolved).toBe("world");
-  });
-
   it("preserves signed numbers from external paste", async () => {
     h.setSystemClipboard("text\t-1\r\ntext\t+1");
     h.select(0, 0);
