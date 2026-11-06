@@ -6,9 +6,12 @@ import type {
   XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
-import type * as CodecModule from "./codec.js";
+/** Loads the codec chunk. */
+function importCodec() {
+  return import("./codec.js");
+}
 
-type Codec = typeof CodecModule;
+type Codec = Awaited<ReturnType<typeof importCodec>>;
 
 /**
  * Backends that load the codec on their first call. Once it loads, the
@@ -23,7 +26,7 @@ function lazyBackends(context: SheetwriteAddonContext): {
   let pending: Promise<Codec> | undefined;
 
   const codec = (): Promise<Codec> => {
-    pending ??= import("./codec.js").then((loaded) => {
+    pending ??= importCodec().then((loaded) => {
       context.xlsx({
         workbook: loaded.sheetwriteWorkbookBackend,
         tableImport: loaded.sheetwriteTableImportBackend,

@@ -129,6 +129,7 @@ const chartsChunks = classifyLazyChunks("charts.html", "charts-async");
 if (chartsChunks.size === 0) throw new Error("Vite emitted no lazy charts chunk");
 const queryChunks = classifyLazyChunks("queries.html", "queries-async");
 if (queryChunks.size === 0) throw new Error("Vite emitted no lazy query chunk");
+classifyLazyChunks("addons.html", "addons-async");
 // Chunks already classified as optional-package code; the chrome walk below skips them.
 const optionalPackageChunks = new Set([...xlsxChunks, ...chartsChunks, ...queryChunks]);
 
@@ -256,7 +257,19 @@ if (queryWasmFiles.length !== 1) {
   throw new Error(`Expected one lazy query WASM asset, got ${queryWasmFiles.length}`);
 }
 
-const defaultWasmFiles = wasmFiles.filter((file) => !queryWasmFiles.includes(file));
+// The add-ons page imports `@sheetwrite/core/history`, whose diff kernel has
+// its own WASM that loads on the first version diff.
+const historyWasmFiles = wasmFiles.filter((file) => /(?:^|\/)sheetwrite_history_bg-[^/]*\.wasm$/.test(file));
+if (historyWasmFiles.length !== 1) {
+  throw new Error(`Expected one lazy history kernel WASM asset, got ${historyWasmFiles.length}`);
+}
+for (const file of historyWasmFiles) {
+  if (!rolesByFile.has(file)) addFile(file, "addons-async");
+}
+
+const defaultWasmFiles = wasmFiles.filter(
+  (file) => !queryWasmFiles.includes(file) && !historyWasmFiles.includes(file),
+);
 if (defaultWasmFiles.length !== 1) {
   throw new Error(`Expected one default Vite WASM asset, got ${defaultWasmFiles.length}`);
 }
