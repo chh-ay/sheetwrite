@@ -34,6 +34,8 @@ const LOG10_2_SHIFT: u32 = 18;
 /// Remainders and gaps are doubled or quadrupled, so 128-bit values keep
 /// this many spare high bits.
 const SMALL_HEADROOM_BITS: u32 = 3;
+/// The largest power of five below 2^64.
+const MAX_FIVE_POWER: u32 = 27;
 /// Doubles below `2^53` that have no fraction are exactly their integer.
 const EXACT_INTEGER_LIMIT: f64 = (1u64 << f64::MANTISSA_DIGITS) as f64;
 /// Big integer width: the largest value, the denominator `2^1074` of a
@@ -72,8 +74,11 @@ impl Digits {
         if digits == 10u64.pow(count) {
             exponent += 1;
         }
-        while digits.is_multiple_of(10) {
-            digits /= 10;
+        // Large steps first: each division is a slow 64-bit divide.
+        for factor in [100_000_000, 10_000, 100, 10] {
+            while digits.is_multiple_of(factor) {
+                digits /= factor;
+            }
         }
         Self { digits, exponent }
     }
@@ -427,13 +432,19 @@ fn scale(binary: &Binary, places: i32) -> Scale {
     scale_small(binary, places).unwrap_or_else(|| scale_big(binary, places))
 }
 
+/// `5^exponent` when it fits 64 bits, by plain multiplications (a checked
+/// 64-bit multiplication is a 128-bit library call in WebAssembly).
+fn five_power(exponent: u32) -> Option<u64> {
+    (exponent <= MAX_FIVE_POWER).then(|| (0..exponent).fold(1, |power, _| power * 5))
+}
+
 /// The 128-bit path: a power-of-two denominator, or a numerator and
 /// denominator below 2^64. Powers of five up to `5^27` fit 64 bits, so the
 /// only wide multiplication is the mantissa times one of them.
 fn scale_small(binary: &Binary, places: i32) -> Option<Scale> {
     let powers = Powers::of(binary, places);
-    let fives_up = u128::from(5u64.checked_pow(powers.fives_up)?);
-    let fives_down = u128::from(5u64.checked_pow(powers.fives_down)?);
+    let fives_up = u128::from(five_power(powers.fives_up)?);
+    let fives_down = u128::from(five_power(powers.fives_down)?);
     let gap = shifted(fives_up, powers.twos_up)?;
     let denominator = shifted(fives_down, powers.twos_down)?;
     let numerator = shifted(fives_up * u128::from(binary.mantissa), powers.twos_up)?;
