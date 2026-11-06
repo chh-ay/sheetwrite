@@ -339,6 +339,9 @@ const insertPivotChartOf =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertPivotChart(grid, kind);
 
+/** Insert › Dashboard › KPI Card opens the measure picker; the panel code loads on first use. */
+const insertKpi = async (grid: Grid): Promise<void> => (await loadPanels(grid)).openKpiPanel(grid);
+
 /** Insert › Filters › Slicer opens the Insert Slicers list; the panel code loads on first use. */
 const insertSlicer = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openSlicerPanel(grid);
@@ -740,6 +743,13 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
               },
             ),
             id: "newDashboard",
+          },
+          {
+            ...button("KPI Card", "dashboard", insertKpi, "newDashboard", { large: true }),
+            // A KPI card is a dashboard item over a data model measure.
+            available: (grid) =>
+              activeSheetIsDashboard(grid) &&
+              (grid.store.getWorkbook().dataModel?.measures?.length ?? 0) > 0,
           },
         ],
       },

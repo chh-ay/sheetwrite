@@ -6,8 +6,12 @@
 
 import { baseTable, relatedTables, withModelField } from "../panels/pivot-model.js";
 import type { CellScalar } from "../types/cell.js";
-import type { DashboardChartItem, DashboardSlicerItem } from "../types/dashboard.js";
-import type { TableRelationship } from "../types/data-model.js";
+import type {
+  DashboardChartItem,
+  DashboardKpiItem,
+  DashboardSlicerItem,
+} from "../types/dashboard.js";
+import type { DataModel, TableRelationship } from "../types/data-model.js";
 import type { Sheet } from "../types/document.js";
 import type { PivotDefinition, PivotFilter } from "../types/pivot.js";
 import type { WorkbookTable } from "../types/table.js";
@@ -132,6 +136,36 @@ function chartPivot(
   };
 }
 
+/**
+ * The hidden pivot of a KPI card: its measure over the measure's home table,
+ * with no rows or columns, filtered by every slicer that reaches that table.
+ * Its output is the measure's caption over its one value.
+ */
+function kpiPivot(
+  item: DashboardKpiItem,
+  model: DataModel | undefined,
+  slicers: ReturnType<typeof slicersOf>,
+  tables: readonly WorkbookTable[],
+): PivotDefinition | null {
+  const measure = model?.measures?.find((candidate) => candidate.id === item.measure);
+  if (measure === undefined) return null;
+  const pivot: PivotDefinition = {
+    id: `kpi-data-${item.id}`,
+    name: measure.name,
+    source: { model: { table: measure.table, fields: [] } },
+    anchor: { row: 0, col: 0 },
+    rows: [],
+    columns: [],
+    values: [{ measure: measure.id }],
+  };
+  const relationships = model?.relationships ?? [];
+  return slicers.reduce(
+    (current, { item: slicer, values }) =>
+      values === undefined ? current : sliced(current, slicer, values, tables, relationships),
+    pivot,
+  );
+}
+
 /** What the engine computes for a dashboard, and where its hidden pivots are. */
 export interface DashboardPayload {
   /** The sheet's pivots in their order, then the hidden pivots. */
@@ -144,20 +178,22 @@ export interface DashboardPayload {
  * The definitions the engine computes for the pivots of `sheet`: first its
  * pivots in their order, each with the keep-list of every slicer that
  * reaches it, then one hidden pivot per slicer that marks values with no data
- * and one per chart item. Undefined when nothing differs from the saved
+ * and one per chart item and KPI card. Undefined when nothing differs from the saved
  * definitions.
  */
 export function dashboardPayload(
   sheet: Sheet,
   sheets: readonly Sheet[],
-  relationships: readonly TableRelationship[],
+  model: DataModel | undefined,
   overrides: SlicerOverrides,
 ): DashboardPayload | undefined {
   const slicers = slicersOf(sheet, overrides);
-  const charts = (sheet.dashboard?.items ?? []).filter(
-    (item): item is DashboardChartItem => item.kind === "chart",
-  );
-  if (slicers.length === 0 && charts.length === 0) return undefined;
+  const items = sheet.dashboard?.items ?? [];
+  const charts = items.filter((item): item is DashboardChartItem => item.kind === "chart");
+  const kpis = items.filter((item): item is DashboardKpiItem => item.kind === "kpi");
+  if (slicers.length === 0 && charts.length === 0 && kpis.length === 0) return undefined;
+
+  const relationships = model?.relationships ?? [];
 
   const tables = sheets.flatMap((candidate) => candidate.tables ?? []);
   const pivots = (sheet.pivots ?? []).map((pivot) =>
@@ -179,5 +215,6 @@ export function dashboardPayload(
       add(item.id, dataPivot(item, slicers, tables, relationships));
   }
   for (const item of charts) add(item.id, chartPivot(item, sheet, pivots));
+  for (const item of kpis) add(item.id, kpiPivot(item, model, slicers, tables));
   return { pivots: all, hidden };
 }

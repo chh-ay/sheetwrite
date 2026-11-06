@@ -374,3 +374,50 @@ it("charts a dashboard pivot without its total, through the slicers, and one und
     "slicer",
   ]);
 });
+
+it("shows a measure on a KPI card in the slicers' filter context", async () => {
+  const input = snapshot();
+  input.workbook.dataModel = {
+    relationships: [],
+    measures: [{ id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" }],
+  };
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [];
+  dash.dashboard = {
+    items: [
+      {
+        id: "region",
+        box: { x: 0, y: 0, w: 3, h: 6 },
+        kind: "slicer",
+        field: { table: "orders", column: "region" },
+      },
+      {
+        id: "total",
+        box: { x: 3, y: 0, w: 3, h: 3 },
+        kind: "kpi",
+        measure: "twice",
+        numberFormat: "#,##0.0",
+      },
+    ],
+  };
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  await import("../src/dashboard/dashboard-view.js");
+  await Promise.resolve();
+  const card = () => host.querySelector(".sheetwrite-dashboard-kpi")?.textContent;
+
+  // Twice the sum of Amount: 2 × (1 + 2 + 3).
+  expect(card()).toBe("12.0");
+  expect(host.querySelector('[data-item-id="total"]')?.getAttribute("aria-label")).toBe("Twice");
+
+  // The Region slicer keeps West: 2 × 2.
+  const west = [...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value")].find(
+    (candidate) => candidate.textContent === "West",
+  );
+  west?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(card()).toBe("4.0");
+});

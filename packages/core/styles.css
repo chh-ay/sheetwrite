@@ -2492,6 +2492,28 @@ textarea.sheetwrite-ribbon-field {
   padding: 6px 8px;
 }
 
+/* A KPI card shows one value, large, in the middle of its box. */
+.sheetwrite-dashboard-kpi {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A KPI card shows one value, large, in the middle of its box. */
+.sheetwrite-dashboard-kpi {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The chart renderer sizes its drawing to the whole body. */
 .sheetwrite-dashboard-item-body.sheetwrite-dashboard-chart {
   overflow: hidden;
