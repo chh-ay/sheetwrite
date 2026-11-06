@@ -23,7 +23,6 @@
     color: var(--sw-fg);
   }
 
-
   /* Flight deck: an instrument panel in the demo palette, like the hub previews. */
   .sw-sp-flight {
     --sw-border: var(--sw-border-strong);
