@@ -1,0 +1,315 @@
+---
+title: Sheetwrite 0.7.0
+description: "Sheetwrite 0.7.0: dashboards, a data model with measures, in-place sort, linked workbooks, saved queries and version history, and what to change when you upgrade."
+---
+
+<Note>
+  0.7.0 is the next release and is not published yet. These notes track the changes already
+  merged for it.
+</Note>
+
+Sheetwrite 0.7.0 turns a workbook into an analysis tool. Tables relate to each other in a data
+model, measures calculate over it, and dashboards put pivots, slicers, PivotCharts and KPI cards
+on one sheet. Sort moves the cells, as Excel's Sort does. Formulas read other workbooks, saved
+queries refresh tables from your sources, and version history saves, compares and restores
+versions. Every add-on now installs through one call. Read the [breaking changes](#breaking-changes)
+before you upgrade.
+
+## Highlights
+
+<CardGroup cols={2}>
+  <Card title="Dashboards" icon="dashboard" href="/docs/features/analysis/dashboards/">
+    Pivots, slicers, PivotCharts and KPI cards on a 12-column dashboard sheet. Slicers filter
+    every pivot they reach through relationships.
+  </Card>
+  <Card title="Data model and measures" icon="chart" href="/docs/features/analysis/data-model/">
+    Relate tables one-to-many, pivot over related tables, and write measures with `CALCULATE`
+    and `ALL`.
+  </Card>
+  <Card title="Sort in place" icon="table" href="/docs/features/data/data-operations/#sort-cells-in-place">
+    Sort commands move the cells in Excel's sort order, as one undoable, synced change. The
+    display-only sort is now the view sort.
+  </Card>
+  <Card title="Linked workbooks" icon="file" href="/docs/features/formulas/">
+    Formulas such as `[Budget.xlsx]Annual!C10` read the values a link saved. Update, change or
+    break links from Edit Links.
+  </Card>
+  <Card title="Saved queries" icon="download" href="/docs/features/data/">
+    The optional `@sheetwrite/queries` engine refreshes tables from CSV, JSON or host data, and
+    XLSX keeps queries as Power Query M.
+  </Card>
+  <Card title="Version history" icon="history" href="/docs/features/data/persistence/#opt-in-version-archives">
+    Save named versions, compare two versions cell by cell with authors, and restore a
+    workbook, sheet or range.
+  </Card>
+  <Card title="Formula help" icon="formula" href="/docs/features/formulas/">
+    Autocomplete, an argument guide, live syntax errors, reference colours and Explain Formula
+    in the cell editor and the formula bar.
+  </Card>
+  <Card title="Compact ribbon" icon="ribbon" href="/docs/features/grid/">
+    One command model drives the toolbar, the full ribbon and a new compact ribbon for narrow
+    layouts.
+  </Card>
+</CardGroup>
+
+## Analysis
+
+### Data model
+
+- Workbook tables relate one-to-many by stable table and column IDs, with undoable, synced
+  `setRelationship` and `removeRelationship` operations
+  ([#368](https://github.com/chh-ay/sheetwrite/pull/368)).
+  `SheetwriteStore.getRelationshipStatus(id)` reports unmatched keys, duplicate lookup keys,
+  type mismatches and removed columns ([#373](https://github.com/chh-ay/sheetwrite/pull/373)).
+- Pivot tables use fields from related tables with the `{ model: { table, fields } }` source.
+  The pivot field list shows the columns of related tables, and adding one turns a table pivot
+  into a model pivot in one undo step ([#388](https://github.com/chh-ay/sheetwrite/pull/388),
+  [#406](https://github.com/chh-ay/sheetwrite/pull/406)).
+- Data › Data Tools has **Data Model**, **Relationships** and **Measures** panels
+  ([#396](https://github.com/chh-ay/sheetwrite/pull/396),
+  [#490](https://github.com/chh-ay/sheetwrite/pull/490)).
+
+### Measures
+
+- Measures are formulas over model columns, calculated in the filter context of each pivot cell,
+  with a `{ measure }` value field and `setMeasure` / `removeMeasure` operations
+  ([#419](https://github.com/chh-ay/sheetwrite/pull/419)).
+- Measures read related tables, refer to other measures by `[Name]`, follow renames, and
+  `GETPIVOTDATA` reads them by name ([#458](https://github.com/chh-ay/sheetwrite/pull/458)).
+- `CALCULATE(expression, filter, …)` with column comparisons and `ALL(Table[Column])` changes
+  the filter context ([#477](https://github.com/chh-ay/sheetwrite/pull/477)).
+
+### Dashboards
+
+- Dashboard sheets (`kind: "dashboard"`) hold pivot, slicer, chart and KPI items on a 12-column
+  grid. Items move and resize with the mouse and the keyboard, and Insert › New Dashboard adds
+  one ([#416](https://github.com/chh-ay/sheetwrite/pull/416),
+  [#438](https://github.com/chh-ay/sheetwrite/pull/438)).
+- Slicers filter every pivot whose table reaches the slicer column through relationships, and
+  dim or hide values that no row has under the other slicers
+  ([#467](https://github.com/chh-ay/sheetwrite/pull/467),
+  [#475](https://github.com/chh-ay/sheetwrite/pull/475)).
+- PivotCharts and KPI cards: a chart item charts a pivot, and a KPI card shows one measure in
+  the slicers' filter context ([#478](https://github.com/chh-ay/sheetwrite/pull/478),
+  [#479](https://github.com/chh-ay/sheetwrite/pull/479)).
+- XLSX export writes each dashboard as a worksheet of its current values, with PivotCharts as
+  native charts, and the dashboard opens as a dashboard again
+  ([#480](https://github.com/chh-ay/sheetwrite/pull/480),
+  [#503](https://github.com/chh-ay/sheetwrite/pull/503)).
+
+### Charts
+
+- Charts over a pivot plot its leaf items, as Excel PivotCharts do, and can plot only some of
+  its values, measures included ([#485](https://github.com/chh-ay/sheetwrite/pull/485),
+  [#498](https://github.com/chh-ay/sheetwrite/pull/498)).
+- Multi-level category labels, as Excel draws them, kept in XLSX as `c:multiLvlStrRef`
+  ([#501](https://github.com/chh-ay/sheetwrite/pull/501)).
+- XLSX import and export read and write Excel column, bar, line, area, pie, doughnut and scatter
+  charts ([#288](https://github.com/chh-ay/sheetwrite/pull/288)).
+
+## Data
+
+### Sort in place
+
+- `store.sortRange` and `grid.sortRange` sort the cells, as Excel does: one undoable, synced
+  change with the `permuteRows` operation and the `"sort"` commit reason. Formulas, merged
+  cells, spill ranges and tables follow Excel's rules
+  ([#378](https://github.com/chh-ay/sheetwrite/pull/378)).
+- Sort A to Z and Sort Z to A sort in place from the ribbon, the toolbar and the column menu.
+  Data › Custom Sort opens a Sort panel with sort levels, a header row and a "Sort view only"
+  option ([#393](https://github.com/chh-ay/sheetwrite/pull/393)).
+- Sorts use Excel's sort order: case-insensitive text in Excel's character order, errors after
+  logical values, and blanks last in both directions
+  ([#377](https://github.com/chh-ay/sheetwrite/pull/377)).
+
+### Linked workbooks
+
+- Formulas accept references to other workbooks, such as `[Budget.xlsx]Annual!C10`, and to
+  their defined names, such as `Budget.xlsx!Total`. They show the values the link saved, or
+  `#REF!` without them ([#430](https://github.com/chh-ay/sheetwrite/pull/430),
+  [#451](https://github.com/chh-ay/sheetwrite/pull/451),
+  [#500](https://github.com/chh-ay/sheetwrite/pull/500)).
+- XLSX import keeps external links and the values Excel saved, and export writes them back
+  ([#462](https://github.com/chh-ay/sheetwrite/pull/462)).
+- `externalLinksAddon({ resolve })` updates links from your resolver, points them at another
+  workbook or breaks them into values, as one undoable change. Data › Queries & Connections ›
+  Edit Links runs the same commands ([#481](https://github.com/chh-ay/sheetwrite/pull/481),
+  [#489](https://github.com/chh-ay/sheetwrite/pull/489)).
+
+### Saved queries
+
+- The optional `@sheetwrite/queries` package is a columnar query engine for CSV, JSON and typed
+  host batches, in a lazily loaded 85 KB gzip WebAssembly module
+  ([#370](https://github.com/chh-ay/sheetwrite/pull/370)).
+- Saved workbook queries refresh into workbook tables through `queriesAddon({ fetchSource })`:
+  one undoable, synced transaction per refresh, with sources loaded only through your callback
+  ([#383](https://github.com/chh-ay/sheetwrite/pull/383)).
+- Data › Get Data, Refresh All and Queries & Connections in the ribbon and toolbar. XLSX keeps
+  saved queries as Power Query M ([#394](https://github.com/chh-ay/sheetwrite/pull/394),
+  [#417](https://github.com/chh-ay/sheetwrite/pull/417)).
+
+### Version history
+
+- `historyAddon()` adds Review › Version History and Save Version: save named versions, compare
+  a version with the current document, preview it read-only, and restore the workbook, a sheet
+  or a range ([#421](https://github.com/chh-ay/sheetwrite/pull/421)).
+- `HistoryArchive` stores versions in content-addressed chunks through a
+  `HistoryStorageAdapter` or the built-in IndexedDB adapter, and `diffVersions` pages changed
+  cells with their authors, computed by a 17 KB gzip WebAssembly kernel that loads only when a
+  comparison opens ([#365](https://github.com/chh-ay/sheetwrite/pull/365),
+  [#390](https://github.com/chh-ay/sheetwrite/pull/390),
+  [#405](https://github.com/chh-ay/sheetwrite/pull/405)).
+- `SyncCoordinatorOptions.authorId` records who made each change
+  ([#386](https://github.com/chh-ay/sheetwrite/pull/386)).
+
+## Formulas
+
+- Defined-name formulas, named LAMBDAs and a Name Manager
+  ([#343](https://github.com/chh-ay/sheetwrite/pull/343)).
+- Formula help in the cell editor and the formula bar: autocomplete, an argument guide, live
+  syntax errors, reference colours and Formulas › Explain Formula
+  ([#301](https://github.com/chh-ay/sheetwrite/pull/301)).
+- Custom JavaScript functions with metadata install with `functionsAddon([...])` and appear in
+  Formulas › Insert Function ([#286](https://github.com/chh-ay/sheetwrite/pull/286),
+  [#466](https://github.com/chh-ay/sheetwrite/pull/466)).
+- The full engine adds Excel's engineering, complex number, Bessel, `CONVERT`, remaining
+  financial, Excel 2007 statistics, byte-width text and `GETPIVOTDATA` functions. Both engines
+  add 30 math functions, `LOOKUP`, `TRIMRANGE`, the `A` statistics and the information
+  functions. See [Excel function coverage](/docs/reference/excel-function-coverage/).
+
+## Grid and editing
+
+- The toolbar, the full ribbon and a new compact ribbon (`config.ribbon: { mode: "compact" }`)
+  render one command model ([#287](https://github.com/chh-ay/sheetwrite/pull/287)).
+- File › Import XLSX opens a workbook in the current grid, and `grid.importWorkbook` replaces
+  the document without recreating the grid ([#363](https://github.com/chh-ay/sheetwrite/pull/363)).
+- `grid.trimMemory()` gives back memory an open grid can build again
+  ([#313](https://github.com/chh-ay/sheetwrite/pull/313)).
+- Moving rows or columns moves the cells, as Excel's Insert Cut Cells does, and every reference
+  follows them ([#499](https://github.com/chh-ay/sheetwrite/pull/499)).
+
+## Performance
+
+Recalculation is 14–16% faster on average across the 53 formula workloads from dense formula
+IDs ([#367](https://github.com/chh-ay/sheetwrite/pull/367)), and another 9–17% from flat
+dependency arrays ([#389](https://github.com/chh-ay/sheetwrite/pull/389)), on Linux and Mac with
+both engines. Selected workloads:
+
+| Workload | Faster by | Pull request |
+| --- | --- | --- |
+| `COUNTIF` with a number criterion, 100k cells | 12–18× | [#385](https://github.com/chh-ay/sheetwrite/pull/385) |
+| `SUM` over two 100k ranges | 3.5–6.6× | [#402](https://github.com/chh-ay/sheetwrite/pull/402) |
+| Row edit in a 100,000-formula workbook | 3.8× | [#497](https://github.com/chh-ay/sheetwrite/pull/497) |
+| Range formulas over loaded pages | 3.0–3.1× | [#423](https://github.com/chh-ay/sheetwrite/pull/423) |
+| One-formula range edit, 100k workbook | 2.5–3.3× | [#389](https://github.com/chh-ay/sheetwrite/pull/389) |
+| Lookup edits and repeated lookups | 1.2–3.0× | [#428](https://github.com/chh-ay/sheetwrite/pull/428) |
+| First recalculation of 100k formulas | 1.5–1.7× | [#389](https://github.com/chh-ay/sheetwrite/pull/389) |
+| Loading formulas | 1.2–1.5× | [#463](https://github.com/chh-ay/sheetwrite/pull/463) |
+
+The dependency index for 100k formulas shrinks from 7.7 MB to 1.2 MB.
+
+## Breaking changes
+
+The [0.7.0 upgrade guide](/docs/start/upgrade-to-0-7-0/) lists every change with its
+replacement and pull request. The changes most apps meet:
+
+### Add-ons install through `initSheetwrite`
+
+<Compare before="0.6" after="0.7.0">
+
+```js partial="0.6 code; these imports and arguments no longer exist"
+import "@sheetwrite/charts/register";
+import "@sheetwrite/xlsx/register";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+```ts compile
+import { chartsAddon } from "@sheetwrite/charts";
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({
+  engine: formulas,
+  addons: [chartsAddon(), xlsxAddon()],
+});
+```
+
+</Compare>
+
+`registerFunction`, `registerQueryCommands`, `createQuerySession`, `createHistoryCommands` and
+`connectExternalLinks` are removed with the `/register` imports. Use `functionsAddon`,
+`queriesAddon` with `querySessionOf(grid)`, `historyAddon` and `externalLinksAddon`.
+
+### Sort moves the cells
+
+<Compare before="0.6" after="0.7.0">
+
+```js partial="0.6 code"
+// Sorted the view only.
+grid.sortBy(2, true);
+grid.setSort([{ col: 2, ascending: true }]);
+```
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+export function sortByRegion(grid: Grid) {
+  // Sorts the cells, as Excel does.
+  grid.sortBy(2, true);
+  // The display-only sort.
+  grid.setViewSort([{ col: 2, ascending: true }]);
+}
+```
+
+</Compare>
+
+`store.sortBy`, `store.sortByMulti`, `grid.setSort` and `grid.sortByMulti` are removed. An
+imported worksheet `sortState` is kept, not applied as a view sort.
+
+### Revisions move to version history
+
+<Compare before="0.6" after="0.7.0">
+
+```js partial="0.6 code"
+const revisions = new RevisionCoordinator(adapter, { documentId, serverVersion });
+const [latest] = await revisions.list();
+await revisions.restore(latest.version, crypto.randomUUID());
+```
+
+```ts compile
+import type { Grid, SyncCoordinator } from "@sheetwrite/core";
+import { HistoryArchive, type HistoryStorageAdapter } from "@sheetwrite/core/history";
+
+export async function restoreLatest(
+  grid: Grid,
+  sync: SyncCoordinator,
+  storage: HistoryStorageAdapter,
+) {
+  const archive = await HistoryArchive.open({ documentId: "workbook-42", storage });
+  const { versions } = await archive.listVersions({ maxEntries: 20 });
+  const latest = versions[0];
+  if (latest === undefined) return;
+  return archive.restoreVersion(grid, latest.id, { kind: "workbook" }, { sync });
+}
+```
+
+</Compare>
+
+### Errors and cancellation
+
+- Bad input and passed limits throw a `SheetwriteError` (`invalid-argument`, `not-found`,
+  `invalid-limits`) instead of `RangeError`, `TypeError` or `Error`
+  ([#309](https://github.com/chh-ay/sheetwrite/pull/309)).
+- Aborted XLSX, CSV, comment and sync calls reject with the signal's reason
+  ([#294](https://github.com/chh-ay/sheetwrite/pull/294),
+  [#320](https://github.com/chh-ay/sheetwrite/pull/320)).
+- A WebAssembly trap throws `engine-failed` and makes every grid on that engine read-only
+  ([#296](https://github.com/chh-ay/sheetwrite/pull/296)).
+
+<Card title="Upgrade to 0.7.0" icon="arrow-right" href="/docs/start/upgrade-to-0-7-0/" cta="Open the guide">
+  Every removed and changed API with its replacement, the document operations to accept on your
+  server, and the behavior changes you will notice.
+</Card>
