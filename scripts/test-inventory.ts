@@ -2,20 +2,39 @@
  * Counts the repository's tests and lists the cases that match a pruning
  * category of issue #326, as Markdown on stdout.
  *
- *   bun scripts/test-inventory.ts [--open-prs]
+ *   bun scripts/test-inventory.ts [--open-prs] [--unique-coverage <directory>]
  *
  * The categories come from static patterns, so every listed case is a
  * candidate for review, not a verdict. `--open-prs` asks `gh` which open pull
  * requests touch each candidate file; a case in such a file stays until that
  * pull request lands.
+ *
+ * `--unique-coverage` runs every package test file alone under Bun coverage,
+ * writing one LCOV report per file below `<directory>`, and lists for each
+ * file the source lines that no other package test file covers. A file with
+ * few unique lines repeats paths that other files already cover. It needs
+ * built packages and runs every package test file once more on its own, so it
+ * belongs on a build machine.
  */
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { parseLcov } from "./coverage-check.js";
 import { captureProcess } from "./script-io.js";
 
 const ROOT = resolve(import.meta.dir, "..");
 const OPEN_PULL_REQUEST_LIMIT = "200";
+
+/** Package test roots whose files run under `test:coverage:ts`. */
+const PACKAGE_TEST_ROOTS = [
+  "packages/core/test",
+  "packages/react/test",
+  "packages/vue/test",
+  "packages/svelte/test",
+  "packages/xlsx/test",
+  "packages/charts/test",
+  "packages/queries/test",
+] as const;
 
 /** Test areas in the order issue #326 reports them. */
 const AREAS = [
@@ -138,6 +157,76 @@ async function openPullRequestsByFile(): Promise<Map<string, number[]>> {
   return byFile;
 }
 
+/** Covered `path:line` keys of runtime package sources in one LCOV report. */
+function coveredSourceLines(report: string): Set<string> {
+  const covered = new Set<string>();
+  for (const record of parseLcov(report, ROOT, "recompute")) {
+    if (!/^packages\/[^/]+\/src\//u.test(record.path)) continue;
+    for (const [line, hits] of record.lineCounts) {
+      if (hits > 0) covered.add(`${record.path}:${line}`);
+    }
+  }
+  return covered;
+}
+
+/**
+ * Runs each package test file alone under coverage and reports, per file,
+ * how many source lines it covers and how many of them no other file covers.
+ */
+async function uniqueCoverageReport(
+  testFiles: readonly string[],
+  directory: string,
+): Promise<string[]> {
+  await rm(directory, { recursive: true, force: true });
+
+  const coveredByFile = new Map<string, Set<string>>();
+  const failedFiles: string[] = [];
+  for (const [index, file] of testFiles.entries()) {
+    const reportDirectory = resolve(directory, String(index));
+    await mkdir(reportDirectory, { recursive: true });
+    const child = Bun.spawn(
+      [
+        "bun",
+        "test",
+        file,
+        "--coverage",
+        "--coverage-reporter=lcov",
+        `--coverage-dir=${reportDirectory}`,
+      ],
+      { cwd: ROOT, stdin: "ignore", stdout: "ignore", stderr: "ignore" },
+    );
+    if ((await child.exited) !== 0) {
+      failedFiles.push(file);
+      continue;
+    }
+    const report = await readFile(resolve(reportDirectory, "lcov.info"), "utf8");
+    coveredByFile.set(file, coveredSourceLines(report));
+  }
+
+  const coveringFiles = new Map<string, number>();
+  for (const covered of coveredByFile.values()) {
+    for (const line of covered) coveringFiles.set(line, (coveringFiles.get(line) ?? 0) + 1);
+  }
+  const rows = [...coveredByFile].map(([file, covered]) => ({
+    file,
+    covered: covered.size,
+    unique: [...covered].filter((line) => coveringFiles.get(line) === 1).length,
+  }));
+  rows.sort((left, right) => left.unique - right.unique || left.file.localeCompare(right.file));
+
+  return [
+    "## Source lines each package test file covers alone",
+    "",
+    `Union of covered source lines: ${coveringFiles.size}`,
+    "",
+    "| File | Covered source lines | Lines no other file covers |",
+    "|---|---:|---:|",
+    ...rows.map((row) => `| \`${row.file}\` | ${row.covered} | ${row.unique} |`),
+    "",
+    `Files that failed alone and are left out: ${failedFiles.length === 0 ? "none" : failedFiles.map((file) => `\`${file}\``).join(", ")}`,
+  ];
+}
+
 async function main(): Promise<void> {
   const commit = (await git("rev-parse", "HEAD")).trim();
   const tracked = (await git("ls-files")).split("\n").filter((path) => path.length > 0);
@@ -185,6 +274,19 @@ async function main(): Promise<void> {
       return `| ${candidate.category} | \`${candidate.file}\` | ${candidate.name} | ${candidate.lines} | ${openPullRequests || "none"} |`;
     }),
   ];
+
+  const uniqueCoverageFlag = process.argv.indexOf("--unique-coverage");
+  if (uniqueCoverageFlag !== -1) {
+    const directory = process.argv[uniqueCoverageFlag + 1];
+    if (directory === undefined) throw new Error("--unique-coverage needs an output directory");
+    const packageTestFiles = tracked.filter(
+      (path) =>
+        TYPESCRIPT_TEST_FILE.test(path) &&
+        PACKAGE_TEST_ROOTS.some((testRoot) => path.startsWith(`${testRoot}/`)),
+    );
+    report.push("", ...(await uniqueCoverageReport(packageTestFiles, resolve(ROOT, directory))));
+  }
+
   process.stdout.write(`${report.join("\n")}\n`);
 }
 
