@@ -371,6 +371,11 @@
 /* ---- Phones: cards in two columns, labels on their own line ---- */
 
 @container speed-story (max-width: 40rem) {
+  /* A phone lane labels every other decade: 1×, 100×, 10,000×. */
+  .speed-story__ticks span:nth-child(even):not(:last-child) {
+    visibility: hidden;
+  }
+
   .speed-story__cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
