@@ -28,10 +28,13 @@ import { formulaTables } from "./src/lib/formula-tables.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
 import { exportOutline } from "./src/lib/outline.ts";
+import { renderPerfBars } from "./src/lib/perf-bars.ts";
+import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
+import { speedStoryMarkup } from "./src/lib/speed-story-markup.ts";
 
 interface HastNode {
   type: string;
@@ -175,42 +178,44 @@ function hydrateFormulaReference() {
   };
 }
 
-/** Draw release reductions from the displayed value, so labels and bars cannot drift. */
-function visualizeReleaseResults() {
+/**
+ * A checked radio or checkbox in Markdown HTML starts checked but stays the
+ * reader's to change: React would treat `checked` as a controlled value and
+ * undo every click, so the markup's `checked` becomes `defaultChecked`.
+ */
+function uncontrolledCheckedInputs() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
-      const delta =
-        node.tagName === "li"
-          ? node.children?.find((child) =>
-              String(child.properties?.className ?? "")
-                .split(/[ ,]+/)
-                .includes("sw-results__delta"),
-            )
-          : undefined;
-      if (delta !== undefined) {
-        const label = textOf(delta).trim();
-        const percent = /^(\d+(?:\.\d+)?)(?:–(\d+(?:\.\d+)?))?% (?:faster|less)$/.exec(label);
-        const ratio = /^([\d,]+(?:\.\d+)?)× faster$/.exec(label);
-        const low = percent
-          ? Number(percent[1])
-          : ratio
-            ? (1 - 1 / Number(ratio[1]?.replaceAll(",", ""))) * 100
-            : undefined;
-        const high = percent ? Number(percent[2] ?? percent[1]) : low;
-        if (low !== undefined && high !== undefined) {
-          node.children?.push({
-            type: "element",
-            tagName: "span",
-            properties: {
-              className: ["sw-results__bar"],
-              ariaHidden: "true",
-              style: `--result-min:${low}%;--result-max:${high}%`,
-            },
-            children: [],
-          });
-        }
+      if (node.tagName === "input" && node.properties?.checked === true) {
+        const { checked: _checked, ...properties } = node.properties;
+        node.properties = { ...properties, defaultChecked: true };
       }
       node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
+/**
+ * Release-note comparisons (`<perf-compare>` blocks) become the shared
+ * performance bars before raw HTML is parsed, so release notes and the
+ * Performance pages draw the same figure.
+ */
+function renderPerfCompares() {
+  return (tree: HastNode): void => {
+    let figures = 0;
+    const visit = (node: HastNode): void => {
+      for (const child of node.children ?? []) {
+        if (child.type === "raw" && isPerfCompare(child.value ?? "")) {
+          figures += 1;
+          child.value = renderPerfBars(
+            parsePerfCompare(child.value ?? "", `perf-compare-${figures}`),
+            (name) => inlineIcon(name),
+          );
+        } else {
+          visit(child);
+        }
+      }
     };
     visit(tree);
   };
@@ -454,15 +459,16 @@ export default defineConfig({
               }),
             },
           ],
+          renderPerfCompares,
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          uncontrolledCheckedInputs,
           renderGridResults,
           [
             renderSectionCards,
             { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
           ],
           hydrateFormulaReference,
-          visualizeReleaseResults,
           dedupeCodePopovers,
           rovingCodeFocus,
           // Prerendered heading ids: fragment links must resolve before hydration.
@@ -478,6 +484,7 @@ export default defineConfig({
     },
     expressiveCodeAssets(),
     formulaTables(),
+    speedStoryMarkup(),
     tailwindcss(),
     tanstackStart({
       pages: [

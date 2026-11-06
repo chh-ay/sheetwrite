@@ -1,5 +1,4 @@
 import { parseEngineBaselineLabel } from "../bench/src/gate-protocol.js";
-import { benchScaleFigure } from "./bench-figures.js";
 import {
   formatBytes,
   formatCaptureTime,
@@ -11,6 +10,14 @@ import {
   readableId,
   shortHash,
 } from "./evidence-format.js";
+import {
+  captureNote,
+  FASTEST_TO_P95,
+  fastestToP95,
+  type MachineEvidence,
+  machineGroups,
+  perfFigure,
+} from "./perf-figures.js";
 
 interface CaptureMeta {
   commit: string;
@@ -217,6 +224,7 @@ function provenance(meta: CaptureMeta, source: string, timeLabel = "Captured"): 
 export function renderChartTrackingSection(
   evidence: ChartTrackingEvidence,
   source: string,
+  machines: readonly MachineEvidence<ChartTrackingEvidence>[],
 ): string[] {
   const outside = evidence.rows.find(
     (row) => row.chartCount === 2_000 && row.source === "literal" && row.scenario === "outside",
@@ -232,22 +240,34 @@ export function renderChartTrackingSection(
   return [
     "## Chart source tracking",
     "",
-    `With 2,000 literal-source charts, an outside-source edit takes ${(outside.commitMs.median * 1_000).toFixed(2)} µs median / ${(outside.commitMs.p95 * 1_000).toFixed(2)} µs p95, versus ${(outside.baselineMs.median * 1_000).toFixed(2)} / ${(outside.baselineMs.p95 * 1_000).toFixed(2)} µs with no charts. No chart is reported or resolved. Median cost does not rise proportionally across 200, 2,000 and 20,000 charts in this capture. This is not an asymptotic guarantee: the 20,000-chart p95 is ${(largest.commitMs.p95 * 1_000).toFixed(2)} µs versus ${(largest.baselineMs.p95 * 1_000).toFixed(2)} µs without charts.`,
+    `On the Linux release machine, with 2,000 literal-source charts, an outside-source edit takes ${(outside.commitMs.median * 1_000).toFixed(2)} µs median / ${(outside.commitMs.p95 * 1_000).toFixed(2)} µs p95, versus ${(outside.baselineMs.median * 1_000).toFixed(2)} / ${(outside.baselineMs.p95 * 1_000).toFixed(2)} µs with no charts. No chart is reported or resolved. Median cost does not rise proportionally across 200, 2,000 and 20,000 charts in this capture. This is not an asymptotic guarantee: the 20,000-chart p95 is ${(largest.commitMs.p95 * 1_000).toFixed(2)} µs versus ${(largest.baselineMs.p95 * 1_000).toFixed(2)} µs without charts.`,
     "",
     "These are transaction-tracking costs, not SVG drawing or browser frame times. The no-chart control belongs to the same 0.6 capture, not an older release. Formula-backed sources refresh conservatively on value commits; their full costs and event counts remain visible below.",
     "",
     ...provenance(evidence.meta, source),
-    ...benchScaleFigure("commit", [
-      { label: "No-chart baseline", entries: [{ sizeLabel: "", ...evidence.baseline }] },
-      ...evidence.rows.map((row) => ({
-        label: `${row.chartCount} charts · ${row.source} · ${row.scenario} source`,
-        entries: [
-          { sizeLabel: "Commit", ...row.commitMs },
-          { sizeLabel: "No charts", ...row.baselineMs, series: "compare" as const },
-          ...(row.eventMs === null ? [] : [{ sizeLabel: "Event", ...row.eventMs }]),
-        ],
-      })),
-    ]),
+    perfFigure({
+      id: "chart-tracking",
+      title: "Median commit time with tracked charts",
+      unit: "ms",
+      scale: "log",
+      rowHeader: "Charts, source and edit",
+      series: { base: "No charts", measured: "Commit with charts" },
+      spreadLabel: FASTEST_TO_P95,
+      groups: machineGroups(
+        machines,
+        (capture) =>
+          capture.rows.map((row) => ({
+            label: `${formatCount(row.chartCount)} charts · ${row.source} source · edit ${row.scenario}`,
+            bars: [
+              { label: "No charts", role: "base", stat: fastestToP95(row.baselineMs) },
+              { label: "With charts", role: "measured", stat: fastestToP95(row.commitMs) },
+            ],
+          })),
+        (capture) => captureNote(capture.meta),
+      ),
+      caption:
+        "Each row compares a commit with that many tracked charts against the same edit with no charts, measured in the same run. The event time, when an event is expected, is in the raw artifact.",
+    }),
     "",
     "### Tracking checkpoints",
     "",
@@ -273,28 +293,42 @@ export function renderChartTrackingSection(
   ];
 }
 
-export function renderPivotSection(evidence: PivotEvidence, source: string): string[] {
+export function renderPivotSection(
+  evidence: PivotEvidence,
+  source: string,
+  machines: readonly MachineEvidence<PivotEvidence>[],
+): string[] {
   return [
     "## Incremental pivot engine",
     "",
-    `Over ${formatCount(evidence.sourceRows)} source rows, the SUM/AVERAGE build takes ${evidence.buildMs.median.toFixed(3)} ms median (${evidence.buildMs.p95.toFixed(3)} ms p95), versus ${evidence.editMs.median.toFixed(4)} ms median (${evidence.editMs.p95.toFixed(4)} ms p95) for an incremental value edit. The matrix has ${evidence.rowFields} row fields, ${evidence.columnFields} column field, and ${evidence.valueFields} value fields. Build and incremental edit timings describe different operations on the same engine, not a 0.5-versus-0.6 speedup.`,
+    `On the Linux release machine, over ${formatCount(evidence.sourceRows)} source rows, the SUM/AVERAGE build takes ${evidence.buildMs.median.toFixed(3)} ms median (${evidence.buildMs.p95.toFixed(3)} ms p95), versus ${evidence.editMs.median.toFixed(4)} ms median (${evidence.editMs.p95.toFixed(4)} ms p95) for an incremental value edit. The matrix has ${evidence.rowFields} row fields, ${evidence.columnFields} column field, and ${evidence.valueFields} value fields. Build and incremental edit timings describe different operations on the same engine, not a 0.5-versus-0.6 speedup.`,
     "",
     ...provenance(evidence.meta, source),
-    ...benchScaleFigure(
-      "operation",
-      (
-        [
-          ["SUM / AVERAGE build", evidence.buildMs],
-          ["Value edit", evidence.editMs],
-          ["Donor-key edit", evidence.donorKeyEditMs],
-          ["MAX build", evidence.maxBuildMs],
-          ["MAX extreme-value edit", evidence.maxExtremeEditMs],
-        ] satisfies Array<[string, Timing]>
-      ).map(([label, stat]) => ({
-        label,
-        entries: [{ sizeLabel: "", median: stat.median, p95: stat.p95 }],
-      })),
-    ),
+    perfFigure({
+      id: "pivot",
+      title: "Median pivot operation time",
+      unit: "ms",
+      scale: "log",
+      rowHeader: "Operation",
+      spreadLabel: FASTEST_TO_P95,
+      groups: machineGroups(
+        machines,
+        (capture) =>
+          (
+            [
+              ["SUM / AVERAGE build", capture.buildMs],
+              ["Value edit", capture.editMs],
+              ["Donor-key edit", capture.donorKeyEditMs],
+              ["MAX build", capture.maxBuildMs],
+              ["MAX extreme-value edit", capture.maxExtremeEditMs],
+            ] satisfies Array<[string, Timing]>
+          ).map(([label, stat]) => ({
+            label,
+            bars: [{ label: "", role: "measured", stat: fastestToP95(stat) }],
+          })),
+        (capture) => captureNote(capture.meta),
+      ),
+    }),
     "",
     "### Retained pivot memory",
     "",
