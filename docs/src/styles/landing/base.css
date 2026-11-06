@@ -125,3 +125,31 @@
 .sw-lp-note {
   color: var(--sw-fg-muted);
 }
+
+/* Arrow icons at the end of link text sit on the text's baseline. */
+.sw-landing :is(a, .sw-features__cta) > .sw-icon {
+  display: inline-block;
+  margin-left: var(--sw-space-1);
+  vertical-align: -0.2em;
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-landing a:hover > .sw-icon,
+.sw-features a:hover .sw-features__cta > .sw-icon {
+  transform: translateX(var(--sw-space-0-5));
+}
+
+.sw-lp-facts > a {
+  white-space: nowrap;
+}
+
+/* Button labels never break; on a narrow screen the second button wraps
+   below the first and both fill the row. */
+.sw-lp-button {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.sw-lp-actions > .sw-lp-button {
+  flex: 1 1 auto;
+}

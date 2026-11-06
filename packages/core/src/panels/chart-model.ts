@@ -1,8 +1,7 @@
 // Chart definitions that Insert › Chart and the Chart panel build, as plain
 // data, so the rules are tested without a DOM.
 
-import { MAX_CHART_SERIES } from "../chart-definition.js";
-import { MAX_CHART_POINTS } from "../charts-live.js";
+import { MAX_CHART_POINTS, MAX_CHART_SERIES } from "../chart-definition.js";
 import { cellRange, normalizedRange } from "../store/ranges.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartAnchor, ChartDefinition, ChartKind, ChartSeries } from "../types/chart.js";

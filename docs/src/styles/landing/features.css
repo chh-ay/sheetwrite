@@ -133,8 +133,8 @@
 }
 
 .fg-cell {
-  fill: color-mix(in srgb, var(--sw-fg) 6%, transparent);
-  stroke: var(--sw-border);
+  fill: color-mix(in srgb, var(--sw-fg) 8%, transparent);
+  stroke: var(--sw-border-strong);
 }
 
 .fg-edit[data-client="a"] {

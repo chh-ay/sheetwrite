@@ -4,8 +4,7 @@
 // or totals and one label column per row field, so the chart never shows a
 // total as a point.
 
-import { MAX_CHART_SERIES } from "../chart-definition.js";
-import { MAX_CHART_POINTS } from "../charts-live.js";
+import { MAX_CHART_POINTS, MAX_CHART_SERIES } from "../chart-definition.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartDefinition, ChartSeriesView, ChartView } from "../types/chart.js";
 
