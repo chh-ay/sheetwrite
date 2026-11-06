@@ -33,6 +33,10 @@
       "reason": "Type-only module is verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/addon.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/cell.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
@@ -93,6 +97,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/xlsx.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/version-history/types.ts",
       "reason": "Type-only module is verified by package and consumer typechecks"
     },
@@ -143,10 +151,6 @@
     {
       "path": "packages/wasm/src/lib.rs",
       "reason": "Module wiring only; behavior is covered through crate contract tests"
-    },
-    {
-      "path": "packages/xlsx/src/register.ts",
-      "reason": "The one-line entrypoint is covered through the explicit registration contract"
     }
   ]
 }

@@ -45,6 +45,8 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   /** Controls link activation: emit an event, also navigate internally, or disable it. */
   hyperlinkActivation?: GridOptions["hyperlinkActivation"];
+  /** Settings for add-ons installed by `initSheetwrite`, keyed by add-on name; applied when the Grid is created. */
+  addons?: GridOptions["addons"];
   /** Named custom cell renderers. */
   renderers?: GridOptions["renderers"];
   /** Named custom cell editors. */

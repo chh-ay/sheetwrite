@@ -1,5 +1,6 @@
 import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
+import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
   fontFor,
@@ -102,6 +103,7 @@ import {
   beginGridTransactionAdmission,
   hasGridTransactionAdmission,
 } from "./transaction-admission.js";
+import type { SheetwriteAddon } from "./types/addon.js";
 import type {
   CellHyperlink,
   CellScalar,
@@ -371,28 +373,51 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
   return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
 }
 
+/** Options of {@link initSheetwrite}. */
+export interface InitSheetwriteOptions {
+  /** Engine module; defaults to `@sheetwrite/wasm`. Pass `@sheetwrite/formulas` for the full engine. */
+  engine?: SheetwriteEngine;
+  /** Explicit WASM bytes or location, for bundlers that cannot resolve the engine asset. */
+  source?: BufferSource | URL | string | Request | WebAssembly.Module;
+  /**
+   * Add-ons to install, in this order, after the engine loads. A name listed
+   * twice rejects; a name installed by an earlier call is kept.
+   */
+  addons?: readonly SheetwriteAddon[];
+}
+
 /**
- * Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
- * Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+ * The add-on registry, once `initSheetwrite` installed any add-on. Its module
+ * loads only then, so a page without add-ons carries none of its code.
+ */
+let addons: AddonRegistry | undefined;
+
+/**
+ * Load one WASM engine and install add-ons before `createGrid`.
  *
  * @example
  * ```ts
+ * import { chartsAddon } from "@sheetwrite/charts";
  * import { initSheetwrite } from "@sheetwrite/core";
  * import * as formulas from "@sheetwrite/formulas";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  *
- * await initSheetwrite(undefined, formulas);
+ * await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] });
  * ```
  * @see /docs/start/choose-an-engine/
  * @see createGrid
  */
-export async function initSheetwrite(
-  source?: BufferSource | URL | string | Request | WebAssembly.Module,
-  engine?: SheetwriteEngine,
-): Promise<void> {
+export async function initSheetwrite(options: InitSheetwriteOptions = {}): Promise<void> {
   try {
-    await loadEngine(source, engine);
+    await loadEngine(options.source, options.engine);
   } catch (error) {
     throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
+  }
+
+  if (options.addons?.length) {
+    const registry = await import("./addons.js");
+    addons = registry.addonRegistry;
+    await addons.install(options.addons);
   }
 }
 
@@ -475,6 +500,7 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
       `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
     );
   }
+
   return new GridImpl(host, opts);
 }
 
@@ -632,6 +658,18 @@ export class GridImpl implements Grid {
     store?: Store,
     ownsStore = store === undefined,
   ) {
+    // Settings for an add-on that `initSheetwrite` did not install reject before anything is built.
+    for (const name in opts.addons) {
+      if (!addons?.has(name)) {
+        throw new SheetwriteError(
+          "invalid-argument",
+          "create-grid",
+          `Sheetwrite: add-on "${name}" is not installed.`,
+          { context: { addon: name } },
+        );
+      }
+    }
+
     assertRibbonConfig(opts.config?.ribbon);
     this.keymap = new Keymap(opts.config);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
@@ -1141,6 +1179,8 @@ export class GridImpl implements Grid {
     // Registered last: a constructor that throws earlier leaves no listener
     // behind. A trap in the first paint reaches `onEngineFailed` through `onEngineTrap`.
     this.removeEngineFailureListener = onEngineFailure((failure) => this.onEngineFailed(failure));
+    // A failing add-on hook destroys this grid and rethrows.
+    addons?.attach(this, opts.addons);
   }
 
   /**
@@ -3441,12 +3481,12 @@ export class GridImpl implements Grid {
         const { pickXlsxWorkbook } = await import("./workbook-io.js");
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
-      versionHistory: () => this.config?.history?.(this, "open"),
+      versionHistory: () => this.historyCommand?.("open"),
       // The dashboard chunk names and adds the sheet; first paint carries only this call.
       newDashboard: () =>
         void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
       saveVersion: () => {
-        if (!this.readOnly) this.config?.history?.(this, "save");
+        if (!this.readOnly) this.historyCommand?.("save");
       },
       editNote: () => {
         // Same gate as the cell editor: do not open an editor whose save must fail.
@@ -3605,7 +3645,7 @@ export class GridImpl implements Grid {
     }
     if (command === "versionHistory" || command === "saveVersion") {
       return {
-        disabled: !this.config?.history || (command === "saveVersion" && this.readOnly),
+        disabled: !this.historyCommand || (command === "saveVersion" && this.readOnly),
         activity: "inactive",
       };
     }
@@ -4001,6 +4041,14 @@ export class GridImpl implements Grid {
       this.actionFeedback.show(`The command did not finish: ${errorDetail(error)}`);
       throw error;
     });
+  }
+
+  /** Opens the history panel or its Save Version form; the history add-on sets it. */
+  declare historyCommand?: (action: "open" | "save") => void;
+
+  /** Run `cleanup` when the grid is destroyed. */
+  addCleanup(cleanup: () => void): void {
+    this.lifetime.add(cleanup);
   }
 
   /**

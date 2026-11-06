@@ -115,6 +115,20 @@ const FORBIDDEN_EXPORTS = new Set([
   "XlsxImportBackend",
   "setXlsxBackend",
   "setXlsxImportBackend",
+  "setXlsxTableExportBackend",
+  "setXlsxTableImportBackend",
+  "setXlsxWorkbookBackend",
+  "setXlsxSourceVerifier",
+  "setChartRendererFactory",
+  "setChartViewProviderFactory",
+  "registerChartsBackend",
+  "registerXlsxBackends",
+  "registerFunction",
+  "unregisterFunction",
+  "registerQueryCommands",
+  "createQuerySession",
+  "createHistoryCommands",
+  "connectExternalLinks",
 ]);
 
 const REQUIRED_CORE_EXPORTS = new Set([
@@ -126,12 +140,11 @@ const REQUIRED_CORE_EXPORTS = new Set([
   "fromXlsxTable",
   "XlsxTableExportBackend",
   "XlsxTableImportBackend",
-  "setXlsxTableExportBackend",
-  "setXlsxTableImportBackend",
   "toXlsxWorkbook",
   "fromXlsxWorkbook",
   "XlsxWorkbookBackend",
-  "setXlsxWorkbookBackend",
+  "initSheetwrite",
+  "SheetwriteAddon",
 ]);
 
 const SUPPORTED_PACKAGES: Readonly<Record<string, true>> = {
