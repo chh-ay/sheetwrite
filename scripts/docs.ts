@@ -71,6 +71,7 @@ import {
 import { siteDataFiles } from "./docs-site-data.js";
 import {
   loadFormulaContractInventory,
+  loadFormulaSummaries,
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
@@ -254,8 +255,9 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ...(await collectCompatibilityDigestIssues()),
   ];
   if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
-  const [formulaInventory, publishedCompatibilityResults] = await Promise.all([
+  const [formulaInventory, formulaSummaries, publishedCompatibilityResults] = await Promise.all([
     loadFormulaContractInventory(repositoryRoot),
+    loadFormulaSummaries(repositoryRoot),
     compatibilityResults(),
   ]);
 
@@ -352,7 +354,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     }
   }
 
-  const formulaPages = renderFormulaFunctionPages(formulaInventory);
+  const formulaPages = renderFormulaFunctionPages(formulaInventory, formulaSummaries);
   const excelCatalog: unknown = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
   );

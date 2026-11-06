@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
+  loadFormulaSummaries,
   renderFormulaFunctionPages,
 } from "../../scripts/formula-docs.ts";
 
@@ -27,14 +28,15 @@ describe("generated formula documentation contract", () => {
     );
     incomplete.functions.splice(index, 1);
 
-    expect(() => renderFormulaFunctionPages(incomplete)).toThrow(
+    const summaries = await loadFormulaSummaries(REPO_ROOT);
+    expect(() => renderFormulaFunctionPages(incomplete, summaries)).toThrow(
       "requires 100 required-supported functions; found 99",
     );
   });
 
   it("publishes every function on exactly one family page, with the profiles its rows link", async () => {
     const inventory = (await loadFormulaContractInventory(REPO_ROOT)) as FormulaInventory;
-    const pages = renderFormulaFunctionPages(inventory);
+    const pages = renderFormulaFunctionPages(inventory, await loadFormulaSummaries(REPO_ROOT));
     const families = pages.filter((page) => page.route !== "reference/formula-functions.md");
     for (const formula of inventory.functions) {
       const holders = families.filter((page) =>
@@ -51,5 +53,17 @@ describe("generated formula documentation contract", () => {
     expect(formulaFamilyNavigation(pages).map((entry) => entry.href)).toEqual(
       families.map((page) => `/docs/${page.route.replace(/\.md$/, "/")}`),
     );
+  });
+
+  it("describes every function in one line", async () => {
+    const inventory = (await loadFormulaContractInventory(REPO_ROOT)) as FormulaInventory;
+    const summaries = await loadFormulaSummaries(REPO_ROOT);
+    const missing = { ...summaries };
+    delete missing[inventory.functions[0]?.canonical ?? ""];
+
+    expect(() => renderFormulaFunctionPages(inventory, missing)).toThrow("has no summary for");
+    expect(() =>
+      renderFormulaFunctionPages(inventory, { ...summaries, NOTAFUNCTION: "x" }),
+    ).toThrow("describes unknown functions: NOTAFUNCTION");
   });
 });

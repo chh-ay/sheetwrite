@@ -255,6 +255,23 @@ function statusPaths(value: unknown, label: string): string {
     : `${status}<br />${paths.map((path) => sourceLink(path)).join("<br />")}`;
 }
 
+const SUMMARIES_PATH = "scripts/formula-summaries.json";
+
+/**
+ * One-line descriptions of the formula functions, keyed by canonical name,
+ * for the formula reference pages. Written for these docs, one per function
+ * in the inventory.
+ */
+export async function loadFormulaSummaries(
+  root: string,
+): Promise<Readonly<Record<string, string>>> {
+  const value: unknown = JSON.parse(await readFile(resolve(root, SUMMARIES_PATH), "utf8"));
+  const summaries = object(value, SUMMARIES_PATH);
+  for (const [name, summary] of Object.entries(summaries))
+    string(summary, `${SUMMARIES_PATH}.${name}`);
+  return summaries as Record<string, string>;
+}
+
 export async function loadFormulaContractInventory(
   root: string,
   path = DEFAULT_INVENTORY_PATH,
@@ -281,7 +298,10 @@ const FORMULA_FUNCTIONS_ROUTE = "/docs/reference/formula-functions/";
  * unsupported categories, and one page per function family. A family page
  * carries only the contract profiles its own functions use.
  */
-export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaReferencePage[] {
+export function renderFormulaFunctionPages(
+  inventoryValue: unknown,
+  summaries: Readonly<Record<string, string>>,
+): FormulaReferencePage[] {
   const inventory = object(inventoryValue, "formula inventory");
   const contract = string(inventory.contract, "contract");
   if (contract !== "sheetwrite.formula-capabilities") {
@@ -320,6 +340,18 @@ export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaRefe
     throw new Error(
       `formula documentation requires ${REQUIRED_SUPPORTED_COUNT} required-supported functions; found ${required.length}`,
     );
+  }
+
+  const unsummarized = functions.filter((formula) => !summaries[formula.canonical]);
+  if (unsummarized.length > 0) {
+    throw new Error(
+      `${SUMMARIES_PATH} has no summary for ${unsummarized.map((formula) => formula.canonical).join(", ")}`,
+    );
+  }
+  const canonicalNames = new Set(functions.map((formula) => formula.canonical));
+  const unknown = Object.keys(summaries).filter((name) => !canonicalNames.has(name));
+  if (unknown.length > 0) {
+    throw new Error(`${SUMMARIES_PATH} describes unknown functions: ${unknown.join(", ")}`);
   }
 
   for (const formula of functions) {
@@ -448,7 +480,7 @@ export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaRefe
       "",
       '<section class="sw-formula-family">',
       "",
-      '<table class="sw-formula-table"><thead><tr><th>Function and syntax</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
+      '<table class="sw-formula-table"><thead><tr><th>Function and syntax</th><th>What it does</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
       ...family.functions.map((formula) => {
         const names = [formula.canonical, ...formula.aliases];
         const aliases = formula.aliases.map((name) => `<code>${html(name)}</code>`).join(", ");
@@ -475,7 +507,7 @@ export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaRefe
           )
           .join("<br />");
         const syntax = formulaSyntaxHtml(formula.canonical, signatures[formula.signature]);
-        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}</td><td data-label="Engine"><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td data-label="Contract"><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
+        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}</td><td class="sw-formula-summary">${html(summaries[formula.canonical] ?? "")}</td><td data-label="Engine"><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td data-label="Contract"><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
       }),
       "</tbody></table>",
       "",
