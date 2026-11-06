@@ -2492,6 +2492,12 @@ textarea.sheetwrite-ribbon-field {
   padding: 6px 8px;
 }
 
+/* The chart renderer sizes its drawing to the whole body. */
+.sheetwrite-dashboard-item-body.sheetwrite-dashboard-chart {
+  overflow: hidden;
+  padding: 0;
+}
+
 .sheetwrite-dashboard-resize {
   position: absolute;
   right: 0;
