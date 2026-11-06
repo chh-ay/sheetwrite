@@ -18,6 +18,7 @@ mod info;
 mod iteration;
 mod literal_criteria;
 mod literal_products;
+mod literal_statistics;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -1872,6 +1873,15 @@ impl CellStore {
 
         if func == Func::SumProduct {
             if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
+        if matches!(
+            func,
+            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
+        ) {
+            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
                 return result;
             }
         }
