@@ -200,14 +200,20 @@ fn formulas_follow_a_link_that_is_added_removed_and_added_again() {
     assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(formula));
 }
 
+/// Define a name of `Budget.xlsx` as core does from its link part: the
+/// name qualified by the book (and its sheet), referring to the link sheet.
+fn define(store: &mut CellStore, name: &str, cells: &str) -> bool {
+    store.set_named_formula(name, -1, &format!("='[Budget.xlsx]Annual'!{cells}"))
+}
+
 /// `linked_store` with the names of `Budget.xlsx` that its link part saves:
 /// `Total` (C10) and `Rows` (C10:C11) for the workbook, and `Local` (C11)
 /// for the sheet `Annual`.
 fn store_with_names() -> (CellStore, usize, usize) {
     let (mut store, report, annual) = linked_store();
-    assert!(store.add_external_name("Budget.xlsx", "", "Total", "=Annual!$C$10"));
-    assert!(store.add_external_name("Budget.xlsx", "", "Rows", "=Annual!$C$10:$C$11"));
-    assert!(store.add_external_name("Budget.xlsx", "Annual", "Local", "=Annual!$C$11"));
+    assert!(define(&mut store, "[Budget.xlsx]!Total", "$C$10"));
+    assert!(define(&mut store, "[Budget.xlsx]!Rows", "$C$10:$C$11"));
+    assert!(define(&mut store, "'[Budget.xlsx]Annual'!Local", "$C$11"));
     (store, report, annual)
 }
 
@@ -255,7 +261,7 @@ fn a_link_name_follows_its_values_and_its_removal() {
     store.recompute(annual);
     assert_eq!(store.get_cell(report, 0, 0).num(), 10.0);
 
-    // Removing the link sheet removes the names that refer to it.
+    // Without the link sheet, the name refers to `#REF!`.
     assert!(store.remove_external_sheet("budget.xlsx", "annual"));
     assert_eq!(
         store.get_cell(report, 0, 0).string().as_deref(),
@@ -264,7 +270,7 @@ fn a_link_name_follows_its_values_and_its_removal() {
 
     let annual = store.add_external_sheet("Budget.xlsx", "Annual", 3, 11);
     store.set_number(annual, 10, 2, 5.0, 0);
-    assert!(store.add_external_name("Budget.xlsx", "", "Total", "=Annual!$C$11"));
+    assert!(define(&mut store, "[Budget.xlsx]!Total", "$C$11"));
     assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
     assert_eq!(
         store.formula_source(report, 0, 0).as_deref(),
@@ -275,6 +281,5 @@ fn a_link_name_follows_its_values_and_its_removal() {
 #[test]
 fn a_name_needs_a_sheet_the_link_holds() {
     let (mut store, _, _) = linked_store();
-    assert!(!store.add_external_name("Budget.xlsx", "", "Other", "=Other!$A$1"));
-    assert!(!store.add_external_name("Budget.xlsx", "", "Broken", "=#REF!"));
+    assert!(!store.set_named_formula("[Budget.xlsx]!Other", -1, "='[Budget.xlsx]Other'!$A$1"));
 }

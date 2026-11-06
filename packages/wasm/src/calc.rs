@@ -2165,9 +2165,6 @@ fn missing_area_end(after: &str) -> String {
 /// The lookup key of a sheet name: the name without case. For a sheet of
 /// another workbook, the folder before `[` is left out, so
 /// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
-///
-/// Out of line: link sheets and link names share it with every sheet lookup.
-#[inline(never)]
 pub(crate) fn sheet_name_key(name: &str) -> String {
     let name = name.rfind('[').map_or(name, |start| &name[start..]);
     name.chars().flat_map(char::to_lowercase).collect()
@@ -2176,8 +2173,8 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// The lookup key of a defined name of another workbook, from the text a
 /// formula writes: `Budget.xlsx!Total`, `'C:\Reports\Budget.xlsx'!Total`,
 /// `[Budget.xlsx]!Total` and `'C:\Reports\[Budget.xlsx]'!Total` all give
-/// `[budget.xlsx]!total`; the sheet-scoped `[Budget.xlsx]Annual!Total`
-/// gives `[budget.xlsx]annual!total`. The folder and the letter case are
+/// `[BUDGET.XLSX]!TOTAL`; the sheet-scoped `[Budget.xlsx]Annual!Total`
+/// gives `[BUDGET.XLSX]ANNUAL!TOTAL`. The folder and the letter case are
 /// left out, as for link sheets. A quote in a book or sheet name stays
 /// doubled, as a quoted formula writes it. `None` for a name without a
 /// workbook.
@@ -2187,12 +2184,15 @@ pub(crate) fn external_name_key(text: &str) -> Option<String> {
         .strip_prefix('\'')
         .and_then(|inner| inner.strip_suffix('\''))
         .unwrap_or(qualifier);
-    if qualifier.contains('[') {
-        return Some(sheet_name_key(&format!("{qualifier}!{name}")));
-    }
-    let folder_end = qualifier.rfind('\\').max(qualifier.rfind('/'));
-    let book = folder_end.map_or(qualifier, |at| &qualifier[at + 1..]);
-    Some(sheet_name_key(&format!("[{book}]!{name}")))
+    let key = match qualifier.rfind('[') {
+        Some(start) => format!("{}!{name}", &qualifier[start..]),
+        None => {
+            let folder_end = qualifier.rfind('\\').max(qualifier.rfind('/'));
+            let book = folder_end.map_or(qualifier, |at| &qualifier[at + 1..]);
+            format!("[{book}]!{name}")
+        }
+    };
+    Some(key.to_uppercase())
 }
 
 /// Whether the text before `!` names another workbook: a sheet of it

@@ -8,9 +8,9 @@ use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, parse, parse_with_features, place_span, resolve_sheet_refs,
-    resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef,
-    TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, external_name_key, parse, parse_with_features, place_span,
+    resolve_sheet_refs, resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef,
+    StructuredRef, TableSection, UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -239,8 +239,11 @@ const MAX_TABLE_COLUMNS: usize = 16_384;
 const MAX_TABLE_NAME_BYTES: usize = 255;
 const MAX_TABLE_ID_BYTES: usize = 128;
 
+/// The lookup key of a defined name: the name without case. A name of a
+/// linked workbook, such as `Budget.xlsx!Total`, has the key of
+/// `external_name_key`, so every spelling of it finds the same name.
 pub(crate) fn workbook_name_key(value: &str) -> String {
-    value.to_uppercase()
+    external_name_key(value).unwrap_or_else(|| value.to_uppercase())
 }
 
 #[derive(Clone, Debug)]

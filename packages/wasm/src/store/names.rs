@@ -228,9 +228,6 @@ impl CellStore {
         formula_sheet: u32,
         placement: &NamePlacement,
     ) -> Option<NameTarget> {
-        if name.contains('!') {
-            return Some(self.external_name_target(name));
-        }
         let mut key = workbook_name_key(name);
         if formula_sheet == NO_SHEET {
             key = self.note_sheet_scoped(key, placement);
@@ -246,7 +243,16 @@ impl CellStore {
             }
             key = scoped.1;
         }
-        None
+
+        // A name of a linked workbook that the link does not hold is
+        // `#REF!`, as in Excel.
+        name.contains('!').then(|| {
+            NameTarget::Formula(Rc::new(NamedFormulaRef {
+                name: name.to_string(),
+                expression: Ast::InvalidRef,
+                nodes: 1,
+            }))
+        })
     }
 
     /// Mark the definition being resolved for every sheet as depending on

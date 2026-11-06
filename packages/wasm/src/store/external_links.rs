@@ -3,20 +3,11 @@
 //! references, with the same cell storage, range reads and dependency
 //! tracking as local sheets, but SHEETS, 3-D spans and the tab order do not
 //! see it.
-//!
-//! A link also keeps the defined names of the linked workbook, each as a
-//! range of a link sheet, so `Budget.xlsx!Total` reads the saved values the
-//! name refers to.
-
-use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 
-use super::names::DefinedName;
 use super::CellStore;
-use crate::calc::{
-    external_name_key, parse, sheet_name_key, Ast, NameTarget, NamedFormulaRef, NamedRangeRef,
-};
+use crate::calc::sheet_name_key;
 
 #[wasm_bindgen]
 impl CellStore {
@@ -71,43 +62,6 @@ impl CellStore {
         self.relink_external_sheet(&key, None);
         self.remove_sheet(handle)
     }
-
-    /// Add the defined name `name` of the linked workbook `book`, in the
-    /// scope of its sheet `sheet` (empty for the workbook), as the link part
-    /// saves it: `refers_to` is a reference such as `=Annual!$B$5` to a sheet
-    /// of that workbook. Formulas that use the name read the saved values of
-    /// that sheet, so add the sheet first. Returns `false`, adding nothing,
-    /// when `refers_to` is not a cell or range of a sheet the store holds;
-    /// formulas that use the name then show `#REF!`, as in Excel. Removing
-    /// the sheet removes the name.
-    #[wasm_bindgen(js_name = addExternalName)]
-    pub fn add_external_name(
-        &mut self,
-        book: &str,
-        sheet: &str,
-        name: &str,
-        refers_to: &str,
-    ) -> bool {
-        // A quoted formula doubles the quotes of the book and sheet names.
-        let qualifier = format!("[{book}]{sheet}").replace('\'', "''");
-        let Some(key) = external_name_key(&format!("{qualifier}!{name}")) else {
-            return false;
-        };
-        let Some(range) = self.link_range(book, refers_to) else {
-            return false;
-        };
-
-        let range = NamedRangeRef {
-            name: name.to_string(),
-            scope: None,
-            ..range
-        };
-        self.defined_names
-            .insert((None, key), DefinedName::Range(range));
-        self.refresh_named_formula_entries();
-        self.recompute_all_sheets();
-        true
-    }
 }
 
 impl CellStore {
@@ -135,53 +89,5 @@ impl CellStore {
             self.graph.invalidate();
             self.recompute_with_volatile_sheets(affected);
         }
-    }
-}
-
-impl CellStore {
-    /// What a defined name of another workbook stands for: the range it
-    /// refers to on a link sheet, or `#REF!` when the link does not hold it.
-    /// Out of line, so the name resolver of every formula stays small.
-    #[inline(never)]
-    pub(crate) fn external_name_target(&self, text: &str) -> NameTarget {
-        let range =
-            external_name_key(text).and_then(|key| match self.defined_names.get(&(None, key)) {
-                Some(DefinedName::Range(range)) => Some(range),
-                _ => None,
-            });
-        match range {
-            Some(range) => NameTarget::Range(NamedRangeRef {
-                name: text.to_string(),
-                ..range.clone()
-            }),
-            None => NameTarget::Formula(Rc::new(NamedFormulaRef {
-                name: text.to_string(),
-                expression: Ast::InvalidRef,
-                nodes: 1,
-            })),
-        }
-    }
-
-    /// The cell or range that `refers_to` names on a sheet of the linked
-    /// workbook `book`, when the store holds that sheet.
-    fn link_range(&self, book: &str, refers_to: &str) -> Option<NamedRangeRef> {
-        let (sheet, cells) = match parse(refers_to).ok()? {
-            Ast::SheetCell(sheet, row, col, _) => (sheet.name, (row, col, row, col)),
-            Ast::SheetRange(sheet, r0, c0, r1, c1, _) => (sheet.name, (r0, c0, r1, c1)),
-            _ => return None,
-        };
-        let handle = *self
-            .sheet_lookup
-            .get(&sheet_name_key(&format!("[{book}]{sheet}")))?;
-        let (row_start, col_start, row_end, col_end) = cells;
-        Some(NamedRangeRef {
-            name: String::new(),
-            scope: None,
-            sheet: handle as u32,
-            row_start,
-            col_start,
-            row_end,
-            col_end,
-        })
     }
 }

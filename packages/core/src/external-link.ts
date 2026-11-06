@@ -20,6 +20,16 @@ const MAX_COLUMNS = 16_384;
 /** The errors that formulas can hold as values. */
 const ERROR_VALUE = /^#(?:DIV\/0!|NULL!|SPILL!|CALC!|VALUE!|REF!|NAME\?|NUM!|N\/A)$/;
 
+/** A sheet before `!` in a link name's reference: quoted, or plain. */
+const SHEET_QUALIFIER = /(?:'((?:[^']|'')*)'|([\p{L}\p{N}_.\\]+))(?=!)/gu;
+/** The scope argument of the engine for a name of the whole workbook. */
+const WORKBOOK_SCOPE = -1;
+
+/** `'[book]sheet'`: a sheet of a linked workbook, quoted as a formula writes it. */
+function linkSheet(book: string, sheet: string): string {
+  return `'${`[${book}]${sheet}`.replaceAll("'", "''")}'`;
+}
+
 /** Where checks append issues; a `DocumentValidationError[]` qualifies. */
 export interface ExternalLinkIssueSink {
   push(...issues: { path: string; code: "invalid-value"; message: string }[]): number;
@@ -98,7 +108,7 @@ export interface ExternalLinkEngine {
   setFormula(sheet: number, row: number, col: number, source: string, style: number): void;
   recompute(sheet: number): void;
   removeExternalSheet(book: string, sheet: string): boolean;
-  addExternalName(book: string, sheet: string, name: string, refersTo: string): boolean;
+  setNamedFormula(name: string, scope: number, source: string): boolean;
 }
 
 /**
@@ -158,10 +168,20 @@ export function installExternalLinks(
       engine.recompute(handle);
     }
 
-    // A name refers to cells of the sheets above. One that refers to a
-    // sheet the link does not hold is left out, so formulas show `#REF!`.
+    // A name is a defined name of this workbook named as formulas write it,
+    // `'[Budget.xlsx]'!Total` or `'[Budget.xlsx]Annual'!Total`, whose sheet
+    // references name the link's sheets. The engine refuses one that names a
+    // sheet the link does not hold, so formulas that use it show `#REF!`.
     for (const { name, refersTo, sheet } of link.names ?? []) {
-      engine.addExternalName(link.book, sheet ?? "", name, refersTo);
+      const qualified = `${linkSheet(link.book, sheet ?? "")}!${name}`;
+      const source = refersTo.replace(SHEET_QUALIFIER, (_, quoted?: string, plain?: string) =>
+        linkSheet(link.book, quoted?.replaceAll("''", "'") ?? plain ?? ""),
+      );
+      engine.setNamedFormula(
+        qualified,
+        WORKBOOK_SCOPE,
+        source.startsWith("=") ? source : `=${source}`,
+      );
     }
   }
   return true;
