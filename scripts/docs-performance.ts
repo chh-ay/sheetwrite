@@ -721,7 +721,7 @@ function benchMethod(
 }
 
 const RENDER_METHOD = benchMethod(
-  "Methodology - what each scenario does",
+  "Methodology: what each scenario does",
   [
     "Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.",
     "Each measured sample repeats one logical action until it covers at least 100 ms of measured time, so timer resolution and scheduler jitter cannot decide a sample. Every raw sample is retained in the artifact.",
@@ -764,7 +764,7 @@ const RENDER_METHOD = benchMethod(
 );
 
 const DATA_METHOD = benchMethod(
-  "Methodology - what each operation does",
+  "Methodology: what each operation does",
   [
     "Identical columnar datasets, per-operation warmup and iteration plans. Fresh instance per ingest; window reads rotate offsets to defeat caches; sort and filter reset between runs; Handsontable edits run with rendering suspended so only its data path is timed.",
     "Memory = JS-heap delta around one ingest in an isolated subprocess, plus Sheetwrite's WASM linear-memory delta.",
@@ -780,7 +780,7 @@ const DATA_METHOD = benchMethod(
 );
 
 const FORMULA_METHOD = benchMethod(
-  "Methodology - what each workload does",
+  "Methodology: what each workload does",
   [
     "Each workload builds a fresh WASM cell-store of the named dependency shape and times the recalculation from one action - usually a single edit. Sizes are formula-cell counts; bright = median, faded = p95.",
   ],

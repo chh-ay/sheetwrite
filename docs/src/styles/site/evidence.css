@@ -1023,17 +1023,18 @@
   background: var(--sw-surface-1);
 }
 
+/* The summary reads like the other disclosures: sans, sentence case. */
 .bench-method > summary {
   padding: var(--sw-space-2) var(--sw-space-4);
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
   cursor: pointer;
+  transition: color 140ms ease;
 }
 
 .bench-method > summary:hover {
-  color: var(--sw-fg-strong);
+  color: var(--sw-accent-strong);
 }
 
 .bench-method__body {
