@@ -145,6 +145,7 @@ details[open] > summary > .sw-disclosure-icon {
   padding: var(--sw-space-1-5) var(--sw-space-2);
   border-radius: var(--sw-radius-sm);
   color: var(--sw-fg-strong);
+  font-family: var(--sw-font-display);
   font-size: var(--sw-text-small);
   font-weight: var(--sw-weight-semibold);
   transition: background-color var(--sw-motion-fast) var(--sw-motion-standard);
@@ -236,10 +237,8 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-sidebar__nav h2 {
   margin: 0 0 var(--sw-space-1-5);
   padding-inline: var(--sw-space-2);
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-body);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-display);
 }
 
 /* The reading column keeps the content width and centers in the space right
@@ -323,8 +322,8 @@ details[open] > summary > .sw-disclosure-icon {
   font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: 0;
 }
-/* Reading hierarchy: display-face h2 sections with room above, display-face
-   h3 subsections, body-face h4 labels. */
+/* Reading hierarchy, every level in the display face: h2 sections with room
+   above, h3 subsections, h4 labels. */
 .sw-docs .sw-prose {
   min-width: 0;
   font-size: var(--sw-text-body);
@@ -349,7 +348,8 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-docs .sw-prose h4 {
   margin: var(--sw-space-8) 0 var(--sw-space-2);
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-heading) var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-heading)
+    var(--sw-font-display);
 }
 .sw-docs .sw-prose p,
 .sw-docs .sw-prose li,
@@ -392,7 +392,7 @@ details[open] > summary > .sw-disclosure-icon {
   margin-bottom: var(--sw-space-2);
   padding-left: var(--sw-space-4);
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-display);
 }
 .sw-toc ul,
 .sw-toc-inline ul {

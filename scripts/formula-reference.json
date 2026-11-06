@@ -728,7 +728,7 @@
     "syntax": "T.INV.2T(probability, deg_freedom)"
   },
   "CHISQ.DIST": {
-    "summary": "The left-tailed chi-squared distribution.",
+    "summary": "The chi-squared distribution, as a density or a left-tailed probability.",
     "syntax": "CHISQ.DIST(x, deg_freedom, cumulative)"
   },
   "CHISQ.DIST.RT": {
@@ -744,7 +744,7 @@
     "syntax": "CHISQ.INV.RT(probability, deg_freedom)"
   },
   "F.DIST": {
-    "summary": "The left-tailed F probability distribution.",
+    "summary": "The F probability distribution, as a density or a left-tailed probability.",
     "syntax": "F.DIST(x, deg_freedom1, deg_freedom2, cumulative)"
   },
   "F.DIST.RT": {
