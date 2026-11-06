@@ -42,8 +42,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.sw-lp-hero__start .sw-lp-button {
-  justify-content: center;
+/* Phones: the buttons stack so neither label breaks. */
+@media (max-width: 30rem) {
+  .sw-lp-hero__start .sw-lp-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ---- Hero illustration: the spreadsheet app ------------------------------- */

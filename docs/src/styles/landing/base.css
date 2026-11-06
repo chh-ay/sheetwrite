@@ -141,3 +141,14 @@
 .sw-lp-facts > a {
   white-space: nowrap;
 }
+
+/* Button labels never break; on a narrow screen the second button wraps
+   below the first and both fill the row. */
+.sw-lp-button {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.sw-lp-actions > .sw-lp-button {
+  flex: 1 1 auto;
+}
