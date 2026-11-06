@@ -4,7 +4,7 @@ set -u
 engine=$1
 bin=/home/vvin/learn/sheetwrite-wt/fa-audit/bench/native/target-$engine/release/formula-replay
 out=/home/vvin/learn/fa-results/perf-$engine; mkdir -p $out
-cd /home/vvin/learn/fa-results
+cd /home/vvin/learn/fa-results || exit 1
 for trace in traces/*.trace; do
   key0=$(basename "$trace" .trace); [ -s "$out/$key0.phases" ] && continue
   key=$(basename "$trace" .trace)

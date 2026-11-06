@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -u
-cd /home/vvin/learn/sheetwrite-wt/fa-develop
+cd /home/vvin/learn/sheetwrite-wt/fa-develop || exit 1
 for engine in default full; do
   SHEETWRITE_BENCH_ENGINE=$engine BENCH_MEMORY_MAX=12G /home/vvin/learn/bench-run --slot 2 \
     bun bench/src/formula-gate.ts --base /home/vvin/learn/sheetwrite-wt/fa-v061 \
