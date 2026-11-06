@@ -5,6 +5,7 @@ import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { median } from "../bench/src/stats.js";
 import type { PerfRow, PerfStat } from "../docs/src/lib/perf-bars.js";
+import type { StoryMachine } from "../docs/src/lib/speedup-story.js";
 import { frontmatter } from "./docs-api.js";
 import { exists, posix, repositoryRoot } from "./docs-shared.js";
 import {
@@ -196,22 +197,11 @@ export function landingDownloads(
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
 
-/** Value at quantile `q` (0 to 1) of sorted values, interpolated between neighbours. */
-function quantile(sorted: readonly number[], q: number): number {
-  const position = (sorted.length - 1) * q;
-  const below = sorted[Math.floor(position)] ?? Number.NaN;
-  const above = sorted[Math.ceil(position)] ?? below;
-  return below + (above - below) * (position - Math.floor(position));
-}
-
-const LOWER_QUARTILE = 0.25;
-const UPPER_QUARTILE = 0.75;
-
 /**
  * Per size, how many times faster Sheetwrite is than Handsontable: the ratio
- * pairs per scenario, then the median and the middle half across scenarios.
- * Sizes with zero full-round pairs are omitted rather than emitted as NaN
- * (JSON.stringify silently turns NaN into null, which would render as a number).
+ * pairs per scenario, then the median across scenarios. Sizes with zero
+ * full-round pairs are omitted rather than emitted as NaN (JSON.stringify
+ * silently turns NaN into null, which would render as a number).
  */
 function landingSizes(evidence: ValidatedRenderEvidence) {
   const successes = (size: number, engine: string, scenario: string): RenderEvidenceResult[] =>
@@ -240,16 +230,11 @@ function landingSizes(evidence: ValidatedRenderEvidence) {
     }
     if (ratios.length === 0) return [];
     const best = ratios.reduce((a, b) => (b.ratio > a.ratio ? b : a));
-    const sorted = ratios.map((entry) => entry.ratio).sort((left, right) => left - right);
     return [
       {
         size,
         comparedScenarios: ratios.length,
         medianRatio: round1(median(ratios.map((r) => r.ratio))),
-        middleHalf: [
-          round1(quantile(sorted, LOWER_QUARTILE)),
-          round1(quantile(sorted, UPPER_QUARTILE)),
-        ],
         bestRatio: round1(best.ratio),
         bestScenario: best.scenario,
         handsontableIncomplete,
@@ -293,21 +278,8 @@ export function landingBenchPayload(
     millionRowMedianMs: round1(median(scenarioMedians)),
     millionRowHeapMb: Math.round(median(scenarioHeaps) / 1_000_000),
   };
-  const machineSummaries = machines.map(({ machine, evidence: capture }) => ({
-    machine: machine.machine,
-    label: machine.label,
-    capture: {
-      commit: capture.metadata.commit,
-      timestamp: capture.metadata.timestamp,
-      browser: `Chromium ${capture.metadata.browserVersion}`,
-      rounds: capture.metadata.rounds,
-    },
-    sizes: landingSizes(capture),
-  }));
   const displayed = [
-    ...[sizes, ...machineSummaries.map((summary) => summary.sizes)].flatMap((list) =>
-      list.flatMap((entry) => [entry.medianRatio, entry.bestRatio, ...entry.middleHalf]),
-    ),
+    ...sizes.flatMap((entry) => [entry.medianRatio, entry.bestRatio]),
     heroStats.millionRowMedianMs,
     heroStats.millionRowHeapMb,
   ];
@@ -329,7 +301,8 @@ export function landingBenchPayload(
     },
     heroStats,
     sizes,
-    machines: machineSummaries.filter((summary) => summary.sizes.length > 0),
+    /** The speed story's data: every interaction at 100,000 rows, per machine. */
+    story: storyMachines(machines),
     ...downloadsField,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
@@ -863,48 +836,54 @@ const STORY_CATEGORY_OF: ReadonlyArray<readonly [RegExp, string]> = [
   [/^arrow-/u, "Keyboard"],
 ];
 
+/** Each machine's interactions at `STORY_ROWS`: the speed story's data, on the pages and the landing. */
+function storyMachines(
+  machines: readonly MachineEvidence<ValidatedRenderEvidence>[],
+): StoryMachine[] {
+  return machines.map(({ machine, evidence }) => {
+    const { name, detail } = machineName(machine);
+    const rounds = (engine: string, scenario: string): number[] =>
+      evidence.results
+        .filter(
+          (result) =>
+            result.rows === STORY_ROWS &&
+            result.engine === engine &&
+            result.scenarioId === scenario &&
+            result.status === "success",
+        )
+        .map((result) => result.medianMs);
+    return {
+      machine: machine.machine,
+      name,
+      detail,
+      note: `${formatCount(STORY_ROWS)} rows · median of ${evidence.metadata.rounds} rounds · Chromium ${evidence.metadata.browserVersion} · captured ${evidence.metadata.timestamp.slice(0, 10)}`,
+      interactions: evidence.config.scenarios.flatMap((scenario) => {
+        const ours = rounds("sheetwrite", scenario);
+        const theirs = rounds("handsontable", scenario);
+        if (ours.length === 0) return [];
+        return [
+          {
+            id: scenario,
+            label: readableId(scenario),
+            category: STORY_CATEGORY_OF.find(([pattern]) => pattern.test(scenario))?.[1] ?? "Paint",
+            measured: {
+              value: median(ours),
+              spread: [Math.min(...ours), Math.max(...ours)] as const,
+            },
+            ...(theirs.length === 0 ? {} : { base: median(theirs) }),
+          },
+        ];
+      }),
+    };
+  });
+}
+
 /** Headline cards, the speedup overview and every number, per machine at `STORY_ROWS`. */
 function renderSpeedStory(machines: readonly MachineEvidence<ValidatedRenderEvidence>[]): string {
   return speedStory({
     id: "render-story",
     baseName: "Handsontable",
-    machines: machines.map(({ machine, evidence }) => {
-      const { name, detail } = machineName(machine);
-      const rounds = (engine: string, scenario: string): number[] =>
-        evidence.results
-          .filter(
-            (result) =>
-              result.rows === STORY_ROWS &&
-              result.engine === engine &&
-              result.scenarioId === scenario &&
-              result.status === "success",
-          )
-          .map((result) => result.medianMs);
-      return {
-        machine: machine.machine,
-        name,
-        detail,
-        note: `${formatCount(STORY_ROWS)} rows · median of ${evidence.metadata.rounds} rounds · Chromium ${evidence.metadata.browserVersion} · captured ${evidence.metadata.timestamp.slice(0, 10)}`,
-        interactions: evidence.config.scenarios.flatMap((scenario) => {
-          const ours = rounds("sheetwrite", scenario);
-          const theirs = rounds("handsontable", scenario);
-          if (ours.length === 0) return [];
-          return [
-            {
-              id: scenario,
-              label: readableId(scenario),
-              category:
-                STORY_CATEGORY_OF.find(([pattern]) => pattern.test(scenario))?.[1] ?? "Paint",
-              measured: {
-                value: median(ours),
-                spread: [Math.min(...ours), Math.max(...ours)] as const,
-              },
-              ...(theirs.length === 0 ? {} : { base: median(theirs) }),
-            },
-          ];
-        }),
-      };
-    }),
+    machines: storyMachines(machines),
   });
 }
 

@@ -19,8 +19,8 @@ export interface StoryInteraction {
   readonly label: string;
   /** "Scroll", "Edit", "Keyboard", "Rows" or "Paint". */
   readonly category: string;
-  /** Sheetwrite's median, with the lowest and highest round. */
-  readonly measured: { readonly value: number; readonly spread: readonly [number, number] };
+  /** Sheetwrite's median, with the lowest and highest round as `[low, high]`. */
+  readonly measured: { readonly value: number; readonly spread: readonly number[] };
   /** The compared library's median; absent when it did not complete. */
   readonly base?: number;
 }
@@ -102,7 +102,8 @@ function details(machine: StoryMachine, baseName: string): string {
   const rows = machine.interactions
     .map((interaction) => {
       const ratio = ratioOf(interaction);
-      const [low, high] = interaction.measured.spread;
+      const [low = interaction.measured.value, high = interaction.measured.value] =
+        interaction.measured.spread;
       return `<tr><th scope="row">${escapeHtml(interaction.label)}</th><td class="speed-story__ours"><b>${formatTime(interaction.measured.value)}</b><small>${formatTime(low)}–${formatTime(high)}</small></td><td>${interaction.base === undefined ? "did not complete" : formatTime(interaction.base)}</td><td>${ratio === undefined ? "" : `${formatTimes(ratio)} faster`}</td><td>${ratio === undefined ? "" : `−${Math.min(99.9, (1 - 1 / ratio) * 100).toFixed(ratio > 1000 ? 1 : 0)}%`}</td></tr>`;
     })
     .join("");

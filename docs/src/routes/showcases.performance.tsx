@@ -1583,7 +1583,7 @@ function EvidenceSection({ workbench }: Readonly<{ workbench: PerformanceWorkben
         {COMPARISON_EVIDENCE.available && (
           <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
             <Suspense fallback={null}>
-              <SpeedupBars id="showcase-speedup" machines={COMPARISON_EVIDENCE.machines} />
+              <SpeedupBars id="showcase-story" machines={COMPARISON_EVIDENCE.story} />
             </Suspense>
           </article>
         )}

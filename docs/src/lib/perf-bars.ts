@@ -1,14 +1,14 @@
 /**
- * Performance bars: the one figure the site uses to show and compare
- * measurements. Generated Performance pages, release notes, the landing page
- * and the performance showcase all render through `renderPerfBars`, so every
- * bar shares one axis style, one number format, one verdict wording and one
- * table view.
+ * Performance bars: the figure the Performance pages and release notes use to
+ * show and compare measurements, so every bar shares one axis style, one
+ * number format, one verdict wording and one table view. The speed story
+ * (`speedup-story.ts`), on the Render page, the landing page and the
+ * performance showcase, uses the same formats and icons.
  *
- * The renderer returns HTML. Build scripts write it into Markdown and React
- * pages set it as static markup, so the figure needs no JavaScript of its own.
- * The caller supplies the icon markup, because build scripts inline sprite
- * icons while pages reference the sprite file.
+ * The renderer returns HTML. Build scripts write it into Markdown, so the
+ * figure needs no JavaScript of its own. The caller supplies the icon markup,
+ * because build scripts inline sprite icons while pages reference the sprite
+ * file.
  */
 
 /** The quantity a figure plots. Times are milliseconds; sizes are bytes. */

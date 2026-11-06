@@ -20,7 +20,7 @@ import {
   releaseHref,
 } from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
-import type { SpeedupMachine } from "../lib/speedup-figure.js";
+import type { StoryMachine } from "../lib/speedup-story.js";
 
 import landingStylesheet from "../styles/landing.css?url";
 
@@ -58,8 +58,8 @@ interface LandingEvidence {
     millionRowHeapMb: number;
   };
   sizes: LandingBenchSize[];
-  /** The same comparison on each machine with a release capture, Linux first. */
-  machines: SpeedupMachine[];
+  /** Every interaction at 100,000 rows, per machine with a release capture, Linux first. */
+  story: StoryMachine[];
 }
 
 interface LandingBenchData extends Partial<LandingEvidence> {
@@ -158,7 +158,7 @@ const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
 function BenchmarkBars({ evidence }: Readonly<{ evidence: LandingEvidence }>) {
   return (
     <Suspense fallback={null}>
-      <SpeedupBars id="landing-speedup" machines={evidence.machines} />
+      <SpeedupBars id="landing-story" machines={evidence.story} />
     </Suspense>
   );
 }
@@ -190,12 +190,12 @@ function FeatureCards() {
 function Landing() {
   const bench = landingBench as LandingBenchData;
   const evidence: LandingEvidence | undefined =
-    bench.available && bench.sizes && bench.heroStats && bench.capture && bench.machines
+    bench.available && bench.sizes && bench.heroStats && bench.capture && bench.story
       ? {
           sizes: bench.sizes,
           heroStats: bench.heroStats,
           capture: bench.capture,
-          machines: bench.machines,
+          story: bench.story,
         }
       : undefined;
   const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
