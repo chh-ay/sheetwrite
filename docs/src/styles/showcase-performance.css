@@ -1,5 +1,6 @@
 @layer components {
-  .sw-sp-frame {
+  /* The page's own measures, on the wrappers inside the shared showcase layout. */
+  .sw-sp-page {
     --sw-sp-space-1: var(--sw-space-1);
     --sw-sp-space-2: var(--sw-space-2);
     --sw-sp-space-3: var(--sw-space-3);
@@ -17,27 +18,10 @@
     --sw-sp-line: 1px;
     --sw-sp-focus: 0 0 0 0.2rem color-mix(in srgb, var(--sw-accent) 35%, transparent);
 
-    display: flex;
-    min-height: 100dvh;
-    flex-direction: column;
-    background: var(--sw-surface-0);
+    display: grid;
+    gap: var(--sw-space-10);
+    min-width: 0;
     color: var(--sw-fg);
-  }
-
-  .sw-sp-page {
-    width: calc(100% - 2 * var(--sw-page-inset));
-    margin-inline: auto;
-    padding-block: var(--sw-space-3) var(--sw-sp-space-8);
-  }
-
-  .sw-sp-page .sw-capability-hero {
-    padding: var(--sw-space-6) 0 var(--sw-space-8);
-  }
-
-  .sw-sp-page .sw-capability-hero h1 {
-    max-width: 24ch;
-    font-size: var(--sw-text-display);
-    line-height: 1.08;
   }
 
   /* Flight deck: an instrument panel in the demo palette, like the hub previews. */
@@ -1982,12 +1966,8 @@
       white-space: nowrap;
     }
 
-    .sw-sp-frame {
-      --sw-sp-grid-height: clamp(22rem, 56vh, 28rem);
-    }
-
     .sw-sp-page {
-      padding-block: var(--sw-sp-space-5) var(--sw-sp-space-7);
+      --sw-sp-grid-height: clamp(22rem, 56vh, 28rem);
     }
 
     .sw-sp-stage-body {
@@ -2063,11 +2043,7 @@
   }
 
   @media (max-width: 520px) {
-    .sw-sp-page .sw-capability-hero__facts {
-      display: none;
-    }
-
-    .sw-sp-frame {
+    .sw-sp-page {
       --sw-sp-grid-height: clamp(20rem, 52vh, 26rem);
     }
 

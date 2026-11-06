@@ -18,12 +18,11 @@ import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
 import { errorText } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { CapabilityHero } from "../showcases/CapabilityHero.js";
+import { ShowcaseLayout } from "../showcases/layout/ShowcaseLayout.js";
 import { ScaleFlightDeck } from "../showcases/ScaleFlight.js";
 import {
   attemptColumnScan,
@@ -702,37 +701,36 @@ function PerformanceRoute() {
   const workbench = usePerformanceWorkbench();
 
   return (
-    <div className="sw-sp-frame">
-      <SiteTopbar active="performance" />
-      <main className="sw-sp-page" id="main-content">
-        <CapabilityHero
-          description={
-            <>
-              Explore {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns
-              of financial operations. Visit any cell. Only the tiles you visit load.
-            </>
-          }
-          eyebrow="CAPABILITY / DATA & SCALE"
-          facts={[
-            { label: "Rows", value: SCALE_ROWS.toLocaleString() },
-            { label: "Columns", value: SCALE_COLUMNS.toLocaleString() },
-            { label: "Address space", value: "1 billion" },
-            { label: "Loading", value: "Requested tiles only" },
-          ]}
-          title="A billion cells. Within reach."
-        />
-
-        <WorkbenchSection workbench={workbench} />
-
+    <ShowcaseLayout
+      demo={
+        <div className="sw-sp-page">
+          <WorkbenchSection workbench={workbench} />
+        </div>
+      }
+      demoLabel="Billion-address Grid workbench"
+      eyebrow="Data and scale"
+      facts={[
+        { label: "Rows", value: SCALE_ROWS.toLocaleString() },
+        { label: "Columns", value: SCALE_COLUMNS.toLocaleString() },
+        { label: "Addresses", value: (SCALE_ROWS * SCALE_COLUMNS).toLocaleString() },
+      ]}
+      guide={{ href: "/docs/features/data/datasources/", label: "Read the datasource guide" }}
+      id="performance"
+      task={
+        <>
+          Explore {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns of
+          financial operations. Visit any cell; only the tiles you visit load.
+        </>
+      }
+      title="A billion cells. Within reach."
+    >
+      <div className="sw-sp-page">
         <PagingSection workbench={workbench} />
-
         <ResourcesSection workbench={workbench} />
-
         <CrossingsSection workbench={workbench} />
-
         <EvidenceSection workbench={workbench} />
-      </main>
-    </div>
+      </div>
+    </ShowcaseLayout>
   );
 }
 
