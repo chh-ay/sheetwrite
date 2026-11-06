@@ -87,7 +87,9 @@ impl CellStore {
         name: &str,
         refers_to: &str,
     ) -> bool {
-        let Some(key) = external_name_key(&format!("[{book}]{sheet}!{name}")) else {
+        // A quoted formula doubles the quotes of the book and sheet names.
+        let qualifier = format!("[{book}]{sheet}").replace('\'', "''");
+        let Some(key) = external_name_key(&format!("{qualifier}!{name}")) else {
             return false;
         };
         let Some(range) = self.link_range(book, refers_to) else {
@@ -110,7 +112,7 @@ impl CellStore {
     /// that use one show `#REF!` until it is added again.
     #[wasm_bindgen(js_name = removeExternalNames)]
     pub fn remove_external_names(&mut self, book: &str) {
-        let prefix = sheet_name_key(&format!("[{book}]"));
+        let prefix = sheet_name_key(&format!("[{book}]").replace('\'', "''"));
         let before = self.defined_names.len();
         self.defined_names
             .retain(|(scope, key), _| scope.is_some() || !key.starts_with(&prefix));
@@ -152,6 +154,8 @@ impl CellStore {
 impl CellStore {
     /// What a defined name of another workbook stands for: the range it
     /// refers to on a link sheet, or `#REF!` when the link does not hold it.
+    /// Out of line, so the name resolver of every formula stays small.
+    #[inline(never)]
     pub(crate) fn external_name_target(&self, text: &str) -> NameTarget {
         let range =
             external_name_key(text).and_then(|key| match self.defined_names.get(&(None, key)) {

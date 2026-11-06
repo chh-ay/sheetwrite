@@ -2165,6 +2165,9 @@ fn missing_area_end(after: &str) -> String {
 /// The lookup key of a sheet name: the name without case. For a sheet of
 /// another workbook, the folder before `[` is left out, so
 /// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
+///
+/// Out of line: link sheets and link names share it with every sheet lookup.
+#[inline(never)]
 pub(crate) fn sheet_name_key(name: &str) -> String {
     let name = name.rfind('[').map_or(name, |start| &name[start..]);
     name.chars().flat_map(char::to_lowercase).collect()
@@ -2175,38 +2178,45 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// `[Budget.xlsx]!Total` and `'C:\Reports\[Budget.xlsx]'!Total` all give
 /// `[budget.xlsx]!total`; the sheet-scoped `[Budget.xlsx]Annual!Total`
 /// gives `[budget.xlsx]annual!total`. The folder and the letter case are
-/// left out, as for link sheets. `None` for a name without a workbook.
+/// left out, as for link sheets. A quote in a book or sheet name stays
+/// doubled, as a quoted formula writes it. `None` for a name without a
+/// workbook.
 pub(crate) fn external_name_key(text: &str) -> Option<String> {
     let (qualifier, name) = text.rsplit_once('!')?;
-    let qualifier = match qualifier
+    let qualifier = qualifier
         .strip_prefix('\'')
         .and_then(|inner| inner.strip_suffix('\''))
-    {
-        Some(inner) => Cow::Owned(inner.replace("''", "'")),
-        None => Cow::Borrowed(qualifier),
-    };
-    let key = match qualifier.rfind('[') {
-        Some(start) => format!("{}!{name}", &qualifier[start..]),
-        None => {
-            let book = qualifier.rsplit(['\\', '/']).next()?;
-            format!("[{book}]!{name}")
-        }
-    };
-    Some(key.chars().flat_map(char::to_lowercase).collect())
+        .unwrap_or(qualifier);
+    if qualifier.contains('[') {
+        return Some(sheet_name_key(&format!("{qualifier}!{name}")));
+    }
+    let folder_end = qualifier.rfind('\\').max(qualifier.rfind('/'));
+    let book = folder_end.map_or(qualifier, |at| &qualifier[at + 1..]);
+    Some(sheet_name_key(&format!("[{book}]!{name}")))
 }
 
 /// Whether the text before `!` names another workbook: a sheet of it
 /// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
 /// `C:\Reports\Budget.xlsx`).
 fn names_workbook(qualifier: &str) -> bool {
-    const EXTENSIONS: [&str; 6] = [".xlsx", ".xlsm", ".xlsb", ".xls", ".xlam", ".ods"];
+    const LONGEST_EXTENSION: usize = 4;
 
-    let bytes = qualifier.as_bytes();
-    is_external_sheet(qualifier)
-        || EXTENSIONS.iter().any(|extension| {
-            bytes.len() > extension.len()
-                && bytes[bytes.len() - extension.len()..].eq_ignore_ascii_case(extension.as_bytes())
-        })
+    let Some((_, extension)) = qualifier.rsplit_once('.') else {
+        return is_external_sheet(qualifier);
+    };
+    let mut lower = [0u8; LONGEST_EXTENSION];
+    let fits = extension.len() <= LONGEST_EXTENSION;
+    if fits {
+        for (slot, byte) in lower.iter_mut().zip(extension.bytes()) {
+            *slot = byte.to_ascii_lowercase();
+        }
+    }
+    let is_book = fits
+        && matches!(
+            &lower[..extension.len()],
+            b"xlsx" | b"xlsm" | b"xlsb" | b"xls" | b"xlam" | b"ods"
+        );
+    is_book || is_external_sheet(qualifier)
 }
 
 /// Whether a sheet reference names a sheet of another workbook:
