@@ -149,7 +149,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         added: RELEASE,
       },
       // Not released yet; the label says so beside the 0.6.x version in the header.
-      { label: "Upgrade to 0.7.0 (next)", href: "/docs/start/upgrade-to-0-7-0/", icon: "upgrade-next" },
+      {
+        label: "Upgrade to 0.7.0 (next)",
+        href: "/docs/start/upgrade-to-0-7-0/",
+        icon: "upgrade-next",
+      },
     ],
   },
   {
@@ -454,7 +458,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Render", href: "/docs/performance/render/", icon: "monitor" },
       { label: "Data engine", href: "/docs/performance/data-engine/", icon: "rows" },
       { label: "Core write path", href: "/docs/performance/core-write-path/", icon: "write" },
-      { label: "Formula engine", href: "/docs/performance/formula-engine/", icon: "formula-engine" },
+      {
+        label: "Formula engine",
+        href: "/docs/performance/formula-engine/",
+        icon: "formula-engine",
+      },
       { label: "XLSX codec", href: "/docs/performance/xlsx-codec/", icon: "xlsx" },
       { label: "Delivery size", href: "/docs/performance/delivery-size/", icon: "weight" },
       { label: "Memory", href: "/docs/performance/memory/", icon: "memory" },
