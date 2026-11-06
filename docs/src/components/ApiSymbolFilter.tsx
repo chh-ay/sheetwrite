@@ -1,4 +1,3 @@
-import { useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 interface SymbolCard {
@@ -20,6 +19,11 @@ interface SymbolGroup {
 
 /** Only entry-point pages list exported symbols. */
 const ENTRY_POINT_PATH = /^\/docs\/api\/[^/]+\/$/;
+
+/** Whether the page at `pathname` lists exported symbols, so the filter has cards to filter. */
+export function listsExportedSymbols(pathname: string): boolean {
+  return ENTRY_POINT_PATH.test(pathname);
+}
 
 /** Below this many cards a filter costs more clicks than it saves. */
 const MINIMUM_FILTERABLE_CARDS = 12;
@@ -56,9 +60,9 @@ function statusFor(query: string, matches: number, total: number): string {
  * The cards are filtered in place rather than re-rendered: the article's own
  * anchors, the outline, and the Pagefind index keep pointing at the same
  * elements, and the disclosure rows below stay the generator's markup.
+ * `pathname` is the page's path; a new one rescans the article.
  */
-export function ApiSymbolFilter(): ReactNode {
-  const pathname = useLocation({ select: (location) => location.pathname });
+export function ApiSymbolFilter({ pathname }: Readonly<{ pathname: string }>): ReactNode {
   const [groups, setGroups] = useState<readonly SymbolGroup[]>([]);
   const [query, setQuery] = useState("");
   const [matchCount, setMatchCount] = useState(0);
@@ -72,7 +76,6 @@ export function ApiSymbolFilter(): ReactNode {
     setQuery("");
     setGroups([]);
     collectedSignature.current = "";
-    if (!ENTRY_POINT_PATH.test(pathname)) return;
     const article = document.querySelector<HTMLElement>(PROSE_SELECTOR);
     if (article === null) return;
     const scan = () => {

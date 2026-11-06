@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import releaseFacts from "../generated/release-facts.json" with { type: "json" };
+import { Island } from "../islands/Island.js";
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { BrandMark } from "./BrandMark.js";
 import { Icon } from "./Icon.js";
@@ -91,7 +92,7 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
         <a className="sw-header__link" href={REPOSITORY_URL}>
           GitHub
         </a>
-        <ThemeToggle />
+        <Island component={ThemeToggle} name="theme" props={{}} />
         {trailing ?? (
           <button
             aria-label="Site menu"

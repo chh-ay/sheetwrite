@@ -1,11 +1,7 @@
-import { useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { MIN_OUTLINE_ENTRIES, type OutlineItem } from "../lib/outline.js";
 import { Icon } from "./Icon.js";
-
-/** The outline before the page says otherwise; one constant, so effects see a stable value. */
-const NO_ENTRIES: readonly OutlineItem[] = [];
 
 /**
  * Outline of the rendered document: h2/h3 headings (ids come from rehype-slug
@@ -19,11 +15,11 @@ const NO_ENTRIES: readonly OutlineItem[] = [];
  * show it; the DOM read then keeps it current (the symbol filter hides groups).
  */
 export function useDocumentOutline(
-  initial: readonly OutlineItem[] = NO_ENTRIES,
+  initial: readonly OutlineItem[],
+  /** The page's path: client-side navigations swap the article without remounting the shell. */
+  pathname: string,
 ): readonly OutlineItem[] {
   const [items, setItems] = useState<readonly OutlineItem[]>(initial);
-  // Client-side navigations swap the article without remounting the shell.
-  const pathname = useLocation({ select: (location) => location.pathname });
 
   useEffect(() => {
     setItems(initial);
@@ -201,4 +197,20 @@ export function InlineTableOfContents({ items }: Readonly<{ items: readonly Outl
       {items.length < MIN_OUTLINE_ENTRIES ? null : <OutlineLinks items={items} />}
     </details>
   );
+}
+
+/** Props of the outline islands: the build-time outline and the page's path. */
+interface OutlineIslandProps {
+  readonly initial: readonly OutlineItem[];
+  readonly pathname: string;
+}
+
+/** {@link TableOfContents} as an island: it keeps its own outline current. */
+export function OutlineRail({ initial, pathname }: OutlineIslandProps) {
+  return <TableOfContents items={useDocumentOutline(initial, pathname)} />;
+}
+
+/** {@link InlineTableOfContents} as an island. */
+export function OutlineInline({ initial, pathname }: OutlineIslandProps) {
+  return <InlineTableOfContents items={useDocumentOutline(initial, pathname)} />;
 }

@@ -706,11 +706,12 @@ function codeGroup(node: ContentNode): ContentNode {
 
 /**
  * Components that render in the browser, each with the module that exports
- * them (from the docs root). A page imports one only when it uses it.
+ * them (from the docs root). A page imports one only when it uses it. The
+ * islands module renders each as an island on static docs pages.
  */
 const RUNTIME_MODULES = {
-  Tabs: { module: "/src/components/Tabs.tsx", names: ["Tab", "Tabs"] },
-  LiveGrid: { module: "/src/components/LiveGrid.tsx", names: ["LiveGrid"] },
+  Tabs: { module: "/src/islands/content.tsx", names: ["Tab", "Tabs"] },
+  LiveGrid: { module: "/src/islands/content.tsx", names: ["LiveGrid"] },
 } as const;
 
 type RuntimeComponent = keyof typeof RUNTIME_MODULES;
