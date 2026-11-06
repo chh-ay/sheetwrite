@@ -10,13 +10,13 @@ import {
   normalizeDocumentHref,
   useDocumentComponent,
 } from "../lib/content.js";
-import { breadcrumbsFor } from "../lib/navigation.js";
-import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import {
   FORMULA_FAMILY_PAGE,
   loadedFormulaReference,
   loadFormulaReference,
 } from "../lib/formula-reference-module.js";
+import { breadcrumbsFor } from "../lib/navigation.js";
+import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
 
 /** The formula reference, from its module once loaded (see lib/formula-reference-module.ts). */
