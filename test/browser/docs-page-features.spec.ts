@@ -142,7 +142,7 @@ test("page actions edit the source file and report a problem with the page", asy
   const edit = page.getByRole("link", { name: "Edit on GitHub" });
   await expect(edit).toHaveAttribute(
     "href",
-    "https://github.com/chh-ay/sheetwrite/edit/develop/docs/src/content/docs/start/first-grid.md",
+    "https://github.com/chh-ay/sheetwrite/edit/develop/docs/src/content/docs/start/first-grid.mdx",
   );
   const report = new URL(
     (await page.getByRole("link", { name: "Report a problem" }).getAttribute("href")) ?? "",

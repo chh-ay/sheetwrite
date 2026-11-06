@@ -293,7 +293,16 @@
   --ecIndent: 0ch;
 }
 
-:root .sw-playground__pending .expressive-code .ec-line .code {
+/* The editor's own padding on both sides; the code block keeps room for its
+   copy button on the right, which would make its rows shorter. */
+:root .sw-prose .sw-playground__pending .expressive-code .ec-line .code {
+  padding-inline: var(--sw-space-5);
   overflow-wrap: anywhere;
   word-break: normal;
+}
+
+/* A line's leading spaces may end a row in the editor's text area, so they
+   may in the placeholder too (the code block keeps them on the first row). */
+:root .sw-prose .sw-playground__pending .expressive-code pre.wrap .ec-line .code span.indent {
+  white-space: pre-wrap;
 }
