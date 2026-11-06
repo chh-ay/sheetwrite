@@ -1,4 +1,9 @@
-import { type AnchorHTMLAttributes, type ComponentType, use } from "react";
+import {
+  type AnchorHTMLAttributes,
+  type ComponentType,
+  type LazyExoticComponent,
+  use,
+} from "react";
 
 import type { OutlineItem } from "./outline.js";
 
