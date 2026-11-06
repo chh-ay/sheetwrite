@@ -161,7 +161,6 @@ describe("frozen panes", () => {
     grid.setFrozen(2, 1);
 
     const frame = recorder.paneFrames.at(-1);
-    expect(frame).toBeDefined();
     if (!frame) throw new Error("expected a pane frame");
     expect(recorder.paints.length).toBe(0); // frozen frames never take the plain paint() path
     expect(frame.panes.length).toBe(4);

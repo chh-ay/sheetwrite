@@ -156,7 +156,6 @@ describe("built-in widget styling", () => {
       injectStyle(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
       const overridden = getComputedStyle(findEl).background;
       expect(overridden).toBe("#abcabc");
-      expect(overridden).not.toBe(THEME.bg);
     } else {
       // Fallback: the seeding + structure contract still holds.
       expect(host.style.getPropertyValue("--sheetwrite-widget-bg")).toBe(THEME.bg);
