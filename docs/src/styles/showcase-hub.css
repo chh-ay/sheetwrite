@@ -1102,7 +1102,8 @@
 @media (max-width: 51.999rem) {
   .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
     grid-template-columns: 1fr;
-    grid-template-rows: 12rem 1fr;
+    /* The miniature (ribbon, formula bar, cells, tabs) sets the preview height. */
+    grid-template-rows: auto 1fr;
   }
 }
 
