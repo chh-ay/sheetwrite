@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { type PerfFigure, type PerfRow, perfVerdict } from "../src/lib/perf-bars.ts";
+import { type PerfFigure, type PerfRow, perfVerdict, renderPerfBars } from "../src/lib/perf-bars.ts";
 import { parsePerfCompare } from "../src/lib/perf-compare.ts";
 import { renderReleaseChange } from "../src/lib/release-change.ts";
 
@@ -139,5 +139,26 @@ describe("engine change", () => {
       ["slower", "worse"],
     ]);
     expect(html).toContain("1 workload within noise");
+    expect(html).toContain("Median <b>2.0× faster</b>");
+    expect(html).toContain("Median <b>2.0× slower</b>");
+  });
+});
+
+describe("machine switch", () => {
+  it("starts with the first machine checked and names the figure it switches", () => {
+    const group = (machine: "linux" | "mac") => ({
+      label: machine === "linux" ? "Linux · x86-64" : "Mac · Apple Silicon",
+      machine,
+      rows: [{ label: "Sort", bars: [{ label: "", role: "measured" as const, stat: { value: 1 } }] }],
+    });
+    const html = renderPerfBars(
+      { ...TIME_FIGURE, title: "Median recalculation time", groups: [group("linux"), group("mac")] },
+      () => "",
+    );
+    expect(html).toContain('aria-label="Machine for median recalculation time"');
+    expect([...html.matchAll(/<input type="radio"[^>]*>/gu)].map(([input]) => input.includes(" checked"))).toEqual([
+      true,
+      false,
+    ]);
   });
 });
