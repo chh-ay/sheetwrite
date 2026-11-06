@@ -1084,11 +1084,11 @@ describe("stable formula sheet identity", () => {
     });
 
     expect(store.renameSheetFormulaIdentity("source", "Sales Data")).toBe(true);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
 
     expect(store.renameSheetFormulaIdentity("source", "O'Brien")).toBe(true);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('O''Brien'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='O''Brien'!A1+1");
     workbook.sheets[0]!.name = "O'Brien";
     const snapshot: WorkbookSnapshot = {
       schemaVersion: 1,
@@ -1127,10 +1127,10 @@ describe("stable formula sheet identity", () => {
     if (!roundTrip.ok) throw new Error("renamed snapshot did not validate");
     expect(roundTrip.value.sheets[1]?.cells[0]?.cells[0]?.value).toEqual({
       kind: "formula",
-      src: "=('O''Brien'!A1+1)",
+      src: "='O''Brien'!A1+1",
     });
     expect(store.renameSheetFormulaIdentity("source", "Sales")).toBe(true);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(Sales!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Sales!A1+1");
     store.dispose();
   });
 
@@ -1160,7 +1160,7 @@ describe("stable formula sheet identity", () => {
 
     expect(store.removeSheetFormulaIdentity("source")).toBe(true);
 
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(#REF!+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe("#REF!");
     expect(store.removeSheetFormulaIdentity("source")).toBe(false);
