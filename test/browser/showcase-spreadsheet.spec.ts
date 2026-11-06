@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
+import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 
 declare global {
@@ -31,6 +32,26 @@ function cell(page: Page, sheet: string, row: number, col: number) {
     },
     [sheet, row, col] as const,
   );
+}
+
+/** RGBA pixels of a page region exactly as the browser composited it. */
+async function regionPixels(
+  page: Page,
+  clip: { x: number; y: number; width: number; height: number },
+): Promise<Uint8ClampedArray> {
+  const image = await page.screenshot({ clip });
+  return page.evaluate(async (encoded) => {
+    const source = new Image();
+    source.src = `data:image/png;base64,${encoded}`;
+    await source.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = source.naturalWidth;
+    canvas.height = source.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("A 2D canvas context is unavailable");
+    context.drawImage(source, 0, 0);
+    return context.getImageData(0, 0, canvas.width, canvas.height).data;
+  }, image.toString("base64"));
 }
 
 test("ribbon commands edit the workbook and AutoSum totals the ledger", async ({ page }) => {
@@ -111,6 +132,32 @@ test("at 320 px the tabs scroll beside the layout buttons instead of under them 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test("at 390 px a cut-off tab label stays clear of the layout button", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  const tabList = ribbon.getByRole("tablist", { name: "Ribbon tabs" });
+  const layout = ribbon.getByRole("button", { name: "Compact ribbon" });
+  await tabList.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+
+  const list = await tabList.boundingBox();
+  const button = await layout.boundingBox();
+  if (list === null || button === null) throw new Error("The tab list or layout button is hidden");
+  // The tabs do not fit at this width, so a label is cut at the list's end.
+  expect(await tabList.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  // Everything between the layout button and the six pixels of the tab list
+  // before it must be plain tab-row background, not part of a tab label.
+  const strip = await regionPixels(page, {
+    x: list.x + list.width - 6,
+    y: button.y,
+    width: button.x - (list.x + list.width - 6),
+    height: button.height,
+  });
+  expect(hasOpaqueForeground(strip)).toBe(false);
 });
 
 for (const mode of ["full", "compact"] as const) {
