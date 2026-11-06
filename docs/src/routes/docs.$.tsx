@@ -12,32 +12,16 @@ import {
 } from "../lib/content.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
+import {
+  FORMULA_FAMILY_PAGE,
+  loadedFormulaReference,
+  loadFormulaReference,
+} from "../lib/formula-reference-module.js";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
 
-type FormulaReferenceModule = typeof import("../components/FormulaReference.js");
-
-let formulaReferenceModule: FormulaReferenceModule | undefined;
-let formulaReferenceLoad: Promise<FormulaReferenceModule> | undefined;
-
-/**
- * The formula reference filter and its select load only with the formula
- * family pages that use them, not with every documentation page. The route
- * loader loads them before a formula page renders, so the server renders the
- * table in place instead of streaming it in after the page.
- */
-function loadFormulaReference(): Promise<FormulaReferenceModule> {
-  formulaReferenceLoad ??= import("../components/FormulaReference.js").then((module) => {
-    formulaReferenceModule = module;
-    return module;
-  });
-  return formulaReferenceLoad;
-}
-
-/** Formula family pages, whose article holds the formula reference. */
-const FORMULA_FAMILY_PAGE = /^\/docs\/reference\/formula-functions\/[^/]+\/$/;
-
+/** The formula reference, from its module once loaded (see lib/formula-reference-module.ts). */
 function FormulaReference(props: Readonly<{ family: string }>) {
-  const { FormulaReference: Reference } = formulaReferenceModule ?? use(loadFormulaReference());
+  const { FormulaReference: Reference } = loadedFormulaReference() ?? use(loadFormulaReference());
   return <Reference {...props} />;
 }
 
