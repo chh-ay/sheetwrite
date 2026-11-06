@@ -1,10 +1,12 @@
 import { SheetwriteError } from "./errors.js";
 import { externalSheetText, rewriteExternalSheets } from "./external-link-formula.js";
+import { connectExternalLinkResolver, type ExternalLinkResolver } from "./external-link-session.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { ExternalLink, ExternalLinkSheet } from "./types/external-link.js";
 import type { Grid } from "./types/grid.js";
 
+export type { ExternalLinkRequest, ExternalLinkResolver } from "./external-link-session.js";
 export {
   type ExternalSheetName,
   externalSheetText,
@@ -12,25 +14,6 @@ export {
   formulaContainsExternalReference,
   rewriteExternalSheets,
 } from "./external-link-formula.js";
-
-/** What a resolver is asked for: one linked workbook and the sheets that formulas name. */
-export interface ExternalLinkRequest {
-  /** The file name formulas use, such as `Budget.xlsx`. */
-  readonly book: string;
-  /** Where the workbook is, as saved: a relative path, a file path or a URL. */
-  readonly target: string;
-  /** The sheets the workbook link holds now. */
-  readonly sheets: readonly string[];
-}
-
-/**
- * Gives the current values of a linked workbook, as sheets with their cells,
- * or `null` when the workbook is not available. A rejected promise counts as
- * a failed update. The values replace all saved values of that link.
- */
-export type ExternalLinkResolver = (
-  request: ExternalLinkRequest,
-) => Promise<ExternalLinkSheet[] | null>;
 
 /** The result of updating one link. */
 export interface ExternalLinkUpdate {
@@ -51,6 +34,16 @@ export interface ExternalLinkUpdate {
 
 function sameBook(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
+}
+
+/**
+ * Give the Edit Links panel of `grid` a resolver, so its Update Values
+ * button can ask the host for current values. Without one, the panel lists
+ * the links and offers Change Source and Break Link only. Returns a function
+ * that disconnects the resolver.
+ */
+export function connectExternalLinks(grid: Grid, resolve: ExternalLinkResolver): () => void {
+  return connectExternalLinkResolver(grid, resolve);
 }
 
 /** The workbook's links; an absent list is empty. */

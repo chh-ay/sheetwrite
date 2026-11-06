@@ -31,7 +31,7 @@ export interface StaticDashboard {
 }
 
 /** The cell of one item value, with its number format or, in the caption row, bold text. */
-function staticCell(
+export function staticCell(
   row: number,
   col: number,
   value: CellScalar,

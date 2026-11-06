@@ -561,6 +561,7 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          ...this.moveLosses(patch),
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
@@ -624,6 +625,7 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          ...this.moveLosses(patch),
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
@@ -1114,6 +1116,18 @@ export class DocumentController {
 
     const losses = engine.permuteRowsLosses(patch);
     return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
+  }
+
+  /**
+   * A formula whose range lost a moved row or column at its edge does not
+   * get it back from the move back, so its cell is captured before the move
+   * and restored after the move back.
+   */
+  private moveLosses(
+    patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
+  ): Extract<DocumentOp, { op: "set" }>[] {
+    const engine = storeEngine(this.options.store);
+    return engine ? engine.moveLosses(patch).map((addr) => this.snapshotCell(addr)) : [];
   }
 
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {

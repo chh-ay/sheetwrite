@@ -1374,11 +1374,16 @@ fn lex_token_after<'a>(
             )?),
             true,
         )
-    } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
-        bytes[*index..]
-            .get(..literal.len())
-            .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
-    }) {
+    } else if let Some((literal, error)) = (c == b'#')
+        .then(|| {
+            ERROR_LITERALS.iter().find(|(literal, _)| {
+                bytes[*index..]
+                    .get(..literal.len())
+                    .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
+            })
+        })
+        .flatten()
+    {
         *index += literal.len();
         Tok::Error(*error)
     } else if c == b'[' {
@@ -1413,17 +1418,26 @@ fn lex_token_after<'a>(
     Ok(Some(tok))
 }
 
-/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`.
+/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`. ASCII
+/// bytes, which most names are, are read without decoding a character.
 fn ident_token<'a>(src: &'a str, index: &mut usize) -> Tok<'a> {
     let start = *index;
+    let bytes = src.as_bytes();
 
-    while *index < src.len() {
+    while let Some(&byte) = bytes.get(*index) {
+        if byte.is_ascii() {
+            if !(byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'_' | b'.' | b'\\')) {
+                break;
+            }
+            *index += 1;
+            continue;
+        }
+
         let ch = src[*index..].chars().next().expect("valid UTF-8 source");
-        if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
-            *index += ch.len_utf8();
-        } else {
+        if !ch.is_alphanumeric() {
             break;
         }
+        *index += ch.len_utf8();
     }
 
     Tok::Ident(Cow::Borrowed(&src[start..*index]), false)
@@ -2877,13 +2891,7 @@ impl AxisEdit {
 
         let span = match self.change {
             AxisChange::Shift { at, delta } => shift_range(*start, *end, at, delta),
-            // A move deletes nothing. When the block moves past one end, the
-            // ends can swap, and the range keeps the cells between them.
-            AxisChange::Move { from, count, to } => {
-                let first = moved_index(*start, from, count, to);
-                let second = moved_index(*end, from, count, to);
-                Some((first.min(second), first.max(second)))
-            }
+            AxisChange::Move { from, count, to } => moved_span(*start, *end, from, count, to),
         };
         match span {
             Some((shifted_start, shifted_end)) if shifted_start <= last => {
@@ -2954,22 +2962,24 @@ pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChan
     )
 }
 
-/// A moved block must not first delete a defined name's references: rewrite
-/// the saved definition once, after the store's remove/add move completes.
-pub(crate) fn move_named_formula_refs(
+/// Follow `count` rows or columns of `edited_sheet` moved from `from` to
+/// `to`, in a formula on `formula_sheet`: references to moved cells and to
+/// the cells the block passes over follow those cells. A defined name's
+/// formula has no sheet: pass `u32::MAX`, so only the references that name
+/// `edited_sheet` move. Returns whether any reference changed.
+pub(crate) fn move_refs(
     ast: &mut Ast,
     edited_sheet: u32,
+    formula_sheet: u32,
     columns: bool,
-    from: u32,
-    count: u32,
-    to: u32,
+    (from, count, to): (u32, u32, u32),
 ) -> bool {
     rewrite_axis(
         ast,
         AxisEdit {
             axis: if columns { Axis::Col } else { Axis::Row },
             change: AxisChange::Move { from, count, to },
-            formula_sheet: u32::MAX,
+            formula_sheet,
             edited_sheet,
         },
     )
@@ -3013,8 +3023,9 @@ fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
 }
 
 /// Where `index` is after `count` indices move from `from` to `to`; `to` is
-/// the first index of the moved block after the move.
-fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
+/// the first index of the moved block after the move. A moved cell takes its
+/// references along, so a reference to one cell follows it.
+pub(crate) fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
     let block_end = from.saturating_add(count);
     if (from..block_end).contains(&index) {
         return to + (index - from);
@@ -3026,6 +3037,30 @@ fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
     } else {
         without_block
     }
+}
+
+/// The inclusive span `start..=end` after `count` indices move from `from`
+/// to `to`, as Excel's Insert Cut Cells changes a range. A span inside the
+/// moved block moves with it. Any other span changes as if the block were
+/// deleted where it was and inserted where it lands: it loses the moved
+/// indices it held, a cut corner included, and grows by the block when the
+/// block lands after its first index and at or before its last.
+pub(crate) fn moved_span(
+    start: u32,
+    end: u32,
+    from: u32,
+    count: u32,
+    to: u32,
+) -> Option<(u32, u32)> {
+    if from <= start && end < from.saturating_add(count) {
+        return Some((
+            moved_index(start, from, count, to),
+            moved_index(end, from, count, to),
+        ));
+    }
+
+    let (start, end) = shift_range(start, end, from, -i64::from(count))?;
+    shift_range(start, end, to, i64::from(count))
 }
 
 /// Shift or contract an inclusive range; deleting every target invalidates it.

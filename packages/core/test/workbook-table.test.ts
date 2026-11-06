@@ -365,7 +365,7 @@ describe("canonical workbook tables", () => {
     store.dispose();
   });
 
-  it("does not restore a moved table on top of another table", () => {
+  it("refuses a column move that would split a table", () => {
     const single: WorkbookTable = {
       id: "table-single",
       name: "Single",
@@ -386,15 +386,16 @@ describe("canonical workbook tables", () => {
       totalsRow: false,
     };
     const store = new SheetwriteStore(workbook([single, wide]));
+    // Column A would land between the two columns of `Wide`.
     expect(
       store.applyTransaction({
         patches: [{ op: "moveColumns", sheet: "data", from: 0, count: 1, to: 1 }],
       }).status,
-    ).toBe("applied");
+    ).toBe("noop");
     const sheet = store.getWorkbook().sheets[0];
     if (!sheet) throw new Error("data sheet is missing");
     expect(() => assertWorkbookTables([sheet])).not.toThrow();
-    expect(sheet.tables?.map((candidate) => candidate.id)).toEqual(["table-wide"]);
+    expect(sheet.tables?.map((candidate) => candidate.range)).toEqual([single.range, wide.range]);
     store.dispose();
   });
 
