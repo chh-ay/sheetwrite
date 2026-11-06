@@ -27,19 +27,6 @@
   overflow: visible;
 }
 
-/* Quiet icons: inside an element with this class, icons draw in the text
-   colour at rest and take the accent only on hover, keyboard focus and the
-   current page, as navigation lists need. */
-.sw-icons-quiet {
-  --sw-icon-accent: currentColor;
-}
-
-.sw-icons-quiet a:hover,
-.sw-icons-quiet a:focus-visible,
-.sw-icons-quiet [aria-current="page"] {
-  --sw-icon-accent: var(--sw-accent);
-}
-
 .sw-icon[data-size="md"] {
   width: var(--sw-icon-md);
   height: var(--sw-icon-md);

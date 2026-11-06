@@ -55,7 +55,7 @@ export const CONTENT_COMPONENTS = {
   AccordionGroup: [],
   Accordion: ["title", "description", "defaultOpen", "id"],
   Frame: ["caption", "hint"],
-  Screenshot: ["name", "alt", "size"],
+  Screenshot: ["name", "alt", "size", "phone"],
   Diagram: ["name", "alt", "caption", "width", "height"],
   Annotated: ["name", "alt", "size", "caption", "points"],
   Compare: ["before", "after"],
@@ -100,6 +100,8 @@ export const SHOT_SIZES = {
   panel: { width: 720, height: 480 },
   wide: { width: 1200, height: 480 },
   card: { width: 640, height: 400 },
+  /** A crop of a panel-sized capture, for phones: shown near its own width. */
+  phone: { width: 420, height: 340 },
 } as const;
 
 export type ShotSize = keyof typeof SHOT_SIZES;
@@ -363,6 +365,8 @@ function frame(node: ContentNode): ContentNode {
 const PAGE_SHOT_SIZES = "(max-width: 48rem) 100vw, 46rem";
 /** The width of a screenshot across the top of a card in a two-column card group. */
 const CARD_SHOT_SIZES = "(max-width: 40rem) 100vw, 23rem";
+/** Where a screenshot with a phone crop shows the crop. */
+const PHONE_MEDIA = "(max-width: 40rem)";
 
 /**
  * One theme's capture: the 1× and 2× AVIF files, lazy, so only the shown
@@ -374,10 +378,11 @@ function themedShot(
   alt: string,
   size: ShotSize,
   sizes: string,
+  phone?: string,
 ) {
   const { width, height } = SHOT_SIZES[size];
-  return element("img", [], {
-    className: ["sw-shot", `sw-shot--${theme}`],
+  const image = element("img", [], {
+    className: phone === undefined ? ["sw-shot", `sw-shot--${theme}`] : ["sw-shot"],
     src: shotUrl(name, theme, 1),
     srcSet: `${shotUrl(name, theme, 1)} ${width}w, ${shotUrl(name, theme, 2)} ${width * 2}w`,
     sizes,
@@ -388,13 +393,39 @@ function themedShot(
     loading: "lazy",
     decoding: "async",
   });
+  if (phone === undefined) return image;
+  // Phones get their own crop, so the labels stay near their own size.
+  const crop = SHOT_SIZES.phone;
+  return element(
+    "picture",
+    [
+      element("source", [], {
+        media: PHONE_MEDIA,
+        srcSet: `${shotUrl(phone, theme, 1)} ${crop.width}w, ${shotUrl(phone, theme, 2)} ${crop.width * 2}w`,
+        sizes: "100vw",
+        width: crop.width,
+        height: crop.height,
+      }),
+      image,
+    ],
+    { className: ["sw-shot-picture", `sw-shot--${theme}`] },
+  );
 }
 
 /** Both themes' captures; CSS shows the one that matches the page. */
-function themedShots(name: string, alt: string, size: ShotSize, sizes: string): ContentNode {
+function themedShots(
+  name: string,
+  alt: string,
+  size: ShotSize,
+  sizes: string,
+  phone?: string,
+): ContentNode {
   return element(
     "span",
-    [themedShot(name, "light", alt, size, sizes), themedShot(name, "dark", alt, size, sizes)],
+    [
+      themedShot(name, "light", alt, size, sizes, phone),
+      themedShot(name, "dark", alt, size, sizes, phone),
+    ],
     { className: ["sw-shots"] },
   );
 }
@@ -410,7 +441,7 @@ function screenshot(node: ContentNode): ContentNode {
   const size = (attribute(node, "size") ?? "app") as ShotSize;
   if (!(size in SHOT_SIZES))
     throw new Error(`<Screenshot size> is one of ${Object.keys(SHOT_SIZES)}`);
-  return themedShots(name, alt, size, PAGE_SHOT_SIZES);
+  return themedShots(name, alt, size, PAGE_SHOT_SIZES, attribute(node, "phone"));
 }
 
 /**

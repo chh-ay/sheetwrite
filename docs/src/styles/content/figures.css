@@ -53,6 +53,11 @@
   display: none;
 }
 
+/* A screenshot with a phone crop: the picture holds the theme class. */
+.sw-shot-picture {
+  display: block;
+}
+
 .sw-shot {
   border: var(--sw-border-width) solid var(--sw-border);
   background: var(--sw-surface-1);

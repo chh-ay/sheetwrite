@@ -236,7 +236,7 @@ function dashboardSheet(): SheetSnapshot {
           box: { x: 7, y: 0, w: 2, h: 3 },
           kind: "kpi",
           measure: "attainment",
-          title: "Attainment",
+          title: "Target",
           numberFormat: "0%",
         },
         {
