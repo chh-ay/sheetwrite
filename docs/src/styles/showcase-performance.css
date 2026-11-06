@@ -15,7 +15,6 @@
     --sw-sp-grid-height: clamp(28rem, calc(100dvh - var(--sw-sp-stage-offset)), 34rem);
     --sw-sp-instrument-width: 16rem;
     --sw-sp-line: 1px;
-    --sw-sp-focus: 0 0 0 0.2rem color-mix(in srgb, var(--sw-accent) 35%, transparent);
 
     display: flex;
     min-height: 100dvh;
@@ -35,16 +34,14 @@
   }
 
   .sw-sp-page .sw-capability-hero h1 {
-    max-width: 24ch;
+    max-width: 14.8em;
     font-size: var(--sw-text-display);
     line-height: 1.08;
   }
 
   /* Flight deck: an instrument panel in the demo palette, like the hub previews. */
   .sw-sp-flight {
-    --sw-accent: var(--sw-accent);
     --sw-border: var(--sw-border-strong);
-    --sw-fg-strong: var(--sw-fg-strong);
     display: grid;
     grid-template-columns: minmax(18rem, 1.15fr) minmax(16rem, 1fr) auto;
     gap: var(--sw-space-5) var(--sw-space-8);
@@ -58,7 +55,8 @@
   .sw-sp-flight__kicker {
     margin: 0 0 var(--sw-space-1-5);
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -163,7 +161,8 @@
 
   .sw-sp-flight__hud dt {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -364,7 +363,8 @@
   .sw-sp-kicker {
     margin: 0 0 var(--sw-sp-space-3);
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -429,14 +429,6 @@
   .sw-sp-page button:hover:not(:disabled) {
     border-color: var(--sw-accent);
     background: color-mix(in srgb, var(--sw-accent) 8%, var(--sw-surface-1));
-  }
-
-  .sw-sp-page button:focus-visible,
-  .sw-sp-page input:focus-visible,
-  .sw-sp-page a:focus-visible,
-  .sw-sp-page summary:focus-visible {
-    outline: none;
-    box-shadow: var(--sw-sp-focus);
   }
 
   .sw-sp-page button:disabled {
@@ -542,7 +534,8 @@
 
   .sw-sp-readout dt {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -746,7 +739,8 @@
   .sw-sp-challenge > p {
     margin: 0 0 var(--sw-sp-space-1);
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1124,7 +1118,8 @@
     width: 100%;
     margin-bottom: var(--sw-sp-space-1);
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1353,7 +1348,8 @@
   .sw-sp-stats dt {
     margin-bottom: var(--sw-sp-space-1);
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1384,7 +1380,8 @@
 
   .sw-sp-cache-meter > span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1414,7 +1411,8 @@
 
   .sw-sp-last-tile span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1470,7 +1468,9 @@
 
   .sw-sp-tile-list li > span {
     color: var(--sw-state-requested);
-    font-weight: var(--sw-weight-semibold);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
+    letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
 
@@ -1606,7 +1606,8 @@
 
   .sw-sp-table thead th {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1695,7 +1696,7 @@
   }
 
   .sw-sp-proof-heading h2 {
-    max-width: 30ch;
+    max-width: 18.5em;
     color: var(--sw-fg-strong);
     font: var(--sw-weight-semibold) var(--sw-text-h1) / 1.12 var(--sw-font-display);
     letter-spacing: var(--sw-tracking-display);
@@ -1829,11 +1830,10 @@
 
   .sw-sp-proof-wins article > span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) clamp(0.62rem, 3.5cqi, var(--sw-text-caption)) / 1.25
-      var(--sw-font-body);
-    letter-spacing: 0.035em;
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
+    letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
-    white-space: nowrap;
   }
 
   .sw-sp-proof-wins__value {
@@ -1855,7 +1855,7 @@
   .sw-sp-evidence-delta {
     display: block;
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+    font: var(--sw-weight-medium) var(--sw-text-caption) / 1.4 var(--sw-font-body);
     font-variant-numeric: tabular-nums;
   }
 

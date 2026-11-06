@@ -28,6 +28,14 @@
   height: var(--sw-icon-lg);
 }
 
+/* An arrow after a plain link's label in running text sits on the text line
+   (styled links such as .sw-link-arrow lay out their own icon). */
+a:not([class]) > .sw-icon:last-child {
+  display: inline-block;
+  margin-inline-start: var(--sw-space-1);
+  vertical-align: -0.2em;
+}
+
 /* Sprite icons as CSS masks, for markers drawn by CSS in generated markup
    (details summaries, link arrows). Each URL is the symbol's own path data;
    test/icons.test.ts keeps them in step with the sprite. */
@@ -50,6 +58,20 @@
   height: var(--sw-icon-sm);
   background: currentColor;
   mask: var(--sw-icon-mask) center / contain no-repeat;
+}
+
+/* ── Headings: every heading is in the display face ──────────────────────
+   Zero specificity, so a component's own heading style still applies; an
+   unstyled heading never falls back to the body face. Eyebrow-styled panel
+   titles set the mono eyebrow role themselves. */
+:where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-heading);
+}
+
+/* Numbers in tables line up: tabular figures in every table on the site. */
+:where(table) {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Eyebrow: the label above a title ───────────────────────────────────── */
@@ -386,6 +408,20 @@ a.sw-card:hover {
   border-bottom: 0;
 }
 
+/* ── Sheet tabs: every Sheetwrite shell on the site ──────────────────────
+   Core paints its sheet tabs from these variables. A grid's own tab bar sets
+   them inline from its theme; the shell's tab row reads them from here, so
+   the active sheet is brand text on a raised surface in both themes. */
+.sheetwrite-shell {
+  --sheetwrite-tab-font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-body);
+  --sheetwrite-tab-bg: var(--sw-surface-1);
+  --sheetwrite-tab-fg: var(--sw-fg-muted);
+  --sheetwrite-tab-border: var(--sw-border);
+  --sheetwrite-tab-hover-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-fg: var(--sw-accent-strong);
+}
+
 /* ── Code tokens: role classes for code rendered outside Expressive Code ── */
 .sw-code-comment {
   color: var(--sw-code-comment);
@@ -498,9 +534,11 @@ samp,
     color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
+/* Hover: a deeper tint and the strong text colour, visible on the bar in both
+   themes. */
 .sw-header__nav a:hover,
 .sw-header__link:hover {
-  background: var(--sw-surface-2);
+  background: var(--sw-surface-3);
   color: var(--sw-fg-strong);
 }
 
@@ -530,29 +568,57 @@ samp,
   justify-self: end;
 }
 
-/* Phones: the section links move to a second, scrollable row. Documentation
-   pages keep one row (brand, search, theme, menu): their menu drawer holds
-   the same destinations, so the reading area starts higher. */
+/* Wide screens: GitHub sits in the actions and the menu button is hidden. */
+.sw-header__nav .sw-header__nav-github,
+.sw-header__menu {
+  display: none;
+}
+
+/* Phones: one row (brand, search or menu, theme). The site links open from
+   the menu button as a panel under the bar; documentation pages hold the same
+   links in their own menu drawer. */
 @media (max-width: 54rem) {
-  .sw-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .sw-header__nav {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
+  .sw-header,
   .sw-header[data-has-search="true"] {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     min-height: var(--sw-header-height-compact);
     padding-block: var(--sw-space-1);
   }
 
-  .sw-header[data-has-search="true"] :is(.sw-header__nav, .sw-header__link) {
+  .sw-header[data-has-search="true"] {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .sw-header__link {
     display: none;
+  }
+
+  .sw-header__menu {
+    display: inline-flex;
+  }
+
+  .sw-header__nav {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--sw-space-2) var(--sw-page-inset) var(--sw-space-4);
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+    background: var(--sw-surface-0);
+    box-shadow: var(--sw-shadow-md);
+  }
+
+  .sw-header[data-menu-open="true"]:not([data-has-search="true"]) .sw-header__nav {
+    display: flex;
+  }
+
+  .sw-header__nav a,
+  .sw-header__nav .sw-header__nav-github {
+    display: flex;
+    min-height: var(--sw-control-height-lg);
   }
 
   .sw-header__search {

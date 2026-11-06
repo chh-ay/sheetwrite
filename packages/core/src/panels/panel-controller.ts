@@ -16,6 +16,7 @@ import type { PivotDefinition } from "../types/pivot.js";
 import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
 import { explainPanel } from "./explain-panel.js";
+import { kpiPanel } from "./kpi-panel.js";
 import { namePanel } from "./name-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
@@ -28,7 +29,15 @@ import { slicerPanel } from "./slicer-panel.js";
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
   | {
-      readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" | "history" | "slicer";
+      readonly kind:
+        | "explain"
+        | "names"
+        | "queries"
+        | "sort"
+        | "dataModel"
+        | "history"
+        | "slicer"
+        | "kpi";
     };
 
 interface PanelState {
@@ -119,6 +128,14 @@ export function openSlicerPanel(grid: Grid): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "slicer" };
   const panel = slicerPanel(grid, grid.getActiveSheet());
+  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
+}
+
+/** Insert › Dashboard › KPI Card: the measure picker for the active dashboard. */
+export function openKpiPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "kpi" };
+  const panel = kpiPanel(grid, grid.getActiveSheet());
   grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
 }
 

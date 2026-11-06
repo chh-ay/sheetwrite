@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
 import landingBench from "../generated/landing-bench.json";
@@ -561,7 +562,10 @@ function HubCard({ owner, medianMs }: Readonly<{ owner: HubOwner; medianMs?: num
           <span className="sw-hub-launch__summary">
             {isFramework ? FRAMEWORK_SUMMARY[owner.id] : SCENE_SUMMARY[owner.id as SceneOwnerId]}
           </span>
-          <span className="sw-hub__owner-count">Open live example →</span>
+          <span className="sw-hub__owner-count">
+            Open live example
+            <Icon name="arrow-right" size="sm" />
+          </span>
         </span>
       </Link>
     </li>

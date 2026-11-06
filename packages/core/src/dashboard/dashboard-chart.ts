@@ -64,7 +64,8 @@ function seriesNameOf(output: PivotOutputRead, col: number): string {
 /**
  * The view of `chart` over a pivot output. `formats` holds the number format
  * of each value field in order; data columns cycle through the value fields.
- * A missing output gives a chart with no series.
+ * With `chart.pivotValues`, only the data columns of those value fields are
+ * series. A missing output gives a chart with no series.
  */
 export function pivotChartView(
   chart: ChartDefinition,
@@ -76,16 +77,19 @@ export function pivotChartView(
   const dataRows = output.rows - output.headerRows;
   const rowCount = Math.min(dataRows, MAX_CHART_POINTS);
   const categories = categoriesOf(output, rowCount);
-  const seriesCount = Math.min(output.cols - output.labelCols, MAX_CHART_SERIES);
+  const plotted = chart.pivotValues;
   const series: ChartSeriesView[] = [];
-  for (let index = 0; index < seriesCount; index += 1) {
+  for (let index = 0; index < output.cols - output.labelCols; index += 1) {
+    if (series.length === MAX_CHART_SERIES) break;
+    const slot = formats.length === 0 ? index : index % formats.length;
+    if (plotted !== undefined && !plotted.includes(slot)) continue;
     const col = output.labelCols + index;
     const values: Array<number | null> = [];
     for (let row = output.headerRows; row < output.headerRows + rowCount; row += 1) {
       const value = output.cells[row * output.cols + col];
       values.push(typeof value === "number" ? value : null);
     }
-    const format = formats.length === 0 ? undefined : formats[index % formats.length];
+    const format = formats[slot];
     series.push({
       name: seriesNameOf(output, col),
       values,

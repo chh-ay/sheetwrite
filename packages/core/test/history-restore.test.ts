@@ -6,6 +6,7 @@ import {
   type CommittedTransaction,
   createGridFromSnapshot,
   type DocumentOp,
+  type ExternalLink,
   type Grid,
   initSheetwrite,
   MemoryPersistenceAdapter,
@@ -305,6 +306,43 @@ describe("restore the workbook", () => {
       "extra",
     ]);
     expect(value(alice.grid, "data", 2, 0)).toBe(33);
+  });
+});
+
+describe("restore external links", () => {
+  it("brings back the earlier link values, and undo puts back the current ones", async () => {
+    const link = (value: number): ExternalLink => ({
+      book: "Budget.xlsx",
+      target: "Budget.xlsx",
+      sheets: [{ name: "Annual", cells: [{ row: 0, col: 0, value }] }],
+    });
+    const { adapter, archive } = await session();
+    const alice = await client(adapter, "alice");
+    await edit(alice, [
+      { op: "setExternalLinks", links: [link(7)] },
+      {
+        op: "set",
+        addr: { sheet: "data", row: 2, col: 0 },
+        value: { kind: "formula", src: "=[Budget.xlsx]Annual!A1" },
+      },
+    ]);
+    const version = await archive.saveVersion("Linked", "alice", 0);
+    await edit(alice, [{ op: "setExternalLinks", links: [link(9)] }]);
+    expect(value(alice.grid, "data", 2, 0)).toBe(9);
+
+    const outcome = await archive.restoreVersion(
+      alice.grid,
+      version.id,
+      { kind: "workbook" },
+      { sync: alice.sync },
+    );
+    expect(outcome.status).toBe("applied");
+    expect(alice.grid.store.getWorkbook().externalLinks).toEqual([link(7)]);
+    expect(value(alice.grid, "data", 2, 0)).toBe(7);
+
+    alice.grid.undo();
+    expect(alice.grid.store.getWorkbook().externalLinks).toEqual([link(9)]);
+    expect(value(alice.grid, "data", 2, 0)).toBe(9);
   });
 });
 

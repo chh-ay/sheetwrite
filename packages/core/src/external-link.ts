@@ -75,6 +75,17 @@ export interface ExternalLinkEngine {
   setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
   setFormula(sheet: number, row: number, col: number, source: string, style: number): void;
   recompute(sheet: number): void;
+  removeExternalSheet(book: string, sheet: string): boolean;
+}
+
+/** Remove the values of every link from the engine; formulas that read them show `#REF!`. */
+export function removeExternalLinks(
+  engine: ExternalLinkEngine,
+  links: readonly ExternalLink[],
+): void {
+  for (const link of links) {
+    for (const sheet of link.sheets) engine.removeExternalSheet(link.book, sheet.name);
+  }
 }
 
 /**

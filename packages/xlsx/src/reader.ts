@@ -37,6 +37,7 @@ import {
   validWorkbookTableXmlElement,
   withXlsxFormulaEngine,
 } from "@sheetwrite/core";
+import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { readCharts } from "./chart-read.js";
@@ -50,11 +51,7 @@ import {
   META_MARKER,
   META_STEM,
 } from "./format.js";
-import {
-  convertFormulaSources,
-  formulaContainsExternalReference,
-  workbookFormulaSources,
-} from "./formula.js";
+import { convertFormulaSources, workbookFormulaSources } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
@@ -1868,6 +1865,33 @@ function hasCustomXml(packageFile: OpcPackage): boolean {
 }
 
 /** Restore sidecar cell fields from the sidecar sheet each worksheet claimed, by sheet order. */
+/**
+ * A dashboard sheet from its Sheetwrite metadata: its items, pivots and
+ * charts, with no cells. The worksheet's static values and charts are not
+ * read, because the export writes them again from the dashboard.
+ */
+function restoredDashboard(
+  meta: SheetSnapshot,
+  id: string,
+  name: string,
+  order: number,
+  state: string | undefined,
+): SheetSnapshot {
+  return {
+    id,
+    name,
+    order,
+    ...(state === "hidden" || state === "veryHidden" ? { visibility: state } : {}),
+    kind: "dashboard",
+    ...(meta.dashboard ? { dashboard: structuredClone(meta.dashboard) } : {}),
+    rowCount: 0,
+    columns: [],
+    ...(meta.pivots ? { pivots: structuredClone(meta.pivots) } : {}),
+    ...(meta.charts ? { charts: structuredClone(meta.charts) } : {}),
+    cells: [],
+  };
+}
+
 function restoreSidecarFields(
   snapshot: WorkbookSnapshot,
   claims: readonly (SheetSnapshot | undefined)[],
@@ -2354,6 +2378,11 @@ export async function readWorkbook(
     const source = sourceSheets[order]!;
     const meta = resolvedMetadata[order];
     const id = resolvedIds[order]!;
+    // A dashboard comes back from Sheetwrite metadata; its worksheet only holds static values.
+    if (meta?.kind === "dashboard") {
+      sheets.push(restoredDashboard(meta, id, source.name, order, source.state));
+      continue;
+    }
     const tableColumnCount = source.tables.reduce(
       (maximum, table) => Math.max(maximum, table.range.end.col + 1),
       0,

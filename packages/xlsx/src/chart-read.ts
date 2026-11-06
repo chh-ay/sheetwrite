@@ -512,6 +512,16 @@ export async function readCharts(
     const drawings = packageFile
       .relationships(sheetPart)
       .filter((entry) => !entry.external && relationshipTypeMatches(entry.type, "drawing"));
+    // A dashboard's charts come from metadata; the export writes its drawing again.
+    if (sheet.kind === "dashboard") {
+      for (const drawing of drawings) {
+        modelled.add(drawing.target);
+        for (const entry of packageFile.relationships(drawing.target)) {
+          if (!entry.external) modelled.add(entry.target);
+        }
+      }
+      continue;
+    }
     for (const drawing of drawings) {
       if (
         !packageFile

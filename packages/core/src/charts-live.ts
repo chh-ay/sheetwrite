@@ -460,7 +460,8 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
-      // Formula results can depend on names, calculation settings and sheet identity/order.
+    case "setExternalLinks":
+      // Formula results can depend on names, calculation settings, linked values and sheet identity/order.
       context.valuesChanged = true;
       return;
 

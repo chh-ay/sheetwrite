@@ -1,3 +1,7 @@
+import headingFont from "@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2?url";
+// The latin heading and body faces, preloaded so text paints in them on the
+// first frame; tokens.css declares the same files.
+import bodyFont from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
 import {
   createRootRoute,
   HeadContent,
@@ -73,6 +77,20 @@ export const Route = createRootRoute({
     const showcaseChrome = !canonicalPath.startsWith("/docs/");
     return {
       links: [
+        {
+          rel: "preload",
+          href: headingFont,
+          as: "font",
+          type: "font/woff2",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "preload",
+          href: bodyFont,
+          as: "font",
+          type: "font/woff2",
+          crossOrigin: "anonymous",
+        },
         // Explicit head links are render-blocking in dev and production. Plain
         // CSS imports are injected by Vite only after hydration in dev, which
         // exposed a half-styled SSR frame on full-page route navigation.

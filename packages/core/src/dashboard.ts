@@ -91,6 +91,15 @@ function isItemBody(item: PlainRecord): boolean {
   const kind = ownValue(item, "kind");
   if (kind === "pivot") return isText(ownValue(item, "pivot"));
   if (kind === "chart") return isText(ownValue(item, "chart"));
+  if (kind === "kpi") {
+    const title = ownValue(item, "title");
+    const numberFormat = ownValue(item, "numberFormat");
+    return (
+      isText(ownValue(item, "measure")) &&
+      (title === undefined || isText(title)) &&
+      (numberFormat === undefined || isText(numberFormat))
+    );
+  }
   if (kind !== "slicer") return false;
 
   const title = ownValue(item, "title");

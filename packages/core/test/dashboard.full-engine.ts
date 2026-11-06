@@ -7,9 +7,12 @@ import * as formulas from "@sheetwrite/formulas";
 import { dashboardPivotResult } from "../src/dashboard/dashboard-view.js";
 import {
   createGridFromSnapshot,
+  type DashboardExport,
   type Grid,
   initSheetwrite,
   resolveChartView,
+  setXlsxWorkbookBackend,
+  toXlsxWorkbook,
   type PivotDefinition,
   type WorkbookSnapshot,
 } from "../src/index.js";
@@ -210,6 +213,72 @@ it("shows measure values in a dashboard pivot, equal to the same pivot on a work
   expect(onDashboard?.cells).toContain(8);
 });
 
+it("charts only the chosen values of a dashboard pivot, measures included, as the pivot computes them", async () => {
+  const input = snapshot();
+  input.workbook.dataModel = {
+    relationships: [],
+    measures: [
+      { id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" },
+      {
+        id: "share",
+        name: "Share",
+        table: "orders",
+        formula: "=SUM(Orders[Amount])/CALCULATE(SUM(Orders[Amount]), ALL(Orders[Region]))",
+      },
+    ],
+  };
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [
+    {
+      id: "on-dashboard",
+      name: "By region",
+      source: {
+        model: {
+          table: "orders",
+          fields: [
+            { table: "orders", column: "region" },
+            { table: "orders", column: "amount" },
+          ],
+        },
+      },
+      anchor: { row: 0, col: 0 },
+      rows: [0],
+      columns: [],
+      values: [{ field: 1, aggregation: "SUM" }, { measure: "twice" }, { measure: "share" }],
+    },
+  ];
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
+  expect(insertPivotChart(grid, "column")).toBe(true);
+  const chart = grid.getCharts("dash")[0];
+  if (chart === undefined) throw new Error("the chart was inserted");
+  const points = () =>
+    resolveChartView(grid.store, "dash", chart.id)?.series.map((series) => [
+      series.name,
+      series.categories,
+      series.values,
+    ]);
+
+  // Orders: East 1 and 3, West 2. Each point is the pivot's cell for its region.
+  expect(grid.setChart({ ...chart, pivotValues: [1, 2] }, "dash").status).toBe("applied");
+  expect(points()).toEqual([
+    ["Twice", ["East", "West"], [8, 4]],
+    ["Share", ["East", "West"], [4 / 6, 2 / 6]],
+  ]);
+  expect(grid.setChart({ ...chart, pivotValues: [2] }, "dash").status).toBe("applied");
+  expect(points()).toEqual([["Share", ["East", "West"], [4 / 6, 2 / 6]]]);
+
+  grid.undo();
+  expect(grid.getCharts("dash")[0]?.pivotValues).toEqual([1, 2]);
+  grid.undo();
+  expect(points()?.map(([name]) => name)).toEqual(["Sum of Amount", "Twice", "Share"]);
+});
+
 it("shows a value field's number format in the dashboard view", async () => {
   const input = snapshot();
   const dash = input.sheets[1];
@@ -372,5 +441,89 @@ it("charts a dashboard pivot without its total, through the slicers, and one und
   expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items.map((item) => item.kind)).toEqual([
     "pivot",
     "slicer",
+  ]);
+});
+
+it("shows a measure on a KPI card in the slicers' filter context", async () => {
+  const input = snapshot();
+  input.workbook.dataModel = {
+    relationships: [],
+    measures: [{ id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" }],
+  };
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [];
+  dash.dashboard = {
+    items: [
+      {
+        id: "region",
+        box: { x: 0, y: 0, w: 3, h: 6 },
+        kind: "slicer",
+        field: { table: "orders", column: "region" },
+      },
+      {
+        id: "total",
+        box: { x: 3, y: 0, w: 3, h: 3 },
+        kind: "kpi",
+        measure: "twice",
+        numberFormat: "#,##0.0",
+      },
+    ],
+  };
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  await import("../src/dashboard/dashboard-view.js");
+  await Promise.resolve();
+  const card = () => host.querySelector(".sheetwrite-dashboard-kpi")?.textContent;
+
+  // Twice the sum of Amount: 2 × (1 + 2 + 3).
+  expect(card()).toBe("12.0");
+  expect(host.querySelector('[data-item-id="total"]')?.getAttribute("aria-label")).toBe("Twice");
+
+  // The Region slicer keeps West: 2 × 2.
+  const west = [...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value")].find(
+    (candidate) => candidate.textContent === "West",
+  );
+  west?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(card()).toBe("4.0");
+});
+
+it("passes each dashboard item's current values to the XLSX export", async () => {
+  const { grid, press } = await withSlicer();
+  press("West");
+  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
+  insertPivotChart(grid, "column");
+  // A backend that keeps what core passes to it.
+  let passed: readonly DashboardExport[] | undefined;
+  setXlsxWorkbookBackend({
+    name: "capture",
+    async toXlsxWorkbook(_snapshot, _options, context) {
+      passed = context?.dashboards;
+      return new Uint8Array();
+    },
+    async fromXlsxWorkbook() {
+      throw new Error("not used");
+    },
+  });
+  try {
+    await toXlsxWorkbook(grid);
+  } finally {
+    setXlsxWorkbookBackend(null);
+  }
+
+  const items = passed?.find((entry) => entry.sheet === "dash")?.items;
+  expect(items?.find((item) => item.id === "sales")?.cells).toEqual([
+    ["By region"],
+    ["Region", "Sum of Amount"],
+    ["West", 2],
+    ["Total", 2],
+  ]);
+  expect(items?.find((item) => item.id === "region")?.cells).toEqual([["Region"], ["West"]]);
+  const chart = items?.find((item) => item.chart !== undefined)?.chart;
+  expect(chart?.series.map((series) => [series.categories, series.values])).toEqual([
+    [["West"], [2]],
   ]);
 });

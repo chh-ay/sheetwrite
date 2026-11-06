@@ -1972,10 +1972,17 @@ function missingCellStoreMethod(error: unknown): string | undefined {
  * background on the pinned core. Its runs take 7–10 ms until that finishes and
  * 1.7–1.9 ms after, with no wasm memory growth; with synchronous compilation
  * or an idle pause before the row they start at steady speed (#463).
+ *
+ * `diamond-edit` runs in about 30 µs, so its 50 ms sample falls inside the
+ * tier-up of the recompute path. A change to that path's code moved the
+ * sample's result by 10–15% under the gate (30 µs to 34 µs) while both
+ * engines ran at 29.2–29.5 µs per edit after warm-up; with 500 ms of warm-up
+ * the gate measured the same 1.007.
  */
 const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
   "workload=unicode-text-date-edit;size=1000": 1_000,
   "workload=independent-first-recompute;size=10000": 500,
+  "workload=diamond-edit;size=32": 500,
 };
 
 /**
