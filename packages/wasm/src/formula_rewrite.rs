@@ -216,7 +216,6 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
 pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
     let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
     let mut out = String::with_capacity(source.len());
-    let mut text = String::new();
     let mut copied = 0;
     let mut count = 0;
     for_each_reference(ast, &mut |node| {
@@ -225,20 +224,20 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
             return;
         };
         count += 1;
-        text.clear();
-        write_ast(node, &mut text);
+        let kept = out.len();
+        out.push_str(&source[copied..span.start]);
+        let written = out.len();
+        write_ast(node, &mut out);
 
         // A deleted spill anchor writes as `#REF!`, without the suffix.
         if span.spills() && !matches!(node, Ast::InvalidRef) {
-            text.push('#');
+            out.push('#');
         }
-        if text == source[span.start..span.end] {
-            return;
+        if out[written..] == source[span.start..span.end] {
+            out.truncate(kept);
+        } else {
+            copied = span.end;
         }
-
-        out.push_str(&source[copied..span.start]);
-        out.push_str(&text);
-        copied = span.end;
     });
 
     debug_assert_eq!(count, spans.len(), "references of {source}");

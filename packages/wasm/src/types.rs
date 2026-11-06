@@ -582,7 +582,9 @@ impl FormulaEntry {
     /// Applies `rewrite` to the entry's tree. When it reports a change, the
     /// read metadata follows the new tree, and the source text changes only
     /// in the references the tree writes differently, as Excel keeps the rest
-    /// of what the user wrote. Returns whether anything changed.
+    /// of what the user wrote. Returns whether anything changed. Out of line,
+    /// so the edits that call it share one copy per rewrite.
+    #[inline(never)]
     fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
