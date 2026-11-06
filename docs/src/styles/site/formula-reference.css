@@ -274,7 +274,7 @@
     display: none;
   }
   .sw-prose .sw-formula-table tr {
-    padding-block: var(--sw-space-2);
+    padding: var(--sw-space-2) var(--sw-space-3);
     border-bottom: var(--sw-border-width) solid var(--sw-border);
   }
   .sw-prose .sw-formula-table td {
