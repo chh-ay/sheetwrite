@@ -148,11 +148,15 @@ function kpiPivot(
   tables: readonly WorkbookTable[],
 ): PivotDefinition | null {
   const measure = model?.measures?.find((candidate) => candidate.id === item.measure);
-  if (measure === undefined) return null;
+  const column = tables.find((table) => table.id === measure?.table)?.columns[0];
+  if (measure === undefined || column === undefined) return null;
+  // A model source lists at least one field; the first column of the home table is unused.
   const pivot: PivotDefinition = {
     id: `kpi-data-${item.id}`,
     name: measure.name,
-    source: { model: { table: measure.table, fields: [] } },
+    source: {
+      model: { table: measure.table, fields: [{ table: measure.table, column: column.id }] },
+    },
     anchor: { row: 0, col: 0 },
     rows: [],
     columns: [],
