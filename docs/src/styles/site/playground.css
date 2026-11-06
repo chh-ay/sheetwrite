@@ -58,6 +58,12 @@
   font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
 }
 
+/* The editor's bottom edge; on the editor, so it spans the panel whatever the hint's width. */
+.sw-playground__editor,
+.sw-playground__pending {
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+
 .sw-playground__editor:focus-within {
   box-shadow: inset 0 0 0 var(--sw-focus-ring-width) var(--sw-focus-ring);
 }
@@ -123,12 +129,9 @@
   color: transparent;
 }
 
-/* Prose caps paragraph width; the hint's top border is the editor's bottom edge and spans the panel. */
 .sw-playground .sw-playground__hint {
-  max-width: none;
   margin: 0;
   padding: var(--sw-space-2) var(--sw-space-5);
-  border-top: var(--sw-border-width) solid var(--sw-border);
   color: var(--sw-fg-muted);
   font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
 }
@@ -255,7 +258,7 @@
 
 .sw-prose .sw-playground__pending .expressive-code figure.frame > figcaption.header,
 .sw-prose .sw-playground__pending .expressive-code .copy,
-.sw-playground__pending details > :not(.expressive-code) {
+.sw-prose .sw-playground__pending details > :not(.expressive-code) {
   display: none;
 }
 
@@ -265,4 +268,32 @@
 
 .sw-prose .sw-playground__pending .expressive-code pre {
   background: var(--sw-code-bg);
+}
+
+/* The panel's text spans the panel: no prose measure on its paragraphs and list items. */
+.sw-docs .sw-prose .sw-playground :is(p, li) {
+  max-width: none;
+}
+
+/* Code shows what is typed, as in the page's code blocks (components.css):
+   no ligatures in either editor layer, so `=>` and `===` look the same before
+   and after Try it, and the caret stays on its character. */
+.sw-playground .sw-playground__editor :is(pre, textarea, code, span),
+.sw-playground .sw-playground__console code {
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "calt" 0,
+    "liga" 0;
+}
+
+/* The placeholder's code wraps as the editor does (rows start at the left
+   edge, breaking anywhere), so the panel keeps its height when the editor
+   replaces it. */
+:root .sw-playground__pending .expressive-code .ec-line {
+  --ecIndent: 0ch;
+}
+
+:root .sw-playground__pending .expressive-code .ec-line .code {
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
