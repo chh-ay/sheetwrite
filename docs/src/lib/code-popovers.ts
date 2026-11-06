@@ -57,9 +57,9 @@ const PANEL_MIN_HEIGHT_PX = 160;
 /**
  * At most this many panels stay prepared; the oldest leave first. Each one is
  * laid out with the page, so preparing every panel would make every page
- * update slower.
+ * update slower. A long example block holds about 30 distinct symbols.
  */
-const MAX_PREPARED_PANELS = 24;
+const MAX_PREPARED_PANELS = 64;
 /** An idle callback prepares another panel only with this much time left. */
 const PREPARE_SLICE_MS = 6;
 
