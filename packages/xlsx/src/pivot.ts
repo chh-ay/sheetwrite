@@ -551,6 +551,8 @@ export async function readPivots(
   const usedIds = new Set<string>();
 
   for (const [order, sheet] of snapshot.sheets.entries()) {
+    // A dashboard's pivots come from metadata, and its worksheet has no native pivot.
+    if (sheet.kind === "dashboard") continue;
     const sheetPart = sheetParts[order];
     const metaPivots =
       metadata?.sheets.find((candidate) => candidate.id === sheet.id)?.pivots ?? [];
@@ -1194,6 +1196,8 @@ export function preparePivots(
     });
   };
   for (const sheet of ordered) {
+    // A dashboard's pivots stay in Sheetwrite metadata; its worksheet holds their values.
+    if (sheet.kind === "dashboard") continue;
     for (const pivot of sheet.pivots ?? []) {
       const source = resolveWriteSource(snapshot, pivot);
       const blocker = typeof source === "string" ? source : definitionBlocker(pivot, source.width);

@@ -7,9 +7,12 @@ import * as formulas from "@sheetwrite/formulas";
 import { dashboardPivotResult } from "../src/dashboard/dashboard-view.js";
 import {
   createGridFromSnapshot,
+  type DashboardExport,
   type Grid,
   initSheetwrite,
   resolveChartView,
+  setXlsxWorkbookBackend,
+  toXlsxWorkbook,
   type PivotDefinition,
   type WorkbookSnapshot,
 } from "../src/index.js";
@@ -420,4 +423,41 @@ it("shows a measure on a KPI card in the slicers' filter context", async () => {
   );
   west?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   expect(card()).toBe("4.0");
+});
+
+it("passes each dashboard item's current values to the XLSX export", async () => {
+  const { grid, press } = await withSlicer();
+  press("West");
+  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
+  insertPivotChart(grid, "column");
+  // A backend that keeps what core passes to it.
+  let passed: readonly DashboardExport[] | undefined;
+  setXlsxWorkbookBackend({
+    name: "capture",
+    async toXlsxWorkbook(_snapshot, _options, context) {
+      passed = context?.dashboards;
+      return new Uint8Array();
+    },
+    async fromXlsxWorkbook() {
+      throw new Error("not used");
+    },
+  });
+  try {
+    await toXlsxWorkbook(grid);
+  } finally {
+    setXlsxWorkbookBackend(null);
+  }
+
+  const items = passed?.find((entry) => entry.sheet === "dash")?.items;
+  expect(items?.find((item) => item.id === "sales")?.cells).toEqual([
+    ["By region"],
+    ["Region", "Sum of Amount"],
+    ["West", 2],
+    ["Total", 2],
+  ]);
+  expect(items?.find((item) => item.id === "region")?.cells).toEqual([["Region"], ["West"]]);
+  const chart = items?.find((item) => item.chart !== undefined)?.chart;
+  expect(chart?.series.map((series) => [series.categories, series.values])).toEqual([
+    [["West"], [2]],
+  ]);
 });
