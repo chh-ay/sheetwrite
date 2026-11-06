@@ -116,7 +116,6 @@ async function drain(stream: ReadableStream<Uint8Array>): Promise<void> {
   for await (const _chunk of stream);
 }
 
-
 describe("delimited-text abort", () => {
   it("parsing rejects with the reason before the scan and once per chunk of records", async () => {
     const csv = Array.from({ length: RECORD_COUNT }, (_unused, row) => `${row},x`).join("\r\n");
@@ -254,16 +253,14 @@ describe("XLSX call abort", () => {
       },
     });
 
-      const failure = await toXlsxWorkbook(snapshot).then(
-        () => undefined,
-        (error: unknown) => error,
-      );
-      if (!(failure instanceof SheetwriteError)) throw new Error("expected a SheetwriteError");
-      expect(failure.code).toBe("export-failed");
-      const backend = failure.context?.backend;
-      if (typeof backend !== "string") throw new Error("expected a backend name in the context");
-      expect(new TextEncoder().encode(backend).byteLength).toBeLessThanOrEqual(
-        MAX_ERROR_TEXT_BYTES,
-      );
+    const failure = await toXlsxWorkbook(snapshot).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    if (!(failure instanceof SheetwriteError)) throw new Error("expected a SheetwriteError");
+    expect(failure.code).toBe("export-failed");
+    const backend = failure.context?.backend;
+    if (typeof backend !== "string") throw new Error("expected a backend name in the context");
+    expect(new TextEncoder().encode(backend).byteLength).toBeLessThanOrEqual(MAX_ERROR_TEXT_BYTES);
   });
 });

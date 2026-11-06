@@ -19,17 +19,17 @@ import { initSheetwrite } from "../src/grid.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
 import {
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
-} from "../src/xlsx-slots.js";
-import {
   fromXlsxTable,
   fromXlsxWorkbook,
   toXlsxTable,
   toXlsxWorkbook,
   XlsxResourceError,
 } from "../src/xlsx-bridge.js";
+import {
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
+} from "../src/xlsx-slots.js";
 import { keepXlsxSlots } from "./fixtures.js";
 
 /** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */

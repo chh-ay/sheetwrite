@@ -134,12 +134,7 @@ const packageSpecs: PackageSpec[] = [
   },
   {
     directory: "packages/charts",
-    extraFiles: [
-      "dist/addon.d.ts",
-      "dist/addon.js",
-      "dist/view-cache.d.ts",
-      "dist/view-cache.js",
-    ],
+    extraFiles: ["dist/addon.d.ts", "dist/addon.js", "dist/view-cache.d.ts", "dist/view-cache.js"],
   },
   { directory: "packages/react" },
   { directory: "packages/vue" },
