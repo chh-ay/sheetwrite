@@ -11,7 +11,8 @@ import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
-import compatibilitySummary from "../generated/compatibility-summary.json";
+// Named imports, so only these three numbers ship in the page bundle.
+import { localPassed, regressions, totalTests } from "../generated/compatibility-summary.json";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
 import {
@@ -305,12 +306,9 @@ function Landing() {
               ) : null}
               <div>
                 <dt>
-                  {compatibilitySummary.localPassed.toLocaleString("en")} /{" "}
-                  {compatibilitySummary.totalTests.toLocaleString("en")}
+                  {localPassed.toLocaleString("en")} / {totalTests.toLocaleString("en")}
                 </dt>
-                <dd>
-                  Excel compatibility checks pass, {compatibilitySummary.regressions} regressions
-                </dd>
+                <dd>Excel compatibility checks pass, {regressions} regressions</dd>
               </div>
               {downloads ? (
                 <div>
