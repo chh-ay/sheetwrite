@@ -33,7 +33,8 @@
 @font-face {
   font-family: "Space Grotesk Fallback";
   font-weight: 100 549;
-  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"),
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"),
     local("Helvetica");
   size-adjust: 108%;
   ascent-override: 91.1%;
@@ -44,7 +45,8 @@
 @font-face {
   font-family: "Space Grotesk Fallback";
   font-weight: 550 900;
-  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
   size-adjust: 100%;
   ascent-override: 98.4%;
