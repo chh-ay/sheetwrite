@@ -2695,8 +2695,8 @@ export async function readWorkbook(
   const calculation = workbook_calculation(workbook_root);
   // Sheetwrite's own metadata holds relationships by stable IDs; a file
   // without it may hold Excel's data model relationships.
-  let dataModel = metadata?.workbook.dataModel;
-  if (dataModel === undefined && hasExcelDataModel(workbook_root)) {
+  let data_model = metadata?.workbook.dataModel;
+  if (data_model === undefined && hasExcelDataModel(workbook_root)) {
     const connections_part = workbook_relationships.find(
       (relationship) =>
         relationshipTypeMatches(relationship.type, "connections") && !relationship.external,
@@ -2707,7 +2707,7 @@ export async function readWorkbook(
     if (readable) await package_file.load([connections_part]);
     const connections = readable ? package_file.readXml(connections_part) : undefined;
     if (readable) package_file.release([connections_part]);
-    dataModel = readExcelDataModel(workbook_root, connections, sheets, context);
+    data_model = readExcelDataModel(workbook_root, connections, sheets, context);
   }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
@@ -2717,7 +2717,7 @@ export async function readWorkbook(
       activeSheet: active_sheet,
       ...(named_ranges?.length ? { namedRanges: structuredClone(named_ranges) } : {}),
       ...(calculation ? { calculation } : {}),
-      ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
+      ...(data_model?.relationships.length ? { dataModel: structuredClone(data_model) } : {}),
     },
     sheets,
   };

@@ -224,7 +224,7 @@ function pivot_from_xml(
   table: XmlElement,
   cache: XmlElement,
   snapshot: WorkbookSnapshot,
-  numberFormat: (numFmtId: number) => string | undefined,
+  number_format: (numFmtId: number) => string | undefined,
 ): ReadPivot | string {
   const name = decodeXstring(xmlAttribute(table, "name") ?? "");
   if (!name) return "it has no name";
@@ -280,7 +280,7 @@ function pivot_from_xml(
     if (!aggregation) return `it uses the ${subtotal} summary`;
     const caption = xmlAttribute(data, "name");
     const format_id = xmlAttribute(data, "numFmtId");
-    const format = format_id === undefined ? undefined : numberFormat(Number(format_id));
+    const format = format_id === undefined ? undefined : number_format(Number(format_id));
     values.push({
       field: value_fields[index] ?? 0,
       aggregation,
