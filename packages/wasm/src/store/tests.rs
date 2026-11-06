@@ -753,6 +753,60 @@ fn pivot_structural_clamp_preserves_both_colliding_anchors_and_recovers() {
     assert_eq!(store.get_cell(output, 8, 1).num(), 18.0);
 }
 
+/// Row of a chart copy's anchor, as core sends it: below the last row of every sheet.
+const UNPLACED_ROW: u32 = 1 << 30;
+
+/// Checks that the copy (pivot 1 on `output`) computes without placing:
+/// both pivots show no error, and each value of the copy, which has no total
+/// row or column, equals the placed pivot's cell for the same region and
+/// quarter.
+fn assert_copy_matches_placed(store: &CellStore, output: usize) {
+    let status = store.pivot_status(output);
+    assert_eq!(status[STATUS_ERROR], 0);
+    assert_eq!(status[STATUS_STRIDE + STATUS_ERROR], 0, "the copy computes");
+
+    let copy = store.pivot_output(output, 1);
+    let layout: Vec<usize> = copy.layout().into_iter().map(|count| count as usize).collect();
+    let (rows, cols, header_rows, label_cols) = (layout[0], layout[1], layout[2], layout[3]);
+    // Two regions by three quarters.
+    assert_eq!((rows - header_rows, cols - label_cols), (2, 3));
+
+    let numbers = copy.numbers();
+    for row in header_rows..rows {
+        for col in label_cols..cols {
+            let placed = store.get_cell(output, row, col).num();
+            assert_eq!(numbers[row * cols + col], placed, "cell ({row}, {col})");
+        }
+    }
+}
+
+#[test]
+fn pivot_anchored_below_its_sheet_computes_without_placing() {
+    let (mut store, source, output) = fixture(12);
+    let placed = fixture_pivot(source, 12, &[SUM]);
+    let copy = PivotPayload {
+        id: 1,
+        anchor: (UNPLACED_ROW, 0),
+        flags: 0,
+        ..fixture_pivot(source, 12, &[SUM])
+    };
+    let mut definitions = placed.numbers();
+    definitions.extend(copy.numbers());
+    assert!(store.set_pivots(output, &definitions, vec!["pivot".into(), "copy".into()]));
+    store.recompute(output);
+    assert_copy_matches_placed(&store, output);
+
+    // A source edit reaches the copy.
+    store.set_number(source, 6, SALES, 106.0, 0);
+    store.recompute(source);
+    assert_copy_matches_placed(&store, output);
+
+    // Deleting rows above the copy leaves it below the sheet.
+    store.remove_rows(output, 0, 1);
+    store.recompute(output);
+    assert_copy_matches_placed(&store, output);
+}
+
 /// Source for the multi-level cases: region, city, product, flag (the
 /// filter field), quarter (the column field) and sales.
 const LEVEL_ROWS: [(&str, &str, &str, f64, f64, f64); 12] = [

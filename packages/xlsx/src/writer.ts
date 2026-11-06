@@ -4,6 +4,7 @@ import type {
   ConditionalFormatRule,
   DashboardExport,
   DataValidationRule,
+  SheetId,
   SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
@@ -1203,12 +1204,20 @@ function iterationAttributes(snapshot: WorkbookSnapshot): string {
   return `${calculation.iterate ? ' iterate="1"' : ""} iterateCount="${calculation.maxIterations}" iterateDelta="${calculation.maxChange}"`;
 }
 
+/** What only core's engine computes for an export. */
+interface EngineExports {
+  /** Static content of each dashboard sheet. */
+  readonly dashboards?: readonly DashboardExport[];
+  /** The resolved view of each worksheet chart over a pivot, by sheet and chart ID. */
+  readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
+}
+
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
 function* writeWorkbookParts(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   resolveHook?: WorkbookWriteHookResolver,
-  dashboards: readonly DashboardExport[] = [],
+  computed: EngineExports = {},
 ): Generator<ZipPart> {
   preflightSnapshot(snapshot, context);
   if (snapshot.sheets.length === 0)
@@ -1251,7 +1260,7 @@ function* writeWorkbookParts(
       sheet.kind === "dashboard"
         ? staticDashboard(
             sheet,
-            dashboards.find((entry) => entry.sheet === sheet.id),
+            computed.dashboards?.find((entry) => entry.sheet === sheet.id),
             context,
           )
         : undefined;
@@ -1265,7 +1274,7 @@ function* writeWorkbookParts(
         sheetTableId,
         hook,
         pivots?.sheetRelationships(exportSheet.id),
-        dashboard?.charts,
+        dashboard?.charts ?? computed.pivotCharts?.get(sheet.id),
       );
     }
     const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);
@@ -1386,24 +1395,18 @@ export async function writeWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
-  dashboards?: readonly DashboardExport[],
+  computed?: EngineExports,
 ): Promise<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  return writeZip(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook, dashboards),
-    context,
-  );
+  return writeZip(writeWorkbookParts(snapshot, { ...context, formulas }, hook, computed), context);
 }
 
 export async function* streamWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
-  dashboards?: readonly DashboardExport[],
+  computed?: EngineExports,
 ): AsyncGenerator<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  yield* zipChunks(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook, dashboards),
-    context,
-  );
+  yield* zipChunks(writeWorkbookParts(snapshot, { ...context, formulas }, hook, computed), context);
 }

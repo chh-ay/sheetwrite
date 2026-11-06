@@ -1865,7 +1865,7 @@ export class StoreDataEngine {
     }
 
     const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    // A dashboard has no cells: its view reads the output with `dashboardPivotOutput`.
+    // A dashboard has no cells: its view reads the output with `pivotOutputCells`.
     const cells = isDashboard(owner) ? [] : this.pivotWindowCells(sheet, record);
     return {
       status: "ok",
@@ -1890,11 +1890,12 @@ export class StoreDataEngine {
   }
 
   /**
-   * The engine output of the pivot at `index` in a dashboard's payload,
-   * which places none in cells; the caller frees it. Null on the default
+   * The engine output of the pivot at `index` in a sheet's payload; the
+   * caller frees it. It serves the pivots that place no output: those of a
+   * dashboard and the chart copies of a worksheet pivot. Null on the default
    * engine. Indices past the sheet's pivots read hidden pivots of a pivot view.
    */
-  dashboardPivotOutput(sheet: SheetId, index: number): PivotOutputCells | null {
+  pivotOutputCells(sheet: SheetId, index: number): PivotOutputCells | null {
     if (index < 0 || !this.wasm.pivotOutput) return null;
     return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
@@ -3381,11 +3382,16 @@ export class StoreDataEngine {
         const sheet = this.sheets.sheetMeta(patch.sheet);
         const chart = sanitizeChartDefinition(patch.chart);
         if (!chart || !chartFitsSheets(chart, sheet, this.workbook.sheets)) return false;
+        const previous = sheet.charts?.find((candidate) => candidate.id === chart.id);
 
         // Chart lists are replaced, never mutated, so captured definitions stay exact for undo.
         const charts = upsertById(sheet.charts ?? [], chart, MAX_CHARTS_PER_SHEET);
         if (!charts) return false;
         sheet.charts = charts;
+        // A chart over a pivot reads a copy of it that the pivot view adds.
+        if (chart.pivot !== undefined || previous?.pivot !== undefined) {
+          this.pivotSheetsDirty.add(patch.sheet);
+        }
 
         return true;
       }
@@ -3393,8 +3399,10 @@ export class StoreDataEngine {
       case "removeChart": {
         const sheet = this.sheets.sheetMeta(patch.sheet);
         const charts = sheet.charts ?? [];
-        if (!charts.some((chart) => chart.id === patch.id)) return false;
-        sheet.charts = charts.filter((chart) => chart.id !== patch.id);
+        const removed = charts.find((chart) => chart.id === patch.id);
+        if (removed === undefined) return false;
+        sheet.charts = charts.filter((chart) => chart !== removed);
+        if (removed.pivot !== undefined) this.pivotSheetsDirty.add(patch.sheet);
         return true;
       }
 
