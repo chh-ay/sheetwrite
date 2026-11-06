@@ -289,7 +289,10 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-document {
   grid-column: 2;
   display: grid;
-  grid-template-columns: minmax(0, var(--sw-content-width));
+  /* A fixed track, not one sized to its content: while the page is still
+     arriving, a column sized to the content parsed so far would widen as
+     longer lines arrive and move everything in it. */
+  grid-template-columns: min(100%, var(--sw-content-width));
   justify-content: center;
   align-content: start;
   min-width: 0;
@@ -665,7 +668,9 @@ html:has(.sw-nav-dialog[open]) {
 
 @media (min-width: 88rem) {
   .sw-docs:not(.sw-docs--api) .sw-document {
-    grid-template-columns: minmax(0, var(--sw-content-width)) var(--sw-docs-outline-width);
+    grid-template-columns:
+      min(100% - var(--sw-docs-outline-width) - var(--sw-space-16), var(--sw-content-width))
+      var(--sw-docs-outline-width);
     column-gap: var(--sw-space-16);
   }
   .sw-document > :not(.sw-toc) {
