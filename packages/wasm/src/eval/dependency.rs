@@ -10,7 +10,7 @@ use crate::graph::{offset_or_search, DirtyRect, DirtySeeds, FORMULA_INDEX_PAGE_R
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
-    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, Value, FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, FORMULA_RECURSION_LIMIT,
 };
 
 /// Queued formula changes always patch the index below this count. Above it, a
@@ -1861,6 +1861,7 @@ pub(super) fn circular_components(
 mod tests {
     use super::*;
     use crate::store::CellStore;
+    use crate::types::Value;
 
     #[test]
     fn duplicate_direct_and_range_edges_preserve_cycle_error_propagation() {
