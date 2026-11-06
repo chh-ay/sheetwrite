@@ -940,7 +940,15 @@
   }
 }
 
-/* Miniature ribbon: a tab row, labeled groups, then a formula bar. */
+/* Beside the miniature, the app card's copy and link sit together in the
+   middle of the pane rather than spreading to its edges. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-launch__body {
+  grid-template-rows: auto;
+  align-content: center;
+}
+
+/* Miniature app: a tab row, labeled groups, the formula bar, cells and sheet
+   tabs. */
 .sw-hub-ribbon {
   display: grid;
   gap: var(--sw-space-1-5);
