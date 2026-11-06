@@ -131,6 +131,21 @@ it("round-trips relationships and model pivots through Sheetwrite metadata", asy
   ]);
 });
 
+it("round-trips measures without relationships through Sheetwrite metadata", async () => {
+  const measure = {
+    id: "total",
+    name: "Total",
+    table: "orders",
+    formula: "=SUM(Orders[Amount])",
+  };
+  const input = authored([]);
+  input.workbook.dataModel = { relationships: [], measures: [measure] };
+
+  const reopened = await fromXlsxWorkbook(await toXlsxWorkbook(input));
+
+  expect(reopened.workbook.dataModel).toEqual({ relationships: [], measures: [measure] });
+});
+
 const DATA_MODEL_EXTENSION = `<extLst><ext uri="{FCE2AD5D-F65C-4FA6-A056-5C36A1767C68}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:dataModel><x15:modelTables><x15:modelTable id="Orders-1" name="Orders" connection="WorksheetConnection_Orders"/><x15:modelTable id="Clients-2" name="Clients" connection="WorksheetConnection_Customers"/><x15:modelTable id="Calendar-3" name="Calendar" connection="ThisWorkbookDataModel"/></x15:modelTables><x15:modelRelationships><x15:modelRelationship fromTable="Orders" fromColumn="Customer" toTable="Clients" toColumn="ID"/><x15:modelRelationship fromTable="Orders" fromColumn="Amount" toTable="Clients" toColumn="Region"/><x15:modelRelationship fromTable="Orders" fromColumn="Customer" toTable="Calendar" toColumn="Date"/></x15:modelRelationships></x15:dataModel></ext></extLst>`;
 
 const connection = (name: string, source: string, id: number) =>
