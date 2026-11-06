@@ -136,7 +136,7 @@ impl<'c> CellTest<'c> {
     fn mask_column(
         &self,
         strings: &StringStorage,
-        (kinds, payloads): (&[u8], &[u64]),
+        (kinds, payloads): LiteralColumn<'_>,
         mask: &mut [u64],
         first: bool,
     ) {
@@ -167,6 +167,9 @@ impl<'c> CellTest<'c> {
 
 /// Rows per word of a match mask.
 const MASK_ROWS: usize = u64::BITS as usize;
+
+/// One column of a literal range: kind bytes and payloads, row by row.
+type LiteralColumn<'a> = (&'a [u8], &'a [u64]);
 
 /// The value the sum and extreme folds see for a literal cell. They skip
 /// text, so a text cell reads as blank instead of copying its string.
@@ -280,8 +283,8 @@ impl CellStore {
     fn literal_criteria_column_family(
         &self,
         fold: CriteriaFold,
-        values: Option<(&[u8], &[u64])>,
-        criteria: &[((&[u8], &[u64]), &CellTest<'_>)],
+        values: Option<LiteralColumn<'_>>,
+        criteria: &[(LiteralColumn<'_>, &CellTest<'_>)],
         rows: usize,
     ) -> EvalResult {
         let strings = &self.strings;
@@ -337,7 +340,7 @@ impl CellStore {
 }
 
 /// The first column of `columns` cut to `rows` rows, when it has them.
-fn column_rows<'a>(columns: &LiteralColumns<'a>, rows: usize) -> Option<(&'a [u8], &'a [u64])> {
+fn column_rows<'a>(columns: &LiteralColumns<'a>, rows: usize) -> Option<LiteralColumn<'a>> {
     let &(kinds, payloads) = columns.columns.first()?;
     Some((kinds.get(..rows)?, payloads.get(..rows)?))
 }
