@@ -422,7 +422,8 @@ impl FormulaEntry {
     /// The formula text: the text the user wrote, with each reference that
     /// an edit has changed since written from the tree. An edit only marks
     /// the text, so a rename or a row edit over many formulas writes none of
-    /// them; the text is written when it is read.
+    /// them; the text is written when it is read. Out of line: many readers.
+    #[inline(never)]
     pub(crate) fn source(&self) -> Cow<'_, str> {
         match &self.ast {
             Some(ast) if self.flags & Self::STALE_REFERENCES != 0 => {
