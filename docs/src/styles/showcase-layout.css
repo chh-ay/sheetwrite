@@ -124,8 +124,11 @@
   box-shadow: var(--sw-shadow-md);
 }
 
+/* Every panel grid sizes its column to the card, not to its widest label,
+   so a long button or value wraps inside the card instead of overflowing. */
 .sw-showcase__controls {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sw-space-4);
   padding: var(--sw-space-5);
   border: var(--sw-border-width) solid var(--sw-border);
@@ -135,6 +138,7 @@
 
 .sw-showcase__control-group {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sw-space-2);
   /* Groups side by side share a row height; their controls keep their own. */
   align-content: start;
@@ -162,6 +166,7 @@
 
 .sw-showcase__control-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sw-space-2);
 }
 
@@ -267,11 +272,13 @@
 }
 
 .sw-showcase__readout dd {
+  min-width: 0;
   margin: 0;
   color: var(--sw-fg-strong);
   font-family: var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
+  overflow-wrap: break-word;
 }
 
 /* ---- Demo window bar ---------------------------------------------------- */

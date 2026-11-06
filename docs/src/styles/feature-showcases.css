@@ -1,18 +1,22 @@
 /* Side-panel pieces shared by the 0.7.0 feature showcases (feature-controls.tsx). */
 .sw-feature-actions {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sw-space-2);
 }
 
+/* A long label wraps onto a second line inside the card. */
 .sw-feature-button {
   justify-content: flex-start;
   width: 100%;
+  padding-block: var(--sw-space-2);
   text-align: start;
+  white-space: normal;
 }
 
 .sw-feature-button > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  line-height: var(--sw-leading-ui);
 }
 
 /* Two buttons side by side, such as Undo and Redo. */
