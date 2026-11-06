@@ -5,6 +5,7 @@ import {
   type GridConfig,
   type ProtectionResolver,
   type RowBridgeProjection,
+  type Theme,
 } from "@sheetwrite/core";
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
@@ -146,8 +147,9 @@ export default function HostRowsShowcase() {
   );
 
   // The grid paints with resolved colors, so it re-reads the site tokens when
-  // the page theme changes.
-  const applySiteTheme = () => grid.current?.replaceTheme({ ...siteGridTheme(), rowHeight: 36 });
+  // the page theme changes. The theme is a prop, so a re-render keeps it.
+  const [theme, setTheme] = useState<Partial<Theme>>({ rowHeight: 36 });
+  const applySiteTheme = () => setTheme({ ...siteGridTheme(), rowHeight: 36 });
   useEffect(() => observeSiteTheme(applySiteTheme), []);
 
   // A changed protection resolver makes the adapter rebuild the Grid from its
@@ -375,7 +377,7 @@ export default function HostRowsShowcase() {
             {...input}
             ref={grid}
             presentation="data-grid"
-            theme={{ rowHeight: 36 }}
+            theme={theme}
             rowBridge={bridge}
             config={GRID_CONFIG}
             onReady={() => {
