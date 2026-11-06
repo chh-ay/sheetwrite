@@ -466,8 +466,8 @@ const RIBBON_SCENE_GROUPS = [
   "Editing",
 ] as const;
 
-/** Cells in the miniature sheet: three rows of six; the last is the SUM cell. */
-const RIBBON_SCENE_CELLS = 18;
+/** Cells in the miniature sheet: six rows of six; the last is the SUM cell. */
+const RIBBON_SCENE_CELLS = 36;
 
 /** A miniature spreadsheet app: ribbon tabs and groups, the formula bar, a few
     rows of cells and the sheet tabs, Home and Sales selected. */

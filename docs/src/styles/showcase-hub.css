@@ -318,6 +318,9 @@
   overflow: visible;
   color: var(--sw-fg-muted);
   font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.5 var(--sw-font-body);
+  /* Captions list terms between "·" separators; a wider word space keeps
+     each separator clear of the words around it. */
+  word-spacing: 0.15em;
 }
 
 .sw-hub-framework-scene {
