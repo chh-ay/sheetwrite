@@ -47,6 +47,18 @@ export function range(sheetId: string, r0: number, c0: number, r1: number, c1: n
 }
 
 /**
+ * Append a grid host to the document with an 800 x 400 layout size, which
+ * happy-dom does not compute on its own.
+ */
+export function mountHost(): HTMLDivElement {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return host;
+}
+
+/**
  * Resolve with the first element under `host` that matches `selector`, now or
  * when it is added. Use it for chrome that loads its own chunk, such as the
  * find bar, instead of a guessed delay.

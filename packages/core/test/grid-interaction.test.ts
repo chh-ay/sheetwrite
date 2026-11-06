@@ -14,7 +14,7 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { elementAdded, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -38,14 +38,6 @@ afterEach(() => {
   restoreStubs();
   globalThis.requestAnimationFrame = originalRaf;
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
 

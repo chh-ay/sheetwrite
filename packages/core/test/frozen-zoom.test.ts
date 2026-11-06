@@ -15,7 +15,7 @@ import type {
   VisibleWindowView,
   Workbook,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
@@ -38,14 +38,6 @@ afterEach(() => {
   restoreStubs();
   globalThis.requestAnimationFrame = originalRaf;
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 function scrollerOf(host: HTMLElement): HTMLDivElement {
   const node = host.querySelector(".sheetwrite-scroller");

@@ -26,7 +26,7 @@ import type {
 } from "../src/types.js";
 import type { XlsxTableExportBackend } from "../src/xlsx-bridge.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-bridge.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -74,14 +74,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
 
