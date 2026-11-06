@@ -147,14 +147,12 @@
   src:
     local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 93.5%;
-  ascent-override: 99.47%;
-  descent-override: 28.88%;
+  size-adjust: 92.8%;
+  ascent-override: 100.22%;
+  descent-override: 29.09%;
   line-gap-override: 0%;
 }
 
-/* Chromium shares one scaled font between @font-face rules whose src lists
-   are identical, so the body fallbacks list the same fonts in another order. */
 @font-face {
   font-family: "Instrument Sans Fallback";
   font-weight: 100 549;
