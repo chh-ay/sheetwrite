@@ -152,7 +152,7 @@ const SAMPLE_ROWS = [
   ["Folder", 9],
 ] as const;
 
-/** The story sits below the fold; its built markup loads with it, not with the page. */
+/** The story sits below the fold: its markup is in the prerendered page, its small component loads later. */
 const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
 
 function BenchmarkBars() {

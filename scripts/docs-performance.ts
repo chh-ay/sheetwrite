@@ -156,8 +156,9 @@ export async function renderLandingBench(): Promise<string> {
 
 /**
  * The speed story as built HTML, for the landing page and the performance
- * showcase. It is its own generated file, so the pages load it with the
- * lazily loaded story component and not with the page.
+ * showcase. It is its own generated file, inlined by the server render and
+ * fetched as an asset after a client-side navigation, so no page script
+ * carries it (see docs/src/lib/speed-story-markup.ts).
  */
 export async function renderLandingStory(): Promise<string> {
   const scale = await loadMachineCaptures(
@@ -166,15 +167,13 @@ export async function renderLandingStory(): Promise<string> {
     "bun run --filter @sheetwrite/bench bench:render:scale",
     validateRenderArtifact,
   );
-  const html =
-    scale.machines.length === 0
-      ? ""
-      : speedStory({
-          id: "story",
-          baseName: "Handsontable",
-          machines: storyMachines(scale.machines),
-        });
-  return `${JSON.stringify({ html }, null, 2)}\n`;
+  return scale.machines.length === 0
+    ? ""
+    : speedStory({
+        id: "story",
+        baseName: "Handsontable",
+        machines: storyMachines(scale.machines),
+      });
 }
 
 /** Download sizes on the landing page, Brotli-compressed as browsers fetch them. */

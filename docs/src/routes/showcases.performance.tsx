@@ -56,7 +56,7 @@ import type { RendererState, RenderingMode } from "../showcases/ui/rendering-mod
 import "@sheetwrite/core/styles.css";
 import stylesheet from "../styles/showcase-performance.css?url";
 
-/** The comparison sits below the fold; its built markup loads with it, not with the page. */
+/** The comparison sits below the fold: its markup is in the prerendered page, its small component loads later. */
 const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
 
 declare global {

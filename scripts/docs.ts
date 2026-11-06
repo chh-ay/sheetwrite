@@ -281,7 +281,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
-    { path: join(generatedDataRoot, "landing-story.json"), content: await renderLandingStory() },
+    { path: join(generatedDataRoot, "landing-story.html"), content: await renderLandingStory() },
   ];
   const symbolOwners = new Map<string, string>();
   for (const pkg of manifest.packages) {

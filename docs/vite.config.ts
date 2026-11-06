@@ -34,6 +34,7 @@ import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
+import { speedStoryMarkup } from "./src/lib/speed-story-markup.ts";
 
 interface HastNode {
   type: string;
@@ -483,6 +484,7 @@ export default defineConfig({
     },
     expressiveCodeAssets(),
     formulaTables(),
+    speedStoryMarkup(),
     tailwindcss(),
     tanstackStart({
       pages: [
