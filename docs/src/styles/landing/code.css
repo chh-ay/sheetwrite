@@ -187,14 +187,10 @@
   line-height: 1.6;
 }
 
-.sw-lp-engines__choices article code {
-  justify-self: start;
+/* The setup snippet, highlighted at build time, sits at the card's foot. */
+.sw-lp-engines__choices article .expressive-code {
+  align-self: end;
   margin-top: var(--sw-space-1-5);
-  padding: var(--sw-space-2) var(--sw-space-3);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-  background: var(--sw-surface-0);
-  color: var(--sw-fg);
   font-size: var(--sw-text-small);
 }
 

@@ -7,6 +7,8 @@ import { CodeTabs } from "../components/landing/CodeTabs.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
 import { GridGlow } from "../components/landing/GridGlow.js";
 import { HeroApp } from "../components/landing/HeroApp.js";
+import EngineDefaultSnippet from "../components/landing/snippets/engine-default.mdx";
+import EngineFullSnippet from "../components/landing/snippets/engine-full.mdx";
 import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
@@ -430,7 +432,7 @@ function Landing() {
                   <b>{kib(downloads.defaultEngineBrotliBytes)}</b> WASM, Brotli
                 </p>
               ) : null}
-              <code>await initSheetwrite();</code>
+              <EngineDefaultSnippet />
             </article>
             <article data-variant="full">
               <span>Full</span>
@@ -444,7 +446,7 @@ function Landing() {
                   <b>{kib(downloads.fullEngineBrotliBytes)}</b> WASM, Brotli
                 </p>
               ) : null}
-              <code>await initSheetwrite(undefined, formulas);</code>
+              <EngineFullSnippet />
             </article>
           </div>
           {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
