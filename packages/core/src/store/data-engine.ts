@@ -693,6 +693,12 @@ export class StoreDataEngine {
   private readonly spillBlockersDirty = new Set<SheetId>();
   /** Sheets whose pivots must be sent to the engine before the mutation commits. */
   private readonly pivotSheetsDirty = new Set<SheetId>();
+  /**
+   * The definitions the engine computes for a sheet's pivots, when they
+   * differ from the saved ones. The dashboard chunk sets it to add slicer
+   * filters, so first paint carries only this slot.
+   */
+  private pivotView: ((sheet: Sheet) => PivotDefinition[] | undefined) | null = null;
 
   private readonly rangeHistory = new Map<
     CompactRangeHistory,
@@ -1079,7 +1085,9 @@ export class StoreDataEngine {
       return;
     }
 
-    const payload = encodePivotPayload(pivots, (id) => this.sheets.handles.get(id));
+    const payload = encodePivotPayload(this.pivotView?.(sheet) ?? pivots, (id) =>
+      this.sheets.handles.get(id),
+    );
     this.boundaryAccounting.record(
       this.resourceOperation ?? "edit",
       "js-to-wasm",
@@ -1090,6 +1098,25 @@ export class StoreDataEngine {
       throw storeFailure("resource-limit", `pivot payload rejected for sheet: ${sheet.id}`, {
         sheet: sheet.id,
       });
+    }
+  }
+
+  /**
+   * Compute pivots from `view` instead of the saved definitions, and send
+   * `sheets` again. A view changes inputs that are not in the document, such
+   * as a read-only viewer's slicer selection, so it needs no transaction.
+   */
+  setPivotView(
+    view: (sheet: Sheet) => PivotDefinition[] | undefined,
+    sheets: readonly SheetId[],
+  ): void {
+    this.pivotView = view;
+    this.wasm.beginMutation();
+    try {
+      for (const id of sheets) this.pivotSheetsDirty.add(id);
+      this.flushPivots();
+    } finally {
+      this.wasm.commitSources();
     }
   }
 
@@ -3759,6 +3786,8 @@ export class StoreDataEngine {
         validateDashboardItemAdmission(patch.item, sheet, issues);
         if (issues.length > 0) return false;
         sheet.dashboard = withDashboardItem(sheet.dashboard, patch.item);
+        // A slicer filters the dashboard's pivots.
+        this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
 
@@ -3766,6 +3795,7 @@ export class StoreDataEngine {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet || !findDashboardItem(sheet, patch.id)) return false;
         sheet.dashboard = withoutDashboardItem(sheet.dashboard, patch.id);
+        this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
 
