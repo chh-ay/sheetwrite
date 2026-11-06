@@ -45,7 +45,8 @@ for (const [width, hasDesktopOutline] of [
 ] as const) {
   test(`documentation has a visible route back home at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto(docsUrl("api/core/grid/"));
+    // A guide: API symbol pages use the full width and carry no outline column.
+    await page.goto(docsUrl("start/first-grid/"));
     await waitForHydration(page);
     if (hasDesktopOutline) {
       await expect(
