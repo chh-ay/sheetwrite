@@ -183,9 +183,11 @@ const assets = publicFiles.map((file) => {
       findChunks,
       documentChunks,
       dashboardChunks,
+      addonRegistryChunks,
     ].some((chunks) => chunks.includes(file))
   ) {
-    // The function table loads from the panels and formula help, as Vite's chrome graph counts it.
+    // The function table loads from the panels and formula help, and the add-on registry from
+    // `initSheetwrite`, as Vite's chrome graph counts them.
     owner = "chrome-async";
     roles = ["chrome-async"];
   } else {
