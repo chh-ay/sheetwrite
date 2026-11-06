@@ -54,6 +54,8 @@ const LINES = [
 const FIRST_QUARTER_COL = 2;
 const TOTAL_COL = FIRST_QUARTER_COL + QUARTERS.length;
 const TOTAL_ROW = LINES.length + 1;
+/** Rows the Budget sheet fills: the header, every line and the total. */
+export const BUDGET_ROWS_USED = TOTAL_ROW + 1;
 /** Each quarter grows a line by this share of the one before. */
 const QUARTER_GROWTH = 0.03;
 

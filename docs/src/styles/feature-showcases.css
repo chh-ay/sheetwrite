@@ -149,3 +149,28 @@
   border-radius: inherit;
   background: var(--sw-accent);
 }
+
+/* A grid sized to its data: the shell chrome (ribbon, formula bar, column
+   headers and sheet tabs) plus `--sw-feature-grid-rows` rows of the grid's
+   default row height. */
+.sw-feature-grid[data-sized="true"] {
+  --sw-feature-grid-chrome: 14rem;
+  --sw-feature-grid-row: 1.75rem;
+  height: calc(
+    var(--sw-feature-grid-chrome) + var(--sw-feature-grid-rows) * var(--sw-feature-grid-row)
+  );
+}
+
+/* Rows of the side-panel lists answer the pointer like the readout rows. */
+:is(.sw-feature-changes, .sw-feature-runs) > li {
+  border-radius: var(--sw-radius-xs);
+  transition: background var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+:is(.sw-feature-changes, .sw-feature-runs) > li:hover {
+  background: var(--sw-surface-2);
+}
+
+.sw-feature-input input:hover:not(:disabled) {
+  border-color: var(--sw-accent);
+}

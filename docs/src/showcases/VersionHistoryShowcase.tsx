@@ -10,6 +10,7 @@ import {
 import {
   authorName,
   BASELINE_NAME,
+  BUDGET_ROWS_USED,
   createVersionHistoryScenario,
   SAM,
   type ChangeReading,
@@ -162,7 +163,12 @@ export default function VersionHistoryShowcase() {
       controls={<HistoryControls scenario={scenario} snapshot={snapshot} />}
       demo={
         <>
-          <DemoGrid hostRef={hostRef} label="Budget workbook" testId="history-grid" />
+          <DemoGrid
+            hostRef={hostRef}
+            label="Budget workbook"
+            rows={BUDGET_ROWS_USED}
+            testId="history-grid"
+          />
           <ActionError error={error} />
         </>
       }

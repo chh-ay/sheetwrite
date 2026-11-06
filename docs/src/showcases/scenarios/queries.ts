@@ -147,6 +147,8 @@ const REPORT_FORMULAS = [
   { label: "Large orders", src: "=ROWS(LargeOrders[Order])", format: "#,##0" },
 ] as const;
 const FORMULA_LABEL_COL = 4;
+/** Rows the Report sheet fills: the Region totals table (a header and each region) or the formulas. */
+export const REPORT_ROWS_USED = Math.max(1 + REGIONS.length, REPORT_FORMULAS.length);
 
 /** Money columns: Revenue in Region totals and Amount in Large orders. */
 const MONEY_COLUMNS: Readonly<Record<string, number>> = { [REPORT_SHEET]: 1, [LARGE_SHEET]: 3 };

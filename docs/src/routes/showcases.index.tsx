@@ -323,6 +323,29 @@ function RecalculationScene() {
   );
 }
 
+/**
+ * A scene formula coloured in markup, so the hub ships no tokenizer: the
+ * leading `=`, a function name and its parentheses take the code colours.
+ */
+function SceneFormula({ formula }: Readonly<{ formula: string }>) {
+  const call = /^=([A-Z][A-Z.]*)\((.*)\)$/.exec(formula);
+  return (
+    <code className="sw-hub-spill__formula">
+      <span className="sw-code-punctuation">=</span>
+      {call ? (
+        <>
+          <span className="sw-code-function">{call[1]}</span>
+          <span className="sw-code-punctuation">(</span>
+          {call[2]}
+          <span className="sw-code-punctuation">)</span>
+        </>
+      ) : (
+        formula.slice(1)
+      )}
+    </code>
+  );
+}
+
 /** A formula over label and value rows, the shape the formula-led scenes share. */
 function FeatureScene({
   id,
@@ -337,7 +360,7 @@ function FeatureScene({
 }>) {
   return (
     <span aria-hidden="true" className={`sw-hub-scene sw-hub-scene--${id}`}>
-      <HighlightedCode className="sw-hub-spill__formula" code={formula} language="formula" />
+      <SceneFormula formula={formula} />
       <span className="sw-hub-spill">
         {rows.map(([label, value]) => (
           <span key={label}>

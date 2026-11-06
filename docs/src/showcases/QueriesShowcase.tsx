@@ -9,6 +9,7 @@ import {
 } from "./layout/ShowcaseLayout.js";
 import {
   createQueriesScenario,
+  REPORT_ROWS_USED,
   FEED_BATCH_ROWS,
   FEED_START_ROWS,
   LARGE_ORDER_AMOUNT,
@@ -156,7 +157,12 @@ export default function QueriesShowcase() {
       controls={<QueriesControls scenario={scenario} snapshot={snapshot} />}
       demo={
         <>
-          <DemoGrid hostRef={hostRef} label="Report workbook" testId="queries-grid" />
+          <DemoGrid
+            hostRef={hostRef}
+            label="Report workbook"
+            rows={REPORT_ROWS_USED}
+            testId="queries-grid"
+          />
           <ActionError error={error} />
         </>
       }

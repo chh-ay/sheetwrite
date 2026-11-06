@@ -183,6 +183,10 @@ export const FUNCTION_NAMES: readonly string[] = FAMILIES.flatMap((family) =>
   family.formulas.map((formula) => formula.name),
 ).filter((name) => /^[A-Z][A-Z0-9.]+$/.test(name));
 
+/** Rows the fullest family sheet fills: the header, then its inputs or formulas. */
+export const FAMILY_ROWS_USED =
+  1 + Math.max(...FAMILIES.map((family) => Math.max(family.inputs.length, family.formulas.length)));
+
 const INPUT_COL = 1;
 const NAME_COL = 3;
 const RESULT_COL = 4;

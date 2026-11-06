@@ -138,6 +138,13 @@ export const ROW_FIELDS = {
 
 export type RowFieldId = keyof typeof ROW_FIELDS;
 
+/**
+ * Rows the model pivot can fill: its header, one row per group of the widest
+ * row field, a blank group for an unmatched order, and the total.
+ */
+export const PIVOT_ROWS_USED =
+  3 + Math.max(new Set(PRODUCTS.map((product) => product[2])).size, REGIONS.length);
+
 /** A model pivot: rows from a related table, revenue and orders from Orders, and the measure. */
 function modelPivot(rowField: RowFieldId): PivotDefinition {
   const fields: TableColumnRef[] = [

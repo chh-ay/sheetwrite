@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 
 import { Icon, type IconName } from "../components/Icon.js";
 import { DemoButton, type DemoButtonProps } from "./ui/DemoButton.js";
@@ -25,17 +25,37 @@ export function ControlActions({ children }: { readonly children: ReactNode }) {
   return <div className="sw-feature-actions">{children}</div>;
 }
 
-/** The live grid of a showcase, sized by the shared stage height. */
+/** Empty rows a sized grid keeps under its data, so the last row never meets the tabs. */
+const GRID_SPARE_ROWS = 2;
+
+/**
+ * The live grid of a showcase. Without `rows` it takes the shared stage height;
+ * with `rows`, it fits that many sheet rows plus a small margin, so short data
+ * does not sit above a band of empty rows.
+ */
 export function DemoGrid({
   hostRef,
   label,
   testId,
+  rows,
 }: {
   readonly hostRef: RefObject<HTMLDivElement | null>;
   readonly label: string;
   readonly testId: string;
+  readonly rows?: number;
 }) {
+  const style =
+    rows === undefined
+      ? undefined
+      : ({ "--sw-feature-grid-rows": rows + GRID_SPARE_ROWS } as CSSProperties);
   return (
-    <div aria-label={label} className="sw-showcase__grid" data-testid={testId} ref={hostRef} />
+    <div
+      aria-label={label}
+      className="sw-showcase__grid sw-feature-grid"
+      data-sized={rows !== undefined}
+      data-testid={testId}
+      ref={hostRef}
+      style={style}
+    />
   );
 }

@@ -10,6 +10,7 @@ import {
 } from "./layout/ShowcaseLayout.js";
 import {
   createFunctionsScenario,
+  FAMILY_ROWS_USED,
   FAMILIES,
   FUNCTION_NAMES,
   type FamilyId,
@@ -122,7 +123,12 @@ export default function FunctionsShowcase() {
       controls={<FunctionsControls scenario={scenario} snapshot={snapshot} />}
       demo={
         <>
-          <DemoGrid hostRef={hostRef} label="Function workbook" testId="functions-grid" />
+          <DemoGrid
+            hostRef={hostRef}
+            label="Function workbook"
+            rows={FAMILY_ROWS_USED}
+            testId="functions-grid"
+          />
           <ActionError error={error} />
         </>
       }

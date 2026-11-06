@@ -12,6 +12,7 @@ import {
 } from "./layout/ShowcaseLayout.js";
 import {
   createDataModelScenario,
+  PIVOT_ROWS_USED,
   ORDER_ROWS,
   RELATIONSHIPS,
   ROW_FIELDS,
@@ -167,7 +168,12 @@ export default function DataModelShowcase() {
       controls={<DataModelControls scenario={scenario} snapshot={snapshot} />}
       demo={
         <>
-          <DemoGrid hostRef={hostRef} label="Data model workbook" testId="model-grid" />
+          <DemoGrid
+            hostRef={hostRef}
+            label="Data model workbook"
+            rows={PIVOT_ROWS_USED}
+            testId="model-grid"
+          />
           <ActionError error={error} />
         </>
       }
