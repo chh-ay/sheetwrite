@@ -152,9 +152,11 @@
 
 /* A grid of short data is sized to it at every width: the shell chrome (ribbon,
    formula bar, column headers and sheet tabs) plus `--sw-feature-grid-rows`
-   rows of the grid's default row height. The ribbon is full beside the desktop
-   panel and compact where the panel follows the demo. */
+   rows of the grid's default row height; `DemoGrid` overrides the default row
+   count inline from its `rows`. The ribbon is full beside the desktop panel and
+   compact where the panel follows the demo. */
 .sw-feature-grid[data-sized="true"] {
+  --sw-feature-grid-rows: 12;
   --sw-feature-grid-chrome: 14rem;
   --sw-feature-grid-row: 1.75rem;
   height: calc(
