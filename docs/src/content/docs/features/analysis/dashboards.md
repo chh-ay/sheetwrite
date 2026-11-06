@@ -142,6 +142,19 @@ The chart is a `ChartDefinition` with `pivot` set to the ID of a pivot on the sa
 
 A KPI card (`kind: "kpi"`) shows its measure's value, large, in the filter context of the dashboard's slicers: each slicer whose table the measure's home table reaches filters it, as it filters a pivot over that table. `title` replaces the measure name as the caption, and `numberFormat` is the Excel format code of the value; absent shows it as General. A card needs the full engine, as measures do.
 
+## XLSX
+
+Excel has no dashboard sheet. `toXlsxWorkbook(grid)` writes each dashboard as a worksheet with the same name. Each worksheet column stands for one grid column, and each row for one grid row. Each item writes its values from the top-left cell of its box:
+
+- a pivot item: its name, then the pivot's current result, with each value field's number format,
+- a slicer: its caption, then the values it keeps,
+- a KPI card: its caption, then its value in its number format,
+- a chart item: a native chart over the box, with its data written into the chart, so Excel shows it without source cells.
+
+The values are the ones that the dashboard shows, with its slicer filters. If an item has more values than its box holds, the export writes all of them and warns. Each export with a dashboard warns once that the dashboard is static in Excel. A snapshot exported without a grid has no computed values, so its dashboards are empty worksheets.
+
+The dashboard itself, with its items, pivots and charts, is saved in the Sheetwrite metadata sheet. Sheetwrite opens the file with the dashboard again; the static values are not read. Excel slicers and timelines in other files are not imported.
+
 ## Undo and collaboration
 
 `setDashboardItem` (insert or replace by ID) and `removeDashboardItem` are document operations. Each change is one undo step, and it is saved and synchronized like other sheet metadata. A slicer selection is a change of its item, so it is saved too, as Excel saves slicer state. Two concurrent changes to the same item conflict, and so do two concurrent items whose boxes overlap. A version-history restore brings the items and pivots of a dashboard back in place.
