@@ -118,6 +118,13 @@ describe("built-in widget styling", () => {
     expect(prop("--sheetwrite-toolbar-fg")).toBe(THEME.headerFg);
     expect(prop("--sheetwrite-menu-hover")).toBe(THEME.gridLine);
     expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
+    expect(prop("--sheetwrite-widget-muted")).toBe(
+      `color-mix(in srgb, ${THEME.fg} 62%, ${THEME.bg})`,
+    );
+    expect(prop("--sheetwrite-widget-muted-bg")).toBe(
+      `color-mix(in srgb, ${THEME.fg} 4%, ${THEME.bg})`,
+    );
+    expect(prop("--sheetwrite-widget-error")).toBe(`color-mix(in srgb, #d92d20 80%, ${THEME.fg})`);
   });
 
   // Contract: every widget token the stylesheets read is seeded, so no widget
