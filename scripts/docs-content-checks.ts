@@ -263,7 +263,6 @@ const SNIPPET_COMPILER_OPTIONS = {
     "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],
     "@sheetwrite/vue": ["../packages/vue/dist/index.d.ts"],
     "@sheetwrite/xlsx": ["../packages/xlsx/dist/index.d.ts"],
-    "@sheetwrite/xlsx/register": ["../packages/xlsx/dist/register.d.ts"],
   },
   skipLibCheck: false,
   strict: true,

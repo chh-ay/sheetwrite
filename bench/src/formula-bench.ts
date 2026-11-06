@@ -1966,9 +1966,23 @@ function missingCellStoreMethod(error: unknown): string | undefined {
  * fresh Bun process on Linux, `unicode-text-date-edit` takes 4.5–4.8 ms per run
  * for the first 50 ms and 1.6 ms after one second, so a 50 ms sample measured
  * tier-up timing instead of the engine (#325).
+ *
+ * `independent-first-recompute` at 10,000 formulas runs right after the
+ * 10,000-formula parse/load row, whose code is still being compiled in the
+ * background on the pinned core. Its runs take 7–10 ms until that finishes and
+ * 1.7–1.9 ms after, with no wasm memory growth; with synchronous compilation
+ * or an idle pause before the row they start at steady speed (#463).
+ *
+ * `diamond-edit` runs in about 30 µs, so its 50 ms sample falls inside the
+ * tier-up of the recompute path. A change to that path's code moved the
+ * sample's result by 10–15% under the gate (30 µs to 34 µs) while both
+ * engines ran at 29.2–29.5 µs per edit after warm-up; with 500 ms of warm-up
+ * the gate measured the same 1.007.
  */
 const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
   "workload=unicode-text-date-edit;size=1000": 1_000,
+  "workload=independent-first-recompute;size=10000": 500,
+  "workload=diamond-edit;size=32": 500,
 };
 
 /**
@@ -2900,7 +2914,7 @@ async function runBenchmark(
     baseline = readCommittedFormulaBaseline();
   }
 
-  await initSheetwrite(undefined, engine);
+  await initSheetwrite({ engine: engine });
 
   // Raw CellStore workloads use the published singleton, not core's instance.
   await engine.load();
@@ -2969,7 +2983,7 @@ async function runBenchmark(
 if (import.meta.main) {
   const sampleIndex = process.argv.indexOf("--sample");
   if (process.argv.includes("--grid-constant-edit")) {
-    await initSheetwrite(undefined, engine);
+    await initSheetwrite({ engine: engine });
     process.stdout.write(`${JSON.stringify(gridConstantEditSample(100_000))}\n`);
     process.exit(0);
   }

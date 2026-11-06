@@ -50,6 +50,12 @@ function displayParts(parts: readonly ts.SymbolDisplayPart[] | undefined): strin
 const INTERNAL_TAG_TEXT = /__(?:VLS|vls)_?\w*|__sheetwrite/;
 
 /**
+ * A `@see Name` tag directly followed by another tag comes back from the
+ * compiler with the next line's comment asterisk attached (`"Grid *"`).
+ */
+const TRAILING_COMMENT_ASTERISK = /\s+\*\s*$/;
+
+/**
  * Join JSDoc tag parts keeping link parts word-separated: quickinfo emits
  * `{text: url, kind: "linkText"}` directly against the following prose part.
  */
@@ -68,7 +74,7 @@ function tagText(parts: readonly ts.SymbolDisplayPart[] | undefined): string | u
     }
     out += part.text;
   }
-  return out;
+  return out.replace(TRAILING_COMMENT_ASTERISK, "");
 }
 
 function hoverOrigin(

@@ -3,6 +3,7 @@
 // keyboard through the menu button on each field. Each change is ONE
 // `grid.setPivot`, so it is one undo step and the output updates at once.
 
+import { scanColumnValues } from "../data-window-reads.js";
 import { Scope } from "../scope.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -31,11 +32,15 @@ import {
   baseTable,
   relatedTables,
   valuesType,
+  withMeasureValue,
   withModelField,
   type FieldFacts,
   type PivotArea,
   type PivotPlacement,
 } from "./pivot-model.js";
+
+/** The badge of a measure in the field list, as Excel marks measures with fx. */
+const MEASURE_BADGE = "fx";
 
 const TYPE_BADGES: Readonly<Record<PivotFieldType, string>> = {
   number: "Number",
@@ -101,11 +106,16 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     if (offset < 0) return [];
     // Related fields can be blank because a fact key has no matching row.
     const seen = new Set<CellScalar>(modelField ? [null] : []);
-    const col = range.start.col + offset;
-    for (let row = range.start.row; row <= range.end.row; row++) {
-      seen.add(grid.store.getCell({ sheet: range.sheet, row, col }).resolved);
-      if (seen.size > MAX_FILTER_VALUES) break;
-    }
+    const span = {
+      sheet: range.sheet,
+      col: range.start.col + offset,
+      startRow: range.start.row,
+      endRow: range.end.row,
+    };
+    scanColumnValues(grid.store, span, (value) => {
+      seen.add(value);
+      return seen.size <= MAX_FILTER_VALUES;
+    });
     return [...seen].sort(compareScalars);
   };
 
@@ -159,6 +169,58 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     const placed =
       to === "values" ? next.values.length - 1 : areaFields(next, to).lastIndexOf(added.field);
     commit(next, `${to}-${placed}-menu`);
+  };
+
+  /**
+   * One section per table that holds measures, with the measures the pivot
+   * does not show yet, as Excel's Field List lists measures under their
+   * home table. A measure goes to Values only.
+   */
+  const appendMeasures = (target: HTMLElement, pivot: PivotDefinition): void => {
+    if (baseTable(pivot.source) === undefined) return;
+    const workbook = grid.store.getWorkbook();
+    const tables = workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+    const shown = new Set(
+      pivot.values.flatMap((value) => ("measure" in value ? [value.measure] : [])),
+    );
+    for (const table of tables) {
+      const measures = (workbook.dataModel?.measures ?? []).filter(
+        (measure) => measure.table === table.id && !shown.has(measure.id),
+      );
+      if (measures.length === 0) continue;
+      const section = panelSection(`Measures: ${table.name}`);
+      const list = document.createElement("ul");
+      list.className = "sheetwrite-panel-fields";
+      list.setAttribute("aria-label", `${table.name} measures`);
+      for (const measure of measures) {
+        const item = document.createElement("li");
+        item.className = "sheetwrite-panel-field-item";
+        const name = document.createElement("span");
+        name.className = "sheetwrite-panel-field-name";
+        name.textContent = measure.name;
+        const badge = document.createElement("span");
+        badge.className = "sheetwrite-panel-badge";
+        badge.textContent = MEASURE_BADGE;
+        const menu = menuButton(
+          `${measure.name} measure actions`,
+          `measure-${measure.id}-menu`,
+          () => [
+            {
+              label: "Add to Values",
+              run: () => {
+                const next = withMeasureValue(pivot, tables, measure.id);
+                if (next !== null) commit(next, `values-${next.values.length - 1}-menu`);
+              },
+            },
+          ],
+          lifetime.signal,
+        );
+        item.append(name, badge, menu);
+        list.appendChild(item);
+      }
+      section.appendChild(list);
+      target.appendChild(section);
+    }
   };
 
   /**
@@ -280,6 +342,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     fieldSection.appendChild(fieldList);
     target.appendChild(fieldSection);
     appendRelatedTables(target, pivot);
+    appendMeasures(target, pivot);
 
     for (const [area, label] of PIVOT_AREAS) {
       target.appendChild(

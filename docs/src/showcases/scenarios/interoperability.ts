@@ -8,7 +8,7 @@
  * import/export/limit protocols the route and its browser spec both consume.
  * Everything here calls the real public `@sheetwrite/core` interchange API;
  * the optional `@sheetwrite/xlsx` codec is loaded only through
- * {@link ensureXlsxRegistered} so the package boundary stays observable.
+ * {@link installXlsx} so the package boundary stays observable.
  */
 
 import type {
@@ -41,6 +41,7 @@ import libreofficeRichUrl from "../../../../packages/xlsx/test/fixtures/libreoff
 import fixtureManifest from "../../../../packages/xlsx/test/fixtures/manifest.json";
 import positiveUrl from "../../../../packages/xlsx/test/fixtures/sheetwrite-libreoffice-positive.xlsx?url";
 import traversalUrl from "../../../../packages/xlsx/test/fixtures/traversal.xlsx?url";
+import { installXlsx } from "../../lib/addons.js";
 import { errorText } from "../../lib/errors.js";
 
 export const INTEROP_ORDERS_SHEET = "orders";
@@ -436,14 +437,6 @@ export async function probeXlsxRegistration(): Promise<{
   }
 }
 
-/**
- * Load and register the optional XLSX codec. Dynamic on purpose: the chunk
- * boundary IS the package boundary this capability demonstrates.
- */
-export async function ensureXlsxRegistered(): Promise<void> {
-  await import("@sheetwrite/xlsx/register");
-}
-
 export interface InteropFixture {
   id: string;
   file: string;
@@ -576,7 +569,7 @@ export async function importWorkbook(
   bytes: ArrayBuffer | Uint8Array,
   options: Omit<XlsxWorkbookOptions, "onWarning"> = {},
 ): Promise<WorkbookImportOutcome> {
-  await ensureXlsxRegistered();
+  await installXlsx();
   const warnings: XlsxWorkbookWarning[] = [];
   const snapshot = await fromXlsxWorkbook(bytes, {
     ...options,
@@ -594,7 +587,7 @@ export interface WorkbookExportOutcome {
 export async function exportWorkbook(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
 ): Promise<WorkbookExportOutcome> {
-  await ensureXlsxRegistered();
+  await installXlsx();
   const warnings: XlsxWorkbookWarning[] = [];
   const bytes = await toXlsxWorkbook(input, { onWarning: (warning) => warnings.push(warning) });
   return { bytes, warnings };
@@ -1014,7 +1007,7 @@ export async function expectRejection(
   bytes: Uint8Array,
   options: XlsxWorkbookOptions = {},
 ): Promise<RejectionReport> {
-  await ensureXlsxRegistered();
+  await installXlsx();
   try {
     await fromXlsxWorkbook(bytes, options);
     return { rejected: false, errorName: null, message: null };

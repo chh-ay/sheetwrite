@@ -4,29 +4,26 @@
 // Nothing here runs for a store until a caller resolves or subscribes, so
 // workbooks without charts pay nothing.
 
-import { chartSourceRanges } from "./chart-definition.js";
+import { MAX_CHART_POINTS } from "./chart-definition.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
 import type {
+  ChartCategoryLevel,
   ChartChangeEvent,
   ChartChangeListener,
   ChartDefinition,
+  ChartKind,
   ChartRange,
   ChartRef,
   ChartSeries,
+  ChartSeriesView,
   ChartView,
 } from "./types/chart.js";
 import type { Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet } from "./types/document.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
-
-/**
- * Most points resolved per series range. Cells are read in row-major order and
- * cells past this count are dropped; the series view reports `truncated`.
- */
-export const MAX_CHART_POINTS = 10_000;
 
 /** Inclusive rectangle actually read for one series range, after bounds and point limits. */
 interface ReadRect {
@@ -43,6 +40,8 @@ interface RangeRead {
   readonly formats: Array<string | null>;
   readonly locale: string | null;
   readonly truncated: boolean;
+  /** Columns per row of `values`. */
+  readonly width: number;
 }
 
 const EMPTY_READ: RangeRead = Object.freeze({
@@ -50,10 +49,43 @@ const EMPTY_READ: RangeRead = Object.freeze({
   formats: [],
   locale: null,
   truncated: false,
+  width: 0,
 });
 
-/** Clip a range to its sheet and to the rows that hold the first `MAX_CHART_POINTS` cells. */
-function readRect(sheets: ReadonlyMap<SheetId, Sheet>, range: ChartRange): ReadRect | null {
+/** How a category range holds its levels: one per column or one per row. */
+type CategoryLevelLayout = "columns" | "rows";
+
+/**
+ * How the categories of `series` hold levels, or null when they have one
+ * level. As in Excel, a category range of several rows and several columns
+ * holds one level per column when the values run down a column, and one
+ * level per row when the values run along a row. Scatter charts read X
+ * values, which have no levels.
+ */
+function categoryLevelLayout(kind: ChartKind, series: ChartSeries): CategoryLevelLayout | null {
+  const { categories, values } = series;
+  if (kind === "scatter" || categories === undefined || categories === "#REF!") return null;
+  if (categories.start.row === categories.end.row || categories.start.col === categories.end.col) {
+    return null;
+  }
+
+  const alongRow =
+    values !== "#REF!" &&
+    values.start.row === values.end.row &&
+    values.start.col !== values.end.col;
+  return alongRow ? "rows" : "columns";
+}
+
+/**
+ * Clip a range to its sheet and to the rows that hold the first
+ * `MAX_CHART_POINTS` cells. With `allRows`, the columns are clipped first so
+ * that every row fits, because each row is one category level.
+ */
+function readRect(
+  sheets: ReadonlyMap<SheetId, Sheet>,
+  range: ChartRange,
+  allRows = false,
+): ReadRect | null {
   if (range === "#REF!") return null;
 
   const sheet = sheets.get(range.sheet);
@@ -63,14 +95,18 @@ function readRect(sheets: ReadonlyMap<SheetId, Sheet>, range: ChartRange): ReadR
   const c0 = Math.min(range.start.col, range.end.col);
   const lastRow = Math.min(Math.max(range.start.row, range.end.row), sheet.rowCount - 1);
   const lastCol = Math.min(Math.max(range.start.col, range.end.col), sheet.columns.length - 1);
-  const c1 = Math.min(lastCol, c0 + MAX_CHART_POINTS - 1);
+  const rowCount = lastRow - r0 + 1;
+  const maxWidth = allRows
+    ? Math.max(1, Math.floor(MAX_CHART_POINTS / rowCount))
+    : MAX_CHART_POINTS;
+  const c1 = Math.min(lastCol, c0 + maxWidth - 1);
   if (r0 > lastRow || c0 > c1) return null;
 
   // Row-major truncation keeps whole leading rows plus a partial last row.
   const width = c1 - c0 + 1;
   const rowsNeeded = Math.ceil(MAX_CHART_POINTS / width);
   const r1 = Math.min(lastRow, r0 + rowsNeeded - 1);
-  const truncated = (lastRow - r0 + 1) * (lastCol - c0 + 1) > MAX_CHART_POINTS;
+  const truncated = rowCount * (lastCol - c0 + 1) > MAX_CHART_POINTS;
   return { sheet, r0, r1, c0, c1, truncated };
 }
 
@@ -80,13 +116,17 @@ function sheetMap(store: Store): Map<SheetId, Sheet> {
   return sheets;
 }
 
-/** One bulk window read per range; never one read per cell. */
+/**
+ * One bulk window read per range; never one read per cell. `allRows` reads
+ * every row of the range, as `readRect` does.
+ */
 function readRange(
   store: Store,
   sheets: ReadonlyMap<SheetId, Sheet>,
   range: ChartRange,
+  allRows = false,
 ): RangeRead {
-  const rect = readRect(sheets, range);
+  const rect = readRect(sheets, range, allRows);
   if (!rect) return EMPTY_READ;
 
   const sheet = rect.sheet;
@@ -115,7 +155,65 @@ function readRange(
   }
 
   const locale = sheet.columns[rect.c0]?.numberLocale ?? null;
-  return { values, formats, locale, truncated: rect.truncated };
+  return { values, formats, locale, truncated: rect.truncated, width };
+}
+
+/** The categories of a series view: the innermost level and the outer levels. */
+type CategoryView = Pick<ChartSeriesView, "categories" | "categoryFormats" | "categoryLevels">;
+
+/**
+ * Split a category read into levels, one per column or one per row of the
+ * read. The last column (or row) is the innermost level and labels each
+ * point. A partial last row of a truncated read is dropped.
+ */
+function categoryLevels(read: RangeRead, layout: CategoryLevelLayout): CategoryView {
+  const width = read.width;
+  const rows = Math.floor(read.values.length / Math.max(1, width));
+  const levelCount = layout === "columns" ? width : rows;
+  const points = layout === "columns" ? rows : width;
+  const levels: ChartCategoryLevel[] = [];
+
+  for (let level = 0; level < levelCount; level++) {
+    const labels = new Array<CellScalar>(points);
+    const formats = new Array<string | null>(points);
+    for (let point = 0; point < points; point++) {
+      const cell = layout === "columns" ? point * width + level : level * width + point;
+      labels[point] = read.values[cell] ?? null;
+      formats[point] = read.formats[cell] ?? null;
+    }
+    levels.push({ labels, formats });
+  }
+
+  const inner = levels.pop();
+  return {
+    categories: inner?.labels ?? [],
+    categoryFormats: inner?.formats ?? [],
+    categoryLevels: levels,
+  };
+}
+
+/** The categories of `source` in a chart of `kind`, with their levels. */
+function readCategories(
+  store: Store,
+  sheets: ReadonlyMap<SheetId, Sheet>,
+  kind: ChartKind,
+  source: ChartSeries,
+): CategoryView & { truncated: boolean } {
+  if (source.categories === undefined) {
+    return { categories: [], categoryFormats: [], categoryLevels: [], truncated: false };
+  }
+
+  const layout = categoryLevelLayout(kind, source);
+  const read = readRange(store, sheets, source.categories, layout === "rows");
+  if (layout === null) {
+    return {
+      categories: read.values,
+      categoryFormats: read.formats,
+      categoryLevels: [],
+      truncated: read.truncated,
+    };
+  }
+  return { ...categoryLevels(read, layout), truncated: read.truncated };
 }
 
 function seriesName(
@@ -141,11 +239,58 @@ function seriesName(
   return `Series ${index + 1}`;
 }
 
+/** Builds the view of a chart over a pivot; set by the pivot view chunk when it loads. */
+let pivotCharts: ((store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView) | null =
+  null;
+
+/** Engines whose pivot views are computed or loading, so each asks for them once. */
+const pivotEngines = new WeakSet<StoreDataEngine>();
+
+/**
+ * Set how charts over pivots resolve, after the engine of `store` computed
+ * its pivot views. The listeners of `store` hear that its charts over pivots
+ * changed. The pivot view chunk calls it.
+ */
+export function setPivotChartViews(
+  store: Store,
+  views: (store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView,
+): void {
+  pivotCharts = views;
+  TRACKERS.get(store)?.pivotViewsChanged();
+}
+
+/**
+ * Load the pivot view chunk and let the engine of `store` compute the pivot
+ * views, once per engine. A failed load tries again at the next request. A
+ * store disposed while the chunk loads is not called again.
+ */
+function requestPivotViews(store: Store): void {
+  const engine = storeEngine(store);
+  if (engine === null || pivotEngines.has(engine)) return;
+
+  pivotEngines.add(engine);
+  void import("./dashboard/dashboard-engine.js").then(
+    (module) => {
+      if (engine.isDisposed) return;
+      module.applyPivotViews(store, []);
+      setPivotChartViews(store, module.pivotChartViewOf);
+    },
+    (error: unknown) => {
+      pivotEngines.delete(engine);
+      throw error;
+    },
+  );
+}
+
 /**
  * Resolve one chart to plain data the renderer draws without reading cells.
  * Values that are not numbers (text, booleans, errors, empty cells) become
  * `null`. Each series range costs one bulk window read of at most
  * `MAX_CHART_POINTS` cells. Returns `null` when the chart does not exist.
+ *
+ * A chart over a pivot reads the pivot's leaf items from a pivot view. The
+ * first such chart loads the code for it; until then the chart has no
+ * series, and a change event names it when it loads.
  *
  * Call it after a {@link subscribeChartChanges} event names the chart, not per frame.
  */
@@ -153,17 +298,22 @@ export function resolveChartView(store: Store, sheet: SheetId, id: string): Char
   const sheets = sheetMap(store);
   const chart = sheets.get(sheet)?.charts?.find((candidate) => candidate.id === id);
   if (!chart) return null;
+  if (chart.pivot !== undefined) {
+    requestPivotViews(store);
+    return pivotCharts?.(store, sheet, chart) ?? { chart, series: [] };
+  }
 
-  const series = chart.series.map((source, index) => {
+  const series = chart.series.map((source, index): ChartSeriesView => {
     const values = readRange(store, sheets, source.values);
-    const categories = source.categories ? readRange(store, sheets, source.categories) : EMPTY_READ;
+    const categories = readCategories(store, sheets, chart.kind, source);
 
     return {
       name: seriesName(store, sheets, source, index),
       values: values.values.map((value) => (typeof value === "number" ? value : null)),
-      categories: categories.values,
+      categories: categories.categories,
+      categoryLevels: categories.categoryLevels,
       numberFormats: values.formats,
-      categoryFormats: categories.formats,
+      categoryFormats: categories.categoryFormats,
       numberLocale: values.locale,
       truncated: values.truncated || categories.truncated,
       referenceError:
@@ -244,6 +394,8 @@ class ChartIndex {
   readonly owned = new Map<SheetId, number[]>();
   /** Charts that read a formula, reference, spill or pivot output; any value change may move them. */
   readonly computed: number[] = [];
+  /** Charts over pivots; they also change when the pivot views are computed again. */
+  readonly pivots: ChartRef[] = [];
 
   constructor(store: Store) {
     const sheets = sheetMap(store);
@@ -253,13 +405,20 @@ class ChartIndex {
     for (const sheet of sheets.values()) {
       for (const definition of sheet.charts ?? []) {
         const chart = this.charts.length;
-        this.charts.push({ sheet: sheet.id, id: definition.id });
+        const ref = { sheet: sheet.id, id: definition.id };
+        this.charts.push(ref);
 
         const owned = this.owned.get(sheet.id);
         if (owned) owned.push(chart);
         else this.owned.set(sheet.id, [chart]);
 
-        if (this.addSources(definition, chart, sheets, entries, engine)) this.computed.push(chart);
+        if (definition.pivot !== undefined) {
+          // A chart over a pivot reads the pivot's result.
+          this.pivots.push(ref);
+          this.computed.push(chart);
+        } else if (this.addSources(definition, chart, sheets, entries, engine)) {
+          this.computed.push(chart);
+        }
       }
     }
 
@@ -276,22 +435,27 @@ class ChartIndex {
   ): boolean {
     let computed = false;
 
-    for (const range of chartSourceRanges(definition)) {
-      const rect = readRect(sheets, range);
-      if (!rect) continue;
+    for (const series of definition.series) {
+      // Category levels in rows are read with every row, so the index covers the same cells.
+      const levelRows = categoryLevelLayout(definition.kind, series) === "rows";
+      for (const range of [series.nameRange, series.values, series.categories]) {
+        if (range === undefined) continue;
+        const rect = readRect(sheets, range, levelRows && range === series.categories);
+        if (!rect) continue;
 
-      const list = entries.get(rect.sheet.id);
-      if (list) list.push({ rect, chart });
-      else entries.set(rect.sheet.id, [{ rect, chart }]);
+        const list = entries.get(rect.sheet.id);
+        if (list) list.push({ rect, chart });
+        else entries.set(rect.sheet.id, [{ rect, chart }]);
 
-      // One bulk source capture per range, only while no earlier range answered.
-      computed ||=
-        engine === null ||
-        engine.chartSourcesComputed({
-          sheet: rect.sheet.id,
-          start: { row: rect.r0, col: rect.c0 },
-          end: { row: rect.r1, col: rect.c1 },
-        });
+        // One bulk source capture per range, only while no earlier range answered.
+        computed ||=
+          engine === null ||
+          engine.chartSourcesComputed({
+            sheet: rect.sheet.id,
+            start: { row: rect.r0, col: rect.c0 },
+            end: { row: rect.r1, col: rect.c1 },
+          });
+      }
     }
 
     return computed;
@@ -447,7 +611,8 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
-      // Formula results can depend on names, calculation settings and sheet identity/order.
+    case "setExternalLinks":
+      // Formula results can depend on names, calculation settings, linked values and sheet identity/order.
       context.valuesChanged = true;
       return;
 
@@ -504,6 +669,18 @@ class ChartTracker {
 
   dispose(): void {
     this.detach();
+  }
+
+  /**
+   * Name every chart over a pivot: the pivot views they read were computed
+   * again with no commit, so the event has no epoch.
+   */
+  pivotViewsChanged(): void {
+    const charts = this.index.pivots;
+    if (charts.length === 0) return;
+
+    const event: ChartChangeEvent = { epoch: undefined, charts: [...charts] };
+    for (const listener of this.listeners) listener(event);
   }
 
   private onChange(event: ChangeEvent): void {

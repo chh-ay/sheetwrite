@@ -11,7 +11,11 @@
 import { resolve } from "node:path";
 
 import { siteDataFiles } from "./docs-site-data.js";
-import { loadFormulaContractInventory, renderFormulaFunctionPages } from "./formula-docs.js";
+import {
+  loadFormulaContractInventory,
+  loadFormulaReferenceEntries,
+  renderFormulaFunctionPages,
+} from "./formula-docs.js";
 import { generateFunctionMetadata } from "./function-metadata.js";
 import { analyzePublicApi } from "./public-api.js";
 import { writeIfChanged } from "./script-io.js";
@@ -25,6 +29,7 @@ async function runDocs(mode: string | undefined): Promise<string> {
   const analysis = await analyzePublicApi(repositoryRoot);
   const formulaPages = renderFormulaFunctionPages(
     await loadFormulaContractInventory(repositoryRoot),
+    await loadFormulaReferenceEntries(repositoryRoot),
   );
   for (const file of siteDataFiles(analysis.manifest, formulaPages)) {
     await writeIfChanged(file.path, file.content);

@@ -287,7 +287,10 @@
   position: absolute;
   top: 50%;
   right: 8px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -318,7 +321,10 @@
   height: 30px;
   padding: 0;
   border-radius: 6px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
 }
 
 .sheetwrite-find-icon-btn:hover {
@@ -447,7 +453,8 @@
 
 /* Tabs keep their width and the list scrolls sideways when they do not fit,
    so a narrow ribbon never puts tabs under the layout buttons. Focusing a tab
-   (arrow keys, Tab) scrolls it into view, so the bar itself can stay hidden. */
+   (arrow keys, Tab) scrolls it into view, clear of the edge fades below, so
+   the bar itself can stay hidden. */
 .sheetwrite-ribbon-tablist {
   display: flex;
   align-items: flex-end;
@@ -456,11 +463,32 @@
   height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  scroll-padding-inline: 30px;
   scrollbar-width: none;
 }
 
 .sheetwrite-ribbon-tablist::-webkit-scrollbar {
   display: none;
+}
+
+/* A hidden end fades out and its last 6px stay clear, so a cut tab label never
+   runs into the layout buttons beside it. */
+.sheetwrite-ribbon-tablist[data-overflow="end"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent calc(100% - 6px));
+}
+
+.sheetwrite-ribbon-tablist[data-overflow="start"] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 30px), transparent calc(100% - 6px));
+}
+
+.sheetwrite-ribbon-tablist[data-overflow="both"] {
+  mask-image: linear-gradient(
+    to right,
+    transparent 6px,
+    #000 30px,
+    #000 calc(100% - 30px),
+    transparent calc(100% - 6px)
+  );
 }
 
 .sheetwrite-ribbon-tab {
@@ -568,7 +596,10 @@
 
 .sheetwrite-ribbon-group-label {
   padding: 2px 0;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 11px;
   line-height: 14px;
   text-align: center;
@@ -801,7 +832,8 @@
 }
 
 .sheetwrite-ribbon-combo-input[aria-invalid="true"] {
-  outline: 2px solid var(--sheetwrite-widget-error, #b42318);
+  outline: 2px solid
+    var(--sheetwrite-widget-error, color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg)));
 }
 
 .sheetwrite-ribbon-combo-arrow {
@@ -983,7 +1015,10 @@
 
 .sheetwrite-ribbon-palette-heading {
   padding: 4px 2px 0;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 11px;
 }
 
@@ -1032,7 +1067,10 @@
 
 /* A field the current choice does not use reads as off, label included. */
 .sheetwrite-ribbon-form label:has(> .sheetwrite-ribbon-field:disabled) {
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
 }
 
 .sheetwrite-ribbon-field {
@@ -1049,7 +1087,10 @@
 }
 
 .sheetwrite-ribbon-field::placeholder {
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
 }
 
 .sheetwrite-ribbon-field:focus {
@@ -1070,7 +1111,10 @@ textarea.sheetwrite-ribbon-field {
 
 .sheetwrite-ribbon-form-error {
   margin: 0;
-  color: var(--sheetwrite-widget-error, #b42318);
+  color: var(
+    --sheetwrite-widget-error,
+    color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg))
+  );
 }
 
 /* The form's one action: the accent border and weight mark it as the default
@@ -1283,7 +1327,10 @@ textarea.sheetwrite-ribbon-field {
 
 .sheetwrite-panel-heading {
   margin: 4px 0 0;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -1323,7 +1370,10 @@ textarea.sheetwrite-ribbon-field {
 
 .sheetwrite-panel-label {
   padding: 0;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 11px;
 }
 
@@ -1340,21 +1390,33 @@ textarea.sheetwrite-ribbon-field {
 }
 
 .sheetwrite-panel-control[aria-invalid="true"] {
-  border-color: var(--sheetwrite-widget-error, #b42318);
+  border-color: var(
+    --sheetwrite-widget-error,
+    color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg))
+  );
 }
 
 .sheetwrite-panel-error {
-  color: var(--sheetwrite-widget-error, #b42318);
+  color: var(
+    --sheetwrite-widget-error,
+    color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg))
+  );
   font-size: 11px;
 }
 
 .sheetwrite-panel-note {
   margin: 0 0 8px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
 }
 
 .sheetwrite-panel-note[role="alert"] {
-  color: var(--sheetwrite-widget-error, #b42318);
+  color: var(
+    --sheetwrite-widget-error,
+    color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg))
+  );
 }
 
 .sheetwrite-panel-kinds {
@@ -1441,13 +1503,19 @@ textarea.sheetwrite-ribbon-field {
   padding: 0 4px;
   border-radius: 4px;
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 11px;
 }
 
 .sheetwrite-panel-area-empty {
   padding: 6px 4px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 11px;
 }
 
@@ -1510,7 +1578,10 @@ textarea.sheetwrite-ribbon-field {
 }
 
 .sheetwrite-panel-menu-item[aria-disabled="true"] {
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   cursor: default;
 }
 
@@ -1580,7 +1651,10 @@ textarea.sheetwrite-ribbon-field {
   justify-content: center;
   width: 16px;
   height: 16px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
 }
 
 .sheetwrite-context-menu-label {
@@ -1589,7 +1663,10 @@ textarea.sheetwrite-ribbon-field {
 
 .sheetwrite-context-menu-shortcut {
   margin-left: 24px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   font-size: 0.9em;
 }
 
@@ -2431,7 +2508,10 @@ textarea.sheetwrite-ribbon-field {
   overflow: auto;
   padding: 12px;
   box-sizing: border-box;
-  background: var(--sheetwrite-widget-muted-bg, #f6f7f9);
+  background: var(
+    --sheetwrite-widget-muted-bg,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 4%, var(--sheetwrite-widget-bg))
+  );
   color: var(--sheetwrite-widget-fg, #111111);
   font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
 }
@@ -2492,6 +2572,34 @@ textarea.sheetwrite-ribbon-field {
   padding: 6px 8px;
 }
 
+/* A KPI card shows one value, large, in the middle of its box. */
+.sheetwrite-dashboard-kpi {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A KPI card shows one value, large, in the middle of its box. */
+.sheetwrite-dashboard-kpi {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The chart renderer sizes its drawing to the whole body. */
+.sheetwrite-dashboard-item-body.sheetwrite-dashboard-chart {
+  overflow: hidden;
+  padding: 0;
+}
+
 .sheetwrite-dashboard-resize {
   position: absolute;
   right: 0;
@@ -2514,7 +2622,10 @@ textarea.sheetwrite-ribbon-field {
 }
 
 .sheetwrite-dashboard-preview[data-taken="true"] {
-  border-color: var(--sheetwrite-widget-error, #b42318);
+  border-color: var(
+    --sheetwrite-widget-error,
+    color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg))
+  );
 }
 
 .sheetwrite-dashboard-pivot {
@@ -2563,7 +2674,10 @@ textarea.sheetwrite-ribbon-field {
 .sheetwrite-dashboard-empty,
 .sheetwrite-dashboard-note {
   margin: 0 0 8px;
-  color: var(--sheetwrite-widget-muted, #6b7280);
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
 }
 
 /* A value field's Number Format form in the pivot field list. */
@@ -2577,4 +2691,13 @@ textarea.sheetwrite-ribbon-field {
 .sheetwrite-panel-format input {
   flex: 1;
   min-width: 0;
+}
+
+/* A slicer value that no row has under the other slicers, as Excel dims it. */
+.sheetwrite-dashboard-slicer-value[data-no-data] {
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 45%, var(--sheetwrite-widget-bg))
+  );
+  border-style: dashed;
 }

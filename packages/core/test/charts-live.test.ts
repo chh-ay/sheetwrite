@@ -1,7 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
-import { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "../src/charts-live.js";
-import { initSheetwrite } from "../src/grid.js";
+import { MAX_CHART_POINTS } from "../src/chart-definition.js";
+import { resolveChartView, subscribeChartChanges } from "../src/charts-live.js";
+import { createGrid, initSheetwrite } from "../src/grid.js";
 import type {
   ChartChangeEvent,
   ChartDefinition,
@@ -10,6 +11,8 @@ import type {
   Workbook,
 } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
+import { storeEngine } from "../src/store/engine-registry.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import { range, sheet } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -314,6 +317,56 @@ describe("chart change events for pivot output", () => {
   });
 });
 
+it("plots the leaf items of worksheet pivots on the full engine, in its own process", async () => {
+  // Engine selection is process-wide, so the full-engine checks run apart.
+  const probe = Bun.spawn(
+    [process.execPath, "test", "./packages/core/test/pivot-chart.full-engine.ts"],
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+  );
+  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+
+  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+    exitCode: 0,
+    failures: [],
+  });
+});
+
+it("calls no engine when its grid is destroyed while the pivot views load", async () => {
+  const restore = installCanvasTestStubs();
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const pivotChart: ChartDefinition = {
+    ...chart("over-pivot", range("data", 0, 1, 1, 1)),
+    series: [],
+    pivot: "sales",
+  };
+  const grid = createGrid(host, {
+    workbook: { activeSheet: "data", sheets: [{ ...sheet("data"), charts: [pivotChart] }] },
+  });
+  const engine = storeEngine(grid.store);
+  if (engine === null) throw new Error("the grid's store has no engine");
+  const calls: string[] = [];
+  engine.setPivotView = () => {
+    calls.push("setPivotView");
+  };
+
+  try {
+    // The first resolve of a chart over a pivot starts loading the pivot views.
+    resolveChartView(grid.store, "data", "over-pivot");
+    grid.destroy();
+    await import("../src/dashboard/dashboard-engine.js");
+    // One macrotask turn runs every microtask queued by the load, including its callback.
+    const { promise: turn, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, 0);
+    await turn;
+
+    expect(calls).toEqual([]);
+  } finally {
+    host.remove();
+    restore();
+  }
+});
+
 describe("resolveChartView", () => {
   it("resolves values, categories and number formats as plain data", () => {
     const { store } = setup();
@@ -340,6 +393,7 @@ describe("resolveChartView", () => {
         name: "Series 1",
         values: [10, null],
         categories: ["Q1", "Q2"],
+        categoryLevels: [],
         // The cell style wins over the column format, as in the painted grid.
         numberFormats: ["0.0%", "#,##0"],
         categoryFormats: ["@", "@"],
@@ -348,6 +402,76 @@ describe("resolveChartView", () => {
         referenceError: false,
       },
     ]);
+  });
+
+  it("reads a category range of several columns as one level per column, the last innermost", () => {
+    const { store, events } = setup();
+    apply(store, [
+      set("data", 3, 0, "East"),
+      set("data", 5, 0, "West"),
+      ...["Retail", "Online", "Retail", "Online"].map((segment, index) =>
+        set("data", 3 + index, 1, segment),
+      ),
+      ...[1, 2, 3, 4].map((value, index) => set("data", 3 + index, 2, value)),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: chart("levels", range("data", 3, 2, 6, 2), range("data", 3, 0, 6, 1)),
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "levels")?.series[0];
+    expect(series?.values).toEqual([1, 2, 3, 4]);
+    expect(series?.categories).toEqual(["Retail", "Online", "Retail", "Online"]);
+    // A blank outer cell continues the group above it, as in Excel.
+    expect(series?.categoryLevels.map((level) => level.labels)).toEqual([
+      ["East", null, "West", null],
+    ]);
+
+    // An edit of an outer label redraws the chart.
+    events.length = 0;
+    apply(store, [set("data", 4, 0, "North")]);
+    expect(events[0]?.charts).toContainEqual({ sheet: "data", id: "levels" });
+    expect(resolveChartView(store, "data", "levels")?.series[0]?.categoryLevels[0]?.labels).toEqual(
+      ["East", "North", "West", null],
+    );
+  });
+
+  it("reads a category range of several rows as one level per row when the values run along a row", () => {
+    const { store } = setup();
+    apply(store, [
+      set("data", 5, 0, 2024),
+      set("data", 5, 2, 2025),
+      ...["H1", "H2", "H1", "H2"].map((half, col) => set("data", 6, col, half)),
+      ...[1, 2, 3, 4].map((value, col) => set("data", 7, col, value)),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: chart("rows", range("data", 7, 0, 7, 3), range("data", 5, 0, 6, 3)),
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "rows")?.series[0];
+    expect(series?.categories).toEqual(["H1", "H2", "H1", "H2"]);
+    expect(series?.categoryLevels.map((level) => level.labels)).toEqual([[2024, null, 2025, null]]);
+  });
+
+  it("keeps one category level for a scatter chart, whose categories are x values", () => {
+    const { store } = setup();
+    apply(store, [
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: {
+          ...chart("xy", range("data", 0, 2, 1, 2), range("data", 0, 0, 1, 1)),
+          kind: "scatter",
+        },
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "xy")?.series[0];
+    expect(series?.categories).toEqual(["Q1", 10, "Q2", 20]);
+    expect(series?.categoryLevels).toEqual([]);
   });
 
   it("reads the first nameRange cell and follows edits to that label", () => {

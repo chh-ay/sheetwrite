@@ -1154,12 +1154,23 @@ pub(crate) fn number_matches_text(
     case_insensitive: bool,
     whole_cell: bool,
 ) -> bool {
+    // A finite number's text has only digits, `-` and `.`, none of which
+    // has a case: a needle with any other character cannot match it, so the
+    // number is not written out.
+    if value.is_finite() && !needle.bytes().all(is_number_text_byte) {
+        return false;
+    }
+
     matches_needle(
         NumberText::of(value).as_str(),
         needle,
         case_insensitive,
         whole_cell,
     )
+}
+
+fn is_number_text_byte(byte: u8) -> bool {
+    byte.is_ascii_digit() || byte == b'-' || byte == b'.'
 }
 
 /// Number of direct-mapped slots in [`MatchCache`]. A power of two so the slot

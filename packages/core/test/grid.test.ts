@@ -23,10 +23,16 @@ import type {
   RowData,
   Store,
   Workbook,
+  XlsxTableExportBackend,
 } from "../src/types.js";
-import type { XlsxTableExportBackend } from "../src/xlsx-bridge.js";
-import { setXlsxTableExportBackend } from "../src/xlsx-bridge.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
+import {
+  keepXlsxSlots,
+  makeColumnarData,
+  makeWorkbook,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -67,12 +73,17 @@ function makeFakeStore(
 
 let restoreStubs: () => void;
 
+/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
+let restoreXlsxSlots = keepXlsxSlots();
+
 beforeEach(() => {
   restoreStubs = installCanvasTestStubs();
+  restoreXlsxSlots = keepXlsxSlots();
 });
 
 afterEach(() => {
   restoreStubs();
+  restoreXlsxSlots();
 });
 
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
@@ -110,16 +121,6 @@ function typeIntoFocusedCell(host: HTMLElement, value: string, key = "Enter"): v
   const editor = expectEditor(host);
   editor.value = value;
   editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  expect(node).toBeInstanceOf(HTMLDivElement);
-  if (!(node instanceof HTMLDivElement)) {
-    throw new Error("expected grid scroller");
-  }
-
-  return node;
 }
 
 function cellPoint(
@@ -1093,7 +1094,7 @@ describe("Grid.setMinColumns", () => {
       },
     };
 
-    setXlsxTableExportBackend(null as never);
+    setXlsxTableExportBackend(null);
     await expect(grid.exportXlsx("missing.xlsx")).rejects.toMatchObject({
       code: "optional-backend-unavailable",
       operation: "xlsx-export",
@@ -1109,7 +1110,6 @@ describe("Grid.setMinColumns", () => {
       expect(receivedStore).toBe(store);
       expect(actionErrors).toEqual([]);
     } finally {
-      setXlsxTableExportBackend(null as never);
       grid.destroy();
     }
   });
@@ -1158,7 +1158,6 @@ describe("Grid.setMinColumns", () => {
       grid.setActiveSheet("inactive");
       await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(IncompleteDataError);
     } finally {
-      setXlsxTableExportBackend(null as never);
       grid.destroy();
       store.dispose();
     }
@@ -1607,11 +1606,11 @@ describe("transactional document metadata", () => {
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
 
     grid.renameSheet("source", "Sales Data");
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
     grid.undo();
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(Sales!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Sales!A1+1");
     grid.redo();
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
 
     grid.moveSheet("source", 1);
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "source", "notes"]);
@@ -1620,11 +1619,11 @@ describe("transactional document metadata", () => {
 
     grid.removeSheet("source");
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(#REF!+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
     grid.undo();
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
     grid.redo();
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);

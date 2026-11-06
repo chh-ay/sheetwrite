@@ -67,6 +67,7 @@ export function seriesView(
     name,
     values,
     categories: [],
+    categoryLevels: [],
     numberFormats: values.map(() => null),
     categoryFormats: [],
     numberLocale: null,

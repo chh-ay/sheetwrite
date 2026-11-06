@@ -125,6 +125,7 @@ export class Ribbon {
     this.tabList.setAttribute("role", "tablist");
     this.tabList.setAttribute("aria-label", "Ribbon tabs");
     this.tabSpecs.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
+    this.tabList.addEventListener("scroll", this.updateTabOverflow, { passive: true });
 
     this.modeButton = document.createElement("button");
     this.modeButton.type = "button";
@@ -158,6 +159,8 @@ export class Ribbon {
     this.lifetime.add(
       onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
     );
+    // Some commands depend on the document, such as Edit Links on its links.
+    this.lifetime.add(grid.on("change", () => this.updateAvailability()));
     // Absent in some test environments; the ribbon then never shrinks groups.
     if (typeof ResizeObserver === "function") {
       const resizeObserver = new ResizeObserver(() => this.scheduleFit());
@@ -417,9 +420,24 @@ export class Ribbon {
     if (this.fitFrame !== 0 || this.lifetime.closed) return;
     this.fitFrame = requestAnimationFrame(() => {
       this.fitFrame = 0;
+      this.updateTabOverflow();
       this.fit();
     });
   }
+
+  /**
+   * Mark which ends of the tab list hide tabs, so the stylesheet fades those
+   * edges instead of cutting a tab label off beside the layout buttons.
+   */
+  private readonly updateTabOverflow = (): void => {
+    const list = this.tabList;
+    const hiddenBefore = list.scrollLeft > 0;
+    const hiddenAfter = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+    if (hiddenBefore && hiddenAfter) list.dataset.overflow = "both";
+    else if (hiddenBefore) list.dataset.overflow = "start";
+    else if (hiddenAfter) list.dataset.overflow = "end";
+    else delete list.dataset.overflow;
+  };
 
   private updateLayout(): void {
     const compact =

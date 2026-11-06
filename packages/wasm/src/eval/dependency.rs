@@ -10,7 +10,7 @@ use crate::graph::{offset_or_search, DirtyRect, DirtySeeds, FORMULA_INDEX_PAGE_R
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
-    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, Value, FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, FORMULA_RECURSION_LIMIT,
 };
 
 /// Queued formula changes always patch the index below this count. Above it, a
@@ -326,6 +326,11 @@ impl DepIndex {
             edges.add_vec::<CellRange>(reads.ranges.len(), reads.ranges.capacity());
         }
         (nodes, edges)
+    }
+
+    /// Whether any formula reads another formula through its static reads.
+    pub(super) fn has_formula_dependencies(&self) -> bool {
+        self.has_formula_dependencies
     }
 
     pub(super) fn has_dynamic_arrays(&self) -> bool {
@@ -1303,16 +1308,24 @@ fn seed_depth_errors(
 
     with_group_marks(index, |ranges| {
         let mut walk = DependencyDepthWalk::new(sheets, slots, index, affected, ranges);
+        // The pass evaluates formulas as the walk finishes them, after
+        // every formula they read.
+        walk.order = std::mem::take(&mut results.order);
+        walk.order.clear();
         let mut found_cycle = false;
+        // Roots in column-major order: the walk finishes each formula after
+        // the formulas it reads, which is the order the pass evaluates.
         for node in 0..walk.formulas.len() {
             let id = walk.formulas[node].1;
             if let Err(error) = walk.depth(node) {
                 found_cycle |= error == FormulaError::Cycle;
-                if !preserve_results || results.get(id).is_none() {
-                    results.insert(id, Value::Error(error));
+                if !preserve_results || !results.has(id) {
+                    results.seeded.push((id, error));
                 }
             }
         }
+        results.order = std::mem::take(&mut walk.order);
+        results.ordered = true;
         found_cycle
     })
 }
@@ -1516,6 +1529,8 @@ struct DependencyDepthWalk<'a> {
     /// Parallel to `ranges.members`.
     range_states: Vec<NodeDepth>,
     stack: Vec<DependencyFrame<'a>>,
+    /// Formulas that finished without an error, each after the formulas it reads.
+    order: Vec<FormulaId>,
 }
 
 impl<'a> DependencyDepthWalk<'a> {
@@ -1546,6 +1561,7 @@ impl<'a> DependencyDepthWalk<'a> {
             ranges,
             range_states: Vec::new(),
             stack: Vec::new(),
+            order: Vec::new(),
         }
     }
 
@@ -1617,6 +1633,9 @@ impl<'a> DependencyDepthWalk<'a> {
             finished = frame.finish();
             let node = frame.edges.node;
             self.stack.pop();
+            if let (DependencyNode::Formula(position), Ok(_)) = (node, finished) {
+                self.order.push(self.formulas[position].1);
+            }
             self.set_state(node, NodeDepth::Done(finished));
             if let Some(parent) = self.stack.last_mut() {
                 parent.include(finished);
@@ -1842,6 +1861,7 @@ pub(super) fn circular_components(
 mod tests {
     use super::*;
     use crate::store::CellStore;
+    use crate::types::Value;
 
     #[test]
     fn duplicate_direct_and_range_edges_preserve_cycle_error_propagation() {
@@ -1865,11 +1885,13 @@ mod tests {
             &mut memo,
         );
         assert!(matches!(
-            memo.get(store.formula_id(left).expect("left formula")),
+            memo.seeded_result(store.formula_id(left).expect("left formula"))
+                .as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
         assert!(matches!(
-            memo.get(store.formula_id(right).expect("right formula")),
+            memo.seeded_result(store.formula_id(right).expect("right formula"))
+                .as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
     }
@@ -2168,22 +2190,24 @@ mod tests {
             &index,
             &mut memo,
         );
-        assert_eq!(memo.len(), ROWS + 1);
+        assert_eq!(memo.seeded.len(), ROWS + 1);
         assert!(matches!(
-            memo.get(
+            memo.seeded_result(
                 store
                     .formula_id(AbsCellKey::new(sheet, 0, 0))
                     .expect("formula")
-            ),
+            )
+            .as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
         for row in 0..ROWS {
             assert!(matches!(
-                memo.get(
+                memo.seeded_result(
                     store
                         .formula_id(AbsCellKey::new(sheet, row as u32, 1))
                         .expect("formula")
-                ),
+                )
+                .as_ref(),
                 Some(Value::Error(FormulaError::Cycle))
             ));
         }
@@ -2223,14 +2247,17 @@ mod tests {
                         &index,
                         &mut memo,
                     );
-                    assert_eq!(memo.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
+                    assert_eq!(memo.seeded.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
                     for row in 0..CHAIN_ROWS {
                         let key = AbsCellKey::new(sheet, row as u32, 0);
                         if row < FORMULA_RECURSION_LIMIT {
-                            assert!(memo.get(store.formula_id(key).expect("formula")).is_none());
+                            assert!(memo
+                                .seeded_result(store.formula_id(key).expect("formula"))
+                                .is_none());
                         } else {
                             assert!(matches!(
-                                memo.get(store.formula_id(key).expect("formula")),
+                                memo.seeded_result(store.formula_id(key).expect("formula"))
+                                    .as_ref(),
                                 Some(Value::Error(FormulaError::Num))
                             ));
                         }
@@ -2246,9 +2273,10 @@ mod tests {
                         &index,
                         &mut memo,
                     );
-                    assert_eq!(memo.len(), CHAIN_ROWS);
+                    assert_eq!(memo.seeded.len(), CHAIN_ROWS);
                     assert!(affected.keys(&store.formula_slots).all(|key| matches!(
-                        memo.get(store.formula_id(key).expect("formula")),
+                        memo.seeded_result(store.formula_id(key).expect("formula"))
+                            .as_ref(),
                         Some(Value::Error(FormulaError::Cycle))
                     )));
                 }

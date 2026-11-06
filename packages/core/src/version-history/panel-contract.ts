@@ -29,8 +29,8 @@ export interface HistoryPanelArchive {
   ): Promise<ApplyTransactionResult>;
 }
 
-/** Host identity and persistence used by the optional history panel. */
-export interface HistoryCommandsOptions {
+/** Host identity and persistence of one grid's version history panel. */
+export interface HistoryAddonOptions {
   /** Archive of the committed document shown by the grid. */
   archive: HistoryPanelArchive;
   /** Authenticated person saving named versions. */

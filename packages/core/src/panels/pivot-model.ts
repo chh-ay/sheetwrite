@@ -355,6 +355,31 @@ export function relatedTables(
 }
 
 /**
+ * The model source of `pivot`: its own, or one over its table with the
+ * table's columns as fields in order, so field indices stay the same. Null
+ * for a range source.
+ */
+function modelSourceOf(
+  pivot: PivotDefinition,
+  tables: readonly WorkbookTable[],
+): { table: string; fields: TableColumnRef[] } | null {
+  const source = pivot.source;
+  if (source.invalid || "range" in source) return null;
+  if ("model" in source) {
+    return {
+      table: source.model.table,
+      fields: source.model.fields.map((field) => ({ ...field })),
+    };
+  }
+  const base = tables.find((candidate) => candidate.id === source.table);
+  if (base === undefined) return null;
+  return {
+    table: base.id,
+    fields: base.columns.map((entry) => ({ table: base.id, column: entry.id })),
+  };
+}
+
+/**
  * `pivot` reading `column` of `table`, and that column's field index. A
  * table source becomes a model source whose first fields are the base
  * table's columns in order, so every field index in use keeps its meaning.
@@ -364,26 +389,34 @@ export function withModelField(
   tables: readonly WorkbookTable[],
   column: TableColumnRef,
 ): { pivot: PivotDefinition; field: number } | null {
-  const source = pivot.source;
-  if (source.invalid || "range" in source) return null;
-
-  let fields: TableColumnRef[];
-  if ("model" in source) fields = source.model.fields.map((field) => ({ ...field }));
-  else {
-    const base = tables.find((candidate) => candidate.id === source.table);
-    if (base === undefined) return null;
-    fields = base.columns.map((entry) => ({ table: base.id, column: entry.id }));
-  }
+  const model = modelSourceOf(pivot, tables);
+  if (model === null) return null;
+  const fields = model.fields;
 
   const found = fields.findIndex(
     (field) => field.table === column.table && field.column === column.column,
   );
   if (found < 0) fields.push({ ...column });
-  const table = "model" in source ? source.model.table : source.table;
   return {
-    pivot: { ...pivot, source: { model: { table, fields } } },
+    pivot: { ...pivot, source: { model: { table: model.table, fields } } },
     field: found < 0 ? fields.length - 1 : found,
   };
+}
+
+/**
+ * `pivot` with measure `id` added as its last value field. A table source
+ * becomes a model source in the same change, as measures need one. Null for
+ * a range source or a measure the pivot already shows.
+ */
+export function withMeasureValue(
+  pivot: PivotDefinition,
+  tables: readonly WorkbookTable[],
+  id: string,
+): PivotDefinition | null {
+  if (pivot.values.some((value) => "measure" in value && value.measure === id)) return null;
+  const model = modelSourceOf(pivot, tables);
+  if (model === null) return null;
+  return { ...pivot, source: { model }, values: [...pivot.values, { measure: id }] };
 }
 
 /** The type the field list shows for a field with these distinct values. */

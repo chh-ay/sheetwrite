@@ -82,6 +82,7 @@ export const GRID_OPTION_POLICY = {
   mutationPolicy: "reset",
   transactionResourceLimits: "reset",
   hyperlinkActivation: "reset",
+  addons: "reset",
   theme: "live",
   readOnly: "live",
   config: "live",
@@ -336,7 +337,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     const operation = initialization.next();
     const alreadyReady = isSheetwriteReady();
     if (!alreadyReady) publication.setInitializationState("loading");
-    const pending = initSheetwrite(input.wasmSource);
+    const pending = initSheetwrite({ source: input.wasmSource });
     const attachment = lifetime;
     void pending
       .then(

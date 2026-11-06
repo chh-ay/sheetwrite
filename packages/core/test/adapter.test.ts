@@ -85,6 +85,7 @@ describe("shared adapter option policy", () => {
       mutationPolicy: "partial",
       transactionResourceLimits: { maxOperations: 25 },
       hyperlinkActivation: "disabled",
+      addons: {},
       renderers: {},
       editors: {},
       overscan: 2,

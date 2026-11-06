@@ -16,7 +16,7 @@ import type {
 } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 
 const SHEET_ROWS = 20;
 const SHEET_COLS = 8;

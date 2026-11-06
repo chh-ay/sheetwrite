@@ -1,6 +1,7 @@
 import type { SnapshotCell, XlsxFormulaEngine } from "@sheetwrite/core";
+import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
-import { formulaContainsExternalReference } from "./formula.js";
+import { linkedFormula } from "./external-links.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 
 /** A cell of a shared-formula group, which uses the master's text as if it were copied there. */
@@ -37,9 +38,14 @@ export function expandSharedFormulas(
   groups: readonly SharedFormulaGroup[],
   context: XlsxCodecContext,
 ): void {
-  for (const group of groups) {
+  for (const shared of groups) {
+    // A master that reads linked workbooks is copied with book names, as a cell formula is.
+    const linked = formulaContainsExternalReference(shared.formula)
+      ? linkedFormula(shared.formula, context.externalBooks)
+      : shared.formula;
+    const group = linked === undefined ? shared : { ...shared, formula: linked };
     const lexes = engine.lexes(group.formula);
-    const external = formulaContainsExternalReference(group.formula);
+    const external = linked === undefined;
 
     for (const member of group.members) {
       const formula = lexes

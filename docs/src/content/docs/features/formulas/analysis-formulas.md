@@ -37,7 +37,7 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const grid = createGrid(host, {
   workbook: {
     activeSheet: "sheet1",
@@ -80,7 +80,7 @@ of the API does not change.
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 With the default engine, these functions return `#NAME?`, and formula assist
@@ -117,7 +117,7 @@ the cells they fill.
 `GROUPBY` groups rows by one or more key columns and aggregates the values. It
 adds a total row by default.
 
-```text partial="formula examples" title="Revenue by region"
+```formula partial="formula examples" title="Revenue by region"
 =GROUPBY(A1:A12, E1:E12, SUM)
 ```
 
@@ -130,7 +130,7 @@ adds a total row by default.
 
 `PIVOTBY` adds column keys:
 
-```text partial="formula examples" title="Revenue by region and product"
+```formula partial="formula examples" title="Revenue by region and product"
 =PIVOTBY(A1:A12, B1:B12, E1:E12, SUM)
 ```
 
@@ -316,7 +316,7 @@ Sheetwrite has two engine builds with the same API. `@sheetwrite/wasm` is the de
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 | Family | Examples |

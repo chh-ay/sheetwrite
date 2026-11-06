@@ -112,6 +112,45 @@ describe("built-in widget styling", () => {
     expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
   });
 
+  // Contract: every widget token the stylesheets read either is seeded or
+  // falls back to a value derived from seeded tokens, so no widget paints a
+  // light-theme colour under a dark theme. The menu shadow and the disabled
+  // row opacity are the same in every theme and fall back to plain values.
+  it("derives every unseeded widget custom property from seeded ones", async () => {
+    const { host } = await makeGrid();
+    const seeded = (name: string) => host.style.getPropertyValue(name) !== "";
+    const constants: Readonly<Record<string, true>> = {
+      "--sheetwrite-menu-shadow": true,
+      "--sheetwrite-menu-disabled-opacity": true,
+    };
+    const reads: { name: string; fallback: string }[] = [];
+    for (const sheet of ["../styles.css", "../shell.css"]) {
+      const css = readFileSync(new URL(sheet, import.meta.url), "utf8");
+      for (const match of css.matchAll(/var\((--sheetwrite-(?:widget|toolbar|menu)-[a-z-]+)/g)) {
+        // The fallback runs from the first comma to the parenthesis that closes this var().
+        let depth = 1;
+        let end = (match.index ?? 0) + match[0].length;
+        while (depth > 0 && end < css.length) {
+          const char = css[end];
+          if (char === "(") depth += 1;
+          if (char === ")") depth -= 1;
+          end += 1;
+        }
+        const rest = css.slice((match.index ?? 0) + match[0].length, end - 1);
+        reads.push({ name: match[1] ?? "", fallback: rest.replace(/^\s*,\s*/, "") });
+      }
+    }
+    const problems = reads.filter(({ name, fallback }) => {
+      if (seeded(name)) return false;
+      const used = [...fallback.matchAll(/var\((--[a-z-]+)/g)].map((match) => match[1] ?? "");
+      if (constants[name]) return used.length > 0;
+      return used.length === 0 || !used.every(seeded);
+    });
+
+    expect(reads.length).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
+  });
+
   // ── Computed-style parity + host override (the core restyling proof) ───────
   // Contract: with the real stylesheet loaded the seeded tokens flow through
   // var() to the exact themed colors, AND a host rule setting the token on the

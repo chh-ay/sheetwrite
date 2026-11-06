@@ -9,9 +9,9 @@ import type { Grid, PresenceMessage, SyncMutationRecord, SyncStateSnapshot } fro
 import type { GridConfig } from "@sheetwrite/core";
 import { createFormulaBar, createNameBox, createSelectionStatus } from "@sheetwrite/core/shell";
 import { SheetwriteGrid } from "@sheetwrite/svelte";
-import { Cloud, CloudOff, GitMerge, Radio, RefreshCw, Users } from "lucide-svelte";
 import { createActionGuard, isRepeatClick, type ActionState } from "../lib/action-guard.js";
 import { OFFLINE_ROWS, OFFLINE_LOCAL_ACTOR, OFFLINE_THEME } from "./scenarios/offline.js";
+import SheetwriteIcon from "./SheetwriteIcon.svelte";
 import {
   SvelteWorkbenchSession,
   type WorkbenchConflict,
@@ -266,7 +266,7 @@ async function mergeConflict(): Promise<void> {
     <header class="sw-demo-controlbar sw-svw-chrome">
       <div class="sw-demo-controlbar__identity">
         <span class="sw-demo-product__mark" aria-hidden="true">
-          <Radio size={16} strokeWidth={1.8} />
+          <SheetwriteIcon name="live" />
         </span>
         <div>
           <h2>No signal. No lost field work.</h2>
@@ -288,10 +288,10 @@ async function mergeConflict(): Promise<void> {
         {#if actionState.pending}
           Changing connection…
         {:else if online}
-          <Cloud size={15} aria-hidden="true" />
+          <SheetwriteIcon name="cloud" />
           {syncState?.activity === "sending" ? "Draining" : "Connected · Go offline"}
         {:else}
-          <CloudOff size={15} aria-hidden="true" />
+          <SheetwriteIcon name="cloud-off" />
           Reconnect · {queue.length} queued
         {/if}
       </button>
@@ -406,7 +406,7 @@ async function mergeConflict(): Promise<void> {
                 : "Overlapping edits — your queued values win on resync."}
             </span>
             <button type="button" data-testid="merge-button" disabled={merging} aria-busy={merging || undefined} onclick={() => void mergeConflict()}>
-              <GitMerge size={14} aria-hidden="true" /> {merging ? "Merging…" : "Merge & resync"}
+              <SheetwriteIcon name="merge" /> {merging ? "Merging…" : "Merge & resync"}
             </button>
           </section>
         {/if}
@@ -432,10 +432,10 @@ async function mergeConflict(): Promise<void> {
           <p>Prove concurrent HQ work or remount the Svelte island while its outbox is offline.</p>
           <div class="sw-svw-actions" role="group" aria-label="Recovery scenario actions">
             <button type="button" data-testid="colleague-button" disabled={!session} onclick={() => void session?.colleagueCommit()}>
-              <Users size={14} aria-hidden="true" /> HQ commits work
+              <SheetwriteIcon name="users" /> HQ commits work
             </button>
             <button type="button" data-variant="quiet" data-testid="remount-button" disabled={!ready} onclick={() => session?.remountIsland()}>
-              <RefreshCw size={14} aria-hidden="true" /> Remount island
+              <SheetwriteIcon name="refresh" /> Remount island
             </button>
           </div>
         </details>
@@ -448,7 +448,7 @@ async function mergeConflict(): Promise<void> {
       <span>outbox {queue.length}</span>
       <span>{online ? "connected" : "offline"}</span>
       <span class="sw-demo-status__binding">
-        <Radio size={13} aria-hidden="true" /> Svelte 5 runes · IndexedDB queue
+        <SheetwriteIcon name="live" /> Svelte 5 runes · IndexedDB queue
       </span>
     </footer>
   </div>

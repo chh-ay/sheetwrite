@@ -9,8 +9,10 @@ import {
   initSheetwrite,
   releaseEngineMemory,
   SheetwriteStore,
+  toXlsxWorkbook,
 } from "../src/index.js";
 import type {
+  DashboardExport,
   DocumentOp,
   PivotDefinition,
   TableRelationship,
@@ -18,9 +20,10 @@ import type {
 } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 const relationship: TableRelationship = {
@@ -450,5 +453,70 @@ it("adds a related table's column to a table pivot from the field list, as one u
     grid.destroy();
     host.remove();
     restore();
+  }
+});
+
+it("passes each worksheet pivot's current output, measures included, to the XLSX export", async () => {
+  const { grid, destroy } = mountReport();
+  let passed: readonly DashboardExport[] | undefined;
+  setXlsxWorkbookBackend({
+    name: "capture",
+    async toXlsxWorkbook(_snapshot, _options, context) {
+      passed = context?.pivotOutputs;
+      return new Uint8Array();
+    },
+    async fromXlsxWorkbook() {
+      throw new Error("not used");
+    },
+  });
+  try {
+    const store = grid.store;
+    if (!(store instanceof SheetwriteStore)) throw new Error("the grid must use a SheetwriteStore");
+    const measure = {
+      id: "twice",
+      name: "Twice",
+      table: "orders",
+      formula: "=SUM(Orders[Amount])*2",
+    };
+    expect(store.setMeasure(measure).status).toBe("applied");
+    expect(
+      grid.setPivot({
+        id: "related",
+        name: "Related",
+        anchor: { row: 2, col: 1 },
+        source: {
+          model: {
+            table: "orders",
+            fields: [
+              { table: "customers", column: "id" },
+              { table: "orders", column: "amount" },
+            ],
+          },
+        },
+        rows: [0],
+        columns: [],
+        values: [{ field: 1, aggregation: "SUM", numberFormat: "0.0" }, { measure: "twice" }],
+      }).status,
+    ).toBe("applied");
+    const result = grid.getPivotResult("report", "related");
+    if (result?.status !== "ok") throw new Error("the pivot computes");
+
+    await toXlsxWorkbook(grid);
+
+    const item = passed?.find((entry) => entry.sheet === "report")?.items[0];
+    const rows = Array.from({ length: result.rows }, (_, row) =>
+      result.cells.slice(row * result.cols, (row + 1) * result.cols),
+    );
+    expect(item?.id).toBe("related");
+    expect(item?.cells).toEqual(rows);
+    // The total row holds both values: the Sum and the measure, which doubles it.
+    const total = item?.cells.at(-1);
+    expect(total?.[0]).toBe("Total");
+    expect(total?.[2]).toBe(Number(total?.[1]) * 2);
+    expect(item?.numberFormats.at(-1)).toEqual([null, "0.0", null]);
+    expect(item?.numberFormats[0]).toEqual([null, null, null]);
+  } finally {
+    setXlsxWorkbookBackend(null);
+    destroy();
   }
 });

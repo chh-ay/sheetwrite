@@ -1,4 +1,29 @@
 import type { ColumnarData, Range, Sheet, Workbook } from "../src/types.js";
+import {
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
+  xlsxTableExportBackend,
+  xlsxTableImportBackend,
+  xlsxWorkbookBackend,
+} from "../src/xlsx-slots.js";
+
+/**
+ * Keep the XLSX backends installed now, and return the function that puts them
+ * back. Add-ons install once per test process, so a test that replaces or
+ * clears a backend restores what another file's `xlsxAddon()` installed.
+ */
+export function keepXlsxSlots(): () => void {
+  const workbook = xlsxWorkbookBackend();
+  const tableImport = xlsxTableImportBackend();
+  const tableExport = xlsxTableExportBackend();
+
+  return () => {
+    setXlsxWorkbookBackend(workbook);
+    setXlsxTableImportBackend(tableImport);
+    setXlsxTableExportBackend(tableExport);
+  };
+}
 
 export function makeWorkbook(rowCount = 50): Workbook {
   return {

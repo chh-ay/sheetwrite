@@ -9,13 +9,11 @@ export {
 
 export { isCellFontFamily, sanitizeCellStyle } from "./cell-style-fields.js";
 
-export {
-  openChartViews,
-  setChartRendererFactory,
-  setChartViewProviderFactory,
-} from "./chart-backend.js";
+export { openChartViews } from "./chart-backend.js";
 
-export { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "./charts-live.js";
+export { MAX_CHART_POINTS } from "./chart-definition.js";
+
+export { resolveChartView, subscribeChartChanges } from "./charts-live.js";
 
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 
@@ -105,25 +103,17 @@ export {
   toTsv,
   toTsvStream,
 } from "./export.js";
+export { MAX_EXTERNAL_SHEET_AREA } from "./external-link.js";
 export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   fromXlsxTable,
   fromXlsxWorkbookFile,
   fromXlsxWorkbook,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
   toXlsxTable,
   toXlsxTableStream,
   toXlsxWorkbook,
   toXlsxWorkbookStream,
   XlsxResourceError,
-  type XlsxResourceLimits,
-  type XlsxTableExportBackend,
-  type XlsxTableImportBackend,
-  type XlsxWorkbookBackend,
-  type XlsxWorkbookOptions,
-  type XlsxWorkbookWarning,
 } from "./xlsx-bridge.js";
 
 export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.js";
@@ -131,6 +121,7 @@ export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.j
 export {
   createGrid,
   DEFAULT_THEME,
+  type InitSheetwriteOptions,
   initSheetwrite,
   isSheetwriteReady,
   resolveThemeFromCss,
@@ -168,7 +159,6 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 
-export { type QueryCommands, registerQueryCommands } from "./query-commands.js";
 export {
   type DocumentRebaseResult,
   type RebaseConflict,
@@ -288,6 +278,7 @@ export type {
   CellVerticalAlign,
   ChangeEvent,
   ChartAnchor,
+  ChartCategoryLevel,
   ChartChangeEvent,
   ChartChangeListener,
   ChartDefinition,
@@ -316,7 +307,11 @@ export type {
   ContextMenuItems,
   Dashboard,
   DashboardBox,
+  DashboardChartItem,
+  DashboardExport,
   DashboardItem,
+  DashboardItemExport,
+  DashboardKpiItem,
   DashboardPivotItem,
   DashboardSlicerItem,
   DataCell,
@@ -331,6 +326,11 @@ export type {
   DataValidationCondition,
   DataValidationRule,
   DocumentOp,
+  ExternalLink,
+  ExternalLinkCell,
+  ExternalLinkName,
+  ExternalLinkSheet,
+  ExternalLinkValue,
   Grid,
   GridActions,
   GridCommandName,
@@ -447,6 +447,19 @@ export type {
   XlsxSourcePart,
   XlsxSourceSnapshot,
   XlsxUnsupportedQuery,
+  QueryCommands,
+  SheetwriteAddon,
+  SheetwriteAddonContext,
+  SheetwriteAddonGridContext,
+  SheetwriteAddonSettings,
+  SheetwriteChartParts,
+  SheetwriteXlsxParts,
+  XlsxResourceLimits,
+  XlsxTableExportBackend,
+  XlsxTableImportBackend,
+  XlsxWorkbookBackend,
+  XlsxWorkbookOptions,
+  XlsxWorkbookWarning,
 } from "./types.js";
 
 export {
