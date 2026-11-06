@@ -151,8 +151,30 @@ export async function renderLandingBench(): Promise<string> {
     "evidence" in fullEngine
       ? landingDownloads(sizeReport.metrics, fullEngine.evidence.engines)
       : undefined,
-    scale.machines,
   );
+}
+
+/**
+ * The speed story as built HTML, for the landing page and the performance
+ * showcase. It is its own generated file, so the pages load it with the
+ * lazily loaded story component and not with the page.
+ */
+export async function renderLandingStory(): Promise<string> {
+  const scale = await loadMachineCaptures(
+    captureMachines(),
+    "render-scale.json",
+    "bun run --filter @sheetwrite/bench bench:render:scale",
+    validateRenderArtifact,
+  );
+  const html =
+    scale.machines.length === 0
+      ? ""
+      : speedStory({
+          id: "story",
+          baseName: "Handsontable",
+          machines: storyMachines(scale.machines),
+        });
+  return `${JSON.stringify({ html }, null, 2)}\n`;
 }
 
 /** Download sizes on the landing page, Brotli-compressed as browsers fetch them. */
@@ -248,7 +270,6 @@ function landingSizes(evidence: ValidatedRenderEvidence) {
 export function landingBenchPayload(
   scale: { evidence: ValidatedRenderEvidence; source: string } | EvidenceState,
   downloads?: LandingDownloads,
-  machines: readonly MachineEvidence<ValidatedRenderEvidence>[] = [],
 ): string {
   // Download sizes do not depend on the benchmark, so both payloads carry them.
   const downloadsField = downloads ? { downloads } : {};
@@ -302,13 +323,6 @@ export function landingBenchPayload(
     },
     heroStats,
     sizes,
-    /** The speed story's data: every interaction at 100,000 rows, per machine. */
-    // The landing page and the showcase carry the Render page's story as built HTML.
-    storyHtml: speedStory({
-      id: "story",
-      baseName: "Handsontable",
-      machines: storyMachines(machines),
-    }),
     ...downloadsField,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;

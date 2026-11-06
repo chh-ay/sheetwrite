@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { Icon } from "../components/Icon.js";
@@ -11,7 +12,6 @@ import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
-import { SpeedupBars } from "../components/SpeedupBars.js";
 // Named imports, so only these three numbers ship in the page bundle.
 import { localPassed, regressions, totalTests } from "../generated/compatibility-summary.json";
 import landingBench from "../generated/landing-bench.json";
@@ -60,8 +60,6 @@ interface LandingEvidence {
     millionRowHeapMb: number;
   };
   sizes: LandingBenchSize[];
-  /** The speed story, built from every machine's release capture. */
-  storyHtml: string;
 }
 
 interface LandingBenchData extends Partial<LandingEvidence> {
@@ -154,8 +152,15 @@ const SAMPLE_ROWS = [
   ["Folder", 9],
 ] as const;
 
-function BenchmarkBars({ evidence }: Readonly<{ evidence: LandingEvidence }>) {
-  return <SpeedupBars html={evidence.storyHtml} />;
+/** The story sits below the fold; its built markup loads with it, not with the page. */
+const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
+
+function BenchmarkBars() {
+  return (
+    <Suspense fallback={null}>
+      <SpeedupBars />
+    </Suspense>
+  );
 }
 
 function FeatureCards() {
@@ -188,12 +193,11 @@ function FeatureCards() {
 function Landing() {
   const bench = landingBench as LandingBenchData;
   const evidence: LandingEvidence | undefined =
-    bench.available && bench.sizes && bench.heroStats && bench.capture && bench.storyHtml
+    bench.available && bench.sizes && bench.heroStats && bench.capture
       ? {
           sizes: bench.sizes,
           heroStats: bench.heroStats,
           capture: bench.capture,
-          storyHtml: bench.storyHtml,
         }
       : undefined;
   const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
@@ -430,7 +434,7 @@ function Landing() {
             </p>
           </header>
           {evidence ? (
-            <BenchmarkBars evidence={evidence} />
+            <BenchmarkBars />
           ) : (
             <p className="sw-lp-note">
               No saved benchmark results are available yet. Run{" "}

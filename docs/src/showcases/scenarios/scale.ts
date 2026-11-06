@@ -693,5 +693,4 @@ export const COMPARISON_EVIDENCE = {
   capture: landingBench.capture,
   heroStats: landingBench.heroStats,
   sizes: landingBench.sizes,
-  storyHtml: landingBench.storyHtml,
 } as const;

@@ -51,6 +51,7 @@ import { entrySlug } from "./docs-paths.js";
 import {
   renderEvidenceText,
   renderLandingBench,
+  renderLandingStory,
   splitPerformancePages,
 } from "./docs-performance.js";
 import {
@@ -280,6 +281,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
+    { path: join(generatedDataRoot, "landing-story.json"), content: await renderLandingStory() },
   ];
   const symbolOwners = new Map<string, string>();
   for (const pkg of manifest.packages) {

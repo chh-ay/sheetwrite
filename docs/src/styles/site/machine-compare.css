@@ -54,7 +54,7 @@
 .machines__axis,
 .machines__row {
   display: grid;
-  grid-template-columns: minmax(9rem, 15rem) minmax(0, 1fr) minmax(10rem, 13rem);
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(9.5rem, 11rem);
   align-items: center;
   column-gap: var(--sw-space-4);
 }
