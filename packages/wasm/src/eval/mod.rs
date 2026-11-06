@@ -17,6 +17,7 @@ mod index;
 mod info;
 mod iteration;
 mod literal_criteria;
+mod literal_products;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -1867,6 +1868,12 @@ impl CellStore {
             | Func::XLookup
             | Func::XMatch => return self.eval_lookup_family(func, args, sheet, pass, depth + 1),
             _ => {}
+        }
+
+        if func == Func::SumProduct {
+            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+                return result;
+            }
         }
 
         if func == Func::Sum {
