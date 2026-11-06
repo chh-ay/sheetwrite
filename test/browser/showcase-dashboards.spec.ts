@@ -24,7 +24,7 @@ test("a slicer filters the dashboard and each change is one undo step", async ({
 
   await controls(page).getByRole("button", { name: "Swap the chart and the pivot" }).click();
   await expect(item(page, "channel-pivot")).toHaveText(/^col 1, row 4/);
-  await expect(item(page, "region-chart")).toHaveText(/^col 7, row 7/);
+  await expect(item(page, "region-chart")).toHaveText(/^col 7, row 4/);
 
   await controls(page).getByRole("button", { name: "Add a product pivot" }).click();
   await expect(item(page, "product-pivot")).toBeVisible();

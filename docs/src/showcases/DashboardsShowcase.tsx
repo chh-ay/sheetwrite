@@ -118,7 +118,13 @@ export default function DashboardsShowcase() {
       controls={<DashboardControls scenario={scenario} snapshot={snapshot} />}
       demo={
         <>
-          <DemoGrid hostRef={hostRef} label="Sales dashboard workbook" testId="dashboard-grid" />
+          {/* Eighteen sheet rows hold the nine dashboard rows the starting items fill. */}
+          <DemoGrid
+            hostRef={hostRef}
+            label="Sales dashboard workbook"
+            rows={18}
+            testId="dashboard-grid"
+          />
           <ActionError error={error} />
         </>
       }
