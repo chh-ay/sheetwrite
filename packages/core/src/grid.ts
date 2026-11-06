@@ -3,11 +3,11 @@ import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
- fontFor,
- intersectingMerges,
- layoutTextLines,
- mergeAnchorAt,
- prepareMergeIndex,
+  fontFor,
+  intersectingMerges,
+  layoutTextLines,
+  mergeAnchorAt,
+  prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
@@ -18,37 +18,37 @@ import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboa
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
- admitTransactionResources,
- assertWorkbookAllocationLimits,
- resolveTransactionResourceLimits,
- validateTransactionResources,
+  admitTransactionResources,
+  assertWorkbookAllocationLimits,
+  resolveTransactionResourceLimits,
+  validateTransactionResources,
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
 import {
- ENGINE_LOAD_HINT,
- engineFailedError,
- engineGeneration,
- isEngineLoaded as isLoaded,
- loadEngine,
- onEngineFailure,
- type SheetwriteEngine,
- stopEngine,
+  ENGINE_LOAD_HINT,
+  engineFailedError,
+  engineGeneration,
+  isEngineLoaded as isLoaded,
+  loadEngine,
+  onEngineFailure,
+  type SheetwriteEngine,
+  stopEngine,
 } from "./engine.js";
 import {
- isSheetwriteError,
- normalizeSheetwriteError,
- SheetwriteError,
- unknownSheetError,
+  isSheetwriteError,
+  normalizeSheetwriteError,
+  SheetwriteError,
+  unknownSheetError,
 } from "./errors.js";
 import { downloadBytesIn, toCsv } from "./export.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import {
- ZOOM_MIN,
- ZOOM_MAX,
- CELL_TEXT_HORIZONTAL_PADDING,
- DEFAULT_DISTINCT_VALUES_LIMIT,
+  ZOOM_MIN,
+  ZOOM_MAX,
+  CELL_TEXT_HORIZONTAL_PADDING,
+  DEFAULT_DISTINCT_VALUES_LIMIT,
 } from "./grid-constants.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
@@ -63,18 +63,18 @@ import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/pa
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
- createRuntimeResourceSnapshot,
- type RuntimeMemoryObservation,
- type RuntimeResourceOperation,
- type RuntimeResourcePhase,
- type RuntimeResourceSnapshot,
+  createRuntimeResourceSnapshot,
+  type RuntimeMemoryObservation,
+  type RuntimeResourceOperation,
+  type RuntimeResourcePhase,
+  type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
 import { registerGridDocument } from "./restore-commit.js";
 import type { CommandToolbar } from "./ribbon/command-toolbar.js";
 import {
- assertRibbonConfig,
- RIBBON_EXPANDED_HEIGHT,
- TOOLBAR_HEIGHT,
+  assertRibbonConfig,
+  RIBBON_EXPANDED_HEIGHT,
+  TOOLBAR_HEIGHT,
 } from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
@@ -87,87 +87,87 @@ import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
- addRowGroup,
- collapseRowGroup,
- removeRowGroup,
- visibleSheetNeighbor,
+  addRowGroup,
+  collapseRowGroup,
+  removeRowGroup,
+  visibleSheetNeighbor,
 } from "./store/ranges.js";
 import {
- clearViewPatch,
- columnFilterPatch,
- rowVisibilityPatches,
- viewSortPatch,
+  clearViewPatch,
+  columnFilterPatch,
+  rowVisibilityPatches,
+  viewSortPatch,
 } from "./store/view-patches.js";
 import { StyleActions } from "./style-actions.js";
 import {
- beginGridTransactionAdmission,
- hasGridTransactionAdmission,
+  beginGridTransactionAdmission,
+  hasGridTransactionAdmission,
 } from "./transaction-admission.js";
 import type { SheetwriteAddon } from "./types/addon.js";
 import type {
- CellHyperlink,
- CellScalar,
- CellStyle,
- CellValue,
- Column,
- ConditionalFormatRule,
+  CellHyperlink,
+  CellScalar,
+  CellStyle,
+  CellValue,
+  Column,
+  ConditionalFormatRule,
 } from "./types/cell.js";
 import type { ChartDefinition, ChartRef } from "./types/chart.js";
 import type {
- CellAddress,
- HighlightRange,
- PresenceOverlay,
- Range,
- Selection,
- SheetId,
+  CellAddress,
+  HighlightRange,
+  PresenceOverlay,
+  Range,
+  Selection,
+  SheetId,
 } from "./types/coordinates.js";
 import type { AggregateOp } from "./types/data.js";
 import type {
- AddSheetInput,
- ColumnFilter,
- DataValidationRule,
- DocumentOp,
- MutationIssue,
- MutationPolicyMode,
- ProtectedRange,
- ProtectionResolver,
- RowGroup,
- Sheet,
- SheetSnapshot,
- SheetVisibility,
- SortKey,
- WorkbookSnapshot,
+  AddSheetInput,
+  ColumnFilter,
+  DataValidationRule,
+  DocumentOp,
+  MutationIssue,
+  MutationPolicyMode,
+  ProtectedRange,
+  ProtectionResolver,
+  RowGroup,
+  Sheet,
+  SheetSnapshot,
+  SheetVisibility,
+  SortKey,
+  WorkbookSnapshot,
 } from "./types/document.js";
 import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/grid.js";
 import type {
- CellEditor,
- CellInputSnapshot,
- ClipboardOutcome,
- Grid,
- GridActions,
- GridCommandName,
- GridCommandState,
- GridConfig,
- GridEvents,
- GridOptions,
- GridPanel,
- GridPresentation,
- ReplaceResult,
- SearchOptions,
- SearchResult,
- SelectionSummary,
- SheetLifecycleResult,
- SheetwriteAddonSettings,
+  CellEditor,
+  CellInputSnapshot,
+  ClipboardOutcome,
+  Grid,
+  GridActions,
+  GridCommandName,
+  GridCommandState,
+  GridConfig,
+  GridEvents,
+  GridOptions,
+  GridPanel,
+  GridPresentation,
+  ReplaceResult,
+  SearchOptions,
+  SearchResult,
+  SelectionSummary,
+  SheetLifecycleResult,
+  SheetwriteAddonSettings,
 } from "./types/grid.js";
 import type { PivotDefinition, PivotResultView, PivotSourceField } from "./types/pivot.js";
 import type { CellRenderer, Renderer, Theme } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
 import type {
- ApplyTransactionResult,
- ChangeEvent,
- GridTransaction,
- RemoteOperationOptions,
- TransactionResourceLimits,
+  ApplyTransactionResult,
+  ChangeEvent,
+  GridTransaction,
+  RemoteOperationOptions,
+  TransactionResourceLimits,
 } from "./types/transaction.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
@@ -186,26 +186,26 @@ const MAX_ELEMENT_HEIGHT_MARGIN = 4_096;
  * read back what the engine actually kept. Re-measured on zoom changes.
  */
 export function measureMaxElementHeight(
- doc: Document | null | undefined = typeof document === "undefined" ? undefined : document,
+  doc: Document | null | undefined = typeof document === "undefined" ? undefined : document,
 ): number {
- if (!doc?.body) return MAX_ELEMENT_HEIGHT_FALLBACK;
- const scroller = doc.createElement("div");
- scroller.style.cssText =
-  "position:absolute;visibility:hidden;left:-9999px;width:32px;height:32px;overflow:scroll;";
- const sizer = doc.createElement("div");
- sizer.style.cssText = "width:1px;height:1000000000000px;";
- scroller.append(sizer);
- doc.body.append(scroller);
- const layoutClamp = sizer.getBoundingClientRect().height;
- scroller.scrollTop = 1_000_000_000_000;
- const scrollClamp = scroller.scrollTop > 0 ? scroller.scrollTop + scroller.clientHeight : 0;
- scroller.remove();
- const measured = Math.min(
-  Number.isFinite(layoutClamp) && layoutClamp > 0 ? layoutClamp : Number.POSITIVE_INFINITY,
-  Number.isFinite(scrollClamp) && scrollClamp > 0 ? scrollClamp : Number.POSITIVE_INFINITY,
- );
- if (!Number.isFinite(measured) || measured < 1_000_000) return MAX_ELEMENT_HEIGHT_FALLBACK;
- return Math.floor(measured) - MAX_ELEMENT_HEIGHT_MARGIN;
+  if (!doc?.body) return MAX_ELEMENT_HEIGHT_FALLBACK;
+  const scroller = doc.createElement("div");
+  scroller.style.cssText =
+    "position:absolute;visibility:hidden;left:-9999px;width:32px;height:32px;overflow:scroll;";
+  const sizer = doc.createElement("div");
+  sizer.style.cssText = "width:1px;height:1000000000000px;";
+  scroller.append(sizer);
+  doc.body.append(scroller);
+  const layoutClamp = sizer.getBoundingClientRect().height;
+  scroller.scrollTop = 1_000_000_000_000;
+  const scrollClamp = scroller.scrollTop > 0 ? scroller.scrollTop + scroller.clientHeight : 0;
+  scroller.remove();
+  const measured = Math.min(
+    Number.isFinite(layoutClamp) && layoutClamp > 0 ? layoutClamp : Number.POSITIVE_INFINITY,
+    Number.isFinite(scrollClamp) && scrollClamp > 0 ? scrollClamp : Number.POSITIVE_INFINITY,
+  );
+  if (!Number.isFinite(measured) || measured < 1_000_000) return MAX_ELEMENT_HEIGHT_FALLBACK;
+  return Math.floor(measured) - MAX_ELEMENT_HEIGHT_MARGIN;
 }
 /** Interaction-tuning default: paint six row and visible-column positions past each viewport edge. */
 const DEFAULT_OVERSCAN = 6;
@@ -214,47 +214,47 @@ const DEFAULT_COL_WIDTH = 100;
 /** Width of the side panel, in CSS pixels; the cells give up this much room while it is open. */
 const PANEL_WIDTH = 320;
 const GRID_COMMANDS: readonly GridCommandName[] = [
- "bold",
- "italic",
- "underline",
- "strikethrough",
- "alignLeft",
- "alignCenter",
- "alignRight",
- "alignTop",
- "alignMiddle",
- "alignBottom",
- "wrap",
- "textColor",
- "fillColor",
- "border",
- "clearFormat",
- "merge",
- "unmerge",
- "sortAsc",
- "sortDesc",
- "exportCsv",
- "exportXlsx",
- "importXlsx",
- "versionHistory",
- "saveVersion",
- "newDashboard",
- "undo",
- "redo",
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "alignLeft",
+  "alignCenter",
+  "alignRight",
+  "alignTop",
+  "alignMiddle",
+  "alignBottom",
+  "wrap",
+  "textColor",
+  "fillColor",
+  "border",
+  "clearFormat",
+  "merge",
+  "unmerge",
+  "sortAsc",
+  "sortDesc",
+  "exportCsv",
+  "exportXlsx",
+  "importXlsx",
+  "versionHistory",
+  "saveVersion",
+  "newDashboard",
+  "undo",
+  "redo",
 ];
 const COMMAND_STATE_ACTIVITY_COMMANDS: readonly GridCommandName[] = [
- "bold",
- "italic",
- "underline",
- "strikethrough",
- "alignLeft",
- "alignCenter",
- "alignRight",
- "alignTop",
- "alignMiddle",
- "alignBottom",
- "wrap",
- "border",
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "alignLeft",
+  "alignCenter",
+  "alignRight",
+  "alignTop",
+  "alignMiddle",
+  "alignBottom",
+  "wrap",
+  "border",
 ];
 /** Bound synchronous command-state work; larger uniform selections report mixed conservatively. */
 const COMMAND_STATE_CELL_LIMIT = 4_096;
@@ -263,102 +263,102 @@ const COMMAND_STATE_CELL_LIMIT = 4_096;
 const MAX_DATASOURCE_ERROR_COLUMN_BANDS = 64;
 
 function isFormattingCommand(command: GridCommandName): boolean {
- return (
-  command === "bold" ||
-  command === "italic" ||
-  command === "underline" ||
-  command === "strikethrough" ||
-  command === "alignLeft" ||
-  command === "alignCenter" ||
-  command === "alignRight" ||
-  command === "alignTop" ||
-  command === "alignMiddle" ||
-  command === "alignBottom" ||
-  command === "wrap" ||
-  command === "textColor" ||
-  command === "fillColor" ||
-  command === "border" ||
-  command === "clearFormat"
- );
+  return (
+    command === "bold" ||
+    command === "italic" ||
+    command === "underline" ||
+    command === "strikethrough" ||
+    command === "alignLeft" ||
+    command === "alignCenter" ||
+    command === "alignRight" ||
+    command === "alignTop" ||
+    command === "alignMiddle" ||
+    command === "alignBottom" ||
+    command === "wrap" ||
+    command === "textColor" ||
+    command === "fillColor" ||
+    command === "border" ||
+    command === "clearFormat"
+  );
 }
 
 function effectiveStyleValue<Key extends keyof CellStyle>(
- cell: CellStyle,
- column: CellStyle | undefined,
- key: Key,
+  cell: CellStyle,
+  column: CellStyle | undefined,
+  key: Key,
 ): CellStyle[Key] {
- return Object.hasOwn(cell, key) ? cell[key] : column?.[key];
+  return Object.hasOwn(cell, key) ? cell[key] : column?.[key];
 }
 
 function formattingCommandActive(
- command: GridCommandName,
- cell: CellStyle,
- column: CellStyle | undefined,
+  command: GridCommandName,
+  cell: CellStyle,
+  column: CellStyle | undefined,
 ): boolean {
- switch (command) {
-  case "bold":
-  case "italic":
-  case "underline":
-  case "strikethrough":
-   return effectiveStyleValue(cell, column, command) === true;
-  case "alignLeft":
-   return effectiveStyleValue(cell, column, "align") === "left";
-  case "alignCenter":
-   return effectiveStyleValue(cell, column, "align") === "center";
-  case "alignRight":
-   return effectiveStyleValue(cell, column, "align") === "right";
-  case "alignTop":
-   return effectiveStyleValue(cell, column, "verticalAlign") === "top";
-  case "alignMiddle":
-   return (effectiveStyleValue(cell, column, "verticalAlign") ?? "middle") === "middle";
-  case "alignBottom":
-   return effectiveStyleValue(cell, column, "verticalAlign") === "bottom";
-  case "wrap":
-   return effectiveStyleValue(cell, column, "wrap") === true;
-  case "border":
-   return effectiveStyleValue(cell, column, "border") !== undefined;
-  default:
-   return false;
- }
+  switch (command) {
+    case "bold":
+    case "italic":
+    case "underline":
+    case "strikethrough":
+      return effectiveStyleValue(cell, column, command) === true;
+    case "alignLeft":
+      return effectiveStyleValue(cell, column, "align") === "left";
+    case "alignCenter":
+      return effectiveStyleValue(cell, column, "align") === "center";
+    case "alignRight":
+      return effectiveStyleValue(cell, column, "align") === "right";
+    case "alignTop":
+      return effectiveStyleValue(cell, column, "verticalAlign") === "top";
+    case "alignMiddle":
+      return (effectiveStyleValue(cell, column, "verticalAlign") ?? "middle") === "middle";
+    case "alignBottom":
+      return effectiveStyleValue(cell, column, "verticalAlign") === "bottom";
+    case "wrap":
+      return effectiveStyleValue(cell, column, "wrap") === true;
+    case "border":
+      return effectiveStyleValue(cell, column, "border") !== undefined;
+    default:
+      return false;
+  }
 }
 
 /** Bounds each auto-fit store read; larger scans continue in frame-scheduled chunks. */
 export const AUTO_FIT_CHUNK_CELLS = 16_384;
 
 export interface AutoFitResourceStats {
- readonly chunkCellLimit: number;
- readonly windowRequests: number;
- readonly maxWindowCells: number;
- readonly scheduledChunks: number;
- readonly completedJobs: number;
- readonly cancelledJobs: number;
- readonly committedPatches: number;
+  readonly chunkCellLimit: number;
+  readonly windowRequests: number;
+  readonly maxWindowCells: number;
+  readonly scheduledChunks: number;
+  readonly completedJobs: number;
+  readonly cancelledJobs: number;
+  readonly committedPatches: number;
 }
 
 /** Scale every `<n>px` occurrence in a CSS font shorthand by `zoom`. */
 function scaleFontPx(font: string, zoom: number): string {
- return font.replace(
-  /(\d+(?:\.\d+)?)px/g,
-  (_, px: string) => `${Math.round(Number.parseFloat(px) * zoom * 10) / 10}px`,
- );
+  return font.replace(
+    /(\d+(?:\.\d+)?)px/g,
+    (_, px: string) => `${Math.round(Number.parseFloat(px) * zoom * 10) / 10}px`,
+  );
 }
 
 /** Default canvas theme used before CSS and explicit theme overrides. */
 export const DEFAULT_THEME: Theme = {
- font: "13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
- bg: "#ffffff",
- fg: "#111111",
- gridLine: "#eeeeee",
- headerBg: "#f4ede1",
- headerFg: "#6b4a1f",
- selection: "#2563eb22",
- selectionBorder: "#2563eb",
- rowHeight: 28,
- headerHeight: 32,
- rowHeaderWidth: 48,
- searchMatch: "#ffd54f80",
- searchActiveMatch: "#f59e0b",
- highlight: "#a7f3d080",
+  font: "13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+  bg: "#ffffff",
+  fg: "#111111",
+  gridLine: "#eeeeee",
+  headerBg: "#f4ede1",
+  headerFg: "#6b4a1f",
+  selection: "#2563eb22",
+  selectionBorder: "#2563eb",
+  rowHeight: 28,
+  headerHeight: 32,
+  rowHeaderWidth: 48,
+  searchMatch: "#ffd54f80",
+  searchActiveMatch: "#f59e0b",
+  highlight: "#a7f3d080",
 };
 
 /**
@@ -367,24 +367,24 @@ export const DEFAULT_THEME: Theme = {
  * the gutter entirely.
  */
 function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
- if (theme.rowHeaderWidth <= 0) return theme.rowHeaderWidth;
- const digits = String(Math.max(1, dataRowCount)).length;
- const fontMatch = /(\d+(?:\.\d+)?)px/.exec(theme.font);
- const fontPx = fontMatch ? Number(fontMatch[1]) : 12;
- return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
+  if (theme.rowHeaderWidth <= 0) return theme.rowHeaderWidth;
+  const digits = String(Math.max(1, dataRowCount)).length;
+  const fontMatch = /(\d+(?:\.\d+)?)px/.exec(theme.font);
+  const fontPx = fontMatch ? Number(fontMatch[1]) : 12;
+  return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
 }
 
 /** Options of {@link initSheetwrite}. */
 export interface InitSheetwriteOptions {
- /** Engine module; defaults to `@sheetwrite/wasm`. Pass `@sheetwrite/formulas` for the full engine. */
- engine?: SheetwriteEngine;
- /** Explicit WASM bytes or location, for bundlers that cannot resolve the engine asset. */
- source?: BufferSource | URL | string | Request | WebAssembly.Module;
- /**
-  * Add-ons to install, in this order, after the engine loads. A name listed
-  * twice rejects; a name installed by an earlier call is kept.
-  */
- addons?: readonly SheetwriteAddon[];
+  /** Engine module; defaults to `@sheetwrite/wasm`. Pass `@sheetwrite/formulas` for the full engine. */
+  engine?: SheetwriteEngine;
+  /** Explicit WASM bytes or location, for bundlers that cannot resolve the engine asset. */
+  source?: BufferSource | URL | string | Request | WebAssembly.Module;
+  /**
+   * Add-ons to install, in this order, after the engine loads. A name listed
+   * twice rejects; a name installed by an earlier call is kept.
+   */
+  addons?: readonly SheetwriteAddon[];
 }
 
 /**
@@ -409,61 +409,61 @@ let addons: AddonRegistry | undefined;
  * @see createGrid
  */
 export async function initSheetwrite(options: InitSheetwriteOptions = {}): Promise<void> {
- try {
-  await loadEngine(options.source, options.engine);
- } catch (error) {
-  throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
- }
+  try {
+    await loadEngine(options.source, options.engine);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
+  }
 
- if (options.addons?.length) {
-  addons = (await import("./addons.js")).addonRegistry;
-  addons.install(options.addons);
- }
+  if (options.addons?.length) {
+    addons = (await import("./addons.js")).addonRegistry;
+    addons.install(options.addons);
+  }
 }
 
 /** Whether `initSheetwrite` has completed — the single readiness source. */
 export function isSheetwriteReady(): boolean {
- return isLoaded();
+  return isLoaded();
 }
 
 /** Read `--sheetwrite-*` CSS custom properties into a partial theme. */
 export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
- if (typeof getComputedStyle !== "function") return {};
+  if (typeof getComputedStyle !== "function") return {};
 
- const cs = getComputedStyle(el);
- const theme: Partial<Theme> = {};
- const read = (name: string): string => cs.getPropertyValue(name).trim();
+  const cs = getComputedStyle(el);
+  const theme: Partial<Theme> = {};
+  const read = (name: string): string => cs.getPropertyValue(name).trim();
 
- const map: Array<[keyof Theme, string]> = [
-  ["bg", "--sheetwrite-bg"],
-  ["fg", "--sheetwrite-fg"],
-  ["gridLine", "--sheetwrite-grid-line"],
-  ["headerBg", "--sheetwrite-header-bg"],
-  ["headerFg", "--sheetwrite-header-fg"],
-  ["selection", "--sheetwrite-selection"],
-  ["selectionBorder", "--sheetwrite-selection-border"],
-  ["searchMatch", "--sheetwrite-search-match"],
-  ["searchActiveMatch", "--sheetwrite-search-active"],
-  ["highlight", "--sheetwrite-highlight"],
- ];
- for (const [key, prop] of map) {
-  const value = read(prop);
-  if (value) (theme[key] as string) = value;
- }
+  const map: Array<[keyof Theme, string]> = [
+    ["bg", "--sheetwrite-bg"],
+    ["fg", "--sheetwrite-fg"],
+    ["gridLine", "--sheetwrite-grid-line"],
+    ["headerBg", "--sheetwrite-header-bg"],
+    ["headerFg", "--sheetwrite-header-fg"],
+    ["selection", "--sheetwrite-selection"],
+    ["selectionBorder", "--sheetwrite-selection-border"],
+    ["searchMatch", "--sheetwrite-search-match"],
+    ["searchActiveMatch", "--sheetwrite-search-active"],
+    ["highlight", "--sheetwrite-highlight"],
+  ];
+  for (const [key, prop] of map) {
+    const value = read(prop);
+    if (value) (theme[key] as string) = value;
+  }
 
- const rh = read("--sheetwrite-row-height");
- if (rh) theme.rowHeight = Number.parseFloat(rh);
+  const rh = read("--sheetwrite-row-height");
+  if (rh) theme.rowHeight = Number.parseFloat(rh);
 
- // `--sheetwrite-font` may be a full CSS font shorthand including a
- // line-height (`13px / 1.4 system-ui`); canvas `ctx.font` and the px
- // parsers reject that segment, so strip it before mapping.
- const font = read("--sheetwrite-font");
- if (font)
-  theme.font = font
-   .replace(/\/\s*[\d.]+/, "")
-   .replace(/\s{2,}/g, " ")
-   .trim();
- return theme;
+  // `--sheetwrite-font` may be a full CSS font shorthand including a
+  // line-height (`13px / 1.4 system-ui`); canvas `ctx.font` and the px
+  // parsers reject that segment, so strip it before mapping.
+  const font = read("--sheetwrite-font");
+  if (font)
+    theme.font = font
+      .replace(/\/\s*[\d.]+/, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  return theme;
 }
 
 /**
@@ -493,3643 +493,3643 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
  * @see GridOptions
  */
 export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
- if (!isLoaded()) {
-  throw new SheetwriteError(
-   "initialization-required",
-   "create-grid",
-   `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
-  );
- }
+  if (!isLoaded()) {
+    throw new SheetwriteError(
+      "initialization-required",
+      "create-grid",
+      `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
+    );
+  }
 
- assertGridAddons(opts.addons);
- const grid = new GridImpl(host, opts);
- addons?.attach(grid, opts.addons);
- return grid;
+  assertGridAddons(opts.addons);
+  const grid = new GridImpl(host, opts);
+  addons?.attach(grid, opts.addons);
+  return grid;
 }
 
 /** Reject settings for an add-on that `initSheetwrite` did not install, before a grid is built. */
 export function assertGridAddons(settings: SheetwriteAddonSettings | undefined): void {
- for (const name in settings) {
-  if (!addons?.has(name)) {
-   throw new SheetwriteError(
-    "invalid-argument",
-    "create-grid",
-    `Sheetwrite: add-on "${name}" is not installed.`,
-    { context: { addon: name } },
-   );
+  for (const name in settings) {
+    if (!addons?.has(name)) {
+      throw new SheetwriteError(
+        "invalid-argument",
+        "create-grid",
+        `Sheetwrite: add-on "${name}" is not installed.`,
+        { context: { addon: name } },
+      );
+    }
   }
- }
 }
 
 /** Run the installed add-ons' grid hooks for a grid that `createGridFromSnapshot` built. */
 export function attachGridAddons(
- grid: GridImpl,
- settings: SheetwriteAddonSettings | undefined,
+  grid: GridImpl,
+  settings: SheetwriteAddonSettings | undefined,
 ): void {
- addons?.attach(grid, settings);
+  addons?.attach(grid, settings);
 }
 
 /** One chunked auto-fit run; its scope cancels the pending frame when it closes. */
 interface AutoFitJob {
- readonly scope: Scope;
- completed: boolean;
+  readonly scope: Scope;
+  completed: boolean;
 }
 
 export class GridImpl implements Grid {
- readonly store: Store;
- readonly actions: GridActions;
- private readonly loadable: SheetwriteStore | null;
- /**
-  * Store ownership. `true` when the grid constructed its own `SheetwriteStore`
-  * (no store was injected via the constructor). Only an owned store is disposed
-  * in `destroy()`; a caller-provided store outlives the grid, so freeing its
-  * WASM `CellStore` is the caller's responsibility, not ours.
-  */
- private readonly ownsStore: boolean;
- private readonly host: HTMLElement;
- private readonly scroller: HTMLDivElement;
- private readonly sizer: HTMLDivElement;
- private renderer: Renderer;
- private readonly interactions: InteractionSessions;
- private readonly ariaMirror: AriaMirror;
- private readonly searchController: SearchController;
- private readonly clipboard: ClipboardController;
- private readonly styleActions: StyleActions;
- private readonly document: DocumentController;
- private readonly datasourceController: DatasourceController;
- private readonly geometry: GeometryLayoutController;
- private readonly overlayPainter: OverlayPainter;
- private readonly domOverlay: DomOverlay;
- private readonly readWindows: ReadWindowController;
- private overscan: number;
- private displayedHiddenRows: Set<number>;
- private displayedHasView: boolean;
- private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
- private readOnly: boolean;
- private maxElementHeight = MAX_ELEMENT_HEIGHT_FALLBACK;
- private lastDevicePixelRatio = 1;
- private tabBar: HTMLDivElement | null = null;
- private sheetTabs: SheetTabs | null = null;
- private tabBarHeight = 0;
- private keyboardPolicy: boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean) = true;
- private keymap: Keymap;
- private zoom = 1;
- private baseTheme: Theme;
- /**
-  * The grid's root scope. `destroy()` closes it, which closes every scope
-  * below: chrome builds, the find bar, the side panel, auto-fit jobs,
-  * clipboard actions, summaries and exports.
-  */
- private readonly lifetime = new Scope();
- /** The toolbar or ribbon build; a rebuild closes it, so a chunk that loads late is dropped. */
- private readonly chromeBuilds = new ScopeSlot(this.lifetime);
- /** The loaded find bar; `null` until its first open, and again after a reset. */
- private findBar: FindBar | null = null;
- /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
- private readonly findBarBuilds = new ScopeSlot(this.lifetime);
- private readonly notes: NotePopover;
- private readonly actionFeedback: ActionFeedback;
- private config: GridConfig | undefined;
- private readonly presentation: GridPresentation;
- private readonly hyperlinkActivation: "event-only" | "internal-navigation" | "disabled";
- private toolbarHeight = 0;
- private readonly viewportEl: HTMLDivElement;
- private readonly customRenderers = new Map<string, CellRenderer>();
- private readonly customEditors = new Map<string, CellEditor>();
+  readonly store: Store;
+  readonly actions: GridActions;
+  private readonly loadable: SheetwriteStore | null;
+  /**
+   * Store ownership. `true` when the grid constructed its own `SheetwriteStore`
+   * (no store was injected via the constructor). Only an owned store is disposed
+   * in `destroy()`; a caller-provided store outlives the grid, so freeing its
+   * WASM `CellStore` is the caller's responsibility, not ours.
+   */
+  private readonly ownsStore: boolean;
+  private readonly host: HTMLElement;
+  private readonly scroller: HTMLDivElement;
+  private readonly sizer: HTMLDivElement;
+  private renderer: Renderer;
+  private readonly interactions: InteractionSessions;
+  private readonly ariaMirror: AriaMirror;
+  private readonly searchController: SearchController;
+  private readonly clipboard: ClipboardController;
+  private readonly styleActions: StyleActions;
+  private readonly document: DocumentController;
+  private readonly datasourceController: DatasourceController;
+  private readonly geometry: GeometryLayoutController;
+  private readonly overlayPainter: OverlayPainter;
+  private readonly domOverlay: DomOverlay;
+  private readonly readWindows: ReadWindowController;
+  private overscan: number;
+  private displayedHiddenRows: Set<number>;
+  private displayedHasView: boolean;
+  private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
+  private readOnly: boolean;
+  private maxElementHeight = MAX_ELEMENT_HEIGHT_FALLBACK;
+  private lastDevicePixelRatio = 1;
+  private tabBar: HTMLDivElement | null = null;
+  private sheetTabs: SheetTabs | null = null;
+  private tabBarHeight = 0;
+  private keyboardPolicy: boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean) = true;
+  private keymap: Keymap;
+  private zoom = 1;
+  private baseTheme: Theme;
+  /**
+   * The grid's root scope. `destroy()` closes it, which closes every scope
+   * below: chrome builds, the find bar, the side panel, auto-fit jobs,
+   * clipboard actions, summaries and exports.
+   */
+  private readonly lifetime = new Scope();
+  /** The toolbar or ribbon build; a rebuild closes it, so a chunk that loads late is dropped. */
+  private readonly chromeBuilds = new ScopeSlot(this.lifetime);
+  /** The loaded find bar; `null` until its first open, and again after a reset. */
+  private findBar: FindBar | null = null;
+  /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
+  private readonly findBarBuilds = new ScopeSlot(this.lifetime);
+  private readonly notes: NotePopover;
+  private readonly actionFeedback: ActionFeedback;
+  private config: GridConfig | undefined;
+  private readonly presentation: GridPresentation;
+  private readonly hyperlinkActivation: "event-only" | "internal-navigation" | "disabled";
+  private toolbarHeight = 0;
+  private readonly viewportEl: HTMLDivElement;
+  private readonly customRenderers = new Map<string, CellRenderer>();
+  private readonly customEditors = new Map<string, CellEditor>();
 
- private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
-  change: new Set(),
-  selection: new Set(),
-  scroll: new Set(),
-  "edit-begin": new Set(),
-  "edit-commit": new Set(),
-  search: new Set(),
-  "command-state-change": new Set(),
-  "active-sheet": new Set(),
-  "hyperlink-activate": new Set(),
-  "renderer-fallback": new Set(),
-  "datasource-error": new Set(),
-  "mutation-rejected": new Set(),
-  "export-error": new Set(),
-  "theme-change": new Set(),
-  "chart-select": new Set(),
-  "chart-activate": new Set(),
-  "engine-failed": new Set(),
- };
+  private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
+    change: new Set(),
+    selection: new Set(),
+    scroll: new Set(),
+    "edit-begin": new Set(),
+    "edit-commit": new Set(),
+    search: new Set(),
+    "command-state-change": new Set(),
+    "active-sheet": new Set(),
+    "hyperlink-activate": new Set(),
+    "renderer-fallback": new Set(),
+    "datasource-error": new Set(),
+    "mutation-rejected": new Set(),
+    "export-error": new Set(),
+    "theme-change": new Set(),
+    "chart-select": new Set(),
+    "chart-activate": new Set(),
+    "engine-failed": new Set(),
+  };
 
- /** Which renderer actually constructed; set by `createRenderer`. */
- private activeRendererKind: "canvas" | "worker" = "canvas";
+  /** Which renderer actually constructed; set by `createRenderer`. */
+  private activeRendererKind: "canvas" | "worker" = "canvas";
 
- private theme: Theme;
- private activeSheet: SheetId;
- /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
- private activeSheetCache: Sheet | null = null;
- /** Shows the dashboard view while a dashboard sheet is active; spreadsheet grids only. */
- private dashboardView: DashboardViewHook | null = null;
- /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
- private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
- private readonly virtualColumnTargets = new Map<SheetId, number>();
- private selection: SelectionModel;
- private readonly mutationRevisions = new MutationRevisionIndex();
- /** The open side panel; closing it runs the panel's cleanup. */
- private readonly sidePanels = new ScopeSlot(this.lifetime);
- /** Engine generation of this grid's store; traps from its reads stop that instance only. */
- private readonly engineGeneration: number;
- /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
- private engineFailure: SheetwriteError | null = null;
- private readonly removeEngineFailureListener: () => void;
- private storeEpoch = 0;
- private windowContentRevision = 0;
- private sourceSheet: SheetId | null = null;
- private sheetHasSources = true;
- /** The running auto-fit job; a new job or an edit closes it. */
- private readonly autoFits = new ScopeSlot(this.lifetime);
- private measureContext: CanvasRenderingContext2D | null = null;
- private imports: ScopeSlot | null = null;
- private documentOperations: ScopeSlot | null = null;
- private readonly hasDatasource: boolean;
- private commandStateQueued = false;
- private commandStateGeneration = 0;
+  private theme: Theme;
+  private activeSheet: SheetId;
+  /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
+  private activeSheetCache: Sheet | null = null;
+  /** Shows the dashboard view while a dashboard sheet is active; spreadsheet grids only. */
+  private dashboardView: DashboardViewHook | null = null;
+  /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
+  private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
+  private readonly virtualColumnTargets = new Map<SheetId, number>();
+  private selection: SelectionModel;
+  private readonly mutationRevisions = new MutationRevisionIndex();
+  /** The open side panel; closing it runs the panel's cleanup. */
+  private readonly sidePanels = new ScopeSlot(this.lifetime);
+  /** Engine generation of this grid's store; traps from its reads stop that instance only. */
+  private readonly engineGeneration: number;
+  /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
+  private engineFailure: SheetwriteError | null = null;
+  private readonly removeEngineFailureListener: () => void;
+  private storeEpoch = 0;
+  private windowContentRevision = 0;
+  private sourceSheet: SheetId | null = null;
+  private sheetHasSources = true;
+  /** The running auto-fit job; a new job or an edit closes it. */
+  private readonly autoFits = new ScopeSlot(this.lifetime);
+  private measureContext: CanvasRenderingContext2D | null = null;
+  private imports: ScopeSlot | null = null;
+  private documentOperations: ScopeSlot | null = null;
+  private readonly hasDatasource: boolean;
+  private commandStateQueued = false;
+  private commandStateGeneration = 0;
 
- private readonly autoFitStats = {
-  windowRequests: 0,
-  maxWindowCells: 0,
-  scheduledChunks: 0,
-  completedJobs: 0,
-  cancelledJobs: 0,
-  committedPatches: 0,
- };
+  private readonly autoFitStats = {
+    windowRequests: 0,
+    maxWindowCells: 0,
+    scheduledChunks: 0,
+    completedJobs: 0,
+    cancelledJobs: 0,
+    committedPatches: 0,
+  };
 
- private resolutionMediaQuery: MediaQueryList | null = null;
+  private resolutionMediaQuery: MediaQueryList | null = null;
 
- private readonly onResolutionChange = (): void => {
-  if (this.lifetime.closed) return;
-  this.armResolutionListener();
-  this.syncSizer();
-  this.readWindows.invalidate();
-  this.scheduleRender();
- };
-
- private readonly onScroll = () => this.scheduleRender();
- private readonly disposeStore: () => void;
- private readonly objectLayer: ObjectLayer;
- private readonly panelHost: HTMLDivElement;
- /** The cell selection last emitted, to tell a real move from a re-emit. */
- private lastSelectionKey = "";
-
- constructor(
-  host: HTMLElement,
-  opts: GridOptions,
-  store?: Store,
-  ownsStore = store === undefined,
- ) {
-  assertRibbonConfig(opts.config?.ribbon);
-  this.keymap = new Keymap(opts.config);
-  this.transactionResourceLimits = resolveTransactionResourceLimits(
-   opts.transactionResourceLimits,
-  );
-  this.host = host;
-  this.presentation = opts.presentation ?? "spreadsheet";
-  this.hyperlinkActivation =
-   opts.hyperlinkActivation === undefined
-    ? "event-only"
-    : opts.hyperlinkActivation === "event-only" ||
-     opts.hyperlinkActivation === "internal-navigation" ||
-     opts.hyperlinkActivation === "disabled"
-     ? opts.hyperlinkActivation
-     : "disabled";
-  const workbook = opts.workbook;
-  if (!(store instanceof SheetwriteStore)) {
-   assertWorkbookAllocationLimits(workbook, {
-    storage: opts.datasourceStorage?.mode ?? "dense",
-   });
-  }
-
-  this.store =
-   store ??
-   new SheetwriteStore(workbook, opts.data, {
-    storage: opts.datasourceStorage?.mode ?? "dense",
-    chunkRows: opts.datasourceStorage?.chunkRows,
-    cacheBytes: opts.datasourceStorage?.cacheBytes,
-    dirtyCellLimit: opts.datasourceStorage?.dirtyCellLimit,
-    protectionResolver: opts.protectionResolver,
-    mutationPolicy: opts.mutationPolicy,
-    transactionResourceLimits: this.transactionResourceLimits,
-   });
-
-  this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
-  // A host store keeps the generation of the engine it was built on.
-  this.engineGeneration = storeGeneration(this.store) ?? engineGeneration();
-  this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
-  this.ownsStore = ownsStore;
-  const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
-  for (const sheet of workbook.sheets) {
-   this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
-  }
-
-  const datasource = opts.datasource;
-  this.hasDatasource = datasource !== undefined;
-  this.readOnly = opts.readOnly ?? false;
-  this.config = opts.config;
-  this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
-  this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
-
-  const requestedActive = opts.workbook.activeSheet;
-  const requestedSheet = workbook.sheets.find((sheet) => sheet.id === requestedActive);
-  this.activeSheet =
-   requestedSheet && (requestedSheet.visibility ?? "visible") === "visible"
-    ? requestedActive
-    : (visibleSheetNeighbor(workbook.sheets, requestedActive) ??
-     workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
-     requestedActive);
-
-  this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
-  this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
-  this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
-  this.theme = this.withAdaptiveGutter(
-   this.baseTheme,
-   workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
-  );
-
-  this.tabBarHeight = opts.config?.tabs !== false ? 28 : 0;
-
-  this.document = new DocumentController({
-   store: this.store,
-   loadable: this.loadable,
-   readOnly: () => this.readOnly,
-   epoch: () => this.storeEpoch,
-   materializeVirtualColumns: (patches) => this.materializeVirtualColumns(patches),
-   onMutationRejected: (issues) => {
-    for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
-   },
-   onHistoryApplied: () => {
-    this.emitSelection();
-    this.render();
-   },
-   transactionResourceLimits: this.transactionResourceLimits,
-   admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
-   trustedResourceCallbacks: true,
-  });
-  registerGridDocument(this, this.document);
-
-  // Headless hosts opt out of (or intercept) the stock key bindings once at
-  // construction; the input controller consults this on every keydown.
-  const keyboardOpt = opts.config?.keyboard ?? true;
-  this.keyboardPolicy =
-   typeof keyboardOpt === "function" ? (e: KeyboardEvent) => keyboardOpt(e, this) : keyboardOpt;
-
-  for (const [name, r] of Object.entries(opts.renderers ?? {})) {
-   this.customRenderers.set(name, r);
-  }
-
-  for (const [name, editor] of Object.entries(opts.editors ?? {})) {
-   this.customEditors.set(name, editor);
-  }
-
-  const sheet = this.sheet();
-  this.maxElementHeight = measureMaxElementHeight();
-  this.lastDevicePixelRatio = globalThis.devicePixelRatio ?? 1;
-
-  this.geometry = new GeometryLayoutController(
-   {
-    sheet: () => this.sheet(),
-    activeSheet: () => this.activeSheet,
-    loadable: this.loadable,
-    theme: () => this.theme,
-    zoom: () => this.zoom,
-    maxElementHeight: () => this.maxElementHeight,
-   },
-   host.clientHeight - this.tabBarHeight,
-  );
-
-  this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
-
-  this.datasourceController = new DatasourceController(
-   {
-    datasource,
-    columns: (sheetId) => {
-     const liveSheet = this.sheetById(sheetId);
-     if (!liveSheet) throw unknownSheetError(sheetId);
-     return liveSheet.columns;
-    },
-    loadable: this.loadable,
-    activeSheet: () => this.activeSheet,
-    rowCount: (sheetId) => this.sheet(sheetId).rowCount,
-    revision: () => this.storeEpoch,
-    isCellNewerThan: (address, revision) =>
-     this.mutationRevisions.isNewerThan(address, revision),
-    retainRevision: (revision) => this.mutationRevisions.retainRevision(revision),
-    onRowsLoaded: () => {
-     this.storeEpoch += 1;
-     this.windowContentRevision += 1;
-     this.scheduleRender();
-    },
-    onError: (request, error) => {
-     // Identifiers and numbers only: column keys are host text, and a wide
-     // request can hold thousands of bands.
-     const context = {
-      protocol: request.protocol,
-      sheet: request.sheet,
-      start: request.start,
-      end: request.end,
-      revision: request.revision,
-      columnBandCount: request.columns.length,
-      columns: request.columns
-       .slice(0, MAX_DATASOURCE_ERROR_COLUMN_BANDS)
-       .map(({ start, end }) => ({ start, end })),
-     };
-
-     // The controller's own page checks carry this code without the
-     // request, so they are wrapped once to add it; host failures with
-     // another code keep their identity.
-     const failure =
-      isSheetwriteError(error) && error.code !== "datasource-request-failed"
-       ? normalizeSheetwriteError(error, "datasource-request-failed", "datasource-request")
-       : new SheetwriteError(
-        "datasource-request-failed",
-        "datasource-request",
-        error instanceof Error ? error.message : "Sheetwrite datasource-request failed",
-        { cause: error, context },
-       );
-     for (const fn of this.listeners["datasource-error"]) {
-      fn({ request, error: failure });
-     }
-    },
-   },
-   sheet.rowCount,
-  );
-
-  this.searchController = new SearchController({
-   store: this.store,
-   loadable: this.loadable,
-   activeSheet: () => this.activeSheet,
-   sheet: (id) => this.sheet(id),
-   toViewRow: (dataRow) => this.toViewRow(dataRow),
-   viewportAnchor: () =>
-    this.geometry.viewportAnchor(
-     this.geometry.toContent(this.scroller.scrollTop),
-     this.scroller.scrollLeft,
-    ),
-   scrollToCell: (addr) => this.scrollToCell(addr),
-   scheduleRender: () => this.scheduleRender(),
-   emit: (result) => {
-    for (const fn of this.listeners.search) fn(result);
-   },
-   readOnly: () => this.readOnly,
-   commit: (patches) => this.document.commit(patches, "replace"),
-  });
-
-  this.clipboard = new ClipboardController({
-   lifetime: this.lifetime,
-   store: this.store,
-   selection: () => this.selection,
-   activeSheet: () => this.activeSheet,
-   sheet: () => this.sheet(),
-   colIndices: () => this.geometry.columnIndices,
-   readOnly: () => this.readOnly,
-   mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
-   toDataRow: (viewRow) => this.toDataRow(viewRow),
-   commit: (patches, reason) => this.document.commit(patches, reason),
-  });
-
-  this.styleActions = new StyleActions({
-   store: this.store,
-   loadable: this.loadable,
-   selection: () => this.selection,
-   activeSheet: () => this.activeSheet,
-   sheet: () => this.sheet(),
-   readOnly: () => this.readOnly,
-   theme: () => this.theme,
-   merges: () => this.sheet().merges ?? [],
-   anchorCell: (row, col) => this.anchorCell(row, col),
-   toDataRow: (viewRow) => this.toDataRow(viewRow),
-   commit: (patches) => this.document.commit(patches, "style"),
-  });
-
-  this.actions = this.buildActions();
-
-  // host chrome: optional toolbar (top) + viewport (cells) + optional tab bar.
-  host.classList.add("sheetwrite");
-  host.style.position = host.style.position || "relative";
-  host.style.overflow = "hidden";
-  if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
-  this.actionFeedback = attachActionFeedback(this, host, this.lifetime);
-
-  const config = this.config;
-  this.createToolbar(config);
-
-  this.viewportEl = document.createElement("div");
-  this.viewportEl.className = "sheetwrite-viewport";
-  this.viewportEl.style.cssText = `position:absolute;left:0;right:0;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
-  host.appendChild(this.viewportEl);
-
-  this.scroller = document.createElement("div");
-  this.scroller.className = "sheetwrite-scroller";
-  this.scroller.style.cssText = "position:absolute;inset:0;overflow:auto;will-change:transform;";
-  this.sizer = document.createElement("div");
-  this.sizer.className = "sheetwrite-sizer";
-  this.scroller.appendChild(this.sizer);
-  this.viewportEl.appendChild(this.scroller);
-
-  // The side panel docks on the right edge, between the ribbon and the tab bar.
-  this.panelHost = document.createElement("div");
-  this.panelHost.className = "sheetwrite-panel-host";
-  this.panelHost.hidden = true;
-  this.panelHost.style.cssText = `position:absolute;right:0;width:${PANEL_WIDTH}px;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
-  host.appendChild(this.panelHost);
-
-  this.renderer = this.createRenderer(opts, this.viewportEl);
-  this.renderer.setRenderers(this.customRenderers);
-
-  this.interactions = new InteractionSessions({
-   host,
-   scroller: this.scroller,
-   viewportEl: this.viewportEl,
-   grid: this,
-   customEditors: this.customEditors,
-   highlightCells: (ranges) => this.highlightCells(ranges),
-   columnHeader: (col) => this.columnHeader(col),
-   toViewRow: (row) => this.toViewRow(row),
-   editListeners: this.listeners,
-   openFind: (options) => this.openFindBar(options),
-   store: this.store,
-   loadable: this.loadable,
-   selection: () => this.selection,
-   activeSheet: () => this.activeSheet,
-   sheet: () => this.sheet(),
-   theme: () => this.theme,
-   colIndices: () => this.geometry.columnIndices,
-   firstCol: () => this.firstCol(),
-   lastCol: () => this.lastCol(),
-   nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
-   previousVisibleColumn: (col) => this.geometry.previousVisibleColumn(col),
-   colAtX: (contentX) => this.colAtX(contentX),
-   rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
-   rowCount: () => this.geometry.rowCount,
-   contentTop: () => this.geometry.toContent(this.scroller.scrollTop),
-   viewportH: () => this.viewportH(),
-   colLeftOf: (col) => this.colLeftOf(col),
-   rowTop: (row) => this.geometry.rowOffset(row),
-   rowHeight: (row) => this.geometry.rowHeight(row),
-   autoFitColumns: (cols) => this.autoFitColumns(cols),
-   previewColumnWidth: (col, width) => {
-    this.geometry.previewColumnWidth(col, width);
-    this.applyLayout();
-    this.scheduleRender();
-   },
-   previewRowHeight: (row, height) => {
-    this.geometry.previewRowHeight(row, height);
+  private readonly onResolutionChange = (): void => {
+    if (this.lifetime.closed) return;
+    this.armResolutionListener();
     this.syncSizer();
     this.readWindows.invalidate();
     this.scheduleRender();
-   },
-   clearResizePreview: () => {
-    this.geometry.clearResizePreview();
+  };
+
+  private readonly onScroll = () => this.scheduleRender();
+  private readonly disposeStore: () => void;
+  private readonly objectLayer: ObjectLayer;
+  private readonly panelHost: HTMLDivElement;
+  /** The cell selection last emitted, to tell a real move from a re-emit. */
+  private lastSelectionKey = "";
+
+  constructor(
+    host: HTMLElement,
+    opts: GridOptions,
+    store?: Store,
+    ownsStore = store === undefined,
+  ) {
+    assertRibbonConfig(opts.config?.ribbon);
+    this.keymap = new Keymap(opts.config);
+    this.transactionResourceLimits = resolveTransactionResourceLimits(
+      opts.transactionResourceLimits,
+    );
+    this.host = host;
+    this.presentation = opts.presentation ?? "spreadsheet";
+    this.hyperlinkActivation =
+      opts.hyperlinkActivation === undefined
+        ? "event-only"
+        : opts.hyperlinkActivation === "event-only" ||
+            opts.hyperlinkActivation === "internal-navigation" ||
+            opts.hyperlinkActivation === "disabled"
+          ? opts.hyperlinkActivation
+          : "disabled";
+    const workbook = opts.workbook;
+    if (!(store instanceof SheetwriteStore)) {
+      assertWorkbookAllocationLimits(workbook, {
+        storage: opts.datasourceStorage?.mode ?? "dense",
+      });
+    }
+
+    this.store =
+      store ??
+      new SheetwriteStore(workbook, opts.data, {
+        storage: opts.datasourceStorage?.mode ?? "dense",
+        chunkRows: opts.datasourceStorage?.chunkRows,
+        cacheBytes: opts.datasourceStorage?.cacheBytes,
+        dirtyCellLimit: opts.datasourceStorage?.dirtyCellLimit,
+        protectionResolver: opts.protectionResolver,
+        mutationPolicy: opts.mutationPolicy,
+        transactionResourceLimits: this.transactionResourceLimits,
+      });
+
+    this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
+    // A host store keeps the generation of the engine it was built on.
+    this.engineGeneration = storeGeneration(this.store) ?? engineGeneration();
+    this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
+    this.ownsStore = ownsStore;
+    const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
+    for (const sheet of workbook.sheets) {
+      this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
+    }
+
+    const datasource = opts.datasource;
+    this.hasDatasource = datasource !== undefined;
+    this.readOnly = opts.readOnly ?? false;
+    this.config = opts.config;
+    this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
+    this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
+
+    const requestedActive = opts.workbook.activeSheet;
+    const requestedSheet = workbook.sheets.find((sheet) => sheet.id === requestedActive);
+    this.activeSheet =
+      requestedSheet && (requestedSheet.visibility ?? "visible") === "visible"
+        ? requestedActive
+        : (visibleSheetNeighbor(workbook.sheets, requestedActive) ??
+          workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
+          requestedActive);
+
+    this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
+    this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
+    this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
+    this.theme = this.withAdaptiveGutter(
+      this.baseTheme,
+      workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
+    );
+
+    this.tabBarHeight = opts.config?.tabs !== false ? 28 : 0;
+
+    this.document = new DocumentController({
+      store: this.store,
+      loadable: this.loadable,
+      readOnly: () => this.readOnly,
+      epoch: () => this.storeEpoch,
+      materializeVirtualColumns: (patches) => this.materializeVirtualColumns(patches),
+      onMutationRejected: (issues) => {
+        for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
+      },
+      onHistoryApplied: () => {
+        this.emitSelection();
+        this.render();
+      },
+      transactionResourceLimits: this.transactionResourceLimits,
+      admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
+      trustedResourceCallbacks: true,
+    });
+    registerGridDocument(this, this.document);
+
+    // Headless hosts opt out of (or intercept) the stock key bindings once at
+    // construction; the input controller consults this on every keydown.
+    const keyboardOpt = opts.config?.keyboard ?? true;
+    this.keyboardPolicy =
+      typeof keyboardOpt === "function" ? (e: KeyboardEvent) => keyboardOpt(e, this) : keyboardOpt;
+
+    for (const [name, r] of Object.entries(opts.renderers ?? {})) {
+      this.customRenderers.set(name, r);
+    }
+
+    for (const [name, editor] of Object.entries(opts.editors ?? {})) {
+      this.customEditors.set(name, editor);
+    }
+
+    const sheet = this.sheet();
+    this.maxElementHeight = measureMaxElementHeight();
+    this.lastDevicePixelRatio = globalThis.devicePixelRatio ?? 1;
+
+    this.geometry = new GeometryLayoutController(
+      {
+        sheet: () => this.sheet(),
+        activeSheet: () => this.activeSheet,
+        loadable: this.loadable,
+        theme: () => this.theme,
+        zoom: () => this.zoom,
+        maxElementHeight: () => this.maxElementHeight,
+      },
+      host.clientHeight - this.tabBarHeight,
+    );
+
+    this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
+
+    this.datasourceController = new DatasourceController(
+      {
+        datasource,
+        columns: (sheetId) => {
+          const liveSheet = this.sheetById(sheetId);
+          if (!liveSheet) throw unknownSheetError(sheetId);
+          return liveSheet.columns;
+        },
+        loadable: this.loadable,
+        activeSheet: () => this.activeSheet,
+        rowCount: (sheetId) => this.sheet(sheetId).rowCount,
+        revision: () => this.storeEpoch,
+        isCellNewerThan: (address, revision) =>
+          this.mutationRevisions.isNewerThan(address, revision),
+        retainRevision: (revision) => this.mutationRevisions.retainRevision(revision),
+        onRowsLoaded: () => {
+          this.storeEpoch += 1;
+          this.windowContentRevision += 1;
+          this.scheduleRender();
+        },
+        onError: (request, error) => {
+          // Identifiers and numbers only: column keys are host text, and a wide
+          // request can hold thousands of bands.
+          const context = {
+            protocol: request.protocol,
+            sheet: request.sheet,
+            start: request.start,
+            end: request.end,
+            revision: request.revision,
+            columnBandCount: request.columns.length,
+            columns: request.columns
+              .slice(0, MAX_DATASOURCE_ERROR_COLUMN_BANDS)
+              .map(({ start, end }) => ({ start, end })),
+          };
+
+          // The controller's own page checks carry this code without the
+          // request, so they are wrapped once to add it; host failures with
+          // another code keep their identity.
+          const failure =
+            isSheetwriteError(error) && error.code !== "datasource-request-failed"
+              ? normalizeSheetwriteError(error, "datasource-request-failed", "datasource-request")
+              : new SheetwriteError(
+                  "datasource-request-failed",
+                  "datasource-request",
+                  error instanceof Error ? error.message : "Sheetwrite datasource-request failed",
+                  { cause: error, context },
+                );
+          for (const fn of this.listeners["datasource-error"]) {
+            fn({ request, error: failure });
+          }
+        },
+      },
+      sheet.rowCount,
+    );
+
+    this.searchController = new SearchController({
+      store: this.store,
+      loadable: this.loadable,
+      activeSheet: () => this.activeSheet,
+      sheet: (id) => this.sheet(id),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
+      viewportAnchor: () =>
+        this.geometry.viewportAnchor(
+          this.geometry.toContent(this.scroller.scrollTop),
+          this.scroller.scrollLeft,
+        ),
+      scrollToCell: (addr) => this.scrollToCell(addr),
+      scheduleRender: () => this.scheduleRender(),
+      emit: (result) => {
+        for (const fn of this.listeners.search) fn(result);
+      },
+      readOnly: () => this.readOnly,
+      commit: (patches) => this.document.commit(patches, "replace"),
+    });
+
+    this.clipboard = new ClipboardController({
+      lifetime: this.lifetime,
+      store: this.store,
+      selection: () => this.selection,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      colIndices: () => this.geometry.columnIndices,
+      readOnly: () => this.readOnly,
+      mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
+      toDataRow: (viewRow) => this.toDataRow(viewRow),
+      commit: (patches, reason) => this.document.commit(patches, reason),
+    });
+
+    this.styleActions = new StyleActions({
+      store: this.store,
+      loadable: this.loadable,
+      selection: () => this.selection,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      readOnly: () => this.readOnly,
+      theme: () => this.theme,
+      merges: () => this.sheet().merges ?? [],
+      anchorCell: (row, col) => this.anchorCell(row, col),
+      toDataRow: (viewRow) => this.toDataRow(viewRow),
+      commit: (patches) => this.document.commit(patches, "style"),
+    });
+
+    this.actions = this.buildActions();
+
+    // host chrome: optional toolbar (top) + viewport (cells) + optional tab bar.
+    host.classList.add("sheetwrite");
+    host.style.position = host.style.position || "relative";
+    host.style.overflow = "hidden";
+    if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
+    this.actionFeedback = attachActionFeedback(this, host, this.lifetime);
+
+    const config = this.config;
+    this.createToolbar(config);
+
+    this.viewportEl = document.createElement("div");
+    this.viewportEl.className = "sheetwrite-viewport";
+    this.viewportEl.style.cssText = `position:absolute;left:0;right:0;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
+    host.appendChild(this.viewportEl);
+
+    this.scroller = document.createElement("div");
+    this.scroller.className = "sheetwrite-scroller";
+    this.scroller.style.cssText = "position:absolute;inset:0;overflow:auto;will-change:transform;";
+    this.sizer = document.createElement("div");
+    this.sizer.className = "sheetwrite-sizer";
+    this.scroller.appendChild(this.sizer);
+    this.viewportEl.appendChild(this.scroller);
+
+    // The side panel docks on the right edge, between the ribbon and the tab bar.
+    this.panelHost = document.createElement("div");
+    this.panelHost.className = "sheetwrite-panel-host";
+    this.panelHost.hidden = true;
+    this.panelHost.style.cssText = `position:absolute;right:0;width:${PANEL_WIDTH}px;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
+    host.appendChild(this.panelHost);
+
+    this.renderer = this.createRenderer(opts, this.viewportEl);
+    this.renderer.setRenderers(this.customRenderers);
+
+    this.interactions = new InteractionSessions({
+      host,
+      scroller: this.scroller,
+      viewportEl: this.viewportEl,
+      grid: this,
+      customEditors: this.customEditors,
+      highlightCells: (ranges) => this.highlightCells(ranges),
+      columnHeader: (col) => this.columnHeader(col),
+      toViewRow: (row) => this.toViewRow(row),
+      editListeners: this.listeners,
+      openFind: (options) => this.openFindBar(options),
+      store: this.store,
+      loadable: this.loadable,
+      selection: () => this.selection,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      theme: () => this.theme,
+      colIndices: () => this.geometry.columnIndices,
+      firstCol: () => this.firstCol(),
+      lastCol: () => this.lastCol(),
+      nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
+      previousVisibleColumn: (col) => this.geometry.previousVisibleColumn(col),
+      colAtX: (contentX) => this.colAtX(contentX),
+      rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
+      rowCount: () => this.geometry.rowCount,
+      contentTop: () => this.geometry.toContent(this.scroller.scrollTop),
+      viewportH: () => this.viewportH(),
+      colLeftOf: (col) => this.colLeftOf(col),
+      rowTop: (row) => this.geometry.rowOffset(row),
+      rowHeight: (row) => this.geometry.rowHeight(row),
+      autoFitColumns: (cols) => this.autoFitColumns(cols),
+      previewColumnWidth: (col, width) => {
+        this.geometry.previewColumnWidth(col, width);
+        this.applyLayout();
+        this.scheduleRender();
+      },
+      previewRowHeight: (row, height) => {
+        this.geometry.previewRowHeight(row, height);
+        this.syncSizer();
+        this.readWindows.invalidate();
+        this.scheduleRender();
+      },
+      clearResizePreview: () => {
+        this.geometry.clearResizePreview();
+        this.applyLayout();
+        this.scheduleRender();
+      },
+      dataEdge: (row, col, dRow, dCol) => this.dataEdge(row, col, dRow, dCol),
+      keyboard: () => this.keyboardPolicy,
+      keymap: () => this.keymap,
+      contentXAt: (viewportX) => this.contentXAt(viewportX),
+      contentYAt: (viewportY) => this.contentYAt(viewportY),
+      zoom: () => this.zoom,
+      screenRect: (row, col, contentTop, scrollLeft) =>
+        this.screenRect(row, col, contentTop, scrollLeft),
+      anchorCell: (row, col) => this.anchorCell(row, col),
+      toDataRow: (viewRow) => this.toDataRow(viewRow),
+      clearSelection: () => this.clearSelection(),
+      emitSelection: () => this.emitSelection(),
+      scrollToCell: (addr) => this.scrollToCell(addr),
+      activateHyperlink: (addr) => {
+        try {
+          return this.activateHyperlink(addr);
+        } catch {
+          return false;
+        }
+      },
+      scheduleRender: () => this.scheduleRender(),
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      copy: () => this.runKeyboardClipboard(this.clipboard.copy()),
+      cut: () => this.runKeyboardClipboard(this.clipboard.cut()),
+      paste: () => this.runKeyboardClipboard(this.clipboard.paste()),
+      pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
+      commit: (patches, reason) => this.document.commit(patches, reason),
+      readOnly: () => this.readOnly,
+      onEditStart: () => this.notes.hideCard(),
+    });
+
+    this.interactions.configureMenu(config, this.theme);
+
+    this.notes = new NotePopover({
+      host,
+      scroller: this.scroller,
+      theme: this.baseTheme,
+      cellAt: (clientX, clientY) => {
+        // The row header column is not a cell, though hit-testing clamps it to the first one.
+        const left = this.viewportEl.getBoundingClientRect().left;
+        if (clientX - left < this.theme.rowHeaderWidth) return null;
+
+        const cell = this.interactions.cellAtPointer(clientX, clientY);
+        return cell ? this.noteCell(cell.row, cell.col) : null;
+      },
+      noteAt: (address) => this.getNote(address),
+      cellRect: (cell) => {
+        const viewport = this.viewportEl.getBoundingClientRect();
+        const rect = this.screenRect(
+          cell.row,
+          cell.col,
+          this.geometry.toContent(this.scroller.scrollTop),
+          this.scroller.scrollLeft,
+        );
+        const left = viewport.left + rect.x;
+        const top = viewport.top + rect.y;
+        return { left, top, right: left + rect.w, bottom: top + rect.h };
+      },
+      editorLabel: (cell) => `Note for ${this.columnHeader(cell.col)}, row ${cell.row + 1}`,
+      commit: (address, text) => this.setNote(address, text),
+      returnFocus: () => this.host.focus(),
+    });
+
+    this.overlayPainter = new OverlayPainter(this.viewportEl, {
+      theme: () => this.theme,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      selection: () => this.selection,
+      rowOffsetOf: (row) => this.geometry.rowOffset(row),
+      freeze: () => ({
+        fr: this.frozenRowCount(),
+        frozenH: this.frozenHeight(),
+        frozenW: this.frozenWidth(),
+        firstBodyCol: this.firstBodyCol(),
+      }),
+      zoom: () => this.zoom,
+      colLeftOf: (col) => this.colLeftOf(col),
+      screenRect: (row, col, contentTop, scrollLeft) =>
+        this.screenRect(row, col, contentTop, scrollLeft),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
+      isEditing: () => this.interactions.isEditing,
+      fillTarget: () => this.interactions.fillPreview,
+      fillHandleScreen: (contentTop, scrollLeft) =>
+        this.interactions.fillHandleScreen(contentTop, scrollLeft),
+      searchMatches: () => this.searchController.matches,
+      searchActive: () => this.searchController.active,
+      searchVersion: () => this.searchController.version,
+      geometryVersion: () => this.readWindows.geometryVersion,
+      scheduleRender: () => this.scheduleRender(),
+    });
+
+    this.domOverlay = new DomOverlay(this.viewportEl, {
+      host,
+      geometry: this.geometry,
+    });
+
+    this.domOverlay.setRenderers(this.customRenderers);
+    this.domOverlay.setTheme(this.theme);
+
+    this.objectLayer = new ObjectLayer({
+      viewport: this.viewportEl,
+      scroller: this.scroller,
+      store: this.store,
+      geometry: this.geometry,
+      activeSheet: () => this.activeSheet,
+      charts: () => {
+        // A dashboard draws its charts in its items, not over cells.
+        const sheet = this.sheetById(this.activeSheet);
+        return isDashboard(sheet) ? [] : (sheet?.charts ?? []);
+      },
+      theme: () => this.theme,
+      zoom: () => this.zoom,
+      readOnly: () => this.readOnly,
+      setChart: (chart) => this.setChart(chart, this.activeSheet),
+      removeChart: (id) => this.removeChart(id, this.activeSheet),
+      focusGrid: () => this.host.focus(),
+      onSelect: (chart) => {
+        for (const fn of this.listeners["chart-select"]) fn(chart);
+      },
+      onActivate: (chart) => {
+        for (const fn of this.listeners["chart-activate"]) fn(chart);
+      },
+      onContextMenu: (chart, clientX, clientY) =>
+        this.interactions.openMenu(this.chartMenuItems(chart), clientX, clientY),
+      isHistoryShortcut: (event) => {
+        const action = this.keymap.action(event);
+        return action === "undo" || action === "redo";
+      },
+    });
+
+    this.objectLayer.sync();
+    // The grid emits no selection at construction; start from the real one so
+    // the first re-emit (an undo, say) does not count as a move.
+    this.lastSelectionKey = JSON.stringify(this.getSelection());
+
+    this.ariaMirror = new AriaMirror({
+      host,
+      scroller: this.scroller,
+      overlay: this.overlayPainter.element,
+      viewport: this.viewportEl,
+      rowCount: sheet.rowCount,
+      colCount: this.geometry.columnIndices.length,
+      readOnly: this.readOnly,
+      presentation: this.presentation,
+      columnHeader: (col) => this.columnHeader(col),
+      focusCell: () => this.selection.focusCell,
+      noteAt: (row, col) =>
+        this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
+      selection: () => this.selection.toSelection(this.activeSheet),
+    });
+
+    this.readWindows = new ReadWindowController({
+      renderer: () => this.renderer,
+      domOverlay: this.domOverlay,
+      overlayPainter: this.overlayPainter,
+      ariaMirror: this.ariaMirror,
+      geometry: this.geometry,
+      datasource: this.datasourceController,
+      datasourceEnabled: Boolean(datasource),
+      store: this.store,
+      activeSheet: () => this.activeSheet,
+      theme: () => this.theme,
+      overscan: () => this.overscan,
+      zoom: () => this.zoom,
+      storeEpoch: () => this.windowContentRevision,
+      viewportHeight: () => this.viewportH(),
+      viewportWidth: () => this.viewportEl.clientWidth,
+      datasourceColumnCount: () => this.sheetById(this.activeSheet)?.columns.length ?? 0,
+      scrollTop: () => this.scroller.scrollTop,
+      scrollLeft: () => this.scroller.scrollLeft,
+      repositionEditor: (contentTop, scrollLeft) => this.repositionEditor(contentTop, scrollLeft),
+      emitScroll: (event) => {
+        for (const fn of this.listeners.scroll) fn(event);
+      },
+      onEngineTrap: (cause) => {
+        this.onEngineFailed(stopEngine(cause, this.engineGeneration));
+      },
+    });
+
+    if (this.tabBarHeight > 0) this.buildTabBar();
+
+    this.disposeStore = this.store.on("change", (event) => this.onStoreChange(event));
+
+    this.applyLayout();
+    this.scroller.addEventListener("scroll", this.onScroll, {
+      passive: true,
+      signal: this.lifetime.signal,
+    });
+
+    if (typeof ResizeObserver !== "undefined") {
+      const resizeObserver = new ResizeObserver(() => this.onResize());
+      resizeObserver.observe(host);
+      this.lifetime.add(() => resizeObserver.disconnect());
+    }
+
+    this.armResolutionListener();
+    this.attachPanels();
+    // A host store built before an engine stop starts this grid read-only.
+    if (this.engineGeneration !== engineGeneration()) this.onEngineFailed(engineFailedError());
+    this.render();
+    // Registered last: a constructor that throws earlier leaves no listener
+    // behind. A trap in the first paint reaches `onEngineFailed` through `onEngineTrap`.
+    this.removeEngineFailureListener = onEngineFailure((failure) => this.onEngineFailed(failure));
+  }
+
+  /**
+   * The engine stopped. Its instance can be half-written, so this grid keeps
+   * its last frame, refuses edits at once and never reads the store again.
+   * The chrome update and the event run one microtask later, so host code
+   * cannot replace the `engine-failed` error of the failing call.
+   */
+  private onEngineFailed(failure: SheetwriteError): void {
+    if (this.lifetime.closed || this.engineFailure) return;
+
+    this.engineFailure = failure;
+    this.readOnly = true;
+    this.readWindows.freeze();
+    // A microtask cannot be cancelled, so it reads the closed state instead.
+    queueMicrotask(() => {
+      if (this.lifetime.closed) return;
+
+      try {
+        this.syncReadOnlyChrome(true);
+      } finally {
+        for (const fn of this.listeners["engine-failed"]) fn({ error: failure });
+      }
+    });
+  }
+
+  /** Listen for first use without fetching the panel chunk on ordinary grids. */
+  private attachPanels(): void {
+    if (this.presentation !== "spreadsheet") return;
+    this.lifetime.add(attachPanelTriggers(this, this.config?.icons));
+    const dashboard = attachDashboardView(this, this.viewportEl, () => this.readOnly);
+    this.dashboardView = dashboard;
+    this.lifetime.add(() => dashboard.dispose());
+  }
+
+  private refreshSourcePresence(): void {
+    const engine = storeEngine(this.store);
+    this.sourceSheet = this.activeSheet;
+    if (!engine || engine.isPaged(this.activeSheet)) {
+      this.sheetHasSources = true;
+      return;
+    }
+    const sources = engine.captureSheetSources(this.activeSheet);
+    this.sheetHasSources =
+      !sources || sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
+  }
+
+  /** Bring every grid part up to date with one committed store change. */
+  private onStoreChange(event: ChangeEvent): void {
+    this.storeEpoch += 1;
+    this.cancelAutoFit();
+    this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
+    this.activeSheetCache = null;
+
+    // Presence learned during this change describes the state after it, which
+    // cannot vouch for cells it just stopped computing (e.g. a removed spill).
+    const presenceKnown = this.sourceSheet === this.activeSheet;
+    const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
+    if (windowChanged) this.windowContentRevision += 1;
+
+    const effects = this.classifyPatches(event.transaction.patches);
+    const viewChanged = (effects & VIEW_EFFECTS) !== 0;
+    this.followSessionSheets(event.transaction.patches);
+
+    this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
+    if (effects & RESET_DATASOURCE) {
+      this.datasourceController.reset(this.sheet().rowCount);
+      this.mutationRevisions.clear();
+      this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
+    }
+
+    const change = effects & RESET_DATASOURCE ? "structure" : viewChanged ? "view" : "value";
+    this.interactions.reconcile(change);
+
+    // A note edit holds a data address that a structure change moves; geometry
+    // changes move the shown card away from its cell.
+    if (change === "structure") this.notes.dismiss();
+    else if (change === "view") this.notes.hideCard();
+
+    if (effects & (REBUILD_ROWS | RECONCILE_VIEW)) this.rebuildIndex();
+    if (effects & REBUILD_COLUMNS) this.rebuildColumnIndex();
+    if (effects & (REBUILD_COLUMNS | APPLY_LAYOUT)) this.applyLayout();
+    if (effects & GEOMETRY_CHANGED) this.readWindows.invalidateData();
+    this.searchController.refreshAfterChange(
+      event.transaction.patches,
+      this.activeSheet,
+      presenceKnown && !this.sheetHasSources,
+    );
+
+    if (effects & RECONCILE_VIEW) {
+      // Selection uses view-row positions: remote/history permutations must reset
+      // it and scroll just like named actions, before change listeners run.
+      this.selection.clear();
+      this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
+      this.emitSelection();
+      this.scroller.scrollTop = 0;
+      this.readWindows.invalidateData();
+    }
+
+    if (effects & SHEETS_CHANGED) this.renderTabs();
+    if (
+      event.transaction.patches.some(
+        (patch) => patch.op === "setNote" && patch.addr.sheet === this.activeSheet,
+      )
+    ) {
+      this.ariaMirror.bumpVersion();
+      this.notes.refresh();
+    }
+
+    // Chart edits, undo and sheet changes all arrive here.
+    this.objectLayer.sync();
+    this.scheduleRender();
+    for (const fn of this.listeners.change) fn(event);
+    this.queueCommandStateChange();
+  }
+
+  /**
+   * Effect bits a committed change requires of the active sheet's view. Row metadata
+   * edits also update `displayedHiddenRows`, whose difference from the store
+   * decides whether the view must be rebuilt.
+   */
+  private classifyPatches(patches: readonly DocumentOp[]): number {
+    let effects = 0;
+
+    for (const patch of patches) {
+      if (changesSheetTabs(patch)) effects |= SHEETS_CHANGED;
+      if (!("sheet" in patch) || patch.sheet !== this.activeSheet) continue;
+
+      if (!annotatesSheet(patch)) effects |= GEOMETRY_CHANGED;
+
+      if (
+        patch.op === "setSheetMeta" &&
+        (patch.patch.sortKeys !== undefined ||
+          patch.patch.filters !== undefined ||
+          patch.patch.rowGroups !== undefined)
+      ) {
+        effects |= RECONCILE_VIEW;
+      } else if (patch.op === "setRowMeta") {
+        const hidden = this.sheet().hiddenRows?.has(patch.row) ?? false;
+        if (hidden !== this.displayedHiddenRows.has(patch.row)) effects |= RECONCILE_VIEW;
+        if (hidden) this.displayedHiddenRows.add(patch.row);
+        else this.displayedHiddenRows.delete(patch.row);
+      }
+
+      if (changesSheetStructure(patch)) {
+        effects |= RESET_DATASOURCE;
+        // Structure edits can clear query state as well as shift columns/rows.
+        // Keep the previous view state: the store has already removed that query.
+        if (
+          (effects & RECONCILE_VIEW) === 0 &&
+          (this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false))
+        ) {
+          effects |= RECONCILE_VIEW;
+        }
+      }
+
+      if (
+        patch.op === "addRows" ||
+        patch.op === "removeRows" ||
+        patch.op === "moveRows" ||
+        patch.op === "setRowMeta" ||
+        (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
+      ) {
+        effects |= REBUILD_ROWS;
+      } else if (
+        patch.op === "addColumns" ||
+        patch.op === "removeColumns" ||
+        patch.op === "moveColumns" ||
+        (patch.op === "setColumn" && ("width" in patch.patch || "visible" in patch.patch))
+      ) {
+        effects |= REBUILD_COLUMNS;
+      }
+
+      if (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta") {
+        effects |= APPLY_LAYOUT;
+      }
+    }
+
+    return effects;
+  }
+
+  /**
+   * Replay sheet adds, removals, moves and visibility changes on the session's
+   * sheet list, so the active sheet moves to the neighbour a user would expect.
+   */
+  private followSessionSheets(patches: readonly DocumentOp[]): void {
+    const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
+    let sessionActive = this.activeSheet;
+
+    for (const patch of patches) {
+      if (patch.op === "addSheet") {
+        sessionSheets.splice(patch.sheet.order, 0, {
+          id: patch.sheet.id,
+          visibility: patch.sheet.visibility,
+        });
+      } else if (patch.op === "removeSheet") {
+        const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
+        if (index < 0) continue;
+
+        sessionSheets.splice(index, 1);
+        if (sessionActive === patch.sheet) {
+          sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet, index) ?? sessionActive;
+        }
+      } else if (patch.op === "moveSheet") {
+        const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
+        const [sheet] = index >= 0 ? sessionSheets.splice(index, 1) : [];
+        if (sheet) sessionSheets.splice(patch.to, 0, sheet);
+      } else if (patch.op === "setSheetVisibility") {
+        const sheet = sessionSheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet) continue;
+
+        sheet.visibility = patch.visibility;
+        if (sessionActive === patch.sheet && patch.visibility !== "visible") {
+          sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet) ?? sessionActive;
+        }
+      }
+    }
+
+    const sheets = this.store.getWorkbook().sheets;
+    const reconciled = sheets.find((sheet) => sheet.id === sessionActive);
+    if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
+      sessionActive =
+        sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ?? sessionActive;
+    }
+
+    if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
+    this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
+  }
+
+  private transactionAffectsWindow(patches: readonly DocumentOp[]): boolean {
+    // The handler runs before a removed or hidden active sheet is replaced, so
+    // the old sheet may be gone; the sheet switch repaints everything anyway.
+    const sheet = this.sheetById(this.activeSheet);
+    if (!sheet) return true;
+    // Presence is read after the first change on each sheet, so that change may
+    // have removed the last formula (and its spill); repaint it conservatively.
+    if (this.sourceSheet !== this.activeSheet) {
+      this.refreshSourcePresence();
+      return true;
+    }
+
+    let affectsWindow = false;
+    const engine = storeEngine(this.store);
+    // A source-free active sheet cannot receive computed values from another
+    // cell or sheet. Formula/ref presence is sticky until a sheet switch, so
+    // removing a spill anchor still refreshes its former children. Unknown
+    // stores, paged loads, conditional formats, validation and merge anchors
+    // stay conservative: their displayed result may depend on off-window data.
+    const dependentDisplay = Boolean(
+      this.sheetHasSources ||
+      !engine ||
+      engine.isPaged(this.activeSheet) ||
+      sheet.conditionalFormats?.length ||
+      sheet.validationRules?.length ||
+      sheet.merges?.length ||
+      sheet.pivots?.length,
+    );
+    let painted: PaintedCells | null = null;
+    for (const patch of patches) {
+      let range: Range | CellAddress;
+      switch (patch.op) {
+        case "set":
+          if (
+            patch.addr.sheet === this.activeSheet &&
+            (patch.value.kind === "formula" || patch.value.kind === "ref")
+          )
+            this.sheetHasSources = true;
+          range = patch.addr;
+          break;
+
+        case "setRange":
+          if (
+            patch.range.sheet === this.activeSheet &&
+            patch.cells.some((cell) => cell.value.kind === "formula" || cell.value.kind === "ref")
+          )
+            this.sheetHasSources = true;
+          range = patch.range;
+          break;
+
+        case "setBlock":
+          if (
+            patch.range.sheet === this.activeSheet &&
+            (patch.block.formulas?.length || patch.block.refs?.length)
+          )
+            this.sheetHasSources = true;
+          range = patch.range;
+          break;
+
+        case "restoreBlock":
+          if (patch.range.sheet === this.activeSheet) this.sheetHasSources = true;
+          range = patch.range;
+          break;
+
+        case "setRangeStyle":
+        case "clearRange":
+        case "permuteRows":
+          range = patch.range;
+          break;
+
+        case "setNote":
+          continue;
+
+        default:
+          affectsWindow = true;
+          continue;
+      }
+
+      if (affectsWindow || dependentDisplay || this.sheetHasSources) {
+        affectsWindow = true;
+        continue;
+      }
+
+      // Large off-screen batches pay for one window snapshot, not one per patch.
+      painted ??= this.readWindows.paintedCells();
+      affectsWindow =
+        "start" in range
+          ? painted.intersects(range.sheet, range.start, range.end)
+          : painted.intersects(range.sheet, range, range);
+    }
+
+    return affectsWindow;
+  }
+
+  private createRenderer(opts: GridOptions, host: HTMLElement): Renderer {
+    if (opts.renderer === "worker") {
+      try {
+        let worker: WorkerRenderer;
+        worker = new WorkerRenderer(opts.workerUrl, {}, (error) => {
+          this.fallbackWorkerRenderer(worker, error);
+        });
+        worker.mount(host, this.theme);
+        this.activeRendererKind = "worker";
+        return worker;
+      } catch (error) {
+        // Worker unavailable (no OffscreenCanvas / construction blocked) —
+        // fall back observably after post-construction subscribers can attach.
+        this.emitRendererFallback(error);
+      }
+    }
+    const canvas = new CanvasRenderer();
+    canvas.mount(host, this.theme);
+    this.activeRendererKind = "canvas";
+    return canvas;
+  }
+
+  private fallbackWorkerRenderer(worker: WorkerRenderer, error: unknown): void {
+    if (this.lifetime.closed || this.renderer !== worker || this.activeRendererKind !== "worker") {
+      return;
+    }
+
+    worker.destroy();
+    const canvas = new CanvasRenderer();
+    canvas.mount(this.viewportEl, this.theme);
+    canvas.setRenderers(this.customRenderers);
+    this.renderer = canvas;
+    this.activeRendererKind = "canvas";
     this.applyLayout();
     this.scheduleRender();
-   },
-   dataEdge: (row, col, dRow, dCol) => this.dataEdge(row, col, dRow, dCol),
-   keyboard: () => this.keyboardPolicy,
-   keymap: () => this.keymap,
-   contentXAt: (viewportX) => this.contentXAt(viewportX),
-   contentYAt: (viewportY) => this.contentYAt(viewportY),
-   zoom: () => this.zoom,
-   screenRect: (row, col, contentTop, scrollLeft) =>
-    this.screenRect(row, col, contentTop, scrollLeft),
-   anchorCell: (row, col) => this.anchorCell(row, col),
-   toDataRow: (viewRow) => this.toDataRow(viewRow),
-   clearSelection: () => this.clearSelection(),
-   emitSelection: () => this.emitSelection(),
-   scrollToCell: (addr) => this.scrollToCell(addr),
-   activateHyperlink: (addr) => {
-    try {
-     return this.activateHyperlink(addr);
-    } catch {
-     return false;
-    }
-   },
-   scheduleRender: () => this.scheduleRender(),
-   undo: () => this.undo(),
-   redo: () => this.redo(),
-   copy: () => this.runKeyboardClipboard(this.clipboard.copy()),
-   cut: () => this.runKeyboardClipboard(this.clipboard.cut()),
-   paste: () => this.runKeyboardClipboard(this.clipboard.paste()),
-   pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
-   commit: (patches, reason) => this.document.commit(patches, reason),
-   readOnly: () => this.readOnly,
-   onEditStart: () => this.notes.hideCard(),
-  });
-
-  this.interactions.configureMenu(config, this.theme);
-
-  this.notes = new NotePopover({
-   host,
-   scroller: this.scroller,
-   theme: this.baseTheme,
-   cellAt: (clientX, clientY) => {
-    // The row header column is not a cell, though hit-testing clamps it to the first one.
-    const left = this.viewportEl.getBoundingClientRect().left;
-    if (clientX - left < this.theme.rowHeaderWidth) return null;
-
-    const cell = this.interactions.cellAtPointer(clientX, clientY);
-    return cell ? this.noteCell(cell.row, cell.col) : null;
-   },
-   noteAt: (address) => this.getNote(address),
-   cellRect: (cell) => {
-    const viewport = this.viewportEl.getBoundingClientRect();
-    const rect = this.screenRect(
-     cell.row,
-     cell.col,
-     this.geometry.toContent(this.scroller.scrollTop),
-     this.scroller.scrollLeft,
-    );
-    const left = viewport.left + rect.x;
-    const top = viewport.top + rect.y;
-    return { left, top, right: left + rect.w, bottom: top + rect.h };
-   },
-   editorLabel: (cell) => `Note for ${this.columnHeader(cell.col)}, row ${cell.row + 1}`,
-   commit: (address, text) => this.setNote(address, text),
-   returnFocus: () => this.host.focus(),
-  });
-
-  this.overlayPainter = new OverlayPainter(this.viewportEl, {
-   theme: () => this.theme,
-   activeSheet: () => this.activeSheet,
-   sheet: () => this.sheet(),
-   selection: () => this.selection,
-   rowOffsetOf: (row) => this.geometry.rowOffset(row),
-   freeze: () => ({
-    fr: this.frozenRowCount(),
-    frozenH: this.frozenHeight(),
-    frozenW: this.frozenWidth(),
-    firstBodyCol: this.firstBodyCol(),
-   }),
-   zoom: () => this.zoom,
-   colLeftOf: (col) => this.colLeftOf(col),
-   screenRect: (row, col, contentTop, scrollLeft) =>
-    this.screenRect(row, col, contentTop, scrollLeft),
-   toViewRow: (dataRow) => this.toViewRow(dataRow),
-   isEditing: () => this.interactions.isEditing,
-   fillTarget: () => this.interactions.fillPreview,
-   fillHandleScreen: (contentTop, scrollLeft) =>
-    this.interactions.fillHandleScreen(contentTop, scrollLeft),
-   searchMatches: () => this.searchController.matches,
-   searchActive: () => this.searchController.active,
-   searchVersion: () => this.searchController.version,
-   geometryVersion: () => this.readWindows.geometryVersion,
-   scheduleRender: () => this.scheduleRender(),
-  });
-
-  this.domOverlay = new DomOverlay(this.viewportEl, {
-   host,
-   geometry: this.geometry,
-  });
-
-  this.domOverlay.setRenderers(this.customRenderers);
-  this.domOverlay.setTheme(this.theme);
-
-  this.objectLayer = new ObjectLayer({
-   viewport: this.viewportEl,
-   scroller: this.scroller,
-   store: this.store,
-   geometry: this.geometry,
-   activeSheet: () => this.activeSheet,
-   charts: () => {
-    // A dashboard draws its charts in its items, not over cells.
-    const sheet = this.sheetById(this.activeSheet);
-    return isDashboard(sheet) ? [] : (sheet?.charts ?? []);
-   },
-   theme: () => this.theme,
-   zoom: () => this.zoom,
-   readOnly: () => this.readOnly,
-   setChart: (chart) => this.setChart(chart, this.activeSheet),
-   removeChart: (id) => this.removeChart(id, this.activeSheet),
-   focusGrid: () => this.host.focus(),
-   onSelect: (chart) => {
-    for (const fn of this.listeners["chart-select"]) fn(chart);
-   },
-   onActivate: (chart) => {
-    for (const fn of this.listeners["chart-activate"]) fn(chart);
-   },
-   onContextMenu: (chart, clientX, clientY) =>
-    this.interactions.openMenu(this.chartMenuItems(chart), clientX, clientY),
-   isHistoryShortcut: (event) => {
-    const action = this.keymap.action(event);
-    return action === "undo" || action === "redo";
-   },
-  });
-
-  this.objectLayer.sync();
-  // The grid emits no selection at construction; start from the real one so
-  // the first re-emit (an undo, say) does not count as a move.
-  this.lastSelectionKey = JSON.stringify(this.getSelection());
-
-  this.ariaMirror = new AriaMirror({
-   host,
-   scroller: this.scroller,
-   overlay: this.overlayPainter.element,
-   viewport: this.viewportEl,
-   rowCount: sheet.rowCount,
-   colCount: this.geometry.columnIndices.length,
-   readOnly: this.readOnly,
-   presentation: this.presentation,
-   columnHeader: (col) => this.columnHeader(col),
-   focusCell: () => this.selection.focusCell,
-   noteAt: (row, col) =>
-    this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
-   selection: () => this.selection.toSelection(this.activeSheet),
-  });
-
-  this.readWindows = new ReadWindowController({
-   renderer: () => this.renderer,
-   domOverlay: this.domOverlay,
-   overlayPainter: this.overlayPainter,
-   ariaMirror: this.ariaMirror,
-   geometry: this.geometry,
-   datasource: this.datasourceController,
-   datasourceEnabled: Boolean(datasource),
-   store: this.store,
-   activeSheet: () => this.activeSheet,
-   theme: () => this.theme,
-   overscan: () => this.overscan,
-   zoom: () => this.zoom,
-   storeEpoch: () => this.windowContentRevision,
-   viewportHeight: () => this.viewportH(),
-   viewportWidth: () => this.viewportEl.clientWidth,
-   datasourceColumnCount: () => this.sheetById(this.activeSheet)?.columns.length ?? 0,
-   scrollTop: () => this.scroller.scrollTop,
-   scrollLeft: () => this.scroller.scrollLeft,
-   repositionEditor: (contentTop, scrollLeft) => this.repositionEditor(contentTop, scrollLeft),
-   emitScroll: (event) => {
-    for (const fn of this.listeners.scroll) fn(event);
-   },
-   onEngineTrap: (cause) => {
-    this.onEngineFailed(stopEngine(cause, this.engineGeneration));
-   },
-  });
-
-  if (this.tabBarHeight > 0) this.buildTabBar();
-
-  this.disposeStore = this.store.on("change", (event) => this.onStoreChange(event));
-
-  this.applyLayout();
-  this.scroller.addEventListener("scroll", this.onScroll, {
-   passive: true,
-   signal: this.lifetime.signal,
-  });
-
-  if (typeof ResizeObserver !== "undefined") {
-   const resizeObserver = new ResizeObserver(() => this.onResize());
-   resizeObserver.observe(host);
-   this.lifetime.add(() => resizeObserver.disconnect());
-  }
-
-  this.armResolutionListener();
-  this.attachPanels();
-  // A host store built before an engine stop starts this grid read-only.
-  if (this.engineGeneration !== engineGeneration()) this.onEngineFailed(engineFailedError());
-  this.render();
-  // Registered last: a constructor that throws earlier leaves no listener
-  // behind. A trap in the first paint reaches `onEngineFailed` through `onEngineTrap`.
-  this.removeEngineFailureListener = onEngineFailure((failure) => this.onEngineFailed(failure));
- }
-
- /**
-  * The engine stopped. Its instance can be half-written, so this grid keeps
-  * its last frame, refuses edits at once and never reads the store again.
-  * The chrome update and the event run one microtask later, so host code
-  * cannot replace the `engine-failed` error of the failing call.
-  */
- private onEngineFailed(failure: SheetwriteError): void {
-  if (this.lifetime.closed || this.engineFailure) return;
-
-  this.engineFailure = failure;
-  this.readOnly = true;
-  this.readWindows.freeze();
-  // A microtask cannot be cancelled, so it reads the closed state instead.
-  queueMicrotask(() => {
-   if (this.lifetime.closed) return;
-
-   try {
-    this.syncReadOnlyChrome(true);
-   } finally {
-    for (const fn of this.listeners["engine-failed"]) fn({ error: failure });
-   }
-  });
- }
-
- /** Listen for first use without fetching the panel chunk on ordinary grids. */
- private attachPanels(): void {
-  if (this.presentation !== "spreadsheet") return;
-  this.lifetime.add(attachPanelTriggers(this, this.config?.icons));
-  const dashboard = attachDashboardView(this, this.viewportEl, () => this.readOnly);
-  this.dashboardView = dashboard;
-  this.lifetime.add(() => dashboard.dispose());
- }
-
- private refreshSourcePresence(): void {
-  const engine = storeEngine(this.store);
-  this.sourceSheet = this.activeSheet;
-  if (!engine || engine.isPaged(this.activeSheet)) {
-   this.sheetHasSources = true;
-   return;
-  }
-  const sources = engine.captureSheetSources(this.activeSheet);
-  this.sheetHasSources =
-   !sources || sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
- }
-
- /** Bring every grid part up to date with one committed store change. */
- private onStoreChange(event: ChangeEvent): void {
-  this.storeEpoch += 1;
-  this.cancelAutoFit();
-  this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
-  this.activeSheetCache = null;
-
-  // Presence learned during this change describes the state after it, which
-  // cannot vouch for cells it just stopped computing (e.g. a removed spill).
-  const presenceKnown = this.sourceSheet === this.activeSheet;
-  const windowChanged = this.transactionAffectsWindow(event.transaction.patches);
-  if (windowChanged) this.windowContentRevision += 1;
-
-  const effects = this.classifyPatches(event.transaction.patches);
-  const viewChanged = (effects & VIEW_EFFECTS) !== 0;
-  this.followSessionSheets(event.transaction.patches);
-
-  this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
-  if (effects & RESET_DATASOURCE) {
-   this.datasourceController.reset(this.sheet().rowCount);
-   this.mutationRevisions.clear();
-   this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
-  }
-
-  const change = effects & RESET_DATASOURCE ? "structure" : viewChanged ? "view" : "value";
-  this.interactions.reconcile(change);
-
-  // A note edit holds a data address that a structure change moves; geometry
-  // changes move the shown card away from its cell.
-  if (change === "structure") this.notes.dismiss();
-  else if (change === "view") this.notes.hideCard();
-
-  if (effects & (REBUILD_ROWS | RECONCILE_VIEW)) this.rebuildIndex();
-  if (effects & REBUILD_COLUMNS) this.rebuildColumnIndex();
-  if (effects & (REBUILD_COLUMNS | APPLY_LAYOUT)) this.applyLayout();
-  if (effects & GEOMETRY_CHANGED) this.readWindows.invalidateData();
-  this.searchController.refreshAfterChange(
-   event.transaction.patches,
-   this.activeSheet,
-   presenceKnown && !this.sheetHasSources,
-  );
-
-  if (effects & RECONCILE_VIEW) {
-   // Selection uses view-row positions: remote/history permutations must reset
-   // it and scroll just like named actions, before change listeners run.
-   this.selection.clear();
-   this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
-   this.emitSelection();
-   this.scroller.scrollTop = 0;
-   this.readWindows.invalidateData();
-  }
-
-  if (effects & SHEETS_CHANGED) this.renderTabs();
-  if (
-   event.transaction.patches.some(
-    (patch) => patch.op === "setNote" && patch.addr.sheet === this.activeSheet,
-   )
-  ) {
-   this.ariaMirror.bumpVersion();
-   this.notes.refresh();
-  }
-
-  // Chart edits, undo and sheet changes all arrive here.
-  this.objectLayer.sync();
-  this.scheduleRender();
-  for (const fn of this.listeners.change) fn(event);
-  this.queueCommandStateChange();
- }
-
- /**
-  * Effect bits a committed change requires of the active sheet's view. Row metadata
-  * edits also update `displayedHiddenRows`, whose difference from the store
-  * decides whether the view must be rebuilt.
-  */
- private classifyPatches(patches: readonly DocumentOp[]): number {
-  let effects = 0;
-
-  for (const patch of patches) {
-   if (changesSheetTabs(patch)) effects |= SHEETS_CHANGED;
-   if (!("sheet" in patch) || patch.sheet !== this.activeSheet) continue;
-
-   if (!annotatesSheet(patch)) effects |= GEOMETRY_CHANGED;
-
-   if (
-    patch.op === "setSheetMeta" &&
-    (patch.patch.sortKeys !== undefined ||
-     patch.patch.filters !== undefined ||
-     patch.patch.rowGroups !== undefined)
-   ) {
-    effects |= RECONCILE_VIEW;
-   } else if (patch.op === "setRowMeta") {
-    const hidden = this.sheet().hiddenRows?.has(patch.row) ?? false;
-    if (hidden !== this.displayedHiddenRows.has(patch.row)) effects |= RECONCILE_VIEW;
-    if (hidden) this.displayedHiddenRows.add(patch.row);
-    else this.displayedHiddenRows.delete(patch.row);
-   }
-
-   if (changesSheetStructure(patch)) {
-    effects |= RESET_DATASOURCE;
-    // Structure edits can clear query state as well as shift columns/rows.
-    // Keep the previous view state: the store has already removed that query.
-    if (
-     (effects & RECONCILE_VIEW) === 0 &&
-     (this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false))
-    ) {
-     effects |= RECONCILE_VIEW;
-    }
-   }
-
-   if (
-    patch.op === "addRows" ||
-    patch.op === "removeRows" ||
-    patch.op === "moveRows" ||
-    patch.op === "setRowMeta" ||
-    (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
-   ) {
-    effects |= REBUILD_ROWS;
-   } else if (
-    patch.op === "addColumns" ||
-    patch.op === "removeColumns" ||
-    patch.op === "moveColumns" ||
-    (patch.op === "setColumn" && ("width" in patch.patch || "visible" in patch.patch))
-   ) {
-    effects |= REBUILD_COLUMNS;
-   }
-
-   if (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta") {
-    effects |= APPLY_LAYOUT;
-   }
-  }
-
-  return effects;
- }
-
- /**
-  * Replay sheet adds, removals, moves and visibility changes on the session's
-  * sheet list, so the active sheet moves to the neighbour a user would expect.
-  */
- private followSessionSheets(patches: readonly DocumentOp[]): void {
-  const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
-  let sessionActive = this.activeSheet;
-
-  for (const patch of patches) {
-   if (patch.op === "addSheet") {
-    sessionSheets.splice(patch.sheet.order, 0, {
-     id: patch.sheet.id,
-     visibility: patch.sheet.visibility,
-    });
-   } else if (patch.op === "removeSheet") {
-    const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
-    if (index < 0) continue;
-
-    sessionSheets.splice(index, 1);
-    if (sessionActive === patch.sheet) {
-     sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet, index) ?? sessionActive;
-    }
-   } else if (patch.op === "moveSheet") {
-    const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
-    const [sheet] = index >= 0 ? sessionSheets.splice(index, 1) : [];
-    if (sheet) sessionSheets.splice(patch.to, 0, sheet);
-   } else if (patch.op === "setSheetVisibility") {
-    const sheet = sessionSheets.find((candidate) => candidate.id === patch.sheet);
-    if (!sheet) continue;
-
-    sheet.visibility = patch.visibility;
-    if (sessionActive === patch.sheet && patch.visibility !== "visible") {
-     sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet) ?? sessionActive;
-    }
-   }
-  }
-
-  const sheets = this.store.getWorkbook().sheets;
-  const reconciled = sheets.find((sheet) => sheet.id === sessionActive);
-  if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
-   sessionActive =
-    sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ?? sessionActive;
-  }
-
-  if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
-  this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
- }
-
- private transactionAffectsWindow(patches: readonly DocumentOp[]): boolean {
-  // The handler runs before a removed or hidden active sheet is replaced, so
-  // the old sheet may be gone; the sheet switch repaints everything anyway.
-  const sheet = this.sheetById(this.activeSheet);
-  if (!sheet) return true;
-  // Presence is read after the first change on each sheet, so that change may
-  // have removed the last formula (and its spill); repaint it conservatively.
-  if (this.sourceSheet !== this.activeSheet) {
-   this.refreshSourcePresence();
-   return true;
-  }
-
-  let affectsWindow = false;
-  const engine = storeEngine(this.store);
-  // A source-free active sheet cannot receive computed values from another
-  // cell or sheet. Formula/ref presence is sticky until a sheet switch, so
-  // removing a spill anchor still refreshes its former children. Unknown
-  // stores, paged loads, conditional formats, validation and merge anchors
-  // stay conservative: their displayed result may depend on off-window data.
-  const dependentDisplay = Boolean(
-   this.sheetHasSources ||
-   !engine ||
-   engine.isPaged(this.activeSheet) ||
-   sheet.conditionalFormats?.length ||
-   sheet.validationRules?.length ||
-   sheet.merges?.length ||
-   sheet.pivots?.length,
-  );
-  let painted: PaintedCells | null = null;
-  for (const patch of patches) {
-   let range: Range | CellAddress;
-   switch (patch.op) {
-    case "set":
-     if (
-      patch.addr.sheet === this.activeSheet &&
-      (patch.value.kind === "formula" || patch.value.kind === "ref")
-     )
-      this.sheetHasSources = true;
-     range = patch.addr;
-     break;
-
-    case "setRange":
-     if (
-      patch.range.sheet === this.activeSheet &&
-      patch.cells.some((cell) => cell.value.kind === "formula" || cell.value.kind === "ref")
-     )
-      this.sheetHasSources = true;
-     range = patch.range;
-     break;
-
-    case "setBlock":
-     if (
-      patch.range.sheet === this.activeSheet &&
-      (patch.block.formulas?.length || patch.block.refs?.length)
-     )
-      this.sheetHasSources = true;
-     range = patch.range;
-     break;
-
-    case "restoreBlock":
-     if (patch.range.sheet === this.activeSheet) this.sheetHasSources = true;
-     range = patch.range;
-     break;
-
-    case "setRangeStyle":
-    case "clearRange":
-    case "permuteRows":
-     range = patch.range;
-     break;
-
-    case "setNote":
-     continue;
-
-    default:
-     affectsWindow = true;
-     continue;
-   }
-
-   if (affectsWindow || dependentDisplay || this.sheetHasSources) {
-    affectsWindow = true;
-    continue;
-   }
-
-   // Large off-screen batches pay for one window snapshot, not one per patch.
-   painted ??= this.readWindows.paintedCells();
-   affectsWindow =
-    "start" in range
-     ? painted.intersects(range.sheet, range.start, range.end)
-     : painted.intersects(range.sheet, range, range);
-  }
-
-  return affectsWindow;
- }
-
- private createRenderer(opts: GridOptions, host: HTMLElement): Renderer {
-  if (opts.renderer === "worker") {
-   try {
-    let worker: WorkerRenderer;
-    worker = new WorkerRenderer(opts.workerUrl, {}, (error) => {
-     this.fallbackWorkerRenderer(worker, error);
-    });
-    worker.mount(host, this.theme);
-    this.activeRendererKind = "worker";
-    return worker;
-   } catch (error) {
-    // Worker unavailable (no OffscreenCanvas / construction blocked) —
-    // fall back observably after post-construction subscribers can attach.
     this.emitRendererFallback(error);
-   }
-  }
-  const canvas = new CanvasRenderer();
-  canvas.mount(host, this.theme);
-  this.activeRendererKind = "canvas";
-  return canvas;
- }
-
- private fallbackWorkerRenderer(worker: WorkerRenderer, error: unknown): void {
-  if (this.lifetime.closed || this.renderer !== worker || this.activeRendererKind !== "worker") {
-   return;
   }
 
-  worker.destroy();
-  const canvas = new CanvasRenderer();
-  canvas.mount(this.viewportEl, this.theme);
-  canvas.setRenderers(this.customRenderers);
-  this.renderer = canvas;
-  this.activeRendererKind = "canvas";
-  this.applyLayout();
-  this.scheduleRender();
-  this.emitRendererFallback(error);
- }
-
- private emitRendererFallback(error: unknown): void {
-  const failure = normalizeSheetwriteError(error, "renderer-fallback", "renderer-worker", {
-   requested: "worker",
-  });
-  queueMicrotask(() => {
-   if (this.lifetime.closed) return;
-   for (const fn of this.listeners["renderer-fallback"]) {
-    fn({ requested: "worker", error: failure });
-   }
-  });
- }
-
- rendererKind(): "canvas" | "worker" {
-  return this.activeRendererKind;
- }
-
- private sheet(id: SheetId = this.activeSheet): Sheet {
-  if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
-
-  const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
-  if (!stored) throw unknownSheetError(id);
-  const target = this.virtualColumnTargets.get(id) ?? stored.columns.length;
-  const sheet =
-   target > stored.columns.length ? { ...stored, columns: [...stored.columns] } : stored;
-  if (sheet !== stored) appendPadColumns(sheet.columns, target);
-  if (id === this.activeSheet) this.activeSheetCache = sheet;
-  return sheet;
- }
-
- private sheetById(id: SheetId): Sheet | null {
-  return this.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
- }
-
- private viewportH(): number {
-  return this.viewportEl.clientHeight;
- }
-
- private nextDefaultSheetName(): string {
-  const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
-  let number = this.store.getWorkbook().sheets.length + 1;
-  while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
-  return `Sheet ${number}`;
- }
-
- private buildTabBar(): void {
-  const bar = document.createElement("div");
-  bar.className = "sheetwrite-tabbar";
-  // Positioning is behavior (the bar reserves this.tabBarHeight in the host
-  // layout); everything cosmetic lives in styles.css behind CSS custom
-  // properties seeded from the theme, so host CSS can restyle freely.
-  bar.style.position = "absolute";
-  bar.style.left = "0";
-  bar.style.right = "0";
-  bar.style.bottom = "0";
-  bar.style.height = `${this.tabBarHeight}px`;
-  this.host.appendChild(bar);
-  this.tabBar = bar;
-  this.sheetTabs = new SheetTabs(bar, {
-   onActivate: (id) => this.setActiveSheet(id),
-   onAdd: () => {
-    const result = this.addSheet({ name: this.nextDefaultSheetName() });
-    if (result.status === "applied") this.setActiveSheet(result.sheet);
-    return result;
-   },
-   onRemove: (id) => this.removeSheet(id),
-   onRename: (id, name) => this.renameSheet(id, name),
-   onMove: (id, toIndex) => this.moveSheet(id, toIndex),
-   onHide: (id) => this.setSheetVisibility(id, "hidden"),
-   onUnhide: (id) => this.setSheetVisibility(id, "visible"),
-   readOnly: this.readOnly,
-  });
-  this.syncTabBarTheme();
-  this.renderTabs();
- }
-
- /** Re-seed the tab bar's CSS custom properties from the (base) theme. */
- private syncTabBarTheme(): void {
-  const bar = this.tabBar;
-  if (!bar) return;
-  bar.style.setProperty("--sheetwrite-tab-font", this.baseTheme.font);
-  bar.style.setProperty("--sheetwrite-tab-bg", this.baseTheme.bg);
-  bar.style.setProperty("--sheetwrite-tab-fg", this.baseTheme.headerFg);
-  bar.style.setProperty("--sheetwrite-tab-border", this.baseTheme.gridLine);
-  bar.style.setProperty("--sheetwrite-tab-hover-bg", this.baseTheme.headerBg);
-  bar.style.setProperty("--sheetwrite-tab-active-bg", this.baseTheme.selection);
-  bar.style.setProperty("--sheetwrite-tab-active-fg", this.baseTheme.selectionBorder);
- }
-
- private renderTabs(): void {
-  this.sheetTabs?.update(this.store.getWorkbook().sheets, this.activeSheet);
- }
-
- private firstCol(): number {
-  return this.geometry.firstColumn();
- }
-
- private lastCol(): number {
-  return this.geometry.lastColumn();
- }
-
- private colLeftOf(col: number): number {
-  return this.geometry.columnLeft(col);
- }
-
- private colAtX(contentX: number): number {
-  return this.geometry.columnAtX(contentX);
- }
-
- private nextVisibleCol(col: number, dir: 1 | -1): number {
-  return this.geometry.nextVisibleColumn(col, dir);
- }
-
- private frozenRowCount(): number {
-  return this.geometry.frozenRowCount();
- }
-
- private frozenColCount(): number {
-  return this.geometry.frozenColumnCount();
- }
-
- private frozenHeight(): number {
-  return this.geometry.frozenHeight();
- }
-
- private frozenWidth(): number {
-  return this.geometry.frozenWidth();
- }
-
- private firstBodyCol(): number {
-  return this.geometry.firstBodyColumn();
- }
-
- private screenRect(
-  row: number,
-  col: number,
-  contentTop: number,
-  scrollLeft: number,
- ): {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
- } {
-  const merge = this.mergeAnchorAt(row, col);
-  return this.geometry.rangeRect(
-   {
-    sheet: this.activeSheet,
-    start: { row: merge?.r0 ?? row, col: merge?.c0 ?? col },
-    end: { row: merge?.r1 ?? row, col: merge?.c1 ?? col },
-   },
-   contentTop,
-   scrollLeft,
-  );
- }
-
- private contentXAt(viewportX: number): number {
-  const contentX = viewportX - this.theme.rowHeaderWidth;
-  const frozen = this.frozenColCount() > 0 && contentX < this.frozenWidth();
-  return frozen ? contentX : contentX + this.scroller.scrollLeft;
- }
-
- private contentYAt(viewportY: number): number {
-  return this.geometry.pointerContentY(viewportY, this.scroller.scrollTop);
- }
-
- private columnHeader(col: number): string {
-  if (this.presentation === "spreadsheet") return colToA1(col);
-  const column = this.sheet().columns[col];
-  return (
-   column?.header ||
-   (column?.key.startsWith("__pad_") ? colToA1(col) : column?.key) ||
-   colToA1(col)
-  );
- }
-
- private applyLayout(): void {
-  this.readWindows.invalidate();
-  const sheet = this.sheet();
-  const columns = sheet.columns.map((column, c) => ({
-   ...column,
-   header: column.visible === false ? "" : this.columnHeader(c),
-   // Paint geometry is zoomed to match the column index; base widths stay
-   // untouched on the workbook.
-   width: column.visible === false ? 0 : this.geometry.columnWidth(c) * this.zoom,
-  }));
-  const domRendererColumns = new Uint8Array(columns.length);
-  for (let col = 0; col < columns.length; col++) {
-   const rendererName = columns[col]?.renderer;
-   if (rendererName && this.customRenderers.get(rendererName)?.dom) {
-    domRendererColumns[col] = 1;
-   }
-  }
-  const layout = {
-   columns,
-   rowHeight: this.theme.rowHeight,
-   headerHeight: this.theme.headerHeight,
-   totalRows: this.geometry.rowCount,
-   zoom: this.zoom,
-   merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
-
-   domRendererColumns,
-  };
-  this.renderer.setLayout(layout);
-  this.domOverlay.setLayout(layout);
-  this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
-  this.syncSizer();
- }
-
- private syncSizer(): void {
-  // Browser zoom moves the layout clamp; a stale cap truncates tall documents.
-  const devicePixelRatio = globalThis.devicePixelRatio ?? 1;
-  if (devicePixelRatio !== this.lastDevicePixelRatio) {
-   this.lastDevicePixelRatio = devicePixelRatio;
-   this.maxElementHeight = measureMaxElementHeight();
-  }
-  const size = this.geometry.layoutSize(this.viewportH());
-  this.sizer.style.width = `${size.width}px`;
-  this.sizer.style.height = `${size.height}px`;
- }
-
- /** The gutter tracks the active sheet's digit count; identity when unchanged. */
- private withAdaptiveGutter(theme: Theme, rowCount: number): Theme {
-  const rowHeaderWidth = adaptiveRowHeaderWidth(theme, rowCount);
-  return rowHeaderWidth === theme.rowHeaderWidth ? theme : { ...theme, rowHeaderWidth };
- }
-
- private rebuildIndex(): void {
-  this.geometry.rebuildRows(
-   this.loadable?.viewRowCount(this.activeSheet) ?? this.sheet().rowCount,
-  );
-  this.datasourceController.resize(this.sheet().rowCount);
-  // Row-count changes can grow the row-number gutter (e.g. crossing 1M rows).
-  const adjusted = this.withAdaptiveGutter(this.theme, this.sheet().rowCount);
-  if (adjusted !== this.theme) {
-   this.theme = adjusted;
-   this.renderer.setTheme(this.theme);
-   this.domOverlay.setTheme(this.theme);
-  }
-  this.syncSizer();
- }
-
- private rebuildColumnIndex(): void {
-  this.geometry.rebuildColumns();
-  this.readWindows.invalidateColumns();
-  this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
- }
-
- private toDataRow(viewRow: number): number {
-  return this.geometry.toDataRow(viewRow);
- }
-
- private toViewRow(dataRow: number): number | null {
-  return this.geometry.toViewRow(dataRow);
- }
-
- private mergeAnchorAt(row: number, col: number): SelRect | null {
-  if (this.loadable?.hasView(this.activeSheet)) return null;
-
-  const merges = this.sheet().merges;
-  if (!merges) return null;
-
-  return mergeAnchorAt(prepareMergeIndex(merges), row, col);
- }
-
- private anchorCell(row: number, col: number): CellRef {
-  const merge = this.mergeAnchorAt(row, col);
-  return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
- }
-
- private scheduleRender(): void {
-  this.readWindows.schedule();
- }
-
- private render(): void {
-  this.readWindows.renderNow();
- }
-
- private repositionEditor(contentTop: number, scrollLeft: number): void {
-  this.interactions.reposition(contentTop, scrollLeft);
-  this.notes.reposition();
-  this.objectLayer.place(contentTop, scrollLeft);
- }
-
- /** A view cell, resolved to its merge anchor, with the data address its note lives at. */
- private noteCell(row: number, col: number): NoteCell {
-  const anchor = this.anchorCell(row, col);
-  return {
-   row: anchor.row,
-   col: anchor.col,
-   address: { sheet: this.activeSheet, row: this.toDataRow(anchor.row), col: anchor.col },
-  };
- }
-
- beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
-  this.interactions.beginEdit(row, col, initial, selectAll);
- }
-
- private clearSelection(): void {
-  if (this.readOnly || this.selection.isEmpty) return;
-
-  const sheet = this.sheet();
-  const patches: DocumentOp[] = [];
-  const rects: SelRect[] = [];
-  this.selection.forEachRect((rect) => rects.push(rect));
-  const merges = sheet.merges;
-  const mergeIndex = merges ? prepareMergeIndex(merges) : null;
-  const intersectsMerge =
-   mergeIndex !== null &&
-   rects.some(
-    (rect) =>
-     intersectingMerges(mergeIndex, rect.r0, rect.r1 + 1, [rect.c0, rect.c1]).length > 0,
-   );
-  if (!intersectsMerge) {
-   for (const rect of rects) {
-    let runStart = this.toDataRow(rect.r0);
-    let previous = runStart;
-    for (let viewRow = rect.r0 + 1; viewRow <= rect.r1 + 1; viewRow++) {
-     const dataRow = viewRow <= rect.r1 ? this.toDataRow(viewRow) : -1;
-     if (viewRow <= rect.r1 && Math.abs(dataRow - previous) === 1) {
-      previous = dataRow;
-      continue;
-     }
-
-     patches.push({
-      op: "clearRange",
-      range: {
-       sheet: this.activeSheet,
-       start: { row: runStart, col: rect.c0 },
-       end: { row: previous, col: rect.c1 },
-      },
-     });
-
-     runStart = dataRow;
-     previous = dataRow;
-    }
-   }
-  } else {
-   const seen = new Set<number>();
-   const nullValue: CellValue = { kind: "literal", value: null };
-   for (const rect of rects) {
-    for (let r = rect.r0; r <= rect.r1; r++) {
-     for (let c = rect.c0; c <= rect.c1; c++) {
-      const cell = this.anchorCell(r, c);
-      const key = cell.row * sheet.columns.length + cell.col;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      patches.push({
-       op: "set",
-       addr: { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
-       value: nullValue,
-      });
-     }
-    }
-   }
-  }
-
-  this.document.commit(patches, "clear");
- }
-
- private emitSelection(): void {
-  this.ariaMirror.bumpVersion();
-  const selection = this.getSelection();
-
-  // One thing is selected at a time: a new cell selection, by any route,
-  // deselects the chart. Undo re-emits an unchanged selection and must keep it.
-  const selectionKey = JSON.stringify(selection);
-  if (selectionKey !== this.lastSelectionKey) {
-   this.lastSelectionKey = selectionKey;
-   this.objectLayer.select(null);
-  }
-
-  for (const listener of this.listeners.selection) listener({ selection });
-  this.emitCommandStateChange();
- }
-
- search(query: string, opts: SearchOptions = {}): SearchResult {
-  return this.searchController.search(query, opts);
- }
-
- findNext(): SearchResult {
-  return this.searchController.findNext();
- }
-
- findPrev(): SearchResult {
-  return this.searchController.findPrev();
- }
-
- clearSearch(): void {
-  this.searchController.clearSearch();
- }
-
- replaceCurrent(replacement: string): SearchResult {
-  return this.searchController.replaceCurrent(replacement);
- }
-
- replaceAll(replacement: string): ReplaceResult {
-  return this.searchController.replaceAll(replacement);
- }
-
- getShortcutLabel(action: KeyboardAction): string {
-  return this.keymap.label(action);
- }
-
- highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
-  this.overlayPainter.highlightCells(ranges, color);
- }
-
- setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void {
-  this.overlayPainter.setPresenceOverlays(overlays);
- }
-
- styleRange(range: Range, style: Partial<CellStyle> | null): void {
-  if (this.readOnly) return;
-
-  this.document.commit(
-   [
-    {
-     op: "setRangeStyle",
-     range: {
-      sheet: range.sheet,
-      start: {
-       row: Math.min(range.start.row, range.end.row),
-       col: Math.min(range.start.col, range.end.col),
-      },
-      end: {
-       row: Math.max(range.start.row, range.end.row),
-       col: Math.max(range.start.col, range.end.col),
-      },
-     },
-     style,
-    },
-   ],
-   "style",
-  );
- }
-
- dataEdge(row: number, col: number, dRow: number, dCol: number): number | null {
-  // View-aware in the store: with an active sort/filter view, `row` is a
-  // view position and vertical moves return view positions.
-  if (!this.loadable) return null;
-  return this.loadable.dataEdge(this.activeSheet, row, col, dRow, dCol);
- }
-
- /** The one detached 2D context that auto-fit measures text with; `trimMemory` drops it. */
- private measurementContext(): CanvasRenderingContext2D | null {
-  this.measureContext ??= document.createElement("canvas").getContext("2d");
-  return this.measureContext;
- }
-
- private requireAutoFitRangeLoaded(range: Range): void {
-  if (!this.loadable || this.loadable.isRangeFullyLoaded(range)) return;
-  const capability = this.loadable.queryCapability(range.sheet);
-  if (capability.status === "incomplete") throw new IncompleteDataError(range.sheet, capability);
- }
-
- private withStoreResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
-  return this.loadable ? this.loadable.withResourceOperation(operation, run) : run();
- }
-
- private noteAutoFitWindow(rows: number, columns: number): void {
-  const cells = rows * columns;
-  this.autoFitStats.windowRequests += 1;
-  this.autoFitStats.maxWindowCells = Math.max(this.autoFitStats.maxWindowCells, cells);
- }
-
- /** A new auto-fit job closes the running one; a job closed before it completes counts as cancelled. */
- private startAutoFit(): AutoFitJob {
-  const job: AutoFitJob = { scope: this.autoFits.next(), completed: false };
-  job.scope.add(() => {
-   if (!job.completed) this.autoFitStats.cancelledJobs += 1;
-  });
-  return job;
- }
-
- private completeAutoFit(job: AutoFitJob): void {
-  job.completed = true;
-  job.scope.close();
- }
-
- /** Run `step` in the next frame, unless the job closes first. */
- private scheduleAutoFitChunk(job: AutoFitJob, step: () => void): void {
-  this.autoFitStats.scheduledChunks += 1;
-
-  // Some hosts run the callback synchronously; then no frame is left to cancel.
-  let ran = false;
-  let removeCancel: (() => void) | undefined;
-  const cancel = scheduleFrame(() => {
-   ran = true;
-   removeCancel?.();
-   step();
-  });
-  if (!ran) removeCancel = job.scope.add(cancel);
- }
-
- private cancelAutoFit(): void {
-  this.autoFits.close();
- }
-
- private measureAutoFitRowWindow(
-  context: CanvasRenderingContext2D,
-  sheet: Sheet,
-  view: VisibleWindowView,
-  columns: readonly number[],
-  bandStart: number,
-  requiredHeights: Float64Array,
-  mergeWidths: ReadonlyMap<number, number>,
- ): void {
-  const fallbackFontSize =
-   Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") || 12;
-  for (let row = view.rows.start; row < view.rows.end; row++) {
-   const requiredIndex = row - bandStart;
-   let required = requiredHeights[requiredIndex] ?? this.baseTheme.rowHeight;
-   for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
-    const col = columns[columnIndex]!;
-    const cell = autoFitCell(sheet, view, row, columnIndex, col);
-    if (!cell) continue;
-    const { value, style } = cell;
-    const text = cellScalarToText(value);
-    if (!style.wrap && !text.includes("\n")) continue;
-    const width =
-     mergeWidths.get(row * sheet.columns.length + col) ?? sheet.columns[col]!.width;
-    const fontSize = style.fontSize ?? fallbackFontSize;
-    context.font = fontFor(this.baseTheme, style);
-    const lineCount = layoutTextLines(
-     context,
-     text,
-     Math.max(0, width - CELL_TEXT_HORIZONTAL_PADDING),
-    ).length;
-    required = Math.max(required, Math.ceil(lineCount * fontSize * 1.2 + 8));
-   }
-   requiredHeights[requiredIndex] = required;
-  }
- }
-
- private measureAutoFitColumnWindow(
-  context: CanvasRenderingContext2D,
-  sheet: Sheet,
-  view: VisibleWindowView,
-  columns: readonly number[],
-  targetOffset: number,
-  widths: Float64Array,
- ): void {
-  for (let row = view.rows.start; row < view.rows.end; row++) {
-   for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
-    const col = columns[columnIndex]!;
-    const cell = autoFitCell(sheet, view, row, columnIndex, col);
-    if (!cell) continue;
-    const { value, style, column } = cell;
-    context.font = fontFor(this.baseTheme, style);
-    let width = widths[targetOffset + columnIndex]!;
-    const text = cellDisplayText(
-     value,
-     style.numberFormat ?? column.numberFormat,
-     column.numberLocale,
-    );
-    for (const line of text.split("\n")) {
-     width = Math.max(width, context.measureText(line).width + CELL_TEXT_HORIZONTAL_PADDING);
-    }
-    widths[targetOffset + columnIndex] = width;
-   }
-  }
- }
-
- autoFitRows(range?: Range): void {
-  if (this.readOnly || (range && range.sheet !== this.activeSheet)) return;
-  this.cancelAutoFit();
-  const sheetId = this.activeSheet;
-  const sheet = this.sheet();
-  const r0 = Math.max(0, Math.min(range?.start.row ?? 0, range?.end.row ?? sheet.rowCount - 1));
-  const r1 = Math.min(
-   sheet.rowCount - 1,
-   Math.max(range?.start.row ?? 0, range?.end.row ?? sheet.rowCount - 1),
-  );
-  const c0 = Math.max(
-   0,
-   Math.min(range?.start.col ?? 0, range?.end.col ?? sheet.columns.length - 1),
-  );
-  const c1 = Math.min(
-   sheet.columns.length - 1,
-   Math.max(range?.start.col ?? 0, range?.end.col ?? sheet.columns.length - 1),
-  );
-  if (r1 < r0 || c1 < c0) return;
-  const measuredRange: Range = {
-   sheet: sheetId,
-   start: { row: r0, col: c0 },
-   end: { row: r1, col: c1 },
-  };
-
-  this.requireAutoFitRangeLoaded(measuredRange);
-  const context = this.measurementContext();
-  if (!context) return;
-
-  const mergeWidths = new Map<number, number>();
-  // Measurement walks view rows, so key each merge by the view row it shows on.
-  for (const merge of sheet.merges ?? []) {
-   const viewRow = this.toViewRow(merge.r0);
-   if (viewRow === null) continue;
-   let width = 0;
-   for (let col = merge.c0; col <= merge.c1; col++) width += sheet.columns[col]?.width ?? 0;
-   mergeWidths.set(viewRow * sheet.columns.length + merge.c0, width);
-  }
-
-  const rowCount = r1 - r0 + 1;
-  const columnCount = c1 - c0 + 1;
-  const patches: DocumentOp[] = [];
-  const appendRowPatches = (bandStart: number, required: Float64Array): void => {
-   for (let offset = 0; offset < required.length; offset++) {
-    const viewRow = bandStart + offset;
-    const dataRow = this.toDataRow(viewRow);
-    const height = required[offset]!;
-    if ((sheet.rowHeights?.get(dataRow) ?? this.baseTheme.rowHeight) === height) continue;
-    patches.push({
-     op: "setRowMeta",
-     sheet: sheetId,
-     row: dataRow,
-     meta: { height },
+  private emitRendererFallback(error: unknown): void {
+    const failure = normalizeSheetwriteError(error, "renderer-fallback", "renderer-worker", {
+      requested: "worker",
     });
-   }
-  };
-
-  if (rowCount * columnCount <= AUTO_FIT_CHUNK_CELLS) {
-   const columns = Array.from({ length: columnCount }, (_, index) => c0 + index);
-   const view = this.withStoreResourceOperation("auto-fit", () =>
-    this.store.getVisibleWindow(sheetId, { start: r0, end: r1 + 1 }, columns),
-   );
-   this.noteAutoFitWindow(rowCount, columnCount);
-   const required = new Float64Array(rowCount);
-   required.fill(this.baseTheme.rowHeight);
-   this.measureAutoFitRowWindow(context, sheet, view, columns, r0, required, mergeWidths);
-   appendRowPatches(r0, required);
-   this.autoFitStats.completedJobs += 1;
-   this.autoFitStats.committedPatches += patches.length;
-   this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
-   return;
+    queueMicrotask(() => {
+      if (this.lifetime.closed) return;
+      for (const fn of this.listeners["renderer-fallback"]) {
+        fn({ requested: "worker", error: failure });
+      }
+    });
   }
 
-  const columnsPerWindow = Math.min(columnCount, AUTO_FIT_CHUNK_CELLS);
-  const rowsPerBand = Math.max(1, Math.floor(AUTO_FIT_CHUNK_CELLS / columnsPerWindow));
-  let bandStart = r0;
-  let bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
-  let columnStart = c0;
-  let required = new Float64Array(bandEnd - bandStart);
-  required.fill(this.baseTheme.rowHeight);
-  const job = this.startAutoFit();
+  rendererKind(): "canvas" | "worker" {
+    return this.activeRendererKind;
+  }
 
-  const step = (): void => {
-   if (job.scope.closed || this.activeSheet !== sheetId) return;
-   const count = Math.min(columnsPerWindow, c1 - columnStart + 1);
-   const columns = Array.from({ length: count }, (_, index) => columnStart + index);
-   const view = this.withStoreResourceOperation("auto-fit", () =>
-    this.store.getVisibleWindow(sheetId, { start: bandStart, end: bandEnd }, columns),
-   );
-   this.noteAutoFitWindow(bandEnd - bandStart, columns.length);
-   this.measureAutoFitRowWindow(context, sheet, view, columns, bandStart, required, mergeWidths);
-   columnStart += count;
-   if (columnStart > c1) {
-    appendRowPatches(bandStart, required);
-    bandStart = bandEnd;
-    if (bandStart > r1) {
-     this.completeAutoFit(job);
-     this.autoFitStats.completedJobs += 1;
-     this.autoFitStats.committedPatches += patches.length;
-     this.withStoreResourceOperation("auto-fit", () =>
-      this.document.commit(patches, "structure"),
-     );
-     return;
+  private sheet(id: SheetId = this.activeSheet): Sheet {
+    if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
+
+    const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
+    if (!stored) throw unknownSheetError(id);
+    const target = this.virtualColumnTargets.get(id) ?? stored.columns.length;
+    const sheet =
+      target > stored.columns.length ? { ...stored, columns: [...stored.columns] } : stored;
+    if (sheet !== stored) appendPadColumns(sheet.columns, target);
+    if (id === this.activeSheet) this.activeSheetCache = sheet;
+    return sheet;
+  }
+
+  private sheetById(id: SheetId): Sheet | null {
+    return this.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
+  }
+
+  private viewportH(): number {
+    return this.viewportEl.clientHeight;
+  }
+
+  private nextDefaultSheetName(): string {
+    const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
+    let number = this.store.getWorkbook().sheets.length + 1;
+    while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
+    return `Sheet ${number}`;
+  }
+
+  private buildTabBar(): void {
+    const bar = document.createElement("div");
+    bar.className = "sheetwrite-tabbar";
+    // Positioning is behavior (the bar reserves this.tabBarHeight in the host
+    // layout); everything cosmetic lives in styles.css behind CSS custom
+    // properties seeded from the theme, so host CSS can restyle freely.
+    bar.style.position = "absolute";
+    bar.style.left = "0";
+    bar.style.right = "0";
+    bar.style.bottom = "0";
+    bar.style.height = `${this.tabBarHeight}px`;
+    this.host.appendChild(bar);
+    this.tabBar = bar;
+    this.sheetTabs = new SheetTabs(bar, {
+      onActivate: (id) => this.setActiveSheet(id),
+      onAdd: () => {
+        const result = this.addSheet({ name: this.nextDefaultSheetName() });
+        if (result.status === "applied") this.setActiveSheet(result.sheet);
+        return result;
+      },
+      onRemove: (id) => this.removeSheet(id),
+      onRename: (id, name) => this.renameSheet(id, name),
+      onMove: (id, toIndex) => this.moveSheet(id, toIndex),
+      onHide: (id) => this.setSheetVisibility(id, "hidden"),
+      onUnhide: (id) => this.setSheetVisibility(id, "visible"),
+      readOnly: this.readOnly,
+    });
+    this.syncTabBarTheme();
+    this.renderTabs();
+  }
+
+  /** Re-seed the tab bar's CSS custom properties from the (base) theme. */
+  private syncTabBarTheme(): void {
+    const bar = this.tabBar;
+    if (!bar) return;
+    bar.style.setProperty("--sheetwrite-tab-font", this.baseTheme.font);
+    bar.style.setProperty("--sheetwrite-tab-bg", this.baseTheme.bg);
+    bar.style.setProperty("--sheetwrite-tab-fg", this.baseTheme.headerFg);
+    bar.style.setProperty("--sheetwrite-tab-border", this.baseTheme.gridLine);
+    bar.style.setProperty("--sheetwrite-tab-hover-bg", this.baseTheme.headerBg);
+    bar.style.setProperty("--sheetwrite-tab-active-bg", this.baseTheme.selection);
+    bar.style.setProperty("--sheetwrite-tab-active-fg", this.baseTheme.selectionBorder);
+  }
+
+  private renderTabs(): void {
+    this.sheetTabs?.update(this.store.getWorkbook().sheets, this.activeSheet);
+  }
+
+  private firstCol(): number {
+    return this.geometry.firstColumn();
+  }
+
+  private lastCol(): number {
+    return this.geometry.lastColumn();
+  }
+
+  private colLeftOf(col: number): number {
+    return this.geometry.columnLeft(col);
+  }
+
+  private colAtX(contentX: number): number {
+    return this.geometry.columnAtX(contentX);
+  }
+
+  private nextVisibleCol(col: number, dir: 1 | -1): number {
+    return this.geometry.nextVisibleColumn(col, dir);
+  }
+
+  private frozenRowCount(): number {
+    return this.geometry.frozenRowCount();
+  }
+
+  private frozenColCount(): number {
+    return this.geometry.frozenColumnCount();
+  }
+
+  private frozenHeight(): number {
+    return this.geometry.frozenHeight();
+  }
+
+  private frozenWidth(): number {
+    return this.geometry.frozenWidth();
+  }
+
+  private firstBodyCol(): number {
+    return this.geometry.firstBodyColumn();
+  }
+
+  private screenRect(
+    row: number,
+    col: number,
+    contentTop: number,
+    scrollLeft: number,
+  ): {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } {
+    const merge = this.mergeAnchorAt(row, col);
+    return this.geometry.rangeRect(
+      {
+        sheet: this.activeSheet,
+        start: { row: merge?.r0 ?? row, col: merge?.c0 ?? col },
+        end: { row: merge?.r1 ?? row, col: merge?.c1 ?? col },
+      },
+      contentTop,
+      scrollLeft,
+    );
+  }
+
+  private contentXAt(viewportX: number): number {
+    const contentX = viewportX - this.theme.rowHeaderWidth;
+    const frozen = this.frozenColCount() > 0 && contentX < this.frozenWidth();
+    return frozen ? contentX : contentX + this.scroller.scrollLeft;
+  }
+
+  private contentYAt(viewportY: number): number {
+    return this.geometry.pointerContentY(viewportY, this.scroller.scrollTop);
+  }
+
+  private columnHeader(col: number): string {
+    if (this.presentation === "spreadsheet") return colToA1(col);
+    const column = this.sheet().columns[col];
+    return (
+      column?.header ||
+      (column?.key.startsWith("__pad_") ? colToA1(col) : column?.key) ||
+      colToA1(col)
+    );
+  }
+
+  private applyLayout(): void {
+    this.readWindows.invalidate();
+    const sheet = this.sheet();
+    const columns = sheet.columns.map((column, c) => ({
+      ...column,
+      header: column.visible === false ? "" : this.columnHeader(c),
+      // Paint geometry is zoomed to match the column index; base widths stay
+      // untouched on the workbook.
+      width: column.visible === false ? 0 : this.geometry.columnWidth(c) * this.zoom,
+    }));
+    const domRendererColumns = new Uint8Array(columns.length);
+    for (let col = 0; col < columns.length; col++) {
+      const rendererName = columns[col]?.renderer;
+      if (rendererName && this.customRenderers.get(rendererName)?.dom) {
+        domRendererColumns[col] = 1;
+      }
     }
-
-    bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
-    columnStart = c0;
-    required = new Float64Array(bandEnd - bandStart);
-    required.fill(this.baseTheme.rowHeight);
-   }
-
-   this.scheduleAutoFitChunk(job, step);
-  };
-
-  this.scheduleAutoFitChunk(job, step);
- }
-
- autoFitColumns(cols?: readonly number[]): void {
-  if (this.readOnly) return;
-  this.cancelAutoFit();
-  const sheetId = this.activeSheet;
-  const sheet = this.sheet();
-  const targets = cols
-   ? [...new Set(cols)].filter((col) => col >= 0 && col < sheet.columns.length)
-   : sheet.columns.map((_, col) => col);
-  if (targets.length === 0) return;
-  for (const col of targets) {
-   this.requireAutoFitRangeLoaded({
-    sheet: sheetId,
-    start: { row: 0, col },
-    end: { row: Math.max(0, sheet.rowCount - 1), col },
-   });
-  }
-
-  const context = this.measurementContext();
-  if (!context) return;
-  const widths = new Float64Array(targets.length);
-  for (let index = 0; index < targets.length; index++) {
-   const column = sheet.columns[targets[index]!]!;
-   context.font = fontFor(this.baseTheme, {
-    ...column.headerStyle,
-    bold: column.headerStyle?.bold ?? true,
-   });
-
-   widths[index] = context.measureText(column.header).width + CELL_TEXT_HORIZONTAL_PADDING;
-  }
-
-  const patches: DocumentOp[] = [];
-  const commitWidths = (): void => {
-   for (let index = 0; index < targets.length; index++) {
-    const col = targets[index]!;
-    const width = Math.max(1, Math.ceil(widths[index]!));
-    if (sheet.columns[col]!.width === width) continue;
-    patches.push({ op: "setColumn", sheet: sheetId, col, patch: { width } });
-   }
-
-   this.autoFitStats.completedJobs += 1;
-   this.autoFitStats.committedPatches += patches.length;
-   this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
-  };
-
-  const totalCells = sheet.rowCount * targets.length;
-  if (totalCells <= AUTO_FIT_CHUNK_CELLS) {
-   const view = this.withStoreResourceOperation("auto-fit", () =>
-    this.store.getVisibleWindow(sheetId, { start: 0, end: sheet.rowCount }, targets),
-   );
-   this.noteAutoFitWindow(sheet.rowCount, targets.length);
-   this.measureAutoFitColumnWindow(context, sheet, view, targets, 0, widths);
-   commitWidths();
-   return;
-  }
-
-  const columnsPerWindow = Math.min(targets.length, AUTO_FIT_CHUNK_CELLS);
-  const rowsPerWindow = Math.max(1, Math.floor(AUTO_FIT_CHUNK_CELLS / columnsPerWindow));
-  let targetOffset = 0;
-  let columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
-  let rowStart = 0;
-  const job = this.startAutoFit();
-
-  const step = (): void => {
-   if (job.scope.closed || this.activeSheet !== sheetId) return;
-   const rowEnd = Math.min(sheet.rowCount, rowStart + rowsPerWindow);
-   const view = this.withStoreResourceOperation("auto-fit", () =>
-    this.store.getVisibleWindow(sheetId, { start: rowStart, end: rowEnd }, columns),
-   );
-   this.noteAutoFitWindow(rowEnd - rowStart, columns.length);
-   this.measureAutoFitColumnWindow(context, sheet, view, columns, targetOffset, widths);
-   rowStart = rowEnd;
-   if (rowStart >= sheet.rowCount) {
-    targetOffset += columns.length;
-    if (targetOffset >= targets.length) {
-     this.completeAutoFit(job);
-     commitWidths();
-     return;
-    }
-
-    columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
-    rowStart = 0;
-   }
-
-   this.scheduleAutoFitChunk(job, step);
-  };
-
-  this.scheduleAutoFitChunk(job, step);
- }
-
- setRowHeight(row: number, height: number): void {
-  this.document.commit(
-   [
-    {
-     op: "setRowMeta",
-     sheet: this.activeSheet,
-     row: this.toDataRow(row),
-     meta: { height: Math.max(1, height) },
-    },
-   ],
-   "structure",
-  );
- }
-
- setColumnWidth(col: number, width: number): void {
-  this.document.commit(
-   [{ op: "setColumn", sheet: this.activeSheet, col, patch: { width: Math.max(1, width) } }],
-   "structure",
-  );
- }
-
- setMinColumns(minColumns?: number): void {
-  const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
-  if (!stored) return;
-  const target = Math.max(
-   stored.columns.length,
-   padTarget(this.host, minColumns, this.presentation),
-  );
-  if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
-  this.virtualColumnTargets.set(this.activeSheet, target);
-  this.activeSheetCache = null;
-  this.rebuildColumnIndex();
-  this.applyLayout();
-  this.scheduleRender();
- }
-
- setOverscan(overscan?: number): void {
-  const next = overscan === undefined ? DEFAULT_OVERSCAN : Math.max(0, Math.floor(overscan));
-  if (next === this.overscan) return;
-  this.overscan = next;
-  // Read per frame by the window calculations; a repaint picks it up.
-  this.readWindows.invalidate();
-  this.scheduleRender();
- }
-
- /** Internal structural counters used by allocation regression tests and range benchmarks. */
- getMutationRevisionStats(): MutationRevisionStats {
-  return this.mutationRevisions.stats();
- }
-
- getAutoFitResourceStats(): AutoFitResourceStats {
-  return { ...this.autoFitStats, chunkCellLimit: AUTO_FIT_CHUNK_CELLS };
- }
-
- resetAutoFitResourceStats(): void {
-  this.autoFitStats.windowRequests = 0;
-  this.autoFitStats.maxWindowCells = 0;
-  this.autoFitStats.scheduledChunks = 0;
-  this.autoFitStats.completedJobs = 0;
-  this.autoFitStats.cancelledJobs = 0;
-  this.autoFitStats.committedPatches = 0;
- }
-
- getRuntimeResourceSnapshot(
-  operation: RuntimeResourceOperation,
-  phase: RuntimeResourcePhase,
-  runtime?: RuntimeMemoryObservation,
- ): RuntimeResourceSnapshot {
-  if (!this.loadable) {
-   throw new SheetwriteError(
-    "unavailable",
-    "resource-diagnostics",
-    "Runtime resource diagnostics require a SheetwriteStore",
-   );
-  }
-  const store = this.loadable.getRuntimeResourceSnapshot(operation, phase, runtime);
-  return createRuntimeResourceSnapshot({
-   operation,
-   phase,
-   wasm: store.wasm,
-   jsOwners: [...store.jsOwners, ...this.datasourceController.getResourceOwners()],
-   boundary: store.boundary,
-   runtime: store.runtime,
-  });
- }
-
- setActiveSheet(id: SheetId, reset = false): void {
-  const target = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
-  if (
-   !target ||
-   (target.visibility ?? "visible") !== "visible" ||
-   (id === this.activeSheet && !reset)
-  )
-   return;
-
-  this.interactions.reconcile("sheet");
-  this.notes.dismiss();
-  this.cancelAutoFit();
-  this.domOverlay.reset();
-  this.mutationRevisions.clear();
-  this.activeSheet = id;
-  this.activeSheetCache = null;
-  const sheet = this.sheet();
-  this.displayedHiddenRows = new Set(sheet.hiddenRows);
-  this.displayedHasView = this.loadable?.hasView(id) ?? false;
-
-  this.rebuildColumnIndex();
-  this.geometry.rebuildRows(this.loadable?.viewRowCount(id) ?? sheet.rowCount);
-  this.selection = new SelectionModel(this.geometry.rowCount, this.firstCol(), this.lastCol());
-  this.datasourceController.reset(sheet.rowCount);
-  this.scroller.scrollTop = 0;
-  this.scroller.scrollLeft = 0;
-
-  this.objectLayer.sync();
-  this.applyLayout();
-  this.renderTabs();
-  for (const fn of this.listeners["active-sheet"]) fn({ sheet: id });
-  this.emitSelection();
-  this.render();
- }
-
- getActiveSheet(): SheetId {
-  return this.activeSheet;
- }
-
- getCellAtPoint(clientX: number, clientY: number): CellAddress | null {
-  const cell = this.interactions.cellAtPointer(clientX, clientY);
-  return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
- }
-
- /**
-  * View-aware editable snapshot of a cell: `(row, col)` are active-sheet view
-  * coordinates; the returned address is the translated data address, so a
-  * formula-bar commit through `applyTransaction` targets the correct row even
-  * under an active sort/filter view.
-  */
- getCellInput(row: number, col: number): CellInputSnapshot | null {
-  const sheet = this.sheet();
-  const column = sheet.columns[col];
-  if (!column || row < 0 || row >= this.geometry.rowCount) return null;
-
-  const cell = this.anchorCell(row, col);
-  const address = {
-   sheet: this.activeSheet,
-   row: this.toDataRow(cell.row),
-   col: cell.col,
-  };
-  const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
-  const resolved = this.store.getCell(address).resolved;
-  const text = formula ?? cellScalarToText(resolved);
-
-  return { address, text, format: column.type };
- }
-
- scrollToCell(addr: CellAddress): void {
-  if (addr.sheet !== this.activeSheet) this.setActiveSheet(addr.sheet);
-
-  // Cells inside the frozen bands are always visible on their pinned axis.
-  const fr = this.frozenRowCount();
-  const frozenH = this.frozenHeight();
-  if (addr.row >= fr) {
-   const top = this.geometry.rowOffset(addr.row);
-   const bottom = top + this.geometry.rowHeight(addr.row);
-   const bodyHeight = Math.max(0, this.viewportH() - this.theme.headerHeight);
-   const contentTop = this.geometry.toContent(this.scroller.scrollTop);
-
-   // Visible body band in content space: [contentTop + frozenH, contentTop + bodyHeight).
-   let target = contentTop;
-   if (top < contentTop + frozenH) target = top - frozenH;
-   else if (bottom > contentTop + bodyHeight) target = bottom - bodyHeight;
-   if (target !== contentTop) {
-    this.scroller.scrollTop = this.geometry.toScroll(Math.max(0, target));
-   }
-  }
-
-  this.ensureColumnVisible(addr.col);
-  this.scheduleRender();
- }
-
- private ensureColumnVisible(col: number): void {
-  if (this.frozenColCount() > 0 && col < this.firstBodyCol()) return;
-
-  const left = this.colLeftOf(col);
-  const width = (this.sheet().columns[col]?.width ?? 0) * this.zoom;
-  const frozenW = this.frozenWidth();
-  const viewLeft = this.scroller.scrollLeft + frozenW;
-  const cellWidth = Math.max(
-   0,
-   this.viewportEl.clientWidth - this.theme.rowHeaderWidth - frozenW,
-  );
-  const viewRight = viewLeft + cellWidth;
-  if (left < viewLeft) this.scroller.scrollLeft = Math.max(0, left - frozenW);
-  else if (left + width > viewRight)
-   this.scroller.scrollLeft = Math.max(0, left + width - cellWidth - frozenW);
- }
-
- getSelection(): Selection | null {
-  return this.selection.toSelection(this.activeSheet);
- }
-
- setSelection(sel: Selection | null): void {
-  this.selection.set(sel);
-  this.emitSelection();
-  this.scheduleRender();
- }
-
- getTheme(): Theme {
-  return { ...this.baseTheme };
- }
-
- setTheme(theme: Partial<Theme>): void {
-  this.baseTheme = { ...this.baseTheme, ...theme };
-  this.applyZoomedTheme();
-  this.reseedWidgetTheme();
-  this.emitThemeChange();
- }
-
- replaceTheme(theme: Partial<Theme> | undefined): void {
-  // Re-run construction-time resolution (grid.ts constructor): defaults,
-  // then host CSS custom properties, then the new option value.
-  this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
-  this.applyZoomedTheme();
-  this.reseedWidgetTheme();
-  this.emitThemeChange();
- }
-
- /**
-  * The built-in widgets (toolbar, find bar, context menu, note card) read
-  * their palette from custom properties seeded on the grid root when they are
-  * created. The note card always exists, so seed them again from the new base
-  * theme so a theme switch (for example to dark) repaints the widgets too, not
-  * only the canvas.
-  */
- private reseedWidgetTheme(): void {
-  seedWidgetTheme(this.host, this.baseTheme);
- }
-
- /**
-  * The toolbar and the ribbon render the command model, which loads as its
-  * own chunk: grids without chrome never download it. The chrome's height is
-  * reserved now, so the grid does not move when it arrives. Each call closes
-  * the previous build, so a chunk that arrives after a rebuild, or after
-  * destroy, is dropped.
-  */
- private createToolbar(config: GridConfig | undefined): void {
-  const build = this.chromeBuilds.next();
-  if (!config || config.toolbar === false) return;
-
-  const ribbon = Boolean(config.ribbon) && !Array.isArray(config.toolbar);
-  const failed = (error: unknown): void => {
-   if (build.closed) return;
-
-   // Give the space back and tell the user; the load error still reaches the host.
-   this.setToolbarHeight(0);
-   this.actionFeedback.show(
-    `The ${ribbon ? "ribbon" : "toolbar"} could not load: ${errorDetail(error)}`,
-   );
-   throw error;
-  };
-
-  if (!ribbon) {
-   this.toolbarHeight = TOOLBAR_HEIGHT;
-   void import("./ribbon/command-toolbar.js").then(({ CommandToolbar: ToolbarClass }) => {
-    if (!build.closed) this.mountToolbar(build, ToolbarClass, config);
-   }, failed);
-   return;
-  }
-
-  this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
-  void import("./ribbon/ribbon.js").then(({ Ribbon: RibbonClass }) => {
-   if (!build.closed) this.mountRibbon(build, RibbonClass, config);
-  }, failed);
- }
-
- /**
-  * Open the find bar. Its code is in its own chunk, loaded on the first open,
-  * so a grid that never searches does not download or build it. A chunk that
-  * arrives after a reset or after destroy is dropped.
-  */
- private openFindBar(options?: { replace?: boolean }): void {
-  if (this.config?.find === false || this.lifetime.closed) return;
-  if (this.findBar) {
-   this.findBar.open(options);
-   return;
-  }
-
-  // Opens during the load share one build, so the bar is made once.
-  const build = this.findBarBuilds.current();
-  void import("./find-bar.js").then(
-   ({ FindBar: FindBarClass }) => {
-    if (build.closed) return;
-    if (!this.findBar) {
-     const findBar = new FindBarClass(this.host, this.baseTheme, this, this.readOnly);
-     this.findBar = findBar;
-     build.add(() => {
-      findBar.destroy();
-      this.findBar = null;
-     });
-    }
-    this.findBar.open(options);
-   },
-   (error: unknown) => {
-    if (build.closed) return;
-    // Tell the user; the load error still reaches the host.
-    this.actionFeedback.show(`The find bar could not load: ${errorDetail(error)}`);
-    throw error;
-   },
-  );
- }
-
- /** Drop the find bar, so the next open builds it for the current config and read-only state. */
- private resetFindBar(): void {
-  this.findBarBuilds.close();
- }
-
- /** Chrome sits first in the host, so keyboard users reach it before the grid. */
- private placeChrome(element: HTMLElement): void {
-  // The grid owns widget theming: seed now, reseed on every theme change.
-  seedWidgetTheme(this.host, this.baseTheme);
-
-  // Grid layout offsets the viewport by the chrome's height, so chrome must leave normal flow.
-  element.style.position = "absolute";
-  element.style.top = "0";
-  element.style.left = "0";
-  element.style.right = "0";
-  this.host.prepend(element);
- }
-
- private mountToolbar(
-  build: Scope,
-  ToolbarClass: typeof CommandToolbar,
-  config: GridConfig,
- ): void {
-  const toolbar = new ToolbarClass(this.host, this, {
-   label: "Spreadsheet formatting",
-   className: "sheetwrite-toolbar",
-   flags: config,
-   ...(Array.isArray(config.toolbar) ? { items: config.toolbar } : {}),
-   ...(config.icons === undefined ? {} : { icons: config.icons }),
-  });
-  toolbar.element.style.height = `${TOOLBAR_HEIGHT}px`;
-  this.placeChrome(toolbar.element);
-  build.add(() => toolbar.destroy());
- }
-
- private mountRibbon(build: Scope, RibbonClass: typeof Ribbon, config: GridConfig): void {
-  const ribbon = new RibbonClass(this.host, this, {
-   onHeightChange: (height) => this.setToolbarHeight(height),
-   flags: config,
-   ...(typeof config.ribbon === "object" ? config.ribbon : {}),
-   ...(config.icons === undefined ? {} : { icons: config.icons }),
-  });
-  this.placeChrome(ribbon.element);
-  build.add(() => ribbon.destroy());
-  if (ribbon.height !== this.toolbarHeight) this.setToolbarHeight(ribbon.height);
- }
-
- private setToolbarHeight(height: number): void {
-  this.toolbarHeight = height;
-  this.viewportEl.style.top = `${height}px`;
-  this.panelHost.style.top = `${height}px`;
-  this.applyLayout();
-  this.render();
- }
-
- private emitThemeChange(): void {
-  const listeners = this.listeners["theme-change"];
-  if (listeners.size === 0) return;
-  for (const fn of listeners)
-   fn({
-    theme: {
-     ...this.baseTheme,
-    },
-   });
- }
-
- getEffectiveTheme(): Theme {
-  return this.theme;
- }
-
- setReadOnly(readOnly: boolean): void {
-  // Only a new grid on a restarted engine can edit again.
-  if (this.engineFailure || readOnly === this.readOnly) return;
-
-  this.readOnly = readOnly;
-  this.syncReadOnlyChrome(readOnly);
- }
-
- /** Bring editors, tabs, the find bar and command state in line with `readOnly`. */
- private syncReadOnlyChrome(readOnly: boolean): void {
-  this.sheetTabs?.setReadOnly(readOnly);
-  this.dashboardView?.sync();
-  if (readOnly) {
-   this.cancelAutoFit();
-   this.interactions.reconcile("read-only");
-   this.notes.dismiss();
-  }
-  if (readOnly) this.host.setAttribute("aria-readonly", "true");
-  else this.host.removeAttribute("aria-readonly");
-
-  this.resetFindBar();
-  this.emitCommandStateChange();
-  // Object handles show only while the grid can be edited.
-  this.scheduleRender();
- }
-
- setConfig(config: GridConfig | undefined): void {
-  // Declarative hosts re-create option objects per render (`config={{...}}`).
-  // A shallowly-equal config is the same configuration: adopt the new
-  // reference but skip the chrome rebuild — rebuilding would drop widget
-  // focus and, through layout-driven scroll events, could re-trigger the
-  // host render that produced the object in the first place.
-  if (shallowEqualConfig(config, this.config)) {
-   this.config = config;
-   return;
-  }
-  assertRibbonConfig(config?.ribbon);
-  const focus = this.selection.focusCell;
-  const keymap = new Keymap(config, {
-   cell: focus ? { sheet: this.activeSheet, ...focus } : null,
-   clientX: 0,
-   clientY: 0,
-  });
-  this.keymap = keymap;
-  this.config = config;
-
-  const keyboard = config?.keyboard ?? true;
-  this.keyboardPolicy =
-   typeof keyboard === "function" ? (event: KeyboardEvent) => keyboard(event, this) : keyboard;
-
-  // `createToolbar` closes the previous build, which destroys its toolbar or ribbon.
-  this.toolbarHeight = 0;
-  this.createToolbar(config);
-
-  this.interactions.configureMenu(config, this.baseTheme);
-
-  this.resetFindBar();
-
-  this.sheetTabs?.destroy();
-  this.sheetTabs = null;
-  this.tabBar?.remove();
-  this.tabBar = null;
-  this.tabBarHeight = config?.tabs !== false ? 28 : 0;
-  if (this.tabBarHeight > 0) this.buildTabBar();
-
-  this.viewportEl.style.top = `${this.toolbarHeight}px`;
-  this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
-  this.panelHost.style.top = `${this.toolbarHeight}px`;
-  this.panelHost.style.bottom = `${this.tabBarHeight}px`;
-  this.applyLayout();
-  this.render();
-  this.emitCommandStateChange();
- }
-
- applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
-  const resourceValidation = validateTransactionResources(
-   transaction.patches,
-   this.transactionResourceLimits,
-  );
-  if (!resourceValidation.ok) {
-   return {
-    status: "rejected",
-    epoch: this.storeEpoch,
-    issues: [resourceValidation.issue],
-   };
-  }
-  // The controller receives a private copy of the caller's operations. The
-  // copy is verified against the measured payload, so the controller and the
-  // store reuse this measurement instead of walking it again.
-  const patches = transaction.patches.slice();
-  const admitted = admitTransactionResources(
-   patches,
-   this.transactionResourceLimits,
-   resourceValidation,
-   transaction.patches,
-  );
-  return this.document.commit(patches, "api", admitted);
- }
-
- exportSnapshot(): WorkbookSnapshot {
-  const snapshot = this.store.exportSnapshot?.();
-  if (!snapshot) {
-   throw new SheetwriteError(
-    "unavailable",
-    "store",
-    "Sheetwrite: the injected Store does not support snapshot export",
-   );
-  }
-  if (snapshot.workbook.activeSheet === this.activeSheet) return snapshot;
-  return {
-   ...snapshot,
-   workbook: { ...snapshot.workbook, activeSheet: this.activeSheet },
-  };
- }
-
- async importWorkbook(
-  source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
-  options?: { signal?: AbortSignal },
- ): Promise<void> {
-  this.lifetime.signal.throwIfAborted();
-  const run = (this.imports ??= new ScopeSlot(this.lifetime)).next();
-
-  try {
-   // Replacement owns cold bootstrap and cleanup; normal grid hosts do not load it.
-   const { replaceDocument } = await import("./document-replace.js");
-   await replaceDocument(
-    {
-     grid: this,
-     store: this.loadable,
-     cancelOperations: () => this.documentOperations?.close(),
-     windows: this.readWindows,
-     history: this.document,
-     clipboard: this.clipboard,
-     closeFind: () => {
-      this.findBarBuilds.close();
-      this.findBar?.destroy();
-      this.findBar = null;
-     },
-     activate: (workbook, activeSheet) => {
-      this.virtualColumnTargets.clear();
-      this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
-
-      this.storeEpoch += 1;
-      this.windowContentRevision += 1;
-
-      this.setActiveSheet(activeSheet, true);
-      this.applyZoomedTheme();
-      this.emitCommandStateChange();
-     },
-    },
-    source,
-    run,
-    options?.signal,
-   );
-  } finally {
-   run.close();
-  }
- }
-
- applyRemoteOperations(
-  operations: readonly DocumentOp[],
-  options: RemoteOperationOptions = {},
- ): ApplyTransactionResult {
-  return this.document.applyRemoteOperations(operations, options);
- }
-
- setZoom(zoom: number): void {
-  if (!Number.isFinite(zoom)) return;
-  const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
-  if (next === this.zoom) return;
-  this.zoom = next;
-  this.applyZoomedTheme();
-  this.notes.hideCard();
- }
-
- getZoom(): number {
-  return this.zoom;
- }
-
- /**
-  * Re-derive the effective (zoom-scaled) theme from the base theme, then
-  * rebuild every geometry consumer. Widgets (toolbar/find/menu) keep the base
-  * theme: zoom scales grid content only, like Sheets.
-  */
- private applyZoomedTheme(): void {
-  const base = this.baseTheme;
-  const z = this.zoom;
-  const scaled =
-   z === 1
-    ? base
-    : {
-     ...base,
-     rowHeight: base.rowHeight * z,
-     headerHeight: base.headerHeight * z,
-     rowHeaderWidth: base.rowHeaderWidth * z,
-     font: scaleFontPx(base.font, z),
+    const layout = {
+      columns,
+      rowHeight: this.theme.rowHeight,
+      headerHeight: this.theme.headerHeight,
+      totalRows: this.geometry.rowCount,
+      zoom: this.zoom,
+      merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
+
+      domRendererColumns,
     };
-  this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
-  this.renderer.setTheme(this.theme);
-  this.domOverlay.setTheme(this.theme);
-  this.syncTabBarTheme();
-  this.rebuildIndex();
-  this.rebuildColumnIndex();
-  this.applyLayout();
-  this.render();
- }
-
- setFrozen(rows: number, cols = 0): void {
-  this.document.commit(
-   [
-    {
-     op: "setSheetMeta",
-     sheet: this.activeSheet,
-     patch: {
-      frozenRows: Math.max(0, Math.floor(rows)),
-      frozenCols: Math.max(0, Math.floor(cols)),
-     },
-    },
-   ],
-   "structure",
-  );
- }
-
- defineCellRenderer(name: string, renderer: CellRenderer): void {
-  this.customRenderers.set(name, renderer);
-  this.renderer.setRenderers(this.customRenderers);
-  this.domOverlay.setRenderers(this.customRenderers);
-  this.applyLayout();
-  this.scheduleRender();
- }
-
- insertRows(at: number, count = 1): void {
-  if (count <= 0) return;
-  this.document.commit(
-   [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
-   "structure",
-  );
- }
-
- removeRows(at: number, count = 1): void {
-  const sheet = this.sheet();
-  if (count <= 0 || at >= sheet.rowCount) return;
-  this.document.commit(
-   [
-    {
-     op: "removeRows",
-     sheet: this.activeSheet,
-     at: Math.max(0, at),
-     count: Math.min(count, sheet.rowCount - Math.max(0, at)),
-    },
-   ],
-   "structure",
-  );
- }
-
- insertColumns(at: number, count = 1): void {
-  if (count <= 0) return;
-  const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
-  this.document.commit(
-   [
-    {
-     op: "addColumns",
-     sheet: this.activeSheet,
-     at: insertAt,
-     columns: this.makeBlankColumns(insertAt, count),
-    },
-   ],
-   "structure",
-  );
- }
-
- removeColumns(at: number, count = 1): void {
-  const sheet = this.sheet();
-  if (count <= 0 || at >= sheet.columns.length || sheet.columns.length <= 1) return;
-  const removeAt = Math.max(0, at);
-  this.document.commit(
-   [
-    {
-     op: "removeColumns",
-     sheet: this.activeSheet,
-     at: removeAt,
-     count: Math.min(count, sheet.columns.length - removeAt, sheet.columns.length - 1),
-    },
-   ],
-   "structure",
-  );
- }
-
- addSheet(input: AddSheetInput): SheetLifecycleResult {
-  const used = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.id));
-  let id = input.id?.trim() || "sheet";
-  let suffix = 2;
-  while (used.has(id)) id = `${input.id?.trim() || "sheet"}-${suffix++}`;
-  const columns = input.columns?.map((column) => ({ ...column })) ?? [
-   { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "text" as const },
-  ];
-  const name = validateSheetName(
-   input.name,
-   this.store.getWorkbook().sheets.map((sheet) => sheet.name),
-  );
-  // A dashboard has no rows or columns.
-  const dashboard = input.kind === "dashboard";
-  const snapshot: SheetSnapshot = {
-   id,
-   name: name.name,
-   order: this.store.getWorkbook().sheets.length,
-   ...(dashboard ? { kind: "dashboard", dashboard: { items: [] } } : {}),
-   rowCount: dashboard ? 0 : (input.rowCount ?? 100),
-   columns: dashboard ? [] : columns,
-   cells: [],
-  };
-  const result = this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
-  return { ...result, sheet: id };
- }
-
- removeSheet(id: SheetId): SheetLifecycleResult {
-  const result = this.document.commit([{ op: "removeSheet", sheet: id }], "structure");
-  return { ...result, sheet: id };
- }
-
- renameSheet(id: SheetId, name: string): SheetLifecycleResult {
-  const validation = validateSheetName(
-   name,
-   this.store
-    .getWorkbook()
-    .sheets.filter((sheet) => sheet.id !== id)
-    .map((sheet) => sheet.name),
-  );
-  const result = this.document.commit(
-   [{ op: "renameSheet", sheet: id, name: validation.name }],
-   "structure",
-  );
-  return { ...result, sheet: id };
- }
-
- moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult {
-  const result = this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
-  return { ...result, sheet: id };
- }
-
- setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult {
-  const result = this.document.commit(
-   [{ op: "setSheetVisibility", sheet: id, visibility }],
-   "structure",
-  );
-  return { ...result, sheet: id };
- }
-
- setConditionalFormats(rules: readonly ConditionalFormatRule[]): void {
-  this.document.commit(
-   [
-    {
-     op: "setSheetMeta",
-     sheet: this.activeSheet,
-     patch: { conditionalFormats: rules.map((rule) => ({ ...rule })) },
-    },
-   ],
-   "style",
-  );
- }
-
- setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult {
-  const sanitized = sanitizeCellHyperlink(hyperlink);
-  const candidate: CellHyperlink = sanitized ?? {
-   id: "",
-   range: {
-    sheet: this.activeSheet,
-    start: { row: 0, col: 0 },
-    end: { row: 0, col: 0 },
-   },
-   target: { kind: "external", url: "unsafe:" },
-  };
-  return this.document.commit(
-   [
-    {
-     op: "setHyperlink",
-     sheet: this.activeSheet,
-     hyperlink: candidate,
-    },
-   ],
-   "api",
-  );
- }
-
- removeHyperlink(id: string): ApplyTransactionResult {
-  return this.document.commit([{ op: "removeHyperlink", sheet: this.activeSheet, id }], "api");
- }
-
- getHyperlink(addr: CellAddress): CellHyperlink | null {
-  return hyperlinkAt(this.store.getWorkbook(), addr);
- }
-
- activateHyperlink(addr: CellAddress): boolean {
-  if (this.hyperlinkActivation === "disabled") return false;
-  const hyperlink = hyperlinkAt(this.store.getWorkbook(), addr);
-  if (!hyperlink) return false;
-  const target = resolveHyperlinkTarget(this.store.getWorkbook(), hyperlink.target);
-  for (const listener of this.listeners["hyperlink-activate"]) {
-   listener({ address: { ...addr }, hyperlink, target });
+    this.renderer.setLayout(layout);
+    this.domOverlay.setLayout(layout);
+    this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
+    this.syncSizer();
   }
-  if (target.kind === "internal" && this.hyperlinkActivation === "internal-navigation") {
-   this.scrollToCell(target.address);
-  }
-  return true;
- }
 
- setValidationRule(rule: DataValidationRule): ApplyTransactionResult {
-  return this.document.commit(
-   [{ op: "setValidationRule", sheet: this.activeSheet, rule: structuredClone(rule) }],
-   "api",
-  );
- }
-
- removeValidationRule(id: string): ApplyTransactionResult {
-  return this.document.commit(
-   [{ op: "removeValidationRule", sheet: this.activeSheet, id }],
-   "api",
-  );
- }
-
- setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult {
-  return this.document.commit(
-   [
-    {
-     op: "setProtectedRange",
-     sheet: this.activeSheet,
-     protectedRange: structuredClone(protectedRange),
-    },
-   ],
-   "api",
-  );
- }
-
- removeProtectedRange(id: string): ApplyTransactionResult {
-  return this.document.commit(
-   [{ op: "removeProtectedRange", sheet: this.activeSheet, id }],
-   "api",
-  );
- }
-
- getPivots(sheet?: SheetId): PivotDefinition[] {
-  return clonePivots(this.store.getWorkbook().sheets, sheet);
- }
-
- setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult {
-  const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, pivot.id)?.id;
-  // Saved values do not match a definition the caller changed.
-  const changed = withoutSavedOutput(structuredClone(pivot));
-  return this.document.commit(
-   [{ op: "setPivot", sheet: owner ?? this.activeSheet, pivot: changed }],
-   "api",
-  );
- }
-
- removePivot(id: string, sheet?: SheetId): ApplyTransactionResult {
-  const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, id)?.id ?? this.activeSheet;
-  return this.document.commit([{ op: "removePivot", sheet: owner, id }], "api");
- }
-
- getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
-  return storeEngine(this.store)?.getPivotFields(sheet, id) ?? [];
- }
-
- getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
-  const engine = storeEngine(this.store);
-  if (engine) return engine.getPivotResult(sheet, id);
-
-  // A custom store has no pivot engine; its definitions still read normally.
-  const pivot = this.store
-   .getWorkbook()
-   .sheets.find((candidate) => candidate.id === sheet)
-   ?.pivots?.find((candidate) => candidate.id === id);
-  return pivot ? uncomputedPivotResult(sheet, pivot) : null;
- }
-
- getCharts(sheet: SheetId = this.activeSheet): readonly ChartDefinition[] {
-  return structuredClone(this.sheetById(sheet)?.charts ?? []);
- }
-
- setChart(chart: ChartDefinition, sheet: SheetId = this.activeSheet): ApplyTransactionResult {
-  return this.document.commit([{ op: "setChart", sheet, chart: structuredClone(chart) }], "api");
- }
-
- removeChart(id: string, sheet?: SheetId): ApplyTransactionResult {
-  const owner =
-   sheet ??
-   this.store
-    .getWorkbook()
-    .sheets.find((candidate) => candidate.charts?.some((chart) => chart.id === id))?.id ??
-   this.activeSheet;
-  return this.document.commit([{ op: "removeChart", sheet: owner, id }], "api");
- }
-
- selectChart(id: string | null, sheet: SheetId = this.activeSheet): void {
-  if (id !== null && sheet !== this.activeSheet) this.setActiveSheet(sheet);
-  // Charts on other sheets are never selected, so there is nothing to deselect there.
-  if (sheet === this.activeSheet) this.objectLayer.select(id);
- }
-
- /**
-  * A chart's right-click menu. Edit chart does what Enter does; a read-only
-  * grid can open the chart's panel but not delete the chart.
-  */
- private chartMenuItems(chart: ChartRef): ContextMenuItem[] {
-  return [
-   {
-    id: "editChart",
-    label: "Edit chart",
-    icon: "chart",
-    onClick: () => {
-     for (const fn of this.listeners["chart-activate"]) fn(chart);
-    },
-   },
-   { action: "separator" },
-   {
-    id: "deleteChart",
-    label: "Delete chart",
-    icon: "delete",
-    visible: () => !this.readOnly,
-    onClick: () => {
-     this.removeChart(chart.id, chart.sheet);
-     // The menu would hand focus back to the chart it opened on, which no
-     // longer exists; whether its frame is gone yet depends on timing.
-     // Focus the grid so Ctrl+Z, arrows and typing keep working.
-     this.host.focus({ preventScroll: true });
-    },
-   },
-  ];
- }
-
- openPanel(panel: GridPanel | null): void {
-  if (this.lifetime.closed) return;
-  const wasOpen = this.sidePanels.active;
-  const hadFocus = this.panelHost.contains(document.activeElement);
-  this.sidePanels.close();
-
-  const isOpen = panel !== null;
-  // The panel focuses its first control while it mounts; a hidden host refuses focus.
-  this.panelHost.hidden = !isOpen;
-  if (panel) {
-   const scope = this.sidePanels.next();
-   scope.add(mountSidePanel(this.panelHost, panel, () => this.openPanel(null)));
-  }
-  if (isOpen !== wasOpen) {
-   this.viewportEl.style.right = isOpen ? `${PANEL_WIDTH}px` : "0px";
-   this.syncSizer();
-   this.render();
-  }
-  // Escape and the close button leave focus in a removed panel; give it back to the grid.
-  if (!isOpen && hadFocus) this.host.focus();
- }
-
- setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {
-  this.store.setProtectionResolver?.(resolver, mode);
- }
-
- setNote(addr: CellAddress, text: string | null): ApplyTransactionResult {
-  return this.document.commit([{ op: "setNote", addr: { ...addr }, text: text || null }], "api");
- }
-
- getNote(addr: CellAddress): string | null {
-  return (
-   this.sheetById(addr.sheet)?.notes?.find(
-    (note) => note.addr.row === addr.row && note.addr.col === addr.col,
-   )?.text ?? null
-  );
- }
-
- private makeBlankColumns(at: number, count: number): Column[] {
-  const used = new Set(this.sheet().columns.map((column) => column.key));
-  const columns: Column[] = [];
-  for (let i = 0; i < count; i++) {
-   const col = at + i;
-   const base = `col_${col}`;
-   let key = base;
-   let suffix = 1;
-   while (used.has(key)) key = `${base}_${suffix++}`;
-   used.add(key);
-   columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
-  }
-  return columns;
- }
-
- private materializeVirtualColumns(patches: DocumentOp[]): DocumentOp[] {
-  // A write is measured against the width its sheet has when it runs, so
-  // column inserts and deletes earlier in the batch count. Undoing a
-  // trailing column delete restores cells right after re-adding the columns.
-  const widthBySheet = new Map<SheetId, number>();
-  const missingBySheet = new Map<SheetId, number>();
-  const widthOf = (sheetId: SheetId): number | null => {
-   const width = widthBySheet.get(sheetId);
-   if (width !== undefined) return width;
-
-   const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
-   if (!stored) return null;
-   widthBySheet.set(sheetId, stored.columns.length);
-   return stored.columns.length;
-  };
-
-  for (const patch of patches) {
-   let sheet: SheetId | null = null;
-   let col = -1;
-   if (patch.op === "addColumns" || patch.op === "removeColumns") {
-    const width = widthOf(patch.sheet);
-    if (width !== null) {
-     const delta = patch.op === "addColumns" ? patch.columns.length : -patch.count;
-     widthBySheet.set(patch.sheet, width + delta);
+  private syncSizer(): void {
+    // Browser zoom moves the layout clamp; a stale cap truncates tall documents.
+    const devicePixelRatio = globalThis.devicePixelRatio ?? 1;
+    if (devicePixelRatio !== this.lastDevicePixelRatio) {
+      this.lastDevicePixelRatio = devicePixelRatio;
+      this.maxElementHeight = measureMaxElementHeight();
     }
-   } else if (patch.op === "set") {
-    sheet = patch.addr.sheet;
-    col = patch.addr.col;
-   } else if (
-    patch.op === "setRange" ||
-    patch.op === "setBlock" ||
-    patch.op === "restoreBlock" ||
-    patch.op === "setRangeStyle" ||
-    patch.op === "clearRange"
-   ) {
-    sheet = patch.range.sheet;
-    col = Math.max(patch.range.start.col, patch.range.end.col);
-   } else if (patch.op === "setColumn") {
-    sheet = patch.sheet;
-    col = patch.col;
-   } else if (patch.op === "addMerge" || patch.op === "removeMerge") {
-    sheet = patch.sheet;
-    col = Math.max(patch.merge.c0, patch.merge.c1);
-   }
-   if (sheet === null) continue;
-
-   const width = widthOf(sheet);
-   if (width === null) continue;
-   missingBySheet.set(sheet, Math.max(missingBySheet.get(sheet) ?? 0, col + 1 - width));
+    const size = this.geometry.layoutSize(this.viewportH());
+    this.sizer.style.width = `${size.width}px`;
+    this.sizer.style.height = `${size.height}px`;
   }
 
-  const additions: DocumentOp[] = [];
-  for (const [sheetId, missing] of missingBySheet) {
-   const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
-   if (!stored || missing <= 0) continue;
-   const used = new Set(stored.columns.map((column) => column.key));
-   const columns: Column[] = [];
-   for (let col = stored.columns.length; col < stored.columns.length + missing; col++) {
-    const base = `col_${col}`;
-    let key = base;
-    let suffix = 1;
-    while (used.has(key)) key = `${base}_${suffix++}`;
-    used.add(key);
-    columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
-   }
-   additions.push({ op: "addColumns", sheet: sheetId, at: stored.columns.length, columns });
+  /** The gutter tracks the active sheet's digit count; identity when unchanged. */
+  private withAdaptiveGutter(theme: Theme, rowCount: number): Theme {
+    const rowHeaderWidth = adaptiveRowHeaderWidth(theme, rowCount);
+    return rowHeaderWidth === theme.rowHeaderWidth ? theme : { ...theme, rowHeaderWidth };
   }
-  return additions.length > 0 ? [...additions, ...patches] : patches;
- }
 
- private buildActions(): GridActions {
-  return {
-   toggleBold: () => this.styleActions.toggleStyle("bold"),
-   toggleItalic: () => this.styleActions.toggleStyle("italic"),
-   toggleUnderline: () => this.styleActions.toggleStyle("underline"),
-   toggleStrikethrough: () => this.styleActions.toggleStyle("strikethrough"),
-   setAlign: (align) => this.styleActions.applyStyle({ align }),
-   setTextColor: (color) => this.styleActions.applyStyle({ color: color ?? undefined }),
-   setFillColor: (color) =>
-    this.styleActions.applyStyle({ backgroundColor: color ?? undefined }),
-   setFontFamily: (family) => this.styleActions.applyStyle({ fontFamily: family ?? undefined }),
-   setFontSize: (px) => this.styleActions.applyStyle({ fontSize: px ?? undefined }),
-   stepFontSize: (direction) => {
-    const defaultFontSize = 13;
-    const themeFontSize =
-     Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") ||
-     defaultFontSize;
-    this.styleActions.applyStyle({
-     fontSize: stepFontSizePx(this.getFocusCellStyle().fontSize ?? themeFontSize, direction),
-    });
-   },
-   setVerticalAlign: (verticalAlign) => this.styleActions.applyStyle({ verticalAlign }),
-   toggleWrap: () => this.styleActions.applyStyle({ wrap: !this.getFocusCellStyle().wrap }),
-   setNumberFormat: (code) => this.styleActions.applyStyle({ numberFormat: code ?? undefined }),
-   stepDecimals: (direction) => {
-    const focus = this.selection.focusCell;
-    if (!focus) return;
-    const column = this.sheet().columns[focus.col];
-    const value = this.store.getCell({
-     sheet: this.activeSheet,
-     row: this.toDataRow(focus.row),
-     col: focus.col,
-    }).resolved;
-
-    const numberFormat = stepNumberFormatDecimals(
-     this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
-     direction,
-     typeof value === "number" ? value : undefined,
-     column?.numberLocale,
+  private rebuildIndex(): void {
+    this.geometry.rebuildRows(
+      this.loadable?.viewRowCount(this.activeSheet) ?? this.sheet().rowCount,
     );
-    if (numberFormat === undefined) return;
-
-    this.styleActions.applyStyle({ numberFormat });
-   },
-   setBorders: (preset) => this.styleActions.setBorders(preset),
-   mergeAndCenter: () => this.styleActions.mergeSelection(true),
-   clearAll: () => this.styleActions.clearAll(),
-   autoSum: () => this.autoSum(),
-   find: () => this.openFindBar(),
-   freezePanes: () => {
-    const focus = this.selection.focusCell;
-    if (focus) this.setFrozen(focus.row, focus.col);
-   },
-   toggleBorder: () => this.styleActions.toggleBorder(),
-   clearFormat: () => this.styleActions.applyStyle(null),
-   merge: () => this.styleActions.mergeSelection(),
-   unmerge: () => this.styleActions.unmergeSelection(),
-   sort: (ascending) => {
-    const f = this.selection.focusCell;
-    if (f) this.sortBy(f.col, ascending);
-   },
-   sortView: (ascending) => {
-    const f = this.selection.focusCell;
-    if (f) this.setViewSort([{ col: f.col, ascending }]);
-   },
-   customSort: () => showSortPanel(this),
-   insertRowAbove: () => {
-    const f = this.selection.focusCell;
-    if (f) this.insertRows(this.toDataRow(f.row));
-   },
-   insertRowBelow: () => {
-    const f = this.selection.focusCell;
-    if (f) this.insertRows(this.toDataRow(f.row) + 1);
-   },
-   deleteRow: () => {
-    const f = this.selection.focusCell;
-    if (f) this.removeRows(this.toDataRow(f.row));
-   },
-   insertColumnLeft: () => {
-    const f = this.selection.focusCell;
-    if (f) this.insertColumns(f.col);
-   },
-   insertColumnRight: () => {
-    const f = this.selection.focusCell;
-    if (f) this.insertColumns(f.col + 1);
-   },
-   deleteColumn: () => {
-    const f = this.selection.focusCell;
-    if (f) this.removeColumns(f.col);
-   },
-   hideRows: (rows) => {
-    const focus = this.selection.focusCell;
-    const targets = rows ?? (focus ? [this.toDataRow(focus.row)] : []);
-    this.hideRows(targets);
-   },
-   showRows: (rows) => this.showRows(rows),
-   autoFitRows: () => {
-    const focus = this.selection.focusCell;
-    if (!focus) return;
-    // `autoFitRows` takes view rows, the same space as the focus cell.
-    const row = focus.row;
-    this.autoFitRows({
-     sheet: this.activeSheet,
-     start: { row, col: 0 },
-     end: { row, col: Math.max(0, this.sheet().columns.length - 1) },
-    });
-   },
-   hideColumns: (cols) => this.hideColumns(cols),
-   showColumns: (cols) => this.showColumns(cols),
-   autoFitColumns: (cols) => this.autoFitColumns(cols),
-   clearFilter: (col) => {
-    const target = col ?? this.selection.focusCell?.col;
-    if (target !== undefined) this.setColumnFilter(target, null);
-   },
-   copy: () => this.clipboard.copy(),
-   cut: () => this.clipboard.cut(),
-   paste: () => this.clipboard.paste(),
-   pasteValues: () => this.clipboard.pasteValues(),
-   clearContents: () => this.clearSelection(),
-   exportCsv: (filename) => {
-    try {
-     this.exportCsv(filename ?? "sheetwrite.csv");
-    } catch (error) {
-     this.emitExportError(error, "csv");
+    this.datasourceController.resize(this.sheet().rowCount);
+    // Row-count changes can grow the row-number gutter (e.g. crossing 1M rows).
+    const adjusted = this.withAdaptiveGutter(this.theme, this.sheet().rowCount);
+    if (adjusted !== this.theme) {
+      this.theme = adjusted;
+      this.renderer.setTheme(this.theme);
+      this.domOverlay.setTheme(this.theme);
     }
-   },
-   // Resolves when the download is handed to the browser; never rejects,
-   // because a failure is reported once through `export-error`.
-   exportXlsx: (filename) =>
-    this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
-     this.emitExportError(error, "xlsx");
-    }),
-   importXlsx: async () => {
-    // File selection is optional chrome, not part of initial grid delivery.
-    const { pickXlsxWorkbook } = await import("./workbook-io.js");
-    await pickXlsxWorkbook(this, this.host, this.lifetime);
-   },
-   versionHistory: () => this.historyCommand?.("open"),
-   // The dashboard chunk names and adds the sheet; first paint carries only this call.
-   newDashboard: () =>
-    void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
-   saveVersion: () => {
-    if (!this.readOnly) this.historyCommand?.("save");
-   },
-   editNote: () => {
-    // Same gate as the cell editor: do not open an editor whose save must fail.
-    const focus = this.selection.focusCell;
-    if (this.readOnly || !focus) return;
+    this.syncSizer();
+  }
 
-    const cell = this.noteCell(focus.row, focus.col);
-    this.scrollToCell({ sheet: this.activeSheet, row: cell.row, col: cell.col });
-    this.notes.edit(cell);
-   },
-   deleteNote: () => {
-    const focus = this.selection.focusCell;
-    if (this.readOnly || !focus) return;
+  private rebuildColumnIndex(): void {
+    this.geometry.rebuildColumns();
+    this.readWindows.invalidateColumns();
+    this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
+  }
 
-    const { address } = this.noteCell(focus.row, focus.col);
-    if (this.getNote(address) !== null) this.setNote(address, null);
-   },
-   showPivotFields: () => {
-    // The field list edits the pivot, so a read-only grid does not open it.
+  private toDataRow(viewRow: number): number {
+    return this.geometry.toDataRow(viewRow);
+  }
+
+  private toViewRow(dataRow: number): number | null {
+    return this.geometry.toViewRow(dataRow);
+  }
+
+  private mergeAnchorAt(row: number, col: number): SelRect | null {
+    if (this.loadable?.hasView(this.activeSheet)) return null;
+
+    const merges = this.sheet().merges;
+    if (!merges) return null;
+
+    return mergeAnchorAt(prepareMergeIndex(merges), row, col);
+  }
+
+  private anchorCell(row: number, col: number): CellRef {
+    const merge = this.mergeAnchorAt(row, col);
+    return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
+  }
+
+  private scheduleRender(): void {
+    this.readWindows.schedule();
+  }
+
+  private render(): void {
+    this.readWindows.renderNow();
+  }
+
+  private repositionEditor(contentTop: number, scrollLeft: number): void {
+    this.interactions.reposition(contentTop, scrollLeft);
+    this.notes.reposition();
+    this.objectLayer.place(contentTop, scrollLeft);
+  }
+
+  /** A view cell, resolved to its merge anchor, with the data address its note lives at. */
+  private noteCell(row: number, col: number): NoteCell {
+    const anchor = this.anchorCell(row, col);
+    return {
+      row: anchor.row,
+      col: anchor.col,
+      address: { sheet: this.activeSheet, row: this.toDataRow(anchor.row), col: anchor.col },
+    };
+  }
+
+  beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
+    this.interactions.beginEdit(row, col, initial, selectAll);
+  }
+
+  private clearSelection(): void {
+    if (this.readOnly || this.selection.isEmpty) return;
+
+    const sheet = this.sheet();
+    const patches: DocumentOp[] = [];
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push(rect));
+    const merges = sheet.merges;
+    const mergeIndex = merges ? prepareMergeIndex(merges) : null;
+    const intersectsMerge =
+      mergeIndex !== null &&
+      rects.some(
+        (rect) =>
+          intersectingMerges(mergeIndex, rect.r0, rect.r1 + 1, [rect.c0, rect.c1]).length > 0,
+      );
+    if (!intersectsMerge) {
+      for (const rect of rects) {
+        let runStart = this.toDataRow(rect.r0);
+        let previous = runStart;
+        for (let viewRow = rect.r0 + 1; viewRow <= rect.r1 + 1; viewRow++) {
+          const dataRow = viewRow <= rect.r1 ? this.toDataRow(viewRow) : -1;
+          if (viewRow <= rect.r1 && Math.abs(dataRow - previous) === 1) {
+            previous = dataRow;
+            continue;
+          }
+
+          patches.push({
+            op: "clearRange",
+            range: {
+              sheet: this.activeSheet,
+              start: { row: runStart, col: rect.c0 },
+              end: { row: previous, col: rect.c1 },
+            },
+          });
+
+          runStart = dataRow;
+          previous = dataRow;
+        }
+      }
+    } else {
+      const seen = new Set<number>();
+      const nullValue: CellValue = { kind: "literal", value: null };
+      for (const rect of rects) {
+        for (let r = rect.r0; r <= rect.r1; r++) {
+          for (let c = rect.c0; c <= rect.c1; c++) {
+            const cell = this.anchorCell(r, c);
+            const key = cell.row * sheet.columns.length + cell.col;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            patches.push({
+              op: "set",
+              addr: { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
+              value: nullValue,
+            });
+          }
+        }
+      }
+    }
+
+    this.document.commit(patches, "clear");
+  }
+
+  private emitSelection(): void {
+    this.ariaMirror.bumpVersion();
+    const selection = this.getSelection();
+
+    // One thing is selected at a time: a new cell selection, by any route,
+    // deselects the chart. Undo re-emits an unchanged selection and must keep it.
+    const selectionKey = JSON.stringify(selection);
+    if (selectionKey !== this.lastSelectionKey) {
+      this.lastSelectionKey = selectionKey;
+      this.objectLayer.select(null);
+    }
+
+    for (const listener of this.listeners.selection) listener({ selection });
+    this.emitCommandStateChange();
+  }
+
+  search(query: string, opts: SearchOptions = {}): SearchResult {
+    return this.searchController.search(query, opts);
+  }
+
+  findNext(): SearchResult {
+    return this.searchController.findNext();
+  }
+
+  findPrev(): SearchResult {
+    return this.searchController.findPrev();
+  }
+
+  clearSearch(): void {
+    this.searchController.clearSearch();
+  }
+
+  replaceCurrent(replacement: string): SearchResult {
+    return this.searchController.replaceCurrent(replacement);
+  }
+
+  replaceAll(replacement: string): ReplaceResult {
+    return this.searchController.replaceAll(replacement);
+  }
+
+  getShortcutLabel(action: KeyboardAction): string {
+    return this.keymap.label(action);
+  }
+
+  highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
+    this.overlayPainter.highlightCells(ranges, color);
+  }
+
+  setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void {
+    this.overlayPainter.setPresenceOverlays(overlays);
+  }
+
+  styleRange(range: Range, style: Partial<CellStyle> | null): void {
     if (this.readOnly) return;
 
-    showPivotFields(this);
-   },
-   undo: () => this.undo(),
-   redo: () => this.redo(),
-  };
- }
-
- getFocusCellStyle(): CellStyle {
-  const focus = this.selection.focusCell;
-  if (!focus) return {};
-  const anchor = this.anchorCell(focus.row, focus.col);
-  const cell = this.store.getCell({
-   sheet: this.activeSheet,
-   row: this.toDataRow(anchor.row),
-   col: anchor.col,
-  });
-  return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
- }
-
- async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
-  signal?.throwIfAborted();
-  // A destroyed grid has freed its store: the call rejects with the grid's abort reason.
-  this.lifetime.signal.throwIfAborted();
-  if (this.selection.isEmpty) return null;
-
-  // Summaries are independent, but none may read a replaced document.
-  const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
-  signal?.addEventListener("abort", () => run.close(signal.reason), {
-   once: true,
-   signal: run.signal,
-  });
-  const rects: SelRect[] = [];
-  this.selection.forEachRect((rect) => rects.push({ ...rect }));
-  const sheet = this.activeSheet;
-  const columnCount = this.sheet().columns.length;
-  try {
-   // Summary scans are cold work; do not add them to initial grid delivery.
-   const { summarizeRects } = await import("./selection-summary.js");
-   return await summarizeRects(this.store, sheet, columnCount, rects, run);
-  } finally {
-   run.close();
-  }
- }
-
- private autoSum(): void {
-  const focus = this.selection.focusCell;
-  if (this.readOnly || !focus) return;
-
-  const row = this.toDataRow(focus.row);
-  const col = focus.col;
-  const chunkCells = 4_096;
-
-  const numericStart = (vertical: boolean): number => {
-   let end = vertical ? row : col;
-   const origin = end;
-   while (end > 0) {
-    const start = Math.max(0, end - chunkCells);
-    const columns = vertical
-     ? [col]
-     : Array.from({ length: end - start }, (_, index) => start + index);
-    const window = this.store.getDataWindow?.(
-     this.activeSheet,
-     vertical ? { start, end } : { start: row, end: row + 1 },
-     columns,
+    this.document.commit(
+      [
+        {
+          op: "setRangeStyle",
+          range: {
+            sheet: range.sheet,
+            start: {
+              row: Math.min(range.start.row, range.end.row),
+              col: Math.min(range.start.col, range.end.col),
+            },
+            end: {
+              row: Math.max(range.start.row, range.end.row),
+              col: Math.max(range.start.col, range.end.col),
+            },
+          },
+          style,
+        },
+      ],
+      "style",
     );
+  }
 
-    let values: ArrayLike<CellScalar>;
-    if (window) values = window.values;
-    else {
-     const coordinates =
-      columns.length === 1 && vertical
-       ? Array.from({ length: end - start }, (_, index) => ({ row: start + index, col }))
-       : columns.map((column) => ({ row, col: column }));
+  dataEdge(row: number, col: number, dRow: number, dCol: number): number | null {
+    // View-aware in the store: with an active sort/filter view, `row` is a
+    // view position and vertical moves return view positions.
+    if (!this.loadable) return null;
+    return this.loadable.dataEdge(this.activeSheet, row, col, dRow, dCol);
+  }
 
-     const engine = storeEngine(this.store);
-     // Custom stores without canonical windows retain their scalar data-address contract.
-     const cells = engine
-      ? engine.captureResolvedCells(this.activeSheet, coordinates)
-      : coordinates.map((coordinate) =>
-       this.store.getCell({ sheet: this.activeSheet, ...coordinate }),
+  /** The one detached 2D context that auto-fit measures text with; `trimMemory` drops it. */
+  private measurementContext(): CanvasRenderingContext2D | null {
+    this.measureContext ??= document.createElement("canvas").getContext("2d");
+    return this.measureContext;
+  }
+
+  private requireAutoFitRangeLoaded(range: Range): void {
+    if (!this.loadable || this.loadable.isRangeFullyLoaded(range)) return;
+    const capability = this.loadable.queryCapability(range.sheet);
+    if (capability.status === "incomplete") throw new IncompleteDataError(range.sheet, capability);
+  }
+
+  private withStoreResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
+    return this.loadable ? this.loadable.withResourceOperation(operation, run) : run();
+  }
+
+  private noteAutoFitWindow(rows: number, columns: number): void {
+    const cells = rows * columns;
+    this.autoFitStats.windowRequests += 1;
+    this.autoFitStats.maxWindowCells = Math.max(this.autoFitStats.maxWindowCells, cells);
+  }
+
+  /** A new auto-fit job closes the running one; a job closed before it completes counts as cancelled. */
+  private startAutoFit(): AutoFitJob {
+    const job: AutoFitJob = { scope: this.autoFits.next(), completed: false };
+    job.scope.add(() => {
+      if (!job.completed) this.autoFitStats.cancelledJobs += 1;
+    });
+    return job;
+  }
+
+  private completeAutoFit(job: AutoFitJob): void {
+    job.completed = true;
+    job.scope.close();
+  }
+
+  /** Run `step` in the next frame, unless the job closes first. */
+  private scheduleAutoFitChunk(job: AutoFitJob, step: () => void): void {
+    this.autoFitStats.scheduledChunks += 1;
+
+    // Some hosts run the callback synchronously; then no frame is left to cancel.
+    let ran = false;
+    let removeCancel: (() => void) | undefined;
+    const cancel = scheduleFrame(() => {
+      ran = true;
+      removeCancel?.();
+      step();
+    });
+    if (!ran) removeCancel = job.scope.add(cancel);
+  }
+
+  private cancelAutoFit(): void {
+    this.autoFits.close();
+  }
+
+  private measureAutoFitRowWindow(
+    context: CanvasRenderingContext2D,
+    sheet: Sheet,
+    view: VisibleWindowView,
+    columns: readonly number[],
+    bandStart: number,
+    requiredHeights: Float64Array,
+    mergeWidths: ReadonlyMap<number, number>,
+  ): void {
+    const fallbackFontSize =
+      Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") || 12;
+    for (let row = view.rows.start; row < view.rows.end; row++) {
+      const requiredIndex = row - bandStart;
+      let required = requiredHeights[requiredIndex] ?? this.baseTheme.rowHeight;
+      for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+        const col = columns[columnIndex]!;
+        const cell = autoFitCell(sheet, view, row, columnIndex, col);
+        if (!cell) continue;
+        const { value, style } = cell;
+        const text = cellScalarToText(value);
+        if (!style.wrap && !text.includes("\n")) continue;
+        const width =
+          mergeWidths.get(row * sheet.columns.length + col) ?? sheet.columns[col]!.width;
+        const fontSize = style.fontSize ?? fallbackFontSize;
+        context.font = fontFor(this.baseTheme, style);
+        const lineCount = layoutTextLines(
+          context,
+          text,
+          Math.max(0, width - CELL_TEXT_HORIZONTAL_PADDING),
+        ).length;
+        required = Math.max(required, Math.ceil(lineCount * fontSize * 1.2 + 8));
+      }
+      requiredHeights[requiredIndex] = required;
+    }
+  }
+
+  private measureAutoFitColumnWindow(
+    context: CanvasRenderingContext2D,
+    sheet: Sheet,
+    view: VisibleWindowView,
+    columns: readonly number[],
+    targetOffset: number,
+    widths: Float64Array,
+  ): void {
+    for (let row = view.rows.start; row < view.rows.end; row++) {
+      for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+        const col = columns[columnIndex]!;
+        const cell = autoFitCell(sheet, view, row, columnIndex, col);
+        if (!cell) continue;
+        const { value, style, column } = cell;
+        context.font = fontFor(this.baseTheme, style);
+        let width = widths[targetOffset + columnIndex]!;
+        const text = cellDisplayText(
+          value,
+          style.numberFormat ?? column.numberFormat,
+          column.numberLocale,
+        );
+        for (const line of text.split("\n")) {
+          width = Math.max(width, context.measureText(line).width + CELL_TEXT_HORIZONTAL_PADDING);
+        }
+        widths[targetOffset + columnIndex] = width;
+      }
+    }
+  }
+
+  autoFitRows(range?: Range): void {
+    if (this.readOnly || (range && range.sheet !== this.activeSheet)) return;
+    this.cancelAutoFit();
+    const sheetId = this.activeSheet;
+    const sheet = this.sheet();
+    const r0 = Math.max(0, Math.min(range?.start.row ?? 0, range?.end.row ?? sheet.rowCount - 1));
+    const r1 = Math.min(
+      sheet.rowCount - 1,
+      Math.max(range?.start.row ?? 0, range?.end.row ?? sheet.rowCount - 1),
+    );
+    const c0 = Math.max(
+      0,
+      Math.min(range?.start.col ?? 0, range?.end.col ?? sheet.columns.length - 1),
+    );
+    const c1 = Math.min(
+      sheet.columns.length - 1,
+      Math.max(range?.start.col ?? 0, range?.end.col ?? sheet.columns.length - 1),
+    );
+    if (r1 < r0 || c1 < c0) return;
+    const measuredRange: Range = {
+      sheet: sheetId,
+      start: { row: r0, col: c0 },
+      end: { row: r1, col: c1 },
+    };
+
+    this.requireAutoFitRangeLoaded(measuredRange);
+    const context = this.measurementContext();
+    if (!context) return;
+
+    const mergeWidths = new Map<number, number>();
+    // Measurement walks view rows, so key each merge by the view row it shows on.
+    for (const merge of sheet.merges ?? []) {
+      const viewRow = this.toViewRow(merge.r0);
+      if (viewRow === null) continue;
+      let width = 0;
+      for (let col = merge.c0; col <= merge.c1; col++) width += sheet.columns[col]?.width ?? 0;
+      mergeWidths.set(viewRow * sheet.columns.length + merge.c0, width);
+    }
+
+    const rowCount = r1 - r0 + 1;
+    const columnCount = c1 - c0 + 1;
+    const patches: DocumentOp[] = [];
+    const appendRowPatches = (bandStart: number, required: Float64Array): void => {
+      for (let offset = 0; offset < required.length; offset++) {
+        const viewRow = bandStart + offset;
+        const dataRow = this.toDataRow(viewRow);
+        const height = required[offset]!;
+        if ((sheet.rowHeights?.get(dataRow) ?? this.baseTheme.rowHeight) === height) continue;
+        patches.push({
+          op: "setRowMeta",
+          sheet: sheetId,
+          row: dataRow,
+          meta: { height },
+        });
+      }
+    };
+
+    if (rowCount * columnCount <= AUTO_FIT_CHUNK_CELLS) {
+      const columns = Array.from({ length: columnCount }, (_, index) => c0 + index);
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: r0, end: r1 + 1 }, columns),
       );
-     values = cells.map((cell) => cell.resolved);
-    }
-
-    for (let index = values.length - 1; index >= 0; index--) {
-     if (typeof values[index] !== "number") return start + index + 1;
-    }
-
-    end = start;
-   }
-
-   return origin === 0 ? origin : end;
-  };
-
-  const firstRow = numericStart(true);
-  const vertical = firstRow < row;
-  const firstCol = vertical ? col : numericStart(false);
-  if (!vertical && firstCol === col) return;
-  const start = `${colToA1(firstCol)}${(vertical ? firstRow : row) + 1}`;
-  const end = `${colToA1(vertical ? col : col - 1)}${(vertical ? row - 1 : row) + 1}`;
-  this.document.commit(
-   [
-    {
-     op: "set",
-     addr: { sheet: this.activeSheet, row, col },
-     value: { kind: "formula", src: `=SUM(${start}:${end})` },
-    },
-   ],
-   "edit-enter",
-  );
- }
-
- getCommandState(command: GridCommandName): GridCommandState {
-  const summary = COMMAND_STATE_ACTIVITY_COMMANDS.includes(command)
-   ? this.formattingSummary()
-   : undefined;
-  return this.resolveCommandState(command, summary);
- }
-
- private resolveCommandState(
-  command: GridCommandName,
-  summary?: Readonly<Partial<Record<GridCommandName, number>>>,
- ): GridCommandState {
-  if (command === "undo") {
-   return {
-    disabled: this.readOnly || !this.document.canUndo,
-    activity: "inactive",
-   };
-  }
-  if (command === "redo") {
-   return {
-    disabled: this.readOnly || !this.document.canRedo,
-    activity: "inactive",
-   };
-  }
-  if (command === "versionHistory" || command === "saveVersion") {
-   return {
-    disabled: !this.historyCommand || (command === "saveVersion" && this.readOnly),
-    activity: "inactive",
-   };
-  }
-  if (command === "importXlsx") {
-   return {
-    disabled:
-     this.readOnly ||
-     !this.ownsStore ||
-     this.hasDatasource ||
-     hasGridTransactionAdmission(this),
-    activity: "inactive",
-   };
-  }
-
-  const selectionRequired =
-   isFormattingCommand(command) ||
-   command === "merge" ||
-   command === "unmerge" ||
-   command === "sortAsc" ||
-   command === "sortDesc";
-  const disabled =
-   (selectionRequired && this.selection.isEmpty) ||
-   (this.readOnly && command !== "exportCsv" && command !== "exportXlsx");
-  const activity = summary?.[command] ?? 0;
-  return {
-   disabled,
-   activity: activity === 3 ? "mixed" : activity === 1 ? "active" : "inactive",
-  };
- }
-
- private formattingSummary(): Readonly<Partial<Record<GridCommandName, number>>> {
-  const summary: Partial<Record<GridCommandName, number>> = {};
-  for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
-
-  // A stopped engine cannot answer style reads; a read-only grid needs none.
-  if (this.selection.isEmpty || this.engineFailure) return summary;
-
-  const coordinates: Array<{ row: number; col: number }> = [];
-  let complete = true;
-  this.selection.forEachRect((rect) => {
-   if (!complete) return;
-
-   for (let row = rect.r0; row <= rect.r1; row++) {
-    const dataRow = this.toDataRow(row);
-    for (let col = rect.c0; col <= rect.c1; col++) {
-     if (coordinates.length >= COMMAND_STATE_CELL_LIMIT) {
-      complete = false;
+      this.noteAutoFitWindow(rowCount, columnCount);
+      const required = new Float64Array(rowCount);
+      required.fill(this.baseTheme.rowHeight);
+      this.measureAutoFitRowWindow(context, sheet, view, columns, r0, required, mergeWidths);
+      appendRowPatches(r0, required);
+      this.autoFitStats.completedJobs += 1;
+      this.autoFitStats.committedPatches += patches.length;
+      this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
       return;
-     }
-
-     const column = this.sheet().columns[col];
-     if (!column) continue;
-     coordinates.push({ row: dataRow, col });
     }
-   }
-  });
 
-  if (!complete) {
-   for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
-   return summary;
+    const columnsPerWindow = Math.min(columnCount, AUTO_FIT_CHUNK_CELLS);
+    const rowsPerBand = Math.max(1, Math.floor(AUTO_FIT_CHUNK_CELLS / columnsPerWindow));
+    let bandStart = r0;
+    let bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
+    let columnStart = c0;
+    let required = new Float64Array(bandEnd - bandStart);
+    required.fill(this.baseTheme.rowHeight);
+    const job = this.startAutoFit();
+
+    const step = (): void => {
+      if (job.scope.closed || this.activeSheet !== sheetId) return;
+      const count = Math.min(columnsPerWindow, c1 - columnStart + 1);
+      const columns = Array.from({ length: count }, (_, index) => columnStart + index);
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: bandStart, end: bandEnd }, columns),
+      );
+      this.noteAutoFitWindow(bandEnd - bandStart, columns.length);
+      this.measureAutoFitRowWindow(context, sheet, view, columns, bandStart, required, mergeWidths);
+      columnStart += count;
+      if (columnStart > c1) {
+        appendRowPatches(bandStart, required);
+        bandStart = bandEnd;
+        if (bandStart > r1) {
+          this.completeAutoFit(job);
+          this.autoFitStats.completedJobs += 1;
+          this.autoFitStats.committedPatches += patches.length;
+          this.withStoreResourceOperation("auto-fit", () =>
+            this.document.commit(patches, "structure"),
+          );
+          return;
+        }
+
+        bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
+        columnStart = c0;
+        required = new Float64Array(bandEnd - bandStart);
+        required.fill(this.baseTheme.rowHeight);
+      }
+
+      this.scheduleAutoFitChunk(job, step);
+    };
+
+    this.scheduleAutoFitChunk(job, step);
   }
 
-  const engine = storeEngine(this.store);
-  // Custom stores without an engine retain their single-cell read contract.
-  const cells = engine
-   ? engine.captureResolvedCells(this.activeSheet, coordinates)
-   : coordinates.map(({ row, col }) =>
-    this.store.getCell({ sheet: this.activeSheet, row, col }),
-   );
+  autoFitColumns(cols?: readonly number[]): void {
+    if (this.readOnly) return;
+    this.cancelAutoFit();
+    const sheetId = this.activeSheet;
+    const sheet = this.sheet();
+    const targets = cols
+      ? [...new Set(cols)].filter((col) => col >= 0 && col < sheet.columns.length)
+      : sheet.columns.map((_, col) => col);
+    if (targets.length === 0) return;
+    for (const col of targets) {
+      this.requireAutoFitRangeLoaded({
+        sheet: sheetId,
+        start: { row: 0, col },
+        end: { row: Math.max(0, sheet.rowCount - 1), col },
+      });
+    }
 
-  for (const [index, coordinate] of coordinates.entries()) {
-   const cell = cells[index];
-   const column = this.sheet().columns[coordinate.col];
-   if (!cell || !column) continue;
+    const context = this.measurementContext();
+    if (!context) return;
+    const widths = new Float64Array(targets.length);
+    for (let index = 0; index < targets.length; index++) {
+      const column = sheet.columns[targets[index]!]!;
+      context.font = fontFor(this.baseTheme, {
+        ...column.headerStyle,
+        bold: column.headerStyle?.bold ?? true,
+      });
 
-   for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
-    const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
-    summary[command] = (summary[command] ?? 0) | bit;
-   }
+      widths[index] = context.measureText(column.header).width + CELL_TEXT_HORIZONTAL_PADDING;
+    }
+
+    const patches: DocumentOp[] = [];
+    const commitWidths = (): void => {
+      for (let index = 0; index < targets.length; index++) {
+        const col = targets[index]!;
+        const width = Math.max(1, Math.ceil(widths[index]!));
+        if (sheet.columns[col]!.width === width) continue;
+        patches.push({ op: "setColumn", sheet: sheetId, col, patch: { width } });
+      }
+
+      this.autoFitStats.completedJobs += 1;
+      this.autoFitStats.committedPatches += patches.length;
+      this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
+    };
+
+    const totalCells = sheet.rowCount * targets.length;
+    if (totalCells <= AUTO_FIT_CHUNK_CELLS) {
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: 0, end: sheet.rowCount }, targets),
+      );
+      this.noteAutoFitWindow(sheet.rowCount, targets.length);
+      this.measureAutoFitColumnWindow(context, sheet, view, targets, 0, widths);
+      commitWidths();
+      return;
+    }
+
+    const columnsPerWindow = Math.min(targets.length, AUTO_FIT_CHUNK_CELLS);
+    const rowsPerWindow = Math.max(1, Math.floor(AUTO_FIT_CHUNK_CELLS / columnsPerWindow));
+    let targetOffset = 0;
+    let columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
+    let rowStart = 0;
+    const job = this.startAutoFit();
+
+    const step = (): void => {
+      if (job.scope.closed || this.activeSheet !== sheetId) return;
+      const rowEnd = Math.min(sheet.rowCount, rowStart + rowsPerWindow);
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: rowStart, end: rowEnd }, columns),
+      );
+      this.noteAutoFitWindow(rowEnd - rowStart, columns.length);
+      this.measureAutoFitColumnWindow(context, sheet, view, columns, targetOffset, widths);
+      rowStart = rowEnd;
+      if (rowStart >= sheet.rowCount) {
+        targetOffset += columns.length;
+        if (targetOffset >= targets.length) {
+          this.completeAutoFit(job);
+          commitWidths();
+          return;
+        }
+
+        columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
+        rowStart = 0;
+      }
+
+      this.scheduleAutoFitChunk(job, step);
+    };
+
+    this.scheduleAutoFitChunk(job, step);
   }
 
-  return summary;
- }
-
- private commandStateSnapshot(): Readonly<Record<GridCommandName, GridCommandState>> {
-  const summary = this.formattingSummary();
-  const states = {} as Record<GridCommandName, GridCommandState>;
-  for (const command of GRID_COMMANDS) {
-   states[command] = this.resolveCommandState(command, summary);
-  }
-  return states;
- }
-
- private emitCommandStateChange(): void {
-  this.commandStateQueued = false;
-  this.commandStateGeneration += 1;
-  if (this.lifetime.closed || this.listeners["command-state-change"].size === 0) return;
-  const event = { states: this.commandStateSnapshot() };
-  for (const listener of this.listeners["command-state-change"]) listener(event);
- }
-
- private queueCommandStateChange(): void {
-  if (this.commandStateQueued || this.lifetime.closed) return;
-  this.commandStateQueued = true;
-  const generation = ++this.commandStateGeneration;
-  queueMicrotask(() => {
-   if (!this.commandStateQueued || generation !== this.commandStateGeneration) return;
-   this.emitCommandStateChange();
-  });
- }
-
- on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void {
-  this.listeners[evt].add(fn);
-  return () => this.listeners[evt].delete(fn);
- }
-
- refresh(): void {
-  this.render();
- }
-
- aggregate(col: number, op: AggregateOp): number {
-  return this.loadable ? this.loadable.aggregate(this.activeSheet, col, op) : 0;
- }
-
- sortBy(col: number, ascending = true): ApplyTransactionResult {
-  return this.quickSort(col, ascending);
- }
-
- filterBy(col: number, needle: string): void {
-  this.setColumnFilter(col, { kind: "contains", text: needle });
- }
-
- clearView(): void {
-  const patch = clearViewPatch(this.sheet());
-  if (patch) this.document.commit([patch], "structure");
- }
-
- setViewSort(keys: readonly SortKey[]): ApplyTransactionResult {
-  return this.document.commit([viewSortPatch(this.activeSheet, keys)], "structure");
- }
-
- sortRange(
-  range: Range,
-  keys: readonly SortKey[],
-  options: { hasHeader?: boolean } = {},
- ): ApplyTransactionResult {
-  const engine = storeEngine(this.store);
-  if (!engine || engine.queryCapability(range.sheet).status !== "complete") {
-   return { status: "noop", epoch: this.storeEpoch, reason: "incomplete-data" };
+  setRowHeight(row: number, height: number): void {
+    this.document.commit(
+      [
+        {
+          op: "setRowMeta",
+          sheet: this.activeSheet,
+          row: this.toDataRow(row),
+          meta: { height: Math.max(1, height) },
+        },
+      ],
+      "structure",
+    );
   }
 
-  const plan = engine.sortRangePlan(range, keys, options.hasHeader ?? false);
-  if (plan.kind === "unchanged") {
-   return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
-  }
-  if (plan.kind === "refused") {
-   const issue: MutationIssue = {
-    kind: "invalid-operation",
-    severity: "error",
-    operationIndex: 0,
-    message: plan.message,
-   };
-   for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
-   return { status: "rejected", epoch: this.storeEpoch, issues: [issue] };
+  setColumnWidth(col: number, width: number): void {
+    this.document.commit(
+      [{ op: "setColumn", sheet: this.activeSheet, col, patch: { width: Math.max(1, width) } }],
+      "structure",
+    );
   }
 
-  return this.document.commit(plan.operations, "sort");
- }
-
- /**
-  * Excel's quick sort: sort the table body that holds the focus cell, or
-  * else the selected range, or else the current region around the focus.
-  */
- private quickSort(col: number, ascending: boolean): ApplyTransactionResult {
-  const focus = this.selection.focusCell;
-  const addr = {
-   sheet: this.activeSheet,
-   row: focus ? this.toDataRow(focus.row) : 0,
-   col,
-  };
-  const target = this.quickSortTarget(addr);
-  if (!target) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
-
-  return this.sortRange(target.range, [{ col, ascending }], { hasHeader: target.hasHeader });
- }
-
- private quickSortTarget(addr: CellAddress): { range: Range; hasHeader: boolean } | null {
-  const table = this.sheet().tables?.find((candidate) => rangeHolds(candidate.range, addr));
-  if (table) {
-   const { range } = table;
-   const start = { row: range.start.row + (table.headerRow ? 1 : 0), col: range.start.col };
-   const end = { row: range.end.row - (table.totalsRow ? 1 : 0), col: range.end.col };
-   return { range: { sheet: range.sheet, start, end }, hasHeader: false };
+  setMinColumns(minColumns?: number): void {
+    const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
+    if (!stored) return;
+    const target = Math.max(
+      stored.columns.length,
+      padTarget(this.host, minColumns, this.presentation),
+    );
+    if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
+    this.virtualColumnTargets.set(this.activeSheet, target);
+    this.activeSheetCache = null;
+    this.rebuildColumnIndex();
+    this.applyLayout();
+    this.scheduleRender();
   }
 
-  const range = this.selectedSortRange() ?? currentRegion(this.store, addr);
-  if (!range || !rangeHolds(range, addr)) return null;
-
-  return { range, hasHeader: looksLikeHeader(this.store, range) };
- }
-
- /**
-  * The selected rectangle in data rows, when one rectangle of more than one
-  * cell is selected and the rows show in data order. A view sort or filter
-  * scatters the data rows of a view rectangle, so it gives `null`.
-  */
- private selectedSortRange(): Range | null {
-  const rects: SelRect[] = [];
-  this.selection.forEachRect((rect) => rects.push(rect));
-  const [rect] = rects;
-  if (rects.length !== 1 || !rect || this.loadable?.hasView(this.activeSheet)) return null;
-  if (rect.r0 === rect.r1 && rect.c0 === rect.c1) return null;
-
-  return {
-   sheet: this.activeSheet,
-   start: { row: rect.r0, col: rect.c0 },
-   end: { row: rect.r1, col: rect.c1 },
-  };
- }
-
- setColumnFilter(col: number, filter: ColumnFilter | null): void {
-  const patch = columnFilterPatch(this.sheet(), col, filter);
-  if (patch) this.document.commit([patch], "structure");
- }
-
- getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
-  return new Map(this.sheet().filters ?? this.loadable?.columnFilters(this.activeSheet) ?? []);
- }
-
- distinctValues(col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
-  return this.loadable?.distinctValues(this.activeSheet, col, limit) ?? [];
- }
-
- hideRows(rows: readonly number[]): void {
-  this.document.commit(rowVisibilityPatches(this.sheet(), rows, true), "structure");
- }
-
- showRows(rows?: readonly number[]): void {
-  const sheet = this.sheet();
-  const patches = rowVisibilityPatches(sheet, rows ?? [...(sheet.hiddenRows ?? [])], false);
-  this.document.commit(patches, "structure");
- }
-
- hiddenRows(): readonly number[] {
-  return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
- }
-
- hideColumns(cols?: readonly number[]): void {
-  const sheet = this.sheet();
-  const targets = cols ?? (this.selection.focusCell ? [this.selection.focusCell.col] : []);
-  const unique = [...new Set(targets)]
-   .filter(
-    (col) => col >= 0 && col < sheet.columns.length && sheet.columns[col]?.visible !== false,
-   )
-   .sort((left, right) => left - right);
-  let visibleCount = sheet.columns.reduce(
-   (count, column) => count + (column.visible === false ? 0 : 1),
-   0,
-  );
-  const patches: DocumentOp[] = [];
-  for (const col of unique) {
-   if (visibleCount <= 1) break;
-   patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: false } });
-   visibleCount--;
+  setOverscan(overscan?: number): void {
+    const next = overscan === undefined ? DEFAULT_OVERSCAN : Math.max(0, Math.floor(overscan));
+    if (next === this.overscan) return;
+    this.overscan = next;
+    // Read per frame by the window calculations; a repaint picks it up.
+    this.readWindows.invalidate();
+    this.scheduleRender();
   }
-  this.document.commit(patches, "structure");
- }
 
- showColumns(cols?: readonly number[]): void {
-  const sheet = this.sheet();
-  const targets =
-   cols ?? sheet.columns.flatMap((column, col) => (column.visible === false ? [col] : []));
-  const patches: DocumentOp[] = [];
-  for (const col of new Set(targets)) {
-   if (col < 0 || col >= sheet.columns.length || sheet.columns[col]?.visible !== false) continue;
-   patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: true } });
+  /** Internal structural counters used by allocation regression tests and range benchmarks. */
+  getMutationRevisionStats(): MutationRevisionStats {
+    return this.mutationRevisions.stats();
   }
-  this.document.commit(patches, "structure");
- }
 
- hiddenColumns(): readonly number[] {
-  return this.sheet().columns.flatMap((column, col) => (column.visible === false ? [col] : []));
- }
-
- groupRows(start: number, end: number): void {
-  const groups = addRowGroup(this.sheet().rowGroups, start, end);
-  this.document.commit(
-   [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
-   "structure",
-  );
- }
-
- ungroupRows(start: number, end: number): void {
-  const groups = removeRowGroup(this.sheet().rowGroups, start, end);
-  this.document.commit(
-   [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
-   "structure",
-  );
- }
-
- setGroupCollapsed(start: number, collapsed: boolean): void {
-  const groups = collapseRowGroup(this.sheet().rowGroups, start, collapsed);
-  this.document.commit(
-   [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
-   "structure",
-  );
- }
-
- rowGroups(): readonly RowGroup[] {
-  return this.sheet().rowGroups ?? [];
- }
-
- undo(): void {
-  if (!this.readOnly) this.document.undo();
-  this.queueCommandStateChange();
- }
-
- redo(): void {
-  if (!this.readOnly) this.document.redo();
-  this.queueCommandStateChange();
- }
-
- private emitExportError(error: unknown, format: "csv" | "xlsx"): void {
-  if (this.lifetime.closed) return;
-  const operation = format === "csv" ? "delimited-export" : "xlsx-export";
-  const failure = normalizeSheetwriteError(error, "export-failed", operation, { format });
-  this.actionFeedback.show(`Export failed: ${failure.message} Try again.`);
-  for (const listener of this.listeners["export-error"]) {
-   listener({ format, error: failure });
+  getAutoFitResourceStats(): AutoFitResourceStats {
+    return { ...this.autoFitStats, chunkCellLimit: AUTO_FIT_CHUNK_CELLS };
   }
- }
 
- /** Both export formats write only the active sheet, so only its rows must be loaded. */
- private requireCompleteSheet(): void {
-  const capability = this.loadable?.queryCapability(this.activeSheet);
-  if (capability?.status === "incomplete") {
-   throw new IncompleteDataError(this.activeSheet, capability);
+  resetAutoFitResourceStats(): void {
+    this.autoFitStats.windowRequests = 0;
+    this.autoFitStats.maxWindowCells = 0;
+    this.autoFitStats.scheduledChunks = 0;
+    this.autoFitStats.completedJobs = 0;
+    this.autoFitStats.cancelledJobs = 0;
+    this.autoFitStats.committedPatches = 0;
   }
- }
 
- exportCsv(filename: string): void {
-  this.requireCompleteSheet();
-  downloadBytesIn(
-   this.lifetime,
-   toCsv(this.sheet(), this.store),
-   filename,
-   "text/csv;charset=utf-8",
-  );
- }
-
- async exportXlsx(filename: string): Promise<void> {
-  // Destroy aborts the export; its listeners on the signal go with this scope.
-  const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
-  try {
-   this.requireCompleteSheet();
-
-   // XLSX conversion is optional document work, not initial grid code.
-   const { exportWorkbookFile } = await import("./workbook-io.js");
-   await exportWorkbookFile(this, filename, run, this.lifetime);
-  } finally {
-   run.close();
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot {
+    if (!this.loadable) {
+      throw new SheetwriteError(
+        "unavailable",
+        "resource-diagnostics",
+        "Runtime resource diagnostics require a SheetwriteStore",
+      );
+    }
+    const store = this.loadable.getRuntimeResourceSnapshot(operation, phase, runtime);
+    return createRuntimeResourceSnapshot({
+      operation,
+      phase,
+      wasm: store.wasm,
+      jsOwners: [...store.jsOwners, ...this.datasourceController.getResourceOwners()],
+      boundary: store.boundary,
+      runtime: store.runtime,
+    });
   }
- }
 
- /**
-  * A resolution query stops being useful after it changes, so replace it with
-  * one matching the current display. This catches DPR-only changes that do not
-  * resize the host and therefore never reach ResizeObserver.
-  */
- private armResolutionListener(): void {
-  this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
-  this.resolutionMediaQuery = null;
-  if (typeof globalThis.matchMedia !== "function") return;
+  setActiveSheet(id: SheetId, reset = false): void {
+    const target = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
+    if (
+      !target ||
+      (target.visibility ?? "visible") !== "visible" ||
+      (id === this.activeSheet && !reset)
+    )
+      return;
 
-  const devicePixelRatio = globalThis.devicePixelRatio ?? 1;
-  this.resolutionMediaQuery = globalThis.matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
-  this.resolutionMediaQuery.addEventListener("change", this.onResolutionChange);
- }
+    this.interactions.reconcile("sheet");
+    this.notes.dismiss();
+    this.cancelAutoFit();
+    this.domOverlay.reset();
+    this.mutationRevisions.clear();
+    this.activeSheet = id;
+    this.activeSheetCache = null;
+    const sheet = this.sheet();
+    this.displayedHiddenRows = new Set(sheet.hiddenRows);
+    this.displayedHasView = this.loadable?.hasView(id) ?? false;
 
- private onResize(): void {
-  this.syncSizer();
-  this.render();
- }
+    this.rebuildColumnIndex();
+    this.geometry.rebuildRows(this.loadable?.viewRowCount(id) ?? sheet.rowCount);
+    this.selection = new SelectionModel(this.geometry.rowCount, this.firstCol(), this.lastCol());
+    this.datasourceController.reset(sheet.rowCount);
+    this.scroller.scrollTop = 0;
+    this.scroller.scrollLeft = 0;
 
- /**
-  * A clipboard shortcut has no caller to await it. Its outcomes need no
-  * message (the shortcut itself is the fallback the menu messages suggest),
-  * but a failure is a bug: tell the user, and let the error reach the host.
-  */
- private runKeyboardClipboard(action: Promise<ClipboardOutcome>): void {
-  void action.then(undefined, (error: unknown) => {
-   if (this.lifetime.closed) return;
-   this.actionFeedback.show(`The command did not finish: ${errorDetail(error)}`);
-   throw error;
-  });
- }
-
- /** Opens the history panel or its Save Version form; the history add-on sets it. */
- declare historyCommand?: (action: "open" | "save") => void;
-
- /** Run `cleanup` when the grid is destroyed. */
- addCleanup(cleanup: () => void): void {
-  this.lifetime.add(cleanup);
- }
-
- /**
-  * Closing the root scope first aborts every running operation and frees the
-  * chrome, panels and timers it owns. The grid's own parts follow in a fixed
-  * order, because later ones (the store, the renderer) are read by earlier ones.
-  */
- destroy(): void {
-  if (this.lifetime.closed) return;
-  this.removeEngineFailureListener();
-  const failures = new FirstFailure();
-  const cleanup = (operation: () => void): void => failures.run(operation);
-
-  cleanup(() => this.lifetime.close());
-  cleanup(() => this.datasourceController.destroy());
-  cleanup(() => this.mutationRevisions.clear());
-  cleanup(() => this.readWindows.destroy());
-  cleanup(() => this.interactions.destroy());
-  cleanup(() => this.notes.destroy());
-  cleanup(() => this.objectLayer.destroy());
-  cleanup(() =>
-   this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange),
-  );
-  this.resolutionMediaQuery = null;
-  cleanup(() => this.document.destroy());
-  cleanup(() => this.disposeStore());
-  // A caller-provided store remains owned by its caller.
-  if (this.ownsStore) cleanup(() => this.loadable?.dispose());
-  cleanup(() => this.renderer.destroy());
-  cleanup(() => this.domOverlay.destroy());
-  cleanup(() => this.scroller.remove());
-  cleanup(() => this.overlayPainter.destroy());
-  cleanup(() => this.sheetTabs?.destroy());
-  cleanup(() => this.tabBar?.remove());
-  cleanup(() => this.panelHost.remove());
-  cleanup(() => this.viewportEl.remove());
-  cleanup(() => this.ariaMirror.destroy());
-  cleanup(() => this.host.classList.remove("sheetwrite"));
-  cleanup(() => {
-   for (const listeners of Object.values(this.listeners)) listeners.clear();
-  });
-
-  failures.rethrow();
- }
-
- trimMemory(): void {
-  if (this.lifetime.closed) return;
-
-  // A worker drops its strings only when the host reader drops its own, so
-  // the next frame resends them. A store without an engine sends no pool ids.
-  const engine = storeEngine(this.store);
-  if (engine) {
-   engine.trimMemory();
-   this.renderer.trimMemory?.();
+    this.objectLayer.sync();
+    this.applyLayout();
+    this.renderTabs();
+    for (const fn of this.listeners["active-sheet"]) fn({ sheet: id });
+    this.emitSelection();
+    this.render();
   }
-  trimNumberFormatCaches();
-  this.measureContext = null;
-  this.overlayPainter.trimMemory();
 
-  // The next frame reads its window again, so a worker renderer gets every
-  // string it paints, and the same cells paint the same output.
-  this.readWindows.invalidateData();
-  this.scheduleRender();
- }
+  getActiveSheet(): SheetId {
+    return this.activeSheet;
+  }
+
+  getCellAtPoint(clientX: number, clientY: number): CellAddress | null {
+    const cell = this.interactions.cellAtPointer(clientX, clientY);
+    return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
+  }
+
+  /**
+   * View-aware editable snapshot of a cell: `(row, col)` are active-sheet view
+   * coordinates; the returned address is the translated data address, so a
+   * formula-bar commit through `applyTransaction` targets the correct row even
+   * under an active sort/filter view.
+   */
+  getCellInput(row: number, col: number): CellInputSnapshot | null {
+    const sheet = this.sheet();
+    const column = sheet.columns[col];
+    if (!column || row < 0 || row >= this.geometry.rowCount) return null;
+
+    const cell = this.anchorCell(row, col);
+    const address = {
+      sheet: this.activeSheet,
+      row: this.toDataRow(cell.row),
+      col: cell.col,
+    };
+    const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
+    const resolved = this.store.getCell(address).resolved;
+    const text = formula ?? cellScalarToText(resolved);
+
+    return { address, text, format: column.type };
+  }
+
+  scrollToCell(addr: CellAddress): void {
+    if (addr.sheet !== this.activeSheet) this.setActiveSheet(addr.sheet);
+
+    // Cells inside the frozen bands are always visible on their pinned axis.
+    const fr = this.frozenRowCount();
+    const frozenH = this.frozenHeight();
+    if (addr.row >= fr) {
+      const top = this.geometry.rowOffset(addr.row);
+      const bottom = top + this.geometry.rowHeight(addr.row);
+      const bodyHeight = Math.max(0, this.viewportH() - this.theme.headerHeight);
+      const contentTop = this.geometry.toContent(this.scroller.scrollTop);
+
+      // Visible body band in content space: [contentTop + frozenH, contentTop + bodyHeight).
+      let target = contentTop;
+      if (top < contentTop + frozenH) target = top - frozenH;
+      else if (bottom > contentTop + bodyHeight) target = bottom - bodyHeight;
+      if (target !== contentTop) {
+        this.scroller.scrollTop = this.geometry.toScroll(Math.max(0, target));
+      }
+    }
+
+    this.ensureColumnVisible(addr.col);
+    this.scheduleRender();
+  }
+
+  private ensureColumnVisible(col: number): void {
+    if (this.frozenColCount() > 0 && col < this.firstBodyCol()) return;
+
+    const left = this.colLeftOf(col);
+    const width = (this.sheet().columns[col]?.width ?? 0) * this.zoom;
+    const frozenW = this.frozenWidth();
+    const viewLeft = this.scroller.scrollLeft + frozenW;
+    const cellWidth = Math.max(
+      0,
+      this.viewportEl.clientWidth - this.theme.rowHeaderWidth - frozenW,
+    );
+    const viewRight = viewLeft + cellWidth;
+    if (left < viewLeft) this.scroller.scrollLeft = Math.max(0, left - frozenW);
+    else if (left + width > viewRight)
+      this.scroller.scrollLeft = Math.max(0, left + width - cellWidth - frozenW);
+  }
+
+  getSelection(): Selection | null {
+    return this.selection.toSelection(this.activeSheet);
+  }
+
+  setSelection(sel: Selection | null): void {
+    this.selection.set(sel);
+    this.emitSelection();
+    this.scheduleRender();
+  }
+
+  getTheme(): Theme {
+    return { ...this.baseTheme };
+  }
+
+  setTheme(theme: Partial<Theme>): void {
+    this.baseTheme = { ...this.baseTheme, ...theme };
+    this.applyZoomedTheme();
+    this.reseedWidgetTheme();
+    this.emitThemeChange();
+  }
+
+  replaceTheme(theme: Partial<Theme> | undefined): void {
+    // Re-run construction-time resolution (grid.ts constructor): defaults,
+    // then host CSS custom properties, then the new option value.
+    this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
+    this.applyZoomedTheme();
+    this.reseedWidgetTheme();
+    this.emitThemeChange();
+  }
+
+  /**
+   * The built-in widgets (toolbar, find bar, context menu, note card) read
+   * their palette from custom properties seeded on the grid root when they are
+   * created. The note card always exists, so seed them again from the new base
+   * theme so a theme switch (for example to dark) repaints the widgets too, not
+   * only the canvas.
+   */
+  private reseedWidgetTheme(): void {
+    seedWidgetTheme(this.host, this.baseTheme);
+  }
+
+  /**
+   * The toolbar and the ribbon render the command model, which loads as its
+   * own chunk: grids without chrome never download it. The chrome's height is
+   * reserved now, so the grid does not move when it arrives. Each call closes
+   * the previous build, so a chunk that arrives after a rebuild, or after
+   * destroy, is dropped.
+   */
+  private createToolbar(config: GridConfig | undefined): void {
+    const build = this.chromeBuilds.next();
+    if (!config || config.toolbar === false) return;
+
+    const ribbon = Boolean(config.ribbon) && !Array.isArray(config.toolbar);
+    const failed = (error: unknown): void => {
+      if (build.closed) return;
+
+      // Give the space back and tell the user; the load error still reaches the host.
+      this.setToolbarHeight(0);
+      this.actionFeedback.show(
+        `The ${ribbon ? "ribbon" : "toolbar"} could not load: ${errorDetail(error)}`,
+      );
+      throw error;
+    };
+
+    if (!ribbon) {
+      this.toolbarHeight = TOOLBAR_HEIGHT;
+      void import("./ribbon/command-toolbar.js").then(({ CommandToolbar: ToolbarClass }) => {
+        if (!build.closed) this.mountToolbar(build, ToolbarClass, config);
+      }, failed);
+      return;
+    }
+
+    this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
+    void import("./ribbon/ribbon.js").then(({ Ribbon: RibbonClass }) => {
+      if (!build.closed) this.mountRibbon(build, RibbonClass, config);
+    }, failed);
+  }
+
+  /**
+   * Open the find bar. Its code is in its own chunk, loaded on the first open,
+   * so a grid that never searches does not download or build it. A chunk that
+   * arrives after a reset or after destroy is dropped.
+   */
+  private openFindBar(options?: { replace?: boolean }): void {
+    if (this.config?.find === false || this.lifetime.closed) return;
+    if (this.findBar) {
+      this.findBar.open(options);
+      return;
+    }
+
+    // Opens during the load share one build, so the bar is made once.
+    const build = this.findBarBuilds.current();
+    void import("./find-bar.js").then(
+      ({ FindBar: FindBarClass }) => {
+        if (build.closed) return;
+        if (!this.findBar) {
+          const findBar = new FindBarClass(this.host, this.baseTheme, this, this.readOnly);
+          this.findBar = findBar;
+          build.add(() => {
+            findBar.destroy();
+            this.findBar = null;
+          });
+        }
+        this.findBar.open(options);
+      },
+      (error: unknown) => {
+        if (build.closed) return;
+        // Tell the user; the load error still reaches the host.
+        this.actionFeedback.show(`The find bar could not load: ${errorDetail(error)}`);
+        throw error;
+      },
+    );
+  }
+
+  /** Drop the find bar, so the next open builds it for the current config and read-only state. */
+  private resetFindBar(): void {
+    this.findBarBuilds.close();
+  }
+
+  /** Chrome sits first in the host, so keyboard users reach it before the grid. */
+  private placeChrome(element: HTMLElement): void {
+    // The grid owns widget theming: seed now, reseed on every theme change.
+    seedWidgetTheme(this.host, this.baseTheme);
+
+    // Grid layout offsets the viewport by the chrome's height, so chrome must leave normal flow.
+    element.style.position = "absolute";
+    element.style.top = "0";
+    element.style.left = "0";
+    element.style.right = "0";
+    this.host.prepend(element);
+  }
+
+  private mountToolbar(
+    build: Scope,
+    ToolbarClass: typeof CommandToolbar,
+    config: GridConfig,
+  ): void {
+    const toolbar = new ToolbarClass(this.host, this, {
+      label: "Spreadsheet formatting",
+      className: "sheetwrite-toolbar",
+      flags: config,
+      ...(Array.isArray(config.toolbar) ? { items: config.toolbar } : {}),
+      ...(config.icons === undefined ? {} : { icons: config.icons }),
+    });
+    toolbar.element.style.height = `${TOOLBAR_HEIGHT}px`;
+    this.placeChrome(toolbar.element);
+    build.add(() => toolbar.destroy());
+  }
+
+  private mountRibbon(build: Scope, RibbonClass: typeof Ribbon, config: GridConfig): void {
+    const ribbon = new RibbonClass(this.host, this, {
+      onHeightChange: (height) => this.setToolbarHeight(height),
+      flags: config,
+      ...(typeof config.ribbon === "object" ? config.ribbon : {}),
+      ...(config.icons === undefined ? {} : { icons: config.icons }),
+    });
+    this.placeChrome(ribbon.element);
+    build.add(() => ribbon.destroy());
+    if (ribbon.height !== this.toolbarHeight) this.setToolbarHeight(ribbon.height);
+  }
+
+  private setToolbarHeight(height: number): void {
+    this.toolbarHeight = height;
+    this.viewportEl.style.top = `${height}px`;
+    this.panelHost.style.top = `${height}px`;
+    this.applyLayout();
+    this.render();
+  }
+
+  private emitThemeChange(): void {
+    const listeners = this.listeners["theme-change"];
+    if (listeners.size === 0) return;
+    for (const fn of listeners)
+      fn({
+        theme: {
+          ...this.baseTheme,
+        },
+      });
+  }
+
+  getEffectiveTheme(): Theme {
+    return this.theme;
+  }
+
+  setReadOnly(readOnly: boolean): void {
+    // Only a new grid on a restarted engine can edit again.
+    if (this.engineFailure || readOnly === this.readOnly) return;
+
+    this.readOnly = readOnly;
+    this.syncReadOnlyChrome(readOnly);
+  }
+
+  /** Bring editors, tabs, the find bar and command state in line with `readOnly`. */
+  private syncReadOnlyChrome(readOnly: boolean): void {
+    this.sheetTabs?.setReadOnly(readOnly);
+    this.dashboardView?.sync();
+    if (readOnly) {
+      this.cancelAutoFit();
+      this.interactions.reconcile("read-only");
+      this.notes.dismiss();
+    }
+    if (readOnly) this.host.setAttribute("aria-readonly", "true");
+    else this.host.removeAttribute("aria-readonly");
+
+    this.resetFindBar();
+    this.emitCommandStateChange();
+    // Object handles show only while the grid can be edited.
+    this.scheduleRender();
+  }
+
+  setConfig(config: GridConfig | undefined): void {
+    // Declarative hosts re-create option objects per render (`config={{...}}`).
+    // A shallowly-equal config is the same configuration: adopt the new
+    // reference but skip the chrome rebuild — rebuilding would drop widget
+    // focus and, through layout-driven scroll events, could re-trigger the
+    // host render that produced the object in the first place.
+    if (shallowEqualConfig(config, this.config)) {
+      this.config = config;
+      return;
+    }
+    assertRibbonConfig(config?.ribbon);
+    const focus = this.selection.focusCell;
+    const keymap = new Keymap(config, {
+      cell: focus ? { sheet: this.activeSheet, ...focus } : null,
+      clientX: 0,
+      clientY: 0,
+    });
+    this.keymap = keymap;
+    this.config = config;
+
+    const keyboard = config?.keyboard ?? true;
+    this.keyboardPolicy =
+      typeof keyboard === "function" ? (event: KeyboardEvent) => keyboard(event, this) : keyboard;
+
+    // `createToolbar` closes the previous build, which destroys its toolbar or ribbon.
+    this.toolbarHeight = 0;
+    this.createToolbar(config);
+
+    this.interactions.configureMenu(config, this.baseTheme);
+
+    this.resetFindBar();
+
+    this.sheetTabs?.destroy();
+    this.sheetTabs = null;
+    this.tabBar?.remove();
+    this.tabBar = null;
+    this.tabBarHeight = config?.tabs !== false ? 28 : 0;
+    if (this.tabBarHeight > 0) this.buildTabBar();
+
+    this.viewportEl.style.top = `${this.toolbarHeight}px`;
+    this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
+    this.panelHost.style.top = `${this.toolbarHeight}px`;
+    this.panelHost.style.bottom = `${this.tabBarHeight}px`;
+    this.applyLayout();
+    this.render();
+    this.emitCommandStateChange();
+  }
+
+  applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
+    const resourceValidation = validateTransactionResources(
+      transaction.patches,
+      this.transactionResourceLimits,
+    );
+    if (!resourceValidation.ok) {
+      return {
+        status: "rejected",
+        epoch: this.storeEpoch,
+        issues: [resourceValidation.issue],
+      };
+    }
+    // The controller receives a private copy of the caller's operations. The
+    // copy is verified against the measured payload, so the controller and the
+    // store reuse this measurement instead of walking it again.
+    const patches = transaction.patches.slice();
+    const admitted = admitTransactionResources(
+      patches,
+      this.transactionResourceLimits,
+      resourceValidation,
+      transaction.patches,
+    );
+    return this.document.commit(patches, "api", admitted);
+  }
+
+  exportSnapshot(): WorkbookSnapshot {
+    const snapshot = this.store.exportSnapshot?.();
+    if (!snapshot) {
+      throw new SheetwriteError(
+        "unavailable",
+        "store",
+        "Sheetwrite: the injected Store does not support snapshot export",
+      );
+    }
+    if (snapshot.workbook.activeSheet === this.activeSheet) return snapshot;
+    return {
+      ...snapshot,
+      workbook: { ...snapshot.workbook, activeSheet: this.activeSheet },
+    };
+  }
+
+  async importWorkbook(
+    source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
+    options?: { signal?: AbortSignal },
+  ): Promise<void> {
+    this.lifetime.signal.throwIfAborted();
+    const run = (this.imports ??= new ScopeSlot(this.lifetime)).next();
+
+    try {
+      // Replacement owns cold bootstrap and cleanup; normal grid hosts do not load it.
+      const { replaceDocument } = await import("./document-replace.js");
+      await replaceDocument(
+        {
+          grid: this,
+          store: this.loadable,
+          cancelOperations: () => this.documentOperations?.close(),
+          windows: this.readWindows,
+          history: this.document,
+          clipboard: this.clipboard,
+          closeFind: () => {
+            this.findBarBuilds.close();
+            this.findBar?.destroy();
+            this.findBar = null;
+          },
+          activate: (workbook, activeSheet) => {
+            this.virtualColumnTargets.clear();
+            this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
+
+            this.storeEpoch += 1;
+            this.windowContentRevision += 1;
+
+            this.setActiveSheet(activeSheet, true);
+            this.applyZoomedTheme();
+            this.emitCommandStateChange();
+          },
+        },
+        source,
+        run,
+        options?.signal,
+      );
+    } finally {
+      run.close();
+    }
+  }
+
+  applyRemoteOperations(
+    operations: readonly DocumentOp[],
+    options: RemoteOperationOptions = {},
+  ): ApplyTransactionResult {
+    return this.document.applyRemoteOperations(operations, options);
+  }
+
+  setZoom(zoom: number): void {
+    if (!Number.isFinite(zoom)) return;
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+    if (next === this.zoom) return;
+    this.zoom = next;
+    this.applyZoomedTheme();
+    this.notes.hideCard();
+  }
+
+  getZoom(): number {
+    return this.zoom;
+  }
+
+  /**
+   * Re-derive the effective (zoom-scaled) theme from the base theme, then
+   * rebuild every geometry consumer. Widgets (toolbar/find/menu) keep the base
+   * theme: zoom scales grid content only, like Sheets.
+   */
+  private applyZoomedTheme(): void {
+    const base = this.baseTheme;
+    const z = this.zoom;
+    const scaled =
+      z === 1
+        ? base
+        : {
+            ...base,
+            rowHeight: base.rowHeight * z,
+            headerHeight: base.headerHeight * z,
+            rowHeaderWidth: base.rowHeaderWidth * z,
+            font: scaleFontPx(base.font, z),
+          };
+    this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
+    this.renderer.setTheme(this.theme);
+    this.domOverlay.setTheme(this.theme);
+    this.syncTabBarTheme();
+    this.rebuildIndex();
+    this.rebuildColumnIndex();
+    this.applyLayout();
+    this.render();
+  }
+
+  setFrozen(rows: number, cols = 0): void {
+    this.document.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: {
+            frozenRows: Math.max(0, Math.floor(rows)),
+            frozenCols: Math.max(0, Math.floor(cols)),
+          },
+        },
+      ],
+      "structure",
+    );
+  }
+
+  defineCellRenderer(name: string, renderer: CellRenderer): void {
+    this.customRenderers.set(name, renderer);
+    this.renderer.setRenderers(this.customRenderers);
+    this.domOverlay.setRenderers(this.customRenderers);
+    this.applyLayout();
+    this.scheduleRender();
+  }
+
+  insertRows(at: number, count = 1): void {
+    if (count <= 0) return;
+    this.document.commit(
+      [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
+      "structure",
+    );
+  }
+
+  removeRows(at: number, count = 1): void {
+    const sheet = this.sheet();
+    if (count <= 0 || at >= sheet.rowCount) return;
+    this.document.commit(
+      [
+        {
+          op: "removeRows",
+          sheet: this.activeSheet,
+          at: Math.max(0, at),
+          count: Math.min(count, sheet.rowCount - Math.max(0, at)),
+        },
+      ],
+      "structure",
+    );
+  }
+
+  insertColumns(at: number, count = 1): void {
+    if (count <= 0) return;
+    const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
+    this.document.commit(
+      [
+        {
+          op: "addColumns",
+          sheet: this.activeSheet,
+          at: insertAt,
+          columns: this.makeBlankColumns(insertAt, count),
+        },
+      ],
+      "structure",
+    );
+  }
+
+  removeColumns(at: number, count = 1): void {
+    const sheet = this.sheet();
+    if (count <= 0 || at >= sheet.columns.length || sheet.columns.length <= 1) return;
+    const removeAt = Math.max(0, at);
+    this.document.commit(
+      [
+        {
+          op: "removeColumns",
+          sheet: this.activeSheet,
+          at: removeAt,
+          count: Math.min(count, sheet.columns.length - removeAt, sheet.columns.length - 1),
+        },
+      ],
+      "structure",
+    );
+  }
+
+  addSheet(input: AddSheetInput): SheetLifecycleResult {
+    const used = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.id));
+    let id = input.id?.trim() || "sheet";
+    let suffix = 2;
+    while (used.has(id)) id = `${input.id?.trim() || "sheet"}-${suffix++}`;
+    const columns = input.columns?.map((column) => ({ ...column })) ?? [
+      { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "text" as const },
+    ];
+    const name = validateSheetName(
+      input.name,
+      this.store.getWorkbook().sheets.map((sheet) => sheet.name),
+    );
+    // A dashboard has no rows or columns.
+    const dashboard = input.kind === "dashboard";
+    const snapshot: SheetSnapshot = {
+      id,
+      name: name.name,
+      order: this.store.getWorkbook().sheets.length,
+      ...(dashboard ? { kind: "dashboard", dashboard: { items: [] } } : {}),
+      rowCount: dashboard ? 0 : (input.rowCount ?? 100),
+      columns: dashboard ? [] : columns,
+      cells: [],
+    };
+    const result = this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
+    return { ...result, sheet: id };
+  }
+
+  removeSheet(id: SheetId): SheetLifecycleResult {
+    const result = this.document.commit([{ op: "removeSheet", sheet: id }], "structure");
+    return { ...result, sheet: id };
+  }
+
+  renameSheet(id: SheetId, name: string): SheetLifecycleResult {
+    const validation = validateSheetName(
+      name,
+      this.store
+        .getWorkbook()
+        .sheets.filter((sheet) => sheet.id !== id)
+        .map((sheet) => sheet.name),
+    );
+    const result = this.document.commit(
+      [{ op: "renameSheet", sheet: id, name: validation.name }],
+      "structure",
+    );
+    return { ...result, sheet: id };
+  }
+
+  moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult {
+    const result = this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+    return { ...result, sheet: id };
+  }
+
+  setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult {
+    const result = this.document.commit(
+      [{ op: "setSheetVisibility", sheet: id, visibility }],
+      "structure",
+    );
+    return { ...result, sheet: id };
+  }
+
+  setConditionalFormats(rules: readonly ConditionalFormatRule[]): void {
+    this.document.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: { conditionalFormats: rules.map((rule) => ({ ...rule })) },
+        },
+      ],
+      "style",
+    );
+  }
+
+  setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult {
+    const sanitized = sanitizeCellHyperlink(hyperlink);
+    const candidate: CellHyperlink = sanitized ?? {
+      id: "",
+      range: {
+        sheet: this.activeSheet,
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: 0 },
+      },
+      target: { kind: "external", url: "unsafe:" },
+    };
+    return this.document.commit(
+      [
+        {
+          op: "setHyperlink",
+          sheet: this.activeSheet,
+          hyperlink: candidate,
+        },
+      ],
+      "api",
+    );
+  }
+
+  removeHyperlink(id: string): ApplyTransactionResult {
+    return this.document.commit([{ op: "removeHyperlink", sheet: this.activeSheet, id }], "api");
+  }
+
+  getHyperlink(addr: CellAddress): CellHyperlink | null {
+    return hyperlinkAt(this.store.getWorkbook(), addr);
+  }
+
+  activateHyperlink(addr: CellAddress): boolean {
+    if (this.hyperlinkActivation === "disabled") return false;
+    const hyperlink = hyperlinkAt(this.store.getWorkbook(), addr);
+    if (!hyperlink) return false;
+    const target = resolveHyperlinkTarget(this.store.getWorkbook(), hyperlink.target);
+    for (const listener of this.listeners["hyperlink-activate"]) {
+      listener({ address: { ...addr }, hyperlink, target });
+    }
+    if (target.kind === "internal" && this.hyperlinkActivation === "internal-navigation") {
+      this.scrollToCell(target.address);
+    }
+    return true;
+  }
+
+  setValidationRule(rule: DataValidationRule): ApplyTransactionResult {
+    return this.document.commit(
+      [{ op: "setValidationRule", sheet: this.activeSheet, rule: structuredClone(rule) }],
+      "api",
+    );
+  }
+
+  removeValidationRule(id: string): ApplyTransactionResult {
+    return this.document.commit(
+      [{ op: "removeValidationRule", sheet: this.activeSheet, id }],
+      "api",
+    );
+  }
+
+  setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult {
+    return this.document.commit(
+      [
+        {
+          op: "setProtectedRange",
+          sheet: this.activeSheet,
+          protectedRange: structuredClone(protectedRange),
+        },
+      ],
+      "api",
+    );
+  }
+
+  removeProtectedRange(id: string): ApplyTransactionResult {
+    return this.document.commit(
+      [{ op: "removeProtectedRange", sheet: this.activeSheet, id }],
+      "api",
+    );
+  }
+
+  getPivots(sheet?: SheetId): PivotDefinition[] {
+    return clonePivots(this.store.getWorkbook().sheets, sheet);
+  }
+
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, pivot.id)?.id;
+    // Saved values do not match a definition the caller changed.
+    const changed = withoutSavedOutput(structuredClone(pivot));
+    return this.document.commit(
+      [{ op: "setPivot", sheet: owner ?? this.activeSheet, pivot: changed }],
+      "api",
+    );
+  }
+
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, id)?.id ?? this.activeSheet;
+    return this.document.commit([{ op: "removePivot", sheet: owner, id }], "api");
+  }
+
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    return storeEngine(this.store)?.getPivotFields(sheet, id) ?? [];
+  }
+
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    const engine = storeEngine(this.store);
+    if (engine) return engine.getPivotResult(sheet, id);
+
+    // A custom store has no pivot engine; its definitions still read normally.
+    const pivot = this.store
+      .getWorkbook()
+      .sheets.find((candidate) => candidate.id === sheet)
+      ?.pivots?.find((candidate) => candidate.id === id);
+    return pivot ? uncomputedPivotResult(sheet, pivot) : null;
+  }
+
+  getCharts(sheet: SheetId = this.activeSheet): readonly ChartDefinition[] {
+    return structuredClone(this.sheetById(sheet)?.charts ?? []);
+  }
+
+  setChart(chart: ChartDefinition, sheet: SheetId = this.activeSheet): ApplyTransactionResult {
+    return this.document.commit([{ op: "setChart", sheet, chart: structuredClone(chart) }], "api");
+  }
+
+  removeChart(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner =
+      sheet ??
+      this.store
+        .getWorkbook()
+        .sheets.find((candidate) => candidate.charts?.some((chart) => chart.id === id))?.id ??
+      this.activeSheet;
+    return this.document.commit([{ op: "removeChart", sheet: owner, id }], "api");
+  }
+
+  selectChart(id: string | null, sheet: SheetId = this.activeSheet): void {
+    if (id !== null && sheet !== this.activeSheet) this.setActiveSheet(sheet);
+    // Charts on other sheets are never selected, so there is nothing to deselect there.
+    if (sheet === this.activeSheet) this.objectLayer.select(id);
+  }
+
+  /**
+   * A chart's right-click menu. Edit chart does what Enter does; a read-only
+   * grid can open the chart's panel but not delete the chart.
+   */
+  private chartMenuItems(chart: ChartRef): ContextMenuItem[] {
+    return [
+      {
+        id: "editChart",
+        label: "Edit chart",
+        icon: "chart",
+        onClick: () => {
+          for (const fn of this.listeners["chart-activate"]) fn(chart);
+        },
+      },
+      { action: "separator" },
+      {
+        id: "deleteChart",
+        label: "Delete chart",
+        icon: "delete",
+        visible: () => !this.readOnly,
+        onClick: () => {
+          this.removeChart(chart.id, chart.sheet);
+          // The menu would hand focus back to the chart it opened on, which no
+          // longer exists; whether its frame is gone yet depends on timing.
+          // Focus the grid so Ctrl+Z, arrows and typing keep working.
+          this.host.focus({ preventScroll: true });
+        },
+      },
+    ];
+  }
+
+  openPanel(panel: GridPanel | null): void {
+    if (this.lifetime.closed) return;
+    const wasOpen = this.sidePanels.active;
+    const hadFocus = this.panelHost.contains(document.activeElement);
+    this.sidePanels.close();
+
+    const isOpen = panel !== null;
+    // The panel focuses its first control while it mounts; a hidden host refuses focus.
+    this.panelHost.hidden = !isOpen;
+    if (panel) {
+      const scope = this.sidePanels.next();
+      scope.add(mountSidePanel(this.panelHost, panel, () => this.openPanel(null)));
+    }
+    if (isOpen !== wasOpen) {
+      this.viewportEl.style.right = isOpen ? `${PANEL_WIDTH}px` : "0px";
+      this.syncSizer();
+      this.render();
+    }
+    // Escape and the close button leave focus in a removed panel; give it back to the grid.
+    if (!isOpen && hadFocus) this.host.focus();
+  }
+
+  setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {
+    this.store.setProtectionResolver?.(resolver, mode);
+  }
+
+  setNote(addr: CellAddress, text: string | null): ApplyTransactionResult {
+    return this.document.commit([{ op: "setNote", addr: { ...addr }, text: text || null }], "api");
+  }
+
+  getNote(addr: CellAddress): string | null {
+    return (
+      this.sheetById(addr.sheet)?.notes?.find(
+        (note) => note.addr.row === addr.row && note.addr.col === addr.col,
+      )?.text ?? null
+    );
+  }
+
+  private makeBlankColumns(at: number, count: number): Column[] {
+    const used = new Set(this.sheet().columns.map((column) => column.key));
+    const columns: Column[] = [];
+    for (let i = 0; i < count; i++) {
+      const col = at + i;
+      const base = `col_${col}`;
+      let key = base;
+      let suffix = 1;
+      while (used.has(key)) key = `${base}_${suffix++}`;
+      used.add(key);
+      columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+    }
+    return columns;
+  }
+
+  private materializeVirtualColumns(patches: DocumentOp[]): DocumentOp[] {
+    // A write is measured against the width its sheet has when it runs, so
+    // column inserts and deletes earlier in the batch count. Undoing a
+    // trailing column delete restores cells right after re-adding the columns.
+    const widthBySheet = new Map<SheetId, number>();
+    const missingBySheet = new Map<SheetId, number>();
+    const widthOf = (sheetId: SheetId): number | null => {
+      const width = widthBySheet.get(sheetId);
+      if (width !== undefined) return width;
+
+      const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
+      if (!stored) return null;
+      widthBySheet.set(sheetId, stored.columns.length);
+      return stored.columns.length;
+    };
+
+    for (const patch of patches) {
+      let sheet: SheetId | null = null;
+      let col = -1;
+      if (patch.op === "addColumns" || patch.op === "removeColumns") {
+        const width = widthOf(patch.sheet);
+        if (width !== null) {
+          const delta = patch.op === "addColumns" ? patch.columns.length : -patch.count;
+          widthBySheet.set(patch.sheet, width + delta);
+        }
+      } else if (patch.op === "set") {
+        sheet = patch.addr.sheet;
+        col = patch.addr.col;
+      } else if (
+        patch.op === "setRange" ||
+        patch.op === "setBlock" ||
+        patch.op === "restoreBlock" ||
+        patch.op === "setRangeStyle" ||
+        patch.op === "clearRange"
+      ) {
+        sheet = patch.range.sheet;
+        col = Math.max(patch.range.start.col, patch.range.end.col);
+      } else if (patch.op === "setColumn") {
+        sheet = patch.sheet;
+        col = patch.col;
+      } else if (patch.op === "addMerge" || patch.op === "removeMerge") {
+        sheet = patch.sheet;
+        col = Math.max(patch.merge.c0, patch.merge.c1);
+      }
+      if (sheet === null) continue;
+
+      const width = widthOf(sheet);
+      if (width === null) continue;
+      missingBySheet.set(sheet, Math.max(missingBySheet.get(sheet) ?? 0, col + 1 - width));
+    }
+
+    const additions: DocumentOp[] = [];
+    for (const [sheetId, missing] of missingBySheet) {
+      const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
+      if (!stored || missing <= 0) continue;
+      const used = new Set(stored.columns.map((column) => column.key));
+      const columns: Column[] = [];
+      for (let col = stored.columns.length; col < stored.columns.length + missing; col++) {
+        const base = `col_${col}`;
+        let key = base;
+        let suffix = 1;
+        while (used.has(key)) key = `${base}_${suffix++}`;
+        used.add(key);
+        columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+      }
+      additions.push({ op: "addColumns", sheet: sheetId, at: stored.columns.length, columns });
+    }
+    return additions.length > 0 ? [...additions, ...patches] : patches;
+  }
+
+  private buildActions(): GridActions {
+    return {
+      toggleBold: () => this.styleActions.toggleStyle("bold"),
+      toggleItalic: () => this.styleActions.toggleStyle("italic"),
+      toggleUnderline: () => this.styleActions.toggleStyle("underline"),
+      toggleStrikethrough: () => this.styleActions.toggleStyle("strikethrough"),
+      setAlign: (align) => this.styleActions.applyStyle({ align }),
+      setTextColor: (color) => this.styleActions.applyStyle({ color: color ?? undefined }),
+      setFillColor: (color) =>
+        this.styleActions.applyStyle({ backgroundColor: color ?? undefined }),
+      setFontFamily: (family) => this.styleActions.applyStyle({ fontFamily: family ?? undefined }),
+      setFontSize: (px) => this.styleActions.applyStyle({ fontSize: px ?? undefined }),
+      stepFontSize: (direction) => {
+        const defaultFontSize = 13;
+        const themeFontSize =
+          Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") ||
+          defaultFontSize;
+        this.styleActions.applyStyle({
+          fontSize: stepFontSizePx(this.getFocusCellStyle().fontSize ?? themeFontSize, direction),
+        });
+      },
+      setVerticalAlign: (verticalAlign) => this.styleActions.applyStyle({ verticalAlign }),
+      toggleWrap: () => this.styleActions.applyStyle({ wrap: !this.getFocusCellStyle().wrap }),
+      setNumberFormat: (code) => this.styleActions.applyStyle({ numberFormat: code ?? undefined }),
+      stepDecimals: (direction) => {
+        const focus = this.selection.focusCell;
+        if (!focus) return;
+        const column = this.sheet().columns[focus.col];
+        const value = this.store.getCell({
+          sheet: this.activeSheet,
+          row: this.toDataRow(focus.row),
+          col: focus.col,
+        }).resolved;
+
+        const numberFormat = stepNumberFormatDecimals(
+          this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
+          direction,
+          typeof value === "number" ? value : undefined,
+          column?.numberLocale,
+        );
+        if (numberFormat === undefined) return;
+
+        this.styleActions.applyStyle({ numberFormat });
+      },
+      setBorders: (preset) => this.styleActions.setBorders(preset),
+      mergeAndCenter: () => this.styleActions.mergeSelection(true),
+      clearAll: () => this.styleActions.clearAll(),
+      autoSum: () => this.autoSum(),
+      find: () => this.openFindBar(),
+      freezePanes: () => {
+        const focus = this.selection.focusCell;
+        if (focus) this.setFrozen(focus.row, focus.col);
+      },
+      toggleBorder: () => this.styleActions.toggleBorder(),
+      clearFormat: () => this.styleActions.applyStyle(null),
+      merge: () => this.styleActions.mergeSelection(),
+      unmerge: () => this.styleActions.unmergeSelection(),
+      sort: (ascending) => {
+        const f = this.selection.focusCell;
+        if (f) this.sortBy(f.col, ascending);
+      },
+      sortView: (ascending) => {
+        const f = this.selection.focusCell;
+        if (f) this.setViewSort([{ col: f.col, ascending }]);
+      },
+      customSort: () => showSortPanel(this),
+      insertRowAbove: () => {
+        const f = this.selection.focusCell;
+        if (f) this.insertRows(this.toDataRow(f.row));
+      },
+      insertRowBelow: () => {
+        const f = this.selection.focusCell;
+        if (f) this.insertRows(this.toDataRow(f.row) + 1);
+      },
+      deleteRow: () => {
+        const f = this.selection.focusCell;
+        if (f) this.removeRows(this.toDataRow(f.row));
+      },
+      insertColumnLeft: () => {
+        const f = this.selection.focusCell;
+        if (f) this.insertColumns(f.col);
+      },
+      insertColumnRight: () => {
+        const f = this.selection.focusCell;
+        if (f) this.insertColumns(f.col + 1);
+      },
+      deleteColumn: () => {
+        const f = this.selection.focusCell;
+        if (f) this.removeColumns(f.col);
+      },
+      hideRows: (rows) => {
+        const focus = this.selection.focusCell;
+        const targets = rows ?? (focus ? [this.toDataRow(focus.row)] : []);
+        this.hideRows(targets);
+      },
+      showRows: (rows) => this.showRows(rows),
+      autoFitRows: () => {
+        const focus = this.selection.focusCell;
+        if (!focus) return;
+        // `autoFitRows` takes view rows, the same space as the focus cell.
+        const row = focus.row;
+        this.autoFitRows({
+          sheet: this.activeSheet,
+          start: { row, col: 0 },
+          end: { row, col: Math.max(0, this.sheet().columns.length - 1) },
+        });
+      },
+      hideColumns: (cols) => this.hideColumns(cols),
+      showColumns: (cols) => this.showColumns(cols),
+      autoFitColumns: (cols) => this.autoFitColumns(cols),
+      clearFilter: (col) => {
+        const target = col ?? this.selection.focusCell?.col;
+        if (target !== undefined) this.setColumnFilter(target, null);
+      },
+      copy: () => this.clipboard.copy(),
+      cut: () => this.clipboard.cut(),
+      paste: () => this.clipboard.paste(),
+      pasteValues: () => this.clipboard.pasteValues(),
+      clearContents: () => this.clearSelection(),
+      exportCsv: (filename) => {
+        try {
+          this.exportCsv(filename ?? "sheetwrite.csv");
+        } catch (error) {
+          this.emitExportError(error, "csv");
+        }
+      },
+      // Resolves when the download is handed to the browser; never rejects,
+      // because a failure is reported once through `export-error`.
+      exportXlsx: (filename) =>
+        this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
+          this.emitExportError(error, "xlsx");
+        }),
+      importXlsx: async () => {
+        // File selection is optional chrome, not part of initial grid delivery.
+        const { pickXlsxWorkbook } = await import("./workbook-io.js");
+        await pickXlsxWorkbook(this, this.host, this.lifetime);
+      },
+      versionHistory: () => this.historyCommand?.("open"),
+      // The dashboard chunk names and adds the sheet; first paint carries only this call.
+      newDashboard: () =>
+        void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
+      saveVersion: () => {
+        if (!this.readOnly) this.historyCommand?.("save");
+      },
+      editNote: () => {
+        // Same gate as the cell editor: do not open an editor whose save must fail.
+        const focus = this.selection.focusCell;
+        if (this.readOnly || !focus) return;
+
+        const cell = this.noteCell(focus.row, focus.col);
+        this.scrollToCell({ sheet: this.activeSheet, row: cell.row, col: cell.col });
+        this.notes.edit(cell);
+      },
+      deleteNote: () => {
+        const focus = this.selection.focusCell;
+        if (this.readOnly || !focus) return;
+
+        const { address } = this.noteCell(focus.row, focus.col);
+        if (this.getNote(address) !== null) this.setNote(address, null);
+      },
+      showPivotFields: () => {
+        // The field list edits the pivot, so a read-only grid does not open it.
+        if (this.readOnly) return;
+
+        showPivotFields(this);
+      },
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+    };
+  }
+
+  getFocusCellStyle(): CellStyle {
+    const focus = this.selection.focusCell;
+    if (!focus) return {};
+    const anchor = this.anchorCell(focus.row, focus.col);
+    const cell = this.store.getCell({
+      sheet: this.activeSheet,
+      row: this.toDataRow(anchor.row),
+      col: anchor.col,
+    });
+    return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
+  }
+
+  async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
+    signal?.throwIfAborted();
+    // A destroyed grid has freed its store: the call rejects with the grid's abort reason.
+    this.lifetime.signal.throwIfAborted();
+    if (this.selection.isEmpty) return null;
+
+    // Summaries are independent, but none may read a replaced document.
+    const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
+    signal?.addEventListener("abort", () => run.close(signal.reason), {
+      once: true,
+      signal: run.signal,
+    });
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push({ ...rect }));
+    const sheet = this.activeSheet;
+    const columnCount = this.sheet().columns.length;
+    try {
+      // Summary scans are cold work; do not add them to initial grid delivery.
+      const { summarizeRects } = await import("./selection-summary.js");
+      return await summarizeRects(this.store, sheet, columnCount, rects, run);
+    } finally {
+      run.close();
+    }
+  }
+
+  private autoSum(): void {
+    const focus = this.selection.focusCell;
+    if (this.readOnly || !focus) return;
+
+    const row = this.toDataRow(focus.row);
+    const col = focus.col;
+    const chunkCells = 4_096;
+
+    const numericStart = (vertical: boolean): number => {
+      let end = vertical ? row : col;
+      const origin = end;
+      while (end > 0) {
+        const start = Math.max(0, end - chunkCells);
+        const columns = vertical
+          ? [col]
+          : Array.from({ length: end - start }, (_, index) => start + index);
+        const window = this.store.getDataWindow?.(
+          this.activeSheet,
+          vertical ? { start, end } : { start: row, end: row + 1 },
+          columns,
+        );
+
+        let values: ArrayLike<CellScalar>;
+        if (window) values = window.values;
+        else {
+          const coordinates =
+            columns.length === 1 && vertical
+              ? Array.from({ length: end - start }, (_, index) => ({ row: start + index, col }))
+              : columns.map((column) => ({ row, col: column }));
+
+          const engine = storeEngine(this.store);
+          // Custom stores without canonical windows retain their scalar data-address contract.
+          const cells = engine
+            ? engine.captureResolvedCells(this.activeSheet, coordinates)
+            : coordinates.map((coordinate) =>
+                this.store.getCell({ sheet: this.activeSheet, ...coordinate }),
+              );
+          values = cells.map((cell) => cell.resolved);
+        }
+
+        for (let index = values.length - 1; index >= 0; index--) {
+          if (typeof values[index] !== "number") return start + index + 1;
+        }
+
+        end = start;
+      }
+
+      return origin === 0 ? origin : end;
+    };
+
+    const firstRow = numericStart(true);
+    const vertical = firstRow < row;
+    const firstCol = vertical ? col : numericStart(false);
+    if (!vertical && firstCol === col) return;
+    const start = `${colToA1(firstCol)}${(vertical ? firstRow : row) + 1}`;
+    const end = `${colToA1(vertical ? col : col - 1)}${(vertical ? row - 1 : row) + 1}`;
+    this.document.commit(
+      [
+        {
+          op: "set",
+          addr: { sheet: this.activeSheet, row, col },
+          value: { kind: "formula", src: `=SUM(${start}:${end})` },
+        },
+      ],
+      "edit-enter",
+    );
+  }
+
+  getCommandState(command: GridCommandName): GridCommandState {
+    const summary = COMMAND_STATE_ACTIVITY_COMMANDS.includes(command)
+      ? this.formattingSummary()
+      : undefined;
+    return this.resolveCommandState(command, summary);
+  }
+
+  private resolveCommandState(
+    command: GridCommandName,
+    summary?: Readonly<Partial<Record<GridCommandName, number>>>,
+  ): GridCommandState {
+    if (command === "undo") {
+      return {
+        disabled: this.readOnly || !this.document.canUndo,
+        activity: "inactive",
+      };
+    }
+    if (command === "redo") {
+      return {
+        disabled: this.readOnly || !this.document.canRedo,
+        activity: "inactive",
+      };
+    }
+    if (command === "versionHistory" || command === "saveVersion") {
+      return {
+        disabled: !this.historyCommand || (command === "saveVersion" && this.readOnly),
+        activity: "inactive",
+      };
+    }
+    if (command === "importXlsx") {
+      return {
+        disabled:
+          this.readOnly ||
+          !this.ownsStore ||
+          this.hasDatasource ||
+          hasGridTransactionAdmission(this),
+        activity: "inactive",
+      };
+    }
+
+    const selectionRequired =
+      isFormattingCommand(command) ||
+      command === "merge" ||
+      command === "unmerge" ||
+      command === "sortAsc" ||
+      command === "sortDesc";
+    const disabled =
+      (selectionRequired && this.selection.isEmpty) ||
+      (this.readOnly && command !== "exportCsv" && command !== "exportXlsx");
+    const activity = summary?.[command] ?? 0;
+    return {
+      disabled,
+      activity: activity === 3 ? "mixed" : activity === 1 ? "active" : "inactive",
+    };
+  }
+
+  private formattingSummary(): Readonly<Partial<Record<GridCommandName, number>>> {
+    const summary: Partial<Record<GridCommandName, number>> = {};
+    for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
+
+    // A stopped engine cannot answer style reads; a read-only grid needs none.
+    if (this.selection.isEmpty || this.engineFailure) return summary;
+
+    const coordinates: Array<{ row: number; col: number }> = [];
+    let complete = true;
+    this.selection.forEachRect((rect) => {
+      if (!complete) return;
+
+      for (let row = rect.r0; row <= rect.r1; row++) {
+        const dataRow = this.toDataRow(row);
+        for (let col = rect.c0; col <= rect.c1; col++) {
+          if (coordinates.length >= COMMAND_STATE_CELL_LIMIT) {
+            complete = false;
+            return;
+          }
+
+          const column = this.sheet().columns[col];
+          if (!column) continue;
+          coordinates.push({ row: dataRow, col });
+        }
+      }
+    });
+
+    if (!complete) {
+      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
+      return summary;
+    }
+
+    const engine = storeEngine(this.store);
+    // Custom stores without an engine retain their single-cell read contract.
+    const cells = engine
+      ? engine.captureResolvedCells(this.activeSheet, coordinates)
+      : coordinates.map(({ row, col }) =>
+          this.store.getCell({ sheet: this.activeSheet, row, col }),
+        );
+
+    for (const [index, coordinate] of coordinates.entries()) {
+      const cell = cells[index];
+      const column = this.sheet().columns[coordinate.col];
+      if (!cell || !column) continue;
+
+      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
+        const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
+        summary[command] = (summary[command] ?? 0) | bit;
+      }
+    }
+
+    return summary;
+  }
+
+  private commandStateSnapshot(): Readonly<Record<GridCommandName, GridCommandState>> {
+    const summary = this.formattingSummary();
+    const states = {} as Record<GridCommandName, GridCommandState>;
+    for (const command of GRID_COMMANDS) {
+      states[command] = this.resolveCommandState(command, summary);
+    }
+    return states;
+  }
+
+  private emitCommandStateChange(): void {
+    this.commandStateQueued = false;
+    this.commandStateGeneration += 1;
+    if (this.lifetime.closed || this.listeners["command-state-change"].size === 0) return;
+    const event = { states: this.commandStateSnapshot() };
+    for (const listener of this.listeners["command-state-change"]) listener(event);
+  }
+
+  private queueCommandStateChange(): void {
+    if (this.commandStateQueued || this.lifetime.closed) return;
+    this.commandStateQueued = true;
+    const generation = ++this.commandStateGeneration;
+    queueMicrotask(() => {
+      if (!this.commandStateQueued || generation !== this.commandStateGeneration) return;
+      this.emitCommandStateChange();
+    });
+  }
+
+  on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void {
+    this.listeners[evt].add(fn);
+    return () => this.listeners[evt].delete(fn);
+  }
+
+  refresh(): void {
+    this.render();
+  }
+
+  aggregate(col: number, op: AggregateOp): number {
+    return this.loadable ? this.loadable.aggregate(this.activeSheet, col, op) : 0;
+  }
+
+  sortBy(col: number, ascending = true): ApplyTransactionResult {
+    return this.quickSort(col, ascending);
+  }
+
+  filterBy(col: number, needle: string): void {
+    this.setColumnFilter(col, { kind: "contains", text: needle });
+  }
+
+  clearView(): void {
+    const patch = clearViewPatch(this.sheet());
+    if (patch) this.document.commit([patch], "structure");
+  }
+
+  setViewSort(keys: readonly SortKey[]): ApplyTransactionResult {
+    return this.document.commit([viewSortPatch(this.activeSheet, keys)], "structure");
+  }
+
+  sortRange(
+    range: Range,
+    keys: readonly SortKey[],
+    options: { hasHeader?: boolean } = {},
+  ): ApplyTransactionResult {
+    const engine = storeEngine(this.store);
+    if (!engine || engine.queryCapability(range.sheet).status !== "complete") {
+      return { status: "noop", epoch: this.storeEpoch, reason: "incomplete-data" };
+    }
+
+    const plan = engine.sortRangePlan(range, keys, options.hasHeader ?? false);
+    if (plan.kind === "unchanged") {
+      return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    }
+    if (plan.kind === "refused") {
+      const issue: MutationIssue = {
+        kind: "invalid-operation",
+        severity: "error",
+        operationIndex: 0,
+        message: plan.message,
+      };
+      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+      return { status: "rejected", epoch: this.storeEpoch, issues: [issue] };
+    }
+
+    return this.document.commit(plan.operations, "sort");
+  }
+
+  /**
+   * Excel's quick sort: sort the table body that holds the focus cell, or
+   * else the selected range, or else the current region around the focus.
+   */
+  private quickSort(col: number, ascending: boolean): ApplyTransactionResult {
+    const focus = this.selection.focusCell;
+    const addr = {
+      sheet: this.activeSheet,
+      row: focus ? this.toDataRow(focus.row) : 0,
+      col,
+    };
+    const target = this.quickSortTarget(addr);
+    if (!target) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+
+    return this.sortRange(target.range, [{ col, ascending }], { hasHeader: target.hasHeader });
+  }
+
+  private quickSortTarget(addr: CellAddress): { range: Range; hasHeader: boolean } | null {
+    const table = this.sheet().tables?.find((candidate) => rangeHolds(candidate.range, addr));
+    if (table) {
+      const { range } = table;
+      const start = { row: range.start.row + (table.headerRow ? 1 : 0), col: range.start.col };
+      const end = { row: range.end.row - (table.totalsRow ? 1 : 0), col: range.end.col };
+      return { range: { sheet: range.sheet, start, end }, hasHeader: false };
+    }
+
+    const range = this.selectedSortRange() ?? currentRegion(this.store, addr);
+    if (!range || !rangeHolds(range, addr)) return null;
+
+    return { range, hasHeader: looksLikeHeader(this.store, range) };
+  }
+
+  /**
+   * The selected rectangle in data rows, when one rectangle of more than one
+   * cell is selected and the rows show in data order. A view sort or filter
+   * scatters the data rows of a view rectangle, so it gives `null`.
+   */
+  private selectedSortRange(): Range | null {
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push(rect));
+    const [rect] = rects;
+    if (rects.length !== 1 || !rect || this.loadable?.hasView(this.activeSheet)) return null;
+    if (rect.r0 === rect.r1 && rect.c0 === rect.c1) return null;
+
+    return {
+      sheet: this.activeSheet,
+      start: { row: rect.r0, col: rect.c0 },
+      end: { row: rect.r1, col: rect.c1 },
+    };
+  }
+
+  setColumnFilter(col: number, filter: ColumnFilter | null): void {
+    const patch = columnFilterPatch(this.sheet(), col, filter);
+    if (patch) this.document.commit([patch], "structure");
+  }
+
+  getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
+    return new Map(this.sheet().filters ?? this.loadable?.columnFilters(this.activeSheet) ?? []);
+  }
+
+  distinctValues(col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
+    return this.loadable?.distinctValues(this.activeSheet, col, limit) ?? [];
+  }
+
+  hideRows(rows: readonly number[]): void {
+    this.document.commit(rowVisibilityPatches(this.sheet(), rows, true), "structure");
+  }
+
+  showRows(rows?: readonly number[]): void {
+    const sheet = this.sheet();
+    const patches = rowVisibilityPatches(sheet, rows ?? [...(sheet.hiddenRows ?? [])], false);
+    this.document.commit(patches, "structure");
+  }
+
+  hiddenRows(): readonly number[] {
+    return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
+  }
+
+  hideColumns(cols?: readonly number[]): void {
+    const sheet = this.sheet();
+    const targets = cols ?? (this.selection.focusCell ? [this.selection.focusCell.col] : []);
+    const unique = [...new Set(targets)]
+      .filter(
+        (col) => col >= 0 && col < sheet.columns.length && sheet.columns[col]?.visible !== false,
+      )
+      .sort((left, right) => left - right);
+    let visibleCount = sheet.columns.reduce(
+      (count, column) => count + (column.visible === false ? 0 : 1),
+      0,
+    );
+    const patches: DocumentOp[] = [];
+    for (const col of unique) {
+      if (visibleCount <= 1) break;
+      patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: false } });
+      visibleCount--;
+    }
+    this.document.commit(patches, "structure");
+  }
+
+  showColumns(cols?: readonly number[]): void {
+    const sheet = this.sheet();
+    const targets =
+      cols ?? sheet.columns.flatMap((column, col) => (column.visible === false ? [col] : []));
+    const patches: DocumentOp[] = [];
+    for (const col of new Set(targets)) {
+      if (col < 0 || col >= sheet.columns.length || sheet.columns[col]?.visible !== false) continue;
+      patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: true } });
+    }
+    this.document.commit(patches, "structure");
+  }
+
+  hiddenColumns(): readonly number[] {
+    return this.sheet().columns.flatMap((column, col) => (column.visible === false ? [col] : []));
+  }
+
+  groupRows(start: number, end: number): void {
+    const groups = addRowGroup(this.sheet().rowGroups, start, end);
+    this.document.commit(
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
+      "structure",
+    );
+  }
+
+  ungroupRows(start: number, end: number): void {
+    const groups = removeRowGroup(this.sheet().rowGroups, start, end);
+    this.document.commit(
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
+      "structure",
+    );
+  }
+
+  setGroupCollapsed(start: number, collapsed: boolean): void {
+    const groups = collapseRowGroup(this.sheet().rowGroups, start, collapsed);
+    this.document.commit(
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
+      "structure",
+    );
+  }
+
+  rowGroups(): readonly RowGroup[] {
+    return this.sheet().rowGroups ?? [];
+  }
+
+  undo(): void {
+    if (!this.readOnly) this.document.undo();
+    this.queueCommandStateChange();
+  }
+
+  redo(): void {
+    if (!this.readOnly) this.document.redo();
+    this.queueCommandStateChange();
+  }
+
+  private emitExportError(error: unknown, format: "csv" | "xlsx"): void {
+    if (this.lifetime.closed) return;
+    const operation = format === "csv" ? "delimited-export" : "xlsx-export";
+    const failure = normalizeSheetwriteError(error, "export-failed", operation, { format });
+    this.actionFeedback.show(`Export failed: ${failure.message} Try again.`);
+    for (const listener of this.listeners["export-error"]) {
+      listener({ format, error: failure });
+    }
+  }
+
+  /** Both export formats write only the active sheet, so only its rows must be loaded. */
+  private requireCompleteSheet(): void {
+    const capability = this.loadable?.queryCapability(this.activeSheet);
+    if (capability?.status === "incomplete") {
+      throw new IncompleteDataError(this.activeSheet, capability);
+    }
+  }
+
+  exportCsv(filename: string): void {
+    this.requireCompleteSheet();
+    downloadBytesIn(
+      this.lifetime,
+      toCsv(this.sheet(), this.store),
+      filename,
+      "text/csv;charset=utf-8",
+    );
+  }
+
+  async exportXlsx(filename: string): Promise<void> {
+    // Destroy aborts the export; its listeners on the signal go with this scope.
+    const run = (this.documentOperations ??= new ScopeSlot(this.lifetime)).current().child();
+    try {
+      this.requireCompleteSheet();
+
+      // XLSX conversion is optional document work, not initial grid code.
+      const { exportWorkbookFile } = await import("./workbook-io.js");
+      await exportWorkbookFile(this, filename, run, this.lifetime);
+    } finally {
+      run.close();
+    }
+  }
+
+  /**
+   * A resolution query stops being useful after it changes, so replace it with
+   * one matching the current display. This catches DPR-only changes that do not
+   * resize the host and therefore never reach ResizeObserver.
+   */
+  private armResolutionListener(): void {
+    this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
+    this.resolutionMediaQuery = null;
+    if (typeof globalThis.matchMedia !== "function") return;
+
+    const devicePixelRatio = globalThis.devicePixelRatio ?? 1;
+    this.resolutionMediaQuery = globalThis.matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
+    this.resolutionMediaQuery.addEventListener("change", this.onResolutionChange);
+  }
+
+  private onResize(): void {
+    this.syncSizer();
+    this.render();
+  }
+
+  /**
+   * A clipboard shortcut has no caller to await it. Its outcomes need no
+   * message (the shortcut itself is the fallback the menu messages suggest),
+   * but a failure is a bug: tell the user, and let the error reach the host.
+   */
+  private runKeyboardClipboard(action: Promise<ClipboardOutcome>): void {
+    void action.then(undefined, (error: unknown) => {
+      if (this.lifetime.closed) return;
+      this.actionFeedback.show(`The command did not finish: ${errorDetail(error)}`);
+      throw error;
+    });
+  }
+
+  /** Opens the history panel or its Save Version form; the history add-on sets it. */
+  declare historyCommand?: (action: "open" | "save") => void;
+
+  /** Run `cleanup` when the grid is destroyed. */
+  addCleanup(cleanup: () => void): void {
+    this.lifetime.add(cleanup);
+  }
+
+  /**
+   * Closing the root scope first aborts every running operation and frees the
+   * chrome, panels and timers it owns. The grid's own parts follow in a fixed
+   * order, because later ones (the store, the renderer) are read by earlier ones.
+   */
+  destroy(): void {
+    if (this.lifetime.closed) return;
+    this.removeEngineFailureListener();
+    const failures = new FirstFailure();
+    const cleanup = (operation: () => void): void => failures.run(operation);
+
+    cleanup(() => this.lifetime.close());
+    cleanup(() => this.datasourceController.destroy());
+    cleanup(() => this.mutationRevisions.clear());
+    cleanup(() => this.readWindows.destroy());
+    cleanup(() => this.interactions.destroy());
+    cleanup(() => this.notes.destroy());
+    cleanup(() => this.objectLayer.destroy());
+    cleanup(() =>
+      this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange),
+    );
+    this.resolutionMediaQuery = null;
+    cleanup(() => this.document.destroy());
+    cleanup(() => this.disposeStore());
+    // A caller-provided store remains owned by its caller.
+    if (this.ownsStore) cleanup(() => this.loadable?.dispose());
+    cleanup(() => this.renderer.destroy());
+    cleanup(() => this.domOverlay.destroy());
+    cleanup(() => this.scroller.remove());
+    cleanup(() => this.overlayPainter.destroy());
+    cleanup(() => this.sheetTabs?.destroy());
+    cleanup(() => this.tabBar?.remove());
+    cleanup(() => this.panelHost.remove());
+    cleanup(() => this.viewportEl.remove());
+    cleanup(() => this.ariaMirror.destroy());
+    cleanup(() => this.host.classList.remove("sheetwrite"));
+    cleanup(() => {
+      for (const listeners of Object.values(this.listeners)) listeners.clear();
+    });
+
+    failures.rethrow();
+  }
+
+  trimMemory(): void {
+    if (this.lifetime.closed) return;
+
+    // A worker drops its strings only when the host reader drops its own, so
+    // the next frame resends them. A store without an engine sends no pool ids.
+    const engine = storeEngine(this.store);
+    if (engine) {
+      engine.trimMemory();
+      this.renderer.trimMemory?.();
+    }
+    trimNumberFormatCaches();
+    this.measureContext = null;
+    this.overlayPainter.trimMemory();
+
+    // The next frame reads its window again, so a worker renderer gets every
+    // string it paints, and the same cells paint the same output.
+    this.readWindows.invalidateData();
+    this.scheduleRender();
+  }
 }
 
 function appendPadColumns(columns: Column[], target: number): void {
- for (let c = columns.length; c < target; c++) {
-  columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
- }
+  for (let c = columns.length; c < target; c++) {
+    columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
+  }
 }
 
 /**
@@ -4138,14 +4138,14 @@ function appendPadColumns(columns: Column[], target: number): void {
  * columns only when the host asks for them with `minColumns`.
  */
 function padTarget(
- host: HTMLElement,
- minColumns: number | undefined,
- presentation: GridPresentation,
+  host: HTMLElement,
+  minColumns: number | undefined,
+  presentation: GridPresentation,
 ): number {
- if (presentation === "data-grid") return minColumns ?? 0;
- const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
- const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
- return Math.max(minColumns ?? 0, fillCols);
+  if (presentation === "data-grid") return minColumns ?? 0;
+  const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
+  const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
+  return Math.max(minColumns ?? 0, fillCols);
 }
 
 /**
@@ -4156,36 +4156,36 @@ function padTarget(
  * (conservatively rebuilding).
  */
 function shallowEqualConfig(a: GridConfig | undefined, b: GridConfig | undefined): boolean {
- if (a === b) return true;
- if (!a || !b) return false;
+  if (a === b) return true;
+  if (!a || !b) return false;
 
- const aKeys = Object.keys(a) as Array<keyof GridConfig>;
- const bKeys = Object.keys(b) as Array<keyof GridConfig>;
- if (aKeys.length !== bKeys.length) return false;
+  const aKeys = Object.keys(a) as Array<keyof GridConfig>;
+  const bKeys = Object.keys(b) as Array<keyof GridConfig>;
+  if (aKeys.length !== bKeys.length) return false;
 
- for (const key of aKeys) {
-  if (key === "ribbon" ? !sameRibbonConfig(a.ribbon, b.ribbon) : !Object.is(a[key], b[key])) {
-   return false;
+  for (const key of aKeys) {
+    if (key === "ribbon" ? !sameRibbonConfig(a.ribbon, b.ribbon) : !Object.is(a[key], b[key])) {
+      return false;
+    }
   }
- }
- return true;
+  return true;
 }
 
 function sameRibbonConfig(a: GridConfig["ribbon"], b: GridConfig["ribbon"]): boolean {
- if (typeof a !== "object" || typeof b !== "object") return Object.is(a, b);
+  if (typeof a !== "object" || typeof b !== "object") return Object.is(a, b);
 
- return a.mode === b.mode && a.compactWidth === b.compactWidth;
+  return a.mode === b.mode && a.compactWidth === b.compactWidth;
 }
 
 /** Whether `range` holds `addr`; ranges here are normalized. */
 function rangeHolds(range: Range, addr: CellAddress): boolean {
- return (
-  range.sheet === addr.sheet &&
-  addr.row >= range.start.row &&
-  addr.row <= range.end.row &&
-  addr.col >= range.start.col &&
-  addr.col <= range.end.col
- );
+  return (
+    range.sheet === addr.sheet &&
+    addr.row >= range.start.row &&
+    addr.row <= range.end.row &&
+    addr.col >= range.start.col &&
+    addr.col <= range.end.col
+  );
 }
 
 // Bits of what one committed change requires of the active sheet's view.
@@ -4202,34 +4202,34 @@ const VIEW_EFFECTS = REBUILD_ROWS | RECONCILE_VIEW | REBUILD_COLUMNS | APPLY_LAY
 
 /** Validation, hyperlinks, protection and charts sit on a sheet without moving its cells. */
 function annotatesSheet(patch: DocumentOp): boolean {
- switch (patch.op) {
-  case "setValidationRule":
-  case "removeValidationRule":
-  case "setHyperlink":
-  case "removeHyperlink":
-  case "setProtectedRange":
-  case "removeProtectedRange":
-  case "setChart":
-  case "removeChart":
-   return true;
-  default:
-   return false;
- }
+  switch (patch.op) {
+    case "setValidationRule":
+    case "removeValidationRule":
+    case "setHyperlink":
+    case "removeHyperlink":
+    case "setProtectedRange":
+    case "removeProtectedRange":
+    case "setChart":
+    case "removeChart":
+      return true;
+    default:
+      return false;
+  }
 }
 
 /** Row and column inserts, removals and moves shift every cell after them. */
 function changesSheetStructure(patch: DocumentOp): boolean {
- switch (patch.op) {
-  case "addRows":
-  case "removeRows":
-  case "moveRows":
-  case "addColumns":
-  case "removeColumns":
-  case "moveColumns":
-   return true;
-  default:
-   return false;
- }
+  switch (patch.op) {
+    case "addRows":
+    case "removeRows":
+    case "moveRows":
+    case "addColumns":
+    case "removeColumns":
+    case "moveColumns":
+      return true;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -4237,20 +4237,20 @@ function changesSheetStructure(patch: DocumentOp): boolean {
  * column style under its own; null for an empty cell.
  */
 function autoFitCell(
- sheet: Sheet,
- view: VisibleWindowView,
- row: number,
- columnIndex: number,
- col: number,
+  sheet: Sheet,
+  view: VisibleWindowView,
+  row: number,
+  columnIndex: number,
+  col: number,
 ): { value: CellScalar; style: CellStyle; column: Column } | null {
- const valueIndex = (row - view.rows.start) * view.cols.length + columnIndex;
- const value = view.values[valueIndex];
- if (value === null || value === undefined || value === "") return null;
+  const valueIndex = (row - view.rows.start) * view.cols.length + columnIndex;
+  const value = view.values[valueIndex];
+  if (value === null || value === undefined || value === "") return null;
 
- const column = sheet.columns[col];
- if (!column) return null;
+  const column = sheet.columns[col];
+  if (!column) return null;
 
- const cellStyle = view.styles[view.styleIds[valueIndex] ?? 0] ?? EMPTY_STYLE;
- const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
- return { value, style, column };
+  const cellStyle = view.styles[view.styleIds[valueIndex] ?? 0] ?? EMPTY_STYLE;
+  const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
+  return { value, style, column };
 }
