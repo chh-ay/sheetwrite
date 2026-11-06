@@ -53,8 +53,39 @@ export interface DashboardSlicerItem {
   itemsWithNoData?: "dim" | "hide" | "show";
 }
 
+/** A chart of the dashboard sheet over one of its pivots, shown in a box. */
+export interface DashboardChartItem {
+  /** Stable ID, unique on the dashboard. */
+  id: string;
+  box: DashboardBox;
+  kind: "chart";
+  /** `ChartDefinition.id` of a chart on the same dashboard sheet; its `pivot` names the data. */
+  chart: string;
+}
+
+/**
+ * A KPI card: the value of one data model measure, in the filter context of
+ * the dashboard's slicers, shown large in a box.
+ */
+export interface DashboardKpiItem {
+  /** Stable ID, unique on the dashboard. */
+  id: string;
+  box: DashboardBox;
+  kind: "kpi";
+  /** `Measure.id` of a measure of the workbook's data model. */
+  measure: string;
+  /** Caption; absent shows the measure name. */
+  title?: string;
+  /** Excel number-format code of the value; absent shows it as General. */
+  numberFormat?: string;
+}
+
 /** One item of a dashboard. */
-export type DashboardItem = DashboardPivotItem | DashboardSlicerItem;
+export type DashboardItem =
+  | DashboardPivotItem
+  | DashboardSlicerItem
+  | DashboardChartItem
+  | DashboardKpiItem;
 
 /** The layout of a dashboard sheet. */
 export interface Dashboard {

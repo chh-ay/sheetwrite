@@ -15,9 +15,11 @@ import type {
   followChart,
   insertChart,
   insertPivot,
+  insertPivotChart,
   openChartPanel,
   openDataModelPanel,
   openExplainPanel,
+  openKpiPanel,
   openNamePanel,
   openPivotPanel,
   openQueryPanel,
@@ -31,9 +33,11 @@ interface PanelController {
   followChart: typeof followChart;
   insertChart: typeof insertChart;
   insertPivot: typeof insertPivot;
+  insertPivotChart: typeof insertPivotChart;
   openChartPanel: typeof openChartPanel;
   openDataModelPanel: typeof openDataModelPanel;
   openExplainPanel: typeof openExplainPanel;
+  openKpiPanel: typeof openKpiPanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
   openQueryPanel: typeof openQueryPanel;

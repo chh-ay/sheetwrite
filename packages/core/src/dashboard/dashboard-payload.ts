@@ -1,4 +1,4 @@
-// The filter context of a dashboard: each slicer keeps the rows whose value
+// What the engine computes for a dashboard. Each slicer keeps the rows whose value
 // in its column is selected, and filters every pivot whose base table reaches
 // the slicer's table through relationships, as an Excel slicer filters the
 // PivotTables connected to it (#231). The result is what the engine computes;
@@ -6,8 +6,12 @@
 
 import { baseTable, relatedTables, withModelField } from "../panels/pivot-model.js";
 import type { CellScalar } from "../types/cell.js";
-import type { DashboardSlicerItem } from "../types/dashboard.js";
-import type { TableRelationship } from "../types/data-model.js";
+import type {
+  DashboardChartItem,
+  DashboardKpiItem,
+  DashboardSlicerItem,
+} from "../types/dashboard.js";
+import type { DataModel, TableRelationship } from "../types/data-model.js";
 import type { Sheet } from "../types/document.js";
 import type { PivotDefinition, PivotFilter } from "../types/pivot.js";
 import type { WorkbookTable } from "../types/table.js";
@@ -110,19 +114,90 @@ function dataPivot(
 }
 
 /**
- * The definitions the engine computes for the pivots of `sheet`: first its
- * pivots in their order, each with the keep-list of every slicer that reaches
- * it, then one hidden pivot per slicer that marks values with no data.
- * Undefined when nothing differs from the saved definitions.
+ * The hidden pivot that charts `item`: its chart's pivot, as the slicers
+ * filter it, without subtotals or totals and with one label column per row
+ * field, as an Excel PivotChart leaves totals out.
  */
-export function slicedPivots(
+function chartPivot(
+  item: DashboardChartItem,
+  sheet: Sheet,
+  pivots: readonly PivotDefinition[],
+): PivotDefinition | null {
+  const chart = sheet.charts?.find((candidate) => candidate.id === item.chart);
+  const pivot = pivots.find((candidate) => candidate.id === chart?.pivot);
+  if (pivot === undefined) return null;
+  return {
+    ...pivot,
+    id: `chart-data-${item.id}`,
+    layout: "tabular",
+    subtotals: false,
+    rowTotals: false,
+    columnTotals: false,
+  };
+}
+
+/**
+ * The hidden pivot of a KPI card: its measure over the measure's home table,
+ * with no rows or columns, filtered by every slicer that reaches that table.
+ * Its output is the measure's caption over its one value.
+ */
+function kpiPivot(
+  item: DashboardKpiItem,
+  model: DataModel | undefined,
+  slicers: ReturnType<typeof slicersOf>,
+  tables: readonly WorkbookTable[],
+): PivotDefinition | null {
+  const measure = model?.measures?.find((candidate) => candidate.id === item.measure);
+  const column = tables.find((table) => table.id === measure?.table)?.columns[0];
+  if (measure === undefined || column === undefined) return null;
+  // A model source lists at least one field; the first column of the home table is unused.
+  const pivot: PivotDefinition = {
+    id: `kpi-data-${item.id}`,
+    name: measure.name,
+    source: {
+      model: { table: measure.table, fields: [{ table: measure.table, column: column.id }] },
+    },
+    anchor: { row: 0, col: 0 },
+    rows: [],
+    columns: [],
+    values: [{ measure: measure.id }],
+  };
+  const relationships = model?.relationships ?? [];
+  return slicers.reduce(
+    (current, { item: slicer, values }) =>
+      values === undefined ? current : sliced(current, slicer, values, tables, relationships),
+    pivot,
+  );
+}
+
+/** What the engine computes for a dashboard, and where its hidden pivots are. */
+export interface DashboardPayload {
+  /** The sheet's pivots in their order, then the hidden pivots. */
+  readonly pivots: PivotDefinition[];
+  /** Payload index of each item's hidden pivot, by item ID. */
+  readonly hidden: ReadonlyMap<string, number>;
+}
+
+/**
+ * The definitions the engine computes for the pivots of `sheet`: first its
+ * pivots in their order, each with the keep-list of every slicer that
+ * reaches it, then one hidden pivot per slicer that marks values with no data
+ * and one per chart item and KPI card. Undefined when nothing differs from the saved
+ * definitions.
+ */
+export function dashboardPayload(
   sheet: Sheet,
   sheets: readonly Sheet[],
-  relationships: readonly TableRelationship[],
+  model: DataModel | undefined,
   overrides: SlicerOverrides,
-): PivotDefinition[] | undefined {
+): DashboardPayload | undefined {
   const slicers = slicersOf(sheet, overrides);
-  if (slicers.length === 0) return undefined;
+  const items = sheet.dashboard?.items ?? [];
+  const charts = items.filter((item): item is DashboardChartItem => item.kind === "chart");
+  const kpis = items.filter((item): item is DashboardKpiItem => item.kind === "kpi");
+  if (slicers.length === 0 && charts.length === 0 && kpis.length === 0) return undefined;
+
+  const relationships = model?.relationships ?? [];
 
   const tables = sheets.flatMap((candidate) => candidate.tables ?? []);
   const pivots = (sheet.pivots ?? []).map((pivot) =>
@@ -132,31 +207,18 @@ export function slicedPivots(
       pivot,
     ),
   );
-  const hidden = slicers.flatMap(({ item }) => {
-    if (item.itemsWithNoData === "show") return [];
-    const pivot = dataPivot(item, slicers, tables, relationships);
-    return pivot === null ? [] : [pivot];
-  });
-  return [...pivots, ...hidden];
-}
-
-/**
- * The payload index of the hidden pivot of `slicer` on `sheet`, in the
- * order `slicedPivots` adds them; -1 when it has none.
- */
-export function dataPivotIndex(
-  sheet: Sheet,
-  slicer: DashboardSlicerItem,
-  sheets: readonly Sheet[],
-): number {
-  const tables = sheets.flatMap((candidate) => candidate.tables ?? []);
-  let index = sheet.pivots?.length ?? 0;
-  for (const item of sheet.dashboard?.items ?? []) {
-    if (item.kind !== "slicer" || item.itemsWithNoData === "show") continue;
-    const table = tables.find((candidate) => candidate.id === item.field.table);
-    if (!table?.columns.some((column) => column.id === item.field.column)) continue;
-    if (item.id === slicer.id) return index;
-    index += 1;
+  const hidden = new Map<string, number>();
+  const all = [...pivots];
+  const add = (id: string, pivot: PivotDefinition | null): void => {
+    if (pivot === null) return;
+    hidden.set(id, all.length);
+    all.push(pivot);
+  };
+  for (const { item } of slicers) {
+    if (item.itemsWithNoData !== "show")
+      add(item.id, dataPivot(item, slicers, tables, relationships));
   }
-  return -1;
+  for (const item of charts) add(item.id, chartPivot(item, sheet, pivots));
+  for (const item of kpis) add(item.id, kpiPivot(item, model, slicers, tables));
+  return { pivots: all, hidden };
 }
