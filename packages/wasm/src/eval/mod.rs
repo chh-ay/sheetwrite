@@ -1462,32 +1462,34 @@ impl CellStore {
         result: EvalResult,
         results: &mut FormulaResults,
     ) {
-        self.store_formula_result(id, result);
+        if let Some((sheet, index)) = self.store_formula_result(id, result) {
+            results.settle_cell(sheet, index);
+        }
         results.settle(id);
     }
 
-    fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
+    /// Returns the sheet and dense cell index written, when the sheet is
+    /// dense; paged sheets are read through the formula's id.
+    fn store_formula_result(
+        &mut self,
+        id: FormulaId,
+        result: EvalResult,
+    ) -> Option<(usize, usize)> {
         // A pass already owns the id; only liveness needs checking at write-back.
-        if self.formula_slots.get(id).is_none() {
-            return;
-        }
+        self.formula_slots.get(id)?;
 
-        let Some(key) = self.formula_slots.location(id) else {
-            return;
-        };
+        let key = self.formula_slots.location(id)?;
 
         let interned = match &result {
             Value::Text(text) => Some(self.intern(text)),
             _ => None,
         };
         let sheet = key.sheet as usize;
-        let Some(data) = self.sheets.get_mut(sheet) else {
-            return;
-        };
+        let data = self.sheets.get_mut(sheet)?;
 
         let (row, col) = key.local();
         if !data.cells.contains_cell(row as usize, col as usize) {
-            return;
+            return None;
         }
 
         let index = data.cells.idx(row as usize, col as usize);
@@ -1504,6 +1506,8 @@ impl CellStore {
             data.cells.set_derived(index, kind, payload),
             "calculated overlay allocation failed"
         );
+
+        (!data.cells.is_paged()).then_some((sheet, index))
     }
 
     pub(crate) fn eval_at(
@@ -1543,6 +1547,21 @@ impl CellStore {
         if kind != KIND_FORMULA {
             debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains(key) }));
             return literal_cell_value(&self.strings, kind, payload);
+        }
+
+        // A formula this pass already wrote reads its stored result, errors
+        // included, without looking up its id. Iteration records each read
+        // by address, so it takes the id path below.
+        if self.iteration.is_none() && pass.results.is_settled_cell(sheet, i) {
+            match s.cells.calculated_cell_at(i) {
+                Some((KIND_FORMULA, payload)) => {
+                    return Value::Error(
+                        FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref),
+                    )
+                }
+                Some((kind, payload)) => return literal_cell_value(&self.strings, kind, payload),
+                None => {}
+            }
         }
 
         if let Some(key) = cell_key(row, col) {

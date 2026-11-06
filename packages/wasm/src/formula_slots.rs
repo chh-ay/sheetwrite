@@ -577,6 +577,9 @@ impl IntoIterator for FormulaWork {
 pub(crate) struct FormulaResults {
     /// Formulas whose result this pass has written to storage.
     settled: FormulaBits,
+    /// The same formulas by dense cell index, so a read of a written cell
+    /// needs no address-to-id lookup.
+    settled_cells: SettledCells,
     /// Results not yet written, at most the formulas pulled during one
     /// top-level evaluation plus the errors the depth walk seeded.
     pulled: Vec<(FormulaId, EvalResult)>,
@@ -620,6 +623,107 @@ struct PassRegex {
     pattern: String,
     insensitive: bool,
     regex: std::rc::Rc<regex_lite::Regex>,
+}
+
+/// Dense cells whose formula result this pass has written, one window of
+/// bit words per sheet over the sheet's cell indexes. A window spans at
+/// most four words per marked cell plus a little slack, so formulas far
+/// apart on a sheet are left out instead of growing it; a cell outside its
+/// window is read through the formula's id, as before.
+#[derive(Default)]
+struct SettledCells {
+    sheets: Vec<CellWindow>,
+}
+
+#[derive(Default)]
+struct CellWindow {
+    /// The word index of `words[0]` in the sheet's cell bitmap.
+    first_word: usize,
+    words: Vec<u64>,
+    /// Cells marked in `words`.
+    cells: usize,
+}
+
+/// Words a window may span beyond four per marked cell, so the first cells
+/// of a sheet can start a window before its density is known.
+const SETTLED_WINDOW_SLACK_WORDS: usize = 64;
+
+/// Words a cleared window keeps for the next pass.
+const RETAINED_WINDOW_WORDS: usize = 1024;
+
+impl SettledCells {
+    #[inline]
+    fn contains(&self, sheet: usize, index: usize) -> bool {
+        let Some(window) = self.sheets.get(sheet) else {
+            return false;
+        };
+        let word = index / BITS_PER_WORD;
+        word.checked_sub(window.first_word)
+            .and_then(|offset| window.words.get(offset))
+            .is_some_and(|bits| bits & (1 << (index % BITS_PER_WORD)) != 0)
+    }
+
+    fn insert(&mut self, sheet: usize, index: usize) {
+        if self.sheets.len() <= sheet {
+            self.sheets.resize_with(sheet + 1, CellWindow::default);
+        }
+        let Some(window) = self.sheets.get_mut(sheet) else {
+            return;
+        };
+        let word = index / BITS_PER_WORD;
+        let limit = 4 * (window.cells + 1) + SETTLED_WINDOW_SLACK_WORDS;
+
+        if window.words.is_empty() {
+            window.first_word = word;
+        }
+
+        if word < window.first_word {
+            // Grow toward lower cells by at least the current length, so a
+            // run written upward moves the words a logarithmic number of times.
+            let grown = (window.first_word - word).max(window.words.len());
+            if window.words.len() + grown > limit {
+                return;
+            }
+
+            window.words.splice(0..0, std::iter::repeat_n(0, grown));
+            window.first_word -= grown;
+        }
+
+        let offset = word - window.first_word;
+        if offset >= window.words.len() {
+            if offset >= limit {
+                return;
+            }
+
+            window.words.resize(offset + 1, 0);
+        }
+
+        let bit = 1 << (index % BITS_PER_WORD);
+        if let Some(bits) = window.words.get_mut(offset) {
+            window.cells += usize::from(*bits & bit == 0);
+            *bits |= bit;
+        }
+    }
+
+    /// Empties every window, keeping a small one's words for the next pass.
+    fn clear(&mut self) {
+        for window in &mut self.sheets {
+            if window.words.capacity() > RETAINED_WINDOW_WORDS {
+                *window = CellWindow::default();
+                continue;
+            }
+
+            window.words.clear();
+            window.cells = 0;
+        }
+    }
+
+    fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
+        stats.add_vec::<CellWindow>(self.sheets.len(), self.sheets.capacity());
+        for window in &self.sheets {
+            stats.add_vec::<u64>(window.words.len(), window.words.capacity());
+        }
+    }
 }
 
 /// The sums of single-range `SUM` formulas in one pass, by range group id.
@@ -684,11 +788,33 @@ impl FormulaResults {
         self.settled.insert(id);
     }
 
+    /// Records that the result written at dense cell `index` of `sheet` is
+    /// this pass's, alongside [`Self::settle`] for its formula.
+    #[inline]
+    pub(crate) fn settle_cell(&mut self, sheet: usize, index: usize) {
+        self.settled_cells.insert(sheet, index);
+    }
+
+    /// Whether this pass wrote the formula result at dense cell `index` of
+    /// `sheet`. `false` only means the cell must be read through its id.
+    #[inline]
+    pub(crate) fn is_settled_cell(&self, sheet: usize, index: usize) -> bool {
+        self.settled_cells.contains(sheet, index)
+    }
+
     /// Forgets `id`'s result for this pass, so it is evaluated again.
     pub(crate) fn unsettle(&mut self, id: FormulaId) {
-        self.settled.remove(id);
+        self.forget_settled(id);
         if self.pulled_bits.remove(id) {
             self.pulled.retain(|&(pulled, _)| pulled != id);
+        }
+    }
+
+    /// Clears `id`'s settled bit. The cell windows hold no ids, so they are
+    /// emptied: later reads of written cells go through their ids instead.
+    fn forget_settled(&mut self, id: FormulaId) {
+        if self.settled.remove(id) {
+            self.settled_cells.clear();
         }
     }
 
@@ -722,7 +848,7 @@ impl FormulaResults {
     /// pulls, iteration and spill anchors use it, so it stays out of line.
     #[inline(never)]
     pub(crate) fn pull(&mut self, id: FormulaId, value: EvalResult) {
-        self.settled.remove(id);
+        self.forget_settled(id);
         if self.pulled_bits.insert(id) {
             self.pulled.push((id, value));
         } else if let Some(current) = self.pulled_mut(id) {
@@ -846,6 +972,7 @@ impl FormulaResults {
         }
         self.pulled.clear();
         self.settled.clear_all();
+        self.settled_cells.clear();
         self.visiting.clear_all();
         self.pulled_bits.clear_all();
         self.order.clear();
@@ -894,6 +1021,7 @@ impl FormulaResults {
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
         self.settled.add_memory_stats(formulas);
+        self.settled_cells.add_memory_stats(formulas);
         self.pulled_bits.add_memory_stats(formulas);
         formulas.add_vec::<(FormulaId, EvalResult)>(self.pulled.len(), self.pulled.capacity());
         formulas.add_vec::<FormulaId>(self.order.len(), self.order.capacity());
@@ -909,5 +1037,55 @@ impl FormulaResults {
             self.range_sums.sums.len(),
             self.range_sums.sums.capacity(),
         );
+    }
+}
+
+#[cfg(test)]
+mod settled_cell_tests {
+    use super::{SettledCells, SETTLED_WINDOW_SLACK_WORDS};
+
+    /// A column written downward or upward is one window holding every cell.
+    #[test]
+    fn column_runs_are_marked_in_either_direction() {
+        let mut cells = SettledCells::default();
+        for index in 10_000..20_000 {
+            cells.insert(0, index);
+        }
+        for index in (0..10_000).rev() {
+            cells.insert(1, index);
+        }
+
+        assert!((10_000..20_000).all(|index| cells.contains(0, index)));
+        assert!((0..10_000).all(|index| cells.contains(1, index)));
+        assert!(!cells.contains(0, 9_999));
+        assert!(!cells.contains(1, 10_000));
+        assert!(!cells.contains(2, 0));
+    }
+
+    /// A cell far from the window is left out rather than growing it, and
+    /// is then read through its id.
+    #[test]
+    fn distant_cells_do_not_grow_the_window() {
+        let mut cells = SettledCells::default();
+        cells.insert(0, 0);
+        let distant = 64 * (8 + SETTLED_WINDOW_SLACK_WORDS) * 64;
+        cells.insert(0, distant);
+
+        assert!(cells.contains(0, 0));
+        assert!(!cells.contains(0, distant));
+        assert!(cells.sheets[0].words.len() <= 1);
+    }
+
+    /// Clearing forgets every cell, so a later pass starts empty.
+    #[test]
+    fn clear_forgets_every_cell() {
+        let mut cells = SettledCells::default();
+        cells.insert(3, 70);
+        cells.clear();
+
+        assert!(!cells.contains(3, 70));
+        cells.insert(3, 5_000);
+        assert!(cells.contains(3, 5_000));
+        assert!(!cells.contains(3, 70));
     }
 }
