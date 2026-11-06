@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
   type ExternalLink,
+  type ExternalLinkCell,
   initSheetwrite,
   SheetwriteStore,
   validateWorkbookSnapshot,
@@ -78,22 +79,29 @@ describe("external workbook links", () => {
         sheets: [{ ...workbook.sheets[0]!, order: 0, cells: [] }],
       } as unknown as WorkbookSnapshot;
     };
-    const withCell = (value: unknown, row = 0): unknown => [
-      { ...budget, sheets: [{ name: "Annual", cells: [{ row, col: 0, value }] }] },
-    ];
-
     expect(validateWorkbookSnapshot(snapshot([budget])).ok).toBe(true);
     for (const invalid of [
       {},
       [{ ...budget, book: "[Budget.xlsx]" }],
       [budget, { ...budget, book: "budget.XLSX" }],
-      withCell({ error: "#BUSY!" }),
-      withCell(Number.NaN),
-      withCell(1, 1_048_576),
-      // The engine holds a linked sheet from A1 to its last cell.
-      [{ ...budget, sheets: [{ name: "Annual", cells: [{ row: 999_999, col: 9, value: 1 }] }] }],
+      [{ ...budget, sheets: [{ name: "Annual" }] }],
     ]) {
       expect(validateWorkbookSnapshot(snapshot(invalid)).ok).toBe(false);
+    }
+
+    // The store checks each saved cell when it gives the links to the engine.
+    const withCell = (row: number, col: number, value: unknown): ExternalLink[] => [
+      // The store receives untrusted values, so the cast is the point of the test.
+      { ...budget, sheets: [{ name: "Annual", cells: [{ row, col, value } as ExternalLinkCell] }] },
+    ];
+    for (const links of [
+      withCell(0, 0, { error: "#BUSY!" }),
+      withCell(0, 0, Number.NaN),
+      withCell(1_048_576, 0, 1),
+      // The engine holds a linked sheet from A1 to its last cell.
+      withCell(999_999, 9, 1),
+    ]) {
+      expect(() => linkedStore(links)).toThrow("invalid external link values");
     }
   });
 });

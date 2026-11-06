@@ -823,7 +823,10 @@ export class StoreDataEngine {
     }
 
     // Before any formula is loaded, so formulas find the links they read.
-    installExternalLinks(this.wasm, workbook.externalLinks ?? []);
+    if (!installExternalLinks(this.wasm, workbook.externalLinks ?? [])) {
+      this.wasm.free();
+      throw storeFailure("invalid-snapshot", "invalid external link values");
+    }
 
     // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
     this.view.flushHiddenRows();
