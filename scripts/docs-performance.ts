@@ -34,8 +34,10 @@ import {
   machineCaptureLines,
   machineFailure,
   machineGroups,
+  machineName,
   perfFigure,
   type RunStat,
+  speedStory,
 } from "./perf-figures.js";
 import {
   renderChartTrackingSection,
@@ -846,6 +848,63 @@ function renderRows(
         { label: "Sheetwrite", role: "measured", ...(sheetwrite ? { stat: sheetwrite } : {}) },
       ],
     };
+  });
+}
+
+/** The workbook size the speed story leads with. */
+const STORY_ROWS = 100_000;
+
+/** Each render scenario's category in the speed story overview. */
+const STORY_CATEGORY_OF: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^scroll-/u, "Scroll"],
+  [/^edit-/u, "Edit"],
+  [/^altering\./u, "Rows"],
+  [/paint/u, "Paint"],
+  [/^arrow-/u, "Keyboard"],
+];
+
+/** Headline cards, the speedup overview and every number, per machine at `STORY_ROWS`. */
+function renderSpeedStory(machines: readonly MachineEvidence<ValidatedRenderEvidence>[]): string {
+  return speedStory({
+    id: "render-story",
+    baseName: "Handsontable",
+    machines: machines.map(({ machine, evidence }) => {
+      const { name, detail } = machineName(machine);
+      const rounds = (engine: string, scenario: string): number[] =>
+        evidence.results
+          .filter(
+            (result) =>
+              result.rows === STORY_ROWS &&
+              result.engine === engine &&
+              result.scenarioId === scenario &&
+              result.status === "success",
+          )
+          .map((result) => result.medianMs);
+      return {
+        machine: machine.machine,
+        name,
+        detail,
+        note: `${formatCount(STORY_ROWS)} rows · median of ${evidence.metadata.rounds} rounds · Chromium ${evidence.metadata.browserVersion} · captured ${evidence.metadata.timestamp.slice(0, 10)}`,
+        interactions: evidence.config.scenarios.flatMap((scenario) => {
+          const ours = rounds("sheetwrite", scenario);
+          const theirs = rounds("handsontable", scenario);
+          if (ours.length === 0) return [];
+          return [
+            {
+              id: scenario,
+              label: readableId(scenario),
+              category:
+                STORY_CATEGORY_OF.find(([pattern]) => pattern.test(scenario))?.[1] ?? "Paint",
+              measured: {
+                value: median(ours),
+                spread: [Math.min(...ours), Math.max(...ours)] as const,
+              },
+              ...(theirs.length === 0 ? {} : { base: median(theirs) }),
+            },
+          ];
+        }),
+      };
+    }),
   });
 }
 
@@ -1738,7 +1797,15 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     lines.push(
       `<div class="evidence-available"><strong>Validated evidence.</strong> ${successes}/${total} engine/scenario/round runs completed across ${evidence.config.rows.length} workbook sizes; every completed run passed its correctness checkpoints${failures > 0 ? `; ${failures} runs did not finish and are shown as such` : ""}.</div>`,
       "",
-      "Both engines drive identical scripted interactions in a controlled browser. Pick a workbook size and a metric:",
+      "Both engines drive identical scripted interactions in a live grid in a controlled browser. The headline numbers and the overview use 100,000-row workbooks; switch the machine to see its own capture.",
+      "",
+      renderSpeedStory(scaleCaptures.machines),
+      "",
+      "### Every size, speed and memory",
+      "",
+      "Pick a workbook size and a metric:",
+      "",
+      renderBenchWidget(evidence, scaleCaptures.machines),
       "",
       ...provenanceList([
         ["Captured", `${formatCaptureTime(metadata.timestamp)} UTC`],
@@ -1753,7 +1820,6 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
         ],
         ["Protocol", `${metadata.rounds} rounds · raw artifact <code>${html(source)}</code>`],
       ]),
-      renderBenchWidget(evidence, scaleCaptures.machines),
       ...renderFailureTable(evidence),
       "",
       RENDER_METHOD,

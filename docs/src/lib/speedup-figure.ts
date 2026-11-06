@@ -43,28 +43,39 @@ export function speedupFigure(id: string, machines: readonly SpeedupMachine[]): 
     ratioWord: "faster",
     series: { measured: "Median of the interactions" },
     spreadLabel: "Middle half of the interactions",
-    groups: machines.map((machine) => ({
-      label: machine.label,
-      machine: machine.machine,
-      note: `Captured ${machine.capture.timestamp.slice(0, 10)} · commit ${machine.capture.commit.slice(0, 7)} · ${machine.capture.rounds} rounds · ${machine.capture.browser}`,
-      rows: machine.sizes.map((entry) => {
-        const [low, high] = entry.middleHalf;
-        return {
-          label: rowsLabel(entry.size),
-          detail: `${entry.comparedScenarios} interactions${entry.handsontableIncomplete > 0 ? ` · Handsontable did not finish ${entry.handsontableIncomplete}` : ""}`,
-          bars: [
-            {
-              label: "",
-              role: "measured",
-              stat: {
-                value: entry.medianRatio,
-                ...(low !== undefined && high !== undefined ? { spread: [low, high] } : {}),
+    groups: machines.map((machine) => {
+      const counts = new Set(machine.sizes.map((entry) => entry.comparedScenarios));
+      // One shared count is stated once, in the machine line; a size that differs says so itself.
+      const shared = counts.size === 1 ? [...counts][0] : undefined;
+      return {
+        label: machine.label,
+        machine: machine.machine,
+        note: `${shared === undefined ? "Median interaction" : `Median of ${shared} interactions`} · ${machine.capture.rounds} rounds · ${machine.capture.browser} · captured ${machine.capture.timestamp.slice(0, 10)} · commit ${machine.capture.commit.slice(0, 7)}`,
+        rows: machine.sizes.map((entry) => {
+          const [low, high] = entry.middleHalf;
+          const notes = [
+            ...(shared === undefined ? [`${entry.comparedScenarios} interactions`] : []),
+            ...(entry.handsontableIncomplete > 0
+              ? [`Handsontable did not finish ${entry.handsontableIncomplete}`]
+              : []),
+          ];
+          return {
+            label: rowsLabel(entry.size),
+            ...(notes.length > 0 ? { detail: notes.join(" · ") } : {}),
+            bars: [
+              {
+                label: "",
+                role: "measured",
+                stat: {
+                  value: entry.medianRatio,
+                  ...(low !== undefined && high !== undefined ? { spread: [low, high] } : {}),
+                },
               },
-            },
-          ],
-        };
-      }),
-    })),
+            ],
+          };
+        }),
+      };
+    }),
     caption:
       "1× is as fast as Handsontable; each step to the right is ten times faster. Each machine has its own axis, and results from different machines are never compared.",
   };

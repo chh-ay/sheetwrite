@@ -78,7 +78,7 @@ export interface PerfFigure {
 /** Icon markup for one sprite icon; inline SVG at build time, a sprite reference on pages. */
 export type PerfIconMarkup = (name: PerfIconName) => string;
 
-export type PerfIconName = "arrow-down" | "arrow-up" | "minus" | "laptop" | "server";
+export type PerfIconName = "arrow-down" | "arrow-up" | "bolt" | "minus" | "laptop" | "server";
 
 export type PerfVerdictKind = "better" | "worse" | "noise" | "missing";
 
@@ -338,11 +338,11 @@ const VALUE_HEADERS: Readonly<Record<PerfUnit, string>> = {
 function verdictMarkup(verdict: PerfVerdict, icon: PerfIconMarkup): string {
   const iconName: PerfIconName =
     verdict.kind === "better" ? "arrow-down" : verdict.kind === "worse" ? "arrow-up" : "minus";
+  // The chip names the result once; the signed % change is in the table view.
   return (
     `<span class="perf-bars__verdict" data-verdict="${verdict.kind}">` +
     icon(iconName) +
     `<strong>${escapeHtml(verdict.text)}</strong>` +
-    (verdict.change ? `<span class="perf-bars__change">${verdict.change}</span>` : "") +
     "</span>"
   );
 }
@@ -370,7 +370,8 @@ function barMarkup(bar: PerfBar, axis: Axis, figure: PerfFigure): string {
   return (
     `<div class="perf-bars__bar" data-role="${bar.role}">` +
     label +
-    `<span class="perf-bars__track" aria-hidden="true"><i class="perf-bars__fill" style="width:${percent(fill)}"></i>${spreadMarkup}</span>` +
+    // The band sits behind the fill; one tick marks the median at the fill's end.
+    `<span class="perf-bars__track" aria-hidden="true">${spreadMarkup}<i class="perf-bars__fill" style="width:${percent(fill)}"></i><i class="perf-bars__median" style="left:${percent(fill)}"></i></span>` +
     `<span class="perf-bars__value"><b>${barValue(bar.stat.value, figure)}</b>${spreadText}</span>` +
     "</div>"
   );
@@ -391,16 +392,17 @@ function rowMarkup(row: PerfRow, axis: Axis, figure: PerfFigure, icon: PerfIconM
   ].join("");
 }
 
+/** Phone axes keep at most this many labels, evenly spaced from the origin. */
+const NARROW_TICK_LABELS = 4;
+
 function axisMarkup(axis: Axis): string {
+  // Every label is centred on its gridline; phones show an evenly spaced subset.
+  const step = Math.ceil((axis.ticks.length - 1) / (NARROW_TICK_LABELS - 1));
   const ticks = axis.ticks
     .map(
       (tick, index) =>
         `<span class="perf-bars__tick" style="left:${percent(tick.at)}"${
-          index === 0
-            ? ' data-edge="start"'
-            : index === axis.ticks.length - 1
-              ? ' data-edge="end"'
-              : ""
+          index % step === 0 ? "" : ' data-narrow="hidden"'
         }>${escapeHtml(tick.label)}</span>`,
     )
     .join("");

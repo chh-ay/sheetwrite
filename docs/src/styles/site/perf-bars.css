@@ -10,7 +10,6 @@
   --perf-track: 0.875rem;
   --perf-base: var(--sw-fg-muted);
   --perf-measured: var(--sw-icon-accent);
-  --perf-whisker: var(--sw-fg-strong);
   --perf-gridline: var(--sw-border);
 
   container: perf-bars / inline-size;
@@ -73,28 +72,28 @@
   background: var(--perf-measured);
 }
 
-/* The whisker swatch draws the band as it appears on a bar: a line with end caps. */
+/* The band swatch draws it as it appears on a bar: a tint with the median tick. */
 .perf-bars__key[data-key="spread"] i {
-  border-inline: 2px solid var(--perf-whisker);
-  border-radius: 0;
-  background: linear-gradient(var(--perf-whisker), var(--perf-whisker)) center / 100% 2px no-repeat;
+  background:
+    linear-gradient(var(--sw-fg-strong), var(--sw-fg-strong)) 70% 50% / 2px 100% no-repeat,
+    color-mix(in srgb, var(--perf-measured) 32%, transparent);
 }
 
 /* ---- Machine groups ---- */
 
 .perf-bars__group + .perf-bars__group {
-  margin-top: var(--sw-space-5);
-  padding-top: var(--sw-space-5);
+  margin-top: var(--sw-space-3);
+  padding-top: var(--sw-space-4);
   border-top: 1px solid var(--sw-border-strong);
 }
 
-/* The machine leads its group: icon and name on one line, the capture under the name. */
+/* The machine leads its group; the capture line and the axis caption share its left edge. */
 .perf-bars__group-title {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sw-space-0-5) var(--sw-space-2);
-  margin-bottom: var(--sw-space-3);
+  margin-bottom: var(--sw-space-2);
   color: var(--sw-fg-strong);
   font-size: var(--sw-text-small);
 }
@@ -108,7 +107,7 @@
 }
 
 .perf-bars__group-note {
-  grid-column: 2;
+  flex-basis: 100%;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-caption);
 }
@@ -154,12 +153,10 @@
   transform: translateX(-50%);
 }
 
-.perf-bars__tick[data-edge="start"] {
-  transform: none;
-}
-
-.perf-bars__tick[data-edge="end"] {
-  transform: translateX(-100%);
+@container perf-bars (max-width: 36rem) {
+  .perf-bars__tick[data-narrow="hidden"] {
+    visibility: hidden;
+  }
 }
 
 /* ---- Rows ---- */
@@ -177,7 +174,6 @@
   gap: var(--sw-space-1-5);
   margin: 0 calc(var(--sw-space-2) * -1);
   padding: var(--sw-space-3) var(--sw-space-2);
-  border-radius: var(--sw-radius-md);
   transition: background-color var(--sw-motion-fast, 120ms) ease;
 }
 
@@ -187,6 +183,7 @@
 
 /* The row under the pointer lifts slightly, so its label, bars and values read as one line. */
 .perf-bars__row:hover {
+  border-radius: var(--sw-radius-md);
   background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
 }
 
@@ -252,11 +249,6 @@
   color: var(--sw-fg-muted);
 }
 
-.perf-bars__change {
-  font-family: var(--sw-font-mono);
-  font-weight: 500;
-}
-
 /* ---- Bars ---- */
 
 .perf-bars__series {
@@ -292,23 +284,53 @@
   inset: 0 auto 0 0;
   border-radius: var(--sw-radius-xs);
   background: var(--perf-base);
+  transform-origin: left;
+  animation: perf-bars-grow 480ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 .perf-bars__bar[data-role="measured"] .perf-bars__fill {
   background: var(--perf-measured);
 }
 
-/* The spread band: a line with end caps from the low to the high end. */
+/* With a band, the fill narrows so the band shows around it across its whole range. */
+.perf-bars__track:has(.perf-bars__spread) .perf-bars__fill {
+  inset-block: 3px;
+}
+
+/* The spread band: a quiet tint behind the fill, from the low to the high end. */
 .perf-bars__spread {
   position: absolute;
-  top: 50%;
-  height: calc(var(--perf-track) + 0.375rem);
-  min-width: 3px;
-  border-inline: 2px solid var(--perf-whisker);
-  background: linear-gradient(var(--perf-whisker), var(--perf-whisker)) center / 100% 2px no-repeat;
-  transform: translateY(-50%);
-  /* A halo in the card colour keeps the band readable where it crosses a fill. */
-  filter: drop-shadow(0 0 1px var(--sw-surface-1));
+  inset-block: 0;
+  min-width: 2px;
+  border-radius: var(--sw-radius-xs);
+  background: color-mix(in srgb, var(--perf-base) 28%, transparent);
+}
+
+.perf-bars__bar[data-role="measured"] .perf-bars__spread {
+  background: color-mix(in srgb, var(--perf-measured) 32%, transparent);
+}
+
+/* One tick marks the median, where the fill ends. */
+.perf-bars__median {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--sw-fg-strong);
+}
+
+@keyframes perf-bars-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perf-bars__fill {
+    animation: none;
+  }
 }
 
 /* Single-series figures need no series column: the track starts under the label. */
@@ -513,12 +535,6 @@
 
   .perf-bars[data-series="none"] .perf-bars__value {
     text-align: left;
-  }
-
-  /* Six or more ticks crowd a phone axis: keep every other label. */
-  .perf-bars__axis:is([data-ticks="6"], [data-ticks="7"], [data-ticks="8"], [data-ticks="9"])
-    .perf-bars__tick:nth-child(even):not([data-edge]) {
-    visibility: hidden;
   }
 }
 

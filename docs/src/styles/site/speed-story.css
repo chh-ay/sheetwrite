@@ -1,0 +1,451 @@
+/* The speed story (docs/src/lib/speedup-story.ts): headline cards, one
+   overview of every interaction's speedup, and every number on demand. Each
+   machine is a panel behind a CSS-only switch, so machines never share a chart. */
+
+.speed-story {
+  container: speed-story / inline-size;
+  margin: var(--sw-space-6) 0 var(--sw-space-8);
+  padding: var(--sw-space-6);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .speed-story :is(p, ul, figure) {
+  margin: 0;
+}
+
+.sw-prose .speed-story ul,
+.speed-story ul {
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .speed-story li,
+.speed-story li {
+  margin: 0;
+}
+
+/* ---- Machine switch ---- */
+
+.speed-story__switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-2);
+}
+
+.speed-story__switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.speed-story__switch label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  padding: var(--sw-space-1-5) var(--sw-space-4);
+  border-radius: var(--sw-radius-pill);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--sw-motion-fast, 120ms) ease,
+    color var(--sw-motion-fast, 120ms) ease;
+}
+
+.speed-story__switch label:hover {
+  color: var(--sw-fg-strong);
+}
+
+.speed-story__switch input:checked + label,
+.speed-story:not(:has(.speed-story__switch input:checked)) input[data-default] + label {
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  box-shadow: var(--sw-shadow-sm);
+}
+
+.speed-story__switch input:checked + label .sw-icon,
+.speed-story:not(:has(.speed-story__switch input:checked)) input[data-default] + label .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+.speed-story__switch input:focus-visible + label {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
+.speed-story__panel {
+  display: none;
+  margin-top: var(--sw-space-5);
+}
+
+.speed-story:has(input[value="linux"]:checked) .speed-story__panel[data-machine="linux"],
+.speed-story:has(input[value="mac"]:checked) .speed-story__panel[data-machine="mac"],
+.speed-story:not(:has(.speed-story__switch input:checked)) .speed-story__panel[data-default] {
+  display: block;
+  animation: speed-story-in 280ms ease both;
+}
+
+@keyframes speed-story-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.speed-story__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-1) var(--sw-space-2);
+  margin-bottom: var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.speed-story__meta .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+.speed-story__meta b {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.speed-story__meta span:not(.speed-story__note) + span:not(.speed-story__note)::before {
+  margin-right: var(--sw-space-2);
+  content: "·";
+}
+
+/* The capture line starts under the icon, on the same edge as the cards below. */
+.speed-story__note {
+  flex-basis: 100%;
+}
+
+/* ---- Headline cards ---- */
+
+.speed-story__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sw-space-3);
+}
+
+.speed-story__card {
+  padding: var(--sw-space-4);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.speed-story__kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speed-story__kicker .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+.sw-prose .speed-story__big,
+.speed-story__big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--sw-space-1-5);
+  margin-top: var(--sw-space-2);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.speed-story__big b {
+  font: 700 clamp(1.625rem, 1.2rem + 1.6cqi, 2.125rem) / 1.05 var(--sw-font-display, inherit);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.speed-story__what {
+  margin-top: var(--sw-space-1) !important;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.speed-story__vs {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.speed-story__vs b {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-mono);
+}
+
+/* ---- Overview: one dot per interaction on a shared ratio axis ---- */
+
+.speed-story__overview {
+  margin-top: var(--sw-space-6) !important;
+}
+
+.speed-story__axis,
+.speed-story__dot-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  column-gap: var(--sw-space-4);
+}
+
+.speed-story__axis {
+  padding-bottom: var(--sw-space-1-5);
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.speed-story__axis-title {
+  grid-column: 1 / -1;
+  margin-bottom: var(--sw-space-1);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.speed-story__ticks {
+  position: relative;
+  grid-column: 2;
+  height: 1.25rem;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.25rem var(--sw-font-mono);
+}
+
+.speed-story__ticks span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.speed-story__group {
+  padding: var(--sw-space-2) 0;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.speed-story__category {
+  padding: var(--sw-space-1) 0;
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speed-story__dot-row {
+  min-height: 1.875rem;
+  margin: 0 calc(var(--sw-space-2) * -1) !important;
+  padding: 0 var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  transition: background-color var(--sw-motion-fast, 120ms) ease;
+}
+
+.speed-story__dot-row:hover {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.speed-story__label {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.speed-story__lane {
+  position: relative;
+  height: 1.125rem;
+  background: repeating-linear-gradient(
+    to right,
+    var(--sw-border) 0 1px,
+    transparent 1px calc(100% / var(--story-steps, 3))
+  );
+}
+
+.speed-story__stem {
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--sw-icon-accent) 50%, transparent);
+  transform-origin: left;
+  animation: speed-story-grow 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.speed-story__dot {
+  position: absolute;
+  top: calc(50% - 0.375rem);
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-left: -0.375rem;
+  border-radius: 50%;
+  background: var(--sw-icon-accent);
+  box-shadow: 0 0 0 2px var(--sw-surface-1);
+}
+
+.speed-story__dot-row:hover .speed-story__dot {
+  box-shadow:
+    0 0 0 2px var(--sw-surface-1),
+    0 0 0 5px color-mix(in srgb, var(--sw-icon-accent) 30%, transparent);
+}
+
+@keyframes speed-story-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.speed-story__ratio {
+  color: var(--sw-fg-strong);
+  font: 600 var(--sw-text-small) var(--sw-font-mono);
+  text-align: right;
+}
+
+.speed-story__missing {
+  grid-column: 2 / -1;
+  color: var(--sw-warning);
+  font-size: var(--sw-text-caption);
+  font-weight: 600;
+}
+
+/* ---- Every number ---- */
+
+.speed-story__details {
+  margin-top: var(--sw-space-4);
+}
+
+.speed-story__details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.speed-story__details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.speed-story__details > summary::before {
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentcolor;
+  content: "";
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: rotate var(--sw-motion-fast, 120ms) ease;
+}
+
+.speed-story__details[open] > summary::before {
+  rotate: 90deg;
+}
+
+.speed-story__details > summary:hover {
+  color: var(--sw-accent-strong);
+}
+
+.speed-story__table {
+  margin-top: var(--sw-space-3);
+  overflow-x: auto;
+}
+
+.sw-prose .speed-story__data,
+.speed-story__data {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+.sw-prose .speed-story__data :is(th, td),
+.speed-story__data :is(th, td) {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  background: none;
+  color: var(--sw-fg-muted);
+  font: 400 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  letter-spacing: normal;
+  text-align: right;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.sw-prose .speed-story__data :is(th[scope="row"], thead th:first-child),
+.speed-story__data :is(th[scope="row"], thead th:first-child) {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+  text-align: left;
+}
+
+.sw-prose .speed-story__data thead th,
+.speed-story__data thead th {
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+}
+
+.speed-story__data tbody tr:hover :is(td, th) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.speed-story__ours b {
+  display: block;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.speed-story__ours small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speed-story__panel,
+  .speed-story__stem {
+    animation: none !important;
+  }
+}
+
+/* ---- Phones: cards in two columns, labels on their own line ---- */
+
+@container speed-story (max-width: 40rem) {
+  .speed-story__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .speed-story__axis,
+  .speed-story__dot-row {
+    grid-template-columns: minmax(0, 1fr) 4rem;
+  }
+
+  .speed-story__ticks {
+    grid-column: 1;
+  }
+
+  .speed-story__label {
+    grid-column: 1 / -1;
+    padding-top: var(--sw-space-1);
+    font-size: var(--sw-text-caption);
+  }
+}
+
+@media (max-width: 40rem) {
+  .speed-story {
+    margin-inline: calc(var(--sw-space-2) * -1);
+    padding: var(--sw-space-4);
+  }
+}

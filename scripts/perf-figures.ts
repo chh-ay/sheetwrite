@@ -15,12 +15,24 @@ import {
   type PerfStat,
   renderPerfBars,
 } from "../docs/src/lib/perf-bars.js";
+import { renderSpeedupStory, type SpeedupStory } from "../docs/src/lib/speedup-story.js";
 import { repositoryRoot } from "./docs-shared.js";
 import { formatCaptureTime, html, provenanceList, shortHash } from "./evidence-format.js";
 
 /** Bars as static HTML for a Markdown page; icons are inlined, so the figure needs no JavaScript. */
 export function perfFigure(figure: PerfFigure): string {
   return renderPerfBars(figure, (name) => inlineIcon(name));
+}
+
+/** The speed story as static HTML for a Markdown page. */
+export function speedStory(story: SpeedupStory): string {
+  return renderSpeedupStory(story, (name) => inlineIcon(name));
+}
+
+/** "Linux · x86-64 · Intel Core i9-12900H" splits into "Linux" and the rest. */
+export function machineName(machine: CaptureMachine): { name: string; detail: string } {
+  const [name = machine.label, ...rest] = machine.label.split(" · ");
+  return { name, detail: rest.join(" · ") };
 }
 
 /** Where each machine's release capture lives, and what the pages call it. */
