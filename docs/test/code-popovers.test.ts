@@ -42,6 +42,11 @@ function livePanel(id = PANEL_ID): HTMLElement | null {
   return document.getElementById(id);
 }
 
+/** True when the panel is in the document and shown. */
+function isOpen(id = PANEL_ID): boolean {
+  return livePanel(id)?.hasAttribute("data-open") ?? false;
+}
+
 function panelLink(): HTMLAnchorElement {
   const link = livePanel()?.querySelector<HTMLAnchorElement>("a");
   if (link === null || link === undefined) throw new Error("No open panel holds a link");
@@ -67,11 +72,11 @@ afterEach(() => {
 });
 
 describe("code popovers", () => {
-  it("keeps panels out of the document until a trigger opens one", () => {
+  it("shows no panel until a trigger opens one", () => {
     mountPage();
     uninstall = installCodePopovers();
 
-    expect(livePanel()).toBeNull();
+    expect(isOpen()).toBe(false);
   });
 
   it("opens the panel on focus, as the trigger's accessible description", () => {
@@ -93,7 +98,7 @@ describe("code popovers", () => {
 
     pointer("pointerover", trigger);
 
-    expect(livePanel()?.isConnected).toBe(true);
+    expect(isOpen()).toBe(true);
   });
 
   it("closes a hovered panel after the pointer leaves the trigger", () => {
@@ -104,7 +109,7 @@ describe("code popovers", () => {
     pointer("pointerout", trigger, page);
     vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
 
-    expect(livePanel()).toBeNull();
+    expect(isOpen()).toBe(false);
     expect(trigger.hasAttribute("data-popover-open")).toBe(false);
   });
 
@@ -119,7 +124,7 @@ describe("code popovers", () => {
     pointer("pointerover", panel, trigger);
     vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
 
-    expect(panel.isConnected).toBe(true);
+    expect(isOpen()).toBe(true);
   });
 
   it("marks the other mentions of the open symbol in the same code block", () => {
@@ -136,8 +141,8 @@ describe("code popovers", () => {
 
     pointer("pointerover", other);
     expect(sameSymbol.hasAttribute("data-popover-related")).toBe(false);
-    expect(livePanel()).toBeNull();
-    expect(livePanel(OTHER_PANEL_ID)?.isConnected).toBe(true);
+    expect(isOpen()).toBe(false);
+    expect(isOpen(OTHER_PANEL_ID)).toBe(true);
   });
 
   it("removes an open panel with its page, so a return visit has one panel", async () => {
@@ -155,14 +160,14 @@ describe("code popovers", () => {
     expect(document.querySelectorAll(`[id="${PANEL_ID}"]`)).toHaveLength(1);
   });
 
-  it("takes a panel out of the document when Escape closes it", () => {
+  it("hides a panel when Escape closes it", () => {
     const { trigger } = mountPage();
     uninstall = installCodePopovers();
     trigger.focus();
 
     trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
-    expect(livePanel()).toBeNull();
+    expect(isOpen()).toBe(false);
   });
 
   it("stays open while keyboard focus is on a link inside the panel", () => {
@@ -173,7 +178,7 @@ describe("code popovers", () => {
     panelLink().focus();
     vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
 
-    expect(livePanel()?.isConnected).toBe(true);
+    expect(isOpen()).toBe(true);
   });
 
   it("closes on Escape from inside the panel and gives focus back to the trigger", () => {
@@ -185,7 +190,7 @@ describe("code popovers", () => {
 
     link.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
-    expect(livePanel()).toBeNull();
+    expect(isOpen()).toBe(false);
     expect(document.activeElement === trigger).toBe(true);
   });
 });

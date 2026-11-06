@@ -71,6 +71,8 @@
 }
 
 /* ── Panel ──────────────────────────────────────────────────────────────── */
+/* Panels are prepared hidden in `body` (laid out, invisible, out of the
+   accessibility tree) and shown with `data-open`. */
 .sw-code-popover__panel {
   z-index: 1000;
   display: block;
@@ -79,7 +81,10 @@
      the viewport clamp inline as the panel opens. */
   width: max-content;
   max-width: min(34rem, calc(100vw - var(--sw-space-6)));
+  max-height: 30rem;
   overflow: auto;
+  visibility: hidden;
+  pointer-events: none;
   border: var(--sw-border-width) solid var(--sw-border-strong);
   border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
@@ -90,6 +95,11 @@
   overscroll-behavior: contain;
   scrollbar-color: var(--sw-border-strong) transparent;
   scrollbar-width: thin;
+}
+
+.sw-code-popover__panel[data-open] {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 /* The signature uses the site code theme: tokens carry the `sw-code-<role>`

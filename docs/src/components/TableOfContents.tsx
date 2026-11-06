@@ -99,11 +99,21 @@ export function useDocumentOutline(): readonly OutlineItem[] {
  */
 const READING_LINE_PX = 96;
 
-/** The id of the last outline target above the reading line, or the first one. */
+/** Distance from the page end that counts as scrolled to the end. */
+const PAGE_END_SLACK_PX = 2;
+
+/**
+ * The id of the last outline target above the reading line, or the first one.
+ * Scrolled to the end of the page, the last heading on screen: short closing
+ * sections can never reach the reading line.
+ */
 function currentSectionId(targets: readonly HTMLElement[]): string {
+  const { scrollHeight } = document.documentElement;
+  const atEnd = window.scrollY + window.innerHeight >= scrollHeight - PAGE_END_SLACK_PX;
+  const line = atEnd ? window.innerHeight : READING_LINE_PX;
   let current = targets[0]?.id ?? "";
   for (const target of targets) {
-    if (target.getBoundingClientRect().top > READING_LINE_PX) break;
+    if (target.getBoundingClientRect().top > line) break;
     current = target.id;
   }
   return current;

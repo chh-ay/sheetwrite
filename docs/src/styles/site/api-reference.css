@@ -79,18 +79,16 @@
 }
 
 .api-metadata div {
-  display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr);
-  gap: var(--sw-space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
   align-items: baseline;
 }
 
+/* "Source" reads as a caption beside its path, in the body face. */
 .api-metadata dt {
   color: var(--sw-fg-muted);
-  font-size: var(--sw-text-eyebrow);
-  font-weight: var(--sw-weight-semibold);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
+  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
 }
 
 .api-metadata dd {
@@ -98,28 +96,68 @@
   margin: 0;
 }
 
-.api-metadata dd code {
+/* The path is a plain link, not a code chip. */
+.sw-prose .api-metadata dd a code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--sw-text-caption);
   overflow-wrap: anywhere;
 }
 
-/* Long member lists open with an anchor index, so a page with dozens of rows
-   reads as an outline instead of a scroll with a click per member. */
-.api-member-index {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sw-space-1) var(--sw-space-3);
-  align-items: baseline;
-  margin: var(--sw-space-5) 0 var(--sw-space-8);
-  padding: var(--sw-space-3) var(--sw-space-4);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-  background: var(--sw-surface-1);
+/* Long member lists open with a collapsed index: one row that opens to a
+   grid of every member name, each a link to its row. */
+.sw-prose .api-member-index {
+  margin: 0 0 var(--sw-space-6);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sw-prose .api-member-index > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-2);
+  min-height: var(--sw-control-height);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+  cursor: pointer;
+  list-style: none;
+}
+
+.sw-prose .api-member-index > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sw-prose .api-member-index > summary::before {
+  content: "";
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: var(--sw-fg-muted);
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: transform var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.sw-prose .api-member-index[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.sw-prose .api-member-index > nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--sw-space-0-5) var(--sw-space-5);
+  margin-top: var(--sw-space-2);
   font-size: var(--sw-text-caption);
 }
 
 .sw-prose .api-member-index a {
+  overflow: hidden;
+  padding: var(--sw-space-0-5) 0;
   color: var(--sw-fg-muted);
   text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sw-prose .api-member-index a code {
@@ -131,8 +169,9 @@
 }
 
 .sw-prose .api-member-index a:hover,
-.sw-prose .api-member-index a:hover code {
-  color: var(--sw-accent-strong);
+.sw-prose .api-member-index a:focus-visible {
+  color: var(--sw-accent);
+  text-decoration: underline;
 }
 
 /* Entry-point tables: editorial rules instead of a boxed grid; the numeric
@@ -597,11 +636,6 @@
 }
 
 @media (max-width: 30rem) {
-  .api-metadata div {
-    grid-template-columns: 1fr;
-    gap: var(--sw-space-0-5);
-  }
-
   /* The summary line drops below the member name instead of squeezing into a
      ragged column beside it, and the signature loses its indent. */
   .api-member summary {

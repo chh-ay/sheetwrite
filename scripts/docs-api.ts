@@ -240,22 +240,29 @@ function memberDocumentationHtml(
   documentation: string,
   routes: DocumentationLinkRoutes,
 ): string {
-  return html(documentation).replace(
-    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
-    (_match, target: string, label: string | undefined) => {
-      const text = label?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
-      return route === undefined
-        ? `<code>${text}</code>`
-        : `<a href="${route}"><code>${text}</code></a>`;
-    },
-  );
+  return html(documentation)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(
+      /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
+      (_match, target: string, label: string | undefined) => {
+        const text = label?.trim() || target;
+        const route = documentationLinkRoute(pkg, entry, item, target, routes);
+        return route === undefined
+          ? `<code>${text}</code>`
+          : `<a href="${route}"><code>${text}</code></a>`;
+      },
+    );
 }
 
-function compactSummary(markdown: string): string {
+/**
+ * The first sentence of a doc comment as one line. Inline code keeps its
+ * backticks when the summary is rendered as HTML (member rows); search and
+ * social descriptions are plain text.
+ */
+function compactSummary(markdown: string, keepInlineCode = false): string {
   const plain = markdown
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[`*_~]/g, "")
+    .replace(keepInlineCode ? /[*_~]/g : /[`*_~]/g, "")
     .replace(/\s+/g, " ")
     .trim();
   const firstSentence = /^.{24,240}?[.!?](?=\s|$)/.exec(plain)?.[0];
@@ -776,7 +783,7 @@ function renderMembers(
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
     const summary =
-      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "");
+      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "", true);
     const summaryDoc =
       documentation === undefined
         ? ""
@@ -806,7 +813,7 @@ function renderMembers(
       "",
       // Skip the body paragraph when it would only restate the summary line.
       ...(documentation === undefined ||
-      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
+      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary.replace(/`/g, "")
         ? []
         : [
             /(?:^|\n)@(example|see)\b/.test(documentation)
@@ -822,10 +829,13 @@ function renderMembers(
     members.length <= MEMBER_INDEX_MINIMUM
       ? []
       : [
-          '<nav class="api-member-index" aria-labelledby="api-member-index-label" data-pagefind-ignore>',
-          '<span class="api-member-index__label" id="api-member-index-label">Jump to a member</span>',
+          // Collapsed: a hundred names would push the first member a screen down.
+          '<details class="api-member-index" data-pagefind-ignore>',
+          `<summary>Jump to a member <span class="api-count">${memberCount}</span></summary>`,
+          '<nav aria-label="Members">',
           ...indexLinks,
           "</nav>",
+          "</details>",
           "",
         ];
   return [

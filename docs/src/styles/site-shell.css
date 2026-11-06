@@ -526,29 +526,6 @@ details[open] > summary > .sw-disclosure-icon {
   margin: var(--sw-space-4) 0 var(--sw-space-6);
   font-size: var(--sw-text-caption);
 }
-/* Member names read as a scannable index in columns, not as a wall of chips. */
-/* The index sits under the Members heading: a labelled grid of names. */
-.sw-docs .api-member-index {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: var(--sw-space-0-5) var(--sw-space-5);
-  margin: 0 0 var(--sw-space-6);
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-.sw-docs .api-member-index__label {
-  grid-column: 1 / -1;
-  margin-bottom: var(--sw-space-1);
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
-}
-.sw-docs .api-member-index a {
-  overflow: hidden;
-  padding: var(--sw-space-0-5) 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .sw-docs .api-member-list {
   border: 0;
   border-bottom: 1px solid var(--sw-border);
@@ -1002,9 +979,6 @@ html:has(.sw-nav-dialog[open]) {
   }
   .sw-doc-pager__link--next {
     text-align: left;
-  }
-  .sw-docs .api-metadata div {
-    grid-template-columns: 1fr;
   }
 }
 

@@ -4,11 +4,16 @@
  * The build renders each distinct panel once per document into an inert
  * `<template class="sw-code-popover-store">` (see `dedupe-code-popovers.ts`),
  * and every trigger names its panel in `data-sw-code-popover-trigger`. One set
- * of document listeners serves all triggers on all pages: a panel's DOM is
- * cloned from its store the first time it opens, lives in `document.body`
- * while open, and leaves the document when it closes. Pointer hover and
- * keyboard focus open the same panel, which is the trigger's accessible
- * description (`aria-describedby`) while it is shown.
+ * of document listeners serves all triggers on all pages.
+ *
+ * Panels are prepared ahead of use: while the browser is idle, the panels of
+ * code blocks near the viewport are cloned from the store into `document.body`,
+ * hidden but laid out. Opening one then only measures, picks a side, positions
+ * it and shows it, so a first hover does no style or layout work on the
+ * panel's content. A panel whose page leaves the document leaves with it.
+ *
+ * Pointer hover and keyboard focus open the same panel, which is the trigger's
+ * accessible description (`aria-describedby`).
  */
 import {
   autoUpdate,
@@ -21,6 +26,8 @@ import {
   type VirtualElement,
 } from "@floating-ui/dom";
 
+import { type Box, choosePanelSide, type PanelSide } from "./code-popover-placement.js";
+
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
 const STORE_SELECTOR = "template.sw-code-popover-store";
 /** One code line; a wrapped line is one element over several visual rows. */
@@ -31,6 +38,8 @@ const HEADER_SELECTOR = ".sw-header";
 const OPEN_ATTRIBUTE = "data-popover-open";
 /** Marks the other mentions of the open trigger's symbol in the same code block. */
 const RELATED_ATTRIBUTE = "data-popover-related";
+/** Shows a prepared panel; without it the panel is laid out but invisible. */
+const PANEL_OPEN_ATTRIBUTE = "data-open";
 
 /** Pointer travel time from a trigger to its panel before the panel closes. */
 const CLOSE_DELAY_MS = 90;
@@ -39,18 +48,26 @@ const VIEWPORT_PADDING_PX = 12;
 /** The 34rem design cap; the inline style wins over the CSS max-width. */
 const PANEL_MAX_WIDTH_PX = 544;
 const PANEL_MAX_HEIGHT_PX = 480;
+/** Code blocks this close to the viewport get their panels prepared. */
+const PREPARE_MARGIN = "50% 0px";
+/** The latest an idle preparation waits when the browser never goes idle. */
+const PREPARE_TIMEOUT_MS = 1000;
+
+const FLOATING_PLACEMENT: Readonly<Record<PanelSide, Placement>> = {
+  below: "bottom-start",
+  above: "top-start",
+  beside: "right-start",
+};
 
 interface OpenPopover {
   trigger: HTMLElement;
   panel: HTMLElement;
   related: readonly HTMLElement[];
   stopPositioning: () => void;
-  /** Closes the panel when a route change takes its trigger out of the page. */
-  detachWatcher: MutationObserver;
 }
 
-/** Panels cloned from a store; a store that leaves with its page takes its panels along. */
-const panelsByStore = new WeakMap<HTMLTemplateElement, Map<string, HTMLElement>>();
+/** Prepared panels by the store they were cloned from. */
+const panelsByStore = new Map<HTMLTemplateElement, Map<string, HTMLElement>>();
 let activePopover: OpenPopover | null = null;
 let closeTimer: number | undefined;
 // Escape returns focus to the trigger; that focus must not open the panel again.
@@ -67,7 +84,10 @@ function isInsideActivePopover(target: EventTarget | null): boolean {
   return activePopover.trigger.contains(target) || activePopover.panel.contains(target);
 }
 
-/** The live panel for `id`, cloned from the page's store on first use. */
+/**
+ * The prepared panel for `id`, cloned from the page's store and added to the
+ * document, hidden, on first use. Its size is final from then on.
+ */
 function panelFor(id: string): HTMLElement | null {
   for (const store of document.querySelectorAll<HTMLTemplateElement>(STORE_SELECTOR)) {
     const cached = panelsByStore.get(store)?.get(id);
@@ -75,15 +95,27 @@ function panelFor(id: string): HTMLElement | null {
     const source = store.content.getElementById(id);
     if (source === null) continue;
     const panel = document.importNode(source, true);
+    panel.style.position = "fixed";
+    Object.assign(panel.style, { left: "0px", top: "0px" });
     let panels = panelsByStore.get(store);
     if (panels === undefined) {
       panels = new Map();
       panelsByStore.set(store, panels);
     }
     panels.set(id, panel);
+    document.body.append(panel);
     return panel;
   }
   return null;
+}
+
+/** Removes the prepared panels of pages that left the document. */
+function pruneDetachedStores(): void {
+  for (const [store, panels] of panelsByStore) {
+    if (store.isConnected) continue;
+    for (const panel of panels.values()) panel.remove();
+    panelsByStore.delete(store);
+  }
 }
 
 /** Other mentions of the same symbol in the trigger's code block. */
@@ -106,11 +138,10 @@ function closePopover(): void {
   cancelScheduledClose();
   if (activePopover === null) return;
 
-  const { trigger, panel, related, stopPositioning, detachWatcher } = activePopover;
+  const { trigger, panel, related, stopPositioning } = activePopover;
   activePopover = null;
   stopPositioning();
-  detachWatcher.disconnect();
-  panel.remove();
+  panel.removeAttribute(PANEL_OPEN_ATTRIBUTE);
   trigger.removeAttribute(OPEN_ATTRIBUTE);
   for (const mention of related) mention.removeAttribute(RELATED_ATTRIBUTE);
 }
@@ -141,73 +172,91 @@ function scheduleClose(): void {
   }, CLOSE_DELAY_MS);
 }
 
-/** The viewport edge the panel keeps clear of, below the sticky site header. */
-function viewportPadding(): { top: number; right: number; bottom: number; left: number } {
+/** The area a panel may cover: the viewport below the sticky site header. */
+function panelArea(): Box {
   const headerBottom = document.querySelector(HEADER_SELECTOR)?.getBoundingClientRect().bottom ?? 0;
   return {
-    top: Math.max(0, headerBottom) + VIEWPORT_PADDING_PX,
-    right: VIEWPORT_PADDING_PX,
-    bottom: VIEWPORT_PADDING_PX,
     left: VIEWPORT_PADDING_PX,
+    top: Math.max(0, headerBottom) + VIEWPORT_PADDING_PX,
+    right: window.innerWidth - VIEWPORT_PADDING_PX,
+    bottom: window.innerHeight - VIEWPORT_PADDING_PX,
   };
 }
 
-/**
- * The anchor box: the trigger's horizontal extent over its whole code line
- * (all visual rows of a wrapped line), so the panel opens clear of the line
- * instead of over the characters right below the trigger.
- */
-function lineAnchor(trigger: HTMLElement): VirtualElement {
-  const line = trigger.closest(LINE_SELECTOR) ?? trigger;
+function lineOf(trigger: HTMLElement): Element {
+  return trigger.closest(LINE_SELECTOR) ?? trigger;
+}
+
+/** Where the line's text ends, on its widest visual row. */
+function lineTextEnd(line: Element): number {
+  const range = document.createRange();
+  range.selectNodeContents(line);
+  let end = 0;
+  for (const rect of range.getClientRects()) end = Math.max(end, rect.right);
+  return end;
+}
+
+function virtualBox(read: () => Box, contextElement: Element): VirtualElement {
   return {
-    contextElement: trigger,
+    contextElement,
     getBoundingClientRect() {
-      const { left, width } = trigger.getBoundingClientRect();
-      const { top, height } = line.getBoundingClientRect();
+      const { left, top, right, bottom } = read();
       return {
         x: left,
         y: top,
         left,
         top,
-        width,
-        height,
-        right: left + width,
-        bottom: top + height,
+        right,
+        bottom,
+        width: right - left,
+        height: bottom - top,
       };
     },
   };
 }
 
 /**
- * Below the line, unless the symbol's other mentions sit only below it: then
- * above, so the highlighted mentions stay visible. With mentions on both
- * sides, the side with fewer of them.
+ * The anchor box for `side`: the trigger's horizontal extent over its whole
+ * line for below and above, so the panel clears the line; the line's text
+ * end for beside.
  */
-function preferredPlacement(trigger: HTMLElement, related: readonly HTMLElement[]): Placement {
-  const line = (trigger.closest(LINE_SELECTOR) ?? trigger).getBoundingClientRect();
-  let above = 0;
-  let below = 0;
-  for (const mention of related) {
-    const { top } = mention.getBoundingClientRect();
-    if (top >= line.bottom) below += 1;
-    else if (top < line.top) above += 1;
+function anchorFor(side: PanelSide, trigger: HTMLElement): VirtualElement {
+  const line = lineOf(trigger);
+  if (side === "beside") {
+    return virtualBox(() => {
+      const { top, bottom } = line.getBoundingClientRect();
+      const end = lineTextEnd(line);
+      return { left: end, top, right: end, bottom };
+    }, trigger);
   }
-  return below > above ? "top-start" : "bottom-start";
+  return virtualBox(() => {
+    const { left, right } = trigger.getBoundingClientRect();
+    const { top, bottom } = line.getBoundingClientRect();
+    return { left, top, right, bottom };
+  }, trigger);
 }
 
 async function positionPopover(
   anchor: VirtualElement,
   panel: HTMLElement,
-  placement: Placement,
+  side: PanelSide,
 ): Promise<void> {
-  const padding = viewportPadding();
-  const opposite: Placement = placement === "top-start" ? "bottom-start" : "top-start";
+  const area = panelArea();
+  const padding = {
+    top: area.top,
+    right: VIEWPORT_PADDING_PX,
+    bottom: VIEWPORT_PADDING_PX,
+    left: VIEWPORT_PADDING_PX,
+  };
+  const opposite: Placement = side === "above" ? "bottom-start" : "top-start";
   const result = await computePosition(anchor, panel, {
     strategy: "fixed",
-    placement,
+    placement: FLOATING_PLACEMENT[side],
     middleware: [
       offset(PANEL_OFFSET_PX),
-      flip({ padding, fallbackPlacements: [opposite, "bottom-end", "top-end"] }),
+      // Beside the line the panel only shifts; above or below it may flip
+      // when scrolling leaves no room on its side.
+      ...(side === "beside" ? [] : [flip({ padding, fallbackPlacements: [opposite] })]),
       shift({ padding }),
       size({
         padding,
@@ -224,6 +273,11 @@ async function positionPopover(
   Object.assign(panel.style, { left: `${result.x}px`, top: `${result.y}px` });
 }
 
+function boxOf(element: Element): Box {
+  const { left, top, right, bottom } = element.getBoundingClientRect();
+  return { left, top, right, bottom };
+}
+
 /** Opens the panel of `trigger`, closing any other open panel. */
 export function openCodePopover(trigger: HTMLElement): void {
   cancelScheduledClose();
@@ -232,29 +286,33 @@ export function openCodePopover(trigger: HTMLElement): void {
   const panel = panelId === undefined ? null : panelFor(panelId);
   if (panelId === undefined || panel === null) return;
 
-  // Every layout read before the first write: reading line boxes after the
-  // writes below would force a second style and layout pass in this event.
+  // Every layout read before the first write. A prepared panel's size is
+  // already laid out, so these reads force no layout.
   const related = relatedTriggers(trigger, panelId);
-  const anchor = lineAnchor(trigger);
-  const placement = preferredPlacement(trigger, related);
+  const line = lineOf(trigger);
+  const side = choosePanelSide({
+    trigger: boxOf(trigger),
+    line: boxOf(line),
+    lineEnd: lineTextEnd(line),
+    panel: { width: panel.offsetWidth, height: panel.offsetHeight },
+    mentions: related.map(boxOf),
+    viewport: panelArea(),
+    gap: PANEL_OFFSET_PX,
+  });
 
   closePopover();
-  // Fixed before it enters the document, so the panel never joins the page flow.
-  panel.style.position = "fixed";
-  document.body.append(panel);
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
-  const detachWatcher = new MutationObserver(() => {
-    if (!trigger.isConnected) closePopover();
-  });
-  detachWatcher.observe(document.body, { childList: true, subtree: true });
-  // Positions synchronously in microtasks, so the first painted frame is placed.
+  const anchor = anchorFor(side, trigger);
+  // Positions in microtasks before the next frame, so the first painted frame
+  // shows the panel in place.
   const stopPositioning = autoUpdate(
     anchor,
     panel,
-    () => void positionPopover(anchor, panel, placement),
+    () => void positionPopover(anchor, panel, side),
   );
-  activePopover = { trigger, panel, related, stopPositioning, detachWatcher };
+  panel.setAttribute(PANEL_OPEN_ATTRIBUTE, "");
+  activePopover = { trigger, panel, related, stopPositioning };
 }
 
 function handlePointerOver(event: PointerEvent): void {
@@ -302,10 +360,81 @@ function handleClick(event: MouseEvent): void {
   else if (!isInsideActivePopover(event.target)) closePopover();
 }
 
+/** Prepares the panels of one code block. */
+function preparePanelsOf(block: Element): void {
+  for (const trigger of block.querySelectorAll<HTMLElement>(TRIGGER_SELECTOR)) {
+    const panelId = trigger.dataset.swCodePopoverTrigger;
+    if (panelId !== undefined) panelFor(panelId);
+  }
+}
+
+/**
+ * Prepares panels for code blocks as they come near the viewport, one block
+ * per idle callback, and drops the panels of pages that leave the document.
+ */
+function installPanelPreparation(): () => void {
+  const pending = new Set<Element>();
+  let idleHandle: number | undefined;
+  const drain = (deadline?: IdleDeadline): void => {
+    idleHandle = undefined;
+    for (const block of pending) {
+      pending.delete(block);
+      if (block.isConnected) preparePanelsOf(block);
+      if (deadline !== undefined && deadline.timeRemaining() <= 0) break;
+    }
+    if (pending.size > 0) scheduleDrain();
+  };
+  const scheduleDrain = (): void => {
+    if (idleHandle !== undefined) return;
+    idleHandle =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback(drain, { timeout: PREPARE_TIMEOUT_MS })
+        : window.setTimeout(drain, 0);
+  };
+  const intersections = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        intersections.unobserve(entry.target);
+        pending.add(entry.target);
+      }
+      if (pending.size > 0) scheduleDrain();
+    },
+    { rootMargin: PREPARE_MARGIN },
+  );
+  const observeBlocks = (root: ParentNode): void => {
+    for (const block of root.querySelectorAll("pre")) {
+      if (block.querySelector(TRIGGER_SELECTOR) !== null) intersections.observe(block);
+    }
+  };
+  observeBlocks(document);
+  const mutations = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element) observeBlocks(node);
+      }
+    }
+    pruneDetachedStores();
+    // The open panel lives in `document.body`, outside the page, so close it
+    // when its trigger leaves the page.
+    if (activePopover !== null && !activePopover.trigger.isConnected) closePopover();
+  });
+  mutations.observe(document.body, { childList: true, subtree: true });
+  return () => {
+    mutations.disconnect();
+    intersections.disconnect();
+    if (idleHandle !== undefined) {
+      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idleHandle);
+      else window.clearTimeout(idleHandle);
+    }
+  };
+}
+
 /**
  * Installs the document listeners that open, keep and close every code hover
- * panel. Returns the uninstaller, which also closes an open panel; a second
- * call while installed is a no-op that returns a no-op.
+ * panel, and the idle preparation of panels near the viewport. Returns the
+ * uninstaller, which also closes an open panel; a second call while installed
+ * is a no-op that returns a no-op.
  */
 export function installCodePopovers(): () => void {
   if (uninstallListeners !== null) return () => {};
@@ -320,11 +449,17 @@ export function installCodePopovers(): () => void {
   for (const [type, listener] of listeners) {
     document.addEventListener(type, listener as EventListener);
   }
+  const uninstallPreparation = installPanelPreparation();
   uninstallListeners = () => {
     closePopover();
+    uninstallPreparation();
     for (const [type, listener] of listeners) {
       document.removeEventListener(type, listener as EventListener);
     }
+    for (const panels of panelsByStore.values()) {
+      for (const panel of panels.values()) panel.remove();
+    }
+    panelsByStore.clear();
     uninstallListeners = null;
   };
   return uninstallListeners;

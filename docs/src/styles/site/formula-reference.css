@@ -59,14 +59,15 @@
   width: 100%;
   table-layout: fixed;
 }
+/* Fixed tracks for the short columns; the description takes the rest. */
 .sw-prose .sw-formula-table :is(th, td):nth-child(1) {
   width: 32%;
 }
-.sw-prose .sw-formula-table :is(th, td):nth-child(2) {
-  width: 38%;
-}
 .sw-prose .sw-formula-table :is(th, td):nth-child(3) {
-  width: 14%;
+  width: 8rem;
+}
+.sw-prose .sw-formula-table :is(th, td):nth-child(4) {
+  width: 9.5rem;
 }
 .sw-prose .sw-formula-table .sw-formula-summary {
   color: var(--sw-fg);
@@ -80,12 +81,16 @@
   overflow-wrap: anywhere;
 }
 /* The call syntax, coloured with the code roles; it is the row's name. */
+/* Long syntax wraps after an argument instead of running into the next
+   column. */
 .sw-prose .sw-formula-table .sw-formula-syntax {
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--sw-code-fg);
   font-size: var(--sw-text-small);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .sw-prose .sw-formula-table small {
   display: block;

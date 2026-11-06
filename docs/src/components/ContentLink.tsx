@@ -7,6 +7,14 @@ import { opensFreshDocument } from "../lib/navigation.js";
 const STATIC_FILE = /\.(?:txt|xml|json|xlsx|csv|png|svg|webp|wasm)$/;
 
 /**
+ * The router marks a link `aria-current="page"` when its path prefixes the
+ * URL, which named every code symbol linking into the current API page as
+ * the current page. Content links are current only for their exact page and
+ * fragment.
+ */
+const EXACT_MATCH = { exact: true, includeHash: true } as const;
+
+/**
  * The `a` element of documentation content. A link to a site page navigates
  * on the client and preloads on intent, like the rest of the site; external
  * links, in-page fragments, and static files stay plain anchors.
@@ -29,7 +37,13 @@ export function ContentLink({ href, children, ...rest }: AnchorHTMLAttributes<HT
     );
   }
   return (
-    <Link {...rest} hash={hash} reloadDocument={opensFreshDocument(path)} to={path}>
+    <Link
+      {...rest}
+      activeOptions={EXACT_MATCH}
+      hash={hash}
+      reloadDocument={opensFreshDocument(path)}
+      to={path}
+    >
       {children}
     </Link>
   );
