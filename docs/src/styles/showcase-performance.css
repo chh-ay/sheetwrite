@@ -1834,7 +1834,6 @@
       var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
-    white-space: nowrap;
   }
 
   .sw-sp-proof-wins__value {
@@ -1856,7 +1855,7 @@
   .sw-sp-evidence-delta {
     display: block;
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+    font: var(--sw-weight-medium) var(--sw-text-caption) / 1.4 var(--sw-font-body);
     font-variant-numeric: tabular-nums;
   }
 
