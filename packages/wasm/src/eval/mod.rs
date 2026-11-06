@@ -16,12 +16,17 @@ mod functions;
 mod index;
 mod info;
 mod iteration;
+mod literal_criteria;
+mod literal_products;
+mod literal_statistics;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
 mod math;
 mod matrix;
 mod number_format;
+#[cfg(test)]
+mod number_format_corpus_tests;
 mod operators;
 mod random;
 mod range_fold;
@@ -72,6 +77,7 @@ use dependency::{
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
+use literal_criteria::CriteriaFold;
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
@@ -1865,6 +1871,21 @@ impl CellStore {
             _ => {}
         }
 
+        if func == Func::SumProduct {
+            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
+        if matches!(
+            func,
+            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
+        ) {
+            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
         if func == Func::Sum {
             if let Some(result) = self.eval_sum_family(args, sheet, pass, depth + 1) {
                 return result;
@@ -2478,6 +2499,13 @@ impl CellStore {
         if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
             return Some(Value::number(count as f64));
         }
+        if let Some(cells) = reader.literal_columns() {
+            return Some(self.literal_criteria_family(
+                CriteriaFold::Count,
+                None,
+                &[(cells, &criterion)],
+            ));
+        }
         let mut matches = 0.0;
         loop {
             match reader.next_allow_errors(pass) {
@@ -2568,6 +2596,14 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
+        if let Some(ranges) = readers
+            .iter()
+            .map(RangeReader::literal_columns)
+            .collect::<Option<Vec<_>>>()
+        {
+            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
+            return Some(self.literal_criteria_family(CriteriaFold::Count, None, &pairs));
+        }
         let mut matches = 0.0;
         loop {
             let first = match readers[0].next_allow_errors(pass) {
@@ -2630,6 +2666,15 @@ impl CellStore {
         if criteria_reader.shape() != value_reader.shape() {
             return Some(Value::Error(FormulaError::Value));
         }
+        if let (Some(cells), Some(values)) = (
+            criteria_reader.literal_columns(),
+            value_reader.literal_columns(),
+        ) {
+            let fold = CriteriaFold::Sum {
+                average: func == Func::AverageIf,
+            };
+            return Some(self.literal_criteria_family(fold, Some(&values), &[(cells, &criterion)]));
+        }
         let mut fold = IfSum::new();
         loop {
             let candidate = match criteria_reader.next_allow_errors(pass) {
@@ -2687,6 +2732,25 @@ impl CellStore {
             criteria.push(criterion);
         }
         let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
+        if let (Some(values), Some(ranges)) = (
+            value_reader.literal_columns(),
+            readers
+                .iter()
+                .map(RangeReader::literal_columns)
+                .collect::<Option<Vec<_>>>(),
+        ) {
+            let fold = if extreme {
+                CriteriaFold::Extreme {
+                    maximum: func == Func::MaxIfs,
+                }
+            } else {
+                CriteriaFold::Sum {
+                    average: func == Func::AverageIfs,
+                }
+            };
+            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
+            return Some(self.literal_criteria_family(fold, Some(&values), &pairs));
+        }
         let mut sums = IfSum::new();
         let mut extremes = IfExtreme::new(func == Func::MaxIfs);
         loop {

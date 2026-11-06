@@ -31,6 +31,7 @@ import {
   validateMeasureAdmission,
   withMeasure,
   withoutMeasure,
+  cloneRelationships,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -1185,6 +1186,29 @@ export class StoreDataEngine {
       strings.push(measure.id, measure.table, measure.formula, "", measure.name);
     }
     return wasm.setRelationships(strings);
+  }
+
+  /**
+   * `model` with each `[table, column, to]` rename applied to every measure
+   * formula, as Excel updates the formulas that name a renamed table,
+   * column or measure; see `renameStructuredReference`. A rename to the same
+   * name is skipped. Returns `model` itself when no formula changes.
+   */
+  private withRenames(
+    model: DataModel | undefined,
+    renames: [table: string, column: string, to: string][],
+  ): DataModel | undefined {
+    let changed = false;
+    const measures = (model?.measures ?? []).map((measure) => {
+      let formula = measure.formula;
+      for (const [table, column, to] of renames) {
+        if ((column || table) === to) continue;
+        formula = getEngine().renameStructuredReference(formula, table, column, to);
+      }
+      changed ||= formula !== measure.formula;
+      return { ...measure, formula };
+    });
+    return changed ? { relationships: cloneRelationships(model), measures } : model;
   }
 
   private syncTable(table: WorkbookTable): boolean {
@@ -3598,6 +3622,16 @@ export class StoreDataEngine {
         const nextTables = [...tables];
         nextTables[index] = next;
         sheet.tables = nextTables;
+
+        const renames: [string, string, string][] = [[current.name, "", next.name]];
+        for (const column of next.columns) {
+          const previous = current.columns.find((candidate) => candidate.id === column.id);
+          if (previous) renames.push([next.name, previous.name, column.name]);
+        }
+        const model = this.withRenames(this.workbook.dataModel, renames);
+        if (model === this.workbook.dataModel) return true;
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 
@@ -3767,9 +3801,12 @@ export class StoreDataEngine {
           return false;
         }
 
+        const previous = findMeasure(current, patch.op === "setMeasure" ? patch.measure.id : "");
         const model =
           patch.op === "setMeasure"
-            ? withMeasure(current, patch.measure)
+            ? this.withRenames(withMeasure(current, patch.measure), [
+                ["", previous?.name ?? "", patch.measure.name],
+              ])
             : withoutMeasure(current, patch.id);
         if (!this.syncRelationships(model)) return false;
         this.workbook.dataModel = model;

@@ -139,6 +139,17 @@ pub(super) fn optional_ast(args: &[Ast], index: usize) -> Option<&Ast> {
     }
 }
 
+/// The range of an argument written as a range, such as `A1:B10` or
+/// `Sheet2!$A$1:$A$9`. A single-cell reference, a defined name or a LET value
+/// returns `None`: functions that read a lone cell as a scalar value coerce it
+/// differently from a range.
+pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
+    match ast {
+        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(ast, formula_sheet),
+        _ => None,
+    }
+}
+
 pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),
