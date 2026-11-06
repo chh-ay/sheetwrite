@@ -173,7 +173,7 @@ exports a factory named `<name>Addon`.
 
 Before:
 
-```ts
+```text partial="0.6 code; these imports and arguments no longer exist"
 import "@sheetwrite/charts/register";
 import "@sheetwrite/xlsx/register";
 import * as formulas from "@sheetwrite/formulas";
