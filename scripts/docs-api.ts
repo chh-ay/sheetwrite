@@ -862,10 +862,13 @@ function linkedTypeHtml(
   });
 }
 
-/** One field row: name, type, a required or optional marker, and its description. */
+/**
+ * One field row: name (none for a return value), type, a required or optional
+ * marker, and its description.
+ */
 function fieldHtml(
   id: string,
-  name: string,
+  name: string | undefined,
   typeHtml: string,
   marker: string | undefined,
   descriptionHtml: string | undefined,
@@ -873,7 +876,7 @@ function fieldHtml(
   return [
     `<div class="api-field" id="${id}">`,
     '<div class="api-field__head">',
-    `<code class="api-field__name">${html(name)}</code>`,
+    name === undefined ? "" : `<code class="api-field__name">${html(name)}</code>`,
     `<code class="api-field__type">${typeHtml}</code>`,
     marker === undefined ? "" : `<span class="api-field__marker">${marker}</span>`,
     "</div>",
@@ -897,6 +900,15 @@ function renderFunctionFields(
 ): string {
   const describe = (text: string | undefined): string | undefined =>
     text === undefined ? undefined : memberDocumentationHtml(pkg, entry, item, text, routes);
+  // Without its own description, a field named by one documented type reads
+  // that type's summary.
+  const typeSummary = (type: string): string | undefined => {
+    if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
+    const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
+    return target === undefined || target.trim() === ""
+      ? undefined
+      : compactSummary(target.split(/\n@/)[0] ?? "", true);
+  };
   const blocks: string[] = [];
   if (fields.parameters.length > 0) {
     blocks.push(
@@ -909,7 +921,10 @@ function renderFunctionFields(
           parameter.name,
           linkedTypeHtml(parameter.type, pkg, entry, item, routes),
           parameter.optional ? "optional" : "required",
-          describe(parts.parameters.get(parameter.name.replace(/^\.\.\./, ""))),
+          describe(
+            parts.parameters.get(parameter.name.replace(/^\.\.\./, "")) ??
+              typeSummary(parameter.type),
+          ),
         ),
       ),
       "</div>",
@@ -922,10 +937,10 @@ function renderFunctionFields(
     '<div class="api-fields">',
     fieldHtml(
       "returns",
-      "returns",
+      undefined,
       linkedTypeHtml(fields.returns, pkg, entry, item, routes),
       undefined,
-      describe(parts.returns),
+      describe(parts.returns ?? typeSummary(fields.returns)),
     ),
     "</div>",
     "",

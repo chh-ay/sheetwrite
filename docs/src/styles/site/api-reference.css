@@ -747,6 +747,12 @@
   font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
   overflow-wrap: anywhere;
 }
+/* A return value has no name: its type leads the row. */
+.sw-prose .api-field__type:first-child {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
+}
 .sw-prose .api-field__type a {
   color: var(--sw-accent-strong);
   text-decoration: none;
