@@ -61,6 +61,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/external-link.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/grid.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },

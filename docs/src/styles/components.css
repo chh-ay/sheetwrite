@@ -530,15 +530,12 @@ samp,
   justify-self: end;
 }
 
-/* Phones: the section links move to a second, scrollable row; the search
-   control stays in the first row between the brand and the actions. */
+/* Phones: the section links move to a second, scrollable row. Documentation
+   pages keep one row (brand, search, theme, menu): their menu drawer holds
+   the same destinations, so the reading area starts higher. */
 @media (max-width: 54rem) {
   .sw-header {
     grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .sw-header[data-has-search="true"] {
-    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .sw-header__nav {
@@ -546,6 +543,16 @@ samp,
     grid-column: 1 / -1;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .sw-header[data-has-search="true"] {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    min-height: var(--sw-header-height-compact);
+    padding-block: var(--sw-space-1);
+  }
+
+  .sw-header[data-has-search="true"] :is(.sw-header__nav, .sw-header__link) {
+    display: none;
   }
 
   .sw-header__search {

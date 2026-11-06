@@ -20,7 +20,7 @@ import {
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
-import { queriesDigest, queryWarning } from "./query-digest.js";
+import { externalLinkDigest, queriesDigest, queryWarning } from "./query-digest.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import {
@@ -53,6 +53,8 @@ import {
  * - Charts and pivots read cell values, so any edit to any sheet drops them.
  *   Charts and pivots the reader maps to definitions (chart-read.ts,
  *   pivot.ts) are not retained here.
+ * - An external link part is kept while its link's saved values are as they
+ *   were at import; otherwise the writer writes the link from its values.
  * - Parts that point into worksheets, tables, styles or the workbook part,
  *   whose bytes Sheetwrite rewrites, are dropped with a warning.
  */
@@ -64,6 +66,8 @@ interface GraphRoot {
   readonly sheetId?: string;
   readonly relationship: OpcRelationship;
   readonly cacheId?: string;
+  /** Digest of the link that an external link part holds. */
+  readonly externalLink?: string;
 }
 
 /** Relationship kinds (the last segment of the OPC type URI) whose part graphs are retained. */
@@ -76,6 +80,7 @@ const RETAINED_KINDS: Readonly<Record<XlsxSourceGraph["owner"], ReadonlySet<stri
     "connections",
     "pivotCacheDefinition",
     "theme",
+    "externalLink",
   ]),
   // Pivot tables have no element in the worksheet XML; Excel finds them through relationships.
   sheet: new Set(["drawing", "pivotTable", "tableSingleCells"]),
@@ -212,6 +217,7 @@ function graphRoots(
   workbookXml: Uint8Array,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
+  linkParts: ReadonlyMap<string, string>,
 ): GraphRoot[] {
   const roots: GraphRoot[] = [];
   for (const relationship of packageFile.relationships("")) {
@@ -228,6 +234,8 @@ function graphRoots(
   for (const relationship of packageFile.relationships(workbookPart)) {
     const kind = relationshipKind(relationship.type);
     if (relationship.external || !isRetainedRelationship("workbook", relationship.type)) continue;
+    // External links are added below, in the order formulas number them.
+    if (kind === "externalLink") continue;
     if (kind !== "pivotCacheDefinition") {
       roots.push({ owner: "workbook", relationship });
       continue;
@@ -239,6 +247,15 @@ function graphRoots(
     if (cacheId === undefined || !/^\d{1,10}$/.test(cacheId)) {
       dropWarning(context, relationship.target, "its pivot cache id is missing");
     } else roots.push({ owner: "workbook", relationship, cacheId });
+  }
+
+  const workbookRelationships = packageFile.relationships(workbookPart);
+  for (const [book, part] of linkParts) {
+    const link = snapshot.workbook.externalLinks?.find((candidate) => candidate.book === book);
+    const relationship = workbookRelationships.find((candidate) => candidate.target === part);
+    if (link && relationship) {
+      roots.push({ owner: "workbook", relationship, externalLink: externalLinkDigest(link) });
+    }
   }
 
   const sheetsByName = new Map(snapshot.sheets.map((sheet) => [sheet.name, sheet.id]));
@@ -292,6 +309,7 @@ export async function capturePreserved(
   context: XlsxCodecContext,
   modelled: ReadonlySet<string>,
   replacements: ReadonlyMap<string, Uint8Array> = new Map(),
+  linkParts: ReadonlyMap<string, string> = new Map(),
 ): Promise<void> {
   const workbookPart = packageFile.officeDocumentPart();
   const roots = graphRoots(
@@ -300,6 +318,7 @@ export async function capturePreserved(
     await packageFile.readBytes(workbookPart),
     snapshot,
     context,
+    linkParts,
   );
   const graphs: XlsxSourceGraph[] = [];
   let digests: Map<string, string> | undefined;
@@ -348,6 +367,7 @@ export async function capturePreserved(
       type: root.relationship.type,
       target: root.relationship.target,
       ...(root.cacheId === undefined ? {} : { cacheId: root.cacheId }),
+      ...(root.externalLink === undefined ? {} : { externalLink: root.externalLink }),
       parts,
       dependencies,
     });
@@ -588,6 +608,9 @@ export function preparePreserved(
   const sheets = new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet]));
   const digests = new Map<string, string>();
   const savedQueries = queriesDigest(snapshot.workbook.queries);
+  const linkBooks = new Map(
+    (snapshot.workbook.externalLinks ?? []).map((link) => [externalLinkDigest(link), link.book]),
+  );
   const partsByName = new Map(source.parts.map((part) => [part.name, part]));
   const valid = new Set<XlsxSourceGraph>();
   for (const graph of source.graphs) {
@@ -599,6 +622,11 @@ export function preparePreserved(
         `Retained Power Query part ${graph.target} was dropped because the saved queries changed; output tables are written as values`,
         graph.target,
       );
+      continue;
+    }
+    // The link's values changed since import, so the export writes it from the model.
+    if (graph.externalLink !== undefined && !linkBooks.has(graph.externalLink)) {
+      dropWarning(context, graph.target, "the saved values of its link changed");
       continue;
     }
 
@@ -666,6 +694,9 @@ export function preparePreserved(
   return {
     rootRelationships: graphs.filter((graph) => graph.owner === "root").map(absolute),
     workbookRelationships: workbookGraphs.map(absolute),
+    externalBooks: workbookGraphs.flatMap((graph) =>
+      graph.externalLink === undefined ? [] : [linkBooks.get(graph.externalLink) ?? ""],
+    ),
     workbookXml(ids) {
       const pivotCaches = workbookGraphs.flatMap((graph, index) =>
         graph.cacheId === undefined
@@ -674,7 +705,12 @@ export function preparePreserved(
               `<pivotCache cacheId="${escapeXml(graph.cacheId)}" r:id="${escapeXml(ids[index] ?? "")}"/>`,
             ],
       );
-      return { pivotCaches };
+      const externalReferences = workbookGraphs.flatMap((graph, index) =>
+        graph.externalLink === undefined
+          ? []
+          : [`<externalReference r:id="${escapeXml(ids[index] ?? "")}"/>`],
+      );
+      return { pivotCaches, externalReferences };
     },
     appendCharts(sheet, charts) {
       const graph = graphs.find(

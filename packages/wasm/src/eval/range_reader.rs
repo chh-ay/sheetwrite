@@ -11,7 +11,17 @@ use super::{EvalPass, LiteralSources};
 
 use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT};
+use crate::types::{
+    CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
+    RANGE_CELL_LIMIT,
+};
+
+#[cfg(test)]
+thread_local! {
+    /// Tests turn literal-column reads off to compare the kernels that use
+    /// them with the cell-by-cell walk.
+    pub(crate) static LITERAL_COLUMNS_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 
 /// A one-pass cursor over a rectangle of cells in row-major order.
 pub(crate) struct RangeReader<'a> {
@@ -32,6 +42,13 @@ pub(crate) struct RangeReader<'a> {
     /// pages. Entering a band records one access per column page; cells inside
     /// it index the page directory directly.
     tile_end_row: usize,
+}
+
+/// A range of literal cells as one `(kinds, payloads)` slice pair per column,
+/// each `rows` long. Cell `(row, col)` of the range is `columns[col].0[row]`.
+pub(crate) struct LiteralColumns<'a> {
+    pub(crate) rows: usize,
+    pub(crate) columns: Vec<(&'a [u8], &'a [u64])>,
 }
 
 impl<'a> RangeReader<'a> {
@@ -90,6 +107,47 @@ impl<'a> RangeReader<'a> {
             self.row_end - self.row_start + 1,
             self.col_end - self.col_start + 1,
         )
+    }
+
+    /// The range's cells as dense column slices of raw kinds and payloads,
+    /// when every cell is a literal number, text or boolean, or a blank that
+    /// no spill writes into. `None` sends the caller to the cell-by-cell walk:
+    /// paged storage, formula or spill cells, and reads at the depth limit,
+    /// where literals go through `eval_at` and fail. Call it before reading.
+    pub(crate) fn literal_columns(&self) -> Option<LiteralColumns<'a>> {
+        self.literals?;
+
+        #[cfg(test)]
+        if LITERAL_COLUMNS_OFF.with(std::cell::Cell::get) {
+            return None;
+        }
+
+        let rows = self.row_start..=self.row_end;
+        let mut columns = Vec::new();
+        columns
+            .try_reserve_exact(self.col_end - self.col_start + 1)
+            .ok()?;
+
+        for col in self.col_start..=self.col_end {
+            let column = self.data.cells.dense_column(col)?;
+            let (kinds, payloads) = column.raw_slices();
+            let kinds = kinds.get(rows.clone())?;
+
+            // A raw empty kind without the calculated bit is a plain blank.
+            if !kinds
+                .iter()
+                .all(|&kind| matches!(kind, KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL))
+            {
+                return None;
+            }
+
+            columns.push((kinds, payloads.get(rows.clone())?));
+        }
+
+        Some(LiteralColumns {
+            rows: self.row_end - self.row_start + 1,
+            columns,
+        })
     }
 
     /// The next value in row-major order, or `None` once the range is spent.

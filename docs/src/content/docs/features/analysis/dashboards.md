@@ -1,14 +1,14 @@
 ---
 title: Dashboards
-description: "Arrange pivots and slicers on a dashboard sheet with a grid layout that is saved, undone and synchronized."
+description: "Arrange pivots, slicers, PivotCharts and KPI cards on a dashboard sheet with a grid layout that is saved, undone and synchronized."
 ---
 
 A dashboard is a sheet of the workbook with `kind: "dashboard"`. It has a tab, a name, an order and a visibility like a worksheet, but it has no cells, rows or columns. It holds items on a grid of 12 columns:
 
 - a **pivot** item shows a pivot of the same sheet,
-- a **slicer** item lists the values of one table column and holds the values that pass.
-
-Slicer filtering, charts and KPI cards follow in later releases ([#231](https://github.com/chh-ay/sheetwrite/issues/231)).
+- a **slicer** item lists the values of one table column and holds the values that pass,
+- a **chart** item shows a chart of the same sheet over one of its pivots, as an Excel PivotChart does,
+- a **KPI card** shows the value of one data model measure.
 
 ## Add a dashboard
 
@@ -113,10 +113,47 @@ Items do not overlap, and a dashboard holds at most 64 items. They are kept in r
 
 While a dashboard is the active sheet, the grid shows its items over the cells. The toolbar, the side panel and the sheet tabs stay as they are. The view loads as its own chunk the first time a dashboard is shown.
 
-- A pivot item shows the pivot's result as a table. Pivots on a dashboard compute without placing output in cells. With the default engine, the item says that it needs the full engine.
+- A pivot item shows the pivot's result as a table, with each value field's number format. Pivots on a dashboard compute without placing output in cells. With the default engine, the item says that it needs the full engine.
 - A slicer item lists the values of its column. A click keeps one value, and Ctrl or Cmd with a click adds or removes a value; a slicer always keeps at least one value. **Clear** keeps every value. Each change is saved with the item.
 - Drag an item's header to move it, and drag its bottom-right corner to resize it. With the keyboard, open the item's actions menu, choose **Move** or **Resize**, then use the arrow keys; Enter or Escape ends. Each drop or arrow step is one undo step. A place that another item holds is refused, and the view says so.
 - In a read-only grid, items cannot move, resize or change.
+
+## Slicers
+
+**Insert › Filters › Slicer** shows on a dashboard. It opens the Insert Slicers list, where each checked table column becomes a slicer in the next free place, in one undo step.
+
+The slicers of a dashboard filter its pivots together. A slicer on a column of table T filters every pivot whose table is T, or a table that reaches T through many-to-one relationships, as an Excel slicer filters the PivotTables connected to it. The filter goes from the one side to the many side, never back. A slicer whose table a pivot cannot reach does not filter it. Slicer filters are added to each pivot's own report filters when the pivot computes; the saved definitions do not change.
+
+In an editable grid, a slicer selection is a saved, synced change of its item, so it is one undo step. In a read-only grid, a slicer filters only that viewer's view: it makes no document change and no undo step.
+
+A slicer dims each value that no row has under the other slicers, and the value stays selectable, as Excel's "Visually indicate items with no data" does. The slicer's actions menu has **Dim Items with No Data**, **Hide Items with No Data** and **Show Items with No Data**, each a saved change. In the API, set `itemsWithNoData` on the slicer item to `"hide"` to hide those values (Excel's "Hide items with no data"), or to `"show"` to show every value plainly.
+
+The dashboard view applies the slicers, so they filter once a dashboard has been shown.
+
+## PivotCharts
+
+**Insert › Charts › PivotChart** shows on a dashboard. It adds a chart of the chosen type over the focused pivot item, or else the first pivot, and an item that shows the chart in the next free place, in one undo step. Removing the item removes its chart too.
+
+The chart is a `ChartDefinition` with `pivot` set to the ID of a pivot on the same dashboard, and an empty `series` list. As in Excel, the row items are the categories and each value field, for each column item, is one series. Subtotals and grand totals are not points. The slicers filter the chart as they filter its pivot, and the chart follows each recalculation. Charts need `@sheetwrite/charts`: without it, the item says so.
+
+## KPI cards
+
+**Insert › Dashboard › KPI Card** shows on a dashboard when the data model has a measure. It opens a list of the measures and adds a card for the chosen one in the next free place.
+
+A KPI card (`kind: "kpi"`) shows its measure's value, large, in the filter context of the dashboard's slicers: each slicer whose table the measure's home table reaches filters it, as it filters a pivot over that table. `title` replaces the measure name as the caption, and `numberFormat` is the Excel format code of the value; absent shows it as General. A card needs the full engine, as measures do.
+
+## XLSX
+
+Excel has no dashboard sheet. `toXlsxWorkbook(grid)` writes each dashboard as a worksheet with the same name. Each worksheet column stands for one grid column, and each row for one grid row. Each item writes its values from the top-left cell of its box:
+
+- a pivot item: its name, then the pivot's current result, with each value field's number format,
+- a slicer: its caption, then the values it keeps,
+- a KPI card: its caption, then its value in its number format,
+- a chart item: a native chart over the box, with its data written into the chart, so Excel shows it without source cells.
+
+The values are the ones that the dashboard shows, with its slicer filters. If an item has more values than its box holds, the export writes all of them and warns. Each export with a dashboard warns once that the dashboard is static in Excel. A snapshot exported without a grid has no computed values, so its dashboards are empty worksheets.
+
+The dashboard itself, with its items, pivots and charts, is saved in the Sheetwrite metadata sheet. Sheetwrite opens the file with the dashboard again; the static values are not read. Excel slicers and timelines in other files are not imported.
 
 ## Undo and collaboration
 

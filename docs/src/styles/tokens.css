@@ -143,6 +143,8 @@
      One page frame for the landing, the hub, every showcase and the product
      bar: content and the brand mark share the same edges at every width. */
   --sw-header-height: 4rem;
+  /* One-row header of documentation pages on phones. */
+  --sw-header-height-compact: 3.5rem;
   --sw-sidebar-width: 17.5rem;
   --sw-content-width: 51rem;
   /* The docs reading area beside the sidebar, without and with the outline. */

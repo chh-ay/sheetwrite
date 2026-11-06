@@ -49,6 +49,9 @@ const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
+// Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
+// and the pivot field model, whose aggregation captions start like the function table.
+const DASHBOARD_SHARED_MARKERS = ["chart-data-", '["SUM","Sum"]'];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
@@ -67,6 +70,9 @@ for (const file of lazyChunks) {
   if (code.includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(file);
   else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  // Before the function table: the shared dashboard code also lists the pivot aggregations.
+  else if (DASHBOARD_SHARED_MARKERS.some((marker) => code.includes(marker)))
+    dashboardChunks.push(file);
   else if (code.includes(FUNCTION_TABLE_MARKER)) functionTableChunks.push(file);
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
     chromeChunks.push(file);

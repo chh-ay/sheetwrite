@@ -105,6 +105,7 @@ export {
   toTsv,
   toTsvStream,
 } from "./export.js";
+export { MAX_EXTERNAL_SHEET_AREA } from "./external-link.js";
 export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   fromXlsxTable,
@@ -316,7 +317,11 @@ export type {
   ContextMenuItems,
   Dashboard,
   DashboardBox,
+  DashboardChartItem,
+  DashboardExport,
   DashboardItem,
+  DashboardItemExport,
+  DashboardKpiItem,
   DashboardPivotItem,
   DashboardSlicerItem,
   DataCell,
@@ -331,6 +336,10 @@ export type {
   DataValidationCondition,
   DataValidationRule,
   DocumentOp,
+  ExternalLink,
+  ExternalLinkCell,
+  ExternalLinkSheet,
+  ExternalLinkValue,
   Grid,
   GridActions,
   GridCommandName,

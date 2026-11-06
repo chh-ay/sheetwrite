@@ -64,6 +64,66 @@ fn rewrite_own_sheet(source: &str, columns: bool, change: AxisChange) -> String 
     })
 }
 
+/// Rename a table or a table column in the structured references of a
+/// formula, as Excel updates formulas when a table or a column is renamed.
+/// An empty `column` renames table `table` to `to`; otherwise column
+/// `column` of `table` becomes `to`, where an empty `table` means
+/// references without a table name. Names match without case.
+#[wasm_bindgen(js_name = renameStructuredReference)]
+pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: &str) -> String {
+    let Some(lexemes) = lex(source) else {
+        return source.to_string();
+    };
+
+    let mut out = String::with_capacity(source.len());
+    let mut copied = 0;
+    for (index, lexeme) in lexemes.iter().enumerate() {
+        let Tok::Structured(raw) = &lexeme.tok else {
+            continue;
+        };
+        let owner = index.checked_sub(1).map(|owner| &lexemes[owner]);
+        let owner_name = match owner.map(|owner| &owner.tok) {
+            Some(Tok::Ident(name, _)) => name.as_ref(),
+            _ => "",
+        };
+        if !same_name(owner_name, table) {
+            continue;
+        }
+
+        let span = if column.is_empty() {
+            owner
+                .filter(|_| !owner_name.is_empty())
+                .map(|owner| owner.start..owner.end)
+        } else {
+            let columns = column_span(raw);
+            same_name(&raw[columns.clone()], column)
+                .then(|| lexeme.start + columns.start..lexeme.start + columns.end)
+        };
+        if let Some(span) = span {
+            out.push_str(&source[copied..span.start]);
+            out.push_str(to);
+            copied = span.end;
+        }
+    }
+
+    out.push_str(&source[copied..]);
+    out
+}
+
+fn same_name(left: &str, right: &str) -> bool {
+    left.to_lowercase() == right.to_lowercase()
+}
+
+/// The byte span of the column name in a structured reference token:
+/// `[Column]`, `[@Column]` or `[[#Section],[Column]]`.
+fn column_span(raw: &str) -> std::ops::Range<usize> {
+    if let Some(separator) = raw.strip_prefix("[[").and_then(|inner| inner.find("],[")) {
+        return separator + 5..raw.len() - 2;
+    }
+    let start = if raw.starts_with("[@") { 2 } else { 1 };
+    start..raw.len() - 1
+}
+
 /// One token of the source and its byte span.
 struct Lexeme<'a> {
     tok: Tok<'a>,
