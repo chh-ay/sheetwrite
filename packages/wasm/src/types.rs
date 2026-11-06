@@ -587,7 +587,7 @@ impl FormulaEntry {
     fn rewrite_ast(
         &mut self,
         formula_sheet: u32,
-        mut rewrite: impl FnMut(&mut Ast) -> bool,
+        rewrite: &mut dyn FnMut(&mut Ast) -> bool,
     ) -> bool {
         let is_reference = self.is_reference();
         let Some(ast) = &mut self.ast else {
@@ -600,7 +600,7 @@ impl FormulaEntry {
                 return false;
             }
         } else {
-            let Some(source) = rewrite_parsed_references(&self.source, ast, &mut rewrite) else {
+            let Some(source) = rewrite_parsed_references(&self.source, ast, rewrite) else {
                 return false;
             };
             self.source = source;
@@ -619,7 +619,7 @@ impl FormulaEntry {
         formula_sheet: u32,
         edited_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| {
+        self.rewrite_ast(formula_sheet, &mut |ast| {
             shift_rows(ast, at, delta, formula_sheet, edited_sheet)
         })
     }
@@ -631,17 +631,19 @@ impl FormulaEntry {
         formula_sheet: u32,
         edited_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| {
+        self.rewrite_ast(formula_sheet, &mut |ast| {
             shift_cols(ast, at, delta, formula_sheet, edited_sheet)
         })
     }
 
     pub(crate) fn rename_sheet(&mut self, handle: u32, name: &str, formula_sheet: u32) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| rename_sheet_refs(ast, handle, name))
+        self.rewrite_ast(formula_sheet, &mut |ast| {
+            rename_sheet_refs(ast, handle, name)
+        })
     }
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
+        self.rewrite_ast(formula_sheet, &mut |ast| invalidate_sheet_refs(ast, handle))
     }
 
     /// Point the entry's references to a sheet of another workbook at the
@@ -676,7 +678,9 @@ impl FormulaEntry {
         names: &[String],
         formula_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| refresh_sheet_spans(ast, order, names))
+        self.rewrite_ast(formula_sheet, &mut |ast| {
+            refresh_sheet_spans(ast, order, names)
+        })
     }
 
     pub(crate) fn update_table<F>(
@@ -688,7 +692,7 @@ impl FormulaEntry {
     where
         F: Fn(&StructuredRef) -> Option<StructuredRef>,
     {
-        self.rewrite_ast(formula_sheet, |ast| {
+        self.rewrite_ast(formula_sheet, &mut |ast| {
             update_structured_refs(ast, table_id, resolve)
         })
     }

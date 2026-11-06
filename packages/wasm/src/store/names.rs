@@ -83,9 +83,8 @@ enum Visit {
 impl Definition {
     /// Rewrite each reference of the tree with `rewrite`; the source changes
     /// only where a reference changed.
-    fn rewrite(&mut self, mut rewrite: impl FnMut(&mut Ast) -> bool) -> bool {
-        let Some(source) = rewrite_parsed_references(&self.source, &mut self.ast, &mut rewrite)
-        else {
+    fn rewrite(&mut self, rewrite: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
+        let Some(source) = rewrite_parsed_references(&self.source, &mut self.ast, rewrite) else {
             return false;
         };
         self.source = source;
@@ -478,7 +477,7 @@ impl CellStore {
                 continue;
             };
             refresh |= definition.positional
-                | definition.rewrite(|ast| {
+                | definition.rewrite(&mut |ast| {
                     if columns {
                         shift_cols(ast, at, delta, NO_SHEET, edited_sheet)
                     } else {
@@ -493,7 +492,7 @@ impl CellStore {
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         for definition in self.defined_names.values_mut() {
             if let DefinedName::Formula(definition) = definition {
-                definition.rewrite(|ast| rename_sheet_refs(ast, handle, name));
+                definition.rewrite(&mut |ast| rename_sheet_refs(ast, handle, name));
             }
         }
     }
@@ -504,7 +503,7 @@ impl CellStore {
         let mut changed = false;
         for definition in self.defined_names.values_mut() {
             if let DefinedName::Formula(definition) = definition {
-                changed |= definition.rewrite(|ast| invalidate_sheet_refs(ast, handle));
+                changed |= definition.rewrite(&mut |ast| invalidate_sheet_refs(ast, handle));
             }
         }
         changed

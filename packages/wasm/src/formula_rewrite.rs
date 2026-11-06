@@ -294,6 +294,10 @@ fn is_deleted(reference: &Ast) -> bool {
     }
 }
 
+/// The tokens of `source` with their spans, or `None` when it does not lex.
+/// Out of line: the lexer step is inlined here, and every rewrite shares
+/// this one copy.
+#[inline(never)]
 fn lex(source: &str) -> Option<Vec<Lexeme<'_>>> {
     let mut lexemes: Vec<Lexeme<'_>> = Vec::new();
     let mut index = 0;
