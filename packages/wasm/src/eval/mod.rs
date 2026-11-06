@@ -24,6 +24,8 @@ mod math;
 mod matrix;
 mod number_format;
 mod operators;
+#[cfg(test)]
+mod pass_rule_tests;
 mod random;
 mod range_fold;
 mod range_reader;
