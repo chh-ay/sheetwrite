@@ -440,13 +440,17 @@ impl SheetFormulas {
         (self.subtotal_count != 0).then(move || slots.subtotal_keys(sheet))
     }
 
+    /// Adds `id` at `key`. Returns `false`, leaving the index unchanged, when
+    /// another formula already holds `key`; every caller then retires `id`,
+    /// so an occupied formula slot is always indexed at its location.
     #[inline(never)]
-    fn index_id(&mut self, key: CellKey, id: FormulaId) {
+    #[must_use]
+    fn index_id(&mut self, key: CellKey, id: FormulaId) -> bool {
         let column = match insert_position(&self.columns, key.1, |column| column.col) {
             Ok(column) => column,
             Err(column) => {
                 if self.columns.get(column..).is_none() {
-                    return;
+                    return false;
                 }
                 if self.columns.capacity() == 0 {
                     self.columns.reserve_exact(FORMULA_INDEX_INITIAL_CAPACITY);
@@ -462,7 +466,7 @@ impl SheetFormulas {
             }
         };
         let Some(column) = self.columns.get_mut(column) else {
-            return;
+            return false;
         };
         let pages = &mut column.pages;
         let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
@@ -470,7 +474,7 @@ impl SheetFormulas {
             Ok(page) => page,
             Err(page) => {
                 if pages.get(page..).is_none() {
-                    return;
+                    return false;
                 }
 
                 // A full page before this band means a dense column: reserve
@@ -497,17 +501,18 @@ impl SheetFormulas {
             }
         };
         let Some(page) = pages.get_mut(page) else {
-            return;
+            return false;
         };
         let cells = &mut page.cells;
         let Err(offset) = insert_position(cells, key.0, |&(row, _)| row) else {
-            return;
+            return false;
         };
         if cells.get(offset..).is_none() {
-            return;
+            return false;
         }
         cells.insert(offset, (key.0, id));
         self.count += 1;
+        true
     }
 
     /// Source import and rewrites keep an existing formula id when possible.
@@ -550,9 +555,13 @@ impl SheetFormulas {
                 let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), entry) else {
                     return (None, None);
                 };
+                // `key` holds no formula, so the new id always indexes.
+                if !self.index_id(key, id) {
+                    let _ = slots.retire(id);
+                    return (None, None);
+                }
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
-                self.index_id(key, id);
                 (None, Some(id))
             }
             (None, None) => (None, None),
@@ -703,10 +712,13 @@ impl SheetFormulas {
                 let Some(entry) = slots.get_mut(id) else {
                     continue;
                 };
-                if let Some(key) = relocate((row, column.col), entry) {
+                // Two formulas meet at one address only when a shift saturates
+                // at the last row or column; the later one is retired with the
+                // moved-out ones.
+                let moved = relocate((row, column.col), entry);
+                if let Some(key) = moved.filter(|&key| self.index_id(key, id)) {
                     slots.relocate(id, AbsCellKey::from_local(previous.sheet as usize, key));
                     slots.refresh_flags(id);
-                    self.index_id(key, id);
                     self.volatile_count += usize::from(slots.is_volatile(id));
                     self.subtotal_count += usize::from(slots.is_subtotal(id));
                 } else {
@@ -1068,6 +1080,77 @@ impl FormulaGraph {
 #[cfg(test)]
 mod tests {
     use super::{DirtyCells, DirtyRect, SheetFormulas};
+    use crate::store::CellStore;
+
+    /// Every occupied formula slot is the formula indexed at its location,
+    /// and no sheet indexes more formulas than there are occupied slots.
+    fn assert_slots_indexed(store: &CellStore, step: &str) {
+        let mut occupied = 0;
+        for (id, key) in store.formula_slots.occupied() {
+            occupied += 1;
+            let indexed = store
+                .sheets
+                .get(key.sheet as usize)
+                .and_then(|sheet| sheet.formulas.id(key.local()));
+            assert_eq!(indexed, Some(id), "{step}: slot {id:?} at {key:?}");
+        }
+        let indexed: usize = store.sheets.iter().map(|sheet| sheet.formulas.len()).sum();
+        assert_eq!(
+            occupied, indexed,
+            "{step}: occupied slots and indexed formulas"
+        );
+    }
+
+    /// The order walk relies on every occupied formula slot being indexed at
+    /// its location. Each path that fills, moves or empties slots keeps it.
+    #[test]
+    fn every_slot_stays_indexed_at_its_location() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(6, 40);
+        let other = store.add_sheet(4, 10);
+        store.set_sheet_name(data, "data", "Data");
+        store.set_sheet_name(other, "other", "Other");
+        for row in 0..20 {
+            store.set_number(data, row, 0, row as f64, 0);
+            store.set_formula(data, row, 1, &format!("=A{}+1", row + 1), 0);
+            store.set_formula(data, row, 2, &format!("=B{}*2", row + 1), 0);
+        }
+        store.set_formula(other, 0, 0, "=SUM(Data!C1:C20)", 0);
+        store.recompute(data);
+        assert_slots_indexed(&store, "load");
+
+        store.set_formula(data, 3, 1, "=A4-1", 0);
+        store.set_number(data, 4, 1, 7.0, 0);
+        store.clear_cell(data, 5, 2, 0);
+        assert_slots_indexed(&store, "edits");
+
+        assert!(store.add_rows(data, 2, 3));
+        assert!(store.remove_rows(data, 10, 2));
+        assert!(store.insert_cols(data, 1, 1));
+        assert!(store.remove_cols(data, 4, 1));
+        assert_slots_indexed(&store, "insert and delete");
+
+        store.move_rows(data, 0, 2, 12);
+        store.move_cols(data, 1, 1, 4);
+        assert_slots_indexed(&store, "moves");
+
+        let order: Vec<u32> = (0..8).rev().collect();
+        store.permute_rows(data, 0, 0, 5, &order);
+        assert_slots_indexed(&store, "sort");
+
+        assert!(store.set_named_range("Values", -1, data, 0, 0, 5, 0));
+        store.set_formula(other, 1, 0, "=SUM(Values)", 0);
+        assert!(store.rename_sheet(data, "data", "Numbers"));
+        assert_slots_indexed(&store, "names and renames");
+
+        let bytes = store.export_memory_state();
+        let mut restored = CellStore::read_memory_state(&bytes).expect("same-build transfer");
+        assert_slots_indexed(&restored, "transfer");
+
+        assert!(restored.remove_sheet(other));
+        restored.recompute(data);
+        assert_slots_indexed(&restored, "sheet removal");
+    }
 
     /// A two-column block written row by row stays one rectangle.
     #[test]
