@@ -1,3 +1,5 @@
+import { GridImpl } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
 import type { ColumnarData, Range, Sheet, Workbook } from "../src/types.js";
 import {
   setXlsxTableExportBackend,
@@ -69,6 +71,42 @@ export function sheet(id: string, rowCount = 10): Sheet {
 
 export function range(sheetId: string, r0: number, c0: number, r1: number, c1: number): Range {
   return { sheet: sheetId, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
+}
+
+/**
+ * Append a grid host to the document with an 800 x 400 layout size, which
+ * happy-dom does not compute on its own.
+ */
+export function mountHost(): HTMLDivElement {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return host;
+}
+
+/**
+ * Mount a grid over a caller-owned store of `makeWorkbook(rowCount)` filled
+ * with `makeColumnarData(rowCount)`.
+ */
+export function mountGridWithData(rowCount = 50): {
+  workbook: Workbook;
+  store: SheetwriteStore;
+  host: HTMLDivElement;
+  grid: GridImpl;
+} {
+  const workbook = makeWorkbook(rowCount);
+  const store = new SheetwriteStore(workbook, makeColumnarData(rowCount));
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  return { workbook, store, host, grid };
+}
+
+/** The grid's scroll container under `host`. */
+export function scrollerOf(host: HTMLElement): HTMLDivElement {
+  const node = host.querySelector(".sheetwrite-scroller");
+  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
+  return node;
 }
 
 /**

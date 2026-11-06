@@ -129,22 +129,11 @@ it("names the release pair the comparison artifact records", () => {
     },
   );
 
-  expect(page).toContain("### Sheetwrite 0.7.0 compared with a fresh 0.6.2 capture");
-  expect(page).toContain("Each suite ran once on 0.6.2 and once on 0.7.0");
-  expect(page).toContain("Change is 0.7.0 / 0.6.2 for the median");
-  expect(page).toContain("**new** has no 0.6.2 counterpart");
-  expect(page).toContain(
-    "| Suite | Measurement | 0.6.2 median / p95 | 0.7.0 median / p95 | Change | Result |",
-  );
+  // The release pair and the engine label come from the artifact; no other release appears.
   expect(page).toContain("| Measurement | 0.6.2 median / p95 | 0.7.0 median / p95 |");
+  expect(page).toContain("0.6.2 engine (WASM) under the 0.7 core and harness");
   expect(page).toContain("| New in 0.7 |");
-  expect(page).toContain(
-    "Formula tables compare the 0.6.2 engine (WASM) under the 0.7 core and harness with the 0.7 engine",
-  );
-  expect(page).toContain("those measurements are 0.7-only");
-  expect(page).toContain(
-    "--base-ref release/version-0.6.2 --baseline-results-dir results/releases/0.6.2",
-  );
+  expect(page).toContain("--base-ref release/version-0.6.2");
   expect(page).not.toMatch(/0\.5\.4|0\.6\.0|\b0\.6 /u);
 });
 

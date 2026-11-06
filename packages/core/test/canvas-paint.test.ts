@@ -391,13 +391,9 @@ describe("paintFrame variable row heights", () => {
     const ctx = render(view, layout, GEOMETRY_VIEWPORT);
 
     const rect = ctx.fillRects.find((r) => r.fillStyle === CELL_FILL);
-    expect(rect).toBeDefined();
     // y = headerHeight(20) + rowTops[1](40) - scrollTop(0); h = rowHeights[1](10).
     expect(rect?.y).toBe(60);
     expect(rect?.h).toBe(10);
-    // The uniform layout would have produced y = 44, h = 24 instead.
-    expect(rect?.y).not.toBe(44);
-    expect(rect?.h).not.toBe(24);
   });
 
   it("removes internal gridlines from a merged rectangle", () => {
@@ -515,7 +511,6 @@ describe("paintFrame column styles", () => {
 
     // Column B's header gets its own background fill at the column's position.
     const bg = ctx.fillRects.find((r) => r.fillStyle === HEADER_BG);
-    expect(bg).toBeDefined();
     expect(bg?.x).toBe(100);
     expect(bg?.w).toBe(80);
     expect(bg?.h).toBe(theme.headerHeight);
@@ -781,7 +776,6 @@ describe("scroll blit and damage-band integrity", () => {
     // strip's background erase the glyph half inside it - sliced digits.
     const ctx = render(view, layout, UNIFORM_VIEWPORT, theme, { x: 0, y: 62, w: 400, h: 18 });
     const label = ctx.fillTexts.find((call) => call.text === "2");
-    expect(label).toBeDefined();
     expect(label?.y).toBe(56);
   });
 

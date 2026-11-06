@@ -190,13 +190,16 @@ jobs:
         run: |
           test -n "$ARTIFACT_DIGEST"
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      # The coverage step runs the package suites and the analysis, history and
+      # queries Rust tests; this step runs every other unit suite and the
+      # default-feature engine tests, side by side. The coverage runs stay one
+      # after the other: together they would raise the job's peak memory.
       - name: Unit and Rust tests
         run: |
-          bun run test:unit
+          bun run test:unit:uncovered &
+          unit=$!
           cargo test --manifest-path packages/wasm/Cargo.toml
-          cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
-          cargo test --manifest-path packages/wasm/history/Cargo.toml
-          cargo test --manifest-path packages/queries/engine/Cargo.toml
+          wait "$unit"
       - name: Type checks, public API and generated docs
         run: |
           bun run typecheck
