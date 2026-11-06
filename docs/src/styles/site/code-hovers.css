@@ -92,10 +92,9 @@
   scrollbar-width: thin;
 }
 
-/* Signature and example code use the site code theme. Expressive Code
-   renders each token with both theme colours: `--0` light, `--1` dark. */
-.sw-code-popover__signature,
-.sw-code-popover__example {
+/* The signature uses the site code theme. Expressive Code renders each token
+   with both theme colours: `--0` light, `--1` dark. */
+.sw-code-popover__signature {
   display: block;
   background: var(--sw-code-bg);
   color: var(--sw-code-fg);
@@ -104,13 +103,11 @@
   white-space: pre;
 }
 
-.sw-code-popover__signature span[style],
-.sw-code-popover__example span[style] {
+.sw-code-popover__signature span[style] {
   color: var(--0);
 }
 
-:root[data-theme="dark"] .sw-code-popover__signature span[style],
-:root[data-theme="dark"] .sw-code-popover__example span[style] {
+:root[data-theme="dark"] .sw-code-popover__signature span[style] {
   color: var(--1);
 }
 
@@ -152,20 +149,6 @@
   font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
-}
-
-/* An example is a small code block under its label, not inline prose. */
-.sw-code-popover__tag--example {
-  display: grid;
-  gap: var(--sw-space-1-5);
-}
-
-.sw-code-popover__example {
-  max-height: 14rem;
-  padding: var(--sw-space-2) var(--sw-space-3);
-  overflow: auto;
-  border: var(--sw-border-width) solid var(--sw-border);
-  border-radius: var(--sw-radius-sm);
 }
 
 .sw-code-popover__tag-link {

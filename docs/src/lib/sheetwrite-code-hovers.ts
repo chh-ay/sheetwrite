@@ -198,7 +198,6 @@ interface RenderedHover {
   narrowSignature: ElementContent[];
   docs?: string;
   tags: readonly [name: string, text: string | undefined][];
-  examples?: ReadonlyMap<string, ElementContent[]>;
   seeRoutes?: ReadonlyMap<string, string>;
   referenceRoute?: string;
   /** When set, the trigger itself is an anchor: hover previews, click navigates. */
@@ -469,15 +468,6 @@ export function hoverPopoverId(
   return `sheetwrite-code-popover-${blockIdentity}-${hoverIndex}-${hover.line}-${hover.character}-${hover.length}-${hashIdentifier(hover.target)}`;
 }
 
-/**
- * An `@example` is code: keep its own line breaks and indentation, which the
- * prose cleanup would fold into one line. A fenced example loses its fence.
- */
-function exampleCode(value: string): string {
-  const fenced = /```[\w-]*\n?([\s\S]*?)```/.exec(value);
-  return (fenced?.[1] ?? value).replace(/^\n+|\s+$/g, "");
-}
-
 /** Make external URLs and site paths clickable in tag text. */
 function tagValueContents(value: string): ElementContent[] {
   const cleaned = cleanDocumentation(value);
@@ -521,13 +511,17 @@ function tagLabel(name: string): Element {
   return h("span.sw-code-popover__tag-name", TAG_LABELS[name] ?? `@${name}`);
 }
 
-function exampleTag(value: string, rendered: RenderedHover): Element {
-  const code = rendered.examples?.get(value) ?? [
-    { type: "text" as const, value: exampleCode(value) },
-  ];
-  return h("span.sw-code-popover__tag.sw-code-popover__tag--example", [
+/**
+ * A panel links to a symbol's examples instead of rendering them: a full
+ * example is hundreds of highlighted spans, which made the first open of a
+ * large panel one long style task. Symbol pages hold them under "Examples";
+ * a member route already points at the member row that holds its own.
+ */
+function exampleLinkTag(referenceRoute: string): Element {
+  const href = referenceRoute.includes("#") ? referenceRoute : `${referenceRoute}#examples`;
+  return h("span.sw-code-popover__tag", [
     tagLabel("example"),
-    h("code.sw-code-popover__example", structuredClone(code)),
+    h("a.sw-code-popover__tag-link", { href }, "Show example"),
   ]);
 }
 
@@ -548,17 +542,21 @@ function seeAlsoTag(values: readonly string[], rendered: RenderedHover): Element
   return h("span.sw-code-popover__tag", [tagLabel("see"), ...targets]);
 }
 
-/** Examples and other tags in source order, then one "See also" row. */
+/** Other tags in source order, then one "See also" row and the example link. */
 function panelTags(rendered: RenderedHover): Element[] {
   const seeAlso: string[] = [];
   const tags: Element[] = [];
+  let hasExample = false;
   for (const [name, value] of rendered.tags) {
     if (name === "see" && value) seeAlso.push(value);
-    else if (name === "example" && value) tags.push(exampleTag(value, rendered));
+    else if (name === "example") hasExample = true;
     else
       tags.push(h("span.sw-code-popover__tag", [tagLabel(name), ...tagValueContents(value ?? "")]));
   }
   if (seeAlso.length > 0) tags.push(seeAlsoTag(seeAlso, rendered));
+  if (hasExample && rendered.referenceRoute !== undefined) {
+    tags.push(exampleLinkTag(rendered.referenceRoute));
+  }
   return tags;
 }
 
@@ -728,7 +726,6 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     string,
     { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
   >();
-  const exampleParts = new Map<string, ElementContent[]>();
 
   const resolveManifest = async (): Promise<void> => {
     if (referenceRoutes && memberReferences && symbolPreviews) return;
@@ -879,26 +876,12 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
               meta: "",
             }),
           ]);
-          const examples = new Map<string, ElementContent[]>();
           const seeRoutes = new Map<string, string>();
           for (const [name, value] of hover.tags ?? []) {
-            if (name === "see" && value) {
-              const label = cleanDocumentation(value);
-              const route = referenceRouteForHover(label, label, routes);
-              if (route) seeRoutes.set(value, route);
-            }
-            if (name !== "example" || !value) continue;
-            let contents = exampleParts.get(value);
-            if (contents === undefined) {
-              const rendered = await signatureRenderer.render({
-                code: exampleCode(value),
-                language: /```([\w-]+)/.exec(value)?.[1] ?? "ts",
-                meta: "",
-              });
-              contents = codeLineContents(rendered.renderedGroupAst);
-              exampleParts.set(value, contents);
-            }
-            examples.set(value, contents);
+            if (name !== "see" || !value) continue;
+            const label = cleanDocumentation(value);
+            const route = referenceRouteForHover(label, label, routes);
+            if (route) seeRoutes.set(value, route);
           }
           const popoverId = hoverPopoverId(codeBlock, hover, hoverIndex);
           line.addAnnotation(
@@ -910,7 +893,6 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
                 docs: hover.docs ?? memberReference?.docs,
                 tags: hover.tags ?? [],
-                examples,
                 seeRoutes,
                 referenceRoute,
                 navigable: referenceRoute !== undefined,
