@@ -1,8 +1,4 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/space-grotesk";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/600.css";
 
 /* Tailwind skips gitignored files when it looks for class names, and the
    generated pages and data are gitignored, so name them here. */
@@ -23,45 +19,174 @@
  * `test/design-tokens.test.ts` measures every text and icon pair below
  * against WCAG AA in both themes.
  */
-/* Arial (Liberation Sans on Linux) scaled to Space Grotesk's width and line
-   metrics, so headings keep their line breaks while the web font loads.
-   Line metrics come from both fonts' hhea tables; widths are measured on a
-   heading at each weight. Space Grotesk keeps nearly one width across its
-   weights, while Arial Bold is much wider than Arial, so the two weight
-   ranges use their own Arial face and scale. Both stay slightly narrower
-   than Space Grotesk, so a heading never gains a line. */
+/* ── Typefaces ─────────────────────────────────────────────────────────
+   Bricolage Grotesque for headings (weight and optical-size axes), Instrument
+   Sans for body and interface text, JetBrains Mono for code and numbers. All
+   SIL Open Font License, self-hosted, latin and latin-ext only; the browser
+   fetches latin-ext only for text that needs it. The latin heading and body
+   files are preloaded (routes/__root.tsx). */
 @font-face {
-  font-family: "Space Grotesk Fallback";
+  font-family: "Bricolage Grotesque Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-ext-opsz-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-400-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-600-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* Metric-matched fallbacks: Arial (Liberation Sans on Linux) scaled to each
+   face's width, with its line metrics from the face's hhea table, so text
+   keeps its line breaks and height while the web fonts load. Widths are
+   measured on headings and body text at each weight range; each fallback
+   stays slightly narrower than its face, so text never gains a line. */
+@font-face {
+  font-family: "Bricolage Grotesque Fallback";
   font-weight: 100 549;
   src:
     local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"),
     local("Helvetica");
-  size-adjust: 108%;
-  ascent-override: 91.1%;
-  descent-override: 27.04%;
+  size-adjust: 100%;
+  ascent-override: 93%;
+  descent-override: 27%;
   line-gap-override: 0%;
 }
 
 @font-face {
-  font-family: "Space Grotesk Fallback";
+  font-family: "Bricolage Grotesque Fallback";
   font-weight: 550 900;
   src:
     local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
   size-adjust: 100%;
-  ascent-override: 98.4%;
-  descent-override: 29.2%;
+  ascent-override: 93%;
+  descent-override: 27%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Sans Fallback";
+  font-weight: 100 549;
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"),
+    local("Helvetica");
+  size-adjust: 100%;
+  ascent-override: 97%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Sans Fallback";
+  font-weight: 550 900;
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+    local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
+  size-adjust: 100%;
+  ascent-override: 97%;
+  descent-override: 25%;
   line-gap-override: 0%;
 }
 
 :root {
   /* ── Type ─────────────────────────────────────────────────────────────
-     Three families: Space Grotesk for display and headings, Inter for body
-     and interface text, JetBrains Mono for code and eyebrows. Roles, not raw
-     sizes: a stylesheet picks the role that matches the text's job. */
-  --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
+     Three families: Bricolage Grotesque for display and headings, Instrument
+     Sans for body and interface text, JetBrains Mono for code, numbers and
+     eyebrows. Roles, not raw sizes: a stylesheet picks the role that matches
+     the text's job. */
+  --sw-font-body:
+    "Instrument Sans Variable", "Instrument Sans", "Instrument Sans Fallback", system-ui, sans-serif;
   --sw-font-display:
-    "Space Grotesk Variable", "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
+    "Bricolage Grotesque Variable", "Bricolage Grotesque", "Bricolage Grotesque Fallback",
+    system-ui, sans-serif;
   --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
