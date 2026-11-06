@@ -111,7 +111,8 @@ export function captureMachines(): readonly CaptureMachine[] {
     machines.push({
       machine: "mac",
       directory: MAC_DIRECTORY,
-      label: `Mac · Apple Silicon · ${cpuName(mac.machine.cpu)}`,
+      // "Apple M5 Pro" under "Apple Silicon" names the maker once: "M5 Pro".
+      label: `Mac · Apple Silicon · ${cpuName(mac.machine.cpu).replace(/^Apple /u, "")}`,
       manifest: mac,
     });
   }

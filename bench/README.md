@@ -710,6 +710,31 @@ from this artifact: the captured release from the capture metadata protocol and
 the baseline from the suites' comparison labels. It rejects an artifact whose
 labels name more than one baseline or another release line.
 
+### Results on another machine
+
+The Linux release machine's captures in `results/` are the published evidence.
+The Performance pages also show a Mac section, captured from the same release:
+
+```sh
+# A clean checkout of the release, and of the XLSX baseline, each with packages built:
+git worktree add ../sheetwrite-v0.6.0 v0.6.0
+(cd ../sheetwrite-v0.6.0 && bun install --frozen-lockfile && bun run build:packages)
+
+# From bench/ of this tree, on an otherwise idle Mac:
+bun run bench:release:machine -- --machine mac --release 0.6.0 \
+  --checkout ../../sheetwrite-v0.6.0 \
+  --xlsx-baseline-root ../../sheetwrite-xlsx-baseline
+```
+
+Each suite runs that release's own benchmark script inside the checkout, so the
+timings measure what the release shipped. The formula suite runs in output
+mode, because `bench:formula` holds a capture to the release machine's
+baseline. Artifacts that stamp the release commit are copied to
+`results/machines/mac/`, beside `capture.json`, which records the release,
+commit, command, machine and each artifact's capture time, and names any suite
+that did not complete. `--suites core-paths,formula` reruns only those suites.
+The pages give each machine its own group and axis and never compare them.
+
 
 ### Chart tracking and pivot evidence
 
