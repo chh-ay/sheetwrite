@@ -132,8 +132,8 @@
   height: var(--sw-icon-sm);
   color: var(--sw-fg-muted);
 }
-.sw-sidebar__nav a:hover > .sw-icon,
-.sw-nav-subgroup > summary:hover > .sw-icon:first-child {
+.sw-sidebar__nav a:is(:hover, :focus-visible) > .sw-icon,
+.sw-nav-subgroup > summary:is(:hover, :focus-visible) > .sw-icon:first-child {
   --sw-icon-accent: var(--sw-accent);
 }
 .sw-sidebar__nav a > span:first-of-type,
