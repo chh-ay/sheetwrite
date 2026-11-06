@@ -5,6 +5,7 @@ import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
   loadFormulaReferenceEntries,
+  syntaxLiterals,
   renderFormulaFunctionPages,
 } from "../../scripts/formula-docs.ts";
 
@@ -86,5 +87,17 @@ describe("generated formula documentation contract", () => {
         );
       }
     }
+  });
+
+  it("accepts argument names and rejects example values in a syntax line", () => {
+    expect(syntaxLiterals("range, criteria, [sum_range]")).toEqual([]);
+    expect(syntaxLiterals("known_y's, [known_x's], [const]")).toEqual([]);
+    expect(syntaxLiterals("probability, alpha, beta, [A], [B]")).toEqual([]);
+    expect(syntaxLiterals("rows, cols, lambda(row, col)")).toEqual([]);
+    expect(syntaxLiterals("number1, [number2], …")).toEqual([]);
+    expect(syntaxLiterals("25, A1:A3, 0")).toEqual(["25", "A1:A3", "0"]);
+    expect(syntaxLiterals('B2:B25, ">5"')).toEqual(["B2:B25", '">5"']);
+    expect(syntaxLiterals("Where do you want to look?")).toEqual(["Where do you want to look?"]);
+    expect(syntaxLiterals("array1, lambda_or_array<#>")).toEqual(["lambda_or_array<#>"]);
   });
 });

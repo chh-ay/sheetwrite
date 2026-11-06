@@ -85,15 +85,15 @@
   },
   "AND": {
     "summary": "TRUE when every argument is TRUE.",
-    "syntax": "AND(A2>1, A2<100)"
+    "syntax": "AND(logical1, [logical2], …)"
   },
   "OR": {
     "summary": "TRUE when any argument is TRUE.",
-    "syntax": "OR(A2>1, A2<100)"
+    "syntax": "OR(logical1, [logical2], …)"
   },
   "NOT": {
     "summary": "Reverses a logical value.",
-    "syntax": "NOT(A2>100)"
+    "syntax": "NOT(logical)"
   },
   "FLOOR": {
     "summary": "Rounds a number down to the nearest multiple of a significance.",
@@ -229,7 +229,7 @@
   },
   "TEXT": {
     "summary": "Formats a value as text with a number format.",
-    "syntax": "TEXT(Value you want to format, \"Format code you want to apply\")"
+    "syntax": "TEXT(value, format_text)"
   },
   "EXACT": {
     "summary": "TRUE when two texts are the same, case included.",
@@ -241,7 +241,7 @@
   },
   "DATEVALUE": {
     "summary": "Converts a date written as text to a date serial number.",
-    "syntax": "DATEVALUE(\"1/1/2008\")"
+    "syntax": "DATEVALUE(date_text)"
   },
   "DAY": {
     "summary": "The day of the month of a date.",
@@ -273,7 +273,7 @@
   },
   "COUNTIF": {
     "summary": "The number of cells that meet one criterion.",
-    "syntax": "COUNTIF(Where do you want to look?, What do you want to look for?)"
+    "syntax": "COUNTIF(range, criteria)"
   },
   "COUNTIFS": {
     "summary": "The number of cells that meet every one of several criteria.",
@@ -281,7 +281,7 @@
   },
   "SUMIF": {
     "summary": "Adds the cells that meet one criterion.",
-    "syntax": "SUMIF(B2:B25, \">5\")"
+    "syntax": "SUMIF(range, criteria, [sum_range])"
   },
   "SUMIFS": {
     "summary": "Adds the cells that meet every one of several criteria.",
@@ -301,7 +301,7 @@
   },
   "MATCH": {
     "summary": "The position of a value in a row or column.",
-    "syntax": "MATCH(25, A1:A3, 0)"
+    "syntax": "MATCH(lookup_value, lookup_array, [match_type])"
   },
   "VLOOKUP": {
     "summary": "Finds a value in the first column of a table and returns a cell from its row.",
@@ -321,7 +321,7 @@
   },
   "FILTER": {
     "summary": "The rows or columns of an array that meet a condition.",
-    "syntax": "FILTER(A5:D20, C5:C20=H2, \"\")"
+    "syntax": "FILTER(array, include, [if_empty])"
   },
   "SORT": {
     "summary": "An array sorted by one of its columns or rows.",
@@ -385,7 +385,7 @@
   },
   "QUOTIENT": {
     "summary": "The integer part of a division.",
-    "syntax": "QUOTIENT(5, 2)"
+    "syntax": "QUOTIENT(numerator, denominator)"
   },
   "GCD": {
     "summary": "The greatest common divisor of integers.",
@@ -417,7 +417,7 @@
   },
   "SEARCH": {
     "summary": "The position of one text in another, ignoring case and allowing wildcards.",
-    "syntax": "SEARCH(\"n\", \"printer\")"
+    "syntax": "SEARCH(find_text, within_text, [start_num])"
   },
   "VALUE": {
     "summary": "Converts a text that looks like a number to a number.",
@@ -453,7 +453,7 @@
   },
   "NUMBERVALUE": {
     "summary": "Converts text to a number with given decimal and group separators.",
-    "syntax": "NUMBERVALUE(Text, [Decimal_separator], [Group_separator ])"
+    "syntax": "NUMBERVALUE(text, [decimal_separator], [group_separator])"
   },
   "TIME": {
     "summary": "The time serial number for an hour, minute and second.",
@@ -573,7 +573,7 @@
   },
   "COUNTBLANK": {
     "summary": "The number of empty cells in a range.",
-    "syntax": "COUNTBLANK(A2:B4)"
+    "syntax": "COUNTBLANK(range)"
   },
   "MAXIFS": {
     "summary": "The largest value among the cells that meet every criterion.",
@@ -609,7 +609,7 @@
   },
   "ADDRESS": {
     "summary": "A cell address as text from a row and column number.",
-    "syntax": "ADDRESS(2, 3)"
+    "syntax": "ADDRESS(row_num, column_num, [abs_num], [a1], [sheet_text])"
   },
   "OFFSET": {
     "summary": "A reference shifted by rows and columns from a starting reference.",
@@ -637,11 +637,11 @@
   },
   "TRANSPOSE": {
     "summary": "An array with its rows and columns swapped.",
-    "syntax": "TRANSPOSE(A1:B4)"
+    "syntax": "TRANSPOSE(array)"
   },
   "SEQUENCE": {
     "summary": "An array of sequential numbers.",
-    "syntax": "SEQUENCE(4, 5)"
+    "syntax": "SEQUENCE(rows, [columns], [start], [step])"
   },
   "TAKE": {
     "summary": "Rows or columns from the start or end of an array.",
@@ -909,7 +909,7 @@
   },
   "DATEDIF": {
     "summary": "The difference between two dates in years, months or days.",
-    "syntax": "DATEDIF(Start_date, End_date, \"Y\")"
+    "syntax": "DATEDIF(start_date, end_date, unit)"
   },
   "ISOWEEKNUM": {
     "summary": "The ISO week number of a date.",
@@ -989,7 +989,7 @@
   },
   "MODE.MULT": {
     "summary": "Every most-frequent value of a set, as a vertical array.",
-    "syntax": "MODE.MULT((number1, [number2], …)"
+    "syntax": "MODE.MULT(number1, [number2], …)"
   },
   "GROWTH": {
     "summary": "Values on an exponential trend fitted to known data.",
@@ -1081,7 +1081,7 @@
   },
   "CEILING.MATH": {
     "summary": "Rounds a number up to the nearest integer or multiple, with a mode for negatives.",
-    "syntax": "CEILING.MATH(24.3, 5)"
+    "syntax": "CEILING.MATH(number, [significance], [mode])"
   },
   "COMBIN": {
     "summary": "The number of combinations of a number of items taken k at a time.",
@@ -1193,7 +1193,7 @@
   },
   "MAP": {
     "summary": "Applies a LAMBDA to each value of arrays and returns the results.",
-    "syntax": "MAP(array1, lambda_or_array<#>)"
+    "syntax": "MAP(array1, [array2], …, lambda)"
   },
   "REDUCE": {
     "summary": "Folds an array into one value with a LAMBDA accumulator.",
@@ -1581,7 +1581,7 @@
   },
   "CONVERT": {
     "summary": "Converts a number from one measurement unit to another.",
-    "syntax": "CONVERT(1, \"lbm\", \"kg\")"
+    "syntax": "CONVERT(number, from_unit, to_unit)"
   },
   "ACCRINT": {
     "summary": "The accrued interest of a security that pays periodic interest.",
@@ -1753,7 +1753,7 @@
   },
   "BASE": {
     "summary": "Converts a number to text in another base (radix).",
-    "syntax": "BASE(Number, Radix [Min_length])"
+    "syntax": "BASE(number, radix, [min_length])"
   },
   "CEILING.PRECISE": {
     "summary": "Rounds a number up to the nearest multiple, whatever its sign.",

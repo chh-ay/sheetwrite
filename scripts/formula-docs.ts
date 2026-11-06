@@ -292,8 +292,36 @@ export async function loadFormulaReferenceEntries(
     if (!syntax.startsWith(`${name}(`) || !syntax.endsWith(")")) {
       throw new Error(`${REFERENCE_PATH}.${name}.syntax must be a call of ${name}: ${syntax}`);
     }
+    const literals = syntaxLiterals(syntax.slice(name.length + 1, -1));
+    if (literals.length > 0) {
+      throw new Error(
+        `${REFERENCE_PATH}.${name}.syntax must name its arguments, not give values: ${literals.join(", ")}`,
+      );
+    }
   }
   return entries as Record<string, FormulaReferenceEntry>;
+}
+
+/**
+ * An argument name as Excel's syntax lines write them: lower-case words joined
+ * by underscores (`sum_range`, `known_y's`, `number-chosen`), or a single
+ * capital for the optional bounds of the beta distributions (`[A]`, `[B]`).
+ */
+const ARGUMENT_NAME = /^(?:[a-z][a-z0-9_'.-]*|[A-Z])$/;
+/** A function argument written as its own call shape, as in `lambda(row, col)`. */
+const LAMBDA_ARGUMENT = /lambda\(([^()]*)\)/g;
+
+/**
+ * The arguments of a syntax line that are not argument names: example values
+ * such as numbers, quoted text or cell references, and prompt text.
+ */
+export function syntaxLiterals(argumentsText: string): string[] {
+  const names = argumentsText
+    .replace(LAMBDA_ARGUMENT, (_, inner: string) => `lambda, ${inner}`)
+    .split(/[,[\]]/)
+    .map((part) => part.trim())
+    .filter((part) => part !== "" && part !== "…");
+  return names.filter((part) => !ARGUMENT_NAME.test(part));
 }
 
 export async function loadFormulaContractInventory(
