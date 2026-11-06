@@ -604,7 +604,19 @@ impl FormulaEntry {
         handle: Option<u32>,
         formula_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| relink_sheet_refs(ast, key, handle))
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !relink_sheet_refs(ast, key, handle) {
+            return false;
+        }
+
+        // A relinked reference writes the same text, so the source stays as
+        // the user wrote it instead of being written again from the tree.
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.set_volatile(volatile);
+        true
     }
 
     /// Re-places the entry's 3-D references in the tab `order`; `names` holds
