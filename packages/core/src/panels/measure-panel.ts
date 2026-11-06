@@ -12,7 +12,7 @@ const NEEDS_NAME_AND_FORMULA = "Enter a name and a formula.";
 const NEEDS_TABLE = "Measures need a workbook table.";
 
 /** What a measure's status means to a user; null when it is ok. */
-export function measureStatusText(status: MeasureStatus): string | null {
+function measureStatusText(status: MeasureStatus): string | null {
   switch (status.status) {
     case "ok":
       return null;
@@ -49,12 +49,6 @@ export function measuresByTable(
   const orphans = measures.filter((measure) => !tables.some((table) => table.id === measure.table));
   if (orphans.length > 0) groups.push([null, orphans]);
   return groups;
-}
-
-/** A measure formula as saved: with its leading `=`. */
-export function measureFormula(text: string): string {
-  const source = text.trim();
-  return source.startsWith("=") ? source : `=${source}`;
 }
 
 function button(label: string, run: () => void, focusKey?: string): HTMLButtonElement {
@@ -148,7 +142,8 @@ export function measurePanel(grid: Grid): GridPanel {
           id: editing ?? nextMeasureId(grid.store.getWorkbook().dataModel?.measures ?? []),
           name: nextName,
           table: table.control.value,
-          formula: measureFormula(source),
+          // Saved formulas keep their leading `=`.
+          formula: source.startsWith("=") ? source : `=${source}`,
         };
         const message = rejectionMessage(
           grid.applyTransaction({ patches: [{ op: "setMeasure", measure }] }),
