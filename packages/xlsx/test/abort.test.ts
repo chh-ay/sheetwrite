@@ -80,7 +80,7 @@ interface CountingSignal {
   readonly checks: () => number;
 }
 
-/** A real signal that aborts with `reason` when the codec reads `aborted` for the `abortAt`-th time. */
+/** A real signal that aborts with `reason` when the codec reads `aborted` for the `abort_at`-th time. */
 function signal_aborting_at(abort_at: number, reason: Error): CountingSignal {
   const controller = new AbortController();
   let checks = 0;

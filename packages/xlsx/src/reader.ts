@@ -949,7 +949,7 @@ function last_column_declarations(spans: readonly number[]): Int32Array {
   }
 
   const owners = new Int32Array(column_count).fill(-1);
-  // `nextFree[col]` leads to the first unclaimed column at or after `col`.
+  // `next_free[col]` leads to the first unclaimed column at or after `col`.
   const next_free = Int32Array.from({ length: column_count + 1 }, (_, col) => col);
   const first_free = (col: number): number => {
     let free = col;
@@ -1344,7 +1344,7 @@ function outline_row_groups(
 
 /**
  * Rows are streamed from the inflated worksheet; only cells and the small
- * non-row tree stay resident. `columnSource` is set for the second pass over a
+ * non-row tree stay resident. `column_source` is set for the second pass over a
  * worksheet whose `cols` follow its rows, whose row warnings were already sent.
  */
 async function parse_sheet(
@@ -2296,7 +2296,7 @@ export async function readWorkbook(
   for (const reference of references) {
     checkAbort(context);
     const worksheet_part = reference.relationship.target;
-    // The worksheet itself is streamed by parseSheet; only its small parts are loaded.
+    // The worksheet itself is streamed by parse_sheet; only its small parts are loaded.
     const parts = package_file
       .relationships(worksheet_part)
       .filter(

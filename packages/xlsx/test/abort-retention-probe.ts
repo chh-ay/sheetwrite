@@ -21,7 +21,7 @@ const CELL_PREFIX = "kept-cell-";
 const PROBE_ABORT = "probe abort";
 const REPEATS = 4;
 
-/** A real signal that aborts when the codec reads `aborted` for the `abortAt`-th time. */
+/** A real signal that aborts when the codec reads `aborted` for the `abort_at`-th time. */
 function signal_aborting_at(abort_at: number): AbortSignal {
   const controller = new AbortController();
   let checks = 0;
@@ -39,7 +39,7 @@ function signal_aborting_at(abort_at: number): AbortSignal {
   return controller.signal;
 }
 
-/** Frames that `scrubStack` pushes; enough to cover the codec's deepest call chain. */
+/** Frames that `scrub_stack` pushes; enough to cover the codec's deepest call chain. */
 const SCRUB_DEPTH = 2_000;
 
 /**

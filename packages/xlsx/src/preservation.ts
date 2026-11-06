@@ -726,7 +726,7 @@ export function preparePreserved(
       for (const part of parts) {
         if (rewritten.has(part.name)) continue;
         const stored = stored_entry(part);
-        // verifyGraph checked these exact bytes; spare the writer a second inflate.
+        // verify_graph checked these exact bytes; spare the writer a second inflate.
         markStoredEntryVerified(stored);
         yield { name: part.name, stored };
       }
