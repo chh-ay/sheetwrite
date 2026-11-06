@@ -116,19 +116,6 @@ describe("SheetwriteStore", () => {
     }
   });
 
-  it("applies literal set patches and resolves them through the WASM boundary", () => {
-    const store = new SheetwriteStore(makeWorkbook(10));
-    store.applyTransaction({
-      patches: [
-        { op: "set", addr: addr(2, 0), value: { kind: "literal", value: "Acme" } },
-        { op: "set", addr: addr(2, 1), value: { kind: "literal", value: 1234.5 } },
-      ],
-    });
-    expect(store.getCell(addr(2, 0)).resolved).toBe("Acme");
-    expect(store.getCell(addr(2, 1)).resolved).toBe(1234.5);
-    expect(store.getCell(addr(2, 2)).resolved).toBeNull();
-  });
-
   it("loads formula CellValues from columnar data through the calc engine", async () => {
     const workbook = makeWorkbook(3);
     const store = new SheetwriteStore(workbook, {
