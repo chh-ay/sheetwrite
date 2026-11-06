@@ -32,6 +32,7 @@ import {
   fastestToP95,
   type MachineEvidence,
   machineCaptureLines,
+  machineFailure,
   machineGroups,
   perfFigure,
   type RunStat,
@@ -405,7 +406,11 @@ async function loadMachineCaptures<T>(
     machines: loaded.flatMap(({ machine, state }) =>
       "evidence" in state ? [{ machine, evidence: state.evidence, source: state.source }] : [],
     ),
-    otherPending: loaded.slice(1).flatMap(({ state }) => ("evidence" in state ? [] : [state])),
+    otherPending: loaded.slice(1).flatMap(({ machine, state }) => {
+      if ("evidence" in state) return [];
+      const failure = machineFailure(machine, artifact);
+      return [failure === undefined ? state : { ...state, reason: failure }];
+    }),
   };
 }
 
@@ -576,14 +581,8 @@ interface DataEvidence {
     bun: string;
     engineVersions: Readonly<Record<"sheetwrite" | "handsontable", string>>;
   };
-  sheetwrite: Record<
-    string,
-    { rows: number; stats: Record<string, RunStat> }
-  >;
-  handsontable: Record<
-    string,
-    { rows: number; stats: Record<string, RunStat> }
-  >;
+  sheetwrite: Record<string, { rows: number; stats: Record<string, RunStat> }>;
+  handsontable: Record<string, { rows: number; stats: Record<string, RunStat> }>;
 }
 
 /** Sizes both engines complete headlessly; the data page compares the engines here. */
@@ -873,11 +872,7 @@ function renderBenchWidget(
         verdictWords: metric === "speed" ? ["faster", "slower"] : ["smaller heap", "larger heap"],
         series: { base: "Handsontable", measured: "Sheetwrite" },
         spreadLabel: "Lowest to highest round",
-        groups: machineGroups(
-          machines,
-          (capture) => renderRows(capture, size, metric),
-          note,
-        ),
+        groups: machineGroups(machines, (capture) => renderRows(capture, size, metric), note),
       }),
     })),
   );
@@ -949,7 +944,13 @@ function dataScaleFigure(machines: readonly MachineEvidence<DataEvidence>[]): st
             const stat = capture.sheetwrite[String(rows)]?.stats[operation];
             return stat === undefined
               ? []
-              : [{ label: `${fmtRows(rows)} rows`, role: "measured" as const, stat: fastestToP95(stat) }];
+              : [
+                  {
+                    label: `${fmtRows(rows)} rows`,
+                    role: "measured" as const,
+                    stat: fastestToP95(stat),
+                  },
+                ];
           }),
         })),
       (capture) => captureNote(capture.meta),
@@ -1231,14 +1232,12 @@ function renderCorePathsSection(
                 detail: readableText(scenarioLabel(scenario.unit)),
                 bars: [{ label: "", role: "measured", stat: fastestToP95(scenario.timing) }],
               },
-              ...(scenario.variants ?? []).map(
-                (variant): PerfRow => ({
-                  label: readableId(variant.id),
-                  id: variant.id,
-                  detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
-                  bars: [{ label: "", role: "measured", stat: fastestToP95(variant.timing) }],
-                }),
-              ),
+              ...(scenario.variants ?? []).map((variant): PerfRow => ({
+                label: readableId(variant.id),
+                id: variant.id,
+                detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
+                bars: [{ label: "", role: "measured", stat: fastestToP95(variant.timing) }],
+              })),
             ]),
           (capture) => captureNote(capture.metadata),
         ),
@@ -2020,7 +2019,8 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "| Artifact | Status | Reproduce with |",
       "| --- | --- | --- |",
       ...pending.map(
-        (state) => `| \`${state.source}\` | ${state.reason} | \`${state.reproduction}\` |`,
+        (state) =>
+          `| \`${state.source}\` | ${markdownCell(state.reason)} | \`${state.reproduction}\` |`,
       ),
       "",
     );

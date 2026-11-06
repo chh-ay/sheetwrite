@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
@@ -9,7 +10,6 @@ import { HeroApp } from "../components/landing/HeroApp.js";
 import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
-import { PerfBars } from "../components/PerfBars.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
@@ -20,7 +20,7 @@ import {
   releaseHref,
 } from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
-import { type SpeedupMachine, speedupFigure } from "../lib/speedup-figure.js";
+import type { SpeedupMachine } from "../lib/speedup-figure.js";
 
 import landingStylesheet from "../styles/landing.css?url";
 
@@ -152,8 +152,15 @@ const SAMPLE_ROWS = [
   ["Folder", 9],
 ] as const;
 
+/** The bars sit below the fold, so their renderer loads with them, not with the page. */
+const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
+
 function BenchmarkBars({ evidence }: Readonly<{ evidence: LandingEvidence }>) {
-  return <PerfBars figure={speedupFigure("landing-speedup", evidence.machines)} />;
+  return (
+    <Suspense fallback={null}>
+      <SpeedupBars id="landing-speedup" machines={evidence.machines} />
+    </Suspense>
+  );
 }
 
 function FeatureCards() {

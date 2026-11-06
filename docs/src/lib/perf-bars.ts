@@ -78,7 +78,7 @@ export interface PerfFigure {
 /** Icon markup for one sprite icon; inline SVG at build time, a sprite reference on pages. */
 export type PerfIconMarkup = (name: PerfIconName) => string;
 
-export type PerfIconName = "arrow-down" | "arrow-up" | "minus" | "monitor" | "terminal";
+export type PerfIconName = "arrow-down" | "arrow-up" | "minus" | "laptop" | "server";
 
 export type PerfVerdictKind = "better" | "worse" | "noise" | "missing";
 
@@ -91,8 +91,8 @@ export interface PerfVerdict {
 }
 
 const MACHINE_ICONS: Readonly<Record<PerfMachine, PerfIconName>> = {
-  linux: "terminal",
-  mac: "monitor",
+  linux: "server",
+  mac: "laptop",
 };
 
 const DEFAULT_VERDICT_WORDS: Readonly<Record<PerfUnit, readonly [string, string]>> = {
@@ -124,9 +124,15 @@ function grouped(value: number, digits: number): string {
   });
 }
 
+/** Below a tenth of a millisecond the reader thinks in µs. */
+const MICROSECOND_LIMIT_MS = 0.1;
+
 /** Three significant figures in the unit a reader expects: µs, ms, then s. */
 export function formatTime(ms: number): string {
-  if (ms > 0 && ms < 0.0095) return `${Math.max(1, Math.round(ms * 1000))} µs`;
+  if (ms > 0 && ms < MICROSECOND_LIMIT_MS) {
+    const us = ms * 1000;
+    return `${grouped(us, us < 10 ? 1 : 0)} µs`;
+  }
   if (ms < 1 && ms > 0) return `${grouped(ms, 2)} ms`;
   if (ms >= 1000) return `${grouped(ms / 1000, ms >= 10_000 ? 1 : 2)} s`;
   return `${grouped(ms, ms < 10 ? 2 : ms < 100 ? 1 : 0)} ms`;
@@ -154,16 +160,23 @@ export function formatPerfValue(value: number, unit: PerfUnit): string {
 /** A bar's value label: "7.8× faster" on a ratio figure with a ratio word, else the plain value. */
 function barValue(value: number, figure: PerfFigure): string {
   const text = formatPerfValue(value, figure.unit);
-  return figure.unit === "ratio" && figure.ratioWord ? `${text} ${escapeHtml(figure.ratioWord)}` : text;
+  return figure.unit === "ratio" && figure.ratioWord
+    ? `${text} ${escapeHtml(figure.ratioWord)}`
+    : text;
 }
+
+/** Above this saving a whole percent would round to "−100%", which reads as "free". */
+const NEAR_FULL_SAVING = 99.5;
 
 /** A signed change with one decimal below 10%, whole percents above: "−75%", "+4.2%". */
 function formatPercent(fraction: number): string {
   const percent = fraction * 100;
   // Decide the decimals on the rounded value, so 9.96% reads "10%", not "10.0%".
   const magnitude = Math.round(Math.abs(percent) * 10) / 10;
-  const digits = magnitude < 10 ? 1 : 0;
-  const text = grouped(magnitude, digits);
+  const isNearFullSaving = percent < 0 && magnitude >= NEAR_FULL_SAVING;
+  const digits = magnitude < 10 || isNearFullSaving ? 1 : 0;
+  const shown = isNearFullSaving ? Math.min(magnitude, 99.9) : magnitude;
+  const text = grouped(shown, digits);
   if (text === grouped(0, digits)) return "0%";
   return `${percent < 0 ? "−" : "+"}${text}%`;
 }
@@ -185,7 +198,10 @@ export function perfVerdict(row: PerfRow, figure: PerfFigure): PerfVerdict | und
   if (pair === undefined) return undefined;
   const { base, measured } = pair;
   if (measured.stat === undefined) {
-    return { kind: "missing", text: `${measured.label}: ${measured.missing ?? "did not complete"}` };
+    return {
+      kind: "missing",
+      text: `${measured.label}: ${measured.missing ?? "did not complete"}`,
+    };
   }
   if (base.stat === undefined) {
     return { kind: "missing", text: `${base.label}: ${base.missing ?? "did not complete"}` };
@@ -278,8 +294,7 @@ function niceStep(largest: number): number {
 
 function linearAxis(values: readonly number[], unit: PerfUnit): Axis {
   const largest = Math.max(...values.filter((value) => value > 0), 1);
-  const step =
-    unit === "bytes" ? niceStep(largest / 1024 ** 2) * 1024 ** 2 : niceStep(largest);
+  const step = unit === "bytes" ? niceStep(largest / 1024 ** 2) * 1024 ** 2 : niceStep(largest);
   const top = Math.ceil(largest / step) * step;
   const count = Math.round(top / step);
   const at = (value: number): number => (Math.max(0, value) / top) * 100;
@@ -312,6 +327,12 @@ const UNIT_NAMES: Readonly<Record<PerfUnit, string>> = {
   ms: "time",
   bytes: "size",
   ratio: "ratio",
+};
+
+const VALUE_HEADERS: Readonly<Record<PerfUnit, string>> = {
+  ms: "Time",
+  bytes: "Size",
+  ratio: "Times faster",
 };
 
 function verdictMarkup(verdict: PerfVerdict, icon: PerfIconMarkup): string {
@@ -375,7 +396,11 @@ function axisMarkup(axis: Axis): string {
     .map(
       (tick, index) =>
         `<span class="perf-bars__tick" style="left:${percent(tick.at)}"${
-          index === 0 ? ' data-edge="start"' : index === axis.ticks.length - 1 ? ' data-edge="end"' : ""
+          index === 0
+            ? ' data-edge="start"'
+            : index === axis.ticks.length - 1
+              ? ' data-edge="end"'
+              : ""
         }>${escapeHtml(tick.label)}</span>`,
     )
     .join("");
@@ -428,10 +453,11 @@ function tableMarkup(figure: PerfFigure): string {
     group.rows.some((row) => measuredPair(row) !== undefined),
   );
   const hasSeries = hasSeriesLabels(figure.groups);
+  // The figure title already names the statistic; the column names the quantity.
   const columns = [
     figure.rowHeader,
     ...(hasSeries ? ["Series"] : []),
-    figure.title,
+    VALUE_HEADERS[figure.unit],
     ...(hasSpread ? [figure.spreadLabel ?? "Spread"] : []),
     ...(hasComparison ? ["Change", "Verdict"] : []),
   ];
@@ -467,7 +493,8 @@ function tableMarkup(figure: PerfFigure): string {
   return (
     '<details class="perf-bars__table">' +
     "<summary>Show the numbers as a table</summary>" +
-    `<div class="perf-bars__table-frame" tabindex="0"><table><caption>${escapeHtml(figure.title)}</caption>${head}${bodies.join("")}</table></div>` +
+    // The class keeps the docs build from wrapping this table in a prose table frame.
+    `<div class="perf-bars__table-frame" tabindex="0" role="region" aria-label="${escapeHtml(figure.title)}, table"><table class="perf-bars__data"><caption>${escapeHtml(figure.title)}</caption>${head}${bodies.join("")}</table></div>` +
     "</details>"
   );
 }
@@ -485,7 +512,8 @@ export function renderPerfBars(figure: PerfFigure, icon: PerfIconMarkup): string
   ];
   for (const group of groups) {
     const values = figureValues([group]);
-    const axis = figure.scale === "log" ? logAxis(values, figure.unit) : linearAxis(values, figure.unit);
+    const axis =
+      figure.scale === "log" ? logAxis(values, figure.unit) : linearAxis(values, figure.unit);
     parts.push(
       // Ticks are evenly spaced on both scales, so the tracks draw them as one repeating gridline.
       `<section class="perf-bars__group"${group.machine ? ` data-machine="${group.machine}"` : ""} style="--perf-steps:${axis.ticks.length - 1}">`,

@@ -88,18 +88,19 @@
   border-top: 1px solid var(--sw-border-strong);
 }
 
+/* The machine leads its group: icon and name on one line, the capture under the name. */
 .perf-bars__group-title {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--sw-space-1) var(--sw-space-2);
+  gap: var(--sw-space-0-5) var(--sw-space-2);
   margin-bottom: var(--sw-space-3);
   color: var(--sw-fg-strong);
   font-size: var(--sw-text-small);
 }
 
 .perf-bars__group-title .sw-icon {
-  color: var(--sw-fg-muted);
+  color: var(--sw-icon-accent);
 }
 
 .perf-bars__group-title strong {
@@ -107,6 +108,7 @@
 }
 
 .perf-bars__group-note {
+  grid-column: 2;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-caption);
 }
@@ -293,6 +295,8 @@
   border-inline: 2px solid var(--perf-whisker);
   background: linear-gradient(var(--perf-whisker), var(--perf-whisker)) center / 100% 2px no-repeat;
   transform: translateY(-50%);
+  /* A thin halo in the card colour keeps the band readable where it crosses a fill. */
+  filter: drop-shadow(0 0 1px var(--sw-surface-1)) drop-shadow(0 0 1px var(--sw-surface-1));
 }
 
 /* Single-series figures need no series column: the track starts under the label. */
@@ -384,27 +388,36 @@
   white-space: nowrap;
 }
 
-.perf-bars__table th,
-.perf-bars__table td {
+/* The prose table style sets eyebrow headers; data headers read as plain labels here. */
+.sw-prose .perf-bars__table :is(th, td),
+.perf-bars__table :is(th, td) {
   padding: var(--sw-space-1-5) var(--sw-space-3);
   border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg);
+  font: 400 var(--sw-text-caption) / 1.45 var(--sw-font-body, inherit);
+  letter-spacing: normal;
   text-align: left;
+  text-transform: none;
   vertical-align: top;
   white-space: nowrap;
 }
 
+.sw-prose .perf-bars__table thead th,
 .perf-bars__table thead th {
   color: var(--sw-fg-muted);
   font-weight: 600;
 }
 
-.perf-bars__table th[scope="colgroup"] {
-  padding-top: var(--sw-space-3);
+.sw-prose .perf-bars__table tbody th,
+.perf-bars__table tbody th {
   color: var(--sw-fg-strong);
+  font-weight: 600;
 }
 
+.sw-prose .perf-bars__table td,
 .perf-bars__table td {
   font-family: var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .perf-bars__caption {
@@ -443,6 +456,25 @@
 
   .perf-bars__missing {
     grid-column: 1 / -1;
+  }
+
+  /* Without a series name, the value takes the series line above the track. */
+  .perf-bars[data-series="none"] .perf-bars__bar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "value"
+      "track";
+  }
+
+  .perf-bars[data-series="none"] .perf-bars__axis {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "scale";
+  }
+
+  .perf-bars[data-series="none"] .perf-bars__value {
+    text-align: left;
   }
 
   /* Six or more ticks crowd a phone axis: keep every other label. */

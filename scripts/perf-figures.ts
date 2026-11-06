@@ -5,6 +5,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { MACHINE_CAPTURE_SUITES } from "../bench/src/machine-capture.js";
 import { inlineIcon } from "../docs/src/icons/inline-icon.js";
 import {
   type PerfFigure,
@@ -54,15 +55,32 @@ interface MachineCaptureManifest {
   readonly startedAt: string;
   readonly finishedAt: string;
   readonly command: string;
+  /** Suites that did not complete on this machine, with the error each printed. */
+  readonly failed?: ReadonlyArray<{ readonly suite: string; readonly error: string }>;
+}
+
+/** Why `artifact` is missing from a machine capture, when its suite did not complete. */
+export function machineFailure(machine: CaptureMachine, artifact: string): string | undefined {
+  const suite = MACHINE_CAPTURE_SUITES.find((entry) =>
+    (entry.artifacts as readonly string[]).includes(artifact),
+  );
+  const failure = machine.manifest?.failed?.find((entry) => entry.suite === suite?.name);
+  return failure === undefined
+    ? undefined
+    : `the ${failure.suite} suite did not complete on this machine: ${failure.error}`;
 }
 
 interface CaptureScopeReceipt {
   readonly metadata?: { readonly cpu?: string; readonly kernel?: string };
 }
 
-/** "12th Gen Intel(R) Core(TM) i9-12900H" reads "12th Gen Intel Core i9-12900H". */
+/** "12th Gen Intel(R) Core(TM) i9-12900H" reads "Intel Core i9-12900H". */
 function cpuName(cpu: string): string {
-  return cpu.replaceAll(/\((R|TM)\)/gu, "").replaceAll(/\s+/gu, " ").trim();
+  return cpu
+    .replaceAll(/\((R|TM)\)/gu, "")
+    .replace(/^\d+(st|nd|rd|th) Gen /u, "")
+    .replaceAll(/\s+/gu, " ")
+    .trim();
 }
 
 function readJson<T>(relativePath: string): T | undefined {
@@ -77,8 +95,9 @@ function readJson<T>(relativePath: string): T | undefined {
  */
 export function captureMachines(): readonly CaptureMachine[] {
   const machines: CaptureMachine[] = [];
-  const linuxCpu = readJson<CaptureScopeReceipt>(`${LINUX_DIRECTORY}/capture-runs/render-scale.json`)
-    ?.metadata?.cpu;
+  const linuxCpu = readJson<CaptureScopeReceipt>(
+    `${LINUX_DIRECTORY}/capture-runs/render-scale.json`,
+  )?.metadata?.cpu;
   machines.push({
     machine: "linux",
     directory: LINUX_DIRECTORY,
@@ -113,7 +132,10 @@ export function machineCaptureLines(machines: readonly CaptureMachine[]): string
           "",
           ...provenanceList([
             ["Release", `${html(manifest.release)} · ${shortHash(manifest.commit)} clean checkout`],
-            ["Captured", `${formatCaptureTime(manifest.startedAt)} → ${formatCaptureTime(manifest.finishedAt)} UTC`],
+            [
+              "Captured",
+              `${formatCaptureTime(manifest.startedAt)} → ${formatCaptureTime(manifest.finishedAt)} UTC`,
+            ],
             [
               "Machine",
               `${html(manifest.machine.cpu)} · ${manifest.machine.logicalCores} cores · ${Math.round(manifest.machine.memoryBytes / GIB)} GiB · ${html(manifest.machine.os)} · Bun ${html(manifest.machine.bun)}`,
@@ -123,7 +145,7 @@ export function machineCaptureLines(machines: readonly CaptureMachine[]): string
           "",
           "Reproduce with:",
           "",
-          '```sh title="Release capture on another machine"',
+          '```sh partial="needs clean, built checkouts of the release and the XLSX baseline" title="Release capture on another machine"',
           manifest.command,
           "```",
           "",

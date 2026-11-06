@@ -20,7 +20,11 @@ function comparison(
   return {
     label: "Sort",
     bars: [
-      { label: "0.5.4", role: "base", stat: { value: base, ...(spreads ? { spread: spreads[0] } : {}) } },
+      {
+        label: "0.5.4",
+        role: "base",
+        stat: { value: base, ...(spreads ? { spread: spreads[0] } : {}) },
+      },
       {
         label: "0.6.0",
         role: "measured",
@@ -93,7 +97,9 @@ describe("release-note comparisons", () => {
   it("rejects a figure that mixes times and sizes, and a value without a unit", () => {
     const block = (line: string) =>
       `<perf-compare title="T" base="a" measured="b" machine="mac">\n${line}\n</perf-compare>`;
-    expect(() => parsePerfCompare(block("Import | 1 s | 300 MiB"), "x")).toThrow(/mixes times and sizes/);
+    expect(() => parsePerfCompare(block("Import | 1 s | 300 MiB"), "x")).toThrow(
+      /mixes times and sizes/,
+    );
     expect(() => parsePerfCompare(block("Import | 1 | 2"), "x")).toThrow(/is not a value/);
   });
 });

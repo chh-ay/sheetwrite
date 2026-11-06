@@ -41,10 +41,13 @@ function parseValue(text: string, where: string): { unit: PerfUnit; stat: PerfSt
   const match = VALUE.exec(text.trim());
   const unit = match?.[3] === undefined ? undefined : UNITS[match[3]];
   if (match === null || unit === undefined) {
-    throw new Error(`<perf-compare> ${where}: "${text}" is not a value such as "4.2 ms" or "310 MiB"`);
+    throw new Error(
+      `<perf-compare> ${where}: "${text}" is not a value such as "4.2 ms" or "310 MiB"`,
+    );
   }
   const low = Number(match[1]?.replaceAll(",", "")) * unit.scale;
-  const high = match[2] === undefined ? undefined : Number(match[2].replaceAll(",", "")) * unit.scale;
+  const high =
+    match[2] === undefined ? undefined : Number(match[2].replaceAll(",", "")) * unit.scale;
   return {
     unit: unit.unit,
     stat: high === undefined ? { value: low } : { value: low, spread: [low, high] },
