@@ -22,9 +22,9 @@
 .host-row-stage__bar p,
 .host-row-panel header p {
   margin: 0 0 var(--sw-space-1-5);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
-  text-transform: uppercase;
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
   color: var(--sw-accent-strong);
 }
 .host-row-stage__bar h2 {
@@ -105,7 +105,7 @@
   width: 100%;
   padding: 0;
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -121,17 +121,6 @@
   margin: 0;
   padding: var(--sw-space-3) var(--sw-space-6);
 }
-.host-row-stage {
-  --sw-surface-0: var(--sw-surface-0);
-  --sw-surface-1: var(--sw-surface-1);
-  --sw-surface-2: var(--sw-surface-2);
-  --sw-fg: var(--sw-fg);
-  --sw-fg-muted: var(--sw-fg-muted);
-  --sw-fg-strong: var(--sw-fg-strong);
-  --sw-border: var(--sw-border);
-  --sw-accent: var(--sw-accent);
-}
-
 /* Core declares its canvas palette on the grid root (.sheetwrite) and overrides
    it again for [data-theme="dark"], so the stage palette only takes effect when
    it is declared on that same element with higher specificity. This also drives

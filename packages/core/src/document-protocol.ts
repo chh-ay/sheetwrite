@@ -22,6 +22,7 @@ import {
   validateRelationshipShape,
 } from "./data-model.js";
 import { SheetwriteError } from "./errors.js";
+import { validateExternalLinksShape } from "./external-link.js";
 import {
   cloneCellHyperlink,
   isSafeExternalHyperlink,
@@ -2391,6 +2392,10 @@ export function validateDocumentOperationShape(
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
+    case "setExternalLinks":
+      validateExternalLinksShape(ownValue(operation, "links"), `${path}.links`, errors);
+      break;
+
     case "setMeasure":
       validateMeasureShape(ownValue(operation, "measure"), `${path}.measure`, errors);
       break;
@@ -2773,9 +2778,11 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
     }
 
-    const queries = ownValue(graph, "queries");
-    if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
-      invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
+    for (const key of ["queries", "externalLink"]) {
+      const digest = ownValue(graph, key);
+      if (digest !== undefined && (typeof digest !== "string" || !/^[0-9a-f]{16}$/.test(digest))) {
+        invalid(errors, `${graphPath}.${key}`, `${key} must be a 64-bit hex digest`);
+      }
     }
 
     const unsupportedPath = `${graphPath}.unsupportedQueries`;
@@ -2969,6 +2976,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const queries = ownValue(workbook, "queries");
     if (queries !== undefined) {
       validateSavedQueriesShape(queries, "workbook.queries", errors);
+    }
+
+    const externalLinks = ownValue(workbook, "externalLinks");
+    if (externalLinks !== undefined) {
+      validateExternalLinksShape(externalLinks, "workbook.externalLinks", errors);
     }
   }
 
@@ -3550,6 +3562,9 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setExternalLinks":
+      return "external-links";
 
     case "setMeasure":
       return `measure:${operation.measure.id}`;

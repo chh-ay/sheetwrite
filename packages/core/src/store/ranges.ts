@@ -321,6 +321,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
+    case "setExternalLinks":
     case "setRelationship":
     case "removeRelationship":
     case "setMeasure":

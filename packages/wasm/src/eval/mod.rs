@@ -16,13 +16,20 @@ mod functions;
 mod index;
 mod info;
 mod iteration;
+mod literal_criteria;
+mod literal_products;
+mod literal_statistics;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
 mod math;
 mod matrix;
 mod number_format;
+#[cfg(test)]
+mod number_format_corpus_tests;
 mod operators;
+#[cfg(test)]
+mod pass_rule_tests;
 mod random;
 mod range_fold;
 mod range_reader;
@@ -72,11 +79,14 @@ use dependency::{
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
+use literal_criteria::CriteriaFold;
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+#[cfg(feature = "analysis")]
+pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
@@ -877,15 +887,19 @@ impl CellStore {
             .index()
             .is_some_and(|index| !index.has_dynamic_arrays())
         {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.evaluate_pass(&mut pass, found_cycle);
+            if self.independent_pass() {
+                self.evaluate_independent_pass(&affected, &mut memo);
+            } else {
+                let mut pass = EvalPass {
+                    affected: &affected,
+                    results: &mut memo,
+                };
+                self.evaluate_pass(&mut pass, found_cycle);
 
-            for id in affected.ids() {
-                if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(id, result);
+                for id in affected.ids() {
+                    if let Some(result) = pass.results.remove(id) {
+                        self.store_formula_result(id, result);
+                    }
                 }
             }
 
@@ -1334,6 +1348,32 @@ impl CellStore {
         data.spill.install(range, &mut data.cells, |offset| {
             calculated_slot(strings, &matrix.values[offset])
         })
+    }
+
+    /// Whether no selected formula can read another one during the pass: no
+    /// static formula-to-formula reads, no runtime references (`OFFSET` and
+    /// `INDIRECT` are volatile) and no iteration. Each formula then reads
+    /// only stored values, so its result can go to storage at once.
+    fn independent_pass(&self) -> bool {
+        self.iteration.is_none()
+            && !self.formula_slots.has_volatile()
+            && self
+                .graph
+                .index()
+                .is_some_and(|index| !index.has_formula_dependencies())
+    }
+
+    /// Evaluates each selected formula once and writes its result to storage
+    /// at once: no pass result table, active-call bits or second write loop.
+    fn evaluate_independent_pass(&mut self, affected: &FormulaWork, memo: &mut FormulaResults) {
+        for id in affected.ids() {
+            let mut pass = EvalPass {
+                affected,
+                results: memo,
+            };
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            self.store_formula_result(id, result);
+        }
     }
 
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
@@ -1863,6 +1903,21 @@ impl CellStore {
             | Func::XLookup
             | Func::XMatch => return self.eval_lookup_family(func, args, sheet, pass, depth + 1),
             _ => {}
+        }
+
+        if func == Func::SumProduct {
+            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
+        if matches!(
+            func,
+            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
+        ) {
+            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
+                return result;
+            }
         }
 
         if func == Func::Sum {
@@ -2478,6 +2533,13 @@ impl CellStore {
         if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
             return Some(Value::number(count as f64));
         }
+        if let Some(cells) = reader.literal_columns() {
+            return Some(self.literal_criteria_family(
+                CriteriaFold::Count,
+                None,
+                &[(cells, &criterion)],
+            ));
+        }
         let mut matches = 0.0;
         loop {
             match reader.next_allow_errors(pass) {
@@ -2568,6 +2630,14 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
+        if let Some(ranges) = readers
+            .iter()
+            .map(RangeReader::literal_columns)
+            .collect::<Option<Vec<_>>>()
+        {
+            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
+            return Some(self.literal_criteria_family(CriteriaFold::Count, None, &pairs));
+        }
         let mut matches = 0.0;
         loop {
             let first = match readers[0].next_allow_errors(pass) {
@@ -2630,6 +2700,15 @@ impl CellStore {
         if criteria_reader.shape() != value_reader.shape() {
             return Some(Value::Error(FormulaError::Value));
         }
+        if let (Some(cells), Some(values)) = (
+            criteria_reader.literal_columns(),
+            value_reader.literal_columns(),
+        ) {
+            let fold = CriteriaFold::Sum {
+                average: func == Func::AverageIf,
+            };
+            return Some(self.literal_criteria_family(fold, Some(&values), &[(cells, &criterion)]));
+        }
         let mut fold = IfSum::new();
         loop {
             let candidate = match criteria_reader.next_allow_errors(pass) {
@@ -2687,6 +2766,25 @@ impl CellStore {
             criteria.push(criterion);
         }
         let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
+        if let (Some(values), Some(ranges)) = (
+            value_reader.literal_columns(),
+            readers
+                .iter()
+                .map(RangeReader::literal_columns)
+                .collect::<Option<Vec<_>>>(),
+        ) {
+            let fold = if extreme {
+                CriteriaFold::Extreme {
+                    maximum: func == Func::MaxIfs,
+                }
+            } else {
+                CriteriaFold::Sum {
+                    average: func == Func::AverageIfs,
+                }
+            };
+            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
+            return Some(self.literal_criteria_family(fold, Some(&values), &pairs));
+        }
         let mut sums = IfSum::new();
         let mut extremes = IfExtreme::new(func == Func::MaxIfs);
         loop {

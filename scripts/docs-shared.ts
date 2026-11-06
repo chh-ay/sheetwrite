@@ -108,3 +108,8 @@ export async function exists(path: string): Promise<boolean> {
 export function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
+
+/** The YAML frontmatter that starts a generated docs page. */
+export function frontmatter(title: string, description: string): string {
+  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
+}
