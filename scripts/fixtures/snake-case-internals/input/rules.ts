@@ -37,6 +37,12 @@ class Counter {
 
   constructor(private readonly startValue: number) {}
 
+  static async create(): Promise<Counter> {
+    const counter = new Counter(await Promise.resolve(0));
+    counter.#stepSize = 2;
+    return counter;
+  }
+
   increment(byAmount: number): number {
     this.currentCount += byAmount * this.#stepSize + this.startValue;
     this.publicTotal = this.currentCount;

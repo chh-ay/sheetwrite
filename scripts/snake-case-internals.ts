@@ -108,6 +108,10 @@ interface Candidate {
   readonly file: SourceFile;
   readonly oldName: string;
   readonly newName: string;
+  /** The member is an ECMAScript `#name`, renamed lexically within its class. */
+  readonly is_private_name: boolean;
+  /** The same file uses the old name somewhere the checker resolved to no symbol. */
+  unresolved_use: boolean;
   readonly occurrences: Occurrence[];
 }
 
@@ -393,6 +397,10 @@ async function find_conflict(
   candidate: Candidate,
   symbol_names: ReadonlyMap<string, string>,
 ): Promise<string | undefined> {
+  if (candidate.unresolved_use) {
+    return `the checker resolves some \`${candidate.oldName}\` in this file to no symbol`;
+  }
+
   const other_old_name = symbol_names.get(`${candidate.file.fileName}\0${candidate.newName}`);
   if (other_old_name !== undefined && other_old_name !== candidate.oldName) {
     return `\`${other_old_name}\` in the same file also becomes \`${candidate.newName}\``;
@@ -426,6 +434,9 @@ async function collect_candidates(
   const exported = new Set<number>();
   const uses = new Map<number, Occurrence[]>();
   const declaration_counts = new Map<number, number>();
+  /** `file\0name` for names the checker resolved to no symbol. */
+  const unresolved = new Set<string>();
+  const private_names = new Map<SourceFile, Node[]>();
 
   for (const file of files) {
     const names: Node[] = [];
@@ -436,6 +447,12 @@ async function collect_candidates(
       const parent = name.parent;
       let symbol: Symbol | undefined = symbols[index];
       let keeps_key = false;
+
+      if (isPrivateIdentifier(name)) {
+        const listed = private_names.get(file);
+        if (listed) listed.push(name);
+        else private_names.set(file, [name]);
+      }
 
       if (isExportSpecifier(parent)) {
         const local = await project.checker.getExportSpecifierLocalTargetSymbol(parent);
@@ -459,7 +476,10 @@ async function collect_candidates(
         keeps_key = true;
       }
 
-      if (!symbol) continue;
+      if (!symbol) {
+        unresolved.add(`${file.fileName}\0${text_of(name)}`);
+        continue;
+      }
 
       const occurrence = { file, name, keeps_key };
       const listed = uses.get(symbol.id);
@@ -480,6 +500,8 @@ async function collect_candidates(
           file,
           oldName: old_name,
           newName: toSnakeCase(old_name),
+          is_private_name: isPrivateIdentifier(name),
+          unresolved_use: false,
           occurrences: [],
         });
       }
@@ -492,6 +514,21 @@ async function collect_candidates(
       continue;
     }
 
+    // A `#name` is lexically scoped to its class, so every `#name` in the class body is
+    // this member, even where the checker cannot type the receiver.
+    if (candidate.is_private_name) {
+      const owner = candidate.declaration.parent;
+      const same_class = (private_names.get(candidate.file) ?? []).filter(
+        (name) =>
+          text_of(name) === candidate.oldName && name.pos >= owner.pos && name.end <= owner.end,
+      );
+      candidate.occurrences.push(
+        ...same_class.map((name) => ({ file: candidate.file, name, keeps_key: false })),
+      );
+      continue;
+    }
+
+    candidate.unresolved_use = unresolved.has(`${candidate.file.fileName}\0${candidate.oldName}`);
     candidate.occurrences.push(...(uses.get(symbol_id) ?? []));
   }
 
