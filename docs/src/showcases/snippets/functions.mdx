@@ -2,7 +2,7 @@
 import * as formulas from "@sheetwrite/formulas";
 
 // The full engine runs every family on this page
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const grid = createGrid(host, { workbook });
 
 // A formula is a cell value; the result is read back after the recalculation
