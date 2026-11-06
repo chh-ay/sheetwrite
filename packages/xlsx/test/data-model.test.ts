@@ -165,6 +165,9 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
     values: [{ field: 1, aggregation: "SUM", numberFormat: "0.00" }, { measure: "share" }],
   };
   const input = authored([ordersToCustomers], [pivot]);
+  // The engine places output inside the sheet, so the sheet has its rows.
+  const data0 = input.sheets[0];
+  if (data0) data0.rowCount = 10;
   input.workbook.dataModel = {
     relationships: [ordersToCustomers],
     measures: [{ id: "share", name: "Share", table: "orders", formula: "=SUM(Orders[Amount])" }],
@@ -204,7 +207,9 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
   expect(sheet).toMatch(/<c r="A7"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Total<\/t>/u);
   // The Sum value keeps its field's number format; the measure is General.
   const styles = strFromU8(unzipSync(saved)["xl/styles.xml"] ?? new Uint8Array());
-  expect(styles).toContain('formatCode="0.00"');
+  // 0.00 is Excel's built-in number format 2.
+  expect(styles).toMatch(/<xf numFmtId="2"/u);
+  expect(sheet).toMatch(/<c r="B6" s="1"><v>7<\/v><\/c>/u);
   expect(sheet).toMatch(/<c r="C6"><v>7<\/v><\/c>/u);
   expect(warnings.map((warning) => warning.message)).toEqual([
     "Pivot table By region was not written as a native pivot because a model pivot needs an Excel data-model binary; its current values were written as cells and it remains in Sheetwrite metadata",
@@ -247,11 +252,10 @@ it("keeps a cell another application changed inside a kept pivot's output", asyn
       ],
     },
   ];
-  const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(
-    authored([], [pivot]),
-    {},
-    { pivotOutputs },
-  );
+  const input = authored([], [pivot]);
+  const data0 = input.sheets[0];
+  if (data0) data0.rowCount = 10;
+  const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(input, {}, { pivotOutputs });
   // Excel saves 9 over the value 7.
   const files = unzipSync(saved);
   const sheet = strFromU8(files["xl/worksheets/sheet1.xml"] ?? new Uint8Array());
