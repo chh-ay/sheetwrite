@@ -1,12 +1,8 @@
-.host-rows-frame {
-  min-height: 100dvh;
-  background: var(--sw-surface-0);
-  color: var(--sw-fg);
-}
+/* The host-owned rows page's wrappers inside the shared showcase layout. */
 .host-rows-showcase {
-  width: calc(100% - 2 * var(--sw-page-inset));
-  margin-inline: auto;
-  padding-block: var(--sw-space-3) var(--sw-space-16);
+  display: grid;
+  gap: var(--sw-space-8);
+  min-width: 0;
 }
 .host-row-stage {
   overflow: hidden;

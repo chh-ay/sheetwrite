@@ -10,14 +10,15 @@ import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { CapabilityHero } from "./CapabilityHero.js";
 import { applyHostProjection, type HostEntity } from "./host-rows-store.js";
+import { ShowcaseLayout } from "./layout/ShowcaseLayout.js";
 import { revenueAccountName } from "./revenue.js";
 import { siteGridTheme } from "./site-grid-theme.js";
 
 const LEAD_IMPORT_ROWS = 10_000;
+/** Accounts the host store starts with. */
+const ACCOUNT_ROWS = 48;
 const HOST_PREVIEW_ROWS = 120;
 /** One Grid commit accepts at most 10,000 operations, so cells load in batches. */
 const LEAD_LOAD_BATCH_ROWS = 1_800;
@@ -69,7 +70,7 @@ const accountNames = [
   "Cobalt Grove",
 ];
 const industries = ["Logistics", "Health", "Works", "Energy", "Foods", "Systems"];
-const initialRows: HostEntity[] = Array.from({ length: 48 }, (_, index) => ({
+const initialRows: HostEntity[] = Array.from({ length: ACCOUNT_ROWS }, (_, index) => ({
   id: `account-${String(index + 1).padStart(3, "0")}`,
   name: `${accountNames[index % accountNames.length]} ${industries[Math.floor(index / accountNames.length)]}`,
   amount:
@@ -260,152 +261,159 @@ export default function HostRowsShowcase() {
   };
 
   return (
-    <div className="host-rows-frame">
-      <SiteTopbar active="showcases" />
-      <main className="host-rows-showcase" data-testid="host-rows-showcase">
-        <CapabilityHero
-          eyebrow="CAPABILITY / HOST-OWNED ROWS"
-          title="Move the view. Keep the account."
-          description="Your app owns the account store. Sort, filter, and edit the Grid. Every delta still names the same account ID."
-          facts={[
-            { label: "Accounts", value: "48 + 10,000 leads" },
-            { label: "Coverage", value: "4 regions" },
-            { label: "Identity", value: "Stable account IDs" },
-            { label: "Write policy", value: "Host decides" },
-          ]}
-        />
-        <section className="host-row-stage" aria-label="Live CRM workbook">
-          <header className="host-row-stage__bar">
-            <div>
-              <p>Fast row ID checks</p>
-              <h2>Import the leads. Keep every ID unique.</h2>
+    <ShowcaseLayout
+      demo={
+        <div className="host-rows-showcase" data-testid="host-rows-showcase">
+          <section className="host-row-stage" aria-label="Live CRM workbook">
+            <header className="host-row-stage__bar">
+              <div>
+                <p>Fast row ID checks</p>
+                <h2>Import the leads. Keep every ID unique.</h2>
+              </div>
+              <button
+                className="host-row-primary"
+                type="button"
+                disabled={!ready || importResult !== null}
+                onClick={importLeads}
+                data-testid="host-import-leads"
+              >
+                {importResult ? "10,000 leads imported" : "Import 10,000 leads"}
+              </button>
+              <output aria-live="polite" data-testid="host-arr-total">
+                <strong>{money.format(arr)}</strong>
+                <span>{entities.size} accounts · host-owned ARR</span>
+              </output>
+              <output
+                className="host-row-import-time"
+                aria-live="polite"
+                data-testid="host-import-timing"
+              >
+                <strong data-empty={!importResult}>
+                  {importResult ? `${importResult.insertMs.toFixed(1)} ms` : "Not run"}
+                </strong>
+                <span>
+                  {importResult
+                    ? `ID checks + row insertion · cell load ${importResult.loadMs.toFixed(0)} ms in ${importResult.batches} commits`
+                    : "Lead import time. Measured in this browser when you import."}
+                </span>
+              </output>
+            </header>
+            <div className="host-row-actions">
+              <fieldset className="host-row-actions__group">
+                <legend>Host changes</legend>
+                <button
+                  type="button"
+                  disabled={!ready || !entities.has("account-001")}
+                  onClick={remoteUpdate}
+                >
+                  Remote update
+                </button>
+                <button type="button" disabled={!ready} onClick={() => grid.current?.insertRows(1)}>
+                  Insert row
+                </button>
+                <button type="button" disabled={!ready} onClick={() => grid.current?.removeRows(1)}>
+                  Delete row
+                </button>
+              </fieldset>
+              <fieldset className="host-row-actions__group">
+                <legend>View only</legend>
+                <button
+                  type="button"
+                  disabled={!ready}
+                  onClick={() => grid.current?.setViewSort([{ col: 1, ascending: false }])}
+                >
+                  Sort view by amount
+                </button>
+                <button
+                  type="button"
+                  disabled={!ready}
+                  onClick={() => grid.current?.filterBy(2, "North")}
+                >
+                  Filter North
+                </button>
+                <button
+                  type="button"
+                  disabled={!ready}
+                  onClick={() => grid.current?.setColumnFilter(2, null)}
+                >
+                  Clear filter
+                </button>
+              </fieldset>
+              <fieldset className="host-row-actions__group">
+                <legend>Write policy</legend>
+                <button
+                  type="button"
+                  disabled={!ready}
+                  onClick={() => {
+                    denyNext.current = true;
+                    grid.current?.applyTransaction({
+                      patches: [
+                        {
+                          op: "set",
+                          addr: { sheet: "sheet1", row: 0, col: 1 },
+                          value: { kind: "literal", value: 999 },
+                        },
+                      ],
+                    });
+                  }}
+                >
+                  Reject next edit
+                </button>
+                <button type="button" disabled={!ready} onClick={transformedAccept}>
+                  Transformed accept
+                </button>
+              </fieldset>
             </div>
-            <button
-              className="host-row-primary"
-              type="button"
-              disabled={!ready || importResult !== null}
-              onClick={importLeads}
-              data-testid="host-import-leads"
-            >
-              {importResult ? "10,000 leads imported" : "Import 10,000 leads"}
-            </button>
-            <output aria-live="polite" data-testid="host-arr-total">
-              <strong>{money.format(arr)}</strong>
-              <span>{entities.size} accounts · host-owned ARR</span>
-            </output>
-            <output
-              className="host-row-import-time"
-              aria-live="polite"
-              data-testid="host-import-timing"
-            >
-              <strong data-empty={!importResult}>
-                {importResult ? `${importResult.insertMs.toFixed(1)} ms` : "Not run"}
-              </strong>
-              <span>
-                {importResult
-                  ? `ID checks + row insertion · cell load ${importResult.loadMs.toFixed(0)} ms in ${importResult.batches} commits`
-                  : "Lead import time. Measured in this browser when you import."}
-              </span>
-            </output>
-          </header>
-          <div className="host-row-actions">
-            <fieldset className="host-row-actions__group">
-              <legend>Host changes</legend>
-              <button
-                type="button"
-                disabled={!ready || !entities.has("account-001")}
-                onClick={remoteUpdate}
-              >
-                Remote update
-              </button>
-              <button type="button" disabled={!ready} onClick={() => grid.current?.insertRows(1)}>
-                Insert row
-              </button>
-              <button type="button" disabled={!ready} onClick={() => grid.current?.removeRows(1)}>
-                Delete row
-              </button>
-            </fieldset>
-            <fieldset className="host-row-actions__group">
-              <legend>View only</legend>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => grid.current?.setViewSort([{ col: 1, ascending: false }])}
-              >
-                Sort amount
-              </button>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => grid.current?.filterBy(2, "North")}
-              >
-                Filter North
-              </button>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => grid.current?.setColumnFilter(2, null)}
-              >
-                Clear filter
-              </button>
-            </fieldset>
-            <fieldset className="host-row-actions__group">
-              <legend>Write policy</legend>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => {
-                  denyNext.current = true;
-                  grid.current?.applyTransaction({
-                    patches: [
-                      {
-                        op: "set",
-                        addr: { sheet: "sheet1", row: 0, col: 1 },
-                        value: { kind: "literal", value: 999 },
-                      },
-                    ],
-                  });
-                }}
-              >
-                Reject next edit
-              </button>
-              <button type="button" disabled={!ready} onClick={transformedAccept}>
-                Transformed accept
-              </button>
-            </fieldset>
-          </div>
-          <SheetwriteGrid
-            {...input}
-            ref={grid}
-            presentation="data-grid"
-            theme={{ rowHeight: 36 }}
-            rowBridge={bridge}
-            config={GRID_CONFIG}
-            onReady={() => {
-              applySiteTheme();
-              setReady(true);
-            }}
-            onRowDelta={(projection) => {
-              if (!applyingServerResult.current) applyProjection(projection);
-            }}
-            onMutationRejected={() =>
-              applyProjection(
-                bridge.reconcile({
-                  status: "rejected",
-                  transactionId: "rejected-showcase",
-                  operations: [],
-                }),
-              )
-            }
-            protectionResolver={protectionResolver}
-            height={428}
-          />
-          <p className="host-row-stage__note">
-            Each imported lead gets a stable ID from the row bridge. The insert is one commit; the
-            50,000 cell values load in bounded batches, because one Grid transaction accepts 10,000
-            operations. Sort and filter change only the view.
-          </p>
-        </section>
+            <SheetwriteGrid
+              {...input}
+              ref={grid}
+              presentation="data-grid"
+              theme={{ rowHeight: 36 }}
+              rowBridge={bridge}
+              config={GRID_CONFIG}
+              onReady={() => {
+                applySiteTheme();
+                setReady(true);
+              }}
+              onRowDelta={(projection) => {
+                if (!applyingServerResult.current) applyProjection(projection);
+              }}
+              onMutationRejected={() =>
+                applyProjection(
+                  bridge.reconcile({
+                    status: "rejected",
+                    transactionId: "rejected-showcase",
+                    operations: [],
+                  }),
+                )
+              }
+              protectionResolver={protectionResolver}
+              height={428}
+            />
+            <p className="host-row-stage__note">
+              Each imported lead gets a stable ID from the row bridge. The insert is one commit; the
+              50,000 cell values load in bounded batches, because one Grid transaction accepts
+              10,000 operations. Sort and filter change only the view.
+            </p>
+          </section>
+        </div>
+      }
+      demoLabel="Live CRM workbook"
+      eyebrow="Host-owned rows"
+      facts={[
+        { label: "Accounts", value: ACCOUNT_ROWS.toLocaleString("en") },
+        { label: "Leads to import", value: LEAD_IMPORT_ROWS.toLocaleString("en") },
+        { label: "Identity", value: "Stable account IDs" },
+      ]}
+      guide={{
+        href: "/docs/features/data/host-owned-rows/",
+        label: "Read the host-owned rows guide",
+      }}
+      id="host-rows"
+      task="Your app owns the account store. Sort the view, filter and edit the grid, then import thousands of leads: every delta still names the same account ID."
+      title="Move the view. Keep the account."
+    >
+      <div className="host-rows-showcase">
         <section className="host-row-proof" aria-label="Host-owned state">
           <div className="host-row-panel">
             <header>
@@ -477,7 +485,7 @@ export default function HostRowsShowcase() {
             ) : null}
           </div>
         </section>
-      </main>
-    </div>
+      </div>
+    </ShowcaseLayout>
   );
 }
