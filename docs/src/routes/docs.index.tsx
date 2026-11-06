@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { DocsShell } from "../components/DocsShell.js";
+import { Icon } from "../components/Icon.js";
 import { pageMeta } from "../lib/seo.js";
 
 export const Route = createFileRoute("/docs/")({
@@ -41,7 +42,7 @@ function DocsOverview() {
               to="/docs/$/"
               params={{ _splat: "start/installation" }}
             >
-              Install Sheetwrite <span aria-hidden="true">→</span>
+              Install Sheetwrite <Icon name="arrow-right" />
             </Link>
             <Link
               className="sw-doc-secondary"
@@ -80,21 +81,21 @@ function DocsOverview() {
           <div className="sw-doc-section-head">
             <h2 id="new-in-release">New in 0.6.1</h2>
             <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }}>
-              Read the release notes →
+              Read the release notes <Icon name="arrow-right" />
             </Link>
           </div>
           <div className="sw-doc-destinations">
             <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }} hash="data-grid-edits">
               <span className="sw-doc-eyebrow">Performance</span>
               <strong>
-                Four slowdowns fixed <span aria-hidden="true">→</span>
+                Four slowdowns fixed <Icon name="arrow-right" />
               </strong>
               <span>Faster data-grid edits, paged scrolling, text lookups and XLSX rejects.</span>
             </Link>
             <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="charts">
               <span className="sw-doc-eyebrow">0.6.0</span>
               <strong>
-                Charts and pivot tables <span aria-hidden="true">→</span>
+                Charts and pivot tables <Icon name="arrow-right" />
               </strong>
               <span>
                 Charts that follow their cell ranges, and pivot tables that the full engine
@@ -104,7 +105,7 @@ function DocsOverview() {
             <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
-                Upgrade checklist <span aria-hidden="true">→</span>
+                Upgrade checklist <Icon name="arrow-right" />
               </strong>
               <span>Update every package together.</span>
             </Link>
@@ -115,7 +116,7 @@ function DocsOverview() {
           <div className="sw-doc-section-head">
             <h2 id="choose-framework">Choose your framework</h2>
             <Link to="/docs/$/" params={{ _splat: "frameworks/lifecycle" }}>
-              Compare lifecycles →
+              Compare lifecycles <Icon name="arrow-right" />
             </Link>
           </div>
           <div className="sw-doc-frameworks">
@@ -140,14 +141,14 @@ function DocsOverview() {
             <Link to="/docs/$/" params={{ _splat: "api" }}>
               <span className="sw-doc-eyebrow">Reference</span>
               <strong>
-                Explore the API <span aria-hidden="true">→</span>
+                Explore the API <Icon name="arrow-right" />
               </strong>
               <span>Browse packages, filter exports, and inspect exact TypeScript signatures.</span>
             </Link>
             <Link to="/docs/$/" params={{ _splat: "concepts/runtime-ownership" }}>
               <span className="sw-doc-eyebrow">Concepts</span>
               <strong>
-                Understand ownership <span aria-hidden="true">→</span>
+                Understand ownership <Icon name="arrow-right" />
               </strong>
               <span>
                 Know what belongs to your application, the adapter, the grid, and the engine.
@@ -156,7 +157,7 @@ function DocsOverview() {
             <Link to="/showcases/">
               <span className="sw-doc-eyebrow">Live examples</span>
               <strong>
-                See it in action <span aria-hidden="true">→</span>
+                See it in action <Icon name="arrow-right" />
               </strong>
               <span>
                 Try real workbooks, framework integrations, and capability demonstrations.
@@ -225,11 +226,15 @@ function DocsOverview() {
           <div className="sw-doc-agent__links">
             <a href="/llms.txt">
               <code>llms.txt</code>
-              <span>Start with the index →</span>
+              <span>
+                Start with the index <Icon name="arrow-right" />
+              </span>
             </a>
             <a href="/llms-full.txt">
               <code>llms-full.txt</code>
-              <span>Read the full reference →</span>
+              <span>
+                Read the full reference <Icon name="arrow-right" />
+              </span>
             </a>
           </div>
         </section>

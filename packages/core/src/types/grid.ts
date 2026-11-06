@@ -812,6 +812,7 @@ export interface GridEvents {
  * @see Grid.applyTransaction
  */
 export interface Grid {
+  /** The store holding this grid's workbook data; shared with other views of it. */
   readonly store: Store;
   /** Imperative action surface for binding custom toolbars/menus. */
   readonly actions: GridActions;
@@ -836,7 +837,9 @@ export interface Grid {
    * `AbortError`. Resolves null when nothing is selected.
    */
   summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
+  /** Show the sheet `id`. Hidden sheets and unknown ids are ignored. */
   setActiveSheet(id: SheetId): void;
+  /** Scroll `addr` into view, switching to its sheet first when needed. */
   scrollToCell(addr: CellAddress): void;
   /**
    * Resolve browser viewport coordinates to an active-sheet cell for host-owned
@@ -850,7 +853,9 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
+  /** The current selection, or null when nothing is selected. */
   getSelection(): Selection | null;
+  /** Select `sel`, or clear the selection with null. */
   setSelection(sel: Selection | null): void;
   /** Resolved base theme, before zoom scaling. The returned object is a copy. */
   getTheme(): Theme;
@@ -908,6 +913,10 @@ export interface Grid {
     operations: readonly DocumentOp[],
     options?: RemoteOperationOptions,
   ): ApplyTransactionResult;
+  /**
+   * Register `renderer` under `name`; columns that name it in their `renderer`
+   * field draw their cells with it. Redefining a name replaces the renderer.
+   */
   defineCellRenderer(name: string, renderer: CellRenderer): void;
   /**
    * Column aggregate over the active sheet's data.
@@ -1109,30 +1118,47 @@ export interface Grid {
    * and not counted. No-op when read-only.
    */
   replaceAll(replacement: string): ReplaceResult;
+  /** Insert `count` (default 1) empty rows at row `at` of the active sheet, as one undo step. */
   insertRows(at: number, count?: number): void;
+  /** Remove `count` (default 1) rows from row `at` of the active sheet, as one undo step. */
   removeRows(at: number, count?: number): void;
+  /** Insert `count` (default 1) empty columns at column `at` of the active sheet, as one undo step. */
   insertColumns(at: number, count?: number): void;
+  /**
+   * Remove `count` (default 1) columns from column `at` of the active sheet, as
+   * one undo step. The last column is never removed.
+   */
   removeColumns(at: number, count?: number): void;
   /** Add a sheet with a stable ID and return its actionable transaction outcome. */
   addSheet(input: AddSheetInput): SheetLifecycleResult;
   /** Remove a sheet while preserving at least one visible worksheet. */
   removeSheet(id: SheetId): SheetLifecycleResult;
+  /** Rename a sheet; the result reports names that are invalid or already taken. */
   renameSheet(id: SheetId, name: string): SheetLifecycleResult;
+  /** Move a sheet to position `toIndex` in the sheet order. */
   moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
   /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
   setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
+  /** Replace every conditional format rule of the active sheet with `rules`, as one undo step. */
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  /** Add a hyperlink on the active sheet, or replace the one with the same id. */
   setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+  /** Remove the active sheet's hyperlink with this id. */
   removeHyperlink(id: string): ApplyTransactionResult;
+  /** The hyperlink covering `addr`, or null. */
   getHyperlink(addr: CellAddress): CellHyperlink | null;
   /**
    * Validate and emit a host-owned activation event. External targets are never
    * opened by Sheetwrite; internal navigation occurs only under the explicit policy.
    */
   activateHyperlink(addr: CellAddress): boolean;
+  /** Add a data validation rule on the active sheet, or replace the one with the same id. */
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
+  /** Remove the active sheet's data validation rule with this id. */
   removeValidationRule(id: string): ApplyTransactionResult;
+  /** Add a protected range on the active sheet, or replace the one with the same id. */
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
+  /** Remove the active sheet's protected range with this id. */
   removeProtectedRange(id: string): ApplyTransactionResult;
   /** Clones of the pivot definitions on `sheet`, or on every sheet; no engine is needed. */
   getPivots(sheet?: SheetId): PivotDefinition[];
@@ -1174,8 +1200,15 @@ export interface Grid {
    * focus to the grid.
    */
   openPanel(panel: GridPanel | null): void;
+  /**
+   * Decide which local edits to protected ranges are allowed; `undefined`
+   * removes the policy. `mode` chooses whether a denied operation rejects its
+   * whole transaction (`"atomic"`) or only itself (`"partial"`).
+   */
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
+  /** Set the plain-text note on `addr`; null or an empty string removes it. */
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
+  /** The note on `addr`, or null. */
   getNote(addr: CellAddress): string | null;
   /**
    * Live-update the render window overscan (row/column positions painted past
@@ -1226,6 +1259,7 @@ export interface Grid {
   setFrozen(rows: number, cols?: number): void;
   /** Content zoom factor (0.5–2): scales row/column geometry and fonts. */
   setZoom(zoom: number): void;
+  /** The current content zoom factor. */
   getZoom(): number;
   /**
    * Which renderer is actually active: `"worker"` when the OffscreenCanvas
@@ -1233,7 +1267,9 @@ export interface Grid {
    * `renderer-fallback`).
    */
   rendererKind(): "canvas" | "worker";
+  /** Listen for a grid event; returns the function that removes the listener. */
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
+  /** Repaint the grid now, for example after a custom renderer's inputs changed. */
   refresh(): void;
   /**
    * Drop the memory this grid can build again: decoded cell strings, rendered

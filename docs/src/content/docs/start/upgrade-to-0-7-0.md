@@ -3,6 +3,10 @@ title: Upgrade to 0.7.0
 description: Replace the removed sort and revision APIs, update error and cancellation handling, and review the sort order and formula results that change in 0.7.0.
 ---
 
+> [!NOTE]
+> 0.7.0 is the next release and is not published yet. This guide tracks the
+> changes already merged for it, so an upgrade can be planned ahead.
+
 Each section lists what changed in 0.7.0, what replaces it, and the pull
 request that made the change. The "before" code is 0.6 code; the "after" code is
 compiled against the 0.7.0 packages when the docs are built.

@@ -111,25 +111,6 @@ a {
   white-space: nowrap;
 }
 
-.sw-brand {
-  display: inline-flex;
-  width: max-content;
-  align-items: center;
-  gap: var(--sw-space-3);
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-h4) / 1 var(--sw-font-display);
-  letter-spacing: var(--sw-tracking-display);
-  text-decoration: none;
-}
-
-.sw-brand svg {
-  width: 1.65rem;
-  height: 1.65rem;
-  fill: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-1));
-  stroke: var(--sw-accent-strong);
-  stroke-width: 1.5;
-}
-
 .sw-skip-link {
   position: fixed;
   top: 0.65rem;
@@ -145,16 +126,6 @@ a {
 
 .sw-skip-link:focus-visible {
   transform: none;
-}
-
-.sw-search-button svg,
-.sw-search-dialog svg {
-  width: var(--sw-icon-sm);
-  height: var(--sw-icon-sm);
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: var(--sw-icon-stroke);
 }
 
 .sw-search-button {
@@ -636,17 +607,6 @@ a {
   margin: var(--sw-space-3) var(--sw-space-1) 0;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-eyebrow);
-}
-
-body .sw-code-popover__tag-link {
-  color: var(--sw-accent-strong);
-  font-weight: var(--sw-weight-semibold);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-body .sw-code-popover__tag-link:hover {
-  text-decoration: underline;
 }
 
 /* Reading order first, colophon last: the footer closes the page with where

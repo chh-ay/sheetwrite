@@ -109,7 +109,11 @@ export function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-/** The YAML frontmatter that starts a generated docs page. */
-export function frontmatter(title: string, description: string): string {
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
+/**
+ * The YAML frontmatter that starts a generated docs page. Symbol pages add
+ * their declaration `kind`, which the page title shows as a chip.
+ */
+export function frontmatter(title: string, description: string, kind?: string): string {
+  const kindLine = kind === undefined ? "" : `kind: ${JSON.stringify(kind)}\n`;
+  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n${kindLine}---\n\n`;
 }
