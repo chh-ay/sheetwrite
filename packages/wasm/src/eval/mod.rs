@@ -1885,6 +1885,7 @@ impl CellStore {
                 return result;
             }
         }
+
         if func == Func::Sum {
             if let Some(result) = self.eval_sum_family(args, sheet, pass, depth + 1) {
                 return result;
