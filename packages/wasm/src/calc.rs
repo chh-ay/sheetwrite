@@ -1834,8 +1834,9 @@ impl<'a> Parser<'a> {
 
     fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
         // Sheet names cannot contain `:`, so a quoted name with one is the
-        // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`.
-        if quoted {
+        // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`. The `:` of a
+        // drive in the path of another workbook is not.
+        if quoted && !is_external_sheet(&sheet_name) {
             if let Some((first, last)) = sheet_name.split_once(':') {
                 return self.sheet_span_at(first.to_string(), last.to_string(), true);
             }
@@ -1953,7 +1954,11 @@ fn missing_area_end(after: &str) -> String {
     format!("Enter a cell, column or row after {after}.")
 }
 
+/// The lookup key of a sheet name: the name without case. For a sheet of
+/// another workbook, the folder before `[` is left out, so
+/// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
 pub(crate) fn sheet_name_key(name: &str) -> String {
+    let name = name.rfind('[').map_or(name, |start| &name[start..]);
     name.chars().flat_map(char::to_lowercase).collect()
 }
 
@@ -2021,10 +2026,10 @@ where
     F: Fn(&str) -> Option<u32>,
     S: Fn(&mut SheetSpanRef) -> bool,
 {
-    // A sheet of another workbook has no handle here; it stays a sheet
-    // reference, which reads as #REF! without values for that workbook.
+    // A sheet of another workbook that the store holds no values for stays
+    // an unresolved sheet reference, which reads as #REF!.
     if let Ast::SheetCell(sheet_ref, ..) | Ast::SheetRange(sheet_ref, ..) = &ast {
-        if is_external_sheet(&sheet_ref.name) {
+        if is_external_sheet(&sheet_ref.name) && resolve(&sheet_ref.name).is_none() {
             return Ok(ast);
         }
     }
