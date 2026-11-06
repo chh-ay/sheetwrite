@@ -25,13 +25,15 @@
  */
 /* Arial (Liberation Sans on Linux) scaled to Space Grotesk's width and line
    metrics, so headings keep their line breaks while the web font loads.
-   Values from both fonts' hhea and advance widths over a heading sample. */
+   Line metrics come from both fonts' hhea tables. The width is matched on
+   bold headings and kept slightly narrower than Space Grotesk, so a heading
+   never gains a line while the web font loads. */
 @font-face {
   font-family: "Space Grotesk Fallback";
   src: local("Arial"), local("Liberation Sans"), local("Helvetica");
-  size-adjust: 108.01%;
-  ascent-override: 91.1%;
-  descent-override: 27.03%;
+  size-adjust: 107%;
+  ascent-override: 91.96%;
+  descent-override: 27.29%;
   line-gap-override: 0%;
 }
 
