@@ -43,6 +43,8 @@ pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+#[cfg(all(test, feature = "analysis"))]
+mod related_measure_tests;
 #[cfg(feature = "analysis")]
 mod relationships;
 #[cfg(all(test, feature = "analysis"))]
@@ -3637,10 +3639,26 @@ impl CellStore {
         formula_col: u32,
     ) -> Result<Ast, FormulaError> {
         let ast = parse(source).map_err(|_| FormulaError::Value)?;
+        let ast = self.resolve_parsed_formula(ast, formula_sheet, formula_row, formula_col)?;
+        #[cfg(feature = "analysis")]
+        let ast = self.bind_regex_patterns(source, ast);
+        Ok(ast)
+    }
+
+    /// Resolves a parsed formula as if it were in the cell at
+    /// (`formula_row`, `formula_col`) of `formula_sheet`: sheet names, defined
+    /// names, then structured references.
+    pub(crate) fn resolve_parsed_formula(
+        &self,
+        ast: Ast,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Result<Ast, FormulaError> {
         let ast = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
         let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
-        let ast = resolve_structured_refs(
+        Ok(resolve_structured_refs(
             ast,
             formula_sheet,
             formula_row,
@@ -3648,10 +3666,7 @@ impl CellStore {
             &|reference, sheet, row, col| {
                 self.resolve_structured_reference(reference, sheet, row, col)
             },
-        );
-        #[cfg(feature = "analysis")]
-        let ast = self.bind_regex_patterns(source, ast);
-        Ok(ast)
+        ))
     }
 
     /// Points the literal REGEX patterns of a new formula at the patterns the

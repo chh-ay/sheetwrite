@@ -1,16 +1,27 @@
 //! Measures of the data model, evaluated in the filter context of each
 //! pivot cell. Core sends them with the relationships (`setRelationships`),
 //! so they share its storage; see [`Relationship::is_measure`].
+//!
+//! A measure reads columns of any model table. Base-table columns see the
+//! base rows of the cell. Another table `T` sees its rows whose values match
+//! the cell's labels and report filters on the fields `T` reaches through
+//! many-to-one relationships; other fields put no condition on `T`, so
+//! filters flow from the one side to the many side only.
 
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use super::relationships::Relationship;
+use rustc_hash::FxHasher;
+
+use super::model_source::{model_routes, ModelSource};
+use super::relationships::{ColumnRef, KeyColumn, Relationship};
 use super::CellStore;
-use crate::calc::{Ast, Func, StructuredRef, TableSection};
+use crate::calc::{parse, Ast, Func, StructuredRef, TableSection};
+use crate::eval::analysis::grouping::{key_part, KeyPart};
 use crate::eval::analysis::lambda::capture;
 use crate::eval::{ast_produces_array, settled_cell_value};
 use crate::formula_slots::FormulaResults;
-use crate::pivot::{PivotCache, PivotLayout};
+use crate::pivot::{MeasureCell, PivotCache, PivotLayout};
 use crate::types::{FormulaError, Value};
 
 /// A measure resolved once per pivot pass: its formula with each model
@@ -20,6 +31,14 @@ struct PreparedMeasure {
     columns: Vec<StructuredRef>,
     /// `column_name(i)` for each column, made once per pass.
     names: Vec<String>,
+    /// For each column, its table's index in the pass's table list.
+    tables: Vec<usize>,
+    /// Whether every column is on the base table (table index 0).
+    base_only: bool,
+    /// Whether any column is on the base table. A cell without base rows
+    /// stays blank for such a measure, as an aggregate of no rows is blank
+    /// in Excel's data model.
+    reads_base: bool,
 }
 
 /// The local name of column `index` in a prepared measure. Measure formulas
@@ -28,91 +47,368 @@ fn column_name(index: usize) -> String {
     format!("_measure_column_{index}")
 }
 
+/// The rows of one non-base table `T` that pass the pivot's report filters
+/// on fields `T` reaches, with their keys at the reachable axis levels.
+#[derive(Default)]
+struct RelatedRows {
+    /// Reachable row-axis levels, then column-axis levels, in level order.
+    levels: Vec<(bool, usize)>,
+    /// Data rows of `T` that pass the filters and have no key error.
+    rows: Vec<u32>,
+    /// `levels.len()` keys per entry of `rows`, row-major.
+    keys: Vec<KeyPart>,
+    /// The levels a cell at `depths` constrains: those above its row and
+    /// column depths.
+    active: Vec<usize>,
+    /// One entry per row: the 32-bit hash of its keys at `active` above its
+    /// index into `rows`, sorted, so a cell's candidate rows are one range
+    /// in ascending row order.
+    order: Vec<u64>,
+    /// The axis depths `order` was sorted for.
+    depths: Option<(usize, usize)>,
+}
+
+impl RelatedRows {
+    /// The keys of entry `index` of `rows` at the active levels.
+    fn active_keys(&self, index: u32) -> impl Iterator<Item = &KeyPart> {
+        let start = index as usize * self.levels.len();
+        self.active
+            .iter()
+            .map(move |&level| &self.keys[start + level])
+    }
+
+    /// Orders the rows by the hash of the levels that cells at `depths`
+    /// constrain, once per pair of axis depths.
+    fn sort_for(&mut self, depths: (usize, usize)) {
+        if self.depths == Some(depths) {
+            return;
+        }
+        self.depths = Some(depths);
+        self.active = (0..self.levels.len())
+            .filter(|&index| {
+                let (on_rows, level) = self.levels[index];
+                level < if on_rows { depths.0 } else { depths.1 }
+            })
+            .collect();
+        let mut order: Vec<u64> = (0..self.rows.len() as u32)
+            .map(|index| (u64::from(keys_hash(self.active_keys(index))) << 32) | u64::from(index))
+            .collect();
+        order.sort_unstable();
+        self.order = order;
+    }
+
+    /// The rows of `T` visible in the cell of `groups`, ascending: the
+    /// entries of `order` with the hash of the cell's labels at the active
+    /// levels whose keys equal those labels.
+    #[inline(never)]
+    fn visible(&mut self, cache: &PivotCache, groups: (u32, u32), out: &mut Vec<u32>) {
+        out.clear();
+        self.sort_for((
+            cache.group_depth(true, groups.0),
+            cache.group_depth(false, groups.1),
+        ));
+        let mut wanted = Vec::with_capacity(self.active.len());
+        for &index in &self.active {
+            let (on_rows, level) = self.levels[index];
+            let group = if on_rows { groups.0 } else { groups.1 };
+            match key_part(&cache.path_label(on_rows, group, level)) {
+                Ok(key) => wanted.push(key),
+                Err(_) => return,
+            }
+        }
+
+        let hash = keys_hash(wanted.iter());
+        let start = self
+            .order
+            .partition_point(|&entry| entry < u64::from(hash) << 32);
+        for &entry in self.order[start..]
+            .iter()
+            .take_while(|&&entry| (entry >> 32) as u32 == hash)
+        {
+            let index = entry as u32;
+            if self.active_keys(index).eq(wanted.iter()) {
+                out.push(self.rows[index as usize]);
+            }
+        }
+    }
+}
+
+/// A 32-bit hash of a sequence of keys.
+fn keys_hash<'a>(keys: impl Iterator<Item = &'a KeyPart>) -> u32 {
+    let mut hasher = FxHasher::default();
+    for key in keys {
+        key.hash(&mut hasher);
+    }
+    hasher.finish() as u32
+}
+
 impl CellStore {
     /// Measure values of one model pivot's output as `(offset, value)`
     /// cells. Each formula is prepared once; bound values live only for one
-    /// cell.
+    /// cell. `fields` are the pivot's model fields.
     #[inline(never)]
     pub(super) fn pivot_measure_cells(
         &self,
         cache: &PivotCache,
         layout: &PivotLayout,
         base: &str,
+        fields: &[ColumnRef],
     ) -> Vec<(usize, Value)> {
-        let prepared: Vec<Result<PreparedMeasure, FormulaError>> = cache
+        let mut tables = vec![base.to_string()];
+        let mut prepared: Vec<Result<PreparedMeasure, FormulaError>> = cache
             .values()
             .iter()
-            .map(|value| self.prepare_pivot_measure(value.measure.as_deref(), base))
+            .map(|value| self.prepare_pivot_measure(value.measure.as_deref(), &mut tables))
             .collect();
+        let mut related = Vec::with_capacity(tables.len() - 1);
+        for (index, table) in tables.iter().enumerate().skip(1) {
+            match self.related_rows(cache, table, fields) {
+                Ok(rows) => related.push(rows),
+                // A measure over a table whose rows cannot be read shows the error.
+                Err(error) => {
+                    related.push(RelatedRows::default());
+                    for measure in &mut prepared {
+                        if measure
+                            .as_ref()
+                            .is_ok_and(|measure| measure.tables.contains(&index))
+                        {
+                            *measure = Err(error);
+                        }
+                    }
+                }
+            }
+        }
+        let include_empty = prepared
+            .iter()
+            .any(|measure| measure.as_ref().is_ok_and(|measure| !measure.base_only));
 
         let mut cells = Vec::new();
-        cache.visit_measure_cells(layout, &mut |offset, slot, rows| {
-            let value = match &prepared[slot] {
-                Ok(measure) => self.measure_family(measure, rows),
-                Err(error) => Value::Error(*error),
+        let mut visible = vec![Vec::new(); related.len()];
+        let mut current = None;
+        cache.visit_measure_cells(layout, include_empty, &mut |cell: &MeasureCell<'_>| {
+            let measure = match &prepared[cell.slot] {
+                Ok(measure) if measure.reads_base && cell.rows.is_empty() => return,
+                Ok(measure) => measure,
+                Err(error) => return cells.push((cell.offset, Value::Error(*error))),
             };
-            cells.push((offset, value));
+            if current != Some(cell.groups) {
+                current = Some(cell.groups);
+                for (rows, table) in visible.iter_mut().zip(&mut related) {
+                    table.visible(cache, cell.groups, rows);
+                }
+            }
+
+            let rows_of = |table: usize| {
+                table
+                    .checked_sub(1)
+                    .map_or(cell.rows, |index| visible[index].as_slice())
+            };
+            cells.push((cell.offset, self.measure_family(measure, &rows_of)));
         });
         cells
     }
 
     /// The measure with `id`, if core sent one.
     pub(super) fn measure_by_id(&self, id: &str) -> Option<&Relationship> {
-        self.relationships
-            .as_deref()?
-            .iter()
-            .find(|record| record.is_measure() && record.id == id)
+        self.measures().find(|record| record.id == id)
     }
 
-    /// The measure of one pivot value, prepared for a pivot whose base
-    /// table is `base`. Measures read only base-table columns.
+    fn measures(&self) -> impl Iterator<Item = &Relationship> {
+        self.relationships
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .filter(|record| record.is_measure())
+    }
+
+    /// The measure of one pivot value, prepared for a pass whose tables are
+    /// `tables` (the base first); tables it reads are appended.
     ///
-    /// Errors: a missing measure or table, or a column that does not
-    /// resolve, is `#REF!`; a formula that does not parse is `#NAME?`; any
-    /// other reference, or a column of another table, is `#VALUE!`.
+    /// Errors: a missing measure, table or column, or an unknown measure
+    /// name, is `#REF!`; a formula that does not parse is `#NAME?`; a cycle
+    /// of measure references and any reference other than a qualified data
+    /// column or a measure name is `#VALUE!`.
     #[inline(never)]
     fn prepare_pivot_measure(
         &self,
         id: Option<&str>,
-        base: &str,
+        tables: &mut Vec<String>,
     ) -> Result<PreparedMeasure, FormulaError> {
         let measure = id
             .and_then(|id| self.measure_by_id(id))
             .ok_or(FormulaError::Ref)?;
-        if self.table_by_id(&measure.from.table).is_none() {
-            return Err(FormulaError::Ref);
-        }
-
-        // Parsed and resolved as a cell formula at A1, so names resolve too
-        // and a defined name is refused below.
-        let mut expression = self
-            .parse_formula_entry(&measure.from.column, 0, 0, 0)
-            .ast
-            .ok_or(FormulaError::Name)?;
+        let mut stack = Vec::new();
+        let expression = self.inlined_measure(measure, &mut stack)?;
+        // Resolved as a cell formula at A1, so names resolve too and a
+        // defined name is refused below.
+        let mut expression = self.resolve_parsed_formula(expression, 0, 0, 0)?;
         let mut columns = Vec::new();
         name_columns(&mut expression, &mut columns)?;
-        if columns.iter().any(|column| column.table_id != base) {
-            return Err(FormulaError::Value);
-        }
 
+        let column_tables: Vec<usize> = columns
+            .iter()
+            .map(|column: &StructuredRef| {
+                tables
+                    .iter()
+                    .position(|table| *table == column.table_id)
+                    .unwrap_or_else(|| {
+                        tables.push(column.table_id.clone());
+                        tables.len() - 1
+                    })
+            })
+            .collect();
         let names = (0..columns.len()).map(column_name).collect();
         Ok(PreparedMeasure {
             expression,
             columns,
             names,
+            base_only: column_tables.iter().all(|&table| table == 0),
+            reads_base: column_tables.contains(&0),
+            tables: column_tables,
         })
     }
 
-    /// Evaluates a prepared measure over base rows `rows`, binding each
-    /// column name to those rows' settled values as LAMBDA binds parameters.
-    /// A measure returns one value, so an array result is `#VALUE!`.
+    /// The parsed formula of `measure` with every `[Name]` reference to
+    /// another measure replaced by that measure's formula, before any
+    /// reference resolves. `stack` holds the measures being inlined.
+    fn inlined_measure<'a>(
+        &'a self,
+        measure: &'a Relationship,
+        stack: &mut Vec<&'a str>,
+    ) -> Result<Ast, FormulaError> {
+        if self.table_by_id(&measure.from.table).is_none() {
+            return Err(FormulaError::Ref);
+        }
+        if stack.contains(&measure.id.as_str()) {
+            return Err(FormulaError::Value);
+        }
+
+        let mut expression = parse(&measure.from.column).map_err(|_| FormulaError::Name)?;
+        stack.push(&measure.id);
+        let inlined = self.inline_references(&mut expression, stack);
+        stack.pop();
+        inlined.map(|()| expression)
+    }
+
+    fn inline_references<'a>(
+        &'a self,
+        expression: &mut Ast,
+        stack: &mut Vec<&'a str>,
+    ) -> Result<(), FormulaError> {
+        match expression {
+            Ast::UnresolvedStructured(reference)
+                if reference.table_name.is_none() && reference.section == TableSection::Body =>
+            {
+                let name = reference.column_name.to_lowercase();
+                let measure = self
+                    .measures()
+                    .find(|measure| measure.to.column.to_lowercase() == name)
+                    .ok_or(FormulaError::Ref)?;
+                *expression = self.inlined_measure(measure, stack)?;
+                Ok(())
+            }
+            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => arguments
+                .iter_mut()
+                .try_for_each(|argument| self.inline_references(argument, stack)),
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                self.inline_references(left, stack)?;
+                self.inline_references(right, stack)
+            }
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                self.inline_references(inner, stack)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// The rows of non-base table `table` and their keys at the axis levels
+    /// whose fields it reaches, filtered by the reachable report filters.
+    fn related_rows(
+        &self,
+        cache: &PivotCache,
+        table: &str,
+        fields: &[ColumnRef],
+    ) -> Result<RelatedRows, FormulaError> {
+        let reachable: Vec<&str> = model_routes(self, table)
+            .iter()
+            .map(|route| route.0)
+            .collect();
+        let reaches = |field: usize| {
+            fields
+                .get(field)
+                .is_some_and(|column| reachable.contains(&column.table.as_str()))
+        };
+        let definition = cache.definition();
+        // One model source over `table`: the level fields, then the filters.
+        let mut levels = Vec::new();
+        let mut columns = Vec::new();
+        for (on_rows, axis) in [(true, &definition.rows), (false, &definition.columns)] {
+            for (level, &field) in axis.iter().enumerate() {
+                if reaches(field) {
+                    levels.push((on_rows, level));
+                    columns.push(fields[field].clone());
+                }
+            }
+        }
+        let mut filters = Vec::new();
+        for filter in &definition.filters {
+            if reaches(filter.field) {
+                filters.push(filter);
+                columns.push(fields[filter.field].clone());
+            }
+        }
+        let source = ModelSource::build(self, table, &columns)?;
+        let definition_table = self.table_by_id(table).ok_or(FormulaError::Ref)?;
+        let count = definition_table
+            .columns
+            .first()
+            .map_or(0, |column| KeyColumn::at(definition_table, column).rows);
+
+        let mut related = RelatedRows {
+            levels,
+            ..RelatedRows::default()
+        };
+        let mut folded = String::new();
+        'rows: for row in 0..count as usize {
+            for (index, filter) in filters.iter().enumerate() {
+                let value = source.value(row, related.levels.len() + index);
+                if !filter.keeps(&value, &mut folded) {
+                    continue 'rows;
+                }
+            }
+            let start = related.keys.len();
+            for field in 0..related.levels.len() {
+                match key_part(&source.value(row, field)) {
+                    Ok(key) => related.keys.push(key),
+                    Err(_) => {
+                        related.keys.truncate(start);
+                        continue 'rows;
+                    }
+                }
+            }
+            related.rows.push(row as u32);
+        }
+        Ok(related)
+    }
+
+    /// Evaluates a prepared measure, binding each column name to the
+    /// settled values of its table's rows in the cell (`rows_of(table)`), as
+    /// LAMBDA binds parameters. A measure returns one value, so an array
+    /// result is `#VALUE!`.
     #[inline(never)]
-    fn measure_family(&self, measure: &PreparedMeasure, rows: &[u32]) -> Value {
+    fn measure_family<'r>(
+        &self,
+        measure: &PreparedMeasure,
+        rows_of: &dyn Fn(usize) -> &'r [u32],
+    ) -> Value {
         let bindings: Vec<(&str, Ast)> = measure
             .names
             .iter()
             .zip(&measure.columns)
-            .map(|(name, column)| (name.as_str(), self.bind_column(column, rows)))
+            .zip(&measure.tables)
+            .map(|((name, column), &table)| {
+                (name.as_str(), self.bind_column(column, rows_of(table)))
+            })
             .collect();
 
         match capture(&measure.expression, &bindings) {
@@ -125,10 +421,11 @@ impl CellStore {
     }
 
     /// The settled values of one column at `rows`, as a one-column matrix.
+    /// No rows bind one blank, as an empty range reads.
     #[inline(never)]
     fn bind_column(&self, column: &StructuredRef, rows: &[u32]) -> Ast {
         let sheet = &self.sheets[column.sheet as usize];
-        let values = rows
+        let mut values: Vec<Value> = rows
             .iter()
             .map(|&row| {
                 settled_cell_value(
@@ -140,8 +437,11 @@ impl CellStore {
                 )
             })
             .collect();
+        if values.is_empty() {
+            values.push(Value::Blank);
+        }
         Ast::BoundMatrix {
-            rows: rows.len(),
+            rows: values.len(),
             cols: 1,
             values: Rc::new(values),
         }

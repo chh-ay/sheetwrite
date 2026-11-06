@@ -927,6 +927,19 @@ function lifecycleConflict(
     };
   }
 
+  // A measure formula names tables and columns, and a rename rewrites only
+  // the measures present when it applies, so a concurrent measure write
+  // would keep the old names on one side.
+  if (
+    (local.op === "setMeasure" && renamesTable(remote)) ||
+    (remote.op === "setMeasure" && renamesTable(local))
+  ) {
+    return {
+      code: "overlapping-edit",
+      message: "A pending measure change and a concurrent table rename may name the same table",
+    };
+  }
+
   const dashboardConflict = dashboardItemConflict(local, remote);
   if (dashboardConflict) return dashboardConflict;
 
@@ -977,6 +990,13 @@ function lifecycleConflict(
   }
 
   return null;
+}
+
+function renamesTable(operation: DocumentOp): boolean {
+  return (
+    operation.op === "updateTable" &&
+    (operation.patch.name !== undefined || operation.patch.columns !== undefined)
+  );
 }
 
 function operationTouchesSheet(
