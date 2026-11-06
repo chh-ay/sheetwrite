@@ -1,20 +1,14 @@
 //! Physical source cells, calculated slots, paging and borrowed read runs.
 
-use std::cell::{Cell, RefCell};
-use std::collections::BTreeSet;
-
-// Only bounded cell coordinates and internal integer IDs use Fx hashing.
-// Document text keys retain randomized hashing in their owning modules.
-use rustc_hash::{FxHashMap, FxHashSet};
-
-use crate::derived::{decode_cell, encode_cell, DerivedOverlay};
-use crate::memory::{
-    StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
-    PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
-};
+use crate::derived::{decode_cell, encode_cell, ABSENT_TAG};
+use crate::memory::{StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES};
 use crate::types::{
     CellKey, FormulaError, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
+
+use paged::{bit, DirtyView, PagedStorage};
+
+mod paged;
 
 mod transfer;
 
@@ -94,59 +88,6 @@ pub(crate) fn dense_resolved(kind: u8, payload: u64) -> (u8, u64) {
         (kind, payload)
     }
 }
-const BITS_PER_WORD: usize = 64;
-
-struct CellChunk {
-    kind: Vec<u8>,
-    payload: Vec<u64>,
-    style: Vec<u32>,
-    loaded: Vec<u64>,
-    last_access: Cell<u64>,
-}
-
-impl CellChunk {
-    fn new(rows: usize, last_access: u64) -> Self {
-        let words = rows.div_ceil(BITS_PER_WORD);
-        Self {
-            kind: vec![KIND_EMPTY; rows],
-            payload: vec![0; rows],
-            style: vec![0; rows],
-            loaded: vec![0; words],
-            last_access: Cell::new(last_access),
-        }
-    }
-
-    fn bit(bits: &[u64], offset: usize) -> bool {
-        bits[offset / BITS_PER_WORD] & (1 << (offset % BITS_PER_WORD)) != 0
-    }
-
-    fn set_bit(bits: &mut [u64], offset: usize, value: bool) {
-        let mask = 1 << (offset % BITS_PER_WORD);
-        let word = &mut bits[offset / BITS_PER_WORD];
-
-        if value {
-            *word |= mask;
-        } else {
-            *word &= !mask;
-        }
-    }
-
-    fn byte_len(&self) -> usize {
-        self.kind.len()
-            + self.payload.len() * std::mem::size_of::<u64>()
-            + self.style.len() * std::mem::size_of::<u32>()
-            + self.loaded.len() * std::mem::size_of::<u64>()
-    }
-}
-
-#[derive(Clone, Copy)]
-struct DirtyCell {
-    payload: u64,
-    revision: u64,
-    style: u32,
-    revision_index: usize,
-    kind: u8,
-}
 
 struct StorageEntry {
     row: usize,
@@ -159,655 +100,8 @@ struct StorageEntry {
 
 pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
 
-struct PagedStorage {
-    chunk_rows: usize,
-    byte_budget: usize,
-    max_dirty_cells: usize,
-    chunks: FxHashMap<(usize, usize), CellChunk>,
-    dirty: FxHashMap<(usize, usize), DirtyCell>,
-    dirty_by_revision: FxHashMap<u64, Vec<(usize, usize)>>,
-    read_pinned: FxHashSet<(usize, usize)>,
-    pin_scratch: FxHashSet<(usize, usize)>,
-    viewport_pinned: FxHashSet<(usize, usize)>,
-    viewport_pin_scratch: FxHashSet<(usize, usize)>,
-    evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
-    clock: Cell<u64>,
-    eviction_candidate_checks: u64,
-    evictions: u64,
-}
-
 /// The largest chunk a paged sheet accepts: the rows of a whole sheet.
 pub(crate) const MAX_PAGE_CHUNK_ROWS: usize = crate::calc::SHEET_ROWS as usize;
-
-impl PagedStorage {
-    /// A chunk holds a power of two of rows, so `chunk_rows` rounds up to
-    /// one. A size above [`MAX_PAGE_CHUNK_ROWS`] is rejected before rounding,
-    /// which could otherwise overflow to zero.
-    fn new(chunk_rows: usize, byte_budget: usize, max_dirty_cells: usize) -> Result<Self, String> {
-        let chunk_rows = Some(chunk_rows.max(1))
-            .filter(|&rows| rows <= MAX_PAGE_CHUNK_ROWS)
-            .map(usize::next_power_of_two)
-            .ok_or_else(|| {
-                format!("paged sheet chunk of {chunk_rows} rows exceeds {MAX_PAGE_CHUNK_ROWS} rows")
-            })?;
-
-        Ok(Self {
-            chunk_rows,
-            byte_budget,
-            max_dirty_cells,
-            chunks: FxHashMap::default(),
-            dirty: FxHashMap::default(),
-            dirty_by_revision: FxHashMap::default(),
-            read_pinned: FxHashSet::default(),
-            pin_scratch: FxHashSet::default(),
-            viewport_pinned: FxHashSet::default(),
-            viewport_pin_scratch: FxHashSet::default(),
-            evictable: RefCell::new(BTreeSet::new()),
-            clock: Cell::new(0),
-            eviction_candidate_checks: 0,
-            evictions: 0,
-        })
-    }
-
-    fn key_offset(&self, row: usize, col: usize) -> ((usize, usize), usize) {
-        ((col, row / self.chunk_rows), row % self.chunk_rows)
-    }
-
-    fn chunk_bytes(&self) -> usize {
-        let words = self.chunk_rows.div_ceil(BITS_PER_WORD);
-        self.chunk_rows
-            * (std::mem::size_of::<u8>() + std::mem::size_of::<u64>() + std::mem::size_of::<u32>())
-            + words * std::mem::size_of::<u64>()
-    }
-
-    fn next_access(&self) -> u64 {
-        let next = self.clock.get().wrapping_add(1);
-        self.clock.set(next);
-        next
-    }
-
-    fn touch(&self, key: (usize, usize)) {
-        let Some(chunk) = self.chunks.get(&key) else {
-            return;
-        };
-
-        let eligible = !self.read_pinned.contains(&key) && !self.viewport_pinned.contains(&key);
-        let previous = chunk.last_access.get();
-        let mut evictable = self.evictable.borrow_mut();
-
-        if eligible {
-            evictable.remove(&(previous, key.0, key.1));
-        }
-
-        let access = self.next_access();
-        chunk.last_access.set(access);
-
-        if eligible {
-            evictable.insert((access, key.0, key.1));
-        }
-    }
-
-    fn evict_for_chunk(&mut self) {
-        if self.byte_budget == 0 {
-            return;
-        }
-
-        let chunk_bytes = self.chunk_bytes();
-
-        while (self.chunks.len() + 1) * chunk_bytes > self.byte_budget {
-            let candidate = self.evictable.get_mut().pop_first();
-            let Some((_, col, chunk_index)) = candidate else {
-                break;
-            };
-
-            self.eviction_candidate_checks = self.eviction_candidate_checks.saturating_add(1);
-            self.chunks.remove(&(col, chunk_index));
-            self.evictions = self.evictions.saturating_add(1);
-        }
-    }
-
-    fn ensure_chunk(&mut self, key: (usize, usize)) -> &mut CellChunk {
-        if !self.chunks.contains_key(&key) {
-            self.evict_for_chunk();
-
-            let access = self.next_access();
-            self.chunks
-                .insert(key, CellChunk::new(self.chunk_rows, access));
-
-            if !self.read_pinned.contains(&key) && !self.viewport_pinned.contains(&key) {
-                self.evictable.get_mut().insert((access, key.0, key.1));
-            }
-        } else {
-            self.touch(key);
-        }
-
-        self.chunks.get_mut(&key).expect("inserted paged chunk")
-    }
-
-    fn clean_loaded(&self, row: usize, col: usize) -> bool {
-        let (key, offset) = self.key_offset(row, col);
-        self.chunks
-            .get(&key)
-            .is_some_and(|chunk| CellChunk::bit(&chunk.loaded, offset))
-    }
-
-    fn read(&self, row: usize, col: usize) -> (u8, u64, u32, bool, bool) {
-        if let Some(cell) = self.dirty.get(&(row, col)) {
-            return (cell.kind, cell.payload, cell.style, true, true);
-        }
-
-        let (key, offset) = self.key_offset(row, col);
-        let Some(chunk) = self.chunks.get(&key) else {
-            return (KIND_EMPTY, 0, 0, false, false);
-        };
-
-        self.touch(key);
-
-        if !CellChunk::bit(&chunk.loaded, offset) {
-            return (KIND_EMPTY, 0, 0, false, false);
-        }
-
-        (
-            chunk.kind[offset],
-            chunk.payload[offset],
-            chunk.style[offset],
-            true,
-            false,
-        )
-    }
-
-    fn write_clean(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32) {
-        let (key, offset) = self.key_offset(row, col);
-        let chunk = self.ensure_chunk(key);
-        chunk.kind[offset] = kind;
-        chunk.payload[offset] = payload;
-        chunk.style[offset] = style;
-        CellChunk::set_bit(&mut chunk.loaded, offset, true);
-    }
-
-    fn can_dirty_cell(&self, row: usize, col: usize) -> bool {
-        self.dirty.contains_key(&(row, col)) || self.dirty.len() < self.max_dirty_cells
-    }
-
-    fn can_dirty_rect(&self, r0: usize, c0: usize, rows: usize, cols: usize) -> bool {
-        let mut additional = 0usize;
-
-        for col in c0..c0 + cols {
-            for row in r0..r0 + rows {
-                if !self.dirty.contains_key(&(row, col)) {
-                    additional += 1;
-
-                    if self.dirty.len() + additional > self.max_dirty_cells {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
-    }
-
-    fn prepare_dirty_rect(
-        &mut self,
-        r0: usize,
-        c0: usize,
-        rows: usize,
-        cols: usize,
-        revision: u64,
-    ) -> bool {
-        let additional = (c0..c0 + cols)
-            .flat_map(|col| (r0..r0 + rows).map(move |row| (row, col)))
-            .filter(|key| !self.dirty.contains_key(key))
-            .count();
-
-        if self.dirty.len().saturating_add(additional) > self.max_dirty_cells
-            || self.dirty.try_reserve(additional).is_err()
-        {
-            return false;
-        }
-
-        if !self.dirty_by_revision.contains_key(&revision)
-            && self.dirty_by_revision.try_reserve(1).is_err()
-        {
-            return false;
-        }
-
-        self.dirty_by_revision
-            .entry(revision)
-            .or_default()
-            .try_reserve(rows.saturating_mul(cols))
-            .is_ok()
-    }
-
-    fn prepare_dirty_cells(&mut self, cells: &[(usize, usize)], revision: u64) -> bool {
-        let additional = cells
-            .iter()
-            .filter(|key| !self.dirty.contains_key(key))
-            .count();
-        if self.dirty.len().saturating_add(additional) > self.max_dirty_cells
-            || self.dirty.try_reserve(additional).is_err()
-        {
-            return false;
-        }
-        if !self.dirty_by_revision.contains_key(&revision)
-            && self.dirty_by_revision.try_reserve(1).is_err()
-        {
-            return false;
-        }
-        self.dirty_by_revision
-            .entry(revision)
-            .or_default()
-            .try_reserve(cells.len())
-            .is_ok()
-    }
-
-    fn reserve_revision_slot(&mut self, revision: u64, key: (usize, usize)) -> Option<usize> {
-        if !self.dirty_by_revision.contains_key(&revision)
-            && self.dirty_by_revision.try_reserve(1).is_err()
-        {
-            return None;
-        }
-        let slots = self.dirty_by_revision.entry(revision).or_default();
-        if slots.try_reserve(1).is_err() {
-            return None;
-        }
-        let index = slots.len();
-        slots.push(key);
-        Some(index)
-    }
-
-    fn remove_revision_slot(&mut self, revision: u64, index: usize) {
-        let Some(slots) = self.dirty_by_revision.get_mut(&revision) else {
-            return;
-        };
-        let moved = (index + 1 < slots.len()).then(|| slots[slots.len() - 1]);
-        slots.swap_remove(index);
-        let empty = slots.is_empty();
-        if let Some(moved) = moved {
-            if let Some(cell) = self.dirty.get_mut(&moved) {
-                cell.revision_index = index;
-            }
-        }
-        if empty {
-            self.dirty_by_revision.remove(&revision);
-        }
-    }
-
-    fn write_dirty(
-        &mut self,
-        row: usize,
-        col: usize,
-        kind: u8,
-        payload: u64,
-        style: u32,
-        revision: u64,
-    ) -> bool {
-        debug_assert_ne!(revision, 0);
-        let key = (row, col);
-        if let Some(cell) = self.dirty.get(&key).copied() {
-            if cell.revision == revision {
-                self.dirty.insert(
-                    key,
-                    DirtyCell {
-                        payload,
-                        revision,
-                        revision_index: cell.revision_index,
-                        style,
-                        kind,
-                    },
-                );
-                return true;
-            }
-            let Some(revision_index) = self.reserve_revision_slot(revision, key) else {
-                return false;
-            };
-            self.remove_revision_slot(cell.revision, cell.revision_index);
-            self.dirty.insert(
-                key,
-                DirtyCell {
-                    payload,
-                    revision,
-                    revision_index,
-                    style,
-                    kind,
-                },
-            );
-            return true;
-        }
-        if self.dirty.len() >= self.max_dirty_cells || self.dirty.try_reserve(1).is_err() {
-            return false;
-        }
-        let Some(revision_index) = self.reserve_revision_slot(revision, key) else {
-            return false;
-        };
-        self.dirty.insert(
-            key,
-            DirtyCell {
-                payload,
-                revision,
-                revision_index,
-                style,
-                kind,
-            },
-        );
-        true
-    }
-
-    fn restore_dirty(
-        &mut self,
-        row: usize,
-        col: usize,
-        kind: u8,
-        payload: u64,
-        style: u32,
-        revision: u64,
-    ) -> bool {
-        self.write_dirty(row, col, kind, payload, style, revision)
-    }
-
-    fn write(
-        &mut self,
-        row: usize,
-        col: usize,
-        kind: u8,
-        payload: u64,
-        style: u32,
-        dirty_revision: Option<u64>,
-    ) -> bool {
-        if let Some(revision) = dirty_revision {
-            return self.write_dirty(row, col, kind, payload, style, revision);
-        }
-        if let Some(cell) = self.dirty.get_mut(&(row, col)) {
-            cell.kind = kind;
-            cell.payload = payload;
-            cell.style = style;
-        } else {
-            self.write_clean(row, col, kind, payload, style);
-        }
-        true
-    }
-
-    fn hydrate(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32) -> bool {
-        if self.dirty.contains_key(&(row, col)) {
-            return false;
-        }
-        self.write_clean(row, col, kind, payload, style);
-        true
-    }
-
-    fn mark_clean(&mut self, row: usize, col: usize) -> bool {
-        let key = (row, col);
-        let Some(cell) = self.dirty.get(&key).copied() else {
-            return false;
-        };
-        self.remove_revision_slot(cell.revision, cell.revision_index);
-        self.dirty.remove(&key);
-        self.write_clean(row, col, cell.kind, cell.payload, cell.style);
-        true
-    }
-
-    fn acknowledge_revision(&mut self, revision: u64) {
-        let Some(matches) = self.dirty_by_revision.remove(&revision) else {
-            return;
-        };
-        for (row, col) in matches {
-            let key = (row, col);
-            let Some(cell) = self.dirty.get(&key).copied() else {
-                continue;
-            };
-            if cell.revision != revision {
-                continue;
-            }
-            self.dirty.remove(&key);
-            self.write_clean(row, col, cell.kind, cell.payload, cell.style);
-        }
-    }
-
-    fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
-        let mut next = std::mem::take(&mut self.pin_scratch);
-        for &col in cols {
-            if rows.is_empty() {
-                if start < end {
-                    for chunk in start / self.chunk_rows..=(end - 1) / self.chunk_rows {
-                        next.insert((col as usize, chunk));
-                    }
-                }
-            } else {
-                for &row in rows {
-                    next.insert((col as usize, row as usize / self.chunk_rows));
-                }
-            }
-        }
-        self.replace_read_pins(next);
-    }
-
-    fn pin_viewport_bands(&mut self, bands: &[u32]) {
-        let mut next = std::mem::take(&mut self.viewport_pin_scratch);
-        for &[r0, r1, c0, c1] in bands.as_chunks::<4>().0 {
-            let [r0, r1, c0, c1] = [r0 as usize, r1 as usize, c0 as usize, c1 as usize];
-            if r0 >= r1 {
-                continue;
-            }
-            for col in c0..c1 {
-                for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
-                    next.insert((col, chunk));
-                }
-            }
-        }
-        for key in self.viewport_pinned.difference(&next) {
-            if self.read_pinned.contains(key) {
-                continue;
-            }
-            if let Some(chunk) = self.chunks.get(key) {
-                self.evictable
-                    .get_mut()
-                    .insert((chunk.last_access.get(), key.0, key.1));
-            }
-        }
-        for key in next.difference(&self.viewport_pinned) {
-            if let Some(chunk) = self.chunks.get(key) {
-                self.evictable
-                    .get_mut()
-                    .remove(&(chunk.last_access.get(), key.0, key.1));
-            }
-        }
-        let mut previous = std::mem::replace(&mut self.viewport_pinned, next);
-        previous.clear();
-        self.viewport_pin_scratch = previous;
-    }
-
-    fn replace_read_pins(&mut self, next: FxHashSet<(usize, usize)>) {
-        let access = self.next_access();
-        let current = &mut self.read_pinned;
-        for key in current.difference(&next) {
-            if self.viewport_pinned.contains(key) {
-                continue;
-            }
-            if let Some(chunk) = self.chunks.get(key) {
-                self.evictable
-                    .get_mut()
-                    .insert((chunk.last_access.get(), key.0, key.1));
-            }
-        }
-        for key in next.difference(current) {
-            if let Some(chunk) = self.chunks.get(key) {
-                self.evictable
-                    .get_mut()
-                    .remove(&(chunk.last_access.get(), key.0, key.1));
-            }
-        }
-        let mut previous = std::mem::replace(current, next);
-        previous.clear();
-        self.pin_scratch = previous;
-        for &key in current.iter() {
-            if let Some(chunk) = self.chunks.get(&key) {
-                chunk.last_access.set(access);
-            }
-        }
-    }
-
-    fn persisted_coordinates(&self) -> Vec<CellKey> {
-        let mut coordinates = Vec::new();
-        for (&(col, chunk_index), chunk) in &self.chunks {
-            for offset in 0..self.chunk_rows {
-                if !CellChunk::bit(&chunk.loaded, offset) {
-                    continue;
-                }
-                let row = chunk_index * self.chunk_rows + offset;
-                if self.dirty.contains_key(&(row, col))
-                    || (chunk.kind[offset] == KIND_EMPTY && chunk.style[offset] == 0)
-                {
-                    continue;
-                }
-                coordinates.push((row as u32, col as u32));
-            }
-        }
-        coordinates.extend(self.dirty.iter().filter_map(|(&(row, col), cell)| {
-            (cell.kind != KIND_EMPTY || cell.style != 0).then_some((row as u32, col as u32))
-        }));
-        coordinates
-    }
-
-    fn entries(&self) -> Vec<StorageEntry> {
-        let mut entries = Vec::with_capacity(self.loaded_cells());
-        for (&(col, chunk_index), chunk) in &self.chunks {
-            for offset in 0..self.chunk_rows {
-                if !CellChunk::bit(&chunk.loaded, offset) {
-                    continue;
-                }
-                let row = chunk_index * self.chunk_rows + offset;
-                if self.dirty.contains_key(&(row, col)) {
-                    continue;
-                }
-                entries.push(StorageEntry {
-                    row,
-                    col,
-                    kind: chunk.kind[offset],
-                    payload: chunk.payload[offset],
-                    style: chunk.style[offset],
-                    dirty_revision: None,
-                });
-            }
-        }
-        entries.extend(self.dirty.iter().map(|(&(row, col), cell)| StorageEntry {
-            row,
-            col,
-            kind: cell.kind,
-            payload: cell.payload,
-            style: cell.style,
-            dirty_revision: Some(cell.revision),
-        }));
-        entries.sort_unstable_by_key(|entry| (entry.col, entry.row));
-        entries
-    }
-
-    fn dirty_coordinates(&self) -> Vec<f64> {
-        let mut coordinates = Vec::with_capacity(self.dirty.len().saturating_mul(2));
-        let mut keys: Vec<_> = self.dirty.keys().copied().collect();
-        keys.sort_unstable();
-        for (row, col) in keys {
-            coordinates.push(row as f64);
-            coordinates.push(col as f64);
-        }
-        coordinates
-    }
-
-    fn byte_len(&self) -> usize {
-        self.chunks.values().map(CellChunk::byte_len).sum()
-    }
-
-    fn dirty_byte_len(&self) -> usize {
-        let dirty_cells = self.dirty.capacity()
-            * (std::mem::size_of::<(usize, usize)>()
-                + std::mem::size_of::<DirtyCell>()
-                + std::mem::size_of::<u8>());
-        let revision_map = self.dirty_by_revision.capacity()
-            * (std::mem::size_of::<u64>()
-                + std::mem::size_of::<Vec<(usize, usize)>>()
-                + std::mem::size_of::<u8>());
-        let revision_cells = self
-            .dirty_by_revision
-            .values()
-            .map(|cells| cells.capacity() * std::mem::size_of::<(usize, usize)>())
-            .sum::<usize>();
-        dirty_cells + revision_map + revision_cells
-    }
-
-    fn loaded_cells(&self) -> usize {
-        let clean = self
-            .chunks
-            .values()
-            .map(|chunk| {
-                chunk
-                    .loaded
-                    .iter()
-                    .map(|word| word.count_ones() as usize)
-                    .sum::<usize>()
-            })
-            .sum::<usize>();
-        clean
-            + self
-                .dirty
-                .keys()
-                .filter(|&&(row, col)| !self.clean_loaded(row, col))
-                .count()
-    }
-
-    fn dirty_cells(&self) -> usize {
-        self.dirty.len()
-    }
-
-    fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
-        let indexes = stats.owner_mut(PAGED_INDEXES);
-        indexes
-            .add_hash_table::<(usize, usize), CellChunk>(self.chunks.len(), self.chunks.capacity());
-        indexes.add_hash_table::<(usize, usize), ()>(
-            self.read_pinned.len(),
-            self.read_pinned.capacity(),
-        );
-        indexes.add_hash_table::<(usize, usize), ()>(
-            self.pin_scratch.len(),
-            self.pin_scratch.capacity(),
-        );
-        indexes.add_hash_table::<(usize, usize), ()>(
-            self.viewport_pinned.len(),
-            self.viewport_pinned.capacity(),
-        );
-        indexes.add_hash_table::<(usize, usize), ()>(
-            self.viewport_pin_scratch.len(),
-            self.viewport_pin_scratch.capacity(),
-        );
-        // `std::collections::BTreeSet` exposes no node capacity. Report its
-        // eviction entries without inventing allocator bytes from `size_of_val`.
-        indexes.entries = indexes
-            .entries
-            .saturating_add(self.evictable.borrow().len());
-
-        for chunk in self.chunks.values() {
-            stats
-                .owner_mut(PAGED_KINDS)
-                .add_vec::<u8>(chunk.kind.len(), chunk.kind.capacity());
-            stats
-                .owner_mut(PAGED_PAYLOADS)
-                .add_vec::<u64>(chunk.payload.len(), chunk.payload.capacity());
-            stats
-                .owner_mut(PAGED_STYLES)
-                .add_vec::<u32>(chunk.style.len(), chunk.style.capacity());
-            stats
-                .owner_mut(PAGED_LOADED_BITMAPS)
-                .add_vec::<u64>(chunk.loaded.len(), chunk.loaded.capacity());
-        }
-        let dirty = stats.owner_mut(PAGED_DIRTY_BITMAPS);
-        dirty.add_hash_table::<(usize, usize), DirtyCell>(self.dirty.len(), self.dirty.capacity());
-        dirty.add_hash_table::<u64, Vec<(usize, usize)>>(
-            self.dirty_by_revision.len(),
-            self.dirty_by_revision.capacity(),
-        );
-        for cells in self.dirty_by_revision.values() {
-            dirty.add_vec::<(usize, usize)>(cells.len(), cells.capacity());
-        }
-    }
-}
 
 /// Aggregate eager-allocation ceiling mirrored by `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`.
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
@@ -854,8 +148,10 @@ struct RowRun {
     len: usize,
 }
 
-/// One sheet's physical cells: column-major dense vectors or paged chunks with a
-/// revisioned dirty overlay, plus calculated slots keyed by the same indices.
+/// One sheet's physical cells: column-major dense vectors or paged storage with
+/// a revisioned dirty overlay. Dense calculated values use the payload slot with
+/// the CALCULATED presence bit in kind; paged ones live in calculated pages.
+/// Source projections mask both back out.
 pub(crate) struct CellStorage {
     n_cols: usize,
     row_count: usize,
@@ -865,10 +161,8 @@ pub(crate) struct CellStorage {
     payload: Vec<u64>,
     /// Host style-dictionary id; `0` means "no explicit style".
     style: Vec<u32>,
-    paged: Option<PagedStorage>,
-    /// Paged calculated scalars; dense results use the payload slot with the
-    /// CALCULATED presence bit in kind. Source projections mask both back out.
-    derived: DerivedOverlay,
+    /// Boxed so a dense sheet carries one pointer for it.
+    paged: Option<Box<PagedStorage>>,
     /// Makes invalidation constant-time for literal-only sheets.
     dense_calculated_cells: usize,
 }
@@ -885,16 +179,8 @@ impl CellStorage {
         for &payload in &self.payload {
             visit_payload(payload);
         }
-        self.derived.visit_payloads(&mut visit_payload);
         if let Some(paged) = &self.paged {
-            for chunk in paged.chunks.values() {
-                for &payload in &chunk.payload {
-                    visit_payload(payload);
-                }
-            }
-            for dirty in paged.dirty.values() {
-                visit_payload(dirty.payload);
-            }
+            paged.visit_payloads(visit_payload);
         }
     }
 
@@ -908,16 +194,8 @@ impl CellStorage {
         for payload in &mut self.payload {
             remap_payload(payload);
         }
-        self.derived.remap_payloads(&remap_payload);
         if let Some(paged) = &mut self.paged {
-            for chunk in paged.chunks.values_mut() {
-                for payload in &mut chunk.payload {
-                    remap_payload(payload);
-                }
-            }
-            for dirty in paged.dirty.values_mut() {
-                remap_payload(&mut dirty.payload);
-            }
+            paged.remap_payloads(remap_payload);
         }
     }
 
@@ -931,7 +209,6 @@ impl CellStorage {
             payload,
             style,
             paged: None,
-            derived: DerivedOverlay::default(),
             dense_calculated_cells: 0,
         })
     }
@@ -949,8 +226,11 @@ impl CellStorage {
             kind: Vec::new(),
             payload: Vec::new(),
             style: Vec::new(),
-            paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)?),
-            derived: DerivedOverlay::default(),
+            paged: Some(Box::new(PagedStorage::new(
+                chunk_rows,
+                byte_budget,
+                max_dirty_cells,
+            )?)),
             dense_calculated_cells: 0,
         })
     }
@@ -983,33 +263,42 @@ impl CellStorage {
 
     #[inline(always)]
     pub(crate) fn kind_at(&self, index: usize) -> u8 {
-        let source = if let Some(paged) = &self.paged {
+        if let Some(paged) = &self.paged {
             let (row, col) = self.coordinates(index);
-            let (kind, _, _, loaded, _) = paged.read(row, col);
-            if !loaded {
-                return kind;
+            let (source, _, _, loaded, _) = paged.read(row, col);
+            if !loaded || source != KIND_EMPTY || !paged.has_calculated() {
+                return source;
             }
 
-            kind
-        } else {
-            // Literals and plain empties are decided by the kind byte alone, so
-            // only calculated slots load (and bounds-check) their payload.
-            let kind = self.kind[index];
-            if kind & CALCULATED == 0 {
-                return kind;
-            }
-            return if kind & !CALCULATED == KIND_FORMULA {
-                KIND_FORMULA
-            } else {
-                decode_cell(self.payload[index]).0
-            };
-        };
-
-        if source == KIND_EMPTY && !self.derived.is_empty() {
-            self.derived.get(index).map_or(source, |value| value.0)
-        } else {
-            source
+            return paged
+                .calculated_at(row, col)
+                .map_or(source, |value| value.0);
         }
+
+        // Literals and plain empties are decided by the kind byte alone, so
+        // only calculated slots load (and bounds-check) their payload.
+        let kind = self.kind[index];
+        if kind & CALCULATED == 0 {
+            return kind;
+        }
+
+        if kind & !CALCULATED == KIND_FORMULA {
+            KIND_FORMULA
+        } else {
+            decode_cell(self.payload[index]).0
+        }
+    }
+
+    /// A paged calculated value; `None` for dense storage.
+    #[inline]
+    fn paged_calculated(&self, index: usize) -> Option<(u8, u64)> {
+        let paged = self.paged.as_ref()?;
+        if !paged.has_calculated() {
+            return None;
+        }
+
+        let (row, col) = self.coordinates(index);
+        paged.calculated_at(row, col)
     }
 
     #[inline]
@@ -1034,27 +323,18 @@ impl CellStorage {
 
     #[inline]
     pub(crate) fn resolved_payload_at(&self, index: usize) -> u64 {
-        if self.paged.is_none() {
+        let Some(paged) = &self.paged else {
             return dense_resolved(self.kind[index], self.payload[index]).1;
-        }
-        if self.derived.is_empty() {
-            return self.source_payload_at(index);
-        }
-
-        let (kind, payload) = if let Some(paged) = &self.paged {
-            let (row, col) = self.coordinates(index);
-            let (kind, payload, _, loaded, _) = paged.read(row, col);
-            if !loaded {
-                return payload;
-            }
-
-            (kind, payload)
-        } else {
-            (self.kind[index], self.payload[index])
         };
 
+        let (row, col) = self.coordinates(index);
+        let (kind, payload, _, loaded, _) = paged.read(row, col);
+        if !loaded || !paged.has_calculated() {
+            return payload;
+        }
+
         if kind == KIND_EMPTY || kind == KIND_FORMULA {
-            self.derived.get(index).map_or(payload, |cell| cell.1)
+            paged.calculated_at(row, col).map_or(payload, |cell| cell.1)
         } else {
             payload
         }
@@ -1065,7 +345,8 @@ impl CellStorage {
         if self.paged.is_none() {
             return (self.kind[index] & CALCULATED != 0).then(|| decode_cell(self.payload[index]));
         }
-        self.derived.get(index)
+
+        self.paged_calculated(index)
     }
 
     #[inline]
@@ -1077,24 +358,26 @@ impl CellStorage {
     }
 
     pub(crate) fn set_derived(&mut self, index: usize, kind: u8, payload: u64) -> bool {
-        if self.paged.is_none() {
-            let source = self.kind[index] & !CALCULATED;
-            debug_assert!(source == KIND_EMPTY || source == KIND_FORMULA);
-            self.dense_calculated_cells += usize::from(self.kind[index] & CALCULATED == 0);
-            self.kind[index] = source | CALCULATED;
-            self.payload[index] = encode_cell(kind, payload);
-            return true;
-        }
-        if self.derived.is_empty() && !self.reserve_derived(1) {
-            return false;
+        let row_count = self.row_count;
+
+        if let Some(paged) = &mut self.paged {
+            return paged.set_calculated(index % row_count, index / row_count, kind, payload);
         }
 
-        self.derived.set(index, kind, payload);
+        let source = self.kind[index] & !CALCULATED;
+        debug_assert!(source == KIND_EMPTY || source == KIND_FORMULA);
+        self.dense_calculated_cells += usize::from(self.kind[index] & CALCULATED == 0);
+        self.kind[index] = source | CALCULATED;
+        self.payload[index] = encode_cell(kind, payload);
         true
     }
 
-    pub(crate) fn reserve_derived(&mut self, additional: usize) -> bool {
-        self.paged.is_none() || self.derived.reserve(additional)
+    /// Allocates the calculated room the inclusive rectangle needs, so the
+    /// results written into it cannot fail. Dense slots always have room.
+    pub(crate) fn reserve_derived(&mut self, r0: usize, c0: usize, r1: usize, c1: usize) -> bool {
+        self.paged
+            .as_mut()
+            .is_none_or(|paged| paged.reserve_calculated(r0, c0, r1, c1))
     }
 
     pub(crate) fn formula_value_kind(&self, index: usize) -> crate::types::FormulaValueKind {
@@ -1118,7 +401,9 @@ impl CellStorage {
             }
             self.dense_calculated_cells = 0;
         }
-        self.derived.clear();
+        if let Some(paged) = &mut self.paged {
+            paged.clear_calculated();
+        }
     }
 
     #[inline]
@@ -1253,7 +538,7 @@ impl CellStorage {
     pub(crate) fn dirty_coordinates(&self) -> Vec<f64> {
         self.paged
             .as_ref()
-            .map_or_else(Vec::new, PagedStorage::dirty_coordinates)
+            .map_or_else(Vec::new, |paged| paged.dirty_coordinates())
     }
 
     pub(crate) fn mark_range_clean(
@@ -1293,7 +578,7 @@ impl CellStorage {
     pub(crate) fn paged_stats(&self) -> Option<(usize, usize, usize, usize, usize)> {
         self.paged.as_ref().map(|paged| {
             (
-                paged.chunks.len(),
+                paged.resident_chunks(),
                 paged.loaded_cells(),
                 paged.dirty_cells(),
                 paged.byte_len(),
@@ -1363,34 +648,25 @@ impl CellStorage {
         .expect("a live paged sheet already has a valid chunk size");
 
         for entry in entries {
-            if let Some((new_row, new_col)) = remap(entry.row, entry.col) {
-                if new_row < new_rows && new_col < new_cols {
-                    if let Some(revision) = entry.dirty_revision {
-                        let _ = next.restore_dirty(
-                            new_row,
-                            new_col,
-                            entry.kind,
-                            entry.payload,
-                            entry.style,
-                            revision,
-                        );
-                    } else {
-                        let _ = next.write(
-                            new_row,
-                            new_col,
-                            entry.kind,
-                            entry.payload,
-                            entry.style,
-                            None,
-                        );
-                    }
-                }
+            let Some((new_row, new_col)) = remap(entry.row, entry.col) else {
+                continue;
+            };
+
+            if new_row < new_rows && new_col < new_cols {
+                let _ = next.write(
+                    new_row,
+                    new_col,
+                    entry.kind,
+                    entry.payload,
+                    entry.style,
+                    entry.dirty_revision,
+                );
             }
         }
 
         self.row_count = new_rows;
         self.n_cols = new_cols;
-        self.paged = Some(next);
+        self.paged = Some(Box::new(next));
     }
 
     /// Whether the grid can take `rows` rows of `cols` columns. A dense grid
@@ -1604,7 +880,6 @@ impl CellStorage {
         if let Some(paged) = &self.paged {
             paged.add_memory_stats(stats);
         }
-        self.derived.add_memory_stats(stats.owner_mut(FORMULAS));
     }
 }
 
@@ -1644,7 +919,7 @@ pub(crate) struct DenseColumn<'a> {
     styles: &'a [u32],
 }
 
-impl DenseColumn<'_> {
+impl<'a> DenseColumn<'a> {
     /// Resolved kind, payload and style of `row`.
     #[inline]
     pub(crate) fn cell(&self, row: usize) -> (u8, u64, u32) {
@@ -1676,7 +951,7 @@ impl DenseColumn<'_> {
     /// loop bounded by the kinds needs no bounds check on the payloads. A
     /// literal's raw kind is its kind; use [`source_kind`] for the others.
     #[inline]
-    pub(crate) fn raw_slices(&self) -> (&[u8], &[u64]) {
+    pub(crate) fn raw_slices(&self) -> (&'a [u8], &'a [u64]) {
         (self.kinds, &self.payloads[..self.kinds.len()])
     }
 
@@ -1694,31 +969,40 @@ pub(crate) fn source_kind(raw: u8) -> u8 {
     raw & !CALCULATED
 }
 
-/// A borrowed column segment bounded by its source page or column.
-/// Indices are absolute and valid only inside `start..end`. Creating a run
-/// allocates nothing and probes the source page directory once; paged runs still
-/// consult the sparse dirty and calculated maps per cell.
+/// A borrowed column segment bounded by its source page or column, and for
+/// paged storage also by its dirty and calculated blocks. Indices are absolute
+/// and valid only inside `start..end`. Creating a run allocates nothing and
+/// indexes each directory once; paged cells then read by row offset.
 #[derive(Clone, Copy)]
 pub(crate) struct CellRun<'a> {
     pub(crate) start: usize,
     pub(crate) end: usize,
+    /// First cell index of the clean page, dirty block and calculated block.
     source_base: usize,
+    dirty_base: usize,
+    calculated_base: usize,
     kinds: &'a [u8],
     payloads: &'a [u64],
     styles: &'a [u32],
-    /// Paged load bits; `None` with empty slices is an absent page.
+    /// Paged load bits; `None` with empty slices is a page without clean values.
     loaded: Option<&'a [u64]>,
     is_dense: bool,
-    dirty: Option<&'a FxHashMap<(usize, usize), DirtyCell>>,
-    row_count: usize,
-    paged_calculated: Option<&'a DerivedOverlay>,
+    dirty: Option<DirtyView<'a>>,
+    /// The page's calculated values; empty when it has none.
+    calculated: &'a [u64],
 }
 
 impl CellRun<'_> {
     #[inline]
-    fn dirty_cell(&self, index: usize) -> Option<&DirtyCell> {
-        self.dirty?
-            .get(&(index % self.row_count, index / self.row_count))
+    fn dirty_cell(&self, index: usize) -> Option<(u8, u64, u32)> {
+        let cell = self.dirty?.get(index - self.dirty_base)?;
+        Some((cell.kind, cell.payload, cell.style))
+    }
+
+    #[inline]
+    fn calculated_cell(&self, index: usize) -> Option<(u8, u64)> {
+        let value = *self.calculated.get(index - self.calculated_base)?;
+        (value != ABSENT_TAG).then(|| decode_cell(value))
     }
 
     #[inline]
@@ -1732,7 +1016,7 @@ impl CellRun<'_> {
         self.is_dense
             || self
                 .loaded
-                .is_some_and(|bits| CellChunk::bit(bits, index - self.source_base))
+                .is_some_and(|bits| bit(bits, index - self.source_base))
     }
 
     #[inline]
@@ -1741,26 +1025,31 @@ impl CellRun<'_> {
         self.clean_loaded(index) || self.dirty_cell(index).is_some()
     }
 
-    /// Reads a paged scalar, style and residency with one dirty-map probe.
+    /// A paged cell's source scalar and style, or `None` when unloaded.
+    #[inline]
+    fn paged_source(&self, index: usize) -> Option<(u8, u64, u32)> {
+        debug_assert!(!self.is_dense && self.contains(index));
+        if let Some(cell) = self.dirty_cell(index) {
+            return Some(cell);
+        }
+
+        if !self.clean_loaded(index) {
+            return None;
+        }
+
+        let offset = index - self.source_base;
+        Some((
+            self.kinds[offset],
+            self.payloads[offset],
+            self.styles[offset],
+        ))
+    }
+
+    /// Reads a paged resolved scalar, style and residency.
     #[inline]
     fn paged_cell(&self, index: usize) -> Option<(u8, u64, u32)> {
-        debug_assert!(!self.is_dense && self.contains(index));
-        let (kind, payload, style) = match self.dirty_cell(index) {
-            Some(cell) => (cell.kind, cell.payload, cell.style),
-            None if self.clean_loaded(index) => {
-                let offset = index - self.source_base;
-                (
-                    self.kinds[offset],
-                    self.payloads[offset],
-                    self.styles[offset],
-                )
-            }
-            None => return None,
-        };
-        let (kind, payload) = self
-            .paged_calculated
-            .and_then(|overlay| overlay.get(index))
-            .unwrap_or((kind, payload));
+        let (kind, payload, style) = self.paged_source(index)?;
+        let (kind, payload) = self.calculated_cell(index).unwrap_or((kind, payload));
         Some((kind, payload, style))
     }
 
@@ -1776,18 +1065,12 @@ impl CellRun<'_> {
     #[inline]
     pub(crate) fn source(&self, index: usize) -> (u8, u64) {
         debug_assert!(self.contains(index));
-        if let Some(cell) = self.dirty_cell(index) {
-            return (cell.kind, cell.payload);
-        }
-        if !self.clean_loaded(index) {
-            return (KIND_EMPTY, 0);
-        }
-        let offset = index - self.source_base;
         if self.is_dense {
-            dense_source(self.kinds[offset], self.payloads[offset])
-        } else {
-            (self.kinds[offset], self.payloads[offset])
+            return dense_source(self.kinds[index], self.payloads[index]);
         }
+
+        self.paged_source(index)
+            .map_or((KIND_EMPTY, 0), |(kind, payload, _)| (kind, payload))
     }
 
     /// Literal sources win; a calculated slot exists only over empty or formula
@@ -1799,19 +1082,9 @@ impl CellRun<'_> {
         if self.is_dense {
             return dense_resolved(self.kinds[index], self.payloads[index]);
         }
-        let source = match self.dirty_cell(index) {
-            Some(cell) => (cell.kind, cell.payload),
-            None if self.clean_loaded(index) => {
-                let offset = index - self.source_base;
-                (self.kinds[offset], self.payloads[offset])
-            }
-            None => return (KIND_EMPTY, 0),
-        };
-        let calculated = match self.paged_calculated {
-            Some(overlay) => overlay.get(index),
-            None => None,
-        };
-        calculated.unwrap_or(source)
+
+        self.paged_cell(index)
+            .map_or((KIND_EMPTY, 0), |(kind, payload, _)| (kind, payload))
     }
 }
 
@@ -1827,14 +1100,14 @@ impl CellStorage {
     }
 
     pub(crate) fn remove_calculated(&mut self, index: usize) {
-        if self.paged.is_none() {
-            if self.kind[index] & CALCULATED != 0 {
-                self.kind[index] &= !CALCULATED;
-                self.payload[index] = 0;
-                self.dense_calculated_cells -= 1;
-            }
-        } else if !self.derived.is_empty() {
-            self.derived.remove(index);
+        let row_count = self.row_count;
+
+        if let Some(paged) = &mut self.paged {
+            paged.remove_calculated(index % row_count, index / row_count);
+        } else if self.kind[index] & CALCULATED != 0 {
+            self.kind[index] &= !CALCULATED;
+            self.payload[index] = 0;
+            self.dense_calculated_cells -= 1;
         }
     }
 
@@ -1876,8 +1149,11 @@ impl CellStorage {
         true
     }
 
+    /// Releases paged calculated pages that hold no result.
     pub(crate) fn compact_calculated(&mut self) {
-        self.derived.compact();
+        if let Some(paged) = &mut self.paged {
+            paged.compact_calculated();
+        }
     }
 
     /// The whole dense source grid; `None` for paged storage.
@@ -1932,47 +1208,75 @@ impl CellStorage {
     }
 
     /// The run containing `start`, ending no later than `end` or the column,
-    /// source page boundary.
+    /// source page boundary. Reading a paged run counts as an access to its page.
     pub(crate) fn run(&self, start: usize, end: usize) -> CellRun<'_> {
+        self.page_run(start, end, true)
+    }
+
+    /// Like [`Self::run`], but leaves the page's access order alone: a tile
+    /// cursor records the access once per page with [`Self::touch_tile`].
+    pub(crate) fn tile_run(&self, start: usize, end: usize) -> CellRun<'_> {
+        self.page_run(start, end, false)
+    }
+
+    /// Records one access to each paged page holding `row` in `col_start..=col_end`.
+    pub(crate) fn touch_tile(&self, row: usize, col_start: usize, col_end: usize) {
+        let Some(paged) = &self.paged else {
+            return;
+        };
+
+        let (page, _) = paged.split(row);
+        for col in col_start..=col_end {
+            paged.touch(paged.page_id(col, page));
+        }
+    }
+
+    /// The first row of the next page after `row`; dense storage is one page.
+    pub(crate) fn next_page_row(&self, row: usize) -> usize {
+        self.paged.as_ref().map_or(usize::MAX, |paged| {
+            let (page, _) = paged.split(row);
+            (page + 1) * paged.chunk_rows
+        })
+    }
+
+    fn page_run(&self, start: usize, end: usize, touch: bool) -> CellRun<'_> {
         debug_assert!(start < end && end <= self.row_count * self.n_cols);
         let row = start % self.row_count;
         let col = start / self.row_count;
         let end = end.min(start + self.row_count - row);
 
-        if let Some(paged) = &self.paged {
-            let (key, _) = paged.key_offset(row, col);
-            let source_base = col * self.row_count + key.1 * paged.chunk_rows;
-            let end = end.min(source_base + paged.chunk_rows);
-            let chunk = paged.chunks.get(&key);
-            paged.touch(key);
-
-            CellRun {
-                start,
-                end,
-                source_base,
-                kinds: chunk.map_or(&[], |chunk| chunk.kind.as_slice()),
-                payloads: chunk.map_or(&[], |chunk| chunk.payload.as_slice()),
-                styles: chunk.map_or(&[], |chunk| chunk.style.as_slice()),
-                loaded: chunk.map(|chunk| chunk.loaded.as_slice()),
-                is_dense: false,
-                dirty: (!paged.dirty.is_empty()).then_some(&paged.dirty),
-                row_count: self.row_count,
-                paged_calculated: (!self.derived.is_empty()).then_some(&self.derived),
-            }
-        } else {
-            CellRun {
+        let Some(paged) = &self.paged else {
+            return CellRun {
                 start,
                 end,
                 source_base: 0,
+                dirty_base: 0,
+                calculated_base: 0,
                 kinds: &self.kind,
                 payloads: &self.payload,
                 styles: &self.style,
                 loaded: None,
                 is_dense: true,
                 dirty: None,
-                row_count: self.row_count,
-                paged_calculated: None,
-            }
+                calculated: &[],
+            };
+        };
+
+        let column_base = col * self.row_count;
+        let view = paged.run_view(row, col, touch);
+        CellRun {
+            start,
+            end: end.min(column_base + view.end_row),
+            source_base: column_base + view.clean_first_row,
+            dirty_base: column_base + view.dirty_first_row,
+            calculated_base: column_base + view.calculated_first_row,
+            kinds: view.clean.map_or(&[], |clean| clean.kind.as_slice()),
+            payloads: view.clean.map_or(&[], |clean| clean.payload.as_slice()),
+            styles: view.clean.map_or(&[], |clean| clean.style.as_slice()),
+            loaded: view.clean.map(|clean| clean.loaded.as_slice()),
+            is_dense: false,
+            dirty: view.dirty,
+            calculated: view.calculated,
         }
     }
 }
@@ -2039,7 +1343,7 @@ mod paged_storage_tests {
         assert!(!storage.hydrate(0, 0, KIND_EMPTY, 30, 3));
         assert!(storage.write(4, 0, KIND_EMPTY, 40, 4, None));
         assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, true));
-        assert_eq!(storage.chunks.len(), 1);
+        assert_eq!(storage.resident_chunks(), 1);
         storage.acknowledge_revision(6);
         assert_eq!(storage.dirty_cells(), 1);
         storage.acknowledge_revision(7);
@@ -2083,7 +1387,7 @@ mod calculated_slot_tests {
             assert!(cells.hydrate_cell(1535, 0, KIND_EMPTY, 0, 9));
             let mut before = StoreMemoryStats::default();
             cells.add_memory_stats(&mut before);
-            assert!(cells.reserve_derived(3));
+            assert!(cells.reserve_derived(0, 0, 1535, 0));
             assert!(cells.set_derived(0, KIND_STRING, encode_str_id(3)));
             assert!(cells.set_derived(512, KIND_FORMULA, FormulaError::Ref.slot() as u64));
             assert!(cells.set_derived(1535, KIND_BOOL, encode_num(1.0)));

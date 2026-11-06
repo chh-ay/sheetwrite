@@ -8,9 +8,9 @@ use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, parse, place_span, resolve_sheet_refs, resolve_structured_refs,
-    sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef, TableSection,
-    UnresolvedStructuredRef,
+    ast_contains_sheet_span, parse, parse_with_features, place_span, resolve_sheet_refs,
+    resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef,
+    TableSection, UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -30,7 +30,12 @@ use crate::types::{
 };
 use crate::window::ConditionalRules;
 
+mod external_links;
 mod hidden_rows;
+#[cfg(all(test, feature = "analysis"))]
+mod measure_tests;
+#[cfg(feature = "analysis")]
+mod measures;
 #[cfg(feature = "analysis")]
 mod model_source;
 mod names;
@@ -38,6 +43,8 @@ pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+#[cfg(all(test, feature = "analysis"))]
+mod related_measure_tests;
 #[cfg(feature = "analysis")]
 mod relationships;
 #[cfg(all(test, feature = "analysis"))]
@@ -284,6 +291,12 @@ pub struct CellStore {
     /// has the field, so the default engine store does not grow.
     #[cfg(feature = "host-functions")]
     pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
+    /// Weak index of the literal REGEX patterns this store's formulas share.
+    /// `None` until a formula uses one, and only the full engine has it. A
+    /// `Cell` adds one pointer to the store, so readers take the index out
+    /// and put it back.
+    #[cfg(feature = "analysis")]
+    regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
     defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
     tables: HashMap<String, TableDefinition>,
@@ -393,6 +406,8 @@ impl CellStore {
             conditional_rules: ConditionalRules::default(),
             #[cfg(feature = "host-functions")]
             custom_functions: None,
+            #[cfg(feature = "analysis")]
+            regex_patterns: std::cell::Cell::new(None),
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
@@ -3302,6 +3317,11 @@ impl CellStore {
                 .add_payload(bytes, bytes);
             results.add_memory_stats(&mut stats);
         }
+        #[cfg(feature = "analysis")]
+        if let Some(patterns) = self.regex_patterns.take() {
+            patterns.add_memory_stats(stats.owner_mut(crate::memory::FORMULAS));
+            self.regex_patterns.set(Some(patterns));
+        }
 
         self.graph.add_memory_stats(&mut stats);
         self.conditional_rules.add_memory_stats(&mut stats);
@@ -3611,6 +3631,9 @@ impl CellStore {
         }
     }
 
+    /// Parses a formula and resolves its sheets, defined names and table
+    /// references. Each step runs only when the parse found a node it
+    /// rewrites, so a formula of plain cells is parsed in one pass.
     fn resolve_formula_ast(
         &self,
         source: &str,
@@ -3618,11 +3641,54 @@ impl CellStore {
         formula_row: u32,
         formula_col: u32,
     ) -> Result<Ast, FormulaError> {
-        let ast = parse(source).map_err(|_| FormulaError::Value)?;
+        let (mut ast, features) = parse_with_features(source).map_err(|_| FormulaError::Value)?;
+
+        if features.sheet_refs {
+            ast = self.resolve_sheets(ast)?;
+        }
+
+        if features.names {
+            let placement = names::NamePlacement::new(formula_row, formula_col);
+            ast = self.resolve_defined_names(ast, formula_sheet, &placement);
+        }
+
+        if features.table_refs {
+            ast = self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col);
+        }
+
+        #[cfg(feature = "analysis")]
+        let ast = self.bind_regex_patterns(source, ast);
+        Ok(ast)
+    }
+
+    /// Resolves a parsed formula as if it were in the cell at
+    /// (`formula_row`, `formula_col`) of `formula_sheet`: sheet names, defined
+    /// names, then structured references. Measures resolve their inlined
+    /// expression this way.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn resolve_parsed_formula(
+        &self,
+        ast: Ast,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Result<Ast, FormulaError> {
         let ast = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
         let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
-        Ok(resolve_structured_refs(
+        Ok(self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col))
+    }
+
+    /// Resolves the table references of a formula in the cell at
+    /// (`formula_row`, `formula_col`) of `formula_sheet`.
+    fn resolve_table_refs(
+        &self,
+        ast: Ast,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Ast {
+        resolve_structured_refs(
             ast,
             formula_sheet,
             formula_row,
@@ -3630,7 +3696,19 @@ impl CellStore {
             &|reference, sheet, row, col| {
                 self.resolve_structured_reference(reference, sheet, row, col)
             },
-        ))
+        )
+    }
+
+    /// Points the literal REGEX patterns of a new formula at the patterns the
+    /// store's formulas share, so formulas with one pattern compile it once.
+    #[cfg(feature = "analysis")]
+    fn bind_regex_patterns(&self, source: &str, mut ast: Ast) -> Ast {
+        if crate::eval::regex_patterns::may_call_regex(source) {
+            let mut patterns = self.regex_patterns.take().unwrap_or_default();
+            patterns.bind(&mut ast);
+            self.regex_patterns.set(Some(patterns));
+        }
+        ast
     }
 
     /// Resolve the sheet names of a parsed formula to stable handles.
@@ -3833,7 +3911,7 @@ impl CellStore {
     }
 
     fn refresh_named_formula_entries(&mut self) {
-        self.forget_name_expansions();
+        self.resolve_name_definitions();
         for formula_sheet in 0..self.sheets.len() {
             if !self
                 .sheet_alive

@@ -16,19 +16,32 @@ mod functions;
 mod index;
 mod info;
 mod iteration;
+mod literal_criteria;
+mod literal_products;
+mod literal_statistics;
 mod lookup;
+#[cfg(test)]
+mod lookup_rule_tests;
 mod math;
 mod matrix;
 mod number_format;
+#[cfg(test)]
+mod number_format_corpus_tests;
 mod operators;
+#[cfg(test)]
+mod pass_rule_tests;
 mod random;
 mod range_fold;
 mod range_reader;
 mod reference;
+#[cfg(feature = "analysis")]
+pub(crate) mod regex_patterns;
 mod statistics;
 mod subtotal;
 #[cfg(test)]
 mod subtotal_tests;
+#[cfg(test)]
+mod test_support;
 mod text;
 mod value;
 mod wildcard;
@@ -36,9 +49,8 @@ mod wildcard;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::rc::Rc;
 
-use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
@@ -67,14 +79,14 @@ use dependency::{
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
-use lookup::{
-    find_match_index_indexed, list_reuse, option_code, positive_index, remember_list,
-    remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
-    CachedTable, LookupPassGuard, LookupReuse, ReuseEntry, TablePart,
-};
+use literal_criteria::CriteriaFold;
+pub(crate) use lookup::LookupStates;
+use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+#[cfg(feature = "analysis")]
+pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
@@ -458,18 +470,8 @@ fn address_text(
         if col_absolute {
             output.push('$');
         }
-        let mut value = col + 1;
-        let mut reversed = [0u8; 3];
-        let mut length = 0;
-        while value > 0 {
-            value -= 1;
-            reversed[length] = b'A' + (value % 26) as u8;
-            length += 1;
-            value /= 26;
-        }
-        for byte in reversed[..length].iter().rev() {
-            output.push(char::from(*byte));
-        }
+        // The check above keeps the column inside the sheet, so it fits in `u32`.
+        write_col(col as u32, &mut output);
         if row_absolute {
             output.push('$');
         }
@@ -818,7 +820,6 @@ impl CellStore {
             return;
         }
 
-        let _lookup_pass = LookupPassGuard::begin();
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
         let mut memo = self.formula_results.take().unwrap_or_default();
@@ -867,8 +868,6 @@ impl CellStore {
             return;
         }
 
-        memo.prepare(self.formula_slots.slots(), affected.len());
-
         let found_cycle = self.graph.index().is_some_and(|index| {
             seed_dependency_depth_errors(
                 &self.sheets,
@@ -886,16 +885,10 @@ impl CellStore {
             .index()
             .is_some_and(|index| !index.has_dynamic_arrays())
         {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.evaluate_pass(&mut pass, found_cycle);
-
-            for id in affected.ids() {
-                if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(id, result);
-                }
+            if self.independent_pass() {
+                self.evaluate_independent_pass(&affected, &mut memo);
+            } else {
+                self.evaluate_selected(&affected, &mut memo, found_cycle);
             }
 
             self.finish_recompute(seeds.iter().copied(), Some(&affected));
@@ -905,12 +898,9 @@ impl CellStore {
             return;
         }
 
+        self.flush_seeded(&mut memo);
         if let Some(limits) = self.iteration.as_deref().copied().filter(|_| found_cycle) {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.settle_circular_references(&mut pass, limits, false);
+            self.settle_circular_references(&affected, &mut memo, limits, false);
         }
 
         let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
@@ -983,7 +973,7 @@ impl CellStore {
                 let vacated_range = data.spill.installed(local);
                 let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
 
-                memo.remove(id);
+                memo.unsettle(id);
                 let mut pass = EvalPass {
                     affected: &affected,
                     results: &mut memo,
@@ -1071,16 +1061,19 @@ impl CellStore {
                         if data.spill.attempt(local).is_some() {
                             data.spill.forget(local, &mut data.cells);
                         }
-                        pass.results.insert(id, matrix.into_first());
+                        pass.results.pull(id, matrix.into_first());
                         Vec::new()
                     }
                     evaluated => self.install_spill_result(key, evaluated, pass.results),
                 };
                 if self.iteration.is_some() {
                     if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
-                        pass.results.insert(id, value);
+                        pass.results.pull(id, value);
                     }
                 }
+                // The anchor and any formula it pulled are written before the
+                // next anchor runs, after its spill is installed.
+                self.flush_pulled(&mut memo);
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
@@ -1156,6 +1149,7 @@ impl CellStore {
             }
 
             let Some(index) = self.graph.index() else {
+                self.flush_pulled(&mut memo);
                 memo.finish(affected);
                 self.formula_results = Some(memo);
                 return;
@@ -1241,6 +1235,7 @@ impl CellStore {
                     &mut memo,
                 );
             }
+            self.flush_seeded(&mut memo);
         }
 
         #[cfg(test)]
@@ -1269,17 +1264,7 @@ impl CellStore {
             }
         });
 
-        let mut pass = EvalPass {
-            affected: &affected,
-            results: &mut memo,
-        };
-        self.evaluate_pass(&mut pass, found_cycle);
-
-        for id in affected.ids() {
-            if let Some(result) = pass.results.remove(id) {
-                self.store_formula_result(id, result);
-            }
-        }
+        self.evaluate_selected(&affected, &mut memo, found_cycle);
 
         self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
         memo.finish(affected);
@@ -1302,19 +1287,19 @@ impl CellStore {
             Err(error) => {
                 let data = &mut self.sheets[sheet];
                 data.spill.forget(local, &mut data.cells);
-                results.insert(id, Value::Error(error));
+                results.pull(id, Value::Error(error));
                 return Vec::new();
             }
         };
         let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
             let data = &mut self.sheets[sheet];
             data.spill.forget(local, &mut data.cells);
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         };
         let data = &mut self.sheets[sheet];
         if let Err(error) = data.spill.admit(range, &mut data.cells, &data.formulas) {
-            results.insert(id, Value::Error(error));
+            results.pull(id, Value::Error(error));
             return Vec::new();
         }
 
@@ -1329,20 +1314,156 @@ impl CellStore {
         let data = &mut self.sheets[sheet];
         if !within_budget {
             data.spill.compact(&mut data.cells);
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
-        if !data.spill.reserve(matrix.values.len(), &mut data.cells) {
-            results.insert(id, Value::Error(FormulaError::Num));
+        if !data.spill.reserve(range, &mut data.cells) {
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
 
         let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
-        results.insert(id, first);
+        results.pull(id, first);
         let strings = &mut self.strings;
         data.spill.install(range, &mut data.cells, |offset| {
             calculated_slot(strings, &matrix.values[offset])
         })
+    }
+
+    /// Whether no selected formula can read another one during the pass: no
+    /// static formula-to-formula reads, no runtime references (`OFFSET` and
+    /// `INDIRECT` are volatile) and no iteration. Each formula then reads
+    /// only stored values, so its result can go to storage at once.
+    fn independent_pass(&self) -> bool {
+        self.iteration.is_none()
+            && !self.formula_slots.has_volatile()
+            && self
+                .graph
+                .index()
+                .is_some_and(|index| !index.has_formula_dependencies())
+    }
+
+    /// Evaluates each selected formula once and writes its result to storage
+    /// at once: no pass result table, active-call bits or second write loop.
+    fn evaluate_independent_pass(&mut self, affected: &FormulaWork, memo: &mut FormulaResults) {
+        for id in affected.ids() {
+            let mut pass = EvalPass {
+                affected,
+                results: memo,
+            };
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            self.store_formula_result(id, result);
+        }
+    }
+
+    /// Writes the pulled results to storage and marks them settled. Most
+    /// formulas pull nothing, so the check stays inline and the loop does not.
+    #[inline]
+    pub(super) fn flush_pulled(&mut self, results: &mut FormulaResults) {
+        if results.has_pulled() {
+            self.write_pulled(results);
+        }
+    }
+
+    #[inline(never)]
+    fn write_pulled(&mut self, results: &mut FormulaResults) {
+        while let Some((id, result)) = results.pop_pulled() {
+            self.settle_result(id, result, results);
+        }
+    }
+
+    /// Writes the errors the depth walk seeded. With iteration on, `#CYCLE!`
+    /// results wait in the pulled list: the component pass replaces them and
+    /// starts from the values the cells held before this pass.
+    fn flush_seeded(&mut self, results: &mut FormulaResults) {
+        if !results.seeded.is_empty() {
+            self.write_seeded(results);
+        }
+    }
+
+    #[inline(never)]
+    fn write_seeded(&mut self, results: &mut FormulaResults) {
+        let mut seeded = std::mem::take(&mut results.seeded);
+        let iterating = self.iteration.is_some();
+        for (id, error) in seeded.drain(..) {
+            if iterating && error == FormulaError::Cycle {
+                results.pull(id, Value::Error(error));
+            } else {
+                self.settle_result(id, Value::Error(error), results);
+            }
+        }
+        results.seeded = seeded;
+    }
+
+    /// Evaluates every selected formula once, each after the formulas it
+    /// reads, and writes its result before the next one runs.
+    fn evaluate_selected(
+        &mut self,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
+        found_cycle: bool,
+    ) {
+        self.flush_seeded(results);
+        match self.iteration.as_deref().copied() {
+            Some(limits) if found_cycle => {
+                self.settle_circular_references(affected, results, limits, true)
+            }
+            _ => self.flush_pulled(results),
+        }
+        if results.ordered {
+            // The walk lists every selected formula it did not resolve to an
+            // error, and those errors are already written.
+            let order = std::mem::take(&mut results.order);
+            for &id in &order {
+                self.evaluate_one(id, affected, results);
+            }
+            results.order = order;
+        } else {
+            for id in affected.ids() {
+                self.evaluate_one(id, affected, results);
+            }
+        }
+    }
+
+    /// Evaluates `id` unless this pass already has its result, then writes it
+    /// and any formula it pulled.
+    pub(super) fn evaluate_one(
+        &mut self,
+        id: FormulaId,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
+    ) {
+        // Between top-level formulas only iteration's seeded cycles wait in
+        // the pulled list, so most checks need only the settled bit.
+        if results.is_settled(id) || (results.has_pulled() && results.has(id)) {
+            return;
+        }
+        let mut pass = EvalPass { affected, results };
+        if self.iteration.is_some() {
+            let _ = self.eval_formula_id(id, &mut pass, 0);
+        } else {
+            // Without iteration nothing on the evaluation path needs this
+            // result before it is written, so it goes straight to the cell.
+            pass.results.visiting.insert(id);
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            pass.results.visiting.remove(id);
+            self.settle_result(id, result, results);
+        }
+        self.flush_pulled(results);
+    }
+
+    /// Writes `id`'s result and marks it settled for this pass. One
+    /// out-of-line copy serves every writer; the call is small next to the
+    /// evaluation it follows.
+    #[inline(never)]
+    pub(super) fn settle_result(
+        &mut self,
+        id: FormulaId,
+        result: EvalResult,
+        results: &mut FormulaResults,
+    ) {
+        self.store_formula_result(id, result);
+        results.settle(id);
     }
 
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
@@ -1426,8 +1547,24 @@ impl CellStore {
 
         if let Some(key) = cell_key(row, col) {
             if let Some(id) = s.formulas.id(key) {
+                // A settled formula's result is already in its cell, read as
+                // a clean formula is; iteration still records the read.
                 if pass.affected.contains(id) {
-                    return self.eval_formula_id(id, pass, depth + 1);
+                    if !pass.results.is_settled(id) {
+                        return self.eval_formula_id(id, pass, depth + 1);
+                    }
+                    if self.iteration.is_some() {
+                        iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
+                    }
+                    // This pass wrote the whole result, errors included, to
+                    // the calculated slot, so no source-error lookup is needed.
+                    return match s.cells.calculated_cell_at(i) {
+                        Some((KIND_FORMULA, payload)) => Value::Error(
+                            FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref),
+                        ),
+                        Some((kind, payload)) => literal_cell_value(&self.strings, kind, payload),
+                        None => Value::number(s.cells.num_at(i)),
+                    };
                 }
 
                 return cached_formula_value(
@@ -1446,18 +1583,6 @@ impl CellStore {
         Value::number(s.cells.num_at(i))
     }
 
-    pub(crate) fn eval_formula_cell(
-        &self,
-        key: AbsCellKey,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> EvalResult {
-        let Some(id) = self.formula_id(key) else {
-            return Value::Number(0.0);
-        };
-        self.eval_formula_id(id, pass, depth)
-    }
-
     /// Evaluate a selected id without repeating its address-index lookup.
     pub(crate) fn eval_formula_id(
         &self,
@@ -1471,7 +1596,11 @@ impl CellStore {
         let Some(key) = self.formula_slots.location(id) else {
             return Value::Error(FormulaError::Ref);
         };
-        if let Some(result) = pass.results.get(id) {
+        if pass.results.is_settled(id) {
+            let (row, col) = key.local();
+            return self.eval_at(key.sheet as usize, row as usize, col as usize, pass, depth);
+        }
+        if let Some(result) = pass.results.pulled(id) {
             if self.iteration.is_some() {
                 iteration::record_iteration_read(key);
             }
@@ -1486,7 +1615,7 @@ impl CellStore {
         }
         let result = self.eval_formula_body(id, pass, depth);
         pass.results.visiting.remove(id);
-        pass.results.insert(id, result.clone());
+        pass.results.pull(id, result.clone());
         if self.iteration.is_some() {
             self.finish_runtime_formula(key, pass).unwrap_or(result)
         } else {
@@ -1567,6 +1696,8 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
             #[cfg(feature = "analysis")]
+            Ast::RegexPattern(pattern) => Value::text(pattern.text()),
+            #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == analysis::lambda::CALL => {
                 analysis::lambda::evaluate(
                     self,
@@ -1592,7 +1723,11 @@ impl CellStore {
                 pass,
                 depth + 1,
             ),
-            Ast::SheetCell(..) | Ast::InvalidRef => Value::Error(FormulaError::Ref),
+            // A sheet reference that ingest did not resolve names another
+            // workbook, which has no values here.
+            Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {
+                Value::Error(FormulaError::Ref)
+            }
             Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
                 Some(value) => value,
                 None => {
@@ -1635,7 +1770,6 @@ impl CellStore {
             | Ast::NamedRange(_)
             | Ast::Range(..)
             | Ast::AbsRange(..)
-            | Ast::SheetRange(..)
             | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
             Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
                 let op = match ast {
@@ -1867,6 +2001,21 @@ impl CellStore {
             | Func::XLookup
             | Func::XMatch => return self.eval_lookup_family(func, args, sheet, pass, depth + 1),
             _ => {}
+        }
+
+        if func == Func::SumProduct {
+            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
+        if matches!(
+            func,
+            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
+        ) {
+            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
+                return result;
+            }
         }
 
         if func == Func::Sum {
@@ -2482,6 +2631,13 @@ impl CellStore {
         if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
             return Some(Value::number(count as f64));
         }
+        if let Some(cells) = reader.literal_columns() {
+            return Some(self.literal_criteria_family(
+                CriteriaFold::Count,
+                None,
+                &[(cells, &criterion)],
+            ));
+        }
         let mut matches = 0.0;
         loop {
             match reader.next_allow_errors(pass) {
@@ -2572,6 +2728,14 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
+        if let Some(ranges) = readers
+            .iter()
+            .map(RangeReader::literal_columns)
+            .collect::<Option<Vec<_>>>()
+        {
+            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
+            return Some(self.literal_criteria_family(CriteriaFold::Count, None, &pairs));
+        }
         let mut matches = 0.0;
         loop {
             let first = match readers[0].next_allow_errors(pass) {
@@ -2634,6 +2798,15 @@ impl CellStore {
         if criteria_reader.shape() != value_reader.shape() {
             return Some(Value::Error(FormulaError::Value));
         }
+        if let (Some(cells), Some(values)) = (
+            criteria_reader.literal_columns(),
+            value_reader.literal_columns(),
+        ) {
+            let fold = CriteriaFold::Sum {
+                average: func == Func::AverageIf,
+            };
+            return Some(self.literal_criteria_family(fold, Some(&values), &[(cells, &criterion)]));
+        }
         let mut fold = IfSum::new();
         loop {
             let candidate = match criteria_reader.next_allow_errors(pass) {
@@ -2691,6 +2864,25 @@ impl CellStore {
             criteria.push(criterion);
         }
         let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
+        if let (Some(values), Some(ranges)) = (
+            value_reader.literal_columns(),
+            readers
+                .iter()
+                .map(RangeReader::literal_columns)
+                .collect::<Option<Vec<_>>>(),
+        ) {
+            let fold = if extreme {
+                CriteriaFold::Extreme {
+                    maximum: func == Func::MaxIfs,
+                }
+            } else {
+                CriteriaFold::Sum {
+                    average: func == Func::AverageIfs,
+                }
+            };
+            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
+            return Some(self.literal_criteria_family(fold, Some(&values), &pairs));
+        }
         let mut sums = IfSum::new();
         let mut extremes = IfExtreme::new(func == Func::MaxIfs);
         loop {
@@ -2874,314 +3066,6 @@ impl CellStore {
                     extreme_if(&value_range, &pairs, func == Func::MaxIfs)
                 } else {
                     aggregate_if(&value_range, &pairs, func == Func::AverageIfs)
-                }
-            }
-            _ => Value::Error(FormulaError::Value),
-        }
-    }
-
-    fn lookup_table_argument(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        part: TablePart,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<CachedTable>, FormulaError> {
-        let reuse = LookupReuse::new(
-            range_from_ast(ast, sheet),
-            |range| table_reuse(range, part),
-            |range, state| remember_table(range, part, state),
-        );
-        self.reused_lookup_range(
-            ast,
-            sheet,
-            reuse,
-            |rows, cols, values| match part {
-                TablePart::FirstColumn => CachedTable::from_column(rows, cols, values),
-                TablePart::FirstRow => CachedTable::from_row(rows, cols, values),
-            },
-            pass,
-            depth,
-        )
-    }
-
-    fn lookup_list_argument(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<CachedList>, FormulaError> {
-        let reuse = LookupReuse::new(range_from_ast(ast, sheet), list_reuse, remember_list);
-        self.reused_lookup_range(ast, sheet, reuse, CachedList::new, pass, depth)
-    }
-
-    fn lookup_result_argument(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<CachedResult>, FormulaError> {
-        let reuse = LookupReuse::new(range_from_ast(ast, sheet), result_reuse, remember_result);
-        self.reused_lookup_range(
-            ast,
-            sheet,
-            reuse,
-            |_, _, values| CachedResult::new(values),
-            pass,
-            depth,
-        )
-    }
-
-    /// Materializes a lookup range and records what this pass may reuse.
-    ///
-    /// A range is materialized once per pass. The first lookup only records
-    /// that the range was seen; the second pays one reusability scan and,
-    /// when nothing in the range can change mid-pass, every later lookup
-    /// reuses the entry. A range searched once pays no reusability scan.
-    fn reused_lookup_range<Materialized>(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        reuse: LookupReuse<Materialized, impl FnOnce(CellRange, ReuseEntry<Materialized>)>,
-        build: impl FnOnce(usize, usize, Vec<Value>) -> Materialized,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<Rc<Materialized>, FormulaError> {
-        let LookupReuse {
-            range,
-            previous,
-            remember,
-        } = reuse;
-        if let Some(ReuseEntry::Reusable(entry)) = &previous {
-            return Ok(Rc::clone(entry));
-        }
-        let (rows, cols, values) = self.eval_matrix_values(ast, sheet, pass, depth)?;
-        let entry = Rc::new(build(rows, cols, values));
-        if let Some(range) = range {
-            match previous {
-                None => remember(range, ReuseEntry::Seen),
-                Some(ReuseEntry::Seen) => {
-                    let state = if self.range_is_reusable(range) {
-                        ReuseEntry::Reusable(Rc::clone(&entry))
-                    } else {
-                        ReuseEntry::Blocked
-                    };
-                    remember(range, state);
-                }
-                Some(ReuseEntry::Blocked) | Some(ReuseEntry::Reusable(_)) => {}
-            }
-        }
-        Ok(entry)
-    }
-
-    /// Materializes a range into its shape and row-major values, exactly as
-    /// `eval_matrix_arg` returns them.
-    fn eval_matrix_values(
-        &self,
-        ast: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<(usize, usize, Vec<Value>), FormulaError> {
-        let mut matrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
-        let rows = matrix.rows;
-        let cols = matrix.cols;
-        let values = std::mem::take(&mut matrix.values);
-        Ok((rows, cols, values))
-    }
-
-    /// True when a lookup may keep a range's decoded cells for the rest of
-    /// the pass: the sheet is fully resident, and no cell of the range is a
-    /// formula or a spilled value, so nothing in it can change mid-pass.
-    fn range_is_reusable(&self, range: CellRange) -> bool {
-        let Some(data) = self.sheets.get(range.sheet as usize) else {
-            return false;
-        };
-        if data.cells.is_paged() {
-            return false;
-        }
-        let has_spills = data.spill.has_owners();
-        let row_end = (range.row_end as usize).min(data.cells.row_count().saturating_sub(1));
-        let col_end = (range.col_end as usize).min(data.cells.n_cols().saturating_sub(1));
-        for col in range.col_start as usize..=col_end {
-            for row in range.row_start as usize..=row_end {
-                let index = data.cells.idx(row, col);
-                if data.cells.kind_at(index) == KIND_FORMULA {
-                    return false;
-                }
-                if has_spills && data.spill.owner((row as u32, col as u32)).is_some() {
-                    return false;
-                }
-            }
-        }
-        true
-    }
-
-    #[inline(never)]
-    fn eval_lookup_family(
-        &self,
-        func: Func,
-        args: &[Ast],
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> EvalResult {
-        let scalar =
-            |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
-        match func {
-            Func::Index => self.eval_index(args, sheet, pass, depth),
-            Func::Match => {
-                if !(2..=3).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
-                    Ok(list) => list,
-                    Err(error) => return Value::Error(error),
-                };
-                let (lookup_rows, lookup_cols) = lookup.shape();
-                if lookup_rows != 1 && lookup_cols != 1 {
-                    return Value::Error(FormulaError::Na);
-                }
-                let mode = optional_ast(args, 2)
-                    .map(|arg| scalar(arg, pass))
-                    .map_or(Ok(1), |value| option_code(&value));
-                let mode = match mode {
-                    Ok(mode @ (-1..=1)) => mode,
-                    Ok(_) => return Value::Error(FormulaError::Value),
-                    Err(error) => return Value::Error(error),
-                };
-                let (match_mode, search_mode) = match mode {
-                    1 => (-1, 2),
-                    -1 => (1, -2),
-                    _ => (0, 1),
-                };
-                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
-                    Ok(Some(index)) => Value::number((index + 1) as f64),
-                    Ok(None) => Value::Error(FormulaError::Na),
-                    Err(error) => Value::Error(error),
-                }
-            }
-            Func::XMatch => {
-                if !(2..=4).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
-                    Ok(list) => list,
-                    Err(error) => return Value::Error(error),
-                };
-                let (lookup_rows, lookup_cols) = lookup.shape();
-                if lookup_rows != 1 && lookup_cols != 1 {
-                    return Value::Error(FormulaError::Value);
-                }
-                let modes = lookup_modes(
-                    optional_ast(args, 2).map(|arg| scalar(arg, pass)),
-                    optional_ast(args, 3).map(|arg| scalar(arg, pass)),
-                );
-                let (match_mode, search_mode) = match modes {
-                    Ok(modes) => modes,
-                    Err(error) => return Value::Error(error),
-                };
-                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
-                    Ok(Some(index)) => Value::number((index + 1) as f64),
-                    Ok(None) => Value::Error(FormulaError::Na),
-                    Err(error) => Value::Error(error),
-                }
-            }
-            Func::VLookup | Func::HLookup => {
-                if !(3..=4).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let part = if func == Func::VLookup {
-                    TablePart::FirstColumn
-                } else {
-                    TablePart::FirstRow
-                };
-                let table = match self.lookup_table_argument(&args[1], sheet, part, pass, depth + 1)
-                {
-                    Ok(table) => table,
-                    Err(error) => return Value::Error(error),
-                };
-                let result_index = match positive_index(&scalar(&args[2], pass)) {
-                    Ok(index) => index,
-                    Err(error) => return Value::Error(error),
-                };
-                let sorted = match optional_ast(args, 3) {
-                    Some(arg) => match bool_from_value(&scalar(arg, pass)) {
-                        Ok(value) => value,
-                        Err(error) => return Value::Error(error),
-                    },
-                    None => true,
-                };
-                let found = match find_match_index_indexed(
-                    table.search(),
-                    &key,
-                    if sorted { -1 } else { 0 },
-                    if sorted { 2 } else { 1 },
-                ) {
-                    Ok(Some(index)) => index,
-                    Ok(None) => return Value::Error(FormulaError::Na),
-                    Err(error) => return Value::Error(error),
-                };
-                let value = if func == Func::VLookup {
-                    table.cell(found, result_index)
-                } else {
-                    table.cell(result_index, found)
-                };
-                value.cloned().unwrap_or(Value::Error(FormulaError::Ref))
-            }
-            Func::XLookup => {
-                if !(3..=6).contains(&args.len()) {
-                    return Value::Error(FormulaError::Value);
-                }
-                let key = scalar(&args[0], pass);
-                if let Value::Error(error) = key {
-                    return Value::Error(error);
-                }
-                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
-                    Ok(list) => list,
-                    Err(error) => return Value::Error(error),
-                };
-                let result = match self.lookup_result_argument(&args[2], sheet, pass, depth + 1) {
-                    Ok(range) => range,
-                    Err(error) => return Value::Error(error),
-                };
-                let (lookup_rows, lookup_cols) = lookup.shape();
-                if lookup.search().values().len() != result.len()
-                    || (lookup_rows != 1 && lookup_cols != 1)
-                {
-                    return Value::Error(FormulaError::Value);
-                }
-                let modes = lookup_modes(
-                    optional_ast(args, 4).map(|arg| scalar(arg, pass)),
-                    optional_ast(args, 5).map(|arg| scalar(arg, pass)),
-                );
-                let (match_mode, search_mode) = match modes {
-                    Ok(modes) => modes,
-                    Err(error) => return Value::Error(error),
-                };
-                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
-                    Ok(Some(index)) => result
-                        .value(index)
-                        .cloned()
-                        .unwrap_or(Value::Error(FormulaError::Ref)),
-                    Ok(None) => optional_ast(args, 3)
-                        .map_or(Value::Error(FormulaError::Na), |arg| scalar(arg, pass)),
-                    Err(error) => Value::Error(error),
                 }
             }
             _ => Value::Error(FormulaError::Value),

@@ -4,10 +4,6 @@
 //! [`FormulaGraph`] owns the workbook dependency index and keeps it in step
 //! with entry replacements, dropping it for rewrites it cannot patch.
 
-use std::collections::hash_set;
-
-use rustc_hash::FxHashSet;
-
 use crate::eval::{build_dep_index, DepIndex};
 use crate::formula_slots::{FormulaId, FormulaStore};
 use crate::memory::{
@@ -19,9 +15,8 @@ use crate::transfer::Writer;
 use crate::transfer::{Reader, TransferResult};
 use crate::types::{AbsCellKey, CellKey, FormulaEntry};
 
-/// `FxHashSet::clear` walks every retained bucket, so a dirty set inflated by
-/// one giant paste is dropped instead of cleared; otherwise it would tax every
-/// later single-cell transaction.
+/// A dirty list inflated by one giant paste is dropped instead of cleared, so
+/// later single-cell transactions do not keep its memory.
 const RETAINED_DIRTY_CAPACITY: usize = 4096;
 
 /// Bulk writes stay range-scoped without letting many disjoint edits grow
@@ -94,10 +89,124 @@ impl DirtyRect {
     }
 }
 
+/// Exact dirty source cells in one flat list: a sorted, unique prefix and an
+/// unsorted tail. Writes in address order (a load or a fill) extend the
+/// prefix, and a write already in it is found by binary search. Other single
+/// writes append to the tail, which may hold repeats, so the list is sorted
+/// and deduplicated in place before it grows: repeated edits of a few cells
+/// stay bounded without hashing.
+#[derive(Default)]
+struct DirtyCells {
+    cells: Vec<CellKey>,
+    sorted_len: usize,
+}
+
+impl DirtyCells {
+    fn insert(&mut self, key: CellKey) {
+        let len = self.cells.len();
+        let Some(&last) = self.cells.last() else {
+            self.cells.push(key);
+            self.sorted_len = 1;
+            return;
+        };
+        if last == key {
+            return;
+        }
+
+        if self.sorted_len == len && last < key {
+            self.cells.push(key);
+            self.sorted_len += 1;
+            return;
+        }
+
+        let prefix = self.cells.get(..self.sorted_len).unwrap_or_default();
+        if prefix.binary_search(&key).is_ok() {
+            return;
+        }
+
+        // Fold before growing. Room for as many cells again as survive the
+        // fold keeps each fold amortized.
+        if len == self.cells.capacity() {
+            self.cells.sort_unstable();
+            self.cells.dedup();
+            self.sorted_len = self.cells.len();
+            if self.cells.binary_search(&key).is_ok() {
+                return;
+            }
+
+            self.cells.reserve(self.cells.len());
+            if self.cells.last().is_none_or(|&last| last < key) {
+                self.sorted_len += 1;
+            }
+        }
+
+        self.cells.push(key);
+    }
+
+    /// Adds a batch in one step. A batch is usually one ascending run (a
+    /// vacated or reinstalled spill): it either continues the sorted list or
+    /// merges with it in one linear pass, where a binary search per cell
+    /// would not be linear. Any other batch is sorted in with the list.
+    fn extend(&mut self, keys: impl IntoIterator<Item = CellKey>) {
+        let start = self.cells.len();
+        let sorted = self.sorted_len == start;
+        let mut ascending = true;
+        for key in keys {
+            let last = self.cells.last().copied();
+            if last == Some(key) {
+                continue;
+            }
+
+            if self.cells.len() > start {
+                ascending &= last.is_none_or(|last| last < key);
+            }
+            self.cells.push(key);
+        }
+
+        let (old, new) = self.cells.split_at(start);
+        let continues = match (old.last(), new.first()) {
+            (Some(last), Some(first)) => last < first,
+            _ => true,
+        };
+        if sorted && ascending && !continues {
+            self.cells = merge_unique(old, new);
+        } else if !(sorted && ascending) {
+            self.cells.sort_unstable();
+            self.cells.dedup();
+        }
+        self.sorted_len = self.cells.len();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+}
+
+/// Merges two ascending, unique lists into one, keeping a cell in both once.
+fn merge_unique(old: &[CellKey], new: &[CellKey]) -> Vec<CellKey> {
+    let mut merged = Vec::with_capacity(old.len() + new.len());
+    let mut old_index = 0;
+    let mut new_index = 0;
+    while let (Some(&old_key), Some(&new_key)) = (old.get(old_index), new.get(new_index)) {
+        if old_key <= new_key {
+            merged.push(old_key);
+            old_index += 1;
+            new_index += usize::from(old_key == new_key);
+        } else {
+            merged.push(new_key);
+            new_index += 1;
+        }
+    }
+
+    merged.extend_from_slice(old.get(old_index..).unwrap_or_default());
+    merged.extend_from_slice(new.get(new_index..).unwrap_or_default());
+    merged
+}
+
 /// What one sheet contributes to the next recompute.
 pub(crate) enum DirtySeeds<'a> {
     All,
-    Cells(hash_set::Iter<'a, CellKey>),
+    Cells(std::slice::Iter<'a, CellKey>),
     Ranges(&'a [DirtyRect]),
 }
 
@@ -105,14 +214,14 @@ pub(crate) enum DirtySeeds<'a> {
 /// writes store bounds, and structural/load paths stay whole-sheet. Switching
 /// from cells to ranges carries every earlier cell into the bounded list.
 enum DirtyState {
-    Cells(FxHashSet<CellKey>),
+    Cells(DirtyCells),
     Ranges(Vec<DirtyRect>),
     All,
 }
 
 impl Default for DirtyState {
     fn default() -> Self {
-        Self::Cells(FxHashSet::default())
+        Self::Cells(DirtyCells::default())
     }
 }
 
@@ -633,12 +742,14 @@ impl SheetFormulas {
 
     /// A bulk writer adds seeds without collecting a second temporary set.
     pub(crate) fn mark_cells_dirty(&mut self, keys: impl IntoIterator<Item = CellKey>) {
-        if matches!(self.dirty, DirtyState::All) {
-            return;
-        }
-
-        for key in keys {
-            self.mark_cell_dirty(key);
+        match &mut self.dirty {
+            DirtyState::Cells(cells) => cells.extend(keys),
+            DirtyState::Ranges(ranges) => {
+                for key in keys {
+                    Self::add_dirty_rect(ranges, DirtyRect::cell(key));
+                }
+            }
+            DirtyState::All => {}
         }
     }
 
@@ -654,7 +765,7 @@ impl SheetFormulas {
 
         if let DirtyState::Cells(cells) = std::mem::take(&mut self.dirty) {
             let mut ranges = vec![rect];
-            for cell in cells {
+            for cell in cells.cells {
                 Self::add_dirty_rect(&mut ranges, DirtyRect::cell(cell));
             }
             self.dirty = DirtyState::Ranges(ranges);
@@ -678,6 +789,22 @@ impl SheetFormulas {
         if let Some(last) = ranges.last_mut() {
             let merged = last.union(rect);
             if merged.area() == last.area() + rect.area() {
+                *last = merged;
+                return;
+            }
+
+            // A block written row by row (or column by column) reaches each
+            // new row one cell at a time. Growing the latest rectangle by
+            // that whole adjacent row keeps the block one rectangle; the
+            // row's other cells are marked early, and the next writes are
+            // usually exactly those cells.
+            let next_row = last.row_end.checked_add(1) == Some(rect.row_start)
+                && last.col_start <= rect.col_start
+                && rect.col_end <= last.col_end;
+            let next_col = last.col_end.checked_add(1) == Some(rect.col_start)
+                && last.row_start <= rect.row_start
+                && rect.row_end <= last.row_end;
+            if next_row || next_col {
                 *last = merged;
                 return;
             }
@@ -706,8 +833,9 @@ impl SheetFormulas {
     /// Keep only small seed capacity after the pass consumes it.
     pub(crate) fn clear_dirty(&mut self) {
         if let DirtyState::Cells(cells) = &mut self.dirty {
-            if cells.capacity() <= RETAINED_DIRTY_CAPACITY {
-                cells.clear();
+            if cells.cells.capacity() <= RETAINED_DIRTY_CAPACITY {
+                cells.cells.clear();
+                cells.sorted_len = 0;
                 return;
             }
         }
@@ -719,7 +847,7 @@ impl SheetFormulas {
     pub(crate) fn dirty_seeds(&self) -> DirtySeeds<'_> {
         match &self.dirty {
             DirtyState::All => DirtySeeds::All,
-            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.iter()),
+            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.cells.iter()),
             DirtyState::Ranges(ranges) => DirtySeeds::Ranges(ranges),
         }
     }
@@ -737,7 +865,7 @@ impl SheetFormulas {
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         match &self.dirty {
             DirtyState::Cells(cells) => {
-                metadata.add_hash_table::<CellKey, ()>(cells.len(), cells.capacity())
+                metadata.add_vec::<CellKey>(cells.cells.len(), cells.cells.capacity())
             }
             DirtyState::Ranges(ranges) => {
                 metadata.add_vec::<DirtyRect>(ranges.len(), ranges.capacity())
@@ -751,8 +879,8 @@ impl SheetFormulas {
             DirtyState::All => out.u32(0),
             DirtyState::Cells(cells) => {
                 out.u32(1);
-                out.usize(cells.len());
-                for &(row, col) in cells {
+                out.usize(cells.cells.len());
+                for &(row, col) in &cells.cells {
                     out.u32(row);
                     out.u32(col);
                 }
@@ -775,7 +903,7 @@ impl SheetFormulas {
         let dirty = match input.u32()? {
             0 => DirtyState::All,
             1 => {
-                let mut cells = FxHashSet::default();
+                let mut cells = DirtyCells::default();
                 for _ in 0..input.count()? {
                     cells.insert((input.u32()?, input.u32()?));
                 }
@@ -934,5 +1062,119 @@ impl FormulaGraph {
             epoch: input.u64()?,
             index: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DirtyCells, DirtyRect, SheetFormulas};
+
+    /// A two-column block written row by row stays one rectangle.
+    #[test]
+    fn row_by_row_block_stays_one_rectangle() {
+        let mut ranges = Vec::new();
+        for row in 0..1_000 {
+            for col in 2..4 {
+                SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((row, col)));
+            }
+        }
+
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].area(), 2_000);
+    }
+
+    /// Cells a row apart are not adjacent: the gap row is not marked.
+    #[test]
+    fn gapped_cells_stay_separate() {
+        let mut ranges = Vec::new();
+        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((0, 1)));
+        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((2, 1)));
+
+        assert_eq!(ranges.len(), 2);
+    }
+
+    /// The distinct cells a list holds, in address order.
+    fn distinct(cells: &DirtyCells) -> Vec<(u32, u32)> {
+        let mut cells = cells.cells.clone();
+        cells.sort_unstable();
+        cells.dedup();
+        cells
+    }
+
+    /// Address-order writes append without a fold and stay sorted.
+    #[test]
+    fn address_order_writes_stay_sorted() {
+        let mut cells = DirtyCells::default();
+        for row in 0..1_000 {
+            cells.insert((row, 1));
+            cells.insert((row, 1));
+        }
+
+        assert_eq!(cells.sorted_len, 1_000);
+        assert_eq!(cells.cells.len(), 1_000);
+    }
+
+    /// Re-marking cells of a sorted list adds nothing.
+    #[test]
+    fn sorted_list_ignores_repeated_cells() {
+        let mut cells = DirtyCells::default();
+        for row in 0..100 {
+            cells.insert((row, 0));
+        }
+        for row in (0..100).rev() {
+            cells.insert((row, 0));
+        }
+
+        assert_eq!(cells.sorted_len, 100);
+        assert_eq!(cells.cells.len(), 100);
+    }
+
+    /// A spill edit marks one source cell, then the vacated column and the
+    /// reinstalled column as batches: the second run merges into the first
+    /// and the list stays sorted and unique.
+    #[test]
+    fn repeated_column_batch_after_a_later_cell_adds_nothing() {
+        let mut cells = DirtyCells::default();
+        cells.insert((999, 1));
+        for _ in 0..2 {
+            cells.extend((0..999).map(|row| (row, 2)));
+        }
+
+        let mut expected: Vec<_> = (0..999).map(|row| (row, 2)).collect();
+        expected.push((999, 1));
+        assert_eq!(cells.cells, expected);
+        assert_eq!(cells.sorted_len, expected.len());
+    }
+
+    /// A batch out of address order is sorted in with the list.
+    #[test]
+    fn unordered_batch_is_sorted_in() {
+        let mut cells = DirtyCells::default();
+        cells.extend([(5, 0), (1, 0)]);
+        cells.extend([(3, 0), (1, 0), (9, 0), (3, 0)]);
+
+        assert_eq!(cells.cells, [(1, 0), (3, 0), (5, 0), (9, 0)]);
+        assert_eq!(cells.sorted_len, 4);
+    }
+
+    /// Scattered repeated writes keep every cell and fold duplicates, so the
+    /// list stays within twice the distinct cells.
+    #[test]
+    fn scattered_repeats_fold_and_keep_every_cell() {
+        let mut cells = DirtyCells::default();
+        let keys: Vec<_> = (0..300u32)
+            .map(|index| ((index * 37) % 101, index % 3))
+            .collect();
+        for _ in 0..20 {
+            for &key in &keys {
+                cells.insert(key);
+            }
+        }
+
+        let mut expected = keys.clone();
+        expected.sort_unstable();
+        expected.dedup();
+        assert_eq!(distinct(&cells), expected);
+        assert!(cells.cells.len() <= 2 * expected.len());
     }
 }

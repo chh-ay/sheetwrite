@@ -20,19 +20,24 @@ struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
     pass: &'a mut EvalPass<'p>,
+    /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
 }
 
 impl Context<'_, '_> {
     fn number(&mut self, ast: &Ast) -> Result<f64, FormulaError> {
-        number_from_value(&self.store.eval_ast(ast, self.sheet, self.pass, self.depth))
+        number_from_value(
+            &self
+                .store
+                .eval_ast(ast, self.sheet, self.pass, self.depth + 1),
+        )
     }
 
     /// Reads a matrix whose cells must all be numbers.
     fn numbers(&mut self, ast: &Ast) -> Result<(usize, usize, Vec<f64>), FormulaError> {
         let matrix = self
             .store
-            .eval_matrix_arg(ast, self.sheet, self.pass, self.depth)?;
+            .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)?;
         let mut numbers = Vec::new();
         numbers
             .try_reserve_exact(matrix.values.len())
@@ -60,7 +65,7 @@ pub(crate) fn evaluate_ast(
         store,
         sheet,
         pass,
-        depth: depth + 1,
+        depth,
     };
     let [argument] = args else {
         return Value::Error(FormulaError::Value);
@@ -135,7 +140,7 @@ pub(crate) fn evaluate_matrix(
         store,
         sheet,
         pass,
-        depth: depth + 1,
+        depth,
     };
     let (rows, cols, numbers) = match (name, args) {
         ("MUNIT", [dimension]) => {

@@ -1,5 +1,6 @@
 import { capturedClearCells } from "./clear-capture.js";
 import { SheetwriteError } from "./errors.js";
+import { DEFAULT_SHEET_ID } from "./grid-constants.js";
 import { restoreBlockFacts } from "./restore-block.js";
 import { cellRange } from "./store/ranges.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
@@ -144,6 +145,7 @@ export interface RowBridgeMetadataDelta<
     | "named-range"
     | "calculation"
     | "relationship"
+    | "measure"
     | "query"
     | "chart"
     | "pivot"
@@ -225,8 +227,6 @@ interface MutableSheetState<Id extends RowBridgeId> {
   readonly rowIdSet: Set<Id>;
   readonly columns: string[];
 }
-
-const DEFAULT_SHEET: SheetId = "sheet1";
 
 function assertNever(value: never): never {
   const unknownValue: unknown = value;
@@ -456,17 +456,17 @@ export class RowBridge<
       rowIds.push(id);
     }
 
-    this.sheets.set(options.sheet ?? DEFAULT_SHEET, { rowIds, rowIdSet, columns: columnKeys });
+    this.sheets.set(options.sheet ?? DEFAULT_SHEET_ID, { rowIds, rowIdSet, columns: columnKeys });
     this.createRowId = options.createRowId;
   }
 
   /** Current data-space row identities; visual sort and filters do not affect this order. */
-  rowIds(sheet: SheetId = DEFAULT_SHEET): readonly (Id | null)[] {
+  rowIds(sheet: SheetId = DEFAULT_SHEET_ID): readonly (Id | null)[] {
     return [...(this.sheets.get(sheet)?.rowIds ?? [])];
   }
 
   /** Current semantic column keys in canonical column order. */
-  columnKeys(sheet: SheetId = DEFAULT_SHEET): readonly string[] {
+  columnKeys(sheet: SheetId = DEFAULT_SHEET_ID): readonly string[] {
     return [...(this.sheets.get(sheet)?.columns ?? [])];
   }
 
@@ -882,11 +882,16 @@ export class RowBridge<
         return this.metadata(transaction, operation, "named-range");
 
       case "setCalculation":
+      case "setExternalLinks":
         return this.metadata(transaction, operation, "calculation");
 
       case "setRelationship":
       case "removeRelationship":
         return this.metadata(transaction, operation, "relationship");
+
+      case "setMeasure":
+      case "removeMeasure":
+        return this.metadata(transaction, operation, "measure");
 
       case "setQuery":
       case "removeQuery":

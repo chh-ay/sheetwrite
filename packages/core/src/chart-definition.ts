@@ -26,17 +26,29 @@ const MAX_CHART_TEXT_LENGTH = 255;
 /** Anchor offset and size ceiling in CSS pixels; the largest canvas edge browsers allocate. */
 const MAX_CHART_PIXELS = 32_767;
 
-const CHART_KINDS: ReadonlySet<unknown> = new Set<ChartKind>([
-  "column",
-  "bar",
-  "line",
-  "area",
-  "pie",
-  "doughnut",
-  "scatter",
-]);
+/** Every chart kind with the name the UI shows for it. */
+export const CHART_KIND_LABELS: Readonly<Record<ChartKind, string>> = {
+  column: "Column",
+  bar: "Bar",
+  line: "Line",
+  area: "Area",
+  pie: "Pie",
+  doughnut: "Doughnut",
+  scatter: "Scatter",
+};
+
 const LEGEND_POSITIONS: ReadonlySet<unknown> = new Set(["none", "top", "right", "bottom", "left"]);
-const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "series"]);
+const CHART_KEYS = new Set([
+  "id",
+  "kind",
+  "title",
+  "axes",
+  "legend",
+  "anchor",
+  "series",
+  "pivot",
+  "pivotValues",
+]);
 const AXES_KEYS = new Set(["xTitle", "yTitle"]);
 const ANCHOR_KEYS = new Set(["row", "col", "offsetX", "offsetY", "width", "height"]);
 const SERIES_KEYS = new Set(["name", "nameRange", "values", "categories"]);
@@ -49,7 +61,7 @@ export interface ChartSheetBounds {
 }
 
 function isChartKind(value: unknown): value is ChartKind {
-  return CHART_KINDS.has(value);
+  return typeof value === "string" && Object.hasOwn(CHART_KIND_LABELS, value);
 }
 
 function isLegendPosition(value: unknown): value is NonNullable<ChartDefinition["legend"]> {
@@ -158,6 +170,28 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
 }
 
 /**
+ * A copy of the value-field positions a chart over a pivot plots: one to
+ * `MAX_CHART_SERIES` distinct whole numbers below `MAX_CHART_SERIES`, or
+ * null when `value` is not one.
+ */
+function sanitizePivotValues(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CHART_SERIES) return null;
+  const positions: number[] = [];
+  for (const position of value) {
+    if (
+      !Number.isInteger(position) ||
+      position < 0 ||
+      position >= MAX_CHART_SERIES ||
+      positions.includes(position)
+    ) {
+      return null;
+    }
+    positions.push(position);
+  }
+  return positions;
+}
+
+/**
  * Validate one untrusted chart definition and return an independent plain copy,
  * or null when any field is missing, unknown, mistyped, or above its bound.
  * Range-to-workbook bounds are checked separately by `chartFitsSheets`.
@@ -171,6 +205,7 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       !isChartKind(chart.kind) ||
       (chart.title !== undefined && !validChartText(chart.title)) ||
       (chart.legend !== undefined && !isLegendPosition(chart.legend)) ||
+      (chart.pivot !== undefined && !validChartText(chart.pivot)) ||
       !Array.isArray(chart.series) ||
       chart.series.length > MAX_CHART_SERIES
     ) {
@@ -179,7 +214,13 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
 
     const anchor = sanitizeAnchor(chart.anchor);
     const axes = chart.axes === undefined ? undefined : sanitizeAxes(chart.axes);
-    if (!anchor || axes === null) return null;
+    // Value positions only mean something for a chart over a pivot.
+    const pivotValues =
+      chart.pivotValues === undefined || chart.pivot === undefined
+        ? undefined
+        : sanitizePivotValues(chart.pivotValues);
+    if (!anchor || axes === null || pivotValues === null) return null;
+    if (chart.pivotValues !== undefined && chart.pivot === undefined) return null;
 
     const series: ChartSeries[] = [];
     for (const entry of chart.series) {
@@ -194,6 +235,8 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       ...(chart.title !== undefined ? { title: chart.title } : {}),
       ...(axes !== undefined ? { axes } : {}),
       ...(chart.legend !== undefined ? { legend: chart.legend } : {}),
+      ...(chart.pivot !== undefined ? { pivot: chart.pivot } : {}),
+      ...(pivotValues !== undefined ? { pivotValues } : {}),
       anchor,
       series,
     };

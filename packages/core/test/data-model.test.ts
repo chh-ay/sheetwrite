@@ -109,6 +109,129 @@ afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
 });
 
+const revenueMeasure = {
+  id: "revenue",
+  name: "Revenue",
+  table: "orders",
+  formula: "=SUM(orders[amount])",
+};
+
+describe("saved measures", () => {
+  it("preserves measures through relationship edits, snapshot loading, undo and redo", () => {
+    const grid = mountGrid();
+    const apply = (operation: unknown) =>
+      grid.applyTransaction({ patches: [operation as DocumentOp] }).status;
+
+    expect(apply({ op: "setMeasure", measure: revenueMeasure })).toBe("applied");
+    expect(apply({ op: "setRelationship", relationship: ordersToCustomers })).toBe("applied");
+    expect(apply({ op: "removeRelationship", id: ordersToCustomers.id })).toBe("applied");
+    expect(grid.store.getWorkbook().dataModel).toEqual({
+      relationships: [],
+      measures: [revenueMeasure],
+    });
+
+    const exported = grid.store.exportSnapshot?.();
+    if (!exported) throw new Error("snapshot export is required");
+    expect(validateWorkbookSnapshot(exported).ok).toBe(true);
+    const restored = SheetwriteStore.fromSnapshot(exported);
+    try {
+      expect(restored.getWorkbook().dataModel).toEqual(grid.store.getWorkbook().dataModel);
+    } finally {
+      restored.dispose();
+    }
+
+    expect(apply({ op: "removeMeasure", id: revenueMeasure.id })).toBe("applied");
+    expect(grid.store.getWorkbook().dataModel).toBeUndefined();
+    grid.undo();
+    expect(grid.store.getWorkbook().dataModel?.measures).toEqual([revenueMeasure]);
+    grid.redo();
+    expect(grid.store.getWorkbook().dataModel).toBeUndefined();
+  });
+
+  it("reports a measure's syntax and home table from the saved model on any engine", () => {
+    const grid = mountGrid();
+    const store = grid.store;
+    if (!(store instanceof SheetwriteStore)) throw new Error("the grid must use a SheetwriteStore");
+    const broken = { ...revenueMeasure, id: "broken", name: "Broken", formula: "=SUM(" };
+    expect(store.setMeasure(revenueMeasure).status).toBe("applied");
+    expect(store.setMeasure(broken).status).toBe("applied");
+
+    expect(store.getMeasureStatus(revenueMeasure.id)).toEqual({ status: "ok" });
+    expect(store.getMeasureStatus(broken.id)).toEqual({ status: "syntax" });
+    expect(store.getMeasureStatus("unknown")).toEqual({ status: "unavailable" });
+
+    const removal: DocumentOp = { op: "removeTable", sheet: "data", tableId: "orders" };
+    expect(grid.applyTransaction({ patches: [removal] }).status).toBe("applied");
+    expect(store.getMeasureStatus(revenueMeasure.id)).toEqual({ status: "missingTable" });
+  });
+
+  it("renames table, column and measure references in measure formulas, undone in one step", () => {
+    const grid = mountGrid();
+    const apply = (operation: DocumentOp) => grid.applyTransaction({ patches: [operation] }).status;
+    const share = {
+      id: "share",
+      name: "Share",
+      table: "customers",
+      formula: "=[revenue] / COUNTA(Customers[id]) + orders[@Amount]",
+    };
+    const formulas = () =>
+      grid.store.getWorkbook().dataModel?.measures?.map((measure) => measure.formula);
+    expect(apply({ op: "setMeasure", measure: revenueMeasure })).toBe("applied");
+    expect(apply({ op: "setMeasure", measure: share })).toBe("applied");
+
+    const renamedTable: DocumentOp = {
+      op: "updateTable",
+      sheet: "data",
+      tableId: "orders",
+      patch: {
+        name: "Sales",
+        columns: [
+          { id: "customer", name: "customer" },
+          { id: "amount", name: "Net" },
+        ],
+      },
+    };
+    expect(apply(renamedTable)).toBe("applied");
+    expect(formulas()).toEqual([
+      "=SUM(Sales[Net])",
+      "=[revenue] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+
+    expect(apply({ op: "setMeasure", measure: { ...revenueMeasure, name: "Income" } })).toBe(
+      "applied",
+    );
+    expect(formulas()).toEqual([
+      "=SUM(orders[amount])",
+      "=[Income] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+
+    grid.undo();
+    expect(formulas()).toEqual([
+      "=SUM(Sales[Net])",
+      "=[Revenue] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+    grid.undo();
+    expect(formulas()).toEqual([
+      "=SUM(orders[amount])",
+      "=[Revenue] / COUNTA(Customers[id]) + orders[@amount]",
+    ]);
+  });
+
+  it("validates saved measure names and formulas without parsing them in TypeScript", () => {
+    expect(validateDocumentOperationShape({ op: "setMeasure", measure: revenueMeasure })).toEqual(
+      [],
+    );
+    for (const patch of [{ name: "" }, { name: "[Revenue]" }, { formula: "SUM(orders[amount])" }]) {
+      expect(
+        validateDocumentOperationShape({
+          op: "setMeasure",
+          measure: { ...revenueMeasure, ...patch },
+        }).length,
+      ).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("relationship shape", () => {
   it("validates setRelationship and removeRelationship operations", () => {
     expect(
@@ -303,6 +426,8 @@ describe("relationship collaboration", () => {
     for (const remote of [
       { op: "setRelationship", relationship: customersToRegions },
       { op: "removeRelationship", id: "anything" },
+      { op: "setMeasure", measure: revenueMeasure },
+      { op: "removeMeasure", id: "anything" },
       { op: "removeTable", sheet: "data", tableId: "customers" },
       { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
     ] satisfies DocumentOp[]) {
@@ -317,7 +442,47 @@ describe("relationship collaboration", () => {
     });
   });
 
-  it("delivers a relationship change to a synced peer", async () => {
+  it("conflicts on a measure write and a concurrent table or column rename, either way", () => {
+    const measure: DocumentOp = { op: "setMeasure", measure: revenueMeasure };
+    const renames: DocumentOp[] = [
+      { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
+      {
+        op: "updateTable",
+        sheet: "data",
+        tableId: "customers",
+        patch: {
+          columns: [
+            { id: "id", name: "id" },
+            { id: "region", name: "Area" },
+          ],
+        },
+      },
+    ];
+    for (const rename of renames) {
+      for (const [local, remote] of [
+        [measure, rename],
+        [rename, measure],
+      ]) {
+        expect(rebaseDocumentOperations([local!], [remote!])).toMatchObject({
+          status: "conflict",
+          conflict: { code: "overlapping-edit" },
+        });
+      }
+    }
+
+    const styled: DocumentOp = {
+      op: "updateTable",
+      sheet: "data",
+      tableId: "orders",
+      patch: { headerRow: true },
+    };
+    expect(rebaseDocumentOperations([measure], [styled])).toEqual({
+      status: "rebased",
+      operations: [measure],
+    });
+  });
+
+  it("delivers relationship and measure changes to a synced peer", async () => {
     const base = { ...snapshot([]), documentId: "model-doc", version: 0 };
     const adapter = new MemoryPersistenceAdapter(base);
     const senderHost = document.createElement("div");
@@ -332,7 +497,10 @@ describe("relationship collaboration", () => {
     try {
       expect(
         sender.applyTransaction({
-          patches: [{ op: "setRelationship", relationship: ordersToCustomers }],
+          patches: [
+            { op: "setRelationship", relationship: ordersToCustomers },
+            { op: "setMeasure", measure: revenueMeasure },
+          ],
         }).status,
       ).toBe("applied");
       expect(await senderSync.sendNext()).toMatchObject({ status: "applied", version: 1 });
@@ -349,7 +517,10 @@ describe("relationship collaboration", () => {
       for (const version of tail.operationsSinceBase) {
         await peerSync.applyVersionedOperation(version);
       }
-      expect(peer.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
+      expect(peer.store.getWorkbook().dataModel).toEqual({
+        relationships: [ordersToCustomers],
+        measures: [revenueMeasure],
+      });
     } finally {
       senderSync.destroy();
       peerSync.destroy();

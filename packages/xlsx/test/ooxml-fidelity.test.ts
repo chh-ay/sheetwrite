@@ -26,6 +26,9 @@ interface RawOptions {
   workbookExtra?: string;
   workbookRelationships?: string;
   sheetName?: string;
+  /** More package parts, by name, and their content type overrides. */
+  parts?: Record<string, string>;
+  overrides?: string;
 }
 
 function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
@@ -44,6 +47,7 @@ function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
           '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>',
         ]
       : []),
+    options.overrides ?? "",
   ];
   const workbookRelationships = [
     `<Relationship Id="rId1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/>`,
@@ -72,6 +76,7 @@ function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
   };
   if (options.styles) files["xl/styles.xml"] = strToU8(options.styles);
   if (options.theme) files["xl/theme/theme1.xml"] = strToU8(options.theme);
+  for (const [name, text] of Object.entries(options.parts ?? {})) files[name] = strToU8(text);
   return zipSync(files, { level: 6, mtime: FIXED_ZIP_TIME });
 }
 
@@ -162,9 +167,32 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(values[27]).toEqual({ kind: "formula", src: "='Q1'!AB1&\"A1\"" });
   });
 
-  it("warns and keeps a cell's own text or scans references when a shared master does not lex", async () => {
+  it("moves whole columns and rows of a shared master and keeps names past the last column", async () => {
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      rawWorkbook(
+        sheet(
+          '<dimension ref="A1:D4"/><sheetData>' +
+            '<row r="1"><c r="C1"><f t="shared" si="0" ref="C1:D1">SUM(A:A)+XYZ1</f></c><c r="D1"><f t="shared" si="0"/></c></row>' +
+            '<row r="3"><c r="A3"><f t="shared" si="1" ref="A3:A4">SUM(1:1)*XFD1</f></c></row>' +
+            '<row r="4"><c r="A4"><f t="shared" si="1"/></c></row>' +
+            "</sheetData>",
+        ),
+      ),
+    );
+    const values = imported.sheets[0]?.cells.flatMap((block) =>
+      block.cells.map((cell) => cell.value),
+    );
+    expect(values).toEqual([
+      { kind: "formula", src: "=SUM(A:A)+XYZ1" },
+      { kind: "formula", src: "=SUM(B:B)+XYZ1" },
+      { kind: "formula", src: "=SUM(1:1)*XFD1" },
+      { kind: "formula", src: "=SUM(2:2)*XFD2" },
+    ]);
+  });
+
+  it("warns and keeps a cell's own text or the master's text when a shared master does not lex", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
-    // An unterminated string: neither the engine nor the reader's copy rule can lex it.
+    // An unterminated string: the engine's lexer cannot read it.
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       rawWorkbook(
         sheet(
@@ -183,7 +211,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(values).toEqual([
       { kind: "formula", src: '=B1&$C$1&"open' },
       { kind: "formula", src: '=B2&$C$1&"own' },
-      { kind: "formula", src: '=B3&$C$1&"open' },
+      { kind: "formula", src: '=B1&$C$1&"open' },
     ]);
     expect(
       warnings
@@ -212,6 +240,108 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(warnings.map((warning) => warning.code)).toEqual(
       expect.arrayContaining(["external-relationship", "external-formula"]),
     );
+  });
+
+  describe("external workbook links", () => {
+    const LINK_PART = "xl/externalLinks/externalLink1.xml";
+    const linkPart = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="${TRANSITIONAL_MAIN}" xmlns:r="${TRANSITIONAL_REL}"><externalBook r:id="rId1"><sheetNames><sheetName val="Annual Plan"/></sheetNames><sheetDataSet><sheetData sheetId="0"><row r="10"><cell r="C10"><v>7</v></cell><cell r="D10" t="str"><v>North</v></cell></row><row r="11"><cell r="C11"><v>5</v></cell><cell r="D11" t="e"><v>#N/A</v></cell></row></sheetData></sheetDataSet></externalBook></externalLink>`;
+    const target = "file:///C:\\Reports\\Budget%202024.xlsx";
+    const linked = (formulas: readonly string[]) =>
+      rawWorkbook(
+        sheet(
+          `<dimension ref="A1"/><sheetData>${formulas
+            .map(
+              (formula, row) =>
+                `<row r="${row + 1}"><c r="A${row + 1}"><f>${formula}</f></c></row>`,
+            )
+            .join("")}</sheetData>`,
+        ),
+        {
+          workbookExtra:
+            '<externalReferences><externalReference r:id="rId9"/></externalReferences>',
+          workbookRelationships: `<Relationship Id="rId9" Type="${TRANSITIONAL_REL}/externalLink" Target="externalLinks/externalLink1.xml"/>`,
+          overrides:
+            '<Override PartName="/xl/externalLinks/externalLink1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"/>',
+          parts: {
+            [LINK_PART]: linkPart,
+            "xl/externalLinks/_rels/externalLink1.xml.rels": `<?xml version="1.0"?><Relationships xmlns="${PACKAGE_REL}"><Relationship Id="rId1" Type="${TRANSITIONAL_REL}/externalLinkPath" Target="${target}" TargetMode="External"/></Relationships>`,
+          },
+        },
+      );
+
+    it("imports the saved values and keeps formulas that read them live", async () => {
+      const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+        linked(["SUM('[1]Annual Plan'!C10:C11)", "'[1]Annual Plan'!D11"]),
+      );
+
+      expect(imported.workbook.externalLinks).toEqual([
+        {
+          book: "Budget 2024.xlsx",
+          target,
+          sheets: [
+            {
+              name: "Annual Plan",
+              cells: [
+                { row: 9, col: 2, value: 7 },
+                { row: 9, col: 3, value: "North" },
+                { row: 10, col: 2, value: 5 },
+                { row: 10, col: 3, value: { error: "#N/A" } },
+              ],
+            },
+          ],
+        },
+      ]);
+      expect(imported.sheets[0]!.cells[0]!.cells.map((cell) => cell.value)).toEqual([
+        { kind: "formula", src: "=SUM('[Budget 2024.xlsx]Annual Plan'!C10:C11)" },
+        { kind: "formula", src: "='[Budget 2024.xlsx]Annual Plan'!D11" },
+      ]);
+    });
+
+    it("writes an unchanged link back byte for byte and a changed one from its values", async () => {
+      const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+        linked(["SUM('[1]Annual Plan'!C10:C11)"]),
+      );
+      const kept = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
+      expect(strFromU8(kept[LINK_PART]!)).toBe(linkPart);
+      expect(strFromU8(kept["xl/workbook.xml"]!)).toMatch(
+        /<\/sheets><externalReferences><externalReference r:id="rId\d+"\/><\/externalReferences>/,
+      );
+      expect(strFromU8(kept["xl/worksheets/sheet1.xml"]!)).toContain(
+        "<f>SUM(&apos;[1]Annual Plan&apos;!C10:C11)</f>",
+      );
+
+      const changed = structuredClone(imported);
+      changed.workbook.externalLinks![0]!.sheets[0]!.cells[0]!.value = 9;
+      changed.sheets[0]!.rowCount = 2;
+      changed.sheets[0]!.cells.push({
+        startRow: 1,
+        startCol: 0,
+        rowCount: 1,
+        colCount: 1,
+        cells: [
+          { rowOffset: 0, colOffset: 0, value: { kind: "formula", src: "=[Sales.xlsx]Q1!A1" } },
+        ],
+      });
+      const written = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(changed));
+      expect(written[LINK_PART]).toBeUndefined();
+      expect(strFromU8(written["xl/externalLinks/sheetwriteLink1.xml"]!)).toContain(
+        '<cell r="C10"><v>9</v></cell>',
+      );
+      expect(strFromU8(written["xl/externalLinks/sheetwriteLink2.xml"]!)).toContain(
+        '<sheetName val="Q1"/>',
+      );
+      const worksheet = strFromU8(written["xl/worksheets/sheet1.xml"]!);
+      expect(worksheet).toContain("<f>SUM(&apos;[1]Annual Plan&apos;!C10:C11)</f>");
+      expect(worksheet).toContain("<f>[2]Q1!A1</f>");
+
+      const reimported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+        await sheetwriteWorkbookBackend.toXlsxWorkbook(changed),
+      );
+      expect(reimported.workbook.externalLinks?.map((link) => link.book)).toEqual([
+        "Budget 2024.xlsx",
+        "Sales.xlsx",
+      ]);
+    });
   });
 
   it("converts date1904 serials, preserves serial 60, and parses t=d as UTC wall time", async () => {

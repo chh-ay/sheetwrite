@@ -12,7 +12,8 @@ import type {
 import type { ChartDefinition } from "./chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 import type { Dashboard, DashboardItem, SheetKind } from "./dashboard.js";
-import type { DataModel, TableRelationship } from "./data-model.js";
+import type { DataModel, Measure, TableRelationship } from "./data-model.js";
+import type { ExternalLink } from "./external-link.js";
 import type { PivotDefinition } from "./pivot.js";
 import type { SavedQuery } from "./query.js";
 import type { WorkbookTable, WorkbookTablePatch, WorkbookTableXmlElement } from "./table.js";
@@ -153,6 +154,8 @@ export interface Workbook {
   dataModel?: DataModel;
   /** Saved refreshable queries; absent means none. */
   queries?: SavedQuery[];
+  /** Saved values of linked workbooks; absent means none. */
+  externalLinks?: ExternalLink[];
 }
 
 export interface AddSheetInput {
@@ -491,9 +494,29 @@ export interface XlsxSourceGraph {
    * change makes the graph stale, so it is dropped.
    */
   readonly queries?: string;
+  /**
+   * 64-bit hex digest of the `workbook.externalLinks` entry that an external
+   * link part holds, at import. When that link's values change, the part is
+   * stale: it is dropped and the link is written from the model.
+   */
+  readonly externalLink?: string;
+  /**
+   * Power Query members of a kept DataMashup that no saved query represents,
+   * with the codec's reason. They leave with the graph, so a list never names
+   * a member that the next XLSX save would drop.
+   */
+  readonly unsupportedQueries?: readonly XlsxUnsupportedQuery[];
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
   readonly dependencies: readonly XlsxSourceDependency[];
+}
+
+/** A kept Power Query member and why the query engine cannot run it. */
+export interface XlsxUnsupportedQuery {
+  /** Section member name, at most 1,024 characters. */
+  readonly member: string;
+  /** The codec's reason code, at most 64 characters. */
+  readonly reason: string;
 }
 
 /** Bounded, frozen record of the OOXML parts Sheetwrite does not model. */
@@ -520,6 +543,8 @@ export interface WorkbookSnapshot {
     dataModel?: DataModel;
     /** Saved refreshable queries; omitted when there are none. */
     queries?: SavedQuery[];
+    /** Saved values of linked workbooks; omitted when there are none. */
+    externalLinks?: ExternalLink[];
   };
   sheets: SheetSnapshot[];
 }
@@ -584,9 +609,15 @@ export type DocumentOp =
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId }
   | { op: "setCalculation"; calculation: CalculationSettings }
+  /** Replace the saved values of every linked workbook; an empty list removes them. */
+  | { op: "setExternalLinks"; links: ExternalLink[] }
   /** Insert or replace the relationship with `relationship.id`. */
   | { op: "setRelationship"; relationship: TableRelationship }
   | { op: "removeRelationship"; id: string }
+  /** Insert or replace a model measure by its stable identity. */
+  | { op: "setMeasure"; measure: Measure }
+  /** Remove a measure while keeping pivot references for undo. */
+  | { op: "removeMeasure"; id: string }
   /** Insert or replace the saved query with `query.id`. */
   | { op: "setQuery"; query: SavedQuery }
   /** Remove a saved query; its output table and values stay. */

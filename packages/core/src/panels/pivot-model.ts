@@ -50,7 +50,7 @@ export function areaFields(pivot: PivotDefinition, area: PivotArea): number[] {
     case "columns":
       return [...pivot.columns];
     case "values":
-      return pivot.values.map((value) => value.field);
+      return pivot.values.map((value) => ("field" in value ? value.field : -1));
     case "filters":
       return (pivot.filters ?? []).map((filter) => filter.field);
   }
@@ -105,6 +105,8 @@ function removePlacement(
     case "values": {
       const value = pivot.values[index];
       if (value === undefined) return [pivot, null];
+      if ("measure" in value)
+        return [{ ...pivot, values: withoutIndex(pivot.values, index) }, null];
       return [
         { ...pivot, values: withoutIndex(pivot.values, index) },
         { field: value.field, value },
@@ -181,6 +183,13 @@ export function placeField(
 
 /** Remove one entry from its area. */
 export function removeField(pivot: PivotDefinition, placement: PivotPlacement): PivotDefinition {
+  // A measure value has no source field to carry anywhere, so removing it
+  // is the one edit it takes.
+  const value = placement.area === "values" ? pivot.values[placement.index] : undefined;
+  if (value !== undefined && "measure" in value) {
+    return { ...pivot, values: withoutIndex(pivot.values, placement.index) };
+  }
+
   const [next, entry] = removePlacement(pivot, placement);
   return entry === null ? pivot : pruneSort(next);
 }
@@ -199,6 +208,37 @@ export function shiftField(
   return placeField(pivot, field, placement.area, facts, placement, target);
 }
 
+/**
+ * Number formats the field list offers, as Excel's Format Cells
+ * categories: General (no format), then a code for each category. Custom
+ * codes are typed.
+ */
+export const VALUE_NUMBER_FORMATS: readonly (readonly [string, string])[] = [
+  ["", "General"],
+  ["#,##0.00", "Number"],
+  ["$#,##0.00", "Currency"],
+  ["0.00%", "Percentage"],
+  ["0.00E+00", "Scientific"],
+];
+
+/** `pivot` with value field `index` shown in `format`; undefined shows it as General. */
+export function setNumberFormat(
+  pivot: PivotDefinition,
+  index: number,
+  format: string | undefined,
+): PivotDefinition {
+  return {
+    ...pivot,
+    values: pivot.values.map((value, position) => {
+      if (position !== index) return value;
+      const next = { ...value };
+      if (format === undefined) delete next.numberFormat;
+      else next.numberFormat = format;
+      return next;
+    }),
+  };
+}
+
 export function setAggregation(
   pivot: PivotDefinition,
   index: number,
@@ -207,7 +247,7 @@ export function setAggregation(
   return {
     ...pivot,
     values: pivot.values.map((value, position) =>
-      position === index ? { ...value, aggregation } : value,
+      position === index && "field" in value ? { ...value, aggregation } : value,
     ),
   };
 }
@@ -315,6 +355,31 @@ export function relatedTables(
 }
 
 /**
+ * The model source of `pivot`: its own, or one over its table with the
+ * table's columns as fields in order, so field indices stay the same. Null
+ * for a range source.
+ */
+function modelSourceOf(
+  pivot: PivotDefinition,
+  tables: readonly WorkbookTable[],
+): { table: string; fields: TableColumnRef[] } | null {
+  const source = pivot.source;
+  if (source.invalid || "range" in source) return null;
+  if ("model" in source) {
+    return {
+      table: source.model.table,
+      fields: source.model.fields.map((field) => ({ ...field })),
+    };
+  }
+  const base = tables.find((candidate) => candidate.id === source.table);
+  if (base === undefined) return null;
+  return {
+    table: base.id,
+    fields: base.columns.map((entry) => ({ table: base.id, column: entry.id })),
+  };
+}
+
+/**
  * `pivot` reading `column` of `table`, and that column's field index. A
  * table source becomes a model source whose first fields are the base
  * table's columns in order, so every field index in use keeps its meaning.
@@ -324,26 +389,34 @@ export function withModelField(
   tables: readonly WorkbookTable[],
   column: TableColumnRef,
 ): { pivot: PivotDefinition; field: number } | null {
-  const source = pivot.source;
-  if (source.invalid || "range" in source) return null;
-
-  let fields: TableColumnRef[];
-  if ("model" in source) fields = source.model.fields.map((field) => ({ ...field }));
-  else {
-    const base = tables.find((candidate) => candidate.id === source.table);
-    if (base === undefined) return null;
-    fields = base.columns.map((entry) => ({ table: base.id, column: entry.id }));
-  }
+  const model = modelSourceOf(pivot, tables);
+  if (model === null) return null;
+  const fields = model.fields;
 
   const found = fields.findIndex(
     (field) => field.table === column.table && field.column === column.column,
   );
   if (found < 0) fields.push({ ...column });
-  const table = "model" in source ? source.model.table : source.table;
   return {
-    pivot: { ...pivot, source: { model: { table, fields } } },
+    pivot: { ...pivot, source: { model: { table: model.table, fields } } },
     field: found < 0 ? fields.length - 1 : found,
   };
+}
+
+/**
+ * `pivot` with measure `id` added as its last value field. A table source
+ * becomes a model source in the same change, as measures need one. Null for
+ * a range source or a measure the pivot already shows.
+ */
+export function withMeasureValue(
+  pivot: PivotDefinition,
+  tables: readonly WorkbookTable[],
+  id: string,
+): PivotDefinition | null {
+  if (pivot.values.some((value) => "measure" in value && value.measure === id)) return null;
+  const model = modelSourceOf(pivot, tables);
+  if (model === null) return null;
+  return { ...pivot, source: { model }, values: [...pivot.values, { measure: id }] };
 }
 
 /** The type the field list shows for a field with these distinct values. */
@@ -366,4 +439,26 @@ export function nextPivotIdentity(pivots: readonly PivotDefinition[]): {
   let number = pivots.length + 1;
   while (ids.has(`pivot-${number}`) || names.has(`PivotTable${number}`)) number += 1;
   return { id: `pivot-${number}`, name: `PivotTable${number}` };
+}
+
+/** Sort order of filter values: numbers, then text, then logicals, then blank. */
+export function compareScalars(a: CellScalar, b: CellScalar): number {
+  const rank = (value: CellScalar): number =>
+    typeof value === "number"
+      ? 0
+      : typeof value === "string"
+        ? 1
+        : typeof value === "boolean"
+          ? 2
+          : 3;
+  const byRank = rank(a) - rank(b);
+  if (byRank !== 0) return byRank;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
+  return Number(a) - Number(b);
+}
+
+/** The label of a filter or slicer value; a blank shows as "(blank)", as in Excel. */
+export function scalarLabel(value: CellScalar): string {
+  return value === null || value === "" ? "(blank)" : String(value);
 }

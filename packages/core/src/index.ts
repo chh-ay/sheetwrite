@@ -7,7 +7,7 @@ export {
   parseCurrencyInput,
 } from "./cell-input.js";
 
-export { isCellFontFamily } from "./cell-style-fields.js";
+export { isCellFontFamily, sanitizeCellStyle } from "./cell-style-fields.js";
 
 export {
   openChartViews,
@@ -105,6 +105,7 @@ export {
   toTsv,
   toTsvStream,
 } from "./export.js";
+export { MAX_EXTERNAL_SHEET_AREA } from "./external-link.js";
 export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   fromXlsxTable,
@@ -126,7 +127,7 @@ export {
   type XlsxWorkbookWarning,
 } from "./xlsx-bridge.js";
 
-export { convertXlsxFormulas } from "./engine.js";
+export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.js";
 
 export {
   createGrid,
@@ -148,7 +149,6 @@ export {
   type ResolvedHyperlinkTarget,
   resolveHyperlinkTarget,
   sanitizeCellHyperlink,
-  sanitizeHyperlinkStyle,
 } from "./hyperlink.js";
 
 export { ICON_NAMES, type IconName } from "./icons/icon-names.js";
@@ -169,6 +169,7 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 
+export { type QueryCommands, registerQueryCommands } from "./query-commands.js";
 export {
   type DocumentRebaseResult,
   type RebaseConflict,
@@ -316,7 +317,11 @@ export type {
   ContextMenuItems,
   Dashboard,
   DashboardBox,
+  DashboardChartItem,
+  DashboardExport,
   DashboardItem,
+  DashboardItemExport,
+  DashboardKpiItem,
   DashboardPivotItem,
   DashboardSlicerItem,
   DataCell,
@@ -331,6 +336,10 @@ export type {
   DataValidationCondition,
   DataValidationRule,
   DocumentOp,
+  ExternalLink,
+  ExternalLinkCell,
+  ExternalLinkSheet,
+  ExternalLinkValue,
   Grid,
   GridActions,
   GridCommandName,
@@ -419,6 +428,8 @@ export type {
   SyncMutationStatus,
   TableColumnRef,
   TableRelationship,
+  Measure,
+  MeasureStatus,
   Theme,
   ToolbarActionName,
   ToolbarIcon,
@@ -444,6 +455,7 @@ export type {
   XlsxSourceGraph,
   XlsxSourcePart,
   XlsxSourceSnapshot,
+  XlsxUnsupportedQuery,
 } from "./types.js";
 
 export {

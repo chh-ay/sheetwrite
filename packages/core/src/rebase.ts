@@ -588,8 +588,11 @@ function transformDirectTarget(
     case "removeNamedRange":
     case "removeTable":
     case "setCalculation":
+    case "setExternalLinks":
     case "setRelationship":
     case "removeRelationship":
+    case "setMeasure":
+    case "removeMeasure":
     case "setQuery":
     case "removeQuery":
     case "removeChart":
@@ -925,6 +928,19 @@ function lifecycleConflict(
     };
   }
 
+  // A measure formula names tables and columns, and a rename rewrites only
+  // the measures present when it applies, so a concurrent measure write
+  // would keep the old names on one side.
+  if (
+    (local.op === "setMeasure" && renamesTable(remote)) ||
+    (remote.op === "setMeasure" && renamesTable(local))
+  ) {
+    return {
+      code: "overlapping-edit",
+      message: "A pending measure change and a concurrent table rename may name the same table",
+    };
+  }
+
   const dashboardConflict = dashboardItemConflict(local, remote);
   if (dashboardConflict) return dashboardConflict;
 
@@ -975,6 +991,13 @@ function lifecycleConflict(
   }
 
   return null;
+}
+
+function renamesTable(operation: DocumentOp): boolean {
+  return (
+    operation.op === "updateTable" &&
+    (operation.patch.name !== undefined || operation.patch.columns !== undefined)
+  );
 }
 
 function operationTouchesSheet(
@@ -1163,10 +1186,16 @@ function operationIdentity(operation: DocumentOp): string {
     case "setCalculation":
       return "calculation";
 
+    // The whole list is replaced, so the last writer wins.
+    case "setExternalLinks":
+      return "external-links";
+
     // The model is checked as a whole (no cycle, one relationship per pair of
     // tables), so any two concurrent relationship changes conflict.
     case "setRelationship":
     case "removeRelationship":
+    case "setMeasure":
+    case "removeMeasure":
       return "data-model";
 
     // Joins and output tables are checked across all queries, so any two

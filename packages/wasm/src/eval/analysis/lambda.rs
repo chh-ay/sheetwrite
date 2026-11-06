@@ -331,6 +331,7 @@ struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
     pass: &'a mut EvalPass<'p>,
+    /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
 }
 
@@ -400,7 +401,9 @@ impl Context<'_, '_> {
     }
 }
 
-fn literal(value: &Value) -> Ast {
+/// `value` as a formula operand: a constant, or a one-cell matrix for a
+/// blank or an error.
+pub(crate) fn literal(value: &Value) -> Ast {
     match value {
         Value::Number(number) => Ast::Num(*number),
         Value::Text(text) => Ast::Str(text.to_string()),

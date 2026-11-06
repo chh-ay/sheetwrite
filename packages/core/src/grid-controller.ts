@@ -155,6 +155,7 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
   };
 
   // Each closure reads `handlers.*` lazily, so mutating a field on the passed
+  // handlers object takes effect on the next event without resubscribing.
   const unsubscribes: Array<() => void> = [
     grid.on("change", (event) => {
       syncCommandStateSubscription();

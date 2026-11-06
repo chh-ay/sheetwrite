@@ -16,11 +16,11 @@ import {
   DEFAULT_ROW_PIXELS,
   EMU_PER_PIXEL,
   elementXml,
-  relationshipsPartOf,
 } from "./chart-xml.js";
 import {
   type OpcPackage,
   type OpcRelationship,
+  relationshipsPart,
   relationshipsXml,
   relationshipTypeMatches,
 } from "./opc.js";
@@ -512,6 +512,16 @@ export async function readCharts(
     const drawings = packageFile
       .relationships(sheetPart)
       .filter((entry) => !entry.external && relationshipTypeMatches(entry.type, "drawing"));
+    // A dashboard's charts come from metadata; the export writes its drawing again.
+    if (sheet.kind === "dashboard") {
+      for (const drawing of drawings) {
+        modelled.add(drawing.target);
+        for (const entry of packageFile.relationships(drawing.target)) {
+          if (!entry.external) modelled.add(entry.target);
+        }
+      }
+      continue;
+    }
     for (const drawing of drawings) {
       if (
         !packageFile
@@ -537,7 +547,7 @@ export async function readCharts(
       const kept = read.relationships
         .filter((entry) => !modelled.has(entry.target))
         .map((entry) => ({ ...entry, target: entry.external ? entry.target : `/${entry.target}` }));
-      replacements.set(relationshipsPartOf(drawing.target), relationshipsXml(kept, context));
+      replacements.set(relationshipsPart(drawing.target), relationshipsXml(kept, context));
     }
   }
   return { modelled, replacements };

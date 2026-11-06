@@ -302,6 +302,9 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
       formulaWorkloadKey({ id: variant.id, size: lookupFormulas }),
       formulaWorkloadKey({ id: `${variant.id}${LOOKUP_EDIT_SUFFIX}`, size: lookupFormulas }),
     ]),
+    ...(smoke ? [MIXED_LOOKUP_SMOKE_ROWS] : MIXED_LOOKUP_SIZES).map((size) =>
+      formulaWorkloadKey({ id: "xlookup-mixed-exact", size }),
+    ),
     formulaWorkloadKey({ id: "spill-filter-resize", size: range }),
     formulaWorkloadKey({ id: "sumproduct-vector-edit", size: range }),
     formulaWorkloadKey({ id: "sumproduct-matrix-edit", size: range }),
@@ -321,6 +324,7 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
 }
 
 const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
+  "xlookup-mixed-exact",
   "formula-constant-edit",
   "vlookup-many",
   "vlookup-many-edit",
@@ -407,6 +411,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return "#DIV/0!";
     case "criteria-range-edit":
       return size - Math.floor(size / 2) + 1;
+    case "xlookup-mixed-exact":
+      return mixedLookupOutput(size);
     case "lookup-range-edit":
       return (size - 1) * 2;
     case "spill-filter-resize":
@@ -541,8 +547,14 @@ export const SAMPLE_WARMUP_FIXTURES = 3;
 
 /** Knobs for one aggregated timing sample: a wall-clock total over repeated fixture runs. */
 export interface AggregatedSampleOptions {
-  /** Untimed fixture runs before the timed loop; the first one also checks correctness. */
+  /** Untimed fixture runs before the timed loop; each one also checks correctness. */
   readonly warmupFixtures: number;
+  /**
+   * Keep warming up, unchecked, until the warm-up runs add up to this many
+   * milliseconds. For rows whose engine code is still being optimised by the
+   * JavaScript engine after `warmupFixtures` runs; zero or absent adds none.
+   */
+  readonly minimumWarmupMs?: number;
   /** Timed fixture runs repeat until their total wall time reaches this floor. */
   readonly minimumSampleDurationMs: number;
 }
@@ -559,25 +571,36 @@ export interface AggregatedWorkloadSample extends CompleteFormulaWorkloadResult 
 }
 
 /**
- * Run and check the untimed warm-up fixtures. A restorable fixture is
+ * Run and check the untimed warm-up fixtures, then keep running unchecked
+ * warm-ups until they add up to `minimumWarmupMs`. A restorable fixture is
  * returned restored, ready for the timed loop.
  */
 function warmUpFixtures(
   id: string,
   factory: FixtureFactory,
   warmupFixtures: number,
+  minimumWarmupMs: number,
   expected: FormulaOutput,
 ): TimedFixture | undefined {
   if (!Number.isInteger(warmupFixtures) || warmupFixtures < 1) {
     throw new RangeError("warmupFixtures must be a positive integer");
   }
+  if (!Number.isFinite(minimumWarmupMs) || minimumWarmupMs < 0) {
+    throw new RangeError("minimumWarmupMs must be a non-negative number");
+  }
   let fixture: TimedFixture | undefined;
-  for (let index = 0; index < warmupFixtures; index += 1) {
+  const started = now();
+  for (let index = 0; index < warmupFixtures || now() - started < minimumWarmupMs; index += 1) {
+    if (index >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
+      throw new RangeError(`${id} did not finish its ${minimumWarmupMs} ms warm-up`);
+    }
     fixture ??= factory();
     fixture.store.resetFormulaMatrixResourceStats();
     fixture.run();
-    assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
-    allocationAt(fixture.store);
+    if (index < warmupFixtures) {
+      assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
+      allocationAt(fixture.store);
+    }
     if (fixture.restore === undefined) {
       fixture.dispose();
       fixture = undefined;
@@ -612,7 +635,9 @@ export function collectAggregatedSample(
     throw new RangeError("minimumSampleDurationMs must be a positive number");
   }
   const expected = expectedOutput ?? expectedFormulaOutput(id, size);
-  let fixture = warmUpFixtures(id, factory, options.warmupFixtures, expected) ?? factory();
+  let fixture =
+    warmUpFixtures(id, factory, options.warmupFixtures, options.minimumWarmupMs ?? 0, expected) ??
+    factory();
 
   // One forced GC brackets the whole sample: a per-iteration GC would dominate
   // the cheap workloads the aggregate exists to measure.
@@ -1343,6 +1368,83 @@ function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant
   };
 }
 
+/** Key-table sizes of the mixed-type exact lookup rows. */
+const MIXED_LOOKUP_SIZES = [10_000, 100_000] as const;
+const MIXED_LOOKUP_SMOKE_ROWS = 1_000;
+
+/** Table rows per lookup formula of the mixed-type rows. */
+const MIXED_LOOKUP_ROWS_PER_FORMULA = 10;
+
+/** Even rows hold numbers and odd rows text, so one key column mixes types. */
+function mixedLookupKeyAt(row: number): number | string {
+  return row % 2 === 0 ? row : `Key${row}`;
+}
+
+/** Formula `formula` looks up table row `formula * 10 + formula % 2`, so the
+ * keys alternate between numbers and text. Text keys differ from the table
+ * only in case. */
+function mixedLookupRowOf(formula: number): number {
+  return formula * MIXED_LOOKUP_ROWS_PER_FORMULA + (formula % 2);
+}
+
+function mixedLookupOutput(tableRows: number): string {
+  const last = tableRows / MIXED_LOOKUP_ROWS_PER_FORMULA - 1;
+  return `${mixedLookupRowOf(last) + 1}`;
+}
+
+/**
+ * Exact `XLOOKUP`s on one key column that mixes numbers and text. The timed
+ * unit is the first recalculation of all formulas; every result is checked
+ * outside the timed interval.
+ */
+function mixedLookupFixture(tableRows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, tableRows);
+  for (let row = 0; row < tableRows; row++) {
+    const key = mixedLookupKeyAt(row);
+    if (typeof key === "number") store.setNumber(sheet, row, 0, key, 0);
+    else store.setString(sheet, row, 0, key, 0);
+  }
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(tableRows, (row) => row + 1),
+    0,
+  );
+
+  const formulas = tableRows / MIXED_LOOKUP_ROWS_PER_FORMULA;
+  for (let formula = 0; formula < formulas; formula++) {
+    const key = mixedLookupKeyAt(mixedLookupRowOf(formula));
+    if (typeof key === "number") store.setNumber(sheet, formula, 2, key, 0);
+    else store.setString(sheet, formula, 2, key.toLowerCase(), 0);
+    store.setFormula(
+      sheet,
+      formula,
+      3,
+      `=XLOOKUP(C${formula + 1},A1:A${tableRows},B1:B${tableRows})`,
+      0,
+    );
+  }
+
+  return {
+    store,
+    run: () => store.recompute(sheet),
+    check: () => {
+      for (let formula = 0; formula < formulas; formula++) {
+        const value = numberAt(store, sheet, formula, 3);
+        const expected = mixedLookupRowOf(formula) + 1;
+        assert(
+          value === expected,
+          `xlookup-mixed-exact row ${formula} expected ${expected}, observed ${value}`,
+        );
+      }
+      return mixedLookupOutput(tableRows);
+    },
+    dispose: () => store.free(),
+  };
+}
+
 function spillFilterResizeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
@@ -1809,6 +1911,9 @@ export function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("error-propagation", 1_000, () => errorPropagationFixture(1_000));
   add("criteria-range-edit", range, () => criteriaRangeFixture(range));
   add("lookup-range-edit", range, () => lookupRangeFixture(range));
+  for (const size of smoke ? [MIXED_LOOKUP_SMOKE_ROWS] : MIXED_LOOKUP_SIZES) {
+    add("xlookup-mixed-exact", size, () => mixedLookupFixture(size));
+  }
   for (const variant of LOOKUP_VARIANTS) {
     add(variant.id, lookupFormulas, () =>
       lookupFixture(lookupFormulas, "first-recompute", variant),
@@ -1868,6 +1973,31 @@ function missingCellStoreMethod(error: unknown): string | undefined {
 }
 
 /**
+ * Rows whose engine code JavaScriptCore is still optimising after the standard
+ * warm-up, with the untimed warm-up (ms) that reaches steady state first. In a
+ * fresh Bun process on Linux, `unicode-text-date-edit` takes 4.5–4.8 ms per run
+ * for the first 50 ms and 1.6 ms after one second, so a 50 ms sample measured
+ * tier-up timing instead of the engine (#325).
+ *
+ * `independent-first-recompute` at 10,000 formulas runs right after the
+ * 10,000-formula parse/load row, whose code is still being compiled in the
+ * background on the pinned core. Its runs take 7–10 ms until that finishes and
+ * 1.7–1.9 ms after, with no wasm memory growth; with synchronous compilation
+ * or an idle pause before the row they start at steady speed (#463).
+ *
+ * `diamond-edit` runs in about 30 µs, so its 50 ms sample falls inside the
+ * tier-up of the recompute path. A change to that path's code moved the
+ * sample's result by 10–15% under the gate (30 µs to 34 µs) while both
+ * engines ran at 29.2–29.5 µs per edit after warm-up; with 500 ms of warm-up
+ * the gate measured the same 1.007.
+ */
+const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
+  "workload=unicode-text-date-edit;size=1000": 1_000,
+  "workload=independent-first-recompute;size=10000": 500,
+  "workload=diamond-edit;size=32": 500,
+};
+
+/**
  * Capture one gate side in this process. Every workload is one aggregated
  * sample of at least `SAMPLE_AGGREGATE_MS`, so 1-3 ms rows average dozens of
  * runs instead of resting on a single cold run.
@@ -1885,6 +2015,7 @@ function captureGateSide(): FormulaGateCapture {
     try {
       sample = collectAggregatedSample(id, size, factory, {
         warmupFixtures: SAMPLE_WARMUP_FIXTURES,
+        minimumWarmupMs: GATE_TIER_UP_WARMUP_MS[key] ?? 0,
         minimumSampleDurationMs: SAMPLE_AGGREGATE_MS,
       });
     } catch (error) {
@@ -2718,6 +2849,16 @@ export function validateFormulaCapture(
   } else {
     validateFormulaRegression(candidate, baseline);
   }
+}
+
+/**
+ * A recorded full capture, such as the shared capture inside full-engine
+ * evidence. It may predate workloads added to the matrix since, under the
+ * same rule as a regression baseline: every core workload is listed and no
+ * key is outside the current full matrix.
+ */
+export function validateRecordedFormulaCapture(capture: FormulaBenchmarkResult): void {
+  validateFormulaEvidence(capture, capture.mode, false, regressionBaselineWorkloadKeys(capture));
 }
 
 function validateCurrentCaptureProvenance(

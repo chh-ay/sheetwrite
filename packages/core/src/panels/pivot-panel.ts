@@ -23,15 +23,23 @@ import {
   setFilterValues,
   setSortOrder,
   shiftField,
+  compareScalars,
+  scalarLabel,
   sourceDataRange,
+  setNumberFormat,
+  VALUE_NUMBER_FORMATS,
   baseTable,
   relatedTables,
   valuesType,
+  withMeasureValue,
   withModelField,
   type FieldFacts,
   type PivotArea,
   type PivotPlacement,
 } from "./pivot-model.js";
+
+/** The badge of a measure in the field list, as Excel marks measures with fx. */
+const MEASURE_BADGE = "fx";
 
 const TYPE_BADGES: Readonly<Record<PivotFieldType, string>> = {
   number: "Number",
@@ -51,7 +59,6 @@ const NEEDS_FULL_ENGINE =
 const MISSING_PIVOT = "This pivot table no longer exists.";
 const TOO_MANY_VALUES = `This field has more than ${MAX_FILTER_VALUES.toLocaleString("en-US")} values, so it cannot be a filter.`;
 const EMPTY_AREA = "Drag fields here";
-const BLANK_LABEL = "(blank)";
 
 /** What a drag carries: a source field, or an entry that leaves its area. */
 interface DragState {
@@ -68,27 +75,6 @@ export function pivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true)
   };
 }
 
-/** Sort order of filter values: numbers, then text, then logicals, then blank. */
-function compareScalars(a: CellScalar, b: CellScalar): number {
-  const rank = (value: CellScalar): number =>
-    typeof value === "number"
-      ? 0
-      : typeof value === "string"
-        ? 1
-        : typeof value === "boolean"
-          ? 2
-          : 3;
-  const byRank = rank(a) - rank(b);
-  if (byRank !== 0) return byRank;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
-  return Number(a) - Number(b);
-}
-
-function scalarLabel(value: CellScalar): string {
-  return value === null || value === "" ? BLANK_LABEL : String(value);
-}
-
 function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: string): () => void {
   const read = (): PivotDefinition | null =>
     grid.getPivots(sheet).find((pivot) => pivot.id === id) ?? null;
@@ -97,6 +83,8 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
 
   let drag: DragState | null = null;
   let message: string | null = null;
+  // The value field whose number format form is open.
+  let formatting: number | null = null;
   let rendered = "";
 
   /**
@@ -175,6 +163,58 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     const placed =
       to === "values" ? next.values.length - 1 : areaFields(next, to).lastIndexOf(added.field);
     commit(next, `${to}-${placed}-menu`);
+  };
+
+  /**
+   * One section per table that holds measures, with the measures the pivot
+   * does not show yet, as Excel's Field List lists measures under their
+   * home table. A measure goes to Values only.
+   */
+  const appendMeasures = (target: HTMLElement, pivot: PivotDefinition): void => {
+    if (baseTable(pivot.source) === undefined) return;
+    const workbook = grid.store.getWorkbook();
+    const tables = workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+    const shown = new Set(
+      pivot.values.flatMap((value) => ("measure" in value ? [value.measure] : [])),
+    );
+    for (const table of tables) {
+      const measures = (workbook.dataModel?.measures ?? []).filter(
+        (measure) => measure.table === table.id && !shown.has(measure.id),
+      );
+      if (measures.length === 0) continue;
+      const section = panelSection(`Measures: ${table.name}`);
+      const list = document.createElement("ul");
+      list.className = "sheetwrite-panel-fields";
+      list.setAttribute("aria-label", `${table.name} measures`);
+      for (const measure of measures) {
+        const item = document.createElement("li");
+        item.className = "sheetwrite-panel-field-item";
+        const name = document.createElement("span");
+        name.className = "sheetwrite-panel-field-name";
+        name.textContent = measure.name;
+        const badge = document.createElement("span");
+        badge.className = "sheetwrite-panel-badge";
+        badge.textContent = MEASURE_BADGE;
+        const menu = menuButton(
+          `${measure.name} measure actions`,
+          `measure-${measure.id}-menu`,
+          () => [
+            {
+              label: "Add to Values",
+              run: () => {
+                const next = withMeasureValue(pivot, tables, measure.id);
+                if (next !== null) commit(next, `values-${next.values.length - 1}-menu`);
+              },
+            },
+          ],
+          lifetime.signal,
+        );
+        item.append(name, badge, menu);
+        list.appendChild(item);
+      }
+      section.appendChild(list);
+      target.appendChild(section);
+    }
   };
 
   /**
@@ -296,6 +336,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     fieldSection.appendChild(fieldList);
     target.appendChild(fieldSection);
     appendRelatedTables(target, pivot);
+    appendMeasures(target, pivot);
 
     for (const [area, label] of PIVOT_AREAS) {
       target.appendChild(
@@ -312,6 +353,17 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           move: (field, to, from, at) => move(pivot, fields, field, to, from, at),
           commit,
           distinctValues: (field) => distinctValues(pivot, field),
+          formatting: () => formatting,
+          editFormat: (index) => {
+            formatting = index;
+            refresh(true);
+            const focus = index === null ? `values-${index}-menu` : `values-${index}-format`;
+            body.querySelector<HTMLElement>(`[data-focus-key="${focus}"]`)?.focus();
+          },
+          measureName: (measureId) =>
+            grid.store
+              .getWorkbook()
+              .dataModel?.measures?.find((measure) => measure.id === measureId)?.name ?? measureId,
           signal: lifetime.signal,
         }),
       );
@@ -352,6 +404,12 @@ interface AreaActions {
   move(field: number, to: PivotArea, from: PivotPlacement | null, at?: number): void;
   commit(next: PivotDefinition, focusKey?: string): void;
   distinctValues(field: number): CellScalar[];
+  /** The saved name of a measure, or its ID when the measure was removed. */
+  measureName(id: string): string;
+  /** The value field whose number format form is open, or null. */
+  formatting(): number | null;
+  /** Open the number format form of value field `index`, or close it with null. */
+  editFormat(index: number | null): void;
   /** The panel's signal; an open menu stops listening on the document when it aborts. */
   signal: AbortSignal;
 }
@@ -381,43 +439,68 @@ function areaSection(
     const placement: PivotPlacement = { area, index };
     const item = document.createElement("li");
     item.className = "sheetwrite-panel-area-item";
-    item.draggable = true;
+    const value = area === "values" ? pivot.values[index] : undefined;
+    // A measure value has no source field, so it cannot move to another
+    // area or shift by field; the list can only remove it.
+    const isMeasure = value !== undefined && "measure" in value;
+    item.draggable = !isMeasure;
 
     const name = document.createElement("span");
     name.className = "sheetwrite-panel-field-name";
-    const value = area === "values" ? pivot.values[index] : undefined;
-    const aggregation = AGGREGATION_LABELS.find(([key]) => key === value?.aggregation)?.[1];
+    const measure = value && "measure" in value ? actions.measureName(value.measure) : undefined;
+    const aggregation =
+      value && "aggregation" in value
+        ? AGGREGATION_LABELS.find(([key]) => key === value.aggregation)?.[1]
+        : undefined;
     name.textContent =
       value?.name ??
+      measure ??
       (aggregation === undefined ? header(field) : `${aggregation} of ${header(field)}`);
     item.appendChild(name);
 
-    const menuItems = (): PanelMenuItem[] => [
-      ...PIVOT_AREAS.map(([to, toLabel]) => ({
-        label: `Move to ${toLabel}`,
-        disabled: to === area,
-        run: () => actions.move(field, to, placement),
-      })),
-      {
-        label: "Move Up",
-        disabled: index === 0,
-        run: () =>
-          actions.commit(shiftField(pivot, placement, -1, noFacts), `${area}-${index - 1}-menu`),
-      },
-      {
-        label: "Move Down",
-        disabled: index === entries.length - 1,
-        run: () =>
-          actions.commit(shiftField(pivot, placement, 1, noFacts), `${area}-${index + 1}-menu`),
-      },
-      { label: "Remove", run: () => actions.commit(removeField(pivot, placement)) },
-    ];
+    const remove: PanelMenuItem = {
+      label: "Remove",
+      run: () => actions.commit(removeField(pivot, placement)),
+    };
+    // Excel opens Number Format from a value field's settings.
+    const numberFormat: PanelMenuItem[] =
+      area === "values" ? [{ label: "Number Format…", run: () => actions.editFormat(index) }] : [];
+    const menuItems = (): PanelMenuItem[] =>
+      isMeasure
+        ? [...numberFormat, remove]
+        : [
+            ...numberFormat,
+            ...PIVOT_AREAS.map(([to, toLabel]) => ({
+              label: `Move to ${toLabel}`,
+              disabled: to === area,
+              run: () => actions.move(field, to, placement),
+            })),
+            {
+              label: "Move Up",
+              disabled: index === 0,
+              run: () =>
+                actions.commit(
+                  shiftField(pivot, placement, -1, noFacts),
+                  `${area}-${index - 1}-menu`,
+                ),
+            },
+            {
+              label: "Move Down",
+              disabled: index === entries.length - 1,
+              run: () =>
+                actions.commit(
+                  shiftField(pivot, placement, 1, noFacts),
+                  `${area}-${index + 1}-menu`,
+                ),
+            },
+            remove,
+          ];
     // The area is part of the name: a field can sit in two areas at once.
     const actionsLabel = `${name.textContent} in ${label} actions`;
     item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems, actions.signal));
 
-    if (area === "values") {
-      const select = selectOf(AGGREGATION_LABELS, value?.aggregation ?? "SUM");
+    if (area === "values" && value && "aggregation" in value) {
+      const select = selectOf(AGGREGATION_LABELS, value.aggregation);
       select.className = "sheetwrite-panel-control";
       select.dataset.focusKey = `${area}-${index}-aggregation`;
       select.setAttribute("aria-label", `Summarize ${header(field)} by`);
@@ -438,14 +521,21 @@ function areaSection(
         actions.commit(setSortOrder(pivot, area, field, select.value === "descending")),
       );
       item.appendChild(select);
-    } else {
+    } else if (area === "filters") {
       item.appendChild(filterValues(pivot, index, field, header(field), actions));
     }
 
-    item.addEventListener("dragstart", (event) => {
-      actions.startDrag({ field, from: placement });
-      event.dataTransfer?.setData("text/plain", header(field));
-    });
+    if (area === "values" && value && actions.formatting() === index) {
+      item.appendChild(
+        numberFormatForm(pivot, index, value.numberFormat, name.textContent, actions),
+      );
+    }
+
+    if (!isMeasure)
+      item.addEventListener("dragstart", (event) => {
+        actions.startDrag({ field, from: placement });
+        event.dataTransfer?.setData("text/plain", header(field));
+      });
     item.addEventListener("dragend", () => actions.endDrag());
     list.appendChild(item);
   });
@@ -515,4 +605,60 @@ function filterValues(
   });
   details.appendChild(group);
   return details;
+}
+
+/**
+ * Excel's Number Format for one value field: a category, or a custom code
+ * typed in the field. OK commits one change; Cancel closes the form.
+ */
+function numberFormatForm(
+  pivot: PivotDefinition,
+  index: number,
+  current: string | undefined,
+  caption: string,
+  actions: AreaActions,
+): HTMLElement {
+  const form = document.createElement("form");
+  form.className = "sheetwrite-panel-format";
+  form.setAttribute("aria-label", `Number format of ${caption}`);
+
+  const preset = VALUE_NUMBER_FORMATS.find(([code]) => code === (current ?? ""));
+  const select = selectOf([...VALUE_NUMBER_FORMATS, ["custom", "Custom"]], preset?.[0] ?? "custom");
+  select.className = "sheetwrite-panel-control";
+  select.dataset.focusKey = `values-${index}-format`;
+  select.setAttribute("aria-label", "Category");
+  const code = document.createElement("input");
+  code.className = "sheetwrite-panel-control";
+  code.setAttribute("aria-label", "Format code");
+  code.value = current ?? "";
+  code.spellcheck = false;
+  select.addEventListener("change", () => {
+    if (select.value !== "custom") code.value = select.value;
+  });
+  code.addEventListener("input", () => {
+    const match = VALUE_NUMBER_FORMATS.find(([candidate]) => candidate === code.value);
+    select.value = match?.[0] ?? "custom";
+  });
+
+  const ok = document.createElement("button");
+  ok.type = "submit";
+  ok.className = "sheetwrite-panel-control";
+  ok.textContent = "OK";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "sheetwrite-panel-control";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => actions.editFormat(null));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const format = code.value.trim();
+    actions.editFormat(null);
+    actions.commit(
+      setNumberFormat(pivot, index, format === "" ? undefined : format),
+      `values-${index}-menu`,
+    );
+  });
+
+  form.append(select, code, ok, cancel);
+  return form;
 }

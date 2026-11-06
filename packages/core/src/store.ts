@@ -1,7 +1,13 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import { chartSourceRanges } from "./chart-definition.js";
 import { dashboardFields } from "./dashboard.js";
-import { cloneRelationship, cloneRelationships } from "./data-model.js";
+import {
+  cloneMeasure,
+  cloneRelationship,
+  cloneRelationships,
+  findMeasure,
+  findTable,
+} from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -14,7 +20,13 @@ import {
   type TransactionResourceValidationResult,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
-import { engineFailedError, engineGeneration, isEngineTrap, stopEngine } from "./engine.js";
+import {
+  engineFailedError,
+  engineGeneration,
+  getEngine,
+  isEngineTrap,
+  stopEngine,
+} from "./engine.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
@@ -52,7 +64,12 @@ import { preparedRestore, TransactionPreparation } from "./transaction-preparati
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { Dashboard, DashboardItem } from "./types/dashboard.js";
-import type { RelationshipStatus, TableRelationship } from "./types/data-model.js";
+import type {
+  Measure,
+  MeasureStatus,
+  RelationshipStatus,
+  TableRelationship,
+} from "./types/data-model.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
@@ -386,6 +403,19 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches: [{ op: "removeRelationship", id }] }, "api");
   }
 
+  /** Detached copies of the workbook's saved measures. */
+  getMeasures(): Measure[] {
+    return (this.engine.getWorkbook().dataModel?.measures ?? []).map(cloneMeasure);
+  }
+
+  /** Save or replace a model measure. */
+  setMeasure(measure: Measure): ApplyTransactionResult {
+    return this.applyTransaction(
+      { patches: [{ op: "setMeasure", measure: cloneMeasure(measure) }] },
+      "api",
+    );
+  }
+
   /** A copy of the items of the dashboard `sheet`, or `null` when it is not a dashboard. */
   getDashboard(sheet: SheetId): Dashboard | null {
     const owner = this.engine.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
@@ -402,6 +432,25 @@ export class SheetwriteStore implements Store {
       { patches: [{ op: "setDashboardItem", sheet, item: structuredClone(item) }] },
       "api",
     );
+  }
+
+  /** Remove a saved measure, retaining pivot references for undo. */
+  removeMeasure(id: string): ApplyTransactionResult {
+    return this.applyTransaction({ patches: [{ op: "removeMeasure", id }] }, "api");
+  }
+
+  /**
+   * Checks a measure from the saved model on every engine: its home table,
+   * then its formula syntax with the engine's parser. References are
+   * checked where the measure is calculated, so pivot cells show those.
+   */
+  getMeasureStatus(id: string): MeasureStatus {
+    const workbook = this.engine.getWorkbook();
+    const measure = findMeasure(workbook.dataModel, id);
+    if (!measure) return { status: "unavailable" };
+    if (!findTable(workbook.sheets, measure.table)) return { status: "missingTable" };
+    if (getEngine().checkFormulaSyntax(measure.formula) !== undefined) return { status: "syntax" };
+    return { status: "ok" };
   }
 
   /** Remove the item with `id` from the dashboard `sheet`. */
@@ -925,7 +974,8 @@ export class SheetwriteStore implements Store {
       if (
         patch.op === "setNamedRange" ||
         patch.op === "removeNamedRange" ||
-        patch.op === "setCalculation"
+        patch.op === "setCalculation" ||
+        patch.op === "setExternalLinks"
       ) {
         // A chart or pivot may read through a defined name, whose target is not tracked,
         // and a calculation change can move any formula result.

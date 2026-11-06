@@ -10,19 +10,17 @@ import { XlsxResourceError } from "@sheetwrite/core";
 import { inflateSync } from "fflate";
 
 import type { DrawingChart } from "./chart-write.js";
-import {
-  CHART_REL,
-  elementXml,
-  PACKAGE_RELATIONSHIPS_NS,
-  relationshipsPartOf,
-} from "./chart-xml.js";
+import { CHART_REL, elementXml } from "./chart-xml.js";
+import { PACKAGE_RELATIONSHIPS_NS } from "./format.js";
 import {
   type OpcPackage,
   type OpcRelationship,
+  relationshipSourcePart,
+  relationshipsPart,
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
-import { queriesDigest, queryWarning } from "./query-digest.js";
+import { externalLinkDigest, queriesDigest, queryWarning } from "./query-digest.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import {
@@ -36,6 +34,7 @@ import {
   xmlLocalName,
 } from "./xml.js";
 import {
+  asciiFold,
   markStoredEntryVerified,
   storedEntryFromBytes,
   type StoredZipEntry,
@@ -54,6 +53,8 @@ import {
  * - Charts and pivots read cell values, so any edit to any sheet drops them.
  *   Charts and pivots the reader maps to definitions (chart-read.ts,
  *   pivot.ts) are not retained here.
+ * - An external link part is kept while its link's saved values are as they
+ *   were at import; otherwise the writer writes the link from its values.
  * - Parts that point into worksheets, tables, styles or the workbook part,
  *   whose bytes Sheetwrite rewrites, are dropped with a warning.
  */
@@ -65,6 +66,8 @@ interface GraphRoot {
   readonly sheetId?: string;
   readonly relationship: OpcRelationship;
   readonly cacheId?: string;
+  /** Digest of the link that an external link part holds. */
+  readonly externalLink?: string;
 }
 
 /** Relationship kinds (the last segment of the OPC type URI) whose part graphs are retained. */
@@ -77,6 +80,7 @@ const RETAINED_KINDS: Readonly<Record<XlsxSourceGraph["owner"], ReadonlySet<stri
     "connections",
     "pivotCacheDefinition",
     "theme",
+    "externalLink",
   ]),
   // Pivot tables have no element in the worksheet XML; Excel finds them through relationships.
   sheet: new Set(["drawing", "pivotTable", "tableSingleCells"]),
@@ -107,12 +111,6 @@ const relationshipTargetCache = new WeakMap<XlsxSourcePart, readonly string[]>()
 
 function relationshipKind(type: string): string {
   return type.slice(type.lastIndexOf("/") + 1);
-}
-
-function sourcePartOfRelationships(part: string): string {
-  const match = /^(.*\/)?_rels\/([^/]+)\.rels$/.exec(part);
-  if (!match) throw new TypeError(`Sheetwrite: ${part} is not a relationships part`);
-  return `${match[1] ?? ""}${match[2] ?? ""}`;
 }
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -219,6 +217,7 @@ function graphRoots(
   workbookXml: Uint8Array,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
+  linkParts: ReadonlyMap<string, string>,
 ): GraphRoot[] {
   const roots: GraphRoot[] = [];
   for (const relationship of packageFile.relationships("")) {
@@ -235,6 +234,8 @@ function graphRoots(
   for (const relationship of packageFile.relationships(workbookPart)) {
     const kind = relationshipKind(relationship.type);
     if (relationship.external || !isRetainedRelationship("workbook", relationship.type)) continue;
+    // External links are added below, in the order formulas number them.
+    if (kind === "externalLink") continue;
     if (kind !== "pivotCacheDefinition") {
       roots.push({ owner: "workbook", relationship });
       continue;
@@ -246,6 +247,15 @@ function graphRoots(
     if (cacheId === undefined || !/^\d{1,10}$/.test(cacheId)) {
       dropWarning(context, relationship.target, "its pivot cache id is missing");
     } else roots.push({ owner: "workbook", relationship, cacheId });
+  }
+
+  const workbookRelationships = packageFile.relationships(workbookPart);
+  for (const [book, part] of linkParts) {
+    const link = snapshot.workbook.externalLinks?.find((candidate) => candidate.book === book);
+    const relationship = workbookRelationships.find((candidate) => candidate.target === part);
+    if (link && relationship) {
+      roots.push({ owner: "workbook", relationship, externalLink: externalLinkDigest(link) });
+    }
   }
 
   const sheetsByName = new Map(snapshot.sheets.map((sheet) => [sheet.name, sheet.id]));
@@ -278,8 +288,8 @@ function reachableParts(
     if (members.has(part)) continue;
     if (!packageFile.archive.has(part) || REWRITTEN_PART.test(part)) return undefined;
     members.add(part);
-    const relationshipsPart = relationshipsPartOf(part);
-    if (packageFile.archive.has(relationshipsPart)) members.add(relationshipsPart);
+    const relationships = relationshipsPart(part);
+    if (packageFile.archive.has(relationships)) members.add(relationships);
     for (const relationship of packageFile.relationships(part)) {
       if (!relationship.external && !modelled.has(relationship.target))
         pending.push(relationship.target);
@@ -299,6 +309,7 @@ export async function capturePreserved(
   context: XlsxCodecContext,
   modelled: ReadonlySet<string>,
   replacements: ReadonlyMap<string, Uint8Array> = new Map(),
+  linkParts: ReadonlyMap<string, string> = new Map(),
 ): Promise<void> {
   const workbookPart = packageFile.officeDocumentPart();
   const roots = graphRoots(
@@ -307,6 +318,7 @@ export async function capturePreserved(
     await packageFile.readBytes(workbookPart),
     snapshot,
     context,
+    linkParts,
   );
   const graphs: XlsxSourceGraph[] = [];
   let digests: Map<string, string> | undefined;
@@ -355,6 +367,7 @@ export async function capturePreserved(
       type: root.relationship.type,
       target: root.relationship.target,
       ...(root.cacheId === undefined ? {} : { cacheId: root.cacheId }),
+      ...(root.externalLink === undefined ? {} : { externalLink: root.externalLink }),
       parts,
       dependencies,
     });
@@ -366,7 +379,7 @@ export async function capturePreserved(
   const retained = new Map<string, XlsxSourcePart>();
   const compressedSizes = new Map<string, number>();
   for (const [name, entry] of packageFile.archive.entries) {
-    compressedSizes.set(name.toLowerCase(), entry.compressedSize);
+    compressedSizes.set(asciiFold(name), entry.compressedSize);
   }
   let retainedBytes = 0;
   for (const unit of units) {
@@ -374,7 +387,7 @@ export async function capturePreserved(
       (part) => !retained.has(part),
     );
     const unitBytes = unitParts.reduce(
-      (total, part) => total + (compressedSizes.get(part.toLowerCase()) ?? 0),
+      (total, part) => total + (compressedSizes.get(asciiFold(part)) ?? 0),
       0,
     );
     if (retainedBytes + unitBytes > context.limits.maxPreservedBytes) {
@@ -478,7 +491,7 @@ function appendChartsToDrawing(
   charts: readonly DrawingChart[],
   context: XlsxCodecContext,
 ): Map<string, Uint8Array> {
-  const relationshipsName = relationshipsPartOf(drawing.name);
+  const relationshipsName = relationshipsPart(drawing.name);
   const root = parseXml(partBytes(drawing), drawing.name, context);
   const relationshipsRoot = relationships
     ? parseXml(partBytes(relationships), relationshipsName, context)
@@ -517,7 +530,7 @@ function relationshipTargets(
   const cached = relationshipTargetCache.get(part);
   if (cached) return cached;
   const bytes = partBytes(part);
-  const sourcePart = sourcePartOfRelationships(name);
+  const sourcePart = relationshipSourcePart(name);
   const targets = xmlChildren(parseXml(bytes, name, context), "Relationship").flatMap(
     (relationship) =>
       xmlAttribute(relationship, "TargetMode") === "External"
@@ -530,10 +543,31 @@ function relationshipTargets(
 
 /**
  * Check a graph from a possibly untrusted snapshot: payload CRCs and sizes, and
- * that its relationships stay inside the graph. Results are cached per frozen
- * part, whose bytes cannot change, so saving the same workbook again is free.
+ * that its relationships parse and stay inside the graph. Returns why the
+ * graph is dropped, or undefined to keep it.
  */
 function verifyGraph(
+  graph: XlsxSourceGraph,
+  partsByName: ReadonlyMap<string, XlsxSourcePart>,
+  context: XlsxCodecContext,
+): string | undefined {
+  try {
+    return graphProblem(graph, partsByName, context);
+  } catch (error) {
+    // Corrupt, over-limit or malformed parts drop only their graph, so a
+    // persisted workbook still opens; abort errors still fail the whole operation.
+    if (isAbort(context, error)) throw error;
+    if (error instanceof TypeError || error instanceof XlsxResourceError) return error.message;
+    throw error;
+  }
+}
+
+/**
+ * The first problem of a graph, or undefined. Payload and relationship results
+ * are cached per frozen part, whose bytes cannot change, so saving the same
+ * workbook again is free.
+ */
+function graphProblem(
   graph: XlsxSourceGraph,
   partsByName: ReadonlyMap<string, XlsxSourcePart>,
   context: XlsxCodecContext,
@@ -544,15 +578,7 @@ function verifyGraph(
     const part = partsByName.get(name);
     if (!part) return `${name} is missing`;
     if (!verifiedParts.has(part)) {
-      try {
-        validateStoredEntry(storedEntry(part), context);
-      } catch (error) {
-        // Corrupt or over-limit payloads drop only their graph, so a persisted
-        // workbook still opens; abort errors still fail the whole operation.
-        if (isAbort(context, error)) throw error;
-        if (error instanceof TypeError || error instanceof XlsxResourceError) return error.message;
-        throw error;
-      }
+      validateStoredEntry(storedEntry(part), context);
       if (Object.isFrozen(part)) verifiedParts.add(part);
     }
     if (!name.endsWith(".rels")) continue;
@@ -582,6 +608,9 @@ export function preparePreserved(
   const sheets = new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet]));
   const digests = new Map<string, string>();
   const savedQueries = queriesDigest(snapshot.workbook.queries);
+  const linkBooks = new Map(
+    (snapshot.workbook.externalLinks ?? []).map((link) => [externalLinkDigest(link), link.book]),
+  );
   const partsByName = new Map(source.parts.map((part) => [part.name, part]));
   const valid = new Set<XlsxSourceGraph>();
   for (const graph of source.graphs) {
@@ -593,6 +622,11 @@ export function preparePreserved(
         `Retained Power Query part ${graph.target} was dropped because the saved queries changed; output tables are written as values`,
         graph.target,
       );
+      continue;
+    }
+    // The link's values changed since import, so the export writes it from the model.
+    if (graph.externalLink !== undefined && !linkBooks.has(graph.externalLink)) {
+      dropWarning(context, graph.target, "the saved values of its link changed");
       continue;
     }
 
@@ -660,6 +694,9 @@ export function preparePreserved(
   return {
     rootRelationships: graphs.filter((graph) => graph.owner === "root").map(absolute),
     workbookRelationships: workbookGraphs.map(absolute),
+    externalBooks: workbookGraphs.flatMap((graph) =>
+      graph.externalLink === undefined ? [] : [linkBooks.get(graph.externalLink) ?? ""],
+    ),
     workbookXml(ids) {
       const pivotCaches = workbookGraphs.flatMap((graph, index) =>
         graph.cacheId === undefined
@@ -668,7 +705,12 @@ export function preparePreserved(
               `<pivotCache cacheId="${escapeXml(graph.cacheId)}" r:id="${escapeXml(ids[index] ?? "")}"/>`,
             ],
       );
-      return { pivotCaches };
+      const externalReferences = workbookGraphs.flatMap((graph, index) =>
+        graph.externalLink === undefined
+          ? []
+          : [`<externalReference r:id="${escapeXml(ids[index] ?? "")}"/>`],
+      );
+      return { pivotCaches, externalReferences };
     },
     appendCharts(sheet, charts) {
       const graph = graphs.find(
@@ -677,10 +719,10 @@ export function preparePreserved(
       const drawing = graph && partsByName.get(graph.target);
       if (!drawing) return false;
 
-      const relationshipsPart = partsByName.get(relationshipsPartOf(drawing.name));
+      const drawingRelationships = partsByName.get(relationshipsPart(drawing.name));
       for (const [name, bytes] of appendChartsToDrawing(
         drawing,
-        relationshipsPart,
+        drawingRelationships,
         charts,
         context,
       )) {

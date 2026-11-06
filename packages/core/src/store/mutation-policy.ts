@@ -349,8 +349,11 @@ export class StoreMutationPolicy {
       case "setNamedRange":
       case "removeNamedRange":
       case "setCalculation":
+      case "setExternalLinks":
       case "setRelationship":
       case "removeRelationship":
+      case "setMeasure":
+      case "removeMeasure":
       case "setQuery":
       case "removeQuery":
       case "setPivot":

@@ -324,6 +324,47 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
+  it("double-clicking a column border fits the whole column, as autoFitColumns does", () => {
+    const rows = 300;
+    const build = () => {
+      const workbook = makeWorkbook(rows);
+      const store = new SheetwriteStore(workbook);
+      store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: rows - 1, col: 0 },
+            value: { kind: "literal", value: "a long value far below the visible rows" },
+          },
+        ],
+      });
+      return { workbook, store };
+    };
+
+    const reference = build();
+    const fitted = new GridImpl(mountHost(), { workbook: reference.workbook }, reference.store);
+    fitted.autoFitColumns([0]);
+    const expectedWidth = reference.workbook.sheets[0]!.columns[0]!.width;
+    fitted.destroy();
+
+    const { workbook, store } = build();
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    try {
+      const border = DEFAULT_THEME.rowHeaderWidth + workbook.sheets[0]!.columns[0]!.width - 1;
+      scrollerOf(host).dispatchEvent(
+        new MouseEvent("dblclick", {
+          clientX: border,
+          clientY: DEFAULT_THEME.headerHeight / 2,
+          bubbles: true,
+        }),
+      );
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
+    } finally {
+      grid.destroy();
+    }
+  });
+
   it("applies the store's view rules: whole rows only, and no commit for an unchanged view", () => {
     const workbook = makeWorkbook(5);
     const store = new SheetwriteStore(workbook, makeColumnarData(5));

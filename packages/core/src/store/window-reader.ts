@@ -1,10 +1,12 @@
 import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
+import { MAX_CONDITIONAL_FORMAT_RULES } from "../conditional-format.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import { utf8ByteLength } from "../utf8.js";
+import { pivotStatusAt } from "./pivot-status.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import {
@@ -31,7 +33,6 @@ const EMPTY_PIN_COLUMNS = new Uint32Array(0);
 // Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
-const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 const UTF8_DECODER = new TextDecoder();
 const DEFAULT_HYPERLINK_STYLE: CellStyle = { color: "#0563C1", underline: true };
 
@@ -565,7 +566,9 @@ export class StoreWindowReader {
     }
 
     const windowStyles = this.stylesFrom(styleDict);
-    this.mergeHyperlinkStyles(sheet, rows, cols, order, styleIds, windowStyles);
+    const overlay = { rows, cols, order, styleIds, styles: windowStyles };
+    this.mergeHyperlinkStyles(overlay, sheet);
+    this.mergePivotFormats(overlay, sheet);
 
     if (condMatches.length > 0) {
       this.mergeCondMatches(sheet, condMatches, styleIds, windowStyles);
@@ -798,7 +801,7 @@ export class StoreWindowReader {
     const rules = this.sheets.sheetMeta(sheet).conditionalFormats ?? [];
     const packable = rules
       .filter((rule) => rule.range.sheet === sheet)
-      .slice(0, CONDITIONAL_MASK_BITS);
+      .slice(0, MAX_CONDITIONAL_FORMAT_RULES);
     const signature = conditionalRulesSignature(packable);
     if (this.condRulesSynced.get(sheet) === signature) {
       this.conditionalRuleInputBytes = 0;
@@ -864,56 +867,52 @@ export class StoreWindowReader {
     return (packable.length > 0 ? CONDITIONAL_HAS_RULES : 0) | CONDITIONAL_RULES_UPDATED;
   }
 
-  private mergeHyperlinkStyles(
-    sheet: SheetId,
-    rows: { start: number; end: number },
-    cols: readonly number[],
-    order: Uint32Array | undefined,
-    styleIds: Uint32Array,
-    styles: CellStyle[],
-  ): void {
-    const hyperlinks = this.sheets.sheetMeta(sheet).hyperlinks ?? [];
-    if (hyperlinks.length === 0 || cols.length === 0 || rows.end <= rows.start) return;
+  /**
+   * The number format of each value field over its value cells, as Excel
+   * applies Value Field Settings › Number Format. Value fields repeat across
+   * each column group, so a data column's field is its offset modulo the
+   * number of value fields. Header rows and label columns keep their style.
+   */
+  private mergePivotFormats(window: StyleOverlayWindow, sheet: SheetId): void {
+    const pivots = this.sheets.sheetMeta(sheet).pivots ?? [];
+    const formatted = pivots.some((pivot) => pivot.values.some((value) => value.numberFormat));
+    if (!formatted || !this.wasm.pivotStatus) return;
 
-    const colPositions = new Map<number, number>();
-    for (let index = 0; index < cols.length; index++) colPositions.set(cols[index]!, index);
+    const status = this.wasm.pivotStatus(this.sheets.handleOf(sheet));
+    const merged = new Map<string, number>();
+    pivots.forEach((pivot, index) => {
+      const record = pivotStatusAt(status, index);
+      const formats = pivot.values.map((value) => value.numberFormat);
+      if (!record || record.error !== 0) return;
+      const firstCol = record.col + record.labelCols;
+      overlayRect(
+        window,
+        merged,
+        [record.row + record.headerRows, firstCol],
+        [record.row + record.rows - 1, record.col + record.cols - 1],
+        (col) => formats[(col - firstCol) % formats.length],
+        (base, numberFormat) => ({ ...base, numberFormat }),
+      );
+    });
+  }
 
-    const mergedIds = new Map<string, number>();
-    const rowCount = Math.min(rows.end - rows.start, Math.floor(styleIds.length / cols.length));
-
-    for (const hyperlink of hyperlinks) {
+  private mergeHyperlinkStyles(window: StyleOverlayWindow, sheet: SheetId): void {
+    const merged = new Map<string, number>();
+    for (const hyperlink of this.sheets.sheetMeta(sheet).hyperlinks ?? []) {
       if (hyperlink.range.sheet !== sheet) continue;
-      const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
-      const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
-      const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
-      const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
-      const styleKey = JSON.stringify(hyperlink.style);
-
-      for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-        const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
-        if (dataRow < r0 || dataRow > r1) continue;
-        for (const [col, colIndex] of colPositions) {
-          if (col < c0 || col > c1) continue;
-          const offset = rowIndex * cols.length + colIndex;
-          const base = styleIds[offset]!;
-          const key = `${base}:${styleKey}`;
-          let merged = mergedIds.get(key);
-          if (merged === undefined) {
-            merged = styles.length;
-            // Native XLSX hyperlink fonts can live on the cell, not the link.
-            // Defaults must not erase those explicit font properties.
-            styles.push({
-              ...DEFAULT_HYPERLINK_STYLE,
-              ...styles[base],
-              ...hyperlink.style,
-            });
-
-            mergedIds.set(key, merged);
-          }
-
-          styleIds[offset] = merged;
-        }
-      }
+      const { start, end } = hyperlink.range;
+      // A link without its own style still overlays the default link look.
+      const key = JSON.stringify(hyperlink.style ?? null);
+      overlayRect(
+        window,
+        merged,
+        [Math.min(start.row, end.row), Math.min(start.col, end.col)],
+        [Math.max(start.row, end.row), Math.max(start.col, end.col)],
+        () => key,
+        // Native XLSX hyperlink fonts can live on the cell, not the link.
+        // Defaults must not erase those explicit font properties.
+        (base) => ({ ...DEFAULT_HYPERLINK_STYLE, ...base, ...hyperlink.style }),
+      );
     }
   }
 
@@ -937,7 +936,7 @@ export class StoreWindowReader {
       let local = mergedIds.get(comboKey);
       if (local === undefined) {
         let merged = styles[base] ?? {};
-        for (let bit = Math.min(rules.length, CONDITIONAL_MASK_BITS) - 1; bit >= 0; bit--) {
+        for (let bit = Math.min(rules.length, MAX_CONDITIONAL_FORMAT_RULES) - 1; bit >= 0; bit--) {
           if ((fullMask & (1 << bit)) !== 0) merged = { ...merged, ...rules[bit]?.style };
         }
         local = styles.length;
@@ -972,4 +971,51 @@ function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): str
     }
   }
   return signature;
+}
+
+/** The cells of one window read that per-window style overlays restyle. */
+interface StyleOverlayWindow {
+  readonly rows: { start: number; end: number };
+  readonly cols: readonly number[];
+  /** View row to data row, when a sort or filter view orders the rows. */
+  readonly order: Uint32Array | undefined;
+  readonly styleIds: Uint32Array;
+  readonly styles: CellStyle[];
+}
+
+/**
+ * Restyle the window cells inside the data rectangle `[first, last]` (row,
+ * column). `keyAt` names the overlay of a column, or undefined to skip it;
+ * each base style and key becomes one merged style, shared through `merged`.
+ */
+function overlayRect(
+  window: StyleOverlayWindow,
+  merged: Map<string, number>,
+  first: readonly [row: number, col: number],
+  last: readonly [row: number, col: number],
+  keyAt: (col: number) => string | undefined,
+  styleFor: (base: CellStyle | undefined, key: string) => CellStyle,
+): void {
+  const { rows, cols, order, styleIds, styles } = window;
+  if (cols.length === 0) return;
+  const rowCount = Math.min(rows.end - rows.start, Math.floor(styleIds.length / cols.length));
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+    const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
+    if (dataRow < first[0] || dataRow > last[0]) continue;
+    for (let colIndex = 0; colIndex < cols.length; colIndex++) {
+      const col = cols[colIndex] ?? -1;
+      const key = col < first[1] || col > last[1] ? undefined : keyAt(col);
+      if (key === undefined) continue;
+      const offset = rowIndex * cols.length + colIndex;
+      const base = styleIds[offset] ?? 0;
+      const id = `${base}:${key}`;
+      let index = merged.get(id);
+      if (index === undefined) {
+        index = styles.length;
+        styles.push(styleFor(styles[base], key));
+        merged.set(id, index);
+      }
+      styleIds[offset] = index;
+    }
+  }
 }

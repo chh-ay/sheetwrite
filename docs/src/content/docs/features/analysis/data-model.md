@@ -153,6 +153,60 @@ A duplicate one-side key or a key type mismatch shows `#VALUE!` at the anchor. A
 
 In the pivot field list, a pivot over a table shows a **Related** section for each table that its table reaches through relationships. The actions menu of a related column adds it to an area. A table source then becomes a model source whose first fields are the table's columns, so the fields in use keep their indices. This is one undo step. The field list names a related field with its table, for example `Customers › Region`.
 
+## Measures
+
+A measure is a named formula over model columns, saved in `workbook.dataModel.measures`. A pivot with a model source shows it as a value field, `{ measure: id }`. As in Excel, each value cell, subtotal and grand total calculates the formula again over the base rows that its row items, column items and report filters select. So a total of `=SUM(Orders[Amount])/COUNT(Orders[Amount])` is the mean of all its rows, not the sum of the means above it ([Measures in Power Pivot](https://support.microsoft.com/en-us/office/measures-in-power-pivot-86484821-a324-4da3-803b-82fd2e5033f4), [filter context](https://learn.microsoft.com/en-us/dax/dax-overview#filter-context)).
+
+```ts prelude="core" partial="requires a full-engine grid with the tables and relationship above" title="Mean amount by customer region"
+grid.store.applyTransaction({
+  patches: [
+    {
+      op: "setMeasure",
+      measure: {
+        id: "mean-amount",
+        name: "Mean Amount",
+        table: "orders",
+        formula: "=SUM(Orders[Amount])/COUNT(Orders[Amount])",
+      },
+    },
+  ],
+});
+grid.setPivot({
+  id: "mean-by-region",
+  name: "Mean by region",
+  source: {
+    model: {
+      table: "orders",
+      fields: [{ table: "customers", column: "region" }],
+    },
+  },
+  anchor: { row: 0, col: 0 },
+  rows: [0],
+  columns: [],
+  values: [{ measure: "mean-amount" }],
+});
+```
+
+- **Names.** Every measure belongs to a home table. Measure names are unique ignoring case and differ from the column names of the home table, following the DAX [naming requirements](https://learn.microsoft.com/en-us/dax/dax-syntax-reference#naming-requirements). The default header of a measure value is the measure name.
+- **Formulas.** A measure uses the formula language of cells. Its references are qualified data columns of any model table, such as `Orders[Amount]`, and other measures by name, such as `[Mean Amount]` ([column and measure references](https://learn.microsoft.com/en-us/dax/best-practices/dax-column-measure-references)). Cell and range references, defined names and the `#All`, `#Headers`, `#Totals` and `@` sections are refused, because a measure has no cell position.
+- **Related tables.** Columns of the base table see the rows of the cell. Another table sees its rows that match the cell's row items, column items and report filters on the fields it reaches through many-to-one relationships, including its own columns. Fields it cannot reach put no condition on it, so filters flow from the one side to the many side only, as with a single [cross-filter direction](https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-create-and-manage-relationships#cross-filter-direction). With orders related to customers, `=SUM(Customers[Credit])` changes with a customer region on rows but shows the same value in every order month column.
+- **CALCULATE.** `=CALCULATE(expression, filter, …)` evaluates its expression in a changed filter context, following [CALCULATE](https://learn.microsoft.com/en-us/dax/calculate-function-dax). A filter is either a comparison of one model column with a value, such as `Customers[Region]="West"` or `Orders[Month]>=3` (with `=`, `<>`, `<`, `<=`, `>` or `>=`), which replaces the row items, column items and report filter on that column, or `ALL(Table[Column])`, which removes them, as [ALL](https://learn.microsoft.com/en-us/dax/all-function-dax) does. Filters on other columns stay, and a comparison filters a table only when the table reaches the compared column through many-to-one relationships. The value of a comparison is evaluated once and may not read columns. For example, `=SUM(Orders[Amount])/CALCULATE(SUM(Orders[Amount]), ALL(Customers[Region]))` is each region's share of its month. Other filters, such as `ALL(Table)`, `FILTER` or a comparison of two columns, and a `CALCULATE` inside another show `#VALUE!`. Excel has no worksheet functions named `CALCULATE` or `ALL`, so a cell formula that uses them shows `#NAME?`.
+- **Errors.** A formula that does not parse shows `#NAME?` in its value cells, a missing table or column or an unknown measure name shows `#REF!`, and an unsupported reference or measures that refer to each other in a cycle show `#VALUE!`. A formula that returns more than one value also shows `#VALUE!`. A pivot whose measure was removed shows `#REF!` at its anchor until undo restores the measure. A cell with no rows of the base table stays blank when the measure reads base-table columns.
+- **Renames.** Renaming a table or one of its columns with `updateTable` rewrites the measure formulas that name it, as Excel updates formulas when a [table is renamed](https://support.microsoft.com/en-us/office/rename-an-excel-table-fbf49a4f-82a3-43eb-8ba2-44d21233b114). Renaming a measure with `setMeasure` rewrites the `[Name]` references to it. The rewrite is part of that change, so one undo step reverses both. A measure change made while another collaborator renames a table or column conflicts, and the client reloads the shared document, so both end with the new names.
+- **GETPIVOTDATA** reads a measure value by the measure name, like any value field.
+- **Engines.** The default engine keeps and synchronizes measures but does not compute them. The full engine keeps no measure results between recomputes.
+
+| Store method | Result |
+| --- | --- |
+| `getMeasures()` | Copies of the saved measures |
+| `setMeasure(measure)` | Inserts it, or replaces the one with its ID |
+| `removeMeasure(id)` | Removes it |
+| `getMeasureStatus(id)` | `missingTable` when the home table is gone, `syntax` when the formula does not parse, otherwise `ok`; `unavailable` for an unknown ID. Checked on every engine; reference errors show in the pivot cells. |
+
+`setMeasure` and `removeMeasure` are document operations: each change is one undo step, and it is saved, synchronized and restored from version history. Two concurrent data model changes conflict. XLSX export keeps measures and the pivots that use them in Sheetwrite metadata, because Excel keeps measures in its data model part.
+
+**Data › Data Tools › Measures** opens the Measures panel once the workbook has a table. It lists the measures under their home tables, with a note when a formula does not parse or its table is gone. The form below names a measure, picks its home table and takes its formula; **Edit** loads a measure into the form, and **Remove** deletes it. Each save and removal is one undo step. In the PivotTable field list, a pivot over a table or the data model lists the measures it does not show yet under **Measures: Table**, marked fx, with **Add to Values**, as Excel's Field List lists measures under their home table. Adding a measure to a pivot over one table makes its source a model source with the same fields.
+
 ## XLSX files
 
 Relationships and pivots over related tables are saved in Sheetwrite metadata, so a Sheetwrite file opens with them again. Import also reads the active relationships of an Excel data model between worksheet tables, by table and column name, and reports the relationships it cannot use. Sheetwrite does not write an Excel data model, so Excel opens the file without relationships and shows no output for a pivot over related tables. See [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/#excel-data-model).

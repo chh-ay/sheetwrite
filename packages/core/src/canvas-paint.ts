@@ -1,3 +1,4 @@
+import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { formatNumber } from "./number-format.js";
 import type {
   CellAlign,
@@ -19,16 +20,13 @@ const FONT_ANGLE_TOKEN_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$
 /** Gap between a top- or bottom-aligned text block and the cell edge, unzoomed. */
 const VERTICAL_TEXT_PAD = 2;
 
-/** Shared empty style; skips a per-cell `{}` allocation on the render hot path. */
-const EMPTY_STYLE: CellStyle = {};
-
 // Border dash patterns, hoisted so paintBorders allocates no array per cell.
 const SOLID_DASH: number[] = [];
 const DASHED_DASH: number[] = [4, 2];
 const DOTTED_DASH: number[] = [1, 2];
 
 /** Composite key stride for the per-frame merge map; column indices are < 2^20. */
-const MERGE_KEY_STRIDE = 0x100000;
+export const MERGE_KEY_STRIDE = 0x100000;
 
 /** Works against a main-thread or worker (OffscreenCanvas) 2D context. */
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -37,7 +35,7 @@ type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
  * Build the per-frame merge lookup. Every covered cell of every merge that
  * intersects the painted window maps to its `MergeRect`, keyed
  * `row * MERGE_KEY_STRIDE + col`. Populating only the window bounds the map to
- * `merges × visible-cells`, turning the per-cell `mergeAt` scan into an O(1)
+ * `merges × visible-cells`, so each painted cell finds its merge with one
  * `Map.get`. Returns `undefined` when there is nothing to cover (the fast path).
  */
 function buildMergeMap(

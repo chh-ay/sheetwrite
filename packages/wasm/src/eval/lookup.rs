@@ -1,17 +1,21 @@
-//! Lookup argument validation and exact/approximate matching algorithms.
+//! Lookup argument validation and exact/approximate matching.
+//!
+//! A lookup range of literal sources is searched where it is stored: each
+//! entry is read from its kind byte and payload, and text from the string
+//! pool, so no copy of the range is built. Any other range is evaluated into
+//! values for that one lookup. When several formulas read one range, its
+//! search state lives in pass state, indexed by range group.
 
-use std::cell::{Cell, Ref, RefCell};
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::rc::Rc;
 
-use crate::calc::Ast;
-use crate::store::CellStore;
-use crate::types::{CellRange, EvalResult, FormulaError, Value};
+use crate::cells::payload_num;
+use crate::types::{
+    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_NUMBER,
+    KIND_STRING,
+};
 
 use super::criteria::WildcardPattern;
-use super::value::{compare_text_case_insensitive, compare_values, number_from_value};
-use super::EvalPass;
+use super::value::{compare_text_case_insensitive, number_from_value};
 
 /// A position or count argument. Excel truncates its fraction, so
 /// `CHOOSE(1.5,…)` picks the first choice.
@@ -42,27 +46,147 @@ pub(super) fn positive_index(value: &Value) -> Result<usize, FormulaError> {
     Ok(index as usize - 1)
 }
 
-fn lookup_compare(left: &Value, right: &Value) -> Result<Ordering, FormulaError> {
-    match (left, right) {
-        (Value::Text(left), Value::Text(right)) => Ok(compare_text_case_insensitive(left, right)),
-        (Value::Error(error), _) | (_, Value::Error(error)) => Err(*error),
-        _ => compare_values(left, right),
+/// Which part of a lookup range holds the search list.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ListPart {
+    /// The whole range in row-major order (`MATCH`, `XMATCH`, `XLOOKUP`).
+    Whole = 0,
+    /// Column 0, top to bottom (`VLOOKUP`).
+    FirstColumn = 1,
+    /// Row 0, left to right (`HLOOKUP`).
+    FirstRow = 2,
+}
+
+/// Search states per range group: one for each part.
+const LIST_PARTS: usize = 3;
+
+/// One list entry, borrowed from storage or from a value.
+#[derive(Clone, Copy)]
+pub(super) enum Entry<'a> {
+    Blank,
+    Number(f64),
+    Text(&'a str),
+    Bool(bool),
+    Error(FormulaError),
+}
+
+impl<'a> Entry<'a> {
+    pub(super) fn of(value: &'a Value) -> Self {
+        match value {
+            Value::Blank => Self::Blank,
+            Value::Number(number) => Self::Number(*number),
+            Value::Text(text) => Self::Text(text),
+            Value::Bool(value) => Self::Bool(*value),
+            Value::Error(error) => Self::Error(*error),
+        }
+    }
+
+    /// A stored literal: the same value `literal_cell_value` builds.
+    #[inline]
+    fn literal(strings: &'a StringStorage, kind: u8, payload: u64) -> Self {
+        match kind {
+            KIND_NUMBER => {
+                let number = payload_num(payload);
+                if number.is_finite() {
+                    Self::Number(number)
+                } else {
+                    Self::Error(FormulaError::Num)
+                }
+            }
+            KIND_STRING => string_from_pool_ref(strings, crate::cells::payload_str_id(payload))
+                .map_or(Self::Error(FormulaError::Ref), Self::Text),
+            KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
+            _ => Self::Blank,
+        }
+    }
+
+    fn rank(self) -> u8 {
+        match self {
+            Self::Blank => 0,
+            Self::Number(_) => 1,
+            Self::Text(_) => 2,
+            Self::Bool(_) => 3,
+            Self::Error(_) => 4,
+        }
+    }
+
+    /// The text a wildcard sees: numbers and logical values never match, and
+    /// an error matches its sentinel such as `#N/A`.
+    fn wildcard_text(self) -> Option<&'a str> {
+        match self {
+            Self::Text(text) => Some(text),
+            Self::Blank => Some(""),
+            Self::Error(error) => Some(error.sentinel()),
+            Self::Number(_) | Self::Bool(_) => None,
+        }
     }
 }
 
-/// Which part of a table holds the search list.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(super) enum TablePart {
-    /// Column 0, top to bottom (`VLOOKUP`).
-    FirstColumn,
-    /// Row 0, left to right (`HLOOKUP`).
-    FirstRow,
+/// The lookup order of two entries: text without case, an error on either
+/// side fails, and otherwise the order of `compare_values`.
+fn compare(left: Entry<'_>, right: Entry<'_>) -> Result<Ordering, FormulaError> {
+    match (left, right) {
+        (Entry::Text(left), Entry::Text(right)) => Ok(compare_text_case_insensitive(left, right)),
+        (Entry::Error(error), _) | (_, Entry::Error(error)) => Err(error),
+        (Entry::Blank, Entry::Blank) => Ok(Ordering::Equal),
+        (Entry::Blank, Entry::Number(right)) => 0.0f64.partial_cmp(&right).ok_or(FormulaError::Num),
+        (Entry::Number(left), Entry::Blank) => left.partial_cmp(&0.0).ok_or(FormulaError::Num),
+        (Entry::Blank, Entry::Text(right)) => Ok("".cmp(right)),
+        (Entry::Text(left), Entry::Blank) => Ok(left.cmp("")),
+        (Entry::Blank, Entry::Bool(right)) => Ok(false.cmp(&right)),
+        (Entry::Bool(left), Entry::Blank) => Ok(left.cmp(&false)),
+        (Entry::Number(left), Entry::Number(right)) => {
+            left.partial_cmp(&right).ok_or(FormulaError::Num)
+        }
+        (Entry::Bool(left), Entry::Bool(right)) => Ok(left.cmp(&right)),
+        _ => Ok(left.rank().cmp(&right.rank())),
+    }
 }
 
-/// The value domain a lookup list lives in. A list whose entries all fall in
-/// one domain compares like a total order, so its exact classes and its
-/// descending boundaries are well defined; a list that mixes domains, holds
-/// an error, or holds NaN keeps the plain scan.
+/// A search list: a range's literal sources read in place, or values.
+/// Matching on the list kind per entry keeps one copy of every search.
+pub(super) enum ListView<'a> {
+    /// Entry `i` is the slot `first + i * step` of a dense sheet's sources.
+    Storage {
+        kinds: &'a [u8],
+        payloads: &'a [u64],
+        strings: &'a StringStorage,
+        first: usize,
+        step: usize,
+        len: usize,
+    },
+    Values(&'a [Value]),
+}
+
+impl ListView<'_> {
+    fn len(&self) -> usize {
+        match self {
+            Self::Storage { len, .. } => *len,
+            Self::Values(values) => values.len(),
+        }
+    }
+
+    #[inline]
+    fn entry(&self, position: usize) -> Entry<'_> {
+        match self {
+            Self::Storage {
+                kinds,
+                payloads,
+                strings,
+                first,
+                step,
+                ..
+            } => {
+                let index = first + position * step;
+                Entry::literal(strings, kinds[index], payloads[index])
+            }
+            Self::Values(values) => Entry::of(&values[position]),
+        }
+    }
+}
+
+/// The value domain a list lives in. A list whose entries all fall in one
+/// domain compares like a total order, so its boundaries are well defined.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum UniformKind {
     Numeric,
@@ -70,387 +194,239 @@ enum UniformKind {
     Logical,
 }
 
-/// Normalized class of one list entry. Two entries share a class exactly when
-/// `lookup_compare` reports them equal, which folds in the special cases:
-/// blank equals `0`, `""` and `FALSE`, and text compares case-insensitively.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum BucketKey {
-    Blank,
-    Zero,
-    EmptyText,
-    FalseBool,
-    Number(u64),
-    Text(String),
-    TrueBool,
+/// What one pass knows about a search list that several formulas read: the
+/// sorted flags, the value domain and the exact-match index, each built on
+/// first use.
+#[derive(Default)]
+pub(crate) struct SearchState {
+    ascending: Option<Result<bool, FormulaError>>,
+    descending: Option<Result<bool, FormulaError>>,
+    kind: Option<Option<UniformKind>>,
+    exact: Option<Option<ExactIndex>>,
 }
 
-/// First and last position of one class in the list.
-type Bucket = (usize, usize);
-
-/// Monotonicity of the list for one search direction.
-#[derive(Clone, Copy)]
-enum Sortedness {
-    Pending,
-    Done(Result<bool, FormulaError>),
-}
-
-/// The value domain a list lives in, computed once on demand. `None` is a
-/// list the index cannot answer for: one that mixes domains, holds an error,
-/// or holds NaN.
-enum KindCache {
-    Pending,
-    Ready(Option<UniformKind>),
-}
-
-enum BucketCache {
-    Pending,
-    Ready(Option<HashMap<BucketKey, Bucket>>),
-}
-
-/// Distinct classes the exact-match index keeps. A list with more distinct
-/// values than this still searches, but it does not hold a hash entry per
-/// value; the cap bounds what one decoded table can cost in memory.
-const LOOKUP_INDEX_MAX_CLASSES: usize = 262_144;
-
-/// One lookup list, decoded once per pass and searched any number of times.
-///
-/// The plain scan answers every input; the index only runs where it proves
-/// the same answer. The first search runs the plain scan, so a range searched
-/// once costs what it always did; later searches use the sorted flags, the
-/// exact-match index and the boundary search. Unsorted, mixed-type, error and
-/// NaN lists keep the plain scan.
-pub(super) struct LookupIndex {
-    values: Vec<Value>,
-    /// Searches run against this list in the pass; index work starts at the
-    /// second one.
-    searches: Cell<u32>,
-    ascending: RefCell<Sortedness>,
-    descending: RefCell<Sortedness>,
-    kind: RefCell<KindCache>,
-    buckets: RefCell<BucketCache>,
-}
-
-impl LookupIndex {
-    /// Takes ownership of a decoded list without computing anything.
-    pub(super) fn new(values: Vec<Value>) -> Self {
-        Self {
-            values,
-            searches: Cell::new(0),
-            ascending: RefCell::new(Sortedness::Pending),
-            descending: RefCell::new(Sortedness::Pending),
-            kind: RefCell::new(KindCache::Pending),
-            buckets: RefCell::new(BucketCache::Pending),
-        }
-    }
-
-    /// The decoded entries in lookup order.
-    pub(super) fn values(&self) -> &[Value] {
-        &self.values
-    }
-
-    /// True when the list is monotone in the direction `search_mode` asks
-    /// for. The error is the first failed pair comparison, exactly where the
-    /// plain walk stops.
-    fn sorted_ok(&self, search_mode: i32) -> Result<bool, FormulaError> {
+impl SearchState {
+    fn sorted_ok(&mut self, list: &ListView<'_>, search_mode: i32) -> Result<bool, FormulaError> {
         let requires_ascending = search_mode == 2;
-        let cached = {
-            let slot = if requires_ascending {
-                self.ascending.borrow()
-            } else {
-                self.descending.borrow()
-            };
-            *slot
+        let slot = if requires_ascending {
+            &mut self.ascending
+        } else {
+            &mut self.descending
         };
-        let outcome = match cached {
-            Sortedness::Done(outcome) => outcome,
-            Sortedness::Pending => {
-                let outcome = monotonicity_walk(&self.values, requires_ascending);
-                let mut slot = if requires_ascending {
-                    self.ascending.borrow_mut()
-                } else {
-                    self.descending.borrow_mut()
-                };
-                *slot = Sortedness::Done(outcome);
-                outcome
-            }
-        };
-        outcome
+        *slot.get_or_insert_with(|| monotonicity_walk(list, requires_ascending))
     }
 
-    /// The list's single comparison domain, computed on first use.
-    fn uniform_kind(&self) -> Option<UniformKind> {
-        let is_pending = matches!(&*self.kind.borrow(), KindCache::Pending);
-        if is_pending {
-            let built = classify(&self.values);
-            *self.kind.borrow_mut() = KindCache::Ready(built);
-        }
-        match &*self.kind.borrow() {
-            KindCache::Ready(kind) => *kind,
-            KindCache::Pending => None,
-        }
+    fn uniform_kind(&mut self, list: &ListView<'_>) -> Option<UniformKind> {
+        *self.kind.get_or_insert_with(|| classify(list))
     }
 
-    /// The class index, built on first use and kept for the pass.
-    fn buckets(&self) -> Ref<'_, BucketCache> {
-        let is_pending = matches!(&*self.buckets.borrow(), BucketCache::Pending);
-        if is_pending {
-            let built = build_buckets(&self.values);
-            *self.buckets.borrow_mut() = BucketCache::Ready(built);
-        }
-        self.buckets.borrow()
-    }
-
-    /// Whether the boundary search can answer for the key: the list is one
+    /// Whether the boundary search can answer for `key`: the list is one
     /// comparison domain, ascending, and the key belongs to that domain.
-    fn boundary_gate(&self, key: &Value) -> bool {
-        let Some(kind) = self.uniform_kind() else {
+    fn boundary_gate(&mut self, list: &ListView<'_>, key: Entry<'_>) -> bool {
+        let Some(kind) = self.uniform_kind(list) else {
             return false;
         };
-        key_fits_domain(key, kind) && matches!(self.sorted_ok(2), Ok(true))
+        key_fits_domain(key, kind) && matches!(self.sorted_ok(list, 2), Ok(true))
     }
 
-    /// First (or last) exactly equal position. The boundary search answers on
-    /// an ascending single-domain list, the class index on any other
-    /// single-domain list, and the plain scan decides everything else,
-    /// including its error order.
-    fn exact_match(
-        &self,
-        key: &Value,
-        search_reverse: bool,
-        use_index: bool,
-    ) -> Result<Option<usize>, FormulaError> {
-        if use_index {
-            if self.boundary_gate(key) {
-                let values = self.values();
-                let lower = first_not_below(values, key)?;
-                let upper = first_above(values, key)?;
-                if lower < upper {
-                    return Ok(Some(if search_reverse { upper - 1 } else { lower }));
-                }
-                return Ok(None);
-            }
-            let buckets = self.buckets();
-            if let BucketCache::Ready(Some(classes)) = &*buckets {
-                if let Some(position) = indexed_exact_match(classes, key, search_reverse) {
-                    return Ok(position);
-                }
-            }
-            drop(buckets);
-        }
-        let values = self.values();
-        if search_reverse {
-            for position in (0..values.len()).rev() {
-                if lookup_compare(&values[position], key)? == Ordering::Equal {
-                    return Ok(Some(position));
-                }
-            }
-        } else {
-            for (position, value) in values.iter().enumerate() {
-                if lookup_compare(value, key)? == Ordering::Equal {
-                    return Ok(Some(position));
-                }
-            }
-        }
-        Ok(None)
-    }
-
-    /// Nearest value across the key, on the side `match_mode` asks for, at the
-    /// position the plain scan reports: the first position of the nearest
-    /// class.
-    fn approximate_match(
-        &self,
-        key: &Value,
-        match_mode: i32,
-        use_index: bool,
-    ) -> Result<Option<usize>, FormulaError> {
-        if use_index && self.boundary_gate(key) {
-            return approximate_boundary(self.values(), key, match_mode);
-        }
-        let values = self.values();
-        let mut best: Option<(usize, Value)> = None;
-        for (position, candidate) in values.iter().enumerate() {
-            let ordering = lookup_compare(candidate, key)?;
-            let is_eligible = if match_mode == -1 {
-                ordering == Ordering::Less
-            } else {
-                ordering == Ordering::Greater
-            };
-            if !is_eligible {
-                continue;
-            }
-            let replaces = match &best {
-                None => true,
-                Some((_, current)) => {
-                    let versus = lookup_compare(candidate, current)?;
-                    if match_mode == -1 {
-                        versus == Ordering::Greater
-                    } else {
-                        versus == Ordering::Less
-                    }
-                }
-            };
-            if replaces {
-                best = Some((position, candidate.clone()));
-            }
-        }
-        Ok(best.map(|(position, _)| position))
+    fn exact_index(&mut self, list: &ListView<'_>) -> Option<&ExactIndex> {
+        self.exact
+            .get_or_insert_with(|| ExactIndex::build(list))
+            .as_ref()
     }
 }
 
-/// Searches a decoded list with the same rules as the plain scan, using the
-/// list's index where it proves the same answer from the second search on.
-pub(super) fn find_match_index_indexed(
-    list: &LookupIndex,
+/// Searches `list` with the plain scan's rules. With `state`, the search uses
+/// the pass's index where it proves the same answer.
+pub(super) fn find_match(
+    list: &ListView<'_>,
     key: &Value,
     match_mode: i32,
     search_mode: i32,
+    state: Option<&mut SearchState>,
 ) -> Result<Option<usize>, FormulaError> {
-    let values = list.values();
-    if values.is_empty() {
+    if list.len() == 0 {
         return Ok(None);
     }
-    let use_index = list.searches.get() > 0;
-    list.searches.set(list.searches.get().saturating_add(1));
-    if search_mode.abs() == 2 && !list.sorted_ok(search_mode)? {
+
+    // Only a list several formulas read has a state, so its index pays off
+    // from the first search; a list read once keeps the plain scan.
+    let use_index = state.is_some();
+    let mut single = SearchState::default();
+    let state = state.unwrap_or(&mut single);
+    if search_mode.abs() == 2 && !state.sorted_ok(list, search_mode)? {
         return Ok(None);
     }
+
+    let key = Entry::of(key);
     let search_reverse = search_mode < 0;
     if match_mode == 2 {
-        return wildcard_scan(values, key, search_reverse);
+        return wildcard_scan(list, key, search_reverse);
     }
-    if let Some(found) = list.exact_match(key, search_reverse, use_index)? {
+    if let Some(found) = exact_match(list, key, search_reverse, use_index, state)? {
         return Ok(Some(found));
     }
     if !matches!(match_mode, -1 | 1) {
         return Ok(None);
     }
-    list.approximate_match(key, match_mode, use_index)
+    if use_index && state.boundary_gate(list, key) {
+        return approximate_boundary(list, key, match_mode);
+    }
+    approximate_scan(list, key, match_mode)
+}
+
+/// First (or last) exactly equal position. The boundary search answers on an
+/// ascending single-domain list, the class index on any other list without
+/// an error, and the plain scan decides everything else, including its error
+/// order.
+fn exact_match(
+    list: &ListView<'_>,
+    key: Entry<'_>,
+    search_reverse: bool,
+    use_index: bool,
+    state: &mut SearchState,
+) -> Result<Option<usize>, FormulaError> {
+    if use_index {
+        if state.boundary_gate(list, key) {
+            let lower = first_not_below(list, key)?;
+            let upper = first_above(list, key)?;
+            if lower < upper {
+                return Ok(Some(if search_reverse { upper - 1 } else { lower }));
+            }
+            return Ok(None);
+        }
+        if let Some(found) = state
+            .exact_index(list)
+            .and_then(|index| index.find(key, search_reverse))
+        {
+            return Ok(found);
+        }
+    }
+
+    let equal = |position: usize| -> Result<bool, FormulaError> {
+        Ok(compare(list.entry(position), key)? == Ordering::Equal)
+    };
+    if search_reverse {
+        for position in (0..list.len()).rev() {
+            if equal(position)? {
+                return Ok(Some(position));
+            }
+        }
+    } else {
+        for position in 0..list.len() {
+            if equal(position)? {
+                return Ok(Some(position));
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Nearest value across the key, on the side `match_mode` asks for, at the
+/// first position of the nearest value.
+fn approximate_scan(
+    list: &ListView<'_>,
+    key: Entry<'_>,
+    match_mode: i32,
+) -> Result<Option<usize>, FormulaError> {
+    let mut best: Option<usize> = None;
+    for position in 0..list.len() {
+        let candidate = list.entry(position);
+        let ordering = compare(candidate, key)?;
+        let is_eligible = if match_mode == -1 {
+            ordering == Ordering::Less
+        } else {
+            ordering == Ordering::Greater
+        };
+        if !is_eligible {
+            continue;
+        }
+
+        let replaces = match best {
+            None => true,
+            Some(current) => {
+                let versus = compare(candidate, list.entry(current))?;
+                if match_mode == -1 {
+                    versus == Ordering::Greater
+                } else {
+                    versus == Ordering::Less
+                }
+            }
+        };
+        if replaces {
+            best = Some(position);
+        }
+    }
+    Ok(best)
 }
 
 /// The plain scan's pair walk: the first non-monotone pair is `Ok(false)`,
 /// the first failed comparison is its error, and a clean walk is `Ok(true)`.
-fn monotonicity_walk(values: &[Value], requires_ascending: bool) -> Result<bool, FormulaError> {
+fn monotonicity_walk(list: &ListView<'_>, requires_ascending: bool) -> Result<bool, FormulaError> {
     let violation = if requires_ascending {
         Ordering::Greater
     } else {
         Ordering::Less
     };
-    for pair in values.windows(2) {
-        match lookup_compare(&pair[0], &pair[1]) {
-            Ok(ordering) if ordering == violation => return Ok(false),
-            Ok(_) => {}
-            Err(error) => return Err(error),
+    for position in 1..list.len() {
+        if compare(list.entry(position - 1), list.entry(position))? == violation {
+            return Ok(false);
         }
     }
     Ok(true)
 }
 
-/// First (or last) wildcard match. A non-text key matches nothing, exactly
-/// like the pattern check the plain scan runs per candidate.
+/// First (or last) wildcard match. A non-text key matches nothing.
 fn wildcard_scan(
-    values: &[Value],
-    key: &Value,
+    list: &ListView<'_>,
+    key: Entry<'_>,
     search_reverse: bool,
 ) -> Result<Option<usize>, FormulaError> {
-    let Value::Text(pattern) = key else {
+    let Entry::Text(pattern) = key else {
         return Ok(None);
     };
     let pattern = WildcardPattern::new(pattern)?;
-    let matches = |candidate: &Value| pattern.matches(candidate);
-    Ok(if search_reverse {
-        (0..values.len())
-            .rev()
-            .find(|&position| matches(&values[position]))
-    } else {
-        (0..values.len()).find(|&position| matches(&values[position]))
-    })
-}
-
-/// Exact-match positions from the class index. `None` keeps the plain scan:
-/// either the list is not indexable or the key is one the index does not
-/// classify (an error or NaN). A classified key with no class in the list is
-/// a real miss, because an indexable list only matches through its classes.
-fn indexed_exact_match(
-    classes: &HashMap<BucketKey, Bucket>,
-    key: &Value,
-    search_reverse: bool,
-) -> Option<Option<usize>> {
-    let mut found: Option<usize> = None;
-    let mut consider = |class: BucketKey| {
-        let Some(&(first, last)) = classes.get(&class) else {
-            return;
-        };
-        let position = if search_reverse { last } else { first };
-        found = Some(match found {
-            None => position,
-            Some(current) if search_reverse => current.max(position),
-            Some(current) => current.min(position),
-        });
+    let matches = |position: usize| {
+        list.entry(position)
+            .wildcard_text()
+            .is_some_and(|text| pattern.matches_text(text))
     };
-    match key {
-        Value::Blank => {
-            consider(BucketKey::Blank);
-            consider(BucketKey::Zero);
-            consider(BucketKey::EmptyText);
-            consider(BucketKey::FalseBool);
-        }
-        Value::Bool(false) => {
-            consider(BucketKey::FalseBool);
-            consider(BucketKey::Blank);
-        }
-        Value::Bool(true) => consider(BucketKey::TrueBool),
-        Value::Text(text) => {
-            let folded = text.to_lowercase();
-            if folded.is_empty() {
-                consider(BucketKey::EmptyText);
-                consider(BucketKey::Blank);
-            } else {
-                consider(BucketKey::Text(folded));
-            }
-        }
-        Value::Number(number) if !number.is_nan() => {
-            if *number == 0.0 {
-                consider(BucketKey::Zero);
-                consider(BucketKey::Blank);
-            } else {
-                consider(BucketKey::Number(number.to_bits()));
-            }
-        }
-        _ => return None,
-    }
-    Some(found)
+    Ok(if search_reverse {
+        (0..list.len()).rev().find(|&position| matches(position))
+    } else {
+        (0..list.len()).find(|&position| matches(position))
+    })
 }
 
 /// Nearest value across the key on an ascending, single-domain list. Equal
 /// neighbours are contiguous there, so the first position not below the key
-/// and the first position above it bound the equal class; without an equal
-/// entry the answer is the first position of the nearest class.
+/// and the first position above it bound the equal run; without an equal
+/// entry the answer is the first position of the nearest value.
 fn approximate_boundary(
-    values: &[Value],
-    key: &Value,
+    list: &ListView<'_>,
+    key: Entry<'_>,
     match_mode: i32,
 ) -> Result<Option<usize>, FormulaError> {
-    let lower = first_not_below(values, key)?;
-    let upper = first_above(values, key)?;
+    let lower = first_not_below(list, key)?;
+    let upper = first_above(list, key)?;
     if match_mode == -1 {
         if lower == 0 {
             return Ok(None);
         }
-        let nearest = &values[lower - 1];
-        return Ok(Some(first_not_below(values, nearest)?));
+        return Ok(Some(first_not_below(list, list.entry(lower - 1))?));
     }
-    if upper == values.len() {
+    if upper == list.len() {
         return Ok(None);
     }
     Ok(Some(upper))
 }
 
-/// First position whose value is not below `probe`.
-fn first_not_below(values: &[Value], probe: &Value) -> Result<usize, FormulaError> {
-    let (mut low, mut high) = (0, values.len());
+/// First position whose entry is not below `probe`.
+fn first_not_below(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, FormulaError> {
+    let (mut low, mut high) = (0, list.len());
     while low < high {
         let middle = low + (high - low) / 2;
-        if lookup_compare(&values[middle], probe)? == Ordering::Less {
+        if compare(list.entry(middle), probe)? == Ordering::Less {
             low = middle + 1;
         } else {
             high = middle;
@@ -459,12 +435,12 @@ fn first_not_below(values: &[Value], probe: &Value) -> Result<usize, FormulaErro
     Ok(low)
 }
 
-/// First position whose value is above `probe`.
-fn first_above(values: &[Value], probe: &Value) -> Result<usize, FormulaError> {
-    let (mut low, mut high) = (0, values.len());
+/// First position whose entry is above `probe`.
+fn first_above(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, FormulaError> {
+    let (mut low, mut high) = (0, list.len());
     while low < high {
         let middle = low + (high - low) / 2;
-        if lookup_compare(&values[middle], probe)? == Ordering::Greater {
+        if compare(list.entry(middle), probe)? == Ordering::Greater {
             high = middle;
         } else {
             low = middle + 1;
@@ -475,334 +451,744 @@ fn first_above(values: &[Value], probe: &Value) -> Result<usize, FormulaError> {
 
 /// Whether the key belongs to the list's value domain. A key from another
 /// domain can compare below one entry and above its neighbour, which breaks
-/// the boundary search, so those keys use the plain scan.
-fn key_fits_domain(key: &Value, kind: UniformKind) -> bool {
+/// the boundary search, so those keys use another path.
+fn key_fits_domain(key: Entry<'_>, kind: UniformKind) -> bool {
     match key {
-        Value::Blank => true,
-        Value::Number(number) => kind == UniformKind::Numeric && !number.is_nan(),
-        Value::Text(_) => kind == UniformKind::Text,
-        Value::Bool(_) => kind == UniformKind::Logical,
-        Value::Error(_) => false,
-    }
-}
-
-/// The comparison domain of one value: `None` for NaN and errors, and an
-/// inner `None` for blanks, which belong to every domain.
-fn domain_of(value: &Value) -> Option<Option<UniformKind>> {
-    match value {
-        Value::Blank => Some(None),
-        Value::Number(number) if !number.is_nan() => Some(Some(UniformKind::Numeric)),
-        Value::Text(_) => Some(Some(UniformKind::Text)),
-        Value::Bool(_) => Some(Some(UniformKind::Logical)),
-        _ => None,
+        Entry::Blank => true,
+        Entry::Number(number) => kind == UniformKind::Numeric && !number.is_nan(),
+        Entry::Text(_) => kind == UniformKind::Text,
+        Entry::Bool(_) => kind == UniformKind::Logical,
+        Entry::Error(_) => false,
     }
 }
 
 /// The domain every entry shares, or `None` when the list mixes domains or
-/// holds an error or NaN.
-fn classify(values: &[Value]) -> Option<UniformKind> {
+/// holds an error or NaN. Blanks belong to every domain.
+fn classify(list: &ListView<'_>) -> Option<UniformKind> {
     let mut found: Option<UniformKind> = None;
-    for value in values {
-        if let Some(entry_kind) = domain_of(value)? {
-            match found {
-                None => found = Some(entry_kind),
-                Some(existing) if existing == entry_kind => {}
-                Some(_) => return None,
-            }
+    for position in 0..list.len() {
+        let kind = match list.entry(position) {
+            Entry::Blank => continue,
+            Entry::Number(number) if !number.is_nan() => UniformKind::Numeric,
+            Entry::Text(_) => UniformKind::Text,
+            Entry::Bool(_) => UniformKind::Logical,
+            _ => return None,
+        };
+        match found {
+            None => found = Some(kind),
+            Some(existing) if existing == kind => {}
+            Some(_) => return None,
         }
     }
     found
 }
 
-/// Classifies every entry once. `None` marks a list the index cannot answer
-/// for: one that mixes domains, holds an error, holds NaN, or holds more
-/// distinct classes than the index keeps.
-fn build_buckets(values: &[Value]) -> Option<HashMap<BucketKey, Bucket>> {
-    let mut classes: HashMap<BucketKey, Bucket> =
-        HashMap::with_capacity(values.len().min(LOOKUP_INDEX_MAX_CLASSES));
-    for (position, value) in values.iter().enumerate() {
-        let class = class_of(value)?;
-        classes
-            .entry(class)
-            .and_modify(|(_, last)| *last = position)
-            .or_insert((position, position));
-        if classes.len() > LOOKUP_INDEX_MAX_CLASSES {
+/// Exact-match classes. Two entries share a class and value exactly when
+/// the lookup order calls them equal within one type; blank equals `0`,
+/// `""` and `FALSE` across types, so a key looks in each class it can equal.
+const CLASS_BLANK: u8 = 0;
+const CLASS_EMPTY_TEXT: u8 = 1;
+const CLASS_NUMBER: u8 = 2;
+const CLASS_TEXT: u8 = 3;
+const CLASS_BOOL: u8 = 4;
+
+/// One list position under its class and value. A number value is its bits
+/// with `-0` as `0`, text its case-folded rank, and a logical 0 or 1.
+#[derive(Clone, Copy)]
+struct IndexEntry {
+    class: u8,
+    value: u64,
+    position: u32,
+}
+
+/// Every position sorted by class, value and position, so an equal run is
+/// contiguous and its ends are its first and last position. Text is ranked
+/// once by its case-folded bytes, so the main sort compares integers only.
+struct ExactIndex {
+    entries: Vec<IndexEntry>,
+    /// The distinct case-folded texts in rank order, end to end.
+    text_bytes: Vec<u8>,
+    /// The end of each rank's text in `text_bytes`.
+    text_ends: Vec<u32>,
+}
+
+impl ExactIndex {
+    /// The index of `list`, or `None` for a list with an error or NaN, whose
+    /// scan order must decide.
+    fn build(list: &ListView<'_>) -> Option<Self> {
+        let mut entries = Vec::with_capacity(list.len());
+        // Folded texts end to end, in list order, with their positions.
+        let mut folded = String::new();
+        let mut folded_ends: Vec<u32> = Vec::new();
+        let mut text_positions: Vec<u32> = Vec::new();
+        for position in 0..list.len() {
+            let (class, value) = match list.entry(position) {
+                Entry::Error(_) => return None,
+                Entry::Number(number) if number.is_nan() => return None,
+                Entry::Blank => (CLASS_BLANK, 0),
+                Entry::Number(number) => (CLASS_NUMBER, number_value(number)),
+                Entry::Text("") => (CLASS_EMPTY_TEXT, 0),
+                Entry::Text(text) => {
+                    fold_case_into(text, &mut folded);
+                    folded_ends.push(folded.len() as u32);
+                    text_positions.push(position as u32);
+                    (CLASS_TEXT, 0)
+                }
+                Entry::Bool(value) => (CLASS_BOOL, u64::from(value)),
+            };
+            entries.push(IndexEntry {
+                class,
+                value,
+                position: position as u32,
+            });
+        }
+
+        let folded = folded.into_bytes();
+        let text = |slot: u32| {
+            let slot = slot as usize;
+            let start = slot
+                .checked_sub(1)
+                .map_or(0, |previous| folded_ends[previous]);
+            &folded[start as usize..folded_ends[slot] as usize]
+        };
+        let mut order: Vec<u32> = (0..text_positions.len() as u32).collect();
+        merge_sort(&mut order, &mut |left, right| text(left).cmp(text(right)));
+
+        let mut text_bytes = Vec::new();
+        let mut text_ends: Vec<u32> = Vec::new();
+        for &slot in &order {
+            let bytes = text(slot);
+            let last_start = text_ends
+                .len()
+                .checked_sub(2)
+                .map_or(0, |previous| text_ends[previous] as usize);
+            if text_ends.is_empty() || &text_bytes[last_start..] != bytes {
+                text_bytes.extend_from_slice(bytes);
+                text_ends.push(text_bytes.len() as u32);
+            }
+            let position = text_positions[slot as usize] as usize;
+            entries[position].value = (text_ends.len() - 1) as u64;
+        }
+        drop((order, text_positions, folded_ends));
+
+        let mut order: Vec<u32> = (0..entries.len() as u32).collect();
+        merge_sort(&mut order, &mut |left, right| {
+            let (left, right) = (entries[left as usize], entries[right as usize]);
+            (left.class, left.value).cmp(&(right.class, right.value))
+        });
+        let entries = order.iter().map(|&index| entries[index as usize]).collect();
+        Some(Self {
+            entries,
+            text_bytes,
+            text_ends,
+        })
+    }
+
+    /// The rank of a case-folded text, by binary search over the ranks.
+    fn text_rank(&self, folded: &[u8]) -> Option<usize> {
+        let text = |rank: usize| {
+            let start = rank
+                .checked_sub(1)
+                .map_or(0, |previous| self.text_ends[previous]);
+            &self.text_bytes[start as usize..self.text_ends[rank] as usize]
+        };
+        let (mut low, mut high) = (0, self.text_ends.len());
+        while low < high {
+            let middle = low + (high - low) / 2;
+            match text(middle).cmp(folded) {
+                Ordering::Less => low = middle + 1,
+                Ordering::Greater => high = middle,
+                Ordering::Equal => return Some(middle),
+            }
+        }
+        None
+    }
+
+    /// The first (or last) position equal to `key`, or `None` for a key the
+    /// index does not classify (an error or NaN), which keeps the plain scan.
+    fn find(&self, key: Entry<'_>, search_reverse: bool) -> Option<Option<usize>> {
+        let mut found: Option<usize> = None;
+        let mut consider = |class: u8, value: u64| {
+            let start = self
+                .entries
+                .partition_point(|entry| (entry.class, entry.value) < (class, value));
+            let end = start
+                + self.entries[start..]
+                    .partition_point(|entry| (entry.class, entry.value) == (class, value));
+            if start == end {
+                return;
+            }
+            let position = if search_reverse {
+                self.entries[end - 1].position
+            } else {
+                self.entries[start].position
+            } as usize;
+            found = Some(match found {
+                None => position,
+                Some(current) if search_reverse => current.max(position),
+                Some(current) => current.min(position),
+            });
+        };
+
+        match key {
+            Entry::Blank => {
+                consider(CLASS_BLANK, 0);
+                consider(CLASS_NUMBER, 0);
+                consider(CLASS_EMPTY_TEXT, 0);
+                consider(CLASS_BOOL, 0);
+            }
+            Entry::Bool(false) => {
+                consider(CLASS_BOOL, 0);
+                consider(CLASS_BLANK, 0);
+            }
+            Entry::Bool(true) => consider(CLASS_BOOL, 1),
+            Entry::Text("") => {
+                consider(CLASS_EMPTY_TEXT, 0);
+                consider(CLASS_BLANK, 0);
+            }
+            Entry::Text(text) => {
+                let mut folded = String::new();
+                fold_case_into(text, &mut folded);
+                if let Some(rank) = self.text_rank(folded.as_bytes()) {
+                    consider(CLASS_TEXT, rank as u64);
+                }
+            }
+            Entry::Number(number) if !number.is_nan() => {
+                consider(CLASS_NUMBER, number_value(number));
+                if number == 0.0 {
+                    consider(CLASS_BLANK, 0);
+                }
+            }
+            _ => return None,
+        }
+        Some(found)
+    }
+
+    fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
+        stats.add_vec::<IndexEntry>(self.entries.len(), self.entries.capacity());
+        stats.add_vec::<u8>(self.text_bytes.len(), self.text_bytes.capacity());
+        stats.add_vec::<u32>(self.text_ends.len(), self.text_ends.capacity());
+    }
+}
+
+/// Appends `text` case-folded to `folded`, with the fast path for ASCII.
+/// Folded texts compare by bytes exactly as `compare_text_case_insensitive`
+/// compares their sources.
+fn fold_case_into(text: &str, folded: &mut String) {
+    if text.is_ascii() {
+        let start = folded.len();
+        folded.push_str(text);
+        folded[start..].make_ascii_lowercase();
+    } else {
+        folded.push_str(&text.to_lowercase());
+    }
+}
+
+/// A number's index value: its bits, with `-0` folded into `0`.
+fn number_value(number: f64) -> u64 {
+    if number == 0.0 {
+        0
+    } else {
+        number.to_bits()
+    }
+}
+
+/// A stable bottom-up merge sort. One copy serves every comparator, so the
+/// index adds no generic sort to the module.
+fn merge_sort(items: &mut [u32], compare: &mut dyn FnMut(u32, u32) -> Ordering) {
+    let len = items.len();
+    let mut scratch = vec![0u32; len];
+    let mut width = 1;
+    while width < len {
+        let mut start = 0;
+        while start < len {
+            let middle = (start + width).min(len);
+            let end = (start + 2 * width).min(len);
+            let (mut left, mut right, mut write) = (start, middle, start);
+            while left < middle && right < end {
+                if compare(items[right], items[left]).is_lt() {
+                    scratch[write] = items[right];
+                    right += 1;
+                } else {
+                    scratch[write] = items[left];
+                    left += 1;
+                }
+                write += 1;
+            }
+            scratch[write..write + middle - left].copy_from_slice(&items[left..middle]);
+            write += middle - left;
+            scratch[write..write + end - right].copy_from_slice(&items[right..end]);
+            start = end;
+        }
+        items.copy_from_slice(&scratch);
+        width *= 2;
+    }
+}
+
+/// The search states of one pass, by range group and list part. `slots` maps
+/// a key to its state and is valid only where `states` holds that key, so a
+/// pass clears only `states`.
+#[derive(Default)]
+pub(crate) struct LookupStates {
+    slots: Vec<u32>,
+    states: Vec<(u32, LookupRangeState)>,
+}
+
+/// What one pass knows about a lookup range: its storage check and the
+/// search state of its list.
+#[derive(Default)]
+pub(crate) struct LookupRangeState {
+    pub(super) source: Option<Result<Option<StorageRange>, FormulaError>>,
+    pub(super) search: SearchState,
+}
+
+impl LookupStates {
+    /// The state of `group` and `part`, created on first use. `groups` is
+    /// the index's group count.
+    pub(super) fn get(
+        &mut self,
+        group: usize,
+        groups: usize,
+        part: ListPart,
+    ) -> &mut LookupRangeState {
+        let key = group * LIST_PARTS + part as usize;
+        let slots = groups * LIST_PARTS;
+        if self.slots.len() != slots {
+            self.slots.resize(slots, 0);
+            self.slots.shrink_to_fit();
+        }
+
+        let slot = self.slots[key] as usize;
+        if self
+            .states
+            .get(slot)
+            .is_none_or(|(stored, _)| *stored as usize != key)
+        {
+            self.slots[key] = self.states.len() as u32;
+            self.states.push((key as u32, LookupRangeState::default()));
+        }
+        let slot = self.slots[key] as usize;
+        &mut self.states[slot].1
+    }
+
+    /// Drops this pass's states; the slot array stays for the next pass.
+    pub(crate) fn clear(&mut self) {
+        self.states.clear();
+    }
+
+    /// Releases a wide pass's state list.
+    pub(crate) fn release(&mut self) {
+        self.states = Vec::new();
+    }
+
+    pub(crate) fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
+        stats.add_vec::<u32>(self.slots.len(), self.slots.capacity());
+        stats.add_vec::<(u32, LookupRangeState)>(self.states.len(), self.states.capacity());
+        for (_, state) in &self.states {
+            if let Some(Some(index)) = &state.search.exact {
+                index.add_memory_stats(stats);
+            }
+        }
+    }
+}
+
+/// A clamped range of literal sources on a dense sheet, which lookups read
+/// in place. `first` is the slot of its top-left cell.
+#[derive(Clone, Copy)]
+pub(crate) struct StorageRange {
+    pub(super) sheet: usize,
+    pub(super) first: usize,
+    pub(super) rows: usize,
+    pub(super) cols: usize,
+    pub(super) row_count: usize,
+}
+
+use super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+use super::{bool_from_value, lookup_modes, EvalPass};
+use crate::calc::{Ast, Func};
+use crate::store::CellStore;
+use crate::types::{CellRange, EvalResult, FORMULA_RECURSION_LIMIT};
+
+/// A lookup argument: a range read in place, or the values of anything else.
+enum LookupArg {
+    Storage {
+        range: StorageRange,
+        /// The pass state of a range several formulas read.
+        shared: Option<(usize, usize)>,
+    },
+    Values {
+        rows: usize,
+        cols: usize,
+        values: Vec<Value>,
+    },
+}
+
+impl LookupArg {
+    fn shape(&self) -> (usize, usize) {
+        match self {
+            Self::Storage { range, .. } => (range.rows, range.cols),
+            Self::Values { rows, cols, .. } => (*rows, *cols),
+        }
+    }
+
+    /// The number of cells, for `XLOOKUP`'s length check.
+    fn len(&self) -> usize {
+        let (rows, cols) = self.shape();
+        rows * cols
+    }
+
+    /// The value at row-major `row` and `col`, with `EvalMatrix::get`'s bounds.
+    fn cell(&self, store: &CellStore, row: usize, col: usize) -> Option<Value> {
+        let (rows, cols) = self.shape();
+        if row >= rows || col >= cols {
             return None;
         }
-    }
-    Some(classes)
-}
-
-/// The exact-match class of one value, or `None` for NaN and errors.
-fn class_of(value: &Value) -> Option<BucketKey> {
-    Some(match value {
-        Value::Blank => BucketKey::Blank,
-        Value::Bool(false) => BucketKey::FalseBool,
-        Value::Bool(true) => BucketKey::TrueBool,
-        Value::Text(text) => {
-            let folded = text.to_lowercase();
-            if folded.is_empty() {
-                BucketKey::EmptyText
-            } else {
-                BucketKey::Text(folded)
+        match self {
+            Self::Storage { range, .. } => {
+                let sources = store.sheets[range.sheet].cells.dense_sources()?;
+                let (kinds, payloads) = sources.raw();
+                let index = range.first + col * range.row_count + row;
+                Some(super::literal_cell_value(
+                    &store.strings,
+                    kinds[index],
+                    payloads[index],
+                ))
             }
+            Self::Values { values, .. } => values.get(row * cols + col).cloned(),
         }
-        Value::Number(number) if !number.is_nan() => {
-            if *number == 0.0 {
-                BucketKey::Zero
-            } else {
-                BucketKey::Number(number.to_bits())
-            }
-        }
-        _ => return None,
-    })
-}
-
-/// A table materialized once for the pass, with the searched column or row
-/// copied out into a reusable search list (`VLOOKUP`, `HLOOKUP`).
-pub(super) struct CachedTable {
-    rows: usize,
-    cols: usize,
-    values: Vec<Value>,
-    list: LookupIndex,
-}
-
-impl CachedTable {
-    /// Keeps `values` for result cells and searches their first column.
-    pub(super) fn from_column(rows: usize, cols: usize, values: Vec<Value>) -> Self {
-        let list = LookupIndex::new(first_column(rows, cols, &values));
-        Self {
-            rows,
-            cols,
-            values,
-            list,
-        }
-    }
-
-    /// Keeps `values` for result cells and searches their first row.
-    pub(super) fn from_row(rows: usize, cols: usize, values: Vec<Value>) -> Self {
-        let list = LookupIndex::new(values.iter().take(cols).cloned().collect());
-        Self {
-            rows,
-            cols,
-            values,
-            list,
-        }
-    }
-
-    /// The reusable search list.
-    pub(super) fn search(&self) -> &LookupIndex {
-        &self.list
-    }
-
-    /// The value at a row-major position, with `EvalMatrix::get`'s bounds.
-    pub(super) fn cell(&self, row: usize, col: usize) -> Option<&Value> {
-        (row < self.rows && col < self.cols)
-            .then(|| self.values.get(row * self.cols + col))
-            .flatten()
-    }
-}
-
-fn first_column(rows: usize, cols: usize, values: &[Value]) -> Vec<Value> {
-    (0..rows)
-        .filter_map(|row| values.get(row * cols))
-        .cloned()
-        .collect()
-}
-
-/// A range that is its own search list (`MATCH`, `XMATCH`, `XLOOKUP`).
-pub(super) struct CachedList {
-    rows: usize,
-    cols: usize,
-    index: LookupIndex,
-}
-
-impl CachedList {
-    /// Takes the row-major values of a range as the search list.
-    pub(super) fn new(rows: usize, cols: usize, values: Vec<Value>) -> Self {
-        Self {
-            rows,
-            cols,
-            index: LookupIndex::new(values),
-        }
-    }
-
-    /// The range's clamped shape, for the argument checks.
-    pub(super) fn shape(&self) -> (usize, usize) {
-        (self.rows, self.cols)
-    }
-
-    /// The reusable search list.
-    pub(super) fn search(&self) -> &LookupIndex {
-        &self.index
-    }
-}
-
-/// A range materialized once for the result cells of a lookup (`XLOOKUP`).
-pub(super) struct CachedResult {
-    values: Vec<Value>,
-}
-
-impl CachedResult {
-    /// Keeps the row-major values of a range.
-    pub(super) fn new(values: Vec<Value>) -> Self {
-        Self { values }
-    }
-
-    /// The number of values, for `XLOOKUP`'s length check.
-    pub(super) fn len(&self) -> usize {
-        self.values.len()
     }
 
     /// The value at a row-major position.
-    pub(super) fn value(&self, position: usize) -> Option<&Value> {
-        self.values.get(position)
+    fn value(&self, store: &CellStore, position: usize) -> Option<Value> {
+        let (_, cols) = self.shape();
+        self.cell(store, position / cols, position % cols)
     }
 }
 
-/// What one recalculation pass knows about a range a lookup read.
-pub(super) enum ReuseEntry<Materialized> {
-    /// Materialized once in this pass; the next lookup decides whether the
-    /// range can be kept.
-    Seen,
-    /// The range cannot change within the pass, so every later lookup reuses
-    /// this entry.
-    Reusable(Rc<Materialized>),
-    /// The range holds cells that can change mid-pass; always materialize.
-    Blocked,
-}
+impl CellStore {
+    /// `INDEX`, `MATCH`, `XMATCH`, `VLOOKUP`, `HLOOKUP` and `XLOOKUP`. See
+    /// `eval_func` for why families live in out-of-line `*_family` handlers.
+    #[inline(never)]
+    pub(super) fn eval_lookup_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        self.eval_lookup(func, args, sheet, pass, depth)
+            .unwrap_or_else(Value::Error)
+    }
 
-impl<Materialized> Clone for ReuseEntry<Materialized> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Seen => Self::Seen,
-            Self::Reusable(entry) => Self::Reusable(Rc::clone(entry)),
-            Self::Blocked => Self::Blocked,
+    fn eval_lookup(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        let scalar =
+            |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
+        match func {
+            Func::Index => Ok(self.eval_index(args, sheet, pass, depth)),
+            Func::Match => {
+                if !(2..=3).contains(&args.len()) {
+                    return Err(FormulaError::Value);
+                }
+                let key = scalar(&args[0], pass);
+                if let Value::Error(error) = key {
+                    return Err(error);
+                }
+                let lookup = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
+                let (lookup_rows, lookup_cols) = lookup.shape();
+                if lookup_rows != 1 && lookup_cols != 1 {
+                    return Err(FormulaError::Na);
+                }
+                let mode = optional_ast(args, 2)
+                    .map(|arg| scalar(arg, pass))
+                    .map_or(Ok(1), |value| option_code(&value));
+                let (match_mode, search_mode) = match mode? {
+                    1 => (-1, 2),
+                    -1 => (1, -2),
+                    0 => (0, 1),
+                    _ => return Err(FormulaError::Value),
+                };
+                self.search_lookup_arg(
+                    &lookup,
+                    ListPart::Whole,
+                    &key,
+                    match_mode,
+                    search_mode,
+                    pass,
+                )
+                .map(|found| {
+                    found.map_or(Value::Error(FormulaError::Na), |index| {
+                        Value::number((index + 1) as f64)
+                    })
+                })
+            }
+            Func::XMatch => {
+                if !(2..=4).contains(&args.len()) {
+                    return Err(FormulaError::Value);
+                }
+                let key = scalar(&args[0], pass);
+                if let Value::Error(error) = key {
+                    return Err(error);
+                }
+                let lookup = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
+                let (lookup_rows, lookup_cols) = lookup.shape();
+                if lookup_rows != 1 && lookup_cols != 1 {
+                    return Err(FormulaError::Value);
+                }
+                let (match_mode, search_mode) = lookup_modes(
+                    optional_ast(args, 2).map(|arg| scalar(arg, pass)),
+                    optional_ast(args, 3).map(|arg| scalar(arg, pass)),
+                )?;
+                self.search_lookup_arg(
+                    &lookup,
+                    ListPart::Whole,
+                    &key,
+                    match_mode,
+                    search_mode,
+                    pass,
+                )
+                .map(|found| {
+                    found.map_or(Value::Error(FormulaError::Na), |index| {
+                        Value::number((index + 1) as f64)
+                    })
+                })
+            }
+            Func::VLookup | Func::HLookup => {
+                if !(3..=4).contains(&args.len()) {
+                    return Err(FormulaError::Value);
+                }
+                let key = scalar(&args[0], pass);
+                if let Value::Error(error) = key {
+                    return Err(error);
+                }
+                let part = if func == Func::VLookup {
+                    ListPart::FirstColumn
+                } else {
+                    ListPart::FirstRow
+                };
+                let table = self.lookup_arg(&args[1], sheet, part, pass, depth + 1)?;
+                let result_index = positive_index(&scalar(&args[2], pass))?;
+                let sorted = match optional_ast(args, 3) {
+                    Some(arg) => bool_from_value(&scalar(arg, pass))?,
+                    None => true,
+                };
+                let (match_mode, search_mode) = if sorted { (-1, 2) } else { (0, 1) };
+                self.search_lookup_arg(&table, part, &key, match_mode, search_mode, pass)
+                    .map(|found| {
+                        let Some(found) = found else {
+                            return Value::Error(FormulaError::Na);
+                        };
+                        let cell = if func == Func::VLookup {
+                            table.cell(self, found, result_index)
+                        } else {
+                            table.cell(self, result_index, found)
+                        };
+                        cell.unwrap_or(Value::Error(FormulaError::Ref))
+                    })
+            }
+            Func::XLookup => {
+                if !(3..=6).contains(&args.len()) {
+                    return Err(FormulaError::Value);
+                }
+                let key = scalar(&args[0], pass);
+                if let Value::Error(error) = key {
+                    return Err(error);
+                }
+                let lookup = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
+                let result = self.lookup_arg(&args[2], sheet, ListPart::Whole, pass, depth + 1)?;
+                let (lookup_rows, lookup_cols) = lookup.shape();
+                if lookup.len() != result.len() || (lookup_rows != 1 && lookup_cols != 1) {
+                    return Err(FormulaError::Value);
+                }
+                let (match_mode, search_mode) = lookup_modes(
+                    optional_ast(args, 4).map(|arg| scalar(arg, pass)),
+                    optional_ast(args, 5).map(|arg| scalar(arg, pass)),
+                )?;
+                match self.search_lookup_arg(
+                    &lookup,
+                    ListPart::Whole,
+                    &key,
+                    match_mode,
+                    search_mode,
+                    pass,
+                ) {
+                    Ok(Some(index)) => Ok(result
+                        .value(self, index)
+                        .unwrap_or(Value::Error(FormulaError::Ref))),
+                    Ok(None) => Ok(optional_ast(args, 3)
+                        .map_or(Value::Error(FormulaError::Na), |arg| scalar(arg, pass))),
+                    Err(error) => Err(error),
+                }
+            }
+            _ => Err(FormulaError::Value),
         }
     }
-}
 
-/// The reuse state of the range one lookup argument reads, and how to record
-/// what this lookup learns about it.
-pub(super) struct LookupReuse<Materialized, Remember> {
-    /// `None` when the argument is not a plain range; such arguments are never reused.
-    pub(super) range: Option<CellRange>,
-    pub(super) previous: Option<ReuseEntry<Materialized>>,
-    pub(super) remember: Remember,
-}
-
-impl<Materialized, Remember> LookupReuse<Materialized, Remember>
-where
-    Remember: FnOnce(CellRange, ReuseEntry<Materialized>),
-{
-    pub(super) fn new(
-        range: Option<CellRange>,
-        reuse: impl FnOnce(CellRange) -> Option<ReuseEntry<Materialized>>,
-        remember: Remember,
-    ) -> Self {
-        Self {
-            range,
-            previous: range.and_then(reuse),
-            remember,
+    /// Searches the `part` list of `arg`: in place for a stored range, with
+    /// its pass state when several formulas read it.
+    fn search_lookup_arg(
+        &self,
+        arg: &LookupArg,
+        part: ListPart,
+        key: &Value,
+        match_mode: i32,
+        search_mode: i32,
+        pass: &mut EvalPass<'_>,
+    ) -> Result<Option<usize>, FormulaError> {
+        match arg {
+            LookupArg::Storage { range, shared } => {
+                let Some(sources) = self.sheets[range.sheet].cells.dense_sources() else {
+                    return Err(FormulaError::Value);
+                };
+                let (kinds, payloads) = sources.raw();
+                let (step, len) = match part {
+                    ListPart::FirstColumn => (1, range.rows),
+                    ListPart::FirstRow => (range.row_count, range.cols),
+                    ListPart::Whole if range.rows == 1 => (range.row_count, range.cols),
+                    ListPart::Whole => (1, range.rows * range.cols),
+                };
+                let list = ListView::Storage {
+                    kinds,
+                    payloads,
+                    strings: &self.strings,
+                    first: range.first,
+                    step,
+                    len,
+                };
+                let state = shared.map(|(group, groups)| {
+                    &mut pass.results.lookup_states().get(group, groups, part).search
+                });
+                find_match(&list, key, match_mode, search_mode, state)
+            }
+            LookupArg::Values { rows, cols, values } => {
+                let first_column;
+                let list: &[Value] = match part {
+                    ListPart::Whole => values,
+                    ListPart::FirstColumn => {
+                        first_column = (0..*rows)
+                            .filter_map(|row| values.get(row * cols))
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        &first_column
+                    }
+                    ListPart::FirstRow => &values[..(*cols).min(values.len())],
+                };
+                find_match(&ListView::Values(list), key, match_mode, search_mode, None)
+            }
         }
     }
-}
 
-thread_local! {
-    /// Reuse state belongs to the active guard, which releases decoded
-    /// ranges even when recalculation returns early.
-    static CACHED_TABLES: RefCell<HashMap<(CellRange, TablePart), ReuseEntry<CachedTable>>> =
-        RefCell::new(HashMap::new());
-    static CACHED_LISTS: RefCell<HashMap<CellRange, ReuseEntry<CachedList>>> =
-        RefCell::new(HashMap::new());
-    static CACHED_RESULTS: RefCell<HashMap<CellRange, ReuseEntry<CachedResult>>> =
-        RefCell::new(HashMap::new());
-    /// Whether a recalculation pass is running. Setters can change a cell
-    /// between passes without clearing anything, so a range is only reused
-    /// while the pass that recorded it holds the values it read.
-    static LOOKUP_PASS_ACTIVE: Cell<bool> = const { Cell::new(false) };
-}
+    /// Reads a lookup argument. A range of literal sources on a dense sheet
+    /// is kept in place, after the checks `eval_range_matrix` makes; anything
+    /// else is evaluated into values for this lookup.
+    fn lookup_arg(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        part: ListPart,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<LookupArg, FormulaError> {
+        if let Some(range) = range_from_ast(ast, sheet) {
+            let shared = self
+                .graph
+                .index()
+                .and_then(|index| index.shared_range_group(range));
+            let source = match shared {
+                Some((group, groups)) => {
+                    let state = pass.results.lookup_states().get(group, groups, part);
+                    *state
+                        .source
+                        .get_or_insert_with(|| self.storage_range(range, depth))
+                }
+                None => self.storage_range(range, depth),
+            };
+            if let Some(range) = source? {
+                return Ok(LookupArg::Storage { range, shared });
+            }
+        }
 
-/// Owns the lifetime of decoded lookup ranges for one recalculation pass.
-pub(super) struct LookupPassGuard;
-
-impl LookupPassGuard {
-    /// Starts a pass: later lookups may reuse decoded ranges.
-    pub(super) fn begin() -> Self {
-        LOOKUP_PASS_ACTIVE.with(|active| active.set(true));
-        Self
+        let matrix: EvalMatrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
+        let rows = matrix.rows;
+        let cols = matrix.cols;
+        let mut matrix = matrix;
+        let values = std::mem::take(&mut matrix.values);
+        Ok(LookupArg::Values { rows, cols, values })
     }
-}
 
-impl Drop for LookupPassGuard {
-    fn drop(&mut self) {
-        LOOKUP_PASS_ACTIVE.with(|active| active.set(false));
-        clear_cached_lookups();
+    /// `range` clamped to the sheet, when every cell is a literal source of a
+    /// dense sheet. The structural, shape and byte checks and their errors
+    /// are those of `eval_range_matrix`. `Ok(None)` is a range with a formula
+    /// or spill cell, paged storage, or a depth past the literal fast path.
+    fn storage_range(
+        &self,
+        range: CellRange,
+        depth: usize,
+    ) -> Result<Option<StorageRange>, FormulaError> {
+        let sheet = range.sheet as usize;
+        let Some(data) = self.sheets.get(sheet) else {
+            return Err(FormulaError::Ref);
+        };
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
+        {
+            return Err(FormulaError::Ref);
+        }
+
+        let row_start = range.row_start as usize;
+        let col_start = range.col_start as usize;
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
+        let rows = row_end - row_start + 1;
+        let cols = col_end - col_start + 1;
+        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+        let (Some(sources), true) = (data.cells.dense_sources(), depth < FORMULA_RECURSION_LIMIT)
+        else {
+            return Ok(None);
+        };
+
+        let (kinds, payloads) = sources.raw();
+        let mut payload_bytes = total
+            .checked_mul(std::mem::size_of::<Value>())
+            .ok_or(FormulaError::Num)?;
+        for col in col_start..=col_end {
+            let column = data.cells.idx(row_start, col);
+            for index in column..column + rows {
+                match kinds[index] {
+                    KIND_EMPTY | KIND_NUMBER | KIND_BOOL => {}
+                    KIND_STRING => {
+                        let id = crate::cells::payload_str_id(payloads[index]);
+                        if let Some(text) = string_from_pool_ref(&self.strings, id) {
+                            payload_bytes = payload_bytes
+                                .checked_add(text.len())
+                                .ok_or(FormulaError::Num)?;
+                        }
+                    }
+                    _ => return Ok(None),
+                }
+            }
+        }
+        if payload_bytes > SPILL_MAX_BYTES {
+            return Err(FormulaError::Num);
+        }
+
+        Ok(Some(StorageRange {
+            sheet,
+            first: data.cells.idx(row_start, col_start),
+            rows,
+            cols,
+            row_count: data.cells.row_count(),
+        }))
     }
-}
-
-fn pass_is_active() -> bool {
-    LOOKUP_PASS_ACTIVE.with(Cell::get)
-}
-
-fn clear_cached_lookups() {
-    CACHED_TABLES.with(|tables| tables.borrow_mut().clear());
-    CACHED_LISTS.with(|lists| lists.borrow_mut().clear());
-    CACHED_RESULTS.with(|results| results.borrow_mut().clear());
-}
-
-/// What this pass knows about `range` and `part`.
-pub(super) fn table_reuse(range: CellRange, part: TablePart) -> Option<ReuseEntry<CachedTable>> {
-    if !pass_is_active() {
-        return None;
-    }
-    CACHED_TABLES.with(|tables| tables.borrow().get(&(range, part)).cloned())
-}
-
-/// Records what this pass knows about `range` and `part`.
-pub(super) fn remember_table(range: CellRange, part: TablePart, state: ReuseEntry<CachedTable>) {
-    if !pass_is_active() {
-        return;
-    }
-    CACHED_TABLES.with(|tables| {
-        tables.borrow_mut().insert((range, part), state);
-    });
-}
-
-/// What this pass knows about `range` as a search list.
-pub(super) fn list_reuse(range: CellRange) -> Option<ReuseEntry<CachedList>> {
-    if !pass_is_active() {
-        return None;
-    }
-    CACHED_LISTS.with(|lists| lists.borrow().get(&range).cloned())
-}
-
-/// Records what this pass knows about `range` as a search list.
-pub(super) fn remember_list(range: CellRange, state: ReuseEntry<CachedList>) {
-    if !pass_is_active() {
-        return;
-    }
-    CACHED_LISTS.with(|lists| {
-        lists.borrow_mut().insert(range, state);
-    });
-}
-
-/// What this pass knows about `range` as a result range.
-pub(super) fn result_reuse(range: CellRange) -> Option<ReuseEntry<CachedResult>> {
-    if !pass_is_active() {
-        return None;
-    }
-    CACHED_RESULTS.with(|results| results.borrow().get(&range).cloned())
-}
-
-/// Records what this pass knows about `range` as a result range.
-pub(super) fn remember_result(range: CellRange, state: ReuseEntry<CachedResult>) {
-    if !pass_is_active() {
-        return;
-    }
-    CACHED_RESULTS.with(|results| {
-        results.borrow_mut().insert(range, state);
-    });
 }
 
 /// Next smaller match by binary search over an ascending list, as
@@ -844,7 +1230,7 @@ impl CellStore {
             Value::Error(error) => return Err(error),
             key => key,
         };
-        let list = self.lookup_list_argument(&args[1], sheet, pass, depth + 1)?;
+        let list = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
         let (rows, cols) = list.shape();
         let is_vector = rows == 1 || cols == 1;
 
@@ -853,75 +1239,39 @@ impl CellStore {
         }
 
         if is_vector {
-            let found =
-                find_match_index_indexed(list.search(), &key, NEXT_SMALLER, BINARY_ASCENDING)?
-                    .ok_or(FormulaError::Na)?;
+            let found = self
+                .search_lookup_arg(
+                    &list,
+                    ListPart::Whole,
+                    &key,
+                    NEXT_SMALLER,
+                    BINARY_ASCENDING,
+                    pass,
+                )?
+                .ok_or(FormulaError::Na)?;
 
             if args.len() == 2 {
-                return list
-                    .search()
-                    .values()
-                    .get(found)
-                    .cloned()
-                    .ok_or(FormulaError::Na);
+                return list.value(self, found).ok_or(FormulaError::Na);
             }
 
-            let result = self.lookup_result_argument(&args[2], sheet, pass, depth + 1)?;
-
-            return result.value(found).cloned().ok_or(FormulaError::Na);
+            let result = self.lookup_arg(&args[2], sheet, ListPart::Whole, pass, depth + 1)?;
+            return result.value(self, found).ok_or(FormulaError::Na);
         }
 
         let part = if cols > rows {
-            TablePart::FirstRow
+            ListPart::FirstRow
         } else {
-            TablePart::FirstColumn
+            ListPart::FirstColumn
         };
-        let table = self.lookup_table_argument(&args[1], sheet, part, pass, depth + 1)?;
-        let found = find_match_index_indexed(table.search(), &key, NEXT_SMALLER, BINARY_ASCENDING)?
+        let table = self.lookup_arg(&args[1], sheet, part, pass, depth + 1)?;
+        let found = self
+            .search_lookup_arg(&table, part, &key, NEXT_SMALLER, BINARY_ASCENDING, pass)?
             .ok_or(FormulaError::Na)?;
         let value = match part {
-            TablePart::FirstRow => table.cell(rows - 1, found),
-            TablePart::FirstColumn => table.cell(found, cols - 1),
+            ListPart::FirstRow => table.cell(self, rows - 1, found),
+            _ => table.cell(self, found, cols - 1),
         };
 
-        value.cloned().ok_or(FormulaError::Na)
-    }
-}
-
-#[cfg(test)]
-mod lifetime_tests {
-    use super::*;
-    use crate::store::CellStore;
-
-    #[test]
-    fn recompute_releases_lookup_ranges_before_store_drop() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 3);
-        for row in 0..3 {
-            store.set_number(sheet, row, 0, (row + 1) as f64, 0);
-            store.set_number(sheet, row, 1, ((row + 1) * 10) as f64, 0);
-            store.set_formula(sheet, row, 2, "=VLOOKUP(2,$A$1:$B$3,2,FALSE)", 0);
-            store.set_formula(sheet, row, 3, "=XLOOKUP(2,$A$1:$A$3,$B$1:$B$3)", 0);
-        }
-        store.recompute(sheet);
-        for row in 0..3 {
-            assert_eq!(store.get_cell(sheet, row, 2).num(), 20.0);
-            assert_eq!(store.get_cell(sheet, row, 3).num(), 20.0);
-        }
-        let cache_lengths = || {
-            (
-                CACHED_TABLES.with(|cache| cache.borrow().len()),
-                CACHED_LISTS.with(|cache| cache.borrow().len()),
-                CACHED_RESULTS.with(|cache| cache.borrow().len()),
-            )
-        };
-        let after_recompute = cache_lengths();
-        drop(store);
-        let after_store_drop = cache_lengths();
-        assert_eq!(
-            (after_recompute, after_store_drop),
-            ((0, 0, 0), (0, 0, 0)),
-            "lookup ranges must be released before the store is dropped"
-        );
+        value.ok_or(FormulaError::Na)
     }
 }

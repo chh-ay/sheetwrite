@@ -10,8 +10,7 @@ import {
   type BenchScale,
   benchScaleFigure,
 } from "./bench-figures.js";
-import { frontmatter } from "./docs-api.js";
-import { exists, posix, repositoryRoot } from "./docs-shared.js";
+import { exists, frontmatter, posix, repositoryRoot } from "./docs-shared.js";
 import {
   allMeasurements,
   evidenceHeadline,

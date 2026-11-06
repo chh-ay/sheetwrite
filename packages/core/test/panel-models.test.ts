@@ -1,12 +1,18 @@
 import { describe, expect, it } from "bun:test";
 
+import { sanitizeChartDefinition } from "../src/chart-definition.js";
+import { pivotChartView } from "../src/dashboard/dashboard-chart.js";
 import {
   chartFromRange,
   DEFAULT_CHART_HEIGHT,
   DEFAULT_CHART_WIDTH,
   nextChartId,
+  pivotValueCaptions,
+  plotsPivotValue,
   selectionRange,
+  withPivotValue,
 } from "../src/panels/chart-model.js";
+import { measuresByTable, nextMeasureId } from "../src/panels/measure-panel.js";
 import {
   defaultAggregation,
   pivotSourceFor,
@@ -16,6 +22,7 @@ import {
   shiftField,
   sourceDataRange,
   type FieldFacts,
+  withMeasureValue,
 } from "../src/panels/pivot-model.js";
 import { formatRangeText, parseRangeText } from "../src/panels/range-text.js";
 import type { CellScalar, PivotDefinition, Range, WorkbookTable } from "../src/types.js";
@@ -143,6 +150,133 @@ describe("chart from a selection", () => {
   });
 });
 
+describe("values of a chart over a pivot", () => {
+  const chart = {
+    id: "c1",
+    kind: "column" as const,
+    anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+    series: [],
+    pivot: "p1",
+  };
+
+  it("captions values as the Field List does: own name, measure name, or aggregation of field", () => {
+    const captions = pivotValueCaptions(
+      [
+        { field: 1, aggregation: "SUM" },
+        { measure: "m1" },
+        { field: 2, aggregation: "COUNTA", name: "Orders" },
+        { measure: "gone" },
+      ],
+      (field) => ["Region", "Amount", "Id"][field] ?? "",
+      (id) => (id === "m1" ? "Margin" : undefined),
+    );
+    expect(captions).toEqual(["Sum of Amount", "Margin", "Orders", "gone"]);
+  });
+
+  it("toggles one value, keeps at least one, and drops the list when every value is plotted", () => {
+    const one = withPivotValue(chart, 3, 0, false);
+    expect(one?.pivotValues).toEqual([1, 2]);
+    expect(plotsPivotValue(one ?? chart, 0)).toBe(false);
+    const only = withPivotValue(withPivotValue(one ?? chart, 3, 1, false) ?? chart, 3, 2, false);
+    expect(only).toBeNull();
+    expect(withPivotValue(one ?? chart, 3, 0, true)).toEqual(chart);
+  });
+
+  it("accepts value positions only on a chart over a pivot, distinct and in bounds", () => {
+    expect(sanitizeChartDefinition({ ...chart, pivotValues: [2, 0] })?.pivotValues).toEqual([2, 0]);
+    const { pivot: _pivot, ...plain } = chart;
+    for (const invalid of [
+      { ...plain, pivotValues: [0] },
+      { ...chart, pivotValues: [] },
+      { ...chart, pivotValues: [1, 1] },
+      { ...chart, pivotValues: [-1] },
+      { ...chart, pivotValues: [0.5] },
+      { ...chart, pivotValues: [32] },
+    ]) {
+      expect(sanitizeChartDefinition(invalid)).toBeNull();
+    }
+  });
+
+  it("plots the data columns of the chosen values only, for each column item", () => {
+    // Two column items (A, B) by two values (V0, V1): data columns A/V0, A/V1, B/V0, B/V1.
+    const output = {
+      rows: 3,
+      cols: 5,
+      headerRows: 2,
+      labelCols: 1,
+      cells: ["", "A", "A", "B", "B", "", "V0", "V1", "V0", "V1", "East", 1, 2, 3, 4],
+    };
+    const view = pivotChartView({ ...chart, pivotValues: [1] }, output, ["0", "0.0"]);
+    expect(view.series.map((series) => [series.name, series.values, series.numberFormats])).toEqual(
+      [
+        ["A / V1", [2], ["0.0"]],
+        ["B / V1", [4], ["0.0"]],
+      ],
+    );
+  });
+});
+
+describe("measures in the field list and the Measures panel", () => {
+  const orders: WorkbookTable = {
+    id: "orders",
+    name: "Orders",
+    range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
+    columns: [
+      { id: "region", name: "Region" },
+      { id: "amount", name: "Amount" },
+    ],
+    headerRow: true,
+    totalsRow: false,
+  };
+  const pivot: PivotDefinition = {
+    id: "p1",
+    name: "P1",
+    source: { table: "orders" },
+    anchor: { row: 0, col: 4 },
+    rows: [0],
+    columns: [],
+    values: [{ field: 1, aggregation: "SUM" }],
+  };
+
+  it("adds a measure as the last value, turning a table source into a model source", () => {
+    const next = withMeasureValue(pivot, [orders], "total");
+    expect(next?.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "region" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    });
+    expect(next?.values).toEqual([{ field: 1, aggregation: "SUM" }, { measure: "total" }]);
+    expect(next && withMeasureValue(next, [orders], "total")).toBeNull();
+    const range = {
+      ...pivot,
+      source: { range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } } },
+    };
+    expect(withMeasureValue(range, [orders], "total")).toBeNull();
+  });
+
+  it("groups measures by home table, with measures of a removed table last", () => {
+    const measure = (id: string, table: string) => ({ id, name: id, table, formula: "=1" });
+    const customers = { ...orders, id: "customers", name: "Customers" };
+    expect(
+      measuresByTable(
+        [measure("a", "customers"), measure("b", "gone"), measure("c", "orders")],
+        [orders, customers],
+      ).map(([table, own]) => [table?.id ?? null, own.map((entry) => entry.id)]),
+    ).toEqual([
+      ["orders", ["c"]],
+      ["customers", ["a"]],
+      [null, ["b"]],
+    ]);
+    expect(nextMeasureId([measure("measure-1", "orders"), measure("measure-3", "orders")])).toBe(
+      "measure-2",
+    );
+  });
+});
+
 describe("A1 range text", () => {
   it("parses cells, ranges, $ markers and sheet prefixes", () => {
     expect(parseRangeText("B2:D9", SHEETS, "s1")).toEqual({ range: range("s1", 1, 1, 8, 3) });
@@ -248,6 +382,17 @@ describe("pivot field moves", () => {
     const removed = removeField(sorted, { area: "rows", index: 1 });
     expect(removed.rows).toEqual([0]);
     expect(removed.sort).toEqual([]);
+  });
+
+  it("removes a measure value and leaves it in place for moves and shifts", () => {
+    const pivot: PivotDefinition = {
+      ...base,
+      values: [{ field: 1, aggregation: "SUM" }, { measure: "per-unit" }],
+    };
+    const measure = { area: "values", index: 1 } as const;
+
+    expect(removeField(pivot, measure).values).toEqual([{ field: 1, aggregation: "SUM" }]);
+    expect(shiftField(pivot, measure, -1, facts(undefined))).toBe(pivot);
   });
 
   it("uses the table that holds the selection as the source", () => {

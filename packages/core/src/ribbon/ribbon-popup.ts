@@ -3,9 +3,10 @@
 // list of its own, as in Excel. Every surface shares the same dismissal,
 // placement and focus-return rules.
 
-const VIEWPORT_MARGIN = 8;
-/** Space between a popup and its trigger, so the two never read as one surface. */
-const TRIGGER_GAP = 4;
+import { type PopupPlacement, popupPosition } from "../menu-surface.js";
+
+/** Popups open under their trigger, with a gap so the two never read as one surface. */
+const POPUP_PLACEMENT: PopupPlacement = { side: "below", gap: 4 };
 
 /** Elements arrow keys move between inside an open popup. */
 const NAVIGABLE =
@@ -165,12 +166,7 @@ export class RibbonPopup {
     surface.style.left = "0px";
     surface.style.top = "0px";
     const origin = surface.getBoundingClientRect();
-    const maxLeft = window.innerWidth - origin.width - VIEWPORT_MARGIN;
-    const below = anchor.bottom + TRIGGER_GAP;
-    const above = anchor.top - origin.height - TRIGGER_GAP;
-    const fitsBelow = below + origin.height <= window.innerHeight - VIEWPORT_MARGIN;
-    const left = Math.max(VIEWPORT_MARGIN, Math.min(anchor.left, maxLeft));
-    const top = Math.max(VIEWPORT_MARGIN, fitsBelow || above < 0 ? below : above);
+    const { left, top } = popupPosition(anchor, origin, POPUP_PLACEMENT);
     surface.style.left = `${left - origin.left}px`;
     surface.style.top = `${top - origin.top}px`;
   }

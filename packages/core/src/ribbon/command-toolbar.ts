@@ -4,6 +4,7 @@
 
 import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
+import { onQueryCommandsChange } from "../query-commands.js";
 import { Scope } from "../scope.js";
 import type {
   CommandFlags,
@@ -279,6 +280,14 @@ export class CommandToolbar {
       grid.on("command-state-change", (event) =>
         this.refresh((command: GridCommandName) => event.states[command]),
       ),
+    );
+    // A query session connects after the grid exists, and its commands appear then.
+    this.lifetime.add(
+      onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
+    );
+    // Some commands depend on the document, such as Edit Links on its links.
+    this.lifetime.add(
+      grid.on("change", () => this.refresh((command) => grid.getCommandState(command))),
     );
     // Absent in some test environments; every command then stays on the row.
     if (typeof ResizeObserver === "function") {
