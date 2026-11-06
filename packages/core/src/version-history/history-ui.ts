@@ -1,3 +1,4 @@
+import { requestPanel } from "../panels/panel-loader.js";
 import type { SheetwriteAddon } from "../types/addon.js";
 import type { HistoryAddonOptions } from "./panel-contract.js";
 
@@ -7,7 +8,8 @@ import type { HistoryAddonOptions } from "./panel-contract.js";
  * from `createGrid(host, { addons: { history: { ... } } })`; grid settings
  * replace the init options field by field. The panel and its code load only
  * when either command runs; archive recording stays under the host's
- * committed-transaction journal.
+ * committed-transaction journal. A grid destroyed while the panel code loads
+ * opens nothing.
  *
  * @example
  * ```ts
@@ -38,13 +40,13 @@ export function historyAddon(
 
       const gridOptions: HistoryAddonOptions = { ...merged, archive, authorId };
       historyCommand((action) => {
-        void import("../panels/panel-controller.js").then(({ openHistoryPanel }) => {
-          openHistoryPanel(grid, async () => {
+        requestPanel(grid, (controller) =>
+          controller.openHistoryPanel(grid, async () => {
             const { historyPanel } = await import("../panels/history-panel.js");
 
             return (target) => historyPanel(target, gridOptions, action === "save");
-          });
-        });
+          }),
+        );
       });
     },
   };

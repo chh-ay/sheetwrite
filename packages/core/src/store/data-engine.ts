@@ -1090,6 +1090,11 @@ export class StoreDataEngine {
     }
   }
 
+  /** Whether `dispose` freed the WASM store; a lazy load that finishes later must not call it. */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
   /**
    * Compute pivots from `view` instead of the saved definitions, and send
    * `sheets` again. A view changes inputs that are not in the document, such

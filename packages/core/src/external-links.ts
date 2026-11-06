@@ -1,6 +1,7 @@
 import { SheetwriteError } from "./errors.js";
 import { externalSheetText, rewriteExternalSheets } from "./external-link-formula.js";
 import { connectExternalLinkResolver, type ExternalLinkResolver } from "./external-link-session.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { SheetwriteAddon } from "./types/addon.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
@@ -157,6 +158,14 @@ export async function updateExternalLinks(
     }
   }
   if (values.size === 0) return results;
+  // The grid can be destroyed, with its store, while the resolver runs.
+  if (storeEngine(grid.store)?.isDisposed) {
+    throw new SheetwriteError(
+      "aborted",
+      "external-link",
+      "The grid was destroyed while the links resolved",
+    );
+  }
 
   // The links can change while the resolver runs, so the update applies to
   // the current list.

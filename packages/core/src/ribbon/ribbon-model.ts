@@ -29,6 +29,7 @@ import type { IconName } from "../icons/icon-names.js";
 import {
   loadPanels,
   pivotsAvailable,
+  requestPanel,
   showDefineName,
   showFormulaExplanation,
   showNameManager,
@@ -90,7 +91,7 @@ function rowSpan(a: number, b: number): [number, number] {
  * none of it.
  */
 function showQueryPanel(grid: Grid, create: boolean): void {
-  void loadPanels(grid).then((controller) => controller.openQueryPanel(grid, create));
+  requestPanel(grid, (controller) => controller.openQueryPanel(grid, create));
 }
 
 /** The query commands show only while a query session is connected to the grid. */
@@ -860,7 +861,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             ...button(
               "Edit Links",
               "editLinks",
-              (grid) => void loadPanels(grid).then((panels) => panels.openEditLinksPanel(grid)),
+              (grid) => requestPanel(grid, (panels) => panels.openEditLinksPanel(grid)),
               "view",
             ),
             // As in Excel, the command shows only for a workbook with links.
