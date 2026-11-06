@@ -107,7 +107,7 @@ function details(machine: StoryMachine, baseName: string): string {
       return `<tr><th scope="row">${escapeHtml(interaction.label)}</th><td class="speed-story__ours"><b>${formatTime(interaction.measured.value)}</b><small>${formatTime(low)}–${formatTime(high)}</small></td><td>${interaction.base === undefined ? "did not complete" : formatTime(interaction.base)}</td><td>${ratio === undefined ? "" : `${formatTimes(ratio)} faster`}</td><td>${ratio === undefined ? "" : `−${Math.min(99.9, (1 - 1 / ratio) * 100).toFixed(ratio > 1000 ? 1 : 0)}%`}</td></tr>`;
     })
     .join("");
-  return `<details class="speed-story__details"><summary>Show all numbers</summary><div class="speed-story__table" tabindex="0" role="region" aria-label="${escapeHtml(machine.name)}: every interaction"><table class="speed-story__data"><thead><tr><th scope="col">Interaction</th><th scope="col">Sheetwrite median (lowest–highest round)</th><th scope="col">${escapeHtml(baseName)} median</th><th scope="col">Speedup</th><th scope="col">Time saved</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+  return `<details class="speed-story__details"><summary>Show all numbers</summary><div class="speed-story__table" tabindex="0" role="region" aria-label="${escapeHtml(machine.name)}: every interaction"><table class="speed-story__data"><thead><tr><th scope="col">Interaction</th><th scope="col">Sheetwrite median<small>lowest–highest round</small></th><th scope="col">${escapeHtml(baseName)} median</th><th scope="col">Speedup</th><th scope="col">Time saved</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
 }
 
 /** The story as HTML: a machine switch over one panel per machine. */
@@ -116,14 +116,14 @@ export function renderSpeedupStory(story: SpeedupStory, icon: PerfIconMarkup): s
   const radios = story.machines
     .map(
       (machine, index) =>
-        `<input type="radio" name="${name}" id="${name}-${machine.machine}" value="${machine.machine}"${index === 0 ? " data-default" : ""}><label for="${name}-${machine.machine}">${icon(MACHINE_ICONS[machine.machine])}${escapeHtml(machine.name)}</label>`,
+        `<input type="radio" name="${name}" id="${name}-${machine.machine}" value="${machine.machine}"${index === 0 ? " checked" : ""}><label for="${name}-${machine.machine}">${icon(MACHINE_ICONS[machine.machine])}${escapeHtml(machine.name)}</label>`,
     )
     .join("");
   const panels = story.machines
     .map(
       (machine, index) =>
-        `<section class="speed-story__panel" data-machine="${machine.machine}"${index === 0 ? " data-default" : ""} aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta"><b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine)}${overview(machine, story.baseName)}${details(machine, story.baseName)}</section>`,
+        `<section class="speed-story__panel" data-machine="${machine.machine}" aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta"><b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine)}${overview(machine, story.baseName)}${details(machine, story.baseName)}</section>`,
     )
     .join("");
-  return `<div class="speed-story" data-pagefind-ignore><div class="machine-switch" role="radiogroup" aria-label="Machine">${radios}</div>${panels}</div>`;
+  return `<div class="speed-story" data-pagefind-ignore><div class="machine-switch" role="radiogroup" aria-label="Machine for the comparison with ${escapeHtml(story.baseName)}">${radios}</div>${panels}</div>`;
 }

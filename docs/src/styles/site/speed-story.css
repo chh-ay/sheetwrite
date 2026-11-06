@@ -34,8 +34,7 @@
 }
 
 .speed-story:has(input[value="linux"]:checked) .speed-story__panel[data-machine="linux"],
-.speed-story:has(input[value="mac"]:checked) .speed-story__panel[data-machine="mac"],
-.speed-story:not(:has(.machine-switch input:checked)) .speed-story__panel[data-default] {
+.speed-story:has(input[value="mac"]:checked) .speed-story__panel[data-machine="mac"] {
   display: block;
   animation: speed-story-in 280ms ease both;
 }
@@ -330,6 +329,17 @@
   text-align: right;
   text-transform: none;
   white-space: nowrap;
+}
+
+/* Names and headings wrap, so the table fits its frame at desktop widths. */
+.sw-prose .speed-story__data :is(thead th, th[scope="row"]),
+.speed-story__data :is(thead th, th[scope="row"]) {
+  white-space: normal;
+}
+
+.speed-story__data thead small {
+  display: block;
+  font-weight: 400;
 }
 
 .sw-prose .speed-story__data :is(th[scope="row"], thead th:first-child),

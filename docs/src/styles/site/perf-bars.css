@@ -116,20 +116,20 @@
   color: var(--sw-fg-strong);
 }
 
-.machine-switch input:checked + label,
-.machine-switch:not(:has(input:checked)) input[data-default] + label {
+.machine-switch input:checked + label {
   background: var(--sw-surface-1);
   color: var(--sw-fg-strong);
   box-shadow: var(--sw-shadow-sm);
 }
 
-.machine-switch input:checked + label .sw-icon,
-.machine-switch:not(:has(input:checked)) input[data-default] + label .sw-icon {
+.machine-switch input:checked + label .sw-icon {
   color: var(--sw-icon-accent);
 }
 
+/* The site's focus ring, on the label the hidden radio stands behind. */
 .machine-switch input:focus-visible + label {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
 }
 
 /* ---- Machine groups ---- */
@@ -154,9 +154,7 @@
 .perf-bars[data-switched]:has(input[value="linux"]:checked)
   .perf-bars__group[data-machine]:not([data-machine="linux"]),
 .perf-bars[data-switched]:has(input[value="mac"]:checked)
-  .perf-bars__group[data-machine]:not([data-machine="mac"]),
-.perf-bars[data-switched]:not(:has(.machine-switch input:checked))
-  .perf-bars__group[data-machine]:not([data-default]) {
+  .perf-bars__group[data-machine]:not([data-machine="mac"]) {
   display: none;
 }
 

@@ -124,6 +124,14 @@ function grouped(value: number, digits: number): string {
   });
 }
 
+/** "Median recalculation time" reads "median recalculation time" inside a sentence. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/** A number and its unit never break across lines. */
+const UNIT_SPACE = "\u00a0";
+
 /** Below a tenth of a millisecond the reader thinks in µs. */
 const MICROSECOND_LIMIT_MS = 0.1;
 
@@ -131,19 +139,19 @@ const MICROSECOND_LIMIT_MS = 0.1;
 export function formatTime(ms: number): string {
   if (ms > 0 && ms < MICROSECOND_LIMIT_MS) {
     const us = ms * 1000;
-    return `${grouped(us, us < 10 ? 1 : 0)} µs`;
+    return `${grouped(us, us < 10 ? 1 : 0)}${UNIT_SPACE}µs`;
   }
-  if (ms < 1 && ms > 0) return `${grouped(ms, 2)} ms`;
-  if (ms >= 1000) return `${grouped(ms / 1000, ms >= 10_000 ? 1 : 2)} s`;
-  return `${grouped(ms, ms < 10 ? 2 : ms < 100 ? 1 : 0)} ms`;
+  if (ms < 1 && ms > 0) return `${grouped(ms, 2)}${UNIT_SPACE}ms`;
+  if (ms >= 1000) return `${grouped(ms / 1000, ms >= 10_000 ? 1 : 2)}${UNIT_SPACE}s`;
+  return `${grouped(ms, ms < 10 ? 2 : ms < 100 ? 1 : 0)}${UNIT_SPACE}ms`;
 }
 
 /** Binary units, as the size reports use. */
 export function formatSize(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${grouped(bytes / 1024 ** 3, 2)} GiB`;
-  if (bytes >= 1024 ** 2) return `${grouped(bytes / 1024 ** 2, 1)} MiB`;
-  if (bytes >= 1024) return `${grouped(bytes / 1024, 1)} KiB`;
-  return `${grouped(bytes, 0)} B`;
+  if (bytes >= 1024 ** 3) return `${grouped(bytes / 1024 ** 3, 2)}${UNIT_SPACE}GiB`;
+  if (bytes >= 1024 ** 2) return `${grouped(bytes / 1024 ** 2, 1)}${UNIT_SPACE}MiB`;
+  if (bytes >= 1024) return `${grouped(bytes / 1024, 1)}${UNIT_SPACE}KiB`;
+  return `${grouped(bytes, 0)}${UNIT_SPACE}B`;
 }
 
 /** Ratios span 1× to 10,000×; decimals only help below 100×. */
@@ -505,16 +513,18 @@ function tableMarkup(figure: PerfFigure): string {
  * A Linux | Mac switch over a figure's machine groups, so one machine shows at a
  * time in place. Radios and `:has()` do the switching; the figure needs no script.
  */
-function machineSwitch(id: string, groups: readonly PerfGroup[], icon: PerfIconMarkup): string {
+function machineSwitch(figure: PerfFigure, groups: readonly PerfGroup[], icon: PerfIconMarkup): string {
+  const id = figure.id;
   const radios = groups.flatMap((group, index) => {
     if (group.machine === undefined) return [];
     const inputId = `${id}-machine-${group.machine}`;
     const name = group.label.split(" · ")[0] ?? group.label;
     return [
-      `<input type="radio" name="${id}-machine" id="${inputId}" value="${group.machine}"${index === 0 ? " data-default" : ""}><label for="${inputId}">${icon(MACHINE_ICONS[group.machine])}${escapeHtml(name)}</label>`,
+      `<input type="radio" name="${id}-machine" id="${inputId}" value="${group.machine}"${index === 0 ? " checked" : ""}><label for="${inputId}">${icon(MACHINE_ICONS[group.machine])}${escapeHtml(name)}</label>`,
     ];
   });
-  return `<div class="machine-switch" role="radiogroup" aria-label="Machine">${radios.join("")}</div>`;
+  // Each switch names its figure, so a page with several reads "Machine for median recalculation time".
+  return `<div class="machine-switch" role="radiogroup" aria-label="Machine for ${escapeHtml(lowerFirst(figure.title))}">${radios.join("")}</div>`;
 }
 
 /** The figure as HTML, every group on its own axis; machines behind a switch. */
@@ -528,7 +538,7 @@ export function renderPerfBars(figure: PerfFigure, icon: PerfIconMarkup): string
   const parts = [
     `<figure class="perf-bars" data-unit="${UNIT_NAMES[figure.unit]}" data-scale="${figure.scale}"${series}${switched ? " data-switched" : ""} aria-labelledby="${figure.id}-title" data-pagefind-ignore>`,
     `<div class="perf-bars__head"><p class="perf-bars__title" id="${figure.id}-title">${escapeHtml(figure.title)}</p>${legendMarkup(figure, hasComparison)}</div>`,
-    switched ? machineSwitch(figure.id, groups, icon) : "",
+    switched ? machineSwitch(figure, groups, icon) : "",
   ];
   for (const [index, group] of groups.entries()) {
     const values = figureValues([group]);
@@ -536,7 +546,7 @@ export function renderPerfBars(figure: PerfFigure, icon: PerfIconMarkup): string
       figure.scale === "log" ? logAxis(values, figure.unit) : linearAxis(values, figure.unit);
     parts.push(
       // Ticks are evenly spaced on both scales, so the tracks draw them as one repeating gridline.
-      `<section class="perf-bars__group"${group.machine ? ` data-machine="${group.machine}"` : ""}${index === 0 ? " data-default" : ""} style="--perf-steps:${axis.ticks.length - 1}">`,
+      `<section class="perf-bars__group"${group.machine ? ` data-machine="${group.machine}"` : ""} style="--perf-steps:${axis.ticks.length - 1}">`,
       // The switch already shows each machine's icon; the heading names the machine in text.
       groupHeading(group, switched ? () => "" : icon),
       axisMarkup(axis),

@@ -155,10 +155,11 @@ function provenanceList(rows: ReadonlyArray<readonly [label: string, value: stri
  * Detail that supports the headline but is not the result: full tables,
  * counters, checkpoints. It stays in the page (and in search) but closed.
  */
-function allMeasurements(lines: readonly string[]): string[] {
+/** Measurements on demand, under a summary that names what they are. */
+function allMeasurements(summary: string, lines: readonly string[]): string[] {
   // Blank lines around the body let Markdown inside the HTML block render.
   return [
-    '<details class="bench-all"><summary>All measurements</summary>',
+    `<details class="bench-all"><summary>${html(summary)}</summary>`,
     "",
     ...lines,
     "",

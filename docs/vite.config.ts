@@ -178,6 +178,24 @@ function hydrateFormulaReference() {
 }
 
 /**
+ * A checked radio or checkbox in Markdown HTML starts checked but stays the
+ * reader's to change: React would treat `checked` as a controlled value and
+ * undo every click, so the markup's `checked` becomes `defaultChecked`.
+ */
+function uncontrolledCheckedInputs() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (node.tagName === "input" && node.properties?.checked === true) {
+        const { checked: _checked, ...properties } = node.properties;
+        node.properties = { ...properties, defaultChecked: true };
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
+/**
  * Release-note comparisons (`<perf-compare>` blocks) become the shared
  * performance bars before raw HTML is parsed, so release notes and the
  * Performance pages draw the same figure.
@@ -443,6 +461,7 @@ export default defineConfig({
           renderPerfCompares,
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          uncontrolledCheckedInputs,
           renderGridResults,
           [
             renderSectionCards,

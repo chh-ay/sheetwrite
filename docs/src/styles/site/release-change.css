@@ -95,6 +95,62 @@
   color: var(--sw-danger);
 }
 
+/* A count of zero is a plain fact, not an alarm or a win. */
+.change__counts [data-zero] b {
+  color: var(--sw-fg-muted);
+}
+
+.change__size {
+  margin-top: var(--sw-space-3) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.change__size b {
+  font-weight: 650;
+}
+
+.change__size[data-verdict="better"] b {
+  color: var(--sw-success);
+}
+
+.change__size[data-verdict="worse"] b {
+  color: var(--sw-danger);
+}
+
+/* The phone toggle: a real checkbox behind its label, shown only on phones. */
+.change__toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.change__toggle-label {
+  display: none;
+  margin-top: var(--sw-space-2);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.change__toggle-label:hover {
+  color: var(--sw-accent-strong);
+}
+
+.change__toggle:focus-visible + .change__rows + .change__toggle-label {
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
+}
+
+.change__toggle:not(:checked) ~ .change__toggle-label [data-open],
+.change__toggle:checked ~ .change__toggle-label [data-closed] {
+  display: none;
+}
+
 .change__counts [data-verdict="noise"] b {
   color: var(--sw-fg-strong);
 }
@@ -345,6 +401,15 @@
 /* ---- Phones: labels on their own line, the lane full width ---- */
 
 @container change (max-width: 40rem) {
+  /* Row 11 on: PHONE_ROWS in docs/src/lib/release-change.ts is 10. */
+  .change__toggle:not(:checked) + .change__rows .change__row:nth-child(n + 11) {
+    display: none;
+  }
+
+  .change__toggle-label {
+    display: inline-flex;
+  }
+
   .change__counts li {
     flex-direction: column;
     gap: var(--sw-space-1);

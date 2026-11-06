@@ -1363,7 +1363,7 @@ function renderCorePathsSection(
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
     ...evidenceHeadline(headlines),
-    ...allMeasurements([
+    ...allMeasurements(`All ${evidence.scenarios.length} scenarios · median time, scale, samples and checkpoints`, [
       perfFigure({
         id: "core-paths",
         title: "Median time per scenario",
@@ -1552,7 +1552,7 @@ function renderXlsxSection(
     "",
     figure("memory"),
     "",
-    ...allMeasurements(provenance),
+    ...allMeasurements("Capture details · fixture, engines and environment", provenance),
     "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
     "",
     '```sh verify title="XLSX codec evidence"',
@@ -2012,22 +2012,22 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   lines.push("## Formula engine benchmark", "");
   if ("evidence" in formula) {
     const { evidence, source } = formula;
+    // The engine change leads; the release capture's own evidence sits with its figure below.
+    lines.push(...(await renderEngineChange()));
     lines.push(
-      `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.workloads.length} recalculation workloads across dependency shapes; every workload passed the protocol's safety ceilings.</div>`,
+      "### Every workload",
+      "",
+      `The ${evidence.workloads.length} recalculation workloads as the release capture measured them, each under its own release's harness; every workload passed the protocol's safety ceilings.`,
       "",
       ...provenanceList([
         ["Captured", `${formatCaptureTime(evidence.meta.timestamp)} UTC`],
         ["Commit", `${shortHash(evidence.meta.commit)} clean worktree`],
         ["Raw artifact", `<code>${html(source)}</code>`],
       ]),
-    );
-
-    lines.push(...(await renderEngineChange()));
-    lines.push(
-      "### Every workload",
-      "",
-      // The engine change leads; the absolute time of every workload is on demand.
-      ...allMeasurements([formulaFigure(formulaCaptures.machines)]),
+      ...allMeasurements(
+        `All ${evidence.workloads.length} workloads · median time · ${formulaCaptures.machines.map(({ machine }) => machineName(machine).name).join(" and ")}`,
+        [formulaFigure(formulaCaptures.machines)],
+      ),
     );
     lines.push(
       "",
