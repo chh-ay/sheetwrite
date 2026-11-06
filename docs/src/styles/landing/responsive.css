@@ -1,0 +1,147 @@
+/* ---- Responsive ---------------------------------------------------------------- */
+
+@media (max-width: 72rem) {
+  .sw-lp-hero,
+  .sw-lp-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-lp-split {
+    grid-template-areas:
+      "head"
+      "code"
+      "result";
+    grid-template-rows: auto;
+  }
+
+  /* One column: copy, then the actions, then the app preview. */
+  .sw-lp-hero {
+    row-gap: var(--sw-space-8);
+  }
+
+  .sw-lp-hero h1 {
+    max-width: 16ch;
+  }
+
+  .sw-lp-facts dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-lp-engines__choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-lp-new {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .sw-arch__steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-arch__steps li + li {
+    border-top: 1px solid var(--sw-border);
+    border-left: 0;
+  }
+
+  .sw-reel__panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-reel__stage {
+    border-top: 1px solid var(--sw-border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 48rem) {
+  .sw-lp-head {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--sw-space-4);
+  }
+
+  /* The full eyebrow wraps at phone width and strands its last word. */
+  .sw-lp-eyebrow__extra {
+    display: none;
+  }
+
+  /* Keep every chapter reachable on touch screens. */
+  .ha-acts button {
+    padding: var(--sw-space-3) var(--sw-space-2);
+    font-size: var(--sw-text-eyebrow);
+  }
+
+  /* The architecture diagram's labels are too small at phone width; the
+     numbered steps carry the same content. */
+  .sw-arch .as {
+    display: none;
+  }
+
+  .sw-arch__steps {
+    border-top: 0;
+  }
+
+  .sw-features,
+  .sw-lp-engines__choices,
+  .sw-lp-new ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-bench__bars li {
+    grid-template-columns: 5rem minmax(0, 1fr) 4.5rem;
+    gap: var(--sw-space-1-5) var(--sw-space-3);
+  }
+
+  .sw-bench__capture {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-lp-close .sw-lp-actions {
+    width: 100%;
+  }
+
+  .sw-reel__tabs button {
+    padding: var(--sw-space-3) var(--sw-space-2);
+    font-size: var(--sw-text-caption);
+  }
+}
+
+@media (max-width: 30rem) {
+  .sw-lp-facts dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-landing :is(.ha-window, .as, .fg, .sr) *,
+  .sw-landing .sw-bench__track i {
+    animation: none !important;
+  }
+
+  /* No timer, so the reel never changes story by itself and needs no pause. */
+  .sw-reel__timer,
+  .sw-reel__pause {
+    display: none;
+  }
+
+  .sw-lp-button,
+  .sw-features a,
+  .sw-reel__tabs::before,
+  .sw-reel__tabs button {
+    transition: none;
+  }
+
+  .sw-reel__copy,
+  .sw-reel__stage {
+    animation: none;
+  }
+
+  .sw-features a:hover {
+    translate: none;
+  }
+}

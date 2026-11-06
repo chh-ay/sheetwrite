@@ -52,7 +52,7 @@ export function CodeTabs() {
       {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Framework"
-        className="sw-tabs__list"
+        className="sw-code-tabs__list"
         onKeyDown={(event) =>
           onTabListKey(
             event,

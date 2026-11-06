@@ -4,7 +4,7 @@ import { siteUrl } from "./playwright.config.js";
 
 // Browser contracts for shared documentation controls: framework tabs, the
 // package command, reader preferences, fragments, the symbol filter outline,
-// and focus in forced-colors mode.
+// the landing story reel, and focus in forced-colors mode.
 
 const INSTALLATION_URL = siteUrl("/docs/start/installation/");
 /** The page clock runs on to this point, then stops; timers then fire only on demand. */
@@ -27,6 +27,12 @@ function collectErrors(page: Page): PageErrors {
 /** Interactive steps need attached listeners; the root component marks hydration. */
 async function waitForHydration(page: Page): Promise<void> {
   await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
+}
+
+async function blurFocus(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
 }
 
 function frameworkTabs(page: Page): Locator {
@@ -159,6 +165,35 @@ test("the outline lists only symbol groups that the filter shows", async ({ page
     }),
   );
   expect(hiddenTargets).toHaveLength(0);
+});
+
+test("the story reel holds its story while focus is inside or the reader pauses it", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto(siteUrl("/"));
+  await waitForHydration(page);
+  const reel = page.locator(".sw-reel");
+  await reel.scrollIntoViewIfNeeded();
+  const timer = reel.locator(".sw-reel__timer");
+  await expect(timer).toHaveCount(1);
+
+  // A focused story link must not be removed by an automatic story change.
+  await reel.locator(".sw-reel__copy a").focus();
+  await expect(timer).toHaveCount(0);
+  await blurFocus(page);
+  await expect(timer).toHaveCount(1);
+
+  const pause = reel.getByRole("button", { name: "Pause stories" });
+  await pause.click();
+  await expect(pause).toHaveAttribute("aria-pressed", "true");
+  await blurFocus(page);
+  await expect(timer).toHaveCount(0);
+
+  await pause.click();
+  await blurFocus(page);
+  await expect(pause).toHaveAttribute("aria-pressed", "false");
+  await expect(timer).toHaveCount(1);
 });
 
 test("keyboard focus stays visible in forced-colors mode", async ({ page }) => {

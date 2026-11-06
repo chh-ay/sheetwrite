@@ -94,14 +94,3 @@
     width: 0;
   }
 }
-
-@media (max-width: 48rem) {
-  .sw-bench__bars li {
-    grid-template-columns: 5rem minmax(0, 1fr) 4.5rem;
-    gap: var(--sw-space-1-5) var(--sw-space-3);
-  }
-
-  .sw-bench__capture {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}

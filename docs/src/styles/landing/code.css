@@ -1,17 +1,69 @@
-/* ---- Code tabs: framework snippets in one code frame ------------------------- */
+/* ---- Code tabs --------------------------------------------------------------- */
+
+/* Heading over result on the left, code on the right. One column puts the
+   result after the code it shows. */
+.sw-lp-split {
+  display: grid;
+  grid-template-areas:
+    "head code"
+    "result code";
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-rows: auto 1fr;
+  gap: var(--sw-space-8) clamp(var(--sw-space-8), 5vw, var(--sw-space-20));
+  align-items: start;
+}
+
+.sw-lp-split .sw-lp-head {
+  display: block;
+  grid-area: head;
+  margin: 0;
+}
+
+.sw-lp-split .sw-code-tabs {
+  grid-area: code;
+}
+
+.sw-lp-split .sw-lp-result {
+  grid-area: result;
+}
+
+.sw-lp-split .sw-lp-head h2 {
+  margin-bottom: var(--sw-space-4);
+}
 
 .sw-code-tabs {
   min-width: 0;
   overflow: hidden;
-  border: var(--sw-border-width) solid var(--sw-border);
+  border: 1px solid var(--sw-border-strong);
   border-radius: var(--sw-radius-xl);
-  background: var(--sw-code-bg);
-  box-shadow: var(--sw-shadow-md);
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
 }
 
-.sw-code-tabs .sw-tabs__list {
-  padding: 0 var(--sw-space-3);
+.sw-code-tabs__list {
+  display: flex;
+  gap: var(--sw-space-1);
+  padding: var(--sw-space-2);
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-code-tabs__list button {
+  padding: var(--sw-space-2) var(--sw-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--sw-radius-md);
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
+  cursor: pointer;
+}
+
+.sw-code-tabs__list button:hover {
+  color: var(--sw-fg-strong);
+}
+
+.sw-code-tabs__list button[aria-selected="true"] {
+  border-color: var(--sw-border-strong);
   background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
 }
 
 .sw-code-tabs__panel {
@@ -20,16 +72,12 @@
 
 /* The highlighted snippet sits flush in the panel instead of as a second card. */
 .sw-code-tabs__panel .expressive-code .frame,
-.sw-code-tabs__panel .expressive-code .frame pre,
-.sw-lp-engine .expressive-code .frame {
-  margin: 0;
-  box-shadow: none;
-}
-
-.sw-code-tabs__panel .expressive-code .frame,
 .sw-code-tabs__panel .expressive-code .frame pre {
+  margin: 0;
   border: 0;
   border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* On the landing, the snippet is read, not studied: hover popovers still work,
@@ -37,4 +85,185 @@
 .sw-code-tabs__panel .sw-code-popover__trigger,
 .sw-code-tabs__panel .sw-code-popover__trigger[data-hover-kind] {
   text-decoration: none;
+}
+
+/* The result beside the code: the same rows as a small sheet. The grid gap
+   spaces it, so it has no margin of its own. */
+.sw-lp-result {
+  margin: 0;
+}
+
+.sw-lp-result table {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-lg);
+  border-collapse: separate;
+  border-spacing: 0;
+  background: color-mix(in srgb, var(--sw-surface-1) 94%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-lp-result th,
+.sw-lp-result td {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  text-align: left;
+}
+
+.sw-lp-result tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.sw-lp-result thead th {
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.2 var(--sw-font-body);
+}
+
+.sw-lp-result th:first-child {
+  width: 2.5rem;
+  border-right: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.2 var(--sw-font-mono);
+  text-align: center;
+}
+
+.sw-lp-result td {
+  color: var(--sw-fg);
+}
+
+.sw-lp-result td:last-child,
+.sw-lp-result thead th:last-child {
+  text-align: right;
+}
+
+.sw-lp-result figcaption {
+  margin-top: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: 1.55;
+}
+
+/* ---- Engine choice ----------------------------------------------------------- */
+
+.sw-lp-engines__choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sw-space-5);
+}
+
+.sw-lp-engines__choices article {
+  display: grid;
+  align-content: start;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-6);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-engines__choices article[data-variant="full"] {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-engines__choices article > span {
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.sw-lp-engines__choices article strong {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1.2 var(--sw-font-mono);
+}
+
+.sw-lp-engines__choices article p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  line-height: 1.6;
+}
+
+.sw-lp-engines__choices article code {
+  justify-self: start;
+  margin-top: var(--sw-space-1-5);
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+}
+
+.sw-lp-engines__choices .sw-lp-engines__size {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-lp-engines__size b {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-h2) / 1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--sw-tracking-display);
+}
+
+/* ---- New in this release ---------------------------------------------------- */
+
+.sw-lp-new {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sw-space-4) var(--sw-space-10);
+  align-items: center;
+  margin-top: var(--sw-space-5);
+  padding: var(--sw-space-5) var(--sw-space-6);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+}
+
+.sw-lp-new h3 {
+  margin: 0;
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sw-lp-new ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sw-space-2) var(--sw-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-lp-new li {
+  position: relative;
+  padding-left: var(--sw-space-4);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: 1.5;
+}
+
+.sw-lp-new li::before {
+  position: absolute;
+  top: 0.55em;
+  left: 0;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--sw-accent);
+  content: "";
+}
+
+.sw-lp-new > a {
+  color: var(--sw-accent-strong);
+  font-weight: var(--sw-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
 }

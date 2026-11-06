@@ -233,26 +233,3 @@
 .sw-arch__steps li[data-current="true"]::before {
   transform: scaleX(1);
 }
-
-@media (max-width: 72rem) {
-  .sw-arch__steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-arch__steps li + li {
-    border-top: var(--sw-border-width) solid var(--sw-border);
-    border-left: 0;
-  }
-}
-
-/* The diagram's labels are too small at phone width; the numbered steps
-   carry the same content. */
-@media (max-width: 48rem) {
-  .sw-arch .as {
-    display: none;
-  }
-
-  .sw-arch__steps {
-    border-top: 0;
-  }
-}
