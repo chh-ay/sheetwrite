@@ -6,6 +6,7 @@
       "entry": [
         "src/index.ts",
         "src/adapter.ts",
+        "src/external-links.ts",
         "src/functions.ts",
         "src/history-archive.ts",
         "src/history-indexeddb.ts",

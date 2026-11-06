@@ -45,7 +45,7 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorContext,
 } from "../errors.js";
-import { installExternalLinks } from "../external-link.js";
+import { installExternalLinks, removeExternalLinks } from "../external-link.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -3788,6 +3788,22 @@ export class StoreDataEngine {
         this.workbook.namedRanges = ranges.filter(
           (range) => !this.sameNamedRange(range, patch.name, patch.scope),
         );
+        return true;
+      }
+
+      case "setExternalLinks": {
+        // The engine turns references to a removed link sheet back into
+        // unresolved references and re-resolves them when it is added, so
+        // replacing the links never changes formula text.
+        const previous = this.workbook.externalLinks ?? [];
+        removeExternalLinks(this.wasm, previous);
+        if (!installExternalLinks(this.wasm, patch.links)) {
+          removeExternalLinks(this.wasm, patch.links);
+          installExternalLinks(this.wasm, previous);
+          return false;
+        }
+        this.workbook.externalLinks =
+          patch.links.length > 0 ? cloneJsonValue(patch.links) : undefined;
         return true;
       }
 

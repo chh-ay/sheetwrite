@@ -609,6 +609,8 @@ export type DocumentOp =
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId }
   | { op: "setCalculation"; calculation: CalculationSettings }
+  /** Replace the saved values of every linked workbook; an empty list removes them. */
+  | { op: "setExternalLinks"; links: ExternalLink[] }
   /** Insert or replace the relationship with `relationship.id`. */
   | { op: "setRelationship"; relationship: TableRelationship }
   | { op: "removeRelationship"; id: string }

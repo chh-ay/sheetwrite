@@ -3133,6 +3133,79 @@ where
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
 /// 3-D references are left to [`refresh_sheet_spans`]: removing one of their
 /// sheets shrinks the span instead.
+/// Point the references whose sheet name has the lookup `key` at `handle`,
+/// or back to unresolved sheet references when `handle` is `None`. Only the
+/// sheets of linked workbooks come and go this way; the text stays the same.
+pub(crate) fn relink_sheet_refs(ast: &mut Ast, key: &str, handle: Option<u32>) -> bool {
+    let relinked = match (&*ast, handle) {
+        (Ast::SheetCell(sheet, row, col, flags), Some(handle))
+            if sheet_name_key(&sheet.name) == key =>
+        {
+            Some(Ast::AbsCell(
+                SheetRef {
+                    handle,
+                    name: sheet.name.clone(),
+                    quoted: sheet.quoted,
+                },
+                *row,
+                *col,
+                *flags,
+            ))
+        }
+        (Ast::SheetRange(sheet, r0, c0, r1, c1, flags), Some(handle))
+            if sheet_name_key(&sheet.name) == key =>
+        {
+            Some(Ast::AbsRange(
+                SheetRef {
+                    handle,
+                    name: sheet.name.clone(),
+                    quoted: sheet.quoted,
+                },
+                *r0,
+                *c0,
+                *r1,
+                *c1,
+                *flags,
+            ))
+        }
+        (Ast::AbsCell(sheet, row, col, flags), None) if sheet_name_key(&sheet.name) == key => {
+            Some(Ast::SheetCell(
+                UnresolvedSheetRef {
+                    name: sheet.name.clone(),
+                    quoted: sheet.quoted,
+                },
+                *row,
+                *col,
+                *flags,
+            ))
+        }
+        (Ast::AbsRange(sheet, r0, c0, r1, c1, flags), None)
+            if sheet_name_key(&sheet.name) == key =>
+        {
+            Some(Ast::SheetRange(
+                UnresolvedSheetRef {
+                    name: sheet.name.clone(),
+                    quoted: sheet.quoted,
+                },
+                *r0,
+                *c0,
+                *r1,
+                *c1,
+                *flags,
+            ))
+        }
+        _ => None,
+    };
+
+    match relinked {
+        Some(relinked) => {
+            *ast = relinked;
+            true
+        }
+        None => ast.fold_children_mut(&mut |child| relink_sheet_refs(child, key, handle)),
+    }
+}
+
 pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
     let invalid = matches!(
         ast,

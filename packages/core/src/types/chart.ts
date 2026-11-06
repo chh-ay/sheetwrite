@@ -45,6 +45,12 @@ export interface ChartDefinition {
    * over pivots show on dashboards.
    */
   pivot?: string;
+  /**
+   * The value fields of the pivot that the chart plots, by position in the
+   * pivot's `values`, as the Field List picks a PivotChart's values in
+   * Excel. Absent plots every value field. Only valid with `pivot`.
+   */
+  pivotValues?: number[];
 }
 
 /** Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order. */
