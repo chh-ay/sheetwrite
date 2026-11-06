@@ -100,6 +100,7 @@ const VIEW: ChartView = {
       name: "Sum of Amount",
       values: [1, 2],
       categories: ["East", "West"],
+      categoryLevels: [],
       numberFormats: [null, null],
       categoryFormats: [null, null],
       numberLocale: null,

@@ -49,7 +49,7 @@ import { slicerSelection } from "./dashboard-payload.js";
 const NEEDS_FULL_ENGINE =
   "This item needs the full engine. Load @sheetwrite/formulas to compute it.";
 const NEEDS_CHARTS =
-  "Charts need @sheetwrite/charts. Import @sheetwrite/charts/register to draw them.";
+  "Charts need @sheetwrite/charts. Install chartsAddon() through initSheetwrite to draw them.";
 const TAKEN = "Another item is in that place.";
 const MOVE_HINT = "Arrow keys move the item. Enter or Escape ends.";
 const RESIZE_HINT = "Arrow keys resize the item. Enter or Escape ends.";

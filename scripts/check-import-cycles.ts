@@ -166,6 +166,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "PowerQueryLoss",
       "PowerQueryUnsupported",
       "QueryAggregate",
+      "QueryCommands",
       "QueryColumnSpec",
       "QueryColumnType",
       "QueryJoinKind",
@@ -200,6 +201,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     dependencies: ["coordinates"],
     exports: [
       "ChartAnchor",
+      "ChartCategoryLevel",
       "ChartChangeEvent",
       "ChartChangeListener",
       "ChartDefinition",
@@ -338,6 +340,19 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "Viewport",
     ],
   },
+  xlsx: {
+    source: "packages/core/src/types/xlsx.ts",
+    dependencies: ["chart", "coordinates", "dashboard", "data", "document", "query", "store"],
+    exports: [
+      "XlsxResourceLimits",
+      "XlsxTableExportBackend",
+      "XlsxTableImportBackend",
+      "XlsxWorkbookBackend",
+      "XlsxWorkbookExportContext",
+      "XlsxWorkbookOptions",
+      "XlsxWorkbookWarning",
+    ],
+  },
   grid: {
     source: "packages/core/src/types/grid.ts",
     dependencies: [
@@ -386,9 +401,21 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "SheetLifecycleResult",
       "SearchResult",
       "SelectionSummary",
+      "SheetwriteAddonSettings",
       "ToolbarActionName",
       "ToolbarIcon",
       "ToolbarItem",
+    ],
+  },
+  addon: {
+    source: "packages/core/src/types/addon.ts",
+    dependencies: ["grid", "query", "store", "xlsx"],
+    exports: [
+      "SheetwriteAddon",
+      "SheetwriteAddonContext",
+      "SheetwriteAddonGridContext",
+      "SheetwriteChartParts",
+      "SheetwriteXlsxParts",
     ],
   },
 };

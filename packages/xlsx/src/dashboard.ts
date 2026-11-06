@@ -2,8 +2,10 @@
 // writes each dashboard as a worksheet of its current values: one worksheet
 // column per grid column and one row per grid row. Each item writes its
 // caption and values at the top-left of its box, and a chart item writes a
-// native chart with literal data over its box. The dashboard itself stays in
-// the Sheetwrite metadata sheet, so Sheetwrite opens it as a dashboard again.
+// native chart over its box that reads the values written for its pivot, or
+// holds literal data when no written cells hold them. The dashboard itself
+// stays in the Sheetwrite metadata sheet, so Sheetwrite opens it as a
+// dashboard again.
 
 import type {
   CellScalar,
@@ -15,6 +17,8 @@ import type {
   SnapshotCell,
 } from "@sheetwrite/core";
 
+import type { PivotCells } from "./chart-cells.js";
+import type { PivotChartData } from "./chart-write.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 
 /** Columns of the dashboard grid; Sheetwrite's layout has 12. */
@@ -24,10 +28,10 @@ const COLUMN_WIDTH = 100;
 /** Excel's default row height, in pixels; the chart height follows it. */
 const ROW_HEIGHT = 20;
 
-/** A dashboard as a static worksheet, and the literal data of its charts by chart ID. */
+/** A dashboard as a static worksheet, and the data of its charts by chart ID. */
 export interface StaticDashboard {
   readonly sheet: SheetSnapshot;
-  readonly charts: ReadonlyMap<string, ChartView>;
+  readonly charts: ReadonlyMap<string, PivotChartData>;
 }
 
 /** The cell of one item value, with its number format or, in the caption row, bold text. */
@@ -66,7 +70,9 @@ export function staticDashboard(
   context: XlsxCodecContext,
 ): StaticDashboard {
   const cells = new Map<number, SnapshotCell>();
-  const charts = new Map<string, ChartView>();
+  // The values of each pivot item and its box, so a chart over that pivot can read them.
+  const pivotCells = new Map<string, PivotCells>();
+  const views: ChartView[] = [];
   const chartDefinitions: ChartDefinition[] = [];
   let rowCount = 1;
   let colCount = GRID_COLUMNS;
@@ -95,6 +101,13 @@ export function staticDashboard(
       }
     }
 
+    if (item.kind === "pivot" && !pivotCells.has(item.pivot)) {
+      pivotCells.set(item.pivot, {
+        cells: exported.cells,
+        origin: { row: item.box.y, col: item.box.x },
+      });
+    }
+
     if (exported.chart !== undefined) {
       const { pivot: _pivot, ...chart } = exported.chart.chart;
       chartDefinitions.push({
@@ -109,10 +122,15 @@ export function staticDashboard(
         },
         series: [],
       });
-      charts.set(chart.id, exported.chart);
+      views.push(exported.chart);
     }
   }
 
+  const charts = new Map<string, PivotChartData>();
+  for (const view of views) {
+    const written = view.chart.pivot === undefined ? undefined : pivotCells.get(view.chart.pivot);
+    charts.set(view.chart.id, written === undefined ? { view } : { view, cells: written });
+  }
   return {
     sheet: {
       id: sheet.id,

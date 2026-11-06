@@ -59,19 +59,49 @@
   width: 100%;
   table-layout: fixed;
 }
+/* Fixed tracks for the short columns; the description takes the rest. */
 .sw-prose .sw-formula-table :is(th, td):nth-child(1) {
-  width: 36%;
+  width: 32%;
 }
-.sw-prose .sw-formula-table :is(th, td):nth-child(2) {
-  width: 22%;
+.sw-prose .sw-formula-table :is(th, td):nth-child(3) {
+  width: 8rem;
+}
+.sw-prose .sw-formula-table :is(th, td):nth-child(4) {
+  width: 9.5rem;
+}
+.sw-prose .sw-formula-table .sw-formula-summary {
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+  overflow-wrap: normal;
 }
 .sw-prose .sw-formula-table td {
+  padding-block: var(--sw-space-2);
   vertical-align: top;
   overflow-wrap: anywhere;
 }
+/* The call syntax, the row's name: the function name and the argument
+   names (`var`) take the code roles, the bare punctuation the punctuation
+   colour. Long syntax wraps after an argument instead of running into the
+   next column. */
+.sw-prose .sw-formula-table .sw-formula-syntax {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sw-code-punctuation);
+  font-size: var(--sw-text-small);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sw-prose .sw-formula-table .sw-formula-syntax var {
+  color: var(--sw-code-property);
+  font-style: normal;
+}
 .sw-prose .sw-formula-table small {
   display: block;
-  margin-top: var(--sw-space-1);
+  margin-top: var(--sw-space-0-5);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-formula-table details {
   margin: 0;
@@ -237,5 +267,40 @@
   .sw-prose .sw-key-preview,
   .sw-prose ol.sw-command-states {
     grid-template-columns: 1fr;
+  }
+  /* Phones: each function is a stacked card-row; Engine and Contract carry
+     their column names as labels. */
+  .sw-prose .sw-formula-table,
+  .sw-prose .sw-formula-table tbody,
+  .sw-prose .sw-formula-table tr,
+  .sw-prose .sw-formula-table td {
+    display: block;
+    width: auto;
+  }
+  .sw-prose .sw-formula-table :is(th, td):nth-child(n) {
+    width: auto;
+  }
+  .sw-prose .sw-formula-table thead {
+    display: none;
+  }
+  .sw-prose .sw-formula-table tr {
+    padding: var(--sw-space-2) var(--sw-space-3);
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+  }
+  .sw-prose .sw-formula-table td {
+    padding: var(--sw-space-0-5) 0;
+    border: 0;
+  }
+  .sw-prose .sw-formula-table td[data-label] {
+    display: flex;
+    gap: var(--sw-space-2);
+    align-items: baseline;
+  }
+  .sw-prose .sw-formula-table td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    width: 5rem;
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-text-caption);
   }
 }

@@ -206,13 +206,24 @@ import "@sheetwrite/core/styles.css";
 
 ### Widget and context-menu styling
 
-The stylesheet also exposes widget variables, in addition to the canvas theme mapping:
+The built-in widgets (toolbar, find bar, menus, panels and the dashboard) read widget variables. The grid sets the theme ones on its host element from the resolved theme; when unset, the others derive in the stylesheet from those, so the widgets follow the light and dark themes:
 
-| CSS custom property | Widget use | Fallback |
+| CSS custom property | Widget use | Default |
 | --- | --- | --- |
-| `--sheetwrite-widget-border` | Borders and separators for toolbar, find and menu chrome | `--sheetwrite-grid-line` |
-| `--sheetwrite-menu-hover` | Context-menu item hover background | `--sheetwrite-grid-line` |
-| `--sheetwrite-menu-disabled-opacity` | Disabled context-menu row opacity | `0.5` |
+| `--sheetwrite-widget-font` | Widget text | theme `font` |
+| `--sheetwrite-widget-bg` | Widget and dashboard card background | theme `bg` |
+| `--sheetwrite-widget-fg` | Widget text color | theme `fg` |
+| `--sheetwrite-widget-border` | Borders and separators for toolbar, find and menu chrome | theme `gridLine` |
+| `--sheetwrite-widget-accent` | Accented labels | theme `headerFg` |
+| `--sheetwrite-widget-selection` | Selected rows and values | theme `selection` |
+| `--sheetwrite-toolbar-bg` | Toolbar background | theme `headerBg` |
+| `--sheetwrite-toolbar-fg` | Toolbar text | theme `headerFg` |
+| `--sheetwrite-menu-hover` | Context-menu item hover background | theme `gridLine` |
+| `--sheetwrite-widget-muted` | Secondary text | `--sheetwrite-widget-fg` mixed 62% with `--sheetwrite-widget-bg` |
+| `--sheetwrite-widget-muted-bg` | Dashboard background under its cards | `--sheetwrite-widget-fg` mixed 4% with `--sheetwrite-widget-bg` |
+| `--sheetwrite-widget-error` | Error text and outlines | red mixed 80% with `--sheetwrite-widget-fg` |
+| `--sheetwrite-menu-shadow` | Menu and popup shadow | a soft dark shadow |
+| `--sheetwrite-menu-disabled-opacity` | Disabled context-menu rows; disabled and mixed ribbon buttons | `0.5` on menu rows, `0.45` on ribbon buttons |
 
 The bundled menu uses these public classes:
 
@@ -224,13 +235,13 @@ The bundled menu uses these public classes:
 | `.sheetwrite-context-menu-shortcut` | Shortcut hint |
 | `.sheetwrite-context-menu-sep` | Separator |
 
-Scope overrides below the grid host. Do not replace positioning, visibility, or disabled behavior:
+The values on the host element are inline, so set an override on the widget element below the host, where it wins without `!important`. Do not replace positioning, visibility, or disabled behavior:
 
 ```css partial="host-scoped visual override" title="Context menu theme hooks"
-.sheetwrite {
+.sheetwrite .sheetwrite-context-menu {
   --sheetwrite-widget-border: #334155;
   --sheetwrite-menu-hover: #1e293b;
-  --sheetwrite-menu-disabled-opacity: 0.45;
+  --sheetwrite-menu-disabled-opacity: 0.5;
 }
 
 .sheetwrite .sheetwrite-context-menu-item {

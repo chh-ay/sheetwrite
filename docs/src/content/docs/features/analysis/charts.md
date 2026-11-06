@@ -4,9 +4,10 @@ description: "Add column, bar, line, area, pie, doughnut and scatter charts that
 ---
 
 ```ts prelude="core" partial="requires a grid with month names in A2:A4 and revenue in B2:B4" title="A line chart of three months"
-import { registerChartsBackend } from "@sheetwrite/charts";
+import { chartsAddon } from "@sheetwrite/charts";
+import { initSheetwrite } from "@sheetwrite/core";
 
-registerChartsBackend();
+await initSheetwrite({ addons: [chartsAddon()] });
 grid.setChart({
   id: "revenue",
   kind: "line",
@@ -36,7 +37,7 @@ grid.setChart({
 <summary>Full setup</summary>
 
 ```ts compile title="A grid with three months of revenue and a line chart"
-import { registerChartsBackend } from "@sheetwrite/charts";
+import { chartsAddon } from "@sheetwrite/charts";
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 
@@ -44,9 +45,8 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (!host) throw new Error("Missing #grid host");
 host.style.height = "360px";
 
-await initSheetwrite();
-// Without this call a chart shows as a frame with its title.
-registerChartsBackend();
+// Without the charts add-on a chart shows as a frame with its title.
+await initSheetwrite({ addons: [chartsAddon()] });
 
 const workbook: Workbook = {
   activeSheet: "s",
@@ -86,8 +86,8 @@ belongs to a sheet and floats over its cells.
 ## Add the charts package
 
 Core keeps the chart definitions, and `@sheetwrite/charts` draws them. Install
-it and call `registerChartsBackend()` once, before or after you create grids.
-To register by import only, import `@sheetwrite/charts/register`.
+it and pass `chartsAddon()` to `initSheetwrite({ addons })` before you create
+grids. Grids created before that draw each chart as a frame with its title.
 
 ```sh verify title="Install the charts package"
 npm install @sheetwrite/charts
@@ -108,7 +108,7 @@ step and returns the transaction result, so a rejected chart reports why.
 | `id` | A stable ID, unique on its sheet. |
 | `kind` | `column`, `bar`, `line`, `area`, `pie`, `doughnut` or `scatter`. |
 | `title` | Text above the chart. Without it, the chart has no title. |
-| `axes` | `{ xTitle, yTitle }`, the axis titles. |
+| `axes` | `{ xTitle, yTitle, multiLevelLabels }`: the axis titles, and `false` to draw category levels in one row. |
 | `legend` | `none`, `top`, `right`, `bottom` or `left`. |
 | `anchor` | The top-left cell (`row`, `col`), the offset from that cell, and the size, all in CSS pixels. |
 | `series` | One entry for each series: `values`, optional `categories`, and a `name` or a `nameRange`. |
@@ -134,6 +134,41 @@ source range. A longer range draws its first 10,000 cells and shows a note.
   value in each horizontal pixel, so a 10,000-point series stays fast.
 - Screen readers announce a chart by its title and kind. The chart image inside
   it has a description that lists the series.
+
+### Multi-level category labels
+
+A category range of several columns holds one category level per column, as
+in Excel ([Change the display of chart axes](https://support.microsoft.com/en-us/office/change-the-display-of-chart-axes-422c97af-1483-4bad-a3db-3a9ef630b5a9),
+"Multi-level Category Labels"). The last column labels each point, and each
+column to its left is an outer level. When the values run along a row, the
+category range has one level per row, and the last row is the inner level.
+
+| Region | Segment | Amount |
+| --- | --- | --- |
+| East | Retail | 10 |
+| | Online | 7 |
+| West | Retail | 4 |
+| | Online | 11 |
+
+With categories A2:B5 and values C2:C5, the chart draws Retail, Online,
+Retail, Online on the first row of labels, and East and West once each on the
+second row, centered under their groups. A blank cell continues the group
+above it; a filled cell starts a new group, also when it repeats the label
+above. Lines divide the categories through the first row and the groups
+through every row.
+
+- Inner labels that do not fit their band turn to read upward. When they
+  still overlap, only every n-th inner label is drawn. Outer labels wrap
+  within their group.
+- In a bar chart, the levels stand in columns left of the plot, and outer
+  labels read upward, as in Excel.
+- `axes.multiLevelLabels: false` draws one row of labels, as Excel does when
+  Format Axis › Multi-level Category Labels is cleared: each label is the text
+  of its levels from the outside in, such as `East Retail`. The Chart panel
+  shows the **Multi-level category labels** check box when the categories
+  have levels.
+- Pie and doughnut charts name each slice from the outside in.
+- Scatter charts read the categories as x values, so they have no levels.
 
 ## Insert and edit in the grid
 
@@ -166,8 +201,9 @@ A chart with `pivot` shows the result of that pivot, as an Excel PivotChart
 does ([Create a PivotChart](https://support.microsoft.com/en-us/office/create-a-pivotchart-c1b1e057-6990-4c38-b52b-8255538e7b1c)):
 
 - The categories are the leaf row items. When the pivot has more than one row
-  field, each label joins the items from the outside in, such as
-  `East / Retail`. Excel draws such labels as [multi-level category labels](https://support.microsoft.com/en-us/office/change-the-display-of-chart-axes-422c97af-1483-4bad-a3db-3a9ef630b5a9).
+  field, the outer row fields are the outer category levels, as in an Excel
+  PivotChart: each outer item shows once, under its group. See
+  [Multi-level category labels](#multi-level-category-labels).
 - Each value field, for each column item, is one series.
 - Subtotals and grand totals are never points, whatever the pivot's layout
   and total settings. Excel PivotCharts do not plot them either
@@ -209,10 +245,24 @@ combination charts, Excel PivotCharts, and series that read literal values or
 several ranges. See
 [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/).
 
-Export writes a chart over a pivot with the values it shows as literal data,
-so Excel opens it as a standard chart of those values. Sheetwrite keeps the
-chart's `pivot` in its metadata, so the file opens in Sheetwrite as a chart
-over the pivot again.
+Export writes a chart over a pivot with references to the cells that hold the
+pivot's values, and those values as the chart's cache:
+
+- Over a worksheet pivot that the export writes as an Excel PivotTable, the
+  chart is that table's PivotChart (`c:pivotSource`). Its ranges span the
+  table's rows, as Excel's PivotCharts do, also in compact layout and with
+  subtotals.
+- Over a pivot whose values the export writes as cells, for example a pivot
+  item on a dashboard or a pivot kept in Sheetwrite metadata, the chart reads
+  those cells when the points fill them in order, as a tabular pivot without
+  subtotals writes them.
+- Otherwise the chart holds literal data. Category levels then have the
+  formula `#REF!` and the labels in their cache, because OOXML has no literal
+  form with levels.
+
+Category levels are `c:multiLvlStrRef` in both directions. Sheetwrite keeps
+the chart's `pivot` in its metadata, so the file opens in Sheetwrite as a
+chart over the pivot again.
 
 Import reads each chart part once per drawing. Repeated frames for that part
 stay opaque and emit the same warning. Once a sheet reaches its chart limit,

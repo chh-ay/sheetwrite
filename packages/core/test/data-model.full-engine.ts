@@ -8,7 +8,6 @@ import {
   createGridFromSnapshot,
   initSheetwrite,
   releaseEngineMemory,
-  setXlsxWorkbookBackend,
   SheetwriteStore,
   toXlsxWorkbook,
 } from "../src/index.js";
@@ -21,9 +20,10 @@ import type {
 } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 const relationship: TableRelationship = {

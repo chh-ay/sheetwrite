@@ -45,8 +45,9 @@ import "@sheetwrite/svelte/styles.css";
 import {
   fromXlsxTable, toXlsxWorkbook, downloadBytes, isSheetwriteError,
   type ColumnarData, type Workbook, type Grid, type XlsxWorkbookOptions,
+  initSheetwrite,
 } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { xlsxAddon } from "@sheetwrite/xlsx";
 
 const initialData: ColumnarData = {
   rowCount: 2, columns: { Item: ["Tea", "Coffee"], Amount: [12, 18] },
@@ -80,6 +81,7 @@ async function open(file: File) {
   busy = true; error = "";
   try {
     if (file.size > 8 * 1024 * 1024) throw new Error("File exceeds 8 MiB");
+    await initSheetwrite({ addons: [xlsxAddon()] });
     const data = await fromXlsxTable(await file.arrayBuffer(), options());
     if (controller.signal.aborted) return;
     activeGrid = undefined;
@@ -93,6 +95,7 @@ async function save() {
   if (!current) return;
   busy = true; error = "";
   try {
+    await initSheetwrite({ addons: [xlsxAddon()] });
     const bytes = await toXlsxWorkbook(current, options());
     if (!controller.signal.aborted) downloadBytes(bytes, "sales.xlsx", mime);
   } catch (failure) {

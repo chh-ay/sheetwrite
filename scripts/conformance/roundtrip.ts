@@ -9,7 +9,7 @@ import {
   DEFAULT_MAX_ITERATIONS,
 } from "../../packages/core/src/document-protocol.js";
 import type { WorkbookSnapshot, XlsxSourceGraph } from "../../packages/core/src/types/document.js";
-import type { XlsxWorkbookWarning } from "../../packages/core/src/xlsx-bridge.js";
+import type { XlsxWorkbookWarning } from "../../packages/core/src/types/xlsx.js";
 import { sheetwriteWorkbookBackend } from "../../packages/xlsx/src/workbook.js";
 import { canonicalJson } from "./normalize.js";
 

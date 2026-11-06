@@ -37,6 +37,7 @@ import {
 } from "@sheetwrite/core/shell";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 
+import { installXlsx } from "../lib/addons.js";
 import { errorText } from "../lib/errors.js";
 import { fitColumnPixels, rowGutterWidth } from "./column-fit.js";
 import {
@@ -454,7 +455,7 @@ export function totalRevenue(grid: Grid): number {
 
 /** Neutral workbook export: snapshot → XLSX bytes → browser download. */
 export async function exportWorkbookXlsx(grid: Grid, filename: string): Promise<number> {
-  await import("@sheetwrite/xlsx/register");
+  await installXlsx();
   const bytes = await toXlsxWorkbook(grid);
   downloadBytes(bytes, filename, XLSX_MIME);
   return bytes.byteLength;
@@ -464,7 +465,7 @@ export async function exportWorkbookXlsx(grid: Grid, filename: string): Promise<
 export async function importWorkbookXlsx(
   data: ArrayBuffer | Uint8Array,
 ): Promise<{ snapshot: WorkbookSnapshot; warnings: string[] }> {
-  await import("@sheetwrite/xlsx/register");
+  await installXlsx();
   const warnings: string[] = [];
   const snapshot = await fromXlsxWorkbook(data, {
     onWarning: (warning) => warnings.push(warning.message),

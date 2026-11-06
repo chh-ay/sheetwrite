@@ -3,11 +3,10 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import type { Workbook } from "@sheetwrite/core";
 import { fromXlsxWorkbook, initSheetwrite, SheetwriteStore, toXlsxTable } from "@sheetwrite/core";
 
-import { buildXlsxModel, registerXlsxBackends } from "../src/index.js";
+import { buildXlsxModel, xlsxAddon } from "../src/index.js";
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 function workbook(): Workbook {

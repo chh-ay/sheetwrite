@@ -31,6 +31,8 @@ export const Route = createFileRoute("/docs/$")({
       return {
         title: "Page moved",
         description: "This page has a new address.",
+        kind: undefined,
+        outline: [],
         moved: href,
         href,
       };
@@ -39,7 +41,14 @@ export const Route = createFileRoute("/docs/$")({
     const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
     if (document === undefined) throw notFound();
-    return { title: document.title, description: document.description, moved: undefined, href };
+    return {
+      title: document.title,
+      description: document.description,
+      kind: document.kind,
+      outline: document.outline ?? [],
+      moved: undefined,
+      href,
+    };
   },
   head: ({ loaderData }) => {
     const title = loaderData?.title ?? "Documentation";
@@ -134,6 +143,8 @@ function DocumentRoute() {
     <DocsShell
       activeHref={activeHref}
       description={metadata.description}
+      kind={metadata.kind}
+      outline={metadata.outline}
       reserveOutline
       title={metadata.title}
     >
