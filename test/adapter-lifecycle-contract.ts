@@ -104,6 +104,7 @@ export const GRID_OPTION_CONFORMANCE = {
   mutationPolicy: { policy: "reset", reason: "input-reset" },
   transactionResourceLimits: { policy: "reset", reason: "input-reset" },
   hyperlinkActivation: { policy: "reset", reason: "input-reset" },
+  addons: { policy: "reset", reason: "input-reset" },
   renderers: { policy: "reset", reason: "renderer-reset" },
   editors: { policy: "reset", reason: "input-reset" },
   overscan: { policy: "live", reason: null },
