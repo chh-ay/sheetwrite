@@ -17,6 +17,7 @@ import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
 import { explainPanel } from "./explain-panel.js";
 import { kpiPanel } from "./kpi-panel.js";
+import { measurePanel } from "./measure-panel.js";
 import { namePanel } from "./name-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
@@ -33,8 +34,10 @@ type OpenPanel =
         | "explain"
         | "names"
         | "queries"
+        | "links"
         | "sort"
         | "dataModel"
+        | "measures"
         | "history"
         | "slicer"
         | "kpi";
@@ -112,6 +115,17 @@ export function openNamePanel(grid: Grid, define = false): void {
   });
 }
 
+/** Data › Measures opens the measures panel. */
+export function openMeasurePanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "measures" };
+  const panel = measurePanel(grid);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
 /** Data › Data Model and Data › Relationships open the data model panel. */
 export function openDataModelPanel(grid: Grid): void {
   const state = stateOf(grid);
@@ -152,6 +166,14 @@ export function openQueryPanel(grid: Grid, create: boolean): void {
   openLazyPanel(grid, { kind: "queries" }, async () => {
     const { queryPanel } = await import("./query-panel.js");
     return (target) => queryPanel(target, create);
+  });
+}
+
+/** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
+export function openEditLinksPanel(grid: Grid): void {
+  openLazyPanel(grid, { kind: "links" }, async () => {
+    const { editLinksPanel } = await import("./edit-links-panel.js");
+    return editLinksPanel;
   });
 }
 

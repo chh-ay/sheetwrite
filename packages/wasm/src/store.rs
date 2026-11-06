@@ -8,9 +8,9 @@ use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, parse, parse_with_features, place_span, resolve_sheet_refs,
-    resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef,
-    TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, external_name_key, moved_index, moved_span, parse,
+    parse_with_features, place_span, resolve_sheet_refs, resolve_structured_refs, sheet_name_key,
+    shift_range, Ast, NamedRangeRef, StructuredRef, TableSection, UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -211,7 +211,7 @@ impl RangeSnapshot {
                 .map(|(_, _, entry)| {
                     std::mem::size_of::<(u32, u32)>()
                         + if entry.is_formula() {
-                            entry.source.len()
+                            entry.source().len()
                         } else {
                             std::mem::size_of::<AbsCellKey>()
                         }
@@ -224,7 +224,7 @@ impl RangeSnapshot {
         self.formulas
             .iter()
             .filter(|(_, _, entry)| entry.is_formula())
-            .map(|(_, _, entry)| entry.source.clone())
+            .map(|(_, _, entry)| entry.source().into_owned())
             .collect()
     }
 }
@@ -239,8 +239,11 @@ const MAX_TABLE_COLUMNS: usize = 16_384;
 const MAX_TABLE_NAME_BYTES: usize = 255;
 const MAX_TABLE_ID_BYTES: usize = 128;
 
+/// The lookup key of a defined name: the name without case. A name of a
+/// linked workbook, such as `Budget.xlsx!Total`, has the key of
+/// `external_name_key`, so every spelling of it finds the same name.
 pub(crate) fn workbook_name_key(value: &str) -> String {
-    value.to_uppercase()
+    external_name_key(value).unwrap_or_else(|| value.to_uppercase())
 }
 
 #[derive(Clone, Debug)]
@@ -1400,7 +1403,7 @@ impl CellStore {
             }
             let offset = ((row - r0) * cols + col - c0) as u32;
             if entry.is_formula() {
-                formulas.push((offset, entry.source.clone()));
+                formulas.push((offset, entry.source().into_owned()));
             } else if let Some(target) = entry.reference_target(sheet as u32) {
                 references.push((offset, target));
             }
@@ -1472,7 +1475,7 @@ impl CellStore {
                 };
                 if entry.is_formula() {
                     formula_offsets.push(offset as u32);
-                    formula_sources.push(entry.source.clone());
+                    formula_sources.push(entry.source().into_owned());
                 } else if let Some(target) = entry.reference_target(sheet as u32) {
                     reference_offsets.push(offset as u32);
                     reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
@@ -1639,10 +1642,13 @@ impl CellStore {
                 -1.0
             };
             let source = s.formulas.get(key, &self.formula_slots);
+            let text = source
+                .filter(|entry| entry.is_formula())
+                .map(FormulaEntry::source);
             let reference_target = source
                 .filter(|entry| entry.is_reference())
                 .and_then(|entry| entry.reference_target(sheet as u32));
-            let source_kind = if source.is_some_and(FormulaEntry::is_formula) {
+            let source_kind = if text.is_some() {
                 1
             } else if reference_target.is_some() {
                 2
@@ -1650,7 +1656,7 @@ impl CellStore {
                 0
             };
             let source_length = if source_kind == 1 {
-                source.map_or(0, |entry| entry.source.len())
+                text.as_ref().map_or(0, |text| text.len())
             } else if source_kind == 2 {
                 3
             } else {
@@ -1666,15 +1672,13 @@ impl CellStore {
                 f64::from(source_kind),
                 source_length as f64,
             ]);
-            if source_kind == 1 {
-                if let Some(entry) = source {
-                    for chunk in entry.source.as_bytes().chunks(4) {
-                        let mut word = 0u32;
-                        for (shift, byte) in chunk.iter().enumerate() {
-                            word |= u32::from(*byte) << (shift * 8);
-                        }
-                        cells.push(f64::from(word));
+            if let Some(text) = &text {
+                for chunk in text.as_bytes().chunks(4) {
+                    let mut word = 0u32;
+                    for (shift, byte) in chunk.iter().enumerate() {
+                        word |= u32::from(*byte) << (shift * 8);
                     }
+                    cells.push(f64::from(word));
                 }
             } else if let Some(target) = reference_target {
                 cells.extend_from_slice(&[
@@ -1778,7 +1782,7 @@ impl CellStore {
                 return false;
             };
             let source = if entry.is_formula() {
-                self.parse_formula_entry(&entry.source, sheet as u32, key.0, key.1)
+                self.parse_formula_entry(&entry.source(), sheet as u32, key.0, key.1)
             } else {
                 let Some(target) = entry.reference_target(sheet as u32) else {
                     return false;
@@ -2523,7 +2527,7 @@ impl CellStore {
             .get(sheet)?
             .formulas
             .get(key, &self.formula_slots)?;
-        entry.is_formula().then(|| entry.source.clone())
+        entry.is_formula().then(|| entry.source().into_owned())
     }
 
     #[wasm_bindgen(js_name = referenceTarget)]
@@ -3426,6 +3430,71 @@ impl CellStore {
         }
     }
 
+    /// Follow `block` (`from`, `count`, `to`) rows or, with `columns`,
+    /// columns of `edited_sheet` that move, in every formula, defined name
+    /// and table of the workbook. The cells themselves move afterwards.
+    pub(crate) fn move_references(
+        &mut self,
+        edited_sheet: u32,
+        columns: bool,
+        block: (u32, u32, u32),
+    ) {
+        for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
+            sheet
+                .formulas
+                .rewrite_entries(&mut self.formula_slots, |entry| {
+                    entry.move_axis(edited_sheet, formula_sheet as u32, columns, block);
+                });
+            sheet.formulas.mark_all_dirty();
+        }
+
+        let (from, count, to) = block;
+        for table in self
+            .tables
+            .values_mut()
+            .filter(|table| table.sheet == edited_sheet)
+        {
+            let span = if columns {
+                (&mut table.col_start, &mut table.col_end)
+            } else {
+                (&mut table.row_start, &mut table.row_end)
+            };
+            if let Some(moved) = moved_span(*span.0, *span.1, from, count, to) {
+                (*span.0, *span.1) = moved;
+            }
+            // Core refuses a move that splits a table, so the moved columns
+            // fill the table's span again; each takes its new place.
+            if columns {
+                let mut placed: Vec<Option<TableColumnDefinition>> =
+                    table.columns.iter().map(|_| None).collect();
+                for mut column in std::mem::take(&mut table.columns) {
+                    column.col = moved_index(column.col, from, count, to);
+                    let slot = column.col.saturating_sub(table.col_start) as usize;
+                    if let Some(empty) = placed.get_mut(slot) {
+                        *empty = Some(column);
+                    }
+                }
+                table.columns = placed.into_iter().flatten().collect();
+            }
+        }
+
+        // Saved pivot output and pivot sources move as a delete where the
+        // block was and an insert where it lands; core sends the moved
+        // definitions again.
+        let axis = if columns {
+            pivot_output::ShiftAxis::Cols
+        } else {
+            pivot_output::ShiftAxis::Rows
+        };
+        self.shift_pivots(edited_sheet as usize, axis, from, -i64::from(count));
+        self.shift_pivots(edited_sheet as usize, axis, to, i64::from(count));
+
+        if self.move_named_references(edited_sheet, columns, block) {
+            self.refresh_named_formula_entries();
+        }
+        self.graph.invalidate();
+    }
+
     fn drop_invalid_references(&mut self) {
         for (sheet_index, sheet) in self.sheets.iter_mut().enumerate() {
             let invalid: Vec<_> = sheet
@@ -3925,7 +3994,7 @@ impl CellStore {
                 .formulas
                 .iter(&self.formula_slots)
                 .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (key, entry.source.clone()))
+                .map(|(key, entry)| (key, entry.source().into_owned()))
                 .collect();
             let refreshed: Vec<_> = sources
                 .into_iter()

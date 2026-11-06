@@ -116,7 +116,13 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   "external-link": {
     source: "packages/core/src/types/external-link.ts",
     dependencies: [],
-    exports: ["ExternalLink", "ExternalLinkCell", "ExternalLinkSheet", "ExternalLinkValue"],
+    exports: [
+      "ExternalLink",
+      "ExternalLinkCell",
+      "ExternalLinkName",
+      "ExternalLinkSheet",
+      "ExternalLinkValue",
+    ],
   },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
