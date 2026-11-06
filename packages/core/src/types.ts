@@ -8,6 +8,7 @@ export type * from "./types/dashboard.js";
 export type * from "./types/data.js";
 export type * from "./types/data-model.js";
 export type * from "./types/document.js";
+export type * from "./types/external-link.js";
 export type * from "./types/grid.js";
 export type * from "./types/pivot.js";
 export type * from "./types/query.js";
