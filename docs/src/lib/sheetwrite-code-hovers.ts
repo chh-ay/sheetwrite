@@ -629,6 +629,8 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
             dataHoverKind: kind,
+            // A public Sheetwrite API symbol: the only kind marked at rest.
+            ...(referenceRoute === undefined ? {} : { dataSwApi: "" }),
           },
           [node],
         ),

@@ -3,10 +3,10 @@
    outside every code block, so its rules are not scoped to `.sw-prose`. */
 
 /* ── Triggers ─────────────────────────────────────────────────────────────
-   At rest code reads as plain highlighted code. Pointing at a block reveals
-   which symbols open a panel with a dotted underline; screens without hover
-   show the underline all the time. Rules are scoped to `.expressive-code` so
-   they win over the prose link style on symbols that are also links. */
+   At rest code reads as plain highlighted code: only Sheetwrite API names
+   carry a very faint dotted underline. A symbol shows its tint when pointed
+   at or focused. Rules are scoped to `.expressive-code` so they win over the
+   prose link style on symbols that are also links. */
 .expressive-code {
   /* The symbol highlight: every code token colour keeps 4.5:1 on it in both
      themes (measured: 4.8:1 for the weakest token). */
@@ -30,22 +30,11 @@
   cursor: pointer;
 }
 
-/* Documented symbols keep a faint dotted underline at rest, so a reader can
-   see where the docs are without pointing; every other hoverable symbol
-   shows its underline while the block is pointed at. */
-.expressive-code .sw-code-popover__trigger[data-hover-kind="documented"],
-.expressive-code:hover .sw-code-popover__trigger {
-  text-decoration-color: var(--sw-border-strong);
-}
-
-.expressive-code:hover .sw-code-popover__trigger[data-hover-kind="documented"] {
-  text-decoration-color: var(--sw-field-edge);
-}
-
-@media (hover: none) {
-  .expressive-code .sw-code-popover__trigger {
-    text-decoration-color: var(--sw-border-strong);
-  }
+/* Only public Sheetwrite API names keep a very faint dotted underline at
+   rest; locals, library names and keywords show the affordance (the symbol
+   tint below) only while the pointer is on them or they hold focus. */
+.expressive-code .sw-code-popover__trigger[data-sw-api] {
+  text-decoration-color: color-mix(in srgb, var(--sw-border-strong) 60%, transparent);
 }
 
 /* The open symbol and its other mentions in the same block share one tint;
