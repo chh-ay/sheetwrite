@@ -1484,6 +1484,9 @@ impl CellStore {
         self.flush_pulled(results);
     }
 
+    // One out-of-line copy serves every writer; the call is small next to
+    // the evaluation it follows.
+    #[inline(never)]
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
         // A pass already owns the id; only liveness needs checking at write-back.
         if self.formula_slots.get(id).is_none() {
