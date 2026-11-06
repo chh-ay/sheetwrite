@@ -843,7 +843,8 @@ export function functionFields(signature: string, name: string): FunctionFields 
       optional,
     };
   });
-  const returns = /^\s*:\s*([\s\S]*?)\s*;?\s*(?:\n|$)/.exec(signature.slice(close + 1))?.[1] ?? "void";
+  const returns =
+    /^\s*:\s*([\s\S]*?)\s*;?\s*(?:\n|$)/.exec(signature.slice(close + 1))?.[1] ?? "void";
   return { parameters, returns };
 }
 

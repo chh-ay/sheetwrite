@@ -349,9 +349,7 @@ export function DocsShell({
   };
 
   return (
-    <div
-      className={`sw-docs${kind === undefined ? "" : " sw-docs--api"}`}
-    >
+    <div className={`sw-docs${kind === undefined ? "" : " sw-docs--api"}`}>
       <a className="sw-skip-link" href="#main-content">
         Skip to content
       </a>

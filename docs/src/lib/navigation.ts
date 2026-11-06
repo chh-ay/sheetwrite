@@ -197,7 +197,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
             href: "/docs/features/grid/resize-merge-and-fill/",
             icon: "merge",
           },
-          { label: "Context menu", href: "/docs/features/grid/context-menu/", icon: "context-menu" },
+          {
+            label: "Context menu",
+            href: "/docs/features/grid/context-menu/",
+            icon: "context-menu",
+          },
           { label: "Search", href: "/docs/features/grid/search/", icon: "search" },
           {
             label: "Status bar",
@@ -214,7 +218,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         href: "/docs/features/formatting/",
         icon: "brush",
         items: [
-          { label: "Styles and themes", href: "/docs/features/formatting/styles/", icon: "palette" },
+          {
+            label: "Styles and themes",
+            href: "/docs/features/formatting/styles/",
+            icon: "palette",
+          },
           {
             label: "Fonts and alignment",
             href: "/docs/features/formatting/fonts-and-alignment/",

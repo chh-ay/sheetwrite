@@ -65,7 +65,10 @@ for (const [width, hasDesktopOutline] of [
     await expect(page).toHaveURL(docsUrl());
     // The overview opens with its section cards.
     await expect(
-      page.locator("main").getByRole("link", { name: /Getting started/ }).first(),
+      page
+        .locator("main")
+        .getByRole("link", { name: /Getting started/ })
+        .first(),
     ).toBeVisible();
     // Showcases is a tab of the documentation bar at every width.
     await page
