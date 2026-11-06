@@ -1,8 +1,8 @@
 import { expect, it } from "bun:test";
 
-import { tokenizeCode } from "../src/lib/code-tokens.ts";
+import { type RuntimeCodeLanguage, tokenizeCode } from "../src/lib/code-tokens.ts";
 
-const roles = (source: string, language: "json" | "formula") =>
+const roles = (source: string, language: RuntimeCodeLanguage) =>
   tokenizeCode(source, language)
     .filter((token) => token.role !== undefined)
     .map((token) => [token.text, token.role]);
@@ -61,4 +61,31 @@ it("tells JSON keys from string values", () => {
     ["true", "keyword"],
     ["}", "punctuation"],
   ]);
+});
+
+it("colours TypeScript a reader edits: keywords, calls, types, keys, strings and comments", () => {
+  const source = [
+    'import { createGrid, type Workbook } from "@sheetwrite/core";',
+    "// One sheet.",
+    "const workbook: Workbook = {",
+    '  activeSheet: "sales",',
+    "};",
+    "grid.store.getCell(addr).resolved; // 16",
+  ].join("\n");
+  expect(
+    tokenizeCode(source, "typescript")
+      .map((token) => token.text)
+      .join(""),
+  ).toBe(source);
+  const coloured = roles(source, "typescript");
+  expect(coloured).toContainEqual(["import", "keyword"]);
+  expect(coloured).toContainEqual(["type", "keyword"]);
+  expect(coloured).toContainEqual(['"@sheetwrite/core"', "string"]);
+  expect(coloured).toContainEqual(["// One sheet.", "comment"]);
+  expect(coloured).toContainEqual(["Workbook", "type"]);
+  expect(coloured).toContainEqual(["activeSheet", "property"]);
+  expect(coloured).toContainEqual(["getCell", "function"]);
+  expect(coloured).toContainEqual(["resolved", "property"]);
+  // A variable with a type annotation is not an object key.
+  expect(coloured).not.toContainEqual(["workbook", "property"]);
 });

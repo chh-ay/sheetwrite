@@ -25,6 +25,7 @@ import { CALLOUTS, callout, contentComponents } from "./src/lib/content-componen
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
 import { formulaTables } from "./src/lib/formula-tables.ts";
+import { markGeneratedPages } from "./src/lib/generated-content.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
 import { exportOutline } from "./src/lib/outline.ts";
@@ -32,6 +33,7 @@ import { renderPerfBars } from "./src/lib/perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
 import { perfFigureMarkup } from "./src/lib/perf-figure-markup.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
+import { runnableCodeBlocks } from "./src/lib/runnable-code.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
@@ -449,16 +451,31 @@ export default defineConfig({
   build: {
     cssCodeSplit: false,
   },
+  // Module workers (core's renderer worker) and the playground runtime
+  // (src/playground/run-example.ts) are ES bundles: the runtime loads the
+  // packages an example imports as separate chunks, only in its frame.
+  worker: {
+    format: "es",
+  },
   plugins: [
     {
       ...mdx({
-        remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm],
+        remarkPlugins: [
+          remarkFrontmatter,
+          [
+            markGeneratedPages,
+            { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
+          ],
+          remarkMdxFrontmatter,
+          remarkGfm,
+        ],
         rehypePlugins: [
           // First: Steps, Cards, callouts and the figures become static HTML, and
           // CodeGroup becomes Tabs, before fences are highlighted.
           contentComponents,
           installCommandsAsTerminals,
           markdownAlertsAsCallouts,
+          runnableCodeBlocks,
           [
             rehypeExpressiveCode,
             {

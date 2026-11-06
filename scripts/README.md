@@ -104,15 +104,17 @@ a script nobody will run.
   inputs continue to consume and verify those canonical tarballs.
 
 - **`docs:generate` owns `docs/src/generated/*`, the API, formula-function,
-  Performance and generated reference pages, and `docs/public/llms*.txt`**.
+  Performance and generated reference pages, `docs/public/llms*.txt` and the
+  changelog feed (`docs/public/changelog/rss.xml`)**.
   None of it is committed: `.gitignore` lists it, and the docs dev server,
   typecheck and site build generate it first, after the packages are built.
   `GENERATED_CONTENT_DIRECTORIES` and `GENERATED_CONTENT_PAGES` in
-  `docs-shared.ts` name the owned pages. `docs:check` renders them in memory
-  and checks them with the authored pages, so a hand-written link to a page
-  or heading that no longer exists fails without a generated copy on disk.
-  The agent-readable files contain authored guides and API declarations from
-  the same inputs as the site.
+  `docs/src/lib/generated-content.ts` name the owned pages. `docs:check`
+  renders them in memory and checks them with the authored pages, so a
+  hand-written link to a page or heading that no longer exists fails without a
+  generated copy on disk. The agent-readable files contain authored guides and
+  API declarations from the same inputs as the site. `docs-feed.ts` writes the
+  feed from the release registry in `docs/src/lib/releases.ts`.
 - **`function-metadata.ts` writes the core function table**
   (`packages/core/src/generated/function-metadata.ts`, not committed). The
   core build and typecheck run it first; `test:unit` runs it and
