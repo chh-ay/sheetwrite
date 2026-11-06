@@ -535,8 +535,14 @@ export const SAMPLE_WARMUP_FIXTURES = 3;
 
 /** Knobs for one aggregated timing sample: a wall-clock total over repeated fixture runs. */
 export interface AggregatedSampleOptions {
-  /** Untimed fixture runs before the timed loop; the first one also checks correctness. */
+  /** Untimed fixture runs before the timed loop; each one also checks correctness. */
   readonly warmupFixtures: number;
+  /**
+   * Keep warming up, unchecked, until the warm-up runs add up to this many
+   * milliseconds. For rows whose engine code is still being optimised by the
+   * JavaScript engine after `warmupFixtures` runs; zero or absent adds none.
+   */
+  readonly minimumWarmupMs?: number;
   /** Timed fixture runs repeat until their total wall time reaches this floor. */
   readonly minimumSampleDurationMs: number;
 }
@@ -553,25 +559,36 @@ export interface AggregatedWorkloadSample extends CompleteFormulaWorkloadResult 
 }
 
 /**
- * Run and check the untimed warm-up fixtures. A restorable fixture is
+ * Run and check the untimed warm-up fixtures, then keep running unchecked
+ * warm-ups until they add up to `minimumWarmupMs`. A restorable fixture is
  * returned restored, ready for the timed loop.
  */
 function warmUpFixtures(
   id: string,
   factory: FixtureFactory,
   warmupFixtures: number,
+  minimumWarmupMs: number,
   expected: FormulaOutput,
 ): TimedFixture | undefined {
   if (!Number.isInteger(warmupFixtures) || warmupFixtures < 1) {
     throw new RangeError("warmupFixtures must be a positive integer");
   }
+  if (!Number.isFinite(minimumWarmupMs) || minimumWarmupMs < 0) {
+    throw new RangeError("minimumWarmupMs must be a non-negative number");
+  }
   let fixture: TimedFixture | undefined;
-  for (let index = 0; index < warmupFixtures; index += 1) {
+  const started = now();
+  for (let index = 0; index < warmupFixtures || now() - started < minimumWarmupMs; index += 1) {
+    if (index >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
+      throw new RangeError(`${id} did not finish its ${minimumWarmupMs} ms warm-up`);
+    }
     fixture ??= factory();
     fixture.store.resetFormulaMatrixResourceStats();
     fixture.run();
-    assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
-    allocationAt(fixture.store);
+    if (index < warmupFixtures) {
+      assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
+      allocationAt(fixture.store);
+    }
     if (fixture.restore === undefined) {
       fixture.dispose();
       fixture = undefined;
@@ -606,7 +623,9 @@ export function collectAggregatedSample(
     throw new RangeError("minimumSampleDurationMs must be a positive number");
   }
   const expected = expectedOutput ?? expectedFormulaOutput(id, size);
-  let fixture = warmUpFixtures(id, factory, options.warmupFixtures, expected) ?? factory();
+  let fixture =
+    warmUpFixtures(id, factory, options.warmupFixtures, options.minimumWarmupMs ?? 0, expected) ??
+    factory();
 
   // One forced GC brackets the whole sample: a per-iteration GC would dominate
   // the cheap workloads the aggregate exists to measure.
@@ -1942,6 +1961,17 @@ function missingCellStoreMethod(error: unknown): string | undefined {
 }
 
 /**
+ * Rows whose engine code JavaScriptCore is still optimising after the standard
+ * warm-up, with the untimed warm-up (ms) that reaches steady state first. In a
+ * fresh Bun process on Linux, `unicode-text-date-edit` takes 4.5–4.8 ms per run
+ * for the first 50 ms and 1.6 ms after one second, so a 50 ms sample measured
+ * tier-up timing instead of the engine (#325).
+ */
+const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
+  "workload=unicode-text-date-edit;size=1000": 1_000,
+};
+
+/**
  * Capture one gate side in this process. Every workload is one aggregated
  * sample of at least `SAMPLE_AGGREGATE_MS`, so 1-3 ms rows average dozens of
  * runs instead of resting on a single cold run.
@@ -1959,6 +1989,7 @@ function captureGateSide(): FormulaGateCapture {
     try {
       sample = collectAggregatedSample(id, size, factory, {
         warmupFixtures: SAMPLE_WARMUP_FIXTURES,
+        minimumWarmupMs: GATE_TIER_UP_WARMUP_MS[key] ?? 0,
         minimumSampleDurationMs: SAMPLE_AGGREGATE_MS,
       });
     } catch (error) {

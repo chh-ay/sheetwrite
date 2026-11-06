@@ -718,6 +718,12 @@ pub enum Ast {
         cols: usize,
         values: std::rc::Rc<Vec<crate::types::Value>>,
     },
+    /// The literal pattern of a REGEX call, shared by every formula in the
+    /// store with the same pattern text. Its compiled programs live as long
+    /// as the formulas that hold it.
+    #[cfg(feature = "analysis")]
+    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
     Name(String),
     NamedRange(NamedRangeRef),
     /// A defined name that holds a formula. Shared, because one name can be
@@ -774,6 +780,79 @@ impl Ast {
         }
     }
 
+    /// Whether `test` holds for a direct child expression: a function
+    /// argument, an operand, or the expression a LET use stands for. A named
+    /// formula's expression is its own definition, not a child; a walker that
+    /// follows names matches `Ast::NamedFormula` itself. Every node kind is
+    /// listed, so a new kind must say whether it has children.
+    pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Ast) -> bool) -> bool {
+        match self {
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(test),
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => test(left) || test(right),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => test(inner),
+            Ast::LetSlot { expression, .. } => test(expression),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } => false,
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => false,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Array { .. } => false,
+        }
+    }
+
+    /// Run `visit` on every direct child expression, as [`Ast::any_child`]
+    /// finds them, and return whether any visit reported a change. Every
+    /// child is visited, so one rewrite does not stop the others. Every node
+    /// kind is listed, so a new kind must say whether it has children.
+    pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
+        match self {
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args
+                .iter_mut()
+                .fold(false, |changed, arg| visit(arg) | changed),
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => visit(left) | visit(right),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => visit(inner),
+            Ast::LetSlot { expression, .. } => visit(expression),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } => false,
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => false,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Array { .. } => false,
+        }
+    }
+
     /// Heap payload owned below an inline AST root. The root itself is already
     /// included in its formula hash-table bucket.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
@@ -782,6 +861,9 @@ impl Ast {
             Ast::BoundMatrix { values, .. } => {
                 out.add_vec::<crate::types::Value>(values.len(), values.capacity());
             }
+            // The store's pattern index counts each shared pattern once.
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => {}
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
             // A shared expansion is counted once, by the store's cache that
@@ -2091,16 +2173,10 @@ pub(crate) fn place_span(span: &mut SheetSpanRef, order: &[u32]) -> bool {
     true
 }
 
+/// Whether the formula's own tree holds a 3-D reference; a defined name's
+/// spans belong to the name, which `refresh_sheet_spans` does not rewrite.
 pub(crate) fn ast_contains_sheet_span(ast: &Ast) -> bool {
-    match ast {
-        Ast::SheetSpan(_) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_sheet_span),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_contains_sheet_span(left) || ast_contains_sheet_span(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_sheet_span(inner),
-        _ => false,
-    }
+    matches!(ast, Ast::SheetSpan(_)) || ast.any_child(&mut ast_contains_sheet_span)
 }
 
 /// Re-places every 3-D reference in `ast` after tabs were moved, inserted or
@@ -2118,21 +2194,7 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
                 true
             }
         },
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            let mut changed = false;
-            for arg in args {
-                changed |= refresh_sheet_spans(arg, order, names);
-            }
-            changed
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            let left_changed = refresh_sheet_spans(left, order, names);
-            refresh_sheet_spans(right, order, names) || left_changed
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            refresh_sheet_spans(inner, order, names)
-        }
-        _ => false,
+        _ => ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names)),
     }
 }
 
@@ -2581,6 +2643,8 @@ fn translate_relative_refs_inner(
         | Ast::Array { .. } => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(_) => true,
     }
 }
 
@@ -2776,18 +2840,7 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
             Axis::Row => edit.move_span(&mut reference.row_start, &mut reference.row_end),
             Axis::Col => edit.move_index(&mut reference.col),
         },
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            return args
-                .iter_mut()
-                .fold(false, |changed, arg| rewrite_axis(arg, edit) | changed);
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            return rewrite_axis(left, edit) | rewrite_axis(right, edit);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            return rewrite_axis(inner, edit);
-        }
-        _ => Moved::Unchanged,
+        _ => return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit)),
     };
 
     if moved == Moved::Deleted {
@@ -2889,14 +2942,14 @@ fn sheet_name_needs_quotes(name: &str) -> bool {
 
 /// Rewrite resolved references by stable numeric handle and regenerate quoting metadata.
 pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool {
-    let mut changed = false;
     match ast {
         Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) if sheet.handle == handle => {
             sheet.name = name.to_string();
             sheet.quoted = sheet_name_needs_quotes(name);
-            changed = true;
+            true
         }
         Ast::SheetSpan(span) => {
+            let mut changed = false;
             for endpoint in [&mut span.first, &mut span.last] {
                 if endpoint.handle == handle {
                     endpoint.name = name.to_string();
@@ -2904,22 +2957,10 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
                     changed = true;
                 }
             }
+            changed
         }
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                changed |= rename_sheet_refs(arg, handle, name);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            changed |= rename_sheet_refs(left, handle, name);
-            changed |= rename_sheet_refs(right, handle, name);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            changed |= rename_sheet_refs(inner, handle, name);
-        }
-        _ => {}
+        _ => ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name)),
     }
-    changed
 }
 
 pub(crate) fn update_structured_refs<F>(ast: &mut Ast, table_id: &str, resolve: &F) -> bool
@@ -2934,23 +2975,7 @@ where
             return true;
         }
     }
-    let mut changed = false;
-    match ast {
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                changed |= update_structured_refs(arg, table_id, resolve);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            changed |= update_structured_refs(left, table_id, resolve);
-            changed |= update_structured_refs(right, table_id, resolve);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            changed |= update_structured_refs(inner, table_id, resolve);
-        }
-        _ => {}
-    }
-    changed
+    ast.fold_children_mut(&mut |child| update_structured_refs(child, table_id, resolve))
 }
 
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
@@ -2966,23 +2991,7 @@ pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
         return true;
     }
 
-    let mut changed = false;
-    match ast {
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                changed |= invalidate_sheet_refs(arg, handle);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            changed |= invalidate_sheet_refs(left, handle);
-            changed |= invalidate_sheet_refs(right, handle);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            changed |= invalidate_sheet_refs(inner, handle);
-        }
-        _ => {}
-    }
-    changed
+    ast.fold_children_mut(&mut |child| invalidate_sheet_refs(child, handle))
 }
 
 fn write_structured_ref(
@@ -3091,6 +3100,8 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),
         Ast::Array { cols, values } => {
             out.push('{');
@@ -3285,7 +3296,8 @@ fn write_a1(row: u32, col: u32, flags: RefFlags, out: &mut String) {
     out.push_str(&(u64::from(row) + 1).to_string());
 }
 
-fn write_col(mut col: u32, out: &mut String) {
+/// Append the A1 letters of a 0-based column (`0` → `A`, `26` → `AA`).
+pub(crate) fn write_col(mut col: u32, out: &mut String) {
     let mut letters = [0u8; 7];
     let mut index = letters.len();
     loop {
