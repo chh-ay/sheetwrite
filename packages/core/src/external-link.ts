@@ -3,6 +3,8 @@ import type { ExternalLink } from "./types/external-link.js";
 
 /** Most linked workbooks in one workbook; Excel files rarely hold more than a few. */
 const MAX_EXTERNAL_LINKS = 1_024;
+/** Most defined names of one linked workbook. */
+const MAX_EXTERNAL_NAMES = 10_000;
 /** Longest book name, sheet name or target. */
 const MAX_NAME_LENGTH = 2_048;
 /** Most saved cells over all links, which bounds the engine memory they use. */
@@ -34,8 +36,9 @@ function isIndex(value: unknown, limit: number): value is number {
 /**
  * Check the bounded shape of `value` at the trust boundary: at most
  * `MAX_EXTERNAL_LINKS` links with unique book names without brackets, a
- * target, and named sheets with cell arrays. The cells themselves are checked
- * once, when `installExternalLinks` gives them to the engine.
+ * target, named sheets with cell arrays, and optional names with a reference.
+ * The cells themselves are checked once, when `installExternalLinks` gives
+ * them to the engine.
  */
 export function validateExternalLinksShape(
   value: unknown,
@@ -61,10 +64,29 @@ export function validateExternalLinksShape(
             isPlainRecord(sheet) &&
             isName(ownValue(sheet, "name")) &&
             Array.isArray(ownValue(sheet, "cells")),
-        )
+        ) &&
+        validNames(ownValue(link, "names"))
       );
     });
   if (!valid) issues.push({ path, code: "invalid-value", message: "invalid external links" });
+}
+
+/** An absent list, or at most `MAX_EXTERNAL_NAMES` names that each have a name, a reference and an optional sheet. */
+function validNames(names: unknown): boolean {
+  return (
+    names === undefined ||
+    (Array.isArray(names) &&
+      names.length <= MAX_EXTERNAL_NAMES &&
+      names.every((entry: unknown) => {
+        const sheet = isPlainRecord(entry) ? ownValue(entry, "sheet") : undefined;
+        return (
+          isPlainRecord(entry) &&
+          isName(ownValue(entry, "name")) &&
+          isName(ownValue(entry, "refersTo")) &&
+          (sheet === undefined || isName(sheet))
+        );
+      }))
+  );
 }
 
 /** The engine calls that hold link values; `CellStore` implements them. */
@@ -76,6 +98,8 @@ export interface ExternalLinkEngine {
   setFormula(sheet: number, row: number, col: number, source: string, style: number): void;
   recompute(sheet: number): void;
   removeExternalSheet(book: string, sheet: string): boolean;
+  addExternalName(book: string, sheet: string, name: string, refersTo: string): boolean;
+  removeExternalNames(book: string): void;
 }
 
 /** Remove the values of every link from the engine; formulas that read them show `#REF!`. */
@@ -84,6 +108,7 @@ export function removeExternalLinks(
   links: readonly ExternalLink[],
 ): void {
   for (const link of links) {
+    engine.removeExternalNames(link.book);
     for (const sheet of link.sheets) engine.removeExternalSheet(link.book, sheet.name);
   }
 }
@@ -130,6 +155,12 @@ export function installExternalLinks(
         else engine.setFormula(handle, row, col, `={${value.error}}`, 0);
       }
       engine.recompute(handle);
+    }
+
+    // A name refers to cells of the sheets above. One that refers to a
+    // sheet the link does not hold is left out, so formulas show `#REF!`.
+    for (const { name, refersTo, sheet } of link.names ?? []) {
+      engine.addExternalName(link.book, sheet ?? "", name, refersTo);
     }
   }
   return true;
