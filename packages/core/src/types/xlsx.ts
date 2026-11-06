@@ -1,6 +1,7 @@
 // XLSX backend contracts shared by core's XLSX bridge and the XLSX add-on.
 // No runtime values live here.
 
+import type { DashboardExport } from "./dashboard.js";
 import type { ColumnarData } from "./data.js";
 import type { Workbook, WorkbookSnapshot } from "./document.js";
 import type { PowerQueryCodec } from "./query.js";
@@ -117,6 +118,15 @@ export interface XlsxWorkbookOptions {
 /** @internal Core-owned provenance for snapshots it materialized during this call. */
 export interface XlsxWorkbookExportContext {
   readonly sourceTracked?: boolean;
+  /** Static content of each dashboard sheet, which only core can compute. */
+  readonly dashboards?: readonly DashboardExport[];
+  /**
+   * Current output of each worksheet pivot, by sheet: each item's `id` is a
+   * pivot ID and its cells start at the pivot's anchor. The export writes
+   * them for pivots it keeps in Sheetwrite metadata, as Excel files carry a
+   * pivot's output as cell values.
+   */
+  readonly pivotOutputs?: readonly DashboardExport[];
 }
 
 /** Optional backend contract for complete workbook XLSX interchange. */

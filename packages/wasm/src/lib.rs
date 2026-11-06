@@ -29,6 +29,8 @@ mod derived;
 #[cfg(feature = "formula-engine")]
 mod eval;
 #[cfg(feature = "formula-engine")]
+mod float_text;
+#[cfg(feature = "formula-engine")]
 mod formula_reads;
 #[cfg(feature = "formula-engine")]
 mod formula_rewrite;
@@ -77,6 +79,8 @@ mod formula_syntax_tests;
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod number_search_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod permute_tests;
 #[cfg(all(test, feature = "formula-engine"))]

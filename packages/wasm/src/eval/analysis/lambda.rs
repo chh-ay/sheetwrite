@@ -401,7 +401,9 @@ impl Context<'_, '_> {
     }
 }
 
-fn literal(value: &Value) -> Ast {
+/// `value` as a formula operand: a constant, or a one-cell matrix for a
+/// blank or an error.
+pub(crate) fn literal(value: &Value) -> Ast {
     match value {
         Value::Number(number) => Ast::Num(*number),
         Value::Text(text) => Ast::Str(text.to_string()),

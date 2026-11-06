@@ -1,6 +1,6 @@
 # Excel checks
 
-Some behavior of Sorting (#353), table relationships (#229) and saved queries (#227) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
+Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433), external links (#226), measures (#230) and dashboards (#231) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 7 and 10 to 14 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
 
 For each check, save the result file under the name given and attach it to the issue in a comment. A test then compares the file with Sheetwrite's result. When a result differs from the expected one, also write down what Excel showed.
 
@@ -14,6 +14,12 @@ For each check, save the result file under the name given and attach it to the i
 | 6 | #229 | `test/fixtures/excel-checks/model-tables-input.xlsx` | `model-relationship-excel.xlsx` |
 | 7 | #229 | `test/fixtures/excel-checks/model-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 8 | #227 | `test/fixtures/excel-checks/power-query-csv.xlsx` | `power-query-csv-excel.xlsx` |
+| 9 | #433 | none; type the formulas into a new workbook | none; record what Excel shows |
+| 10 | #226 | `test/fixtures/excel-checks/links-sheetwrite-export.xlsx` and `Budget.xlsx` | `links-excel.xlsx` |
+| 11 | #226 | `test/fixtures/excel-checks/links-sheetwrite-export.xlsx` | none; record what Excel shows |
+| 12 | #230 | `test/fixtures/excel-checks/measures-model-pivot.xlsx` | none; record what Excel shows |
+| 13 | #230 | `test/fixtures/excel-checks/measures-only-model.xlsx` | `measures-only-model-excel.xlsx` |
+| 14 | #231 | `test/fixtures/excel-checks/dashboard-sheetwrite-export.xlsx` | none; record what Excel shows |
 
 ## 1. Sort order (#353)
 
@@ -93,17 +99,18 @@ Expected: Excel shows the relationship in **Data › Relationships** as active. 
 
 ## 7. A Sheetwrite workbook with a model pivot (#229)
 
-Sheetwrite related the same tables and added a model pivot at A8 (`Region` by sum of `Amount`). Sheetwrite cannot write Excel's data model, which is a known difference for 0.7.0.
+Sheetwrite related the same tables and added a model pivot at A8 (`Region` by sum of `Amount`). Sheetwrite cannot write Excel's data model, which is a known difference for 0.7.0. The export writes the pivot's current output as cells and keeps the pivot in Sheetwrite metadata (#495).
 
 1. Open the file.
-2. Open **Data › Relationships**.
+2. Write down A8:B12.
+3. Open **Data › Relationships**.
 
 Expected:
 
 - Excel opens the file without a repair message.
 - The tables and their values are as in the input file.
+- A8:B12 hold `Region`, `Sum of Amount`; North 15; South 20; West 7; `Total` 42, as plain values: Excel shows no PivotTable there.
 - Data › Relationships lists no relationship.
-- A8 and the cells below are empty, because the model pivot is not a native pivot in Excel.
 
 ## 8. A saved query refreshes in Excel (#227)
 
@@ -121,3 +128,87 @@ Expected:
 - Step 3: the table `People` refreshes without an error and shows `Name` and `Age` with Ana 34, Ben 27, Chloe 41.
 - Step 4: the query and the table are still there.
 - After import with the query codec, Sheetwrite still has query `People` bound to table `People`.
+
+## 9. TEXT with a percent code past the largest number (#433)
+
+A percent sign multiplies the number by 100 before TEXT writes it. Near Excel's largest number, 9.99999999999999E+307 ([Excel specifications and limits](https://support.microsoft.com/en-us/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)), that product no longer fits.
+
+1. In a new workbook, type these formulas in A1:A3:
+   - `=TEXT(9.99999999999999E+307,"0%")`
+   - `=TEXT(-9.99999999999999E+307,"0.0%;(0.0%)")`
+   - `=TEXT(1E+305,"0%%")`
+2. Write down what each cell shows.
+
+Expected: `#NUM!` in all three cells, the error Excel gives a result too large to show ([How to correct a #NUM! error](https://support.microsoft.com/en-us/office/how-to-correct-a-num-error-f5193bfc-4400-43f4-88c4-8e1dcca0428b)). Sheetwrite returns `#NUM!` for these cells. If Excel shows text or another error, attach a screenshot to #433.
+
+## 10. External links from a Sheetwrite workbook (#226)
+
+Sheet `Report` reads the workbook `Budget.xlsx`: B1 is `=[Budget.xlsx]Annual!C10`, B2 is `=SUM([Budget.xlsx]Annual!C10:C11)` and B3 is `=[Budget.xlsx]Annual!C10*2`. Sheetwrite saved the values 1200 for C10 and 300 for C11 with the link. `Budget.xlsx` holds newer values: 1500 in C10 and 500 in C11.
+
+1. Copy `links-sheetwrite-export.xlsx` to an empty folder. Do not copy `Budget.xlsx` yet.
+2. Open the file. If Excel shows a security bar about links, leave it closed and do not select **Enable Content**.
+3. Write down B1:B3.
+4. Select **Data › Queries & Connections › Edit Links**. Write down the sources and their status. Close the dialog.
+5. Close the file without saving. Copy `Budget.xlsx` into the same folder.
+6. Open `links-sheetwrite-export.xlsx` again. Select **Data › Queries & Connections › Edit Links**, select `Budget.xlsx` and **Update Values**. Close the dialog.
+7. Save as `links-excel.xlsx` in the same folder.
+
+Expected:
+
+- Excel opens the file without a repair message.
+- Step 3: B1 shows 1200, B2 1500 and B3 2400, the saved values.
+- Step 4: Edit Links lists `Budget.xlsx` and `Prices.xlsx`.
+- Step 6: B1 shows 1500, B2 2000 and B3 3000.
+- After import, Sheetwrite has a link `Budget.xlsx` with the values 1500 in C10 and 500 in C11, and B1:B3 show 1500, 2000 and 3000.
+
+## 11. A link Sheetwrite added for a book a formula names (#226)
+
+B4 of the same file is `=[Prices.xlsx]List!B2`. The workbook had no link for `Prices.xlsx`, so Sheetwrite's export added one without values, as Excel does when a formula names a closed workbook.
+
+1. Open `links-sheetwrite-export.xlsx` from a folder that holds no `Prices.xlsx`. Do not enable content.
+2. Write down B4 and its formula in the formula bar.
+3. Select **Data › Queries & Connections › Edit Links**, select `Prices.xlsx` and **Check Status**. Write down the status.
+
+Expected: the formula still names `Prices.xlsx` and sheet `List`; Excel may show the folder path in front of the book name. B4 shows `#REF!`, as in Sheetwrite, because the link has no saved values. Edit Links lists `Prices.xlsx`, and Check Status reports that the source is not found.
+
+## 12. A model pivot with measures (#230)
+
+Sheet `Data` has the table `Orders` (`Region`, `Amount`) and, at D1, the model pivot `Revenue by region`: `Region` by sum of `Amount`, the measure `Revenue` (`=SUM(Orders[Amount])`) and the measure `Share` (`=[Revenue]/CALCULATE([Revenue], ALL(Orders[Region]))`). Excel keeps measures in its data model part, which Sheetwrite does not write, so the export warned "Pivot table Revenue by region was not written as a native pivot because a model pivot needs an Excel data-model binary; its current values were written as cells and it remains in Sheetwrite metadata".
+
+1. Open the file.
+2. Write down what D1:G6 show.
+3. Open **Data › Relationships** and **Data › Data Model › Manage Data Model** (Power Pivot), if your Excel has it. Write down whether any table or measure is listed.
+
+Expected:
+
+- Excel opens the file without a repair message.
+- The table `Orders` and its values are as in the input file.
+- D1:G6 hold the pivot's values as plain cells: `Region`, `Sum of Amount`, `Revenue`, `Share`; East 180, 180, 27%; North 190, 190, 29%; South 95, 95, 15%; West 190, 190, 29%; `Total` 655, 655, 100%. The share cells use the `0%` format. Excel shows no PivotTable there, as in check 7.
+- No relationship or measure is listed in Excel.
+
+## 13. Measures with no relationships through Excel (#230)
+
+The workbook's data model has the measures `Revenue` and `Share` over the table `Orders`, and no relationships. They are in the Sheetwrite metadata sheet, which Excel keeps hidden.
+
+1. Open the file.
+2. Change B2 from 120 to 125.
+3. Save as `measures-only-model-excel.xlsx`.
+
+Expected: Excel opens and saves the file without a repair message. After import, Sheetwrite has the measures `Revenue` and `Share` with their formulas and home table `Orders`, and B2 is 125.
+
+## 14. A dashboard in Excel (#231)
+
+Sheet `Dashboard` is a Sheetwrite dashboard: the model pivot `Revenue by region`, a `Region` slicer that keeps East, North and West, a KPI card of `Revenue`, and a PivotChart of `Revenue`. The export wrote it as a worksheet of the items' current values and a native column chart with literal data, and warned "Dashboard sheets were written as worksheets of their current values and charts; they are interactive only in Sheetwrite".
+
+1. Open the file and select sheet `Dashboard`.
+2. Write down A1:D6, F1:F4 and H1:H2.
+3. Select the chart. Write down its title, its categories and its bar heights, and whether **Chart Design › Select Data** shows a range or no range.
+
+Expected:
+
+- Excel opens the file without a repair message.
+- A1 is `Revenue by region`. A3:D5 list East 180, 180, 27%; North 190, 190, 29%; West 190, 190, 29%. Row 6 is `Total` 560, 560, 85%. The share total is not 100% because `ALL` removes the slicer's region filter too, as in DAX.
+- F1 is `Region`, and F2:F4 list East, North and West.
+- H1 is `Revenue` and H2 is 560.
+- The chart draws three columns, East 180, North 190 and West 190, titled `Revenue by region`. Its data is literal, so Select Data shows no source range.
+

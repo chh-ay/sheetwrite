@@ -100,7 +100,7 @@ Zero-argument `initSheetwrite()` is canonical for the imperative package. It is 
 Pass a source only for unsupported bundlers, public-asset policies, or controlled delivery:
 
 ```ts prelude="wasm" partial="requires an explicit asset source" title="Explicit WASM source"
-await initSheetwrite(source);
+await initSheetwrite({ source });
 ```
 
 Accepted sources are `BufferSource | URL | string | Request | WebAssembly.Module`. The raw binary remains exported as `@sheetwrite/wasm/wasm`.

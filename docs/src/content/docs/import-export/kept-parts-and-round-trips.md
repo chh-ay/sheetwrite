@@ -80,7 +80,7 @@ parts for the current queries instead. See
 
 ## Drops and warnings
 
-Parts reached through a relationship into worksheet, table, styles or workbook parts are dropped because Sheetwrite rewrites those parts. External links, chart sheets, digital signatures and graphs whose relationships point outside the kept parts are also dropped with warnings.
+Parts reached through a relationship into worksheet, table, styles or workbook parts are dropped because Sheetwrite rewrites those parts. External links that are not workbooks (DDE and OLE links), chart sheets, digital signatures and graphs whose relationships point outside the kept parts are also dropped with warnings.
 
 `resourceLimits.maxPreservedBytes` defaults to 64 MiB of compressed data. A graph over this kept-part budget is dropped with a warning rather than making preservation unbounded. This is distinct from hard input/decompression resource failures.
 
@@ -88,7 +88,7 @@ Kept parts retain their names and their own `.rels` bytes. New workbook, sheet a
 
 ### Excel data model
 
-Excel keeps its data model in a binary part (`powerPivotData`, [MS-XLDM]) that Sheetwrite does not read or write. Import drops that part with a warning, and reads the model's active relationships from `x15:dataModel` in `workbook.xml` ([MS-XLSX] 2.6.128–2.6.132). A relationship whose two model tables load worksheet tables becomes a [data model](/docs/features/analysis/data-model/) relationship; each other relationship is reported. Sheetwrite relationships and pivots over related tables round-trip through Sheetwrite metadata. Excel opens an exported file without a data model, so it shows no output for a pivot over related tables.
+Excel keeps its data model in a binary part (`powerPivotData`, [MS-XLDM]) that Sheetwrite does not read or write. Import drops that part with a warning, and reads the model's active relationships from `x15:dataModel` in `workbook.xml` ([MS-XLSX] 2.6.128–2.6.132). A relationship whose two model tables load worksheet tables becomes a [data model](/docs/features/analysis/data-model/) relationship; each other relationship is reported. Sheetwrite relationships and pivots over related tables round-trip through Sheetwrite metadata. Excel opens an exported file without a data model. A pivot that export keeps in Sheetwrite metadata, such as a pivot over the data model, is written as the cells of its current output with its number formats, so Excel shows the values; on import, Sheetwrite removes those cells and shows the live pivot again, and keeps any of them that another application changed.
 
 ## Edits, undo and snapshots
 

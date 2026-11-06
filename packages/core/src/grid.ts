@@ -13,6 +13,7 @@ import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
+import { isDashboard } from "./dashboard.js";
 import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
@@ -1067,7 +1068,11 @@ export class GridImpl implements Grid {
       store: this.store,
       geometry: this.geometry,
       activeSheet: () => this.activeSheet,
-      charts: () => this.sheetById(this.activeSheet)?.charts ?? [],
+      charts: () => {
+        // A dashboard draws its charts in its items, not over cells.
+        const sheet = this.sheetById(this.activeSheet);
+        return isDashboard(sheet) ? [] : (sheet?.charts ?? []);
+      },
       theme: () => this.theme,
       zoom: () => this.zoom,
       readOnly: () => this.readOnly,

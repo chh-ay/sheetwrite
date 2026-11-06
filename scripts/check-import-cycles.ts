@@ -59,6 +59,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/coordinates.ts",
     "../types/document.ts",
     "../types/store.ts",
+    "pivot-status.ts",
     "sheet-registry.ts",
     "wasm-contract.ts",
     "wire-tags.ts",
@@ -112,13 +113,22 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "TableRelationship",
     ],
   },
+  "external-link": {
+    source: "packages/core/src/types/external-link.ts",
+    dependencies: [],
+    exports: ["ExternalLink", "ExternalLinkCell", "ExternalLinkSheet", "ExternalLinkValue"],
+  },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
-    dependencies: ["cell", "data-model"],
+    dependencies: ["cell", "chart", "coordinates", "data-model"],
     exports: [
       "Dashboard",
       "DashboardBox",
+      "DashboardChartItem",
+      "DashboardExport",
       "DashboardItem",
+      "DashboardItemExport",
+      "DashboardKpiItem",
       "DashboardPivotItem",
       "DashboardSlicerItem",
       "SheetKind",
@@ -206,6 +216,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "coordinates",
       "dashboard",
       "data-model",
+      "external-link",
       "pivot",
       "query",
       "table",
@@ -323,7 +334,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   xlsx: {
     source: "packages/core/src/types/xlsx.ts",
-    dependencies: ["data", "document", "query", "store"],
+    dependencies: ["dashboard", "data", "document", "query", "store"],
     exports: [
       "XlsxResourceLimits",
       "XlsxTableExportBackend",

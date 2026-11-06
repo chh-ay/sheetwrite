@@ -9,6 +9,7 @@
 
 import { actionFeedbackFor } from "../action-feedback.js";
 import { CHART_KINDS } from "../chart-kinds.js";
+import { isDashboard } from "../dashboard.js";
 import {
   ACCOUNTING_FORMAT,
   COMMA_FORMAT,
@@ -332,9 +333,30 @@ const insertChartOf =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
 
+/** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard pivot. */
+const insertPivotChartOf =
+  (kind: ChartKind) =>
+  async (grid: Grid): Promise<boolean> =>
+    (await loadPanels(grid)).insertPivotChart(grid, kind);
+
+/** Insert › Dashboard › KPI Card opens the measure picker; the panel code loads on first use. */
+const insertKpi = async (grid: Grid): Promise<void> => (await loadPanels(grid)).openKpiPanel(grid);
+
+/** Insert › Filters › Slicer opens the Insert Slicers list; the panel code loads on first use. */
+const insertSlicer = async (grid: Grid): Promise<void> =>
+  (await loadPanels(grid)).openSlicerPanel(grid);
+
+function activeSheetIsDashboard(grid: Grid): boolean {
+  const sheet = grid.getActiveSheet();
+  return isDashboard(grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet));
+}
+
 /** Data › Data Tools opens the data model panel; the panel code loads on first use. */
 const openDataModel = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openDataModelPanel(grid);
+
+const openMeasures = async (grid: Grid): Promise<void> =>
+  (await loadPanels(grid)).openMeasurePanel(grid);
 
 /** The data model needs workbook tables: one to manage, two to relate. */
 function workbookTableCount(grid: Grid): number {
@@ -356,6 +378,23 @@ const chart: RibbonMenuSpec = {
   large: true,
   run: insertChartOf("column"),
   items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insertChartOf(kind) })),
+};
+
+/** Excel's PivotChart: on a dashboard with a pivot, a chart over that pivot. */
+const pivotChart: RibbonMenuSpec = {
+  kind: "menu",
+  id: "pivotChart",
+  label: "PivotChart",
+  icon: "chart",
+  availability: "newDashboard",
+  large: true,
+  run: insertPivotChartOf("column"),
+  items: CHART_KINDS.map(({ kind, label, icon }) => ({
+    label,
+    icon,
+    run: insertPivotChartOf(kind),
+  })),
+  available: (grid) => activeSheetIsDashboard(grid),
 };
 
 function outline(group: boolean): (grid: Grid) => void {
@@ -648,7 +687,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Insert",
-    reduceOrder: ["notes", "links", "dashboard", "charts", "tables", "rowsColumns"],
+    reduceOrder: ["notes", "links", "filters", "dashboard", "charts", "tables", "rowsColumns"],
     groups: [
       {
         id: "rowsColumns",
@@ -688,7 +727,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         label: "Charts",
         icon: "chart",
         layout: "flow",
-        controls: [chart],
+        controls: [chart, pivotChart],
       },
       {
         id: "dashboard",
@@ -707,6 +746,26 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
               },
             ),
             id: "newDashboard",
+          },
+          {
+            ...button("KPI Card", "kpiCard", insertKpi, "newDashboard", { large: true }),
+            // A KPI card is a dashboard item over a data model measure.
+            available: (grid) =>
+              activeSheetIsDashboard(grid) &&
+              (grid.store.getWorkbook().dataModel?.measures?.length ?? 0) > 0,
+          },
+        ],
+      },
+      {
+        id: "filters",
+        label: "Filters",
+        icon: "slicer",
+        layout: "flow",
+        controls: [
+          {
+            ...button("Slicer", "slicer", insertSlicer, "newDashboard", { large: true }),
+            // A slicer is a dashboard item, so the command shows on a dashboard.
+            available: (grid) => activeSheetIsDashboard(grid),
           },
         ],
       },
@@ -793,6 +852,16 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             ),
             available: queriesConnected,
           },
+          {
+            ...button(
+              "Edit Links",
+              "editLinks",
+              (grid) => void loadPanels(grid).then((panels) => panels.openEditLinksPanel(grid)),
+              "view",
+            ),
+            // As in Excel, the command shows only for a workbook with links.
+            available: (grid) => (grid.store.getWorkbook().externalLinks?.length ?? 0) > 0,
+          },
         ],
       },
       {
@@ -834,6 +903,11 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           {
             ...button("Relationships", "relationships", openDataModel, "view", { large: true }),
             available: (grid) => workbookTableCount(grid) > 1,
+          },
+          {
+            ...button("Measures", "measure", openMeasures, "view", { large: true }),
+            description: "Manage Measures",
+            available: (grid) => workbookTableCount(grid) > 0,
           },
         ],
       },

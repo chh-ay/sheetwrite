@@ -16,17 +16,32 @@ import type { PivotDefinition } from "../types/pivot.js";
 import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
 import { explainPanel } from "./explain-panel.js";
+import { kpiPanel } from "./kpi-panel.js";
+import { measurePanel } from "./measure-panel.js";
 import { namePanel } from "./name-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
 import { parseRangeText } from "./range-text.js";
 import { relationshipPanel } from "./relationship-panel.js";
+import { slicerPanel } from "./slicer-panel.js";
 
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" | "history" };
+  | {
+      readonly kind:
+        | "explain"
+        | "names"
+        | "queries"
+        | "links"
+        | "sort"
+        | "dataModel"
+        | "measures"
+        | "history"
+        | "slicer"
+        | "kpi";
+    };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -100,6 +115,17 @@ export function openNamePanel(grid: Grid, define = false): void {
   });
 }
 
+/** Data › Measures opens the measures panel. */
+export function openMeasurePanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "measures" };
+  const panel = measurePanel(grid);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
 /** Data › Data Model and Data › Relationships open the data model panel. */
 export function openDataModelPanel(grid: Grid): void {
   const state = stateOf(grid);
@@ -109,6 +135,22 @@ export function openDataModelPanel(grid: Grid): void {
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),
   });
+}
+
+/** Insert › Filters › Slicer: the Insert Slicers list for the active dashboard. */
+export function openSlicerPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "slicer" };
+  const panel = slicerPanel(grid, grid.getActiveSheet());
+  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
+}
+
+/** Insert › Dashboard › KPI Card: the measure picker for the active dashboard. */
+export function openKpiPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "kpi" };
+  const panel = kpiPanel(grid, grid.getActiveSheet());
+  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
 }
 
 /** Show the Sort panel for the selection or the current region. */
@@ -124,6 +166,14 @@ export function openQueryPanel(grid: Grid, create: boolean): void {
   openLazyPanel(grid, { kind: "queries" }, async () => {
     const { queryPanel } = await import("./query-panel.js");
     return (target) => queryPanel(target, create);
+  });
+}
+
+/** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
+export function openEditLinksPanel(grid: Grid): void {
+  openLazyPanel(grid, { kind: "links" }, async () => {
+    const { editLinksPanel } = await import("./edit-links-panel.js");
+    return editLinksPanel;
   });
 }
 
@@ -219,6 +269,50 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
   grid.selectChart(chart.id, range.sheet);
   openChartPanel(grid, { sheet: range.sheet, id: chart.id });
   return true;
+}
+
+/** Width and height, in dashboard cells, of a new PivotChart. */
+const PIVOT_CHART_BOX = { w: 6, h: 8 } as const;
+
+/**
+ * Insert › Charts › PivotChart on a dashboard: a chart of `kind` over the
+ * focused pivot item, or else the first one, in the next free box. The chart
+ * and its item are one transaction, so one undo removes both. False when the
+ * dashboard has no pivot or the store refuses the change.
+ */
+export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolean {
+  const sheet = grid.getActiveSheet();
+  const items =
+    grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
+    [];
+  const pivots = items.filter((item) => item.kind === "pivot");
+  const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
+  const source = pivots.find((item) => item.id === focused) ?? pivots[0];
+  if (source === undefined || source.kind !== "pivot") return false;
+
+  const id = nextChartId(grid.getCharts(sheet));
+  const box = firstFreeBox(items, PIVOT_CHART_BOX.w, PIVOT_CHART_BOX.h);
+  const title = grid.getPivots(sheet).find((pivot) => pivot.id === source.pivot)?.name;
+  // A dashboard places the chart through its item box, so the anchor stays at the origin.
+  const anchor = { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 };
+  const result = grid.applyTransaction({
+    patches: [
+      {
+        op: "setChart",
+        sheet,
+        chart: {
+          id,
+          kind,
+          ...(title === undefined ? {} : { title }),
+          anchor,
+          series: [],
+          pivot: source.pivot,
+        },
+      },
+      { op: "setDashboardItem", sheet, item: { id: `chart-${id}`, box, kind: "chart", chart: id } },
+    ],
+  });
+  return result.status === "applied";
 }
 
 /** Where Insert › PivotTable puts the new pivot. */

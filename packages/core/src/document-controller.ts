@@ -28,6 +28,7 @@ import {
 import { cloneCellHyperlink } from "./hyperlink.js";
 import { formulaNameKey, sheetNameKey } from "./name-key.js";
 import { clonePivot, planPivotEdit, pivotRewrites } from "./pivot.js";
+import { cloneJsonValue } from "./plain-data.js";
 import {
   encodeRestoreBlock,
   encodeMeasuredRestoreBlock,
@@ -897,6 +898,14 @@ export class DocumentController {
           patch.op === "setNamedRange" ? { op: "removeNamedRange", name, scope } : null,
         );
       }
+
+      case "setExternalLinks":
+        return [
+          {
+            op: "setExternalLinks",
+            links: cloneJsonValue(this.options.store.getWorkbook().externalLinks ?? []),
+          },
+        ];
 
       case "setCalculation": {
         // Absent settings are the defaults, which undo must restore explicitly.

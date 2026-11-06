@@ -74,6 +74,15 @@ struct MeasureFixture {
     scratch_rows: usize,
 }
 
+/// One measure cell of a pivot output and the labels that select its rows.
+struct LabeledCell {
+    slot: usize,
+    row_labels: Vec<Value>,
+    col_labels: Vec<Value>,
+    actual: Value,
+    at: (usize, usize),
+}
+
 /// A small deterministic generator, so failures reproduce.
 struct Lcg(u64);
 
@@ -215,12 +224,35 @@ impl MeasureFixture {
     /// Every measure cell equals the same formula over the flattened rows
     /// that the cell's labels select.
     fn assert_matches_flattened(&mut self, rows: &[usize], columns: &[usize], flags: u32) {
+        let cells = self.measure_cells(rows, columns, flags);
+        for cell in &cells {
+            let selected = self.select(rows, &cell.row_labels, columns, &cell.col_labels);
+            let expected = if selected.is_empty() {
+                Value::Blank
+            } else {
+                self.oracle(MEASURES[cell.slot].1, &selected)
+            };
+            assert_eq!(
+                cell.actual, expected,
+                "measure {} at {:?}",
+                cell.slot, cell.at
+            );
+        }
+        assert!(
+            cells.len() > MEASURES.len() * 4,
+            "the pivot has measure cells"
+        );
+    }
+
+    /// Each measure cell of the output with the label paths of its row and
+    /// column.
+    fn measure_cells(&self, rows: &[usize], columns: &[usize], flags: u32) -> Vec<LabeledCell> {
         let status = self.store.pivot_status(self.output);
         assert_eq!(status[0], 0, "the pivot shows output");
         let (out_rows, out_cols) = (status[3] as usize, status[4] as usize);
         let label_cols = if flags & TABULAR != 0 { rows.len() } else { 1 };
         let header_rows = columns.len() + 1;
-        let mut checked = 0;
+        let mut cells = Vec::new();
         let mut outer = Value::Blank;
 
         for out_row in header_rows..out_rows {
@@ -233,24 +265,19 @@ impl MeasureFixture {
             };
             for out_col in label_cols..out_cols {
                 let slot = (out_col - label_cols) % MEASURES.len();
-                let col_labels: Vec<Value> = (0..columns.len())
-                    .map(|row| {
-                        let value_col = out_col - slot;
-                        self.output_value(row, value_col)
-                    })
+                let col_labels = (0..columns.len())
+                    .map(|row| self.output_value(row, out_col - slot))
                     .collect();
-                let selected = self.select(rows, &row_labels, columns, &col_labels);
-                let actual = settled(&self.store, self.output, out_row, out_col);
-                let expected = if selected.is_empty() {
-                    Value::Blank
-                } else {
-                    self.oracle(MEASURES[slot].1, &selected)
-                };
-                assert_eq!(actual, expected, "measure {slot} at ({out_row}, {out_col})");
-                checked += 1;
+                cells.push(LabeledCell {
+                    slot,
+                    row_labels: row_labels.clone(),
+                    col_labels,
+                    actual: self.output_value(out_row, out_col),
+                    at: (out_row, out_col),
+                });
             }
         }
-        assert!(checked > MEASURES.len() * 4, "the pivot has measure cells");
+        cells
     }
 
     fn output_value(&self, row: usize, col: usize) -> Value {
@@ -445,4 +472,159 @@ fn measure_errors_show_in_their_cells_and_a_missing_measure_at_the_anchor() {
     fixture.set_measures(&["=SUM(orders[amount])"]);
     fixture.store.recompute_changed();
     assert_ne!(fixture.store.pivot_status(fixture.output)[0], 0);
+}
+
+/// Measures with `CALCULATE` filters that only remove axis fields.
+const CALCULATE_MEASURES: [&str; 5] = [
+    "=CALCULATE(SUM(orders[qty]), ALL(orders[region]))",
+    "=SUM(orders[qty])/CALCULATE(SUM(orders[qty]), ALL(orders[segment]))",
+    "=CALCULATE(SUM(orders[qty]), ALL(orders[quarter]), ALL(orders[region]))",
+    "=CALCULATE(COUNTA(orders[amount]), ALL(orders[segment]))",
+    "=CALCULATE(SUM(orders[qty]), ALL(orders[qty]))",
+];
+/// The fields each measure of [`CALCULATE_MEASURES`] removes from the
+/// context; `qty` is no pivot field, so removing it changes nothing.
+const CALCULATE_REMOVED: [&[usize]; 5] =
+    [&[REGION], &[SEGMENT], &[QUARTER, REGION], &[SEGMENT], &[]];
+
+/// Rows passing the report filter, unless `removed` holds its field, whose
+/// fields equal the labels at every level of the paths except the
+/// `removed` fields, until a total or blank label ends a path.
+fn select_without(
+    data: &[Order],
+    paths: [(&[usize], &[Value]); 2],
+    removed: &[usize],
+) -> Vec<usize> {
+    (0..ROWS)
+        .filter(|&row| removed.contains(&CHANNEL) || KEPT_CHANNELS.contains(&data[row].channel))
+        .filter(|&row| {
+            paths.iter().all(|(fields, labels)| {
+                fields
+                    .iter()
+                    .zip(labels.iter())
+                    .take_while(|(_, label)| {
+                        **label != Value::Blank && **label != Value::text("Total")
+                    })
+                    .all(|(&field, label)| {
+                        removed.contains(&field) || field_value(&data[row], field) == *label
+                    })
+            })
+        })
+        .collect()
+}
+
+/// `CALCULATE` with `ALL` on axis fields: each cell sums the rows its labels
+/// select, ignoring the removed fields, also for an inner row level, with
+/// tabular and compact rows and subtotals. A share reads the cell's own rows
+/// too, so it is blank where the cell has none.
+#[test]
+fn calculate_removes_axis_field_filters() {
+    let layouts: [(&[usize], &[usize], u32); 3] = [
+        (&[REGION], &[QUARTER], ROW_TOTALS | COLUMN_TOTALS),
+        (
+            &[REGION, SEGMENT],
+            &[QUARTER],
+            ROW_TOTALS | COLUMN_TOTALS | SUBTOTALS | TABULAR,
+        ),
+        (&[REGION, SEGMENT], &[], ROW_TOTALS | SUBTOTALS),
+    ];
+    let mut fixture = MeasureFixture::new(17);
+    fixture.set_measures(&CALCULATE_MEASURES);
+    for (rows, columns, flags) in layouts {
+        fixture.install(rows, columns, flags);
+        for cell in fixture.measure_cells(rows, columns, flags) {
+            let paths: [(&[usize], &[Value]); 2] =
+                [(rows, &cell.row_labels), (columns, &cell.col_labels)];
+            let context = select_without(&fixture.data, paths, CALCULATE_REMOVED[cell.slot]);
+            let qty = |selected: &[usize]| {
+                selected
+                    .iter()
+                    .map(|&row| fixture.data[row].qty)
+                    .sum::<f64>()
+            };
+            let expected = match cell.slot {
+                1 => {
+                    let own = select_without(&fixture.data, paths, &[]);
+                    if own.is_empty() {
+                        Value::Blank
+                    } else {
+                        Value::Number(qty(&own) / qty(&context))
+                    }
+                }
+                3 => Value::Number(
+                    context
+                        .iter()
+                        .filter(|&&row| !matches!(fixture.data[row].amount, Amount::Blank))
+                        .count() as f64,
+                ),
+                _ => Value::Number(qty(&context)),
+            };
+            match (&cell.actual, &expected) {
+                (Value::Number(actual), Value::Number(expected)) => {
+                    assert!(
+                        (actual - expected).abs() < 1e-9,
+                        "measure {} at {:?}: {actual} vs {expected}",
+                        cell.slot,
+                        cell.at
+                    );
+                }
+                _ => assert_eq!(
+                    cell.actual, expected,
+                    "measure {} at {:?}",
+                    cell.slot, cell.at
+                ),
+            }
+        }
+    }
+}
+
+/// Errors inside `CALCULATE` reach the enclosing expression, so `IFERROR`
+/// and `ISERROR` see them as in a cell formula: the error row of the base
+/// table, which `ALL` of the channel brings back, and a division by zero.
+const CALCULATE_ERROR_MEASURES: [&str; 5] = [
+    "=CALCULATE(SUM(orders[amount]), ALL(orders[channel]))",
+    "=IFERROR(CALCULATE(SUM(orders[amount]), ALL(orders[channel])), -1)",
+    "=ISERROR(CALCULATE(SUM(orders[amount]), ALL(orders[channel])))",
+    "=IFERROR(CALCULATE(SUM(orders[qty])/0, ALL(orders[region])), -2)",
+    "=ISERROR(CALCULATE(SUM(orders[qty])/0, ALL(orders[region])))",
+];
+
+#[test]
+fn errors_inside_calculate_reach_iferror_and_iserror() {
+    let (rows, columns, flags): (&[usize], &[usize], u32) =
+        (&[REGION], &[QUARTER], ROW_TOTALS | COLUMN_TOTALS);
+    let mut fixture = MeasureFixture::new(23);
+    fixture.set_measures(&CALCULATE_ERROR_MEASURES);
+    fixture.install(rows, columns, flags);
+    let mut errors = 0;
+
+    for cell in fixture.measure_cells(rows, columns, flags) {
+        let paths: [(&[usize], &[Value]); 2] =
+            [(rows, &cell.row_labels), (columns, &cell.col_labels)];
+        let context = select_without(&fixture.data, paths, &[CHANNEL]);
+        let amount_error = context.contains(&ERROR_ROW);
+        let amount: f64 = context
+            .iter()
+            .filter_map(|&row| match fixture.data[row].amount {
+                Amount::Number(number) => Some(number),
+                _ => None,
+            })
+            .sum();
+        let expected = match (cell.slot, amount_error) {
+            (0, true) => Value::Error(FormulaError::DivZero),
+            (0, false) => Value::Number(amount),
+            (1, true) => Value::Number(-1.0),
+            (1, false) => Value::Number(amount),
+            (2, error) => Value::Bool(error),
+            (3, _) => Value::Number(-2.0),
+            _ => Value::Bool(true),
+        };
+        errors += usize::from(amount_error && cell.slot == 0);
+        assert_eq!(
+            cell.actual, expected,
+            "measure {} at {:?}",
+            cell.slot, cell.at
+        );
+    }
+    assert!(errors > 0, "some cells see the error row");
 }

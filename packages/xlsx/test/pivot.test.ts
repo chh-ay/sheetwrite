@@ -499,3 +499,50 @@ describe("XLSX pivot tables", () => {
     expect(cellCount(reopened)).toBe(0);
   });
 });
+
+describe("XLSX pivot value number formats", () => {
+  it("writes a value field's number format as its dataField numFmtId", async () => {
+    const pivot: PivotDefinition = {
+      id: "units",
+      name: "Units",
+      source: { range: DATA_RANGE },
+      anchor: { row: 0, col: 0 },
+      rows: [0],
+      columns: [],
+      values: [
+        { field: 2, aggregation: "SUM", numberFormat: "$#,##0.00" },
+        { field: 2, aggregation: "MAX", numberFormat: "0.00%" },
+      ],
+    };
+
+    const bytes = await toXlsxWorkbook(authored([pivot]));
+    const table = text(bytes, "xl/pivotTables/pivotTable1.xml");
+    const styles = text(bytes, "xl/styles.xml");
+
+    // 0.00% is built-in format 10; the currency code is custom, from 164.
+    expect(
+      table.match(/<dataField [^>]*>/g)?.map((field) => field.match(/numFmtId="(\d+)"/)?.[1]),
+    ).toEqual(["164", "10"]);
+    expect(styles).toContain('<numFmt numFmtId="164" formatCode="$#,##0.00"/>');
+  });
+
+  it("reads a dataField numFmtId from Excel as the value field's number format", async () => {
+    const files = unzipSync(await sample());
+    const formatted = (part: string) =>
+      strToU8(
+        text(zipSync(files), part).replace(
+          '<dataField name="Summe von Field2" fld="1" baseField="0" baseItem="0"/>',
+          '<dataField name="Summe von Field2" fld="1" baseField="0" baseItem="0" numFmtId="3"/>',
+        ),
+      );
+    files["xl/pivotTables/pivotTable1.xml"] = formatted("xl/pivotTables/pivotTable1.xml");
+    files["xl/pivotTables/pivotTable2.xml"] = formatted("xl/pivotTables/pivotTable2.xml");
+
+    const snapshot = await fromXlsxWorkbook(zipSync(files));
+
+    // Built-in format 3 is #,##0.
+    expect(sheetNamed(snapshot, "Tabelle2").pivots?.[0]?.values).toEqual([
+      { field: 1, aggregation: "SUM", name: "Summe von Field2", numberFormat: "#,##0" },
+    ]);
+  });
+});
