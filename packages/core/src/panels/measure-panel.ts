@@ -179,38 +179,30 @@ export function measurePanel(grid: Grid): GridPanel {
           entries.append(empty);
         }
         for (const [home, own] of groups) {
-          const heading = document.createElement("h4");
-          heading.className = "sheetwrite-panel-label";
-          heading.textContent = home?.name ?? "Removed table";
-          const list = document.createElement("ul");
-          list.className = "sheetwrite-panel-fields";
-          list.setAttribute("aria-label", `${home?.name ?? "Removed table"} measures`);
           for (const measure of own) {
-            const item = document.createElement("li");
-            item.className = "sheetwrite-panel-field-item";
-            const label = document.createElement("span");
-            label.className = "sheetwrite-panel-field-name";
-            label.textContent = measure.name;
-            const source = document.createElement("code");
+            // A measure is named by its home table, as Excel's Manage Measures lists them.
+            const label = `${home?.name ?? "Removed table"} › ${measure.name}`;
+            const row = panelSection(label);
+            const source = document.createElement("p");
             source.className = "sheetwrite-explain-formula";
             source.textContent = measure.formula;
-            item.append(label, source);
+            row.append(source);
             const status = measureStatusText(
               store.getMeasureStatus?.(measure.id) ?? { status: "ok" },
             );
             if (status !== null) {
-              const warning = document.createElement("span");
-              warning.className = "sheetwrite-panel-error";
+              const warning = document.createElement("p");
+              warning.className = "sheetwrite-panel-note";
               warning.textContent = status;
-              item.append(warning);
+              row.append(warning);
             }
-            item.append(
-              button("Edit", () => edit(measure), `edit-${measure.id}`),
-              button("Remove", () => remove(measure), `remove-${measure.id}`),
-            );
-            list.append(item);
+            const change = button("Edit", () => edit(measure), `edit-${measure.id}`);
+            change.setAttribute("aria-label", `Edit ${label}`);
+            const removal = button("Remove", () => remove(measure), `remove-${measure.id}`);
+            removal.setAttribute("aria-label", `Remove ${label}`);
+            row.append(change, removal);
+            entries.append(row);
           }
-          entries.append(heading, list);
         }
       };
 
