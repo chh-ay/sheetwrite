@@ -86,7 +86,7 @@
 }
 .sw-sidebar__nav {
   display: grid;
-  gap: var(--sw-space-6);
+  gap: var(--sw-space-8);
 }
 /* A section: a small label over its pages. */
 .sw-nav-section {
@@ -94,19 +94,24 @@
   gap: var(--sw-space-0-5);
 }
 .sw-nav-section > h2 {
-  margin: 0 0 var(--sw-space-1);
-  padding-inline: var(--sw-space-2);
+  margin: 0 0 var(--sw-space-2);
+  padding-inline: var(--sw-space-3);
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui)
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
     var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
 }
 /* Page rows and group rows: icon, label, then a badge or chevron. */
+/* Rows of 34 px; the icon sits in a fixed column so every label starts on
+   the same line. */
 .sw-sidebar__nav a,
 .sw-nav-subgroup > summary {
   display: flex;
   align-items: center;
-  gap: var(--sw-space-2);
-  padding: var(--sw-space-1-5) var(--sw-space-2);
+  gap: var(--sw-space-3);
+  min-height: 2.125rem;
+  padding: var(--sw-space-1) var(--sw-space-3);
   border-radius: var(--sw-radius-md);
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-small);
@@ -119,6 +124,8 @@
 .sw-sidebar__nav a > .sw-icon,
 .sw-nav-subgroup > summary > .sw-icon:first-child {
   flex: none;
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
   color: var(--sw-fg-muted);
 }
 .sw-sidebar__nav a > span:first-of-type,

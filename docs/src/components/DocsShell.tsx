@@ -56,22 +56,16 @@ interface DocsShellProps {
   title: string;
 }
 
-const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
-
 /**
- * New/Updated marker for a page changed in the latest release; text, so
- * screen readers announce it. Only page links carry it: a group marker would
- * repeat its pages' markers on a collapsed row.
+ * The one sidebar marker: "New" on a page added in the latest release; text,
+ * so screen readers announce it. Only page links carry it: a group marker
+ * would repeat its pages' markers on a collapsed row.
  */
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
-  const badge = navigationBadge(item, LATEST_RELEASE.version);
-  if (badge === undefined) return null;
-
-  return (
-    <span className="sw-nav-badge" data-badge={badge}>
-      {BADGE_TEXT[badge]}
-    </span>
-  );
+  if (item.items !== undefined || navigationBadge(item, LATEST_RELEASE.version) !== "new") {
+    return null;
+  }
+  return <span className="sw-nav-badge">New</span>;
 }
 
 interface NavigationEntriesProps {
@@ -114,7 +108,7 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
             {
               label: "Overview",
               href: item.href,
-              icon: "book" as const,
+              icon: item.icon,
               added: item.added,
               updated: item.updated,
             },
@@ -162,24 +156,12 @@ function NavigationSections({
             items={
               section.href === undefined
                 ? section.items
-                : [{ label: "Overview", href: section.href, icon: "book" }, ...section.items]
+                : [{ label: "Overview", href: section.href, icon: section.icon }, ...section.items]
             }
             onNavigate={onNavigate}
           />
         </section>
       ))}
-      <section className="sw-nav-section">
-        <h2>For LLMs</h2>
-        {/* Plain text endpoints, not routes: no client-side navigation. */}
-        <a href="/llms.txt" title="Curated documentation index for AI agents">
-          <Icon name="file" />
-          <span>llms.txt</span>
-        </a>
-        <a href="/llms-full.txt" title="Complete documentation text for AI agents">
-          <Icon name="file" />
-          <span>llms-full.txt</span>
-        </a>
-      </section>
     </nav>
   );
 }
@@ -441,6 +423,8 @@ export function DocsShell({
           <DocumentPager {...neighbours} />
           <div className="sw-document__colophon">
             <span>Sheetwrite is MIT licensed.</span>
+            {/* Plain text endpoints, not routes: no client-side navigation. */}
+            <a href="/llms.txt">llms.txt</a>
             <a href="https://github.com/chh-ay/sheetwrite/issues">Report a documentation issue</a>
           </div>
         </footer>

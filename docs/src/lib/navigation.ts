@@ -63,6 +63,8 @@ export interface NavigationSection {
   tab: DocsTabId;
   /** The section's overview page, which lists its pages as cards. */
   href?: string;
+  /** The icon of the section's overview row, when it has an overview page. */
+  icon?: IconName;
   items: readonly NavigationItem[];
 }
 
@@ -108,8 +110,9 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Getting started",
     tab: "guides",
     href: "/docs/start/",
+    icon: "play",
     items: [
-      { label: "Installation", href: "/docs/start/installation/", icon: "download" },
+      { label: "Installation", href: "/docs/start/installation/", icon: "package" },
       { label: "First grid", href: "/docs/start/first-grid/", icon: "table" },
       {
         label: "Choose an engine",
@@ -131,6 +134,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Frameworks",
     tab: "guides",
     href: "/docs/frameworks/",
+    icon: "layers",
     items: [
       { label: "Vanilla", href: "/docs/frameworks/vanilla/", icon: "framework-vanilla" },
       { label: "React", href: "/docs/frameworks/react/", icon: "framework-react" },
@@ -143,6 +147,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Concepts",
     tab: "guides",
     href: "/docs/concepts/",
+    icon: "key",
     items: [
       { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/", icon: "key" },
       {
@@ -163,6 +168,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Features",
     tab: "guides",
     href: "/docs/features/",
+    icon: "sparkle",
     items: [
       {
         label: "Grid",
@@ -348,6 +354,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Import and export",
     tab: "guides",
     href: "/docs/import-export/",
+    icon: "upload",
     items: [
       { label: "XLSX import", href: "/docs/import-export/xlsx-import/", icon: "upload" },
       { label: "XLSX export", href: "/docs/import-export/xlsx-export/", icon: "download" },
@@ -376,6 +383,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Tutorials",
     tab: "guides",
     href: "/docs/tutorials/",
+    icon: "book",
     items: [
       {
         label: "Excel in JavaScript",
@@ -419,6 +427,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Performance",
     tab: "guides",
     href: "/docs/performance/",
+    icon: "gauge",
     items: [
       { label: "Render", href: "/docs/performance/render/", icon: "monitor" },
       { label: "Data engine", href: "/docs/performance/data-engine/", icon: "database" },
