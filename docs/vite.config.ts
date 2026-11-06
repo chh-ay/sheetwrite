@@ -22,6 +22,7 @@ import type { IconName } from "./src/icons/icon-names.ts";
 import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
+import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
@@ -386,7 +387,8 @@ const OWNED_BY_SITE_MODULE = "tabindex-js-module";
  * of every page, in its HTML and its hydration chunk. Pages render code
  * without them; the root loads them once instead:
  *
- * - The stylesheet, so it is downloaded once and cached across the site.
+ * - The stylesheet, so it is downloaded once and cached across the site,
+ *   with the copy button's state rules scoped to the button.
  * - The scripts (the copy button), as a function the root runs after
  *   hydration. A `<script>` in page content is inert when React renders it
  *   on a client-side navigation, and React reports it as an error. The
@@ -403,7 +405,7 @@ function expressiveCodeAssets(): Plugin {
     async load(id) {
       if (id === RESOLVED_EXPRESSIVE_CODE_STYLES_ID) {
         const { baseStyles, themeStyles } = await sharedExpressiveCodeRenderer();
-        return `${baseStyles}\n${themeStyles}`;
+        return `${scopeCopyButtonStates(baseStyles)}\n${themeStyles}`;
       }
       if (id !== RESOLVED_EXPRESSIVE_CODE_SCRIPTS_ID) return undefined;
       const { jsModules } = await sharedExpressiveCodeRenderer();
