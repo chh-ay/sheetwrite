@@ -4,15 +4,18 @@ import { join, relative, sep } from "node:path";
 import { element, type HastNode } from "./build-hast.js";
 import { docCard } from "./content-components.js";
 import { DOCS_NAVIGATION, type NavigationItem, navigationBadge } from "./navigation.js";
-import { LATEST_RELEASE } from "./releases.js";
+import { RELEASES } from "./releases.js";
 
 /**
  * Group overview pages. `<div class="sw-section-cards"></div>` on the page of
  * a sidebar group becomes one card per page in that group, with the page's
- * description and its New/Updated badge, all read at build time from the
+ * description and, for a page added in the current release, a New badge, all read at build time from the
  * sidebar tree and each page's frontmatter. The sidebar stays the only list.
  */
 const CARDS_TAG = "sw-section-cards";
+
+/** The newest release, the next one included: its added pages carry New. */
+const CURRENT_RELEASE = RELEASES[0]?.version ?? "";
 
 /**
  * The illustration (public/figures/illustrations) on the card of each page
@@ -109,7 +112,8 @@ export function renderSectionCards(options: { contentRoot: string }) {
         if (file.path === undefined) throw new Error(`${CARDS_TAG} needs a source file`);
         const pages = sectionPages(routeOf(options.contentRoot, file.path));
         const cards = pages.map((page) => {
-          const badge = navigationBadge(page, LATEST_RELEASE.version);
+          // The current release is the newest one, the next release included.
+          const isNew = navigationBadge(page, CURRENT_RELEASE) === "new";
           const illustration = SECTION_ILLUSTRATIONS[page.href];
           return docCard({
             title: page.label,
@@ -117,13 +121,12 @@ export function renderSectionCards(options: { contentRoot: string }) {
             body: [{ type: "text", value: description(options.contentRoot, page.href) }],
             illustration,
             icon: illustration === undefined ? sidebarIcon(page) : undefined,
-            badge:
-              badge === undefined
-                ? undefined
-                : element("span", [{ type: "text", value: badge === "new" ? "New" : "Updated" }], {
-                    className: ["sw-nav-badge"],
-                    dataBadge: badge,
-                  }),
+            badge: isNew
+              ? element("span", [{ type: "text", value: "New" }], {
+                  className: ["sw-nav-badge"],
+                  dataBadge: "new",
+                })
+              : undefined,
           });
         });
         children[index] = element("div", cards, {
