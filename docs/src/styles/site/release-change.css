@@ -177,7 +177,8 @@
   position: relative;
   height: 1.125rem;
   background:
-    linear-gradient(var(--sw-fg-muted), var(--sw-fg-muted)) var(--change-origin, 50%) 0 / 1px 100% no-repeat,
+    linear-gradient(var(--sw-fg-muted), var(--sw-fg-muted)) var(--change-origin, 50%) 0 / 1px 100%
+      no-repeat,
     repeating-linear-gradient(
       to right,
       var(--sw-border) 0 1px,
