@@ -8,7 +8,10 @@
 //! many-to-one relationships; other fields put no condition on `T`, so
 //! filters flow from the one side to the many side only.
 
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+
+use rustc_hash::FxHasher;
 
 use super::model_source::{model_routes, ModelSource};
 use super::relationships::{ColumnRef, KeyColumn, Relationship};
@@ -46,6 +49,7 @@ fn column_name(index: usize) -> String {
 
 /// The rows of one non-base table `T` that pass the pivot's report filters
 /// on fields `T` reaches, with their keys at the reachable axis levels.
+#[derive(Default)]
 struct RelatedRows {
     /// Reachable row-axis levels, then column-axis levels, in level order.
     levels: Vec<(bool, usize)>,
@@ -56,9 +60,10 @@ struct RelatedRows {
     /// The levels a cell at `depths` constrains: those above its row and
     /// column depths.
     active: Vec<usize>,
-    /// Indices into `rows`, sorted by their keys at `active` and ascending
-    /// within equal keys, so each cell's rows are one range.
-    order: Vec<u32>,
+    /// One entry per row: the 32-bit hash of its keys at `active` above its
+    /// index into `rows`, sorted, so a cell's candidate rows are one range
+    /// in ascending row order.
+    order: Vec<u64>,
     /// The axis depths `order` was sorted for.
     depths: Option<(usize, usize)>,
 }
@@ -72,8 +77,8 @@ impl RelatedRows {
             .map(move |&level| &self.keys[start + level])
     }
 
-    /// Sorts the rows by the levels that cells at `depths` constrain, once
-    /// per pair of axis depths.
+    /// Orders the rows by the hash of the levels that cells at `depths`
+    /// constrain, once per pair of axis depths.
     fn sort_for(&mut self, depths: (usize, usize)) {
         if self.depths == Some(depths) {
             return;
@@ -85,13 +90,17 @@ impl RelatedRows {
                 level < if on_rows { depths.0 } else { depths.1 }
             })
             .collect();
-        let mut order: Vec<u32> = (0..self.rows.len() as u32).collect();
-        order.sort_by(|&left, &right| self.active_keys(left).cmp(self.active_keys(right)));
+        let mut order: Vec<u64> = (0..self.rows.len() as u32)
+            .map(|index| (u64::from(keys_hash(self.active_keys(index))) << 32) | u64::from(index))
+            .collect();
+        order.sort_unstable();
         self.order = order;
     }
 
-    /// The rows of `T` visible in the cell of `groups`, ascending: the range
-    /// of `order` whose keys equal the cell's labels at the active levels.
+    /// The rows of `T` visible in the cell of `groups`, ascending: the
+    /// entries of `order` with the hash of the cell's labels at the active
+    /// levels whose keys equal those labels.
+    #[inline(never)]
     fn visible(&mut self, cache: &PivotCache, groups: (u32, u32), out: &mut Vec<u32>) {
         out.clear();
         self.sort_for((
@@ -108,18 +117,29 @@ impl RelatedRows {
             }
         }
 
+        let hash = keys_hash(wanted.iter());
         let start = self
             .order
-            .partition_point(|&index| self.active_keys(index).lt(wanted.iter()));
-        let end = self
-            .order
-            .partition_point(|&index| self.active_keys(index).le(wanted.iter()));
-        out.extend(
-            self.order[start..end]
-                .iter()
-                .map(|&index| self.rows[index as usize]),
-        );
+            .partition_point(|&entry| entry < u64::from(hash) << 32);
+        for &entry in self.order[start..]
+            .iter()
+            .take_while(|&&entry| (entry >> 32) as u32 == hash)
+        {
+            let index = entry as u32;
+            if self.active_keys(index).eq(wanted.iter()) {
+                out.push(self.rows[index as usize]);
+            }
+        }
     }
+}
+
+/// A 32-bit hash of a sequence of keys.
+fn keys_hash<'a>(keys: impl Iterator<Item = &'a KeyPart>) -> u32 {
+    let mut hasher = FxHasher::default();
+    for key in keys {
+        key.hash(&mut hasher);
+    }
+    hasher.finish() as u32
 }
 
 impl CellStore {
@@ -135,15 +155,29 @@ impl CellStore {
         fields: &[ColumnRef],
     ) -> Vec<(usize, Value)> {
         let mut tables = vec![base.to_string()];
-        let prepared: Vec<Result<PreparedMeasure, FormulaError>> = cache
+        let mut prepared: Vec<Result<PreparedMeasure, FormulaError>> = cache
             .values()
             .iter()
             .map(|value| self.prepare_pivot_measure(value.measure.as_deref(), &mut tables))
             .collect();
-        let mut related: Vec<Result<RelatedRows, FormulaError>> = tables[1..]
-            .iter()
-            .map(|table| self.related_rows(cache, table, fields))
-            .collect();
+        let mut related = Vec::with_capacity(tables.len() - 1);
+        for (index, table) in tables.iter().enumerate().skip(1) {
+            match self.related_rows(cache, table, fields) {
+                Ok(rows) => related.push(rows),
+                // A measure over a table whose rows cannot be read shows the error.
+                Err(error) => {
+                    related.push(RelatedRows::default());
+                    for measure in &mut prepared {
+                        if measure
+                            .as_ref()
+                            .is_ok_and(|measure| measure.tables.contains(&index))
+                        {
+                            *measure = Err(error);
+                        }
+                    }
+                }
+            }
+        }
         let include_empty = prepared
             .iter()
             .any(|measure| measure.as_ref().is_ok_and(|measure| !measure.base_only));
@@ -160,28 +194,16 @@ impl CellStore {
             if current != Some(cell.groups) {
                 current = Some(cell.groups);
                 for (rows, table) in visible.iter_mut().zip(&mut related) {
-                    if let Ok(table) = table {
-                        table.visible(cache, cell.groups, rows);
-                    }
+                    table.visible(cache, cell.groups, rows);
                 }
             }
 
-            let value = match measure.tables.iter().find_map(|&table| {
+            let rows_of = |table: usize| {
                 table
                     .checked_sub(1)
-                    .and_then(|index| related[index].as_ref().err())
-            }) {
-                Some(error) => Value::Error(*error),
-                None => {
-                    let rows_of = |table: usize| {
-                        table
-                            .checked_sub(1)
-                            .map_or(cell.rows, |index| visible[index].as_slice())
-                    };
-                    self.measure_family(measure, &rows_of)
-                }
+                    .map_or(cell.rows, |index| visible[index].as_slice())
             };
-            cells.push((cell.offset, value));
+            cells.push((cell.offset, self.measure_family(measure, &rows_of)));
         });
         cells
     }
@@ -317,34 +339,24 @@ impl CellStore {
                 .is_some_and(|column| reachable.contains(&column.table.as_str()))
         };
         let definition = cache.definition();
-        let levels: Vec<(bool, usize)> = [(true, &definition.rows), (false, &definition.columns)]
-            .into_iter()
-            .flat_map(|(on_rows, axis)| {
-                axis.iter()
-                    .enumerate()
-                    .filter(|&(_, &field)| reaches(field))
-                    .map(move |(level, _)| (on_rows, level))
-            })
-            .collect();
-        let filters: Vec<_> = definition
-            .filters
-            .iter()
-            .filter(|filter| reaches(filter.field))
-            .collect();
-
         // One model source over `table`: the level fields, then the filters.
-        let columns: Vec<ColumnRef> = levels
-            .iter()
-            .map(|&(on_rows, level)| {
-                let axis = if on_rows {
-                    &definition.rows
-                } else {
-                    &definition.columns
-                };
-                fields[axis[level]].clone()
-            })
-            .chain(filters.iter().map(|filter| fields[filter.field].clone()))
-            .collect();
+        let mut levels = Vec::new();
+        let mut columns = Vec::new();
+        for (on_rows, axis) in [(true, &definition.rows), (false, &definition.columns)] {
+            for (level, &field) in axis.iter().enumerate() {
+                if reaches(field) {
+                    levels.push((on_rows, level));
+                    columns.push(fields[field].clone());
+                }
+            }
+        }
+        let mut filters = Vec::new();
+        for filter in &definition.filters {
+            if reaches(filter.field) {
+                filters.push(filter);
+                columns.push(fields[filter.field].clone());
+            }
+        }
         let source = ModelSource::build(self, table, &columns)?;
         let definition_table = self.table_by_id(table).ok_or(FormulaError::Ref)?;
         let count = definition_table
@@ -354,11 +366,7 @@ impl CellStore {
 
         let mut related = RelatedRows {
             levels,
-            rows: Vec::new(),
-            keys: Vec::new(),
-            active: Vec::new(),
-            order: Vec::new(),
-            depths: None,
+            ..RelatedRows::default()
         };
         let mut folded = String::new();
         'rows: for row in 0..count as usize {

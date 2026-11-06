@@ -13,10 +13,8 @@ pub(crate) const TOTAL_LABEL: &str = "Total";
 
 /// A hash bucket for a group key. Blank compares equal to zero, `FALSE` and
 /// empty text, so they share one bucket; [`compare_group_values`] then
-/// separates unequal nonblank keys inside a bucket. The derived order only
-/// brings equal buckets together for sorted lookups; it is not the display
-/// order of groups.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// separates unequal nonblank keys inside a bucket.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum KeyPart {
     Zero,
     Number(u64),
