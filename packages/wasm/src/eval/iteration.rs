@@ -25,7 +25,7 @@ use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 use super::dependency::circular_components;
 use super::value::cached_formula_value;
 use super::EvalPass;
-use crate::formula_slots::{FormulaResults, FormulaWork};
+use crate::formula_slots::{FormulaBits, FormulaResults, FormulaWork};
 
 /// Excel accepts 1 to 32,767 iterations.
 const MAX_ITERATIONS: u32 = 32_767;
@@ -201,6 +201,7 @@ impl CellStore {
     /// unevaluated: they may read spill cells that do not exist yet. The
     /// depth walk's `#CYCLE!` results are still pulled, not written, so the
     /// cells hold the values each component starts from.
+    #[inline(never)]
     pub(super) fn settle_circular_references(
         &mut self,
         affected: &FormulaWork,
@@ -208,11 +209,11 @@ impl CellStore {
         limits: IterationLimits,
         evaluate_readers: bool,
     ) {
-        let mut cyclic_ids = Vec::new();
+        let mut cyclic_ids = FormulaBits::default();
         let mut pulled = results.take_pulled();
         for (id, result) in pulled.drain(..) {
             if result == Value::Error(FormulaError::Cycle) {
-                cyclic_ids.push(id);
+                cyclic_ids.insert(id);
             } else {
                 self.store_formula_result(id, result);
                 results.settle(id);
@@ -220,14 +221,9 @@ impl CellStore {
         }
         results.restore_pulled(pulled);
         // Selection order, as the memo listed them.
-        cyclic_ids.sort_unstable_by_key(|id| id.index());
         let cyclic: Vec<AbsCellKey> = affected
             .ids()
-            .filter(|id| {
-                cyclic_ids
-                    .binary_search_by_key(&id.index(), |c| c.index())
-                    .is_ok()
-            })
+            .filter(|&id| cyclic_ids.contains(id))
             .filter_map(|id| self.formula_slots.location(id))
             .collect();
 
@@ -261,6 +257,7 @@ impl CellStore {
     /// Sweeps one circular component until it converges or the iteration
     /// limit is spent. Each member's new value is written before the next
     /// member reads it, so a sweep costs one evaluation per member.
+    #[inline(never)]
     fn iterate_component(
         &mut self,
         members: &[AbsCellKey],

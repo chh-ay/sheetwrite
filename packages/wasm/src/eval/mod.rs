@@ -1405,6 +1405,7 @@ impl CellStore {
     /// Writes the errors the depth walk seeded. With iteration on, `#CYCLE!`
     /// results wait: the component pass replaces them and starts from the
     /// values the cells held before this pass.
+    #[inline(never)]
     fn flush_seeded(&mut self, results: &mut FormulaResults) {
         if self.iteration.is_none() {
             self.flush_pulled(results);
