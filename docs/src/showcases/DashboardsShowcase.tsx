@@ -1,5 +1,3 @@
-import { formatNumber } from "@sheetwrite/core";
-
 import { ActionError } from "../lib/use-action.js";
 import { ControlActions, ControlButton, DemoGrid } from "./feature-controls.js";
 import {
@@ -34,7 +32,7 @@ function DashboardControls({
     <>
       <ShowcaseControlGroup
         title="Filter with a slicer"
-        description="The slicers filter the pivot, the chart and the KPI cards together."
+        description="The slicers filter the KPI cards, the chart and the pivot together."
       >
         <ControlActions>
           <ControlButton
@@ -49,12 +47,10 @@ function DashboardControls({
         <ShowcaseReadout
           items={[
             {
-              label: "Revenue by channel, total",
+              label: "Region slicer keeps",
               value: (
-                <span data-testid="dashboard-filtered-revenue">
-                  {typeof snapshot?.filteredRevenue === "number"
-                    ? formatNumber(snapshot.filteredRevenue, "$#,##0")
-                    : "…"}
+                <span data-testid="dashboard-region-selection">
+                  {snapshot?.regionSelection ?? "Every region"}
                 </span>
               ),
             },

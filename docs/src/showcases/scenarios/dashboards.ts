@@ -205,8 +205,8 @@ export interface ItemReading {
 export interface DashboardSnapshot {
  readonly items: readonly ItemReading[];
  readonly hasProductPivot: boolean;
- /** The grand total of the channel pivot, in the slicers' filter context. */
- readonly filteredRevenue: CellScalar;
+ /** The Region slicer's kept values, or null while it keeps every region. */
+ readonly regionSelection: string | null;
 }
 
 export interface DashboardScenario extends LiveScenario<DashboardSnapshot> {
@@ -241,13 +241,6 @@ function itemReading(item: DashboardItem): ItemReading {
   place: `col ${x + 1}, row ${y + 1} · ${w}×${h}`,
   selected: item.kind === "slicer" && item.selected ? item.selected.join(", ") : null,
  };
-}
-
-/** The bottom-right cell of a pivot result: its grand total. */
-function grandTotal(grid: Grid): CellScalar {
- const result = grid.getPivotResult(DASHBOARD_SHEET, CHANNEL_PIVOT);
- if (result?.status !== "ok") return null;
- return result.cells[result.rows * result.cols - 1] ?? null;
 }
 
 /** Mount the orders and the dashboard, then change its items through the public Grid API. */
@@ -298,7 +291,6 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
    ),
    "The dashboard pivots",
   );
-  listeners.notify();
   const stopChanges = grid.on("change", () => listeners.notify());
   dispose = () => {
    stopChanges();
@@ -312,7 +304,8 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
   snapshot: () => ({
    items: items().map(itemReading),
    hasProductPivot: items().some((candidate) => candidate.id === PRODUCT_ITEM.id),
-   filteredRevenue: grid ? grandTotal(grid) : null,
+   regionSelection: items().map(itemReading).find((entry) => entry.id === "region-slicer")
+    ?.selected ?? null,
   }),
   addProductPivot() {
    setItems([PRODUCT_ITEM], "The new pivot item");
