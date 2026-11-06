@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense, use, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
@@ -14,13 +14,32 @@ import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
 
+type FormulaReferenceModule = typeof import("../components/FormulaReference.js");
+
+let formulaReferenceModule: FormulaReferenceModule | undefined;
+let formulaReferenceLoad: Promise<FormulaReferenceModule> | undefined;
+
 /**
  * The formula reference filter and its select load only with the formula
- * family pages that use them, not with every documentation page.
+ * family pages that use them, not with every documentation page. The route
+ * loader loads them before a formula page renders, so the server renders the
+ * table in place instead of streaming it in after the page.
  */
-const FormulaReference = lazy(async () => ({
-  default: (await import("../components/FormulaReference.js")).FormulaReference,
-}));
+function loadFormulaReference(): Promise<FormulaReferenceModule> {
+  formulaReferenceLoad ??= import("../components/FormulaReference.js").then((module) => {
+    formulaReferenceModule = module;
+    return module;
+  });
+  return formulaReferenceLoad;
+}
+
+/** Formula family pages, whose article holds the formula reference. */
+const FORMULA_FAMILY_PAGE = /^\/docs\/reference\/formula-functions\/[^/]+\/$/;
+
+function FormulaReference(props: Readonly<{ family: string }>) {
+  const { FormulaReference: Reference } = formulaReferenceModule ?? use(loadFormulaReference());
+  return <Reference {...props} />;
+}
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
@@ -48,6 +67,7 @@ export const Route = createFileRoute("/docs/$")({
         href,
       };
     }
+    if (FORMULA_FAMILY_PAGE.test(href)) await loadFormulaReference();
     // Dynamic import: the docs page index ships with docs routes, not every page.
     const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
