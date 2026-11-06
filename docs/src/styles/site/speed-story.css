@@ -514,8 +514,8 @@
     font-size: var(--sw-text-caption);
   }
 
-  /* A phone lane labels every other decade, counted from the right end, so labels never touch. */
-  .lane-group__ticks span:nth-last-child(even):not(:first-child) {
+  /* A phone lane labels every other decade from the first, so labels never touch. */
+  .lane-group__ticks span:nth-child(even) {
     visibility: hidden;
   }
 

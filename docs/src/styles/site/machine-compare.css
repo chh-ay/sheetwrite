@@ -294,8 +294,8 @@
     font-size: var(--sw-text-caption);
   }
 
-  /* A phone axis labels every other step, counted from the right end, so labels never touch. */
-  .machines__ticks span:nth-last-child(even):not(:first-child, [data-parity]) {
+  /* A phone axis labels every other step from the first, and 1×, so labels never touch. */
+  .machines__ticks span:nth-child(even):not([data-parity]) {
     visibility: hidden;
   }
 
