@@ -144,7 +144,8 @@
   .sw-si-section-kicker {
     margin: 0 0 var(--sw-space-1);
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -180,7 +181,8 @@
 
   .sw-si-disclosure > summary > span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -371,17 +373,6 @@
   /* ── Workbench: one instrument in the demo palette ── */
 
   .sw-si-workbench {
-    --sw-surface-0: var(--sw-surface-0);
-    --sw-surface-1: var(--sw-surface-1);
-    --sw-surface-2: var(--sw-surface-2);
-    --sw-fg: var(--sw-fg);
-    --sw-fg-strong: var(--sw-fg-strong);
-    --sw-fg-muted: var(--sw-fg-muted);
-    --sw-border: var(--sw-border);
-    --sw-border-strong: var(--sw-border-strong);
-    --sw-accent: var(--sw-accent);
-    --sw-accent-strong: var(--sw-accent-strong);
-    --sw-accent-ink: var(--sw-accent-ink);
     /* Keep soft and raised tokens in the demo palette so chips and their text
        match the workbench surface rather than the page. */
     --sw-accent-soft: color-mix(in srgb, var(--sw-accent) 18%, transparent);
@@ -449,7 +440,8 @@
 
   .sw-si-workbench__label > span:first-child {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -845,7 +837,8 @@
     gap: var(--sw-space-1);
     min-width: 11rem;
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-sans);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1186,7 +1179,8 @@
   .sw-si-compat__detail dt {
     margin-bottom: var(--sw-space-1);
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-sans);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1249,7 +1243,8 @@
 
   .sw-si-results__summary dt {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-sans);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1389,7 +1384,8 @@
 
   .sw-si-results__local > strong {
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1456,7 +1452,8 @@
   .sw-si-report dt {
     margin: 0 0 var(--sw-space-1);
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-sans);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1580,7 +1577,8 @@
 
   .sw-si-fixture__label {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1751,7 +1749,8 @@
 
   .sw-si-matrix thead th {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-sans);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1973,7 +1972,8 @@
   .sw-si-isolation__status > strong,
   .sw-si-isolation__exact > span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }

@@ -213,7 +213,7 @@
 .sw-rwb-history__heading > span,
 .sw-rwb-toolgroup h3 {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -270,7 +270,7 @@
 .sw-rwb-query dt,
 .sw-rwb-kpi dt {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }

@@ -28,6 +28,14 @@
   height: var(--sw-icon-lg);
 }
 
+/* An arrow after a plain link's label in running text sits on the text line
+   (styled links such as .sw-link-arrow lay out their own icon). */
+a:not([class]) > .sw-icon:last-child {
+  display: inline-block;
+  margin-inline-start: var(--sw-space-1);
+  vertical-align: -0.2em;
+}
+
 /* Sprite icons as CSS masks, for markers drawn by CSS in generated markup
    (details summaries, link arrows). Each URL is the symbol's own path data;
    test/icons.test.ts keeps them in step with the sprite. */

@@ -44,7 +44,7 @@
 .sw-hub__eyebrow {
   margin: 0 0 var(--sw-space-3);
   color: var(--sw-accent-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -259,7 +259,7 @@
 
 .sw-hub-launch__meta {
   color: var(--sw-hub-accent-ink);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -609,8 +609,9 @@
 .sw-hub-sync__seq::before {
   margin-right: var(--sw-space-1);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-mono);
   content: "seq";
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 

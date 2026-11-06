@@ -343,14 +343,16 @@
 
   .sw-demo-commandbar .sw-demo-select__label {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
 
   .sw-demo-commandbar label > span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -383,7 +385,8 @@
 
   .sw-demo-render-mode__label {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -774,7 +777,8 @@
     align-items: center;
     gap: var(--sw-space-3);
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -994,7 +998,8 @@
 
   .sw-showcase-page__footer-install > span {
     color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-body);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1031,7 +1036,9 @@
 
   .sw-showcase-page__footer-links a span {
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.2 var(--sw-font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
+    letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
 
@@ -1086,7 +1093,8 @@
   .sw-vanilla-brief p,
   .sw-vanilla-brief dt {
     color: var(--demo-accent);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+      var(--sw-font-mono);
     letter-spacing: var(--sw-tracking-eyebrow);
     text-transform: uppercase;
   }
@@ -1487,24 +1495,8 @@
 }
 
 @layer components {
-  .sw-showcase-page[data-framework="react"] {
-    --sw-accent: var(--sw-fw-react);
-    --sw-accent-strong: color-mix(in srgb, var(--sw-fw-react) 72%, var(--sw-fg-strong));
-    --sw-accent-soft: color-mix(in srgb, var(--sw-fw-react) 16%, var(--sw-surface-1));
-  }
-
-  .sw-showcase-page[data-framework="vue"] {
-    --sw-accent: var(--sw-fw-vue);
-    --sw-accent-strong: color-mix(in srgb, var(--sw-fw-vue) 72%, var(--sw-fg-strong));
-    --sw-accent-soft: color-mix(in srgb, var(--sw-fw-vue) 16%, var(--sw-surface-1));
-  }
-
-  .sw-showcase-page[data-framework="svelte"] {
-    --sw-accent: var(--sw-fw-svelte);
-    --sw-accent-strong: color-mix(in srgb, var(--sw-fw-svelte) 72%, var(--sw-fg-strong));
-    --sw-accent-soft: color-mix(in srgb, var(--sw-fw-svelte) 16%, var(--sw-surface-1));
-  }
-
+  /* Framework colours mark the framework (its demo accent); actions, links
+     and selection keep the brand accent on every page. */
   .sw-demo-app[data-framework="react"] {
     --demo-accent: var(--sw-fw-react);
   }

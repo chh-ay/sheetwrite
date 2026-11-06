@@ -28,7 +28,7 @@
 
 .sw-vuewb-app .sw-vuewb-readout__label {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -287,7 +287,7 @@
 
 .sw-vuewb-policy-result strong {
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
