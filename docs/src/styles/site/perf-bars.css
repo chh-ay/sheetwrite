@@ -151,9 +151,12 @@
   border-top: 0;
 }
 
-.perf-bars[data-switched]:has(input[value="linux"]:checked) .perf-bars__group[data-machine]:not([data-machine="linux"]),
-.perf-bars[data-switched]:has(input[value="mac"]:checked) .perf-bars__group[data-machine]:not([data-machine="mac"]),
-.perf-bars[data-switched]:not(:has(.machine-switch input:checked)) .perf-bars__group[data-machine]:not([data-default]) {
+.perf-bars[data-switched]:has(input[value="linux"]:checked)
+  .perf-bars__group[data-machine]:not([data-machine="linux"]),
+.perf-bars[data-switched]:has(input[value="mac"]:checked)
+  .perf-bars__group[data-machine]:not([data-machine="mac"]),
+.perf-bars[data-switched]:not(:has(.machine-switch input:checked))
+  .perf-bars__group[data-machine]:not([data-default]) {
   display: none;
 }
 

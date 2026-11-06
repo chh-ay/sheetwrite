@@ -121,11 +121,19 @@ describe("engine change", () => {
         machine: "linux",
         machineLabel: "Linux",
         note: "",
-        workloads: [workload("faster", 10, 5), workload("same", 10, 10.2), workload("slower", 10, 20)],
+        workloads: [
+          workload("faster", 10, 5),
+          workload("same", 10, 10.2),
+          workload("slower", 10, 20),
+        ],
       },
       () => "",
     );
-    const drawn = [...html.matchAll(/class="change__row" data-verdict="(\w+)"><span class="change__label">(\w+)/gu)];
+    const drawn = [
+      ...html.matchAll(
+        /class="change__row" data-verdict="(\w+)"><span class="change__label">(\w+)/gu,
+      ),
+    ];
     expect(drawn.map((match) => [match[2], match[1]])).toEqual([
       ["faster", "better"],
       ["slower", "worse"],
