@@ -1,4 +1,5 @@
 import {
+  colToA1,
   formatNumber,
   type DocumentOp,
   type Grid,
@@ -158,7 +159,7 @@ function queriesWorkbook(): Workbook {
   const columns = (sheet: string, widths: readonly number[]) =>
     widths.map((width, index) => ({
       key: `c${index}`,
-      header: "",
+      header: colToA1(index),
       width,
       type: "text" as const,
       ...(MONEY_COLUMNS[sheet] === index ? { numberFormat: MONEY } : {}),
@@ -289,7 +290,8 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
   const ready = (async () => {
     const shell = await mountShowcaseShell(
       host,
-      { workbook: queriesWorkbook() },
+      // Letter headers without filler columns: the grid ends with the report's columns.
+      { workbook: queriesWorkbook(), presentation: "data-grid" },
       controller.signal,
     );
     if (!shell) return;

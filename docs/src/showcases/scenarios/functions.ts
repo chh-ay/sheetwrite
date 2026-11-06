@@ -275,7 +275,7 @@ function functionsWorkbook(): Workbook {
       rowCount: 24,
       columns: widths.map((width, index) => ({
         key: `c${index}`,
-        header: "",
+        header: colToA1(index),
         width,
         type: "text" as const,
       })),
@@ -317,7 +317,8 @@ export function createFunctionsScenario(host: HTMLElement): FunctionsScenario {
   const ready = (async () => {
     const shell = await mountShowcaseShell(
       host,
-      { workbook: functionsWorkbook() },
+      // Letter headers without filler columns: the grid ends with each family's columns.
+      { workbook: functionsWorkbook(), presentation: "data-grid" },
       controller.signal,
     );
     if (!shell) return;

@@ -89,7 +89,7 @@ function budgetWorkbook(): Workbook {
         frozenRows: 1,
         columns: widths.map((width, index) => ({
           key: `c${index}`,
-          header: "",
+          header: colToA1(index),
           width,
           type: index < FIRST_QUARTER_COL ? ("text" as const) : ("number" as const),
           ...(index < FIRST_QUARTER_COL ? {} : { numberFormat: "$#,##0" }),
@@ -243,6 +243,8 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
       host,
       {
         workbook: budgetWorkbook(),
+        // Letter headers without filler columns: the grid ends with the budget's columns.
+        presentation: "data-grid",
         config: {
           history: createHistoryCommands({
             archive: opened,

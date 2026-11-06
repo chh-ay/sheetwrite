@@ -1,4 +1,5 @@
 import {
+  colToA1,
   formatNumber,
   SheetwriteStore,
   type CellScalar,
@@ -243,7 +244,12 @@ function modelOperations(): DocumentOp[] {
 
 function modelWorkbook(): Workbook {
   const columns = (widths: readonly number[]) =>
-    widths.map((width, index) => ({ key: `c${index}`, header: "", width, type: "text" as const }));
+    widths.map((width, index) => ({
+      key: `c${index}`,
+      header: colToA1(index),
+      width,
+      type: "text" as const,
+    }));
   return {
     activeSheet: REPORT_SHEET,
     sheets: [
@@ -313,7 +319,12 @@ export function createDataModelScenario(host: HTMLElement): DataModelScenario {
   let rowField: RowFieldId = "category";
 
   const ready = (async () => {
-    const shell = await mountShowcaseShell(host, { workbook: modelWorkbook() }, controller.signal);
+    // Letter headers without filler columns: the grid ends with each sheet's columns.
+    const shell = await mountShowcaseShell(
+      host,
+      { workbook: modelWorkbook(), presentation: "data-grid" },
+      controller.signal,
+    );
     if (!shell) return;
     grid = shell.grid;
     shellElement = shell.element;
