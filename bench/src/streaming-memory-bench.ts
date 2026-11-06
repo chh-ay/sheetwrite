@@ -122,8 +122,12 @@ async function worker(): Promise<StreamingMemoryResult> {
   const xlsx = (await import(
     pathToFileURL(resolve(root, "packages/xlsx/src/workbook.ts")).href
   )) as { sheetwriteWorkbookBackend: XlsxWorkbookBackend };
+  // The core bridge module, not the public add-on API, so both checkouts install the same backend the same way.
+  const bridge = (await import(
+    pathToFileURL(resolve(root, "packages/core/src/xlsx-bridge.ts")).href
+  )) as { setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): void };
   await core.initSheetwrite();
-  core.setXlsxWorkbookBackend(xlsx.sheetwriteWorkbookBackend);
+  bridge.setXlsxWorkbookBackend(xlsx.sheetwriteWorkbookBackend);
   const options = {
     maxCells: rows * COLUMNS,
     resourceLimits: {

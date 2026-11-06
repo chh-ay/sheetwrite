@@ -51,7 +51,7 @@ async function lifecycle(): Promise<Record<string, unknown>> {
   // different-source call rejects.
   const first = initSheetwrite();
   const sameSourceWhileInFlight = initSheetwrite();
-  const second = initSheetwrite("https://example.invalid/x.wasm").then(
+  const second = initSheetwrite({ source: "https://example.invalid/x.wasm" }).then(
     () => "fulfilled",
     (error: unknown) => rejectedInitialization(error),
   );
@@ -66,7 +66,7 @@ async function lifecycle(): Promise<Record<string, unknown>> {
   result.repeatFulfilled = true;
 
   // Different source AFTER success warns and keeps the first module.
-  await initSheetwrite("https://example.invalid/late.wasm");
+  await initSheetwrite({ source: "https://example.invalid/late.wasm" });
   result.postSuccessDifferentSource = "fulfilled";
 
   result.storeAfter = new SheetwriteStore(workbook) instanceof SheetwriteStore;
@@ -76,7 +76,7 @@ async function lifecycle(): Promise<Record<string, unknown>> {
 async function retry(): Promise<Record<string, unknown>> {
   const result: Record<string, unknown> = {};
 
-  result.firstFailure = await initSheetwrite("https://example.invalid/broken.wasm").then(
+  result.firstFailure = await initSheetwrite({ source: "https://example.invalid/broken.wasm" }).then(
     () => "fulfilled",
     (error: unknown) => rejectedInitialization(error),
   );

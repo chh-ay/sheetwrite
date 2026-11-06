@@ -12,7 +12,7 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsx } from "../src/index.js";
 
 const SAMPLE = new URL("fixtures/preserve-ExcelPivotTableSample.xlsx", import.meta.url);
 /** Serials of the sample's dates: 2022-01-01, 2022-01-03, 2022-11-11 and 2022-11-13. */
@@ -102,8 +102,7 @@ function authored(pivots: PivotDefinition[]): WorkbookSnapshot {
 const DATA_RANGE = { sheet: "data", start: { row: 0, col: 0 }, end: { row: 5, col: 3 } };
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsx()] });
 });
 
 describe("XLSX pivot tables", () => {

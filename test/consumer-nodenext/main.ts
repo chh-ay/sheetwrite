@@ -18,6 +18,7 @@ import type {
   WorkbookSnapshot,
   XlsxTableExportBackend,
   XlsxTableImportBackend,
+  SheetwriteAddon,
 } from "@sheetwrite/core";
 import {
   createGrid,
@@ -25,16 +26,12 @@ import {
   fromXlsxTable,
   initSheetwrite,
   MemoryPersistenceAdapter,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
   SyncCoordinator,
   toXlsxTable,
 } from "@sheetwrite/core";
 import { createGridController } from "@sheetwrite/core/adapter";
 import * as Xlsx from "@sheetwrite/xlsx";
-import "@sheetwrite/xlsx/register";
 import * as Charts from "@sheetwrite/charts";
-import "@sheetwrite/charts/register";
 
 // Removed pre-release names must stay absent from packed declarations.
 // @ts-expect-error `Patch` was removed in favor of `DocumentOp`.
@@ -49,9 +46,9 @@ import type { XlsxImportBackend as RemovedXlsxImportBackend } from "@sheetwrite/
 import type { toXlsx as removedToXlsx } from "@sheetwrite/core";
 // @ts-expect-error use `fromXlsxTable`.
 import type { fromXlsx as removedFromXlsx } from "@sheetwrite/core";
-// @ts-expect-error use `setXlsxTableExportBackend`.
+// @ts-expect-error use `initSheetwrite({ addons })`.
 import type { setXlsxBackend as removedSetXlsxBackend } from "@sheetwrite/core";
-// @ts-expect-error use `setXlsxTableImportBackend`.
+// @ts-expect-error use `initSheetwrite({ addons })`.
 import type { setXlsxImportBackend as removedSetXlsxImportBackend } from "@sheetwrite/core";
 
 export type RemovedExportsMustStayAbsent = [
@@ -107,15 +104,18 @@ const tableImportBackend: XlsxTableImportBackend = {
     return { rowCount: 0, columns: {} };
   },
 };
-setXlsxTableExportBackend(tableExportBackend);
-setXlsxTableImportBackend(tableImportBackend);
+const tableAddon: SheetwriteAddon = {
+  name: "consumer-table",
+  setup(context) {
+    context.xlsx({ tableExport: tableExportBackend, tableImport: tableImportBackend });
+  },
+};
+void initSheetwrite({ addons: [Xlsx.xlsx(), Charts.charts(), tableAddon] });
 void toXlsxTable;
 void fromXlsxTable;
 void datasource;
 void operation;
-void Xlsx.registerXlsxBackends;
 void Charts.createChartViewCache;
-void Charts.registerChartsBackend;
 
 const positionalDatasource: DataSource = {
   capabilities: { protocol: 2, columns: "windowed" },

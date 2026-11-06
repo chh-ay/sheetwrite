@@ -17,7 +17,7 @@ import * as formulas from "@sheetwrite/formulas";
 import { createQuerySession } from "../src/node.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 let restoreStubs: () => void;

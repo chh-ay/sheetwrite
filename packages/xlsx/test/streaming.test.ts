@@ -16,14 +16,13 @@ import {
 } from "@sheetwrite/core";
 import { deflateSync, strToU8, unzipSync } from "fflate";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsx } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
 import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
 import { rawXlsx, rawZip, worksheet } from "./raw-opc.js";
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsx()] });
 });
 
 function largeSnapshot(rows: number): WorkbookSnapshot {

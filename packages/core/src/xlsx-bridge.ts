@@ -114,7 +114,7 @@ export interface XlsxTableExportBackend {
 
 let tableExportBackend: XlsxTableExportBackend | null = null;
 
-/** Registers the optional table XLSX export implementation used by core. */
+/** Sets the table XLSX export implementation that the XLSX add-on installs. */
 export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
   tableExportBackend = next;
 }
@@ -126,7 +126,7 @@ function missingXlsxBackend(
   return new SheetwriteError(
     "optional-backend-unavailable",
     operation,
-    `Sheetwrite: XLSX backend not registered. Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling ${functionName}.`,
+    `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsx()] }) before calling ${functionName}.`,
     { context: { backend: "xlsx", functionName }, retryable: false },
   );
 }
@@ -170,10 +170,10 @@ function xlsxCallFailure(
  *
  * @example
  * ```ts
- * import { registerXlsxBackends } from "@sheetwrite/xlsx";
- * import { toXlsxTable, downloadBytes, type Workbook, type Store } from "@sheetwrite/core";
+ * import { xlsx } from "@sheetwrite/xlsx";
+ * import { initSheetwrite, toXlsxTable, downloadBytes, type Workbook, type Store } from "@sheetwrite/core";
  *
- * registerXlsxBackends();
+ * await initSheetwrite({ addons: [xlsx()] });
  * async function download(workbook: Workbook, store: Store) {
  *   const bytes = await toXlsxTable(workbook, store);
  *   downloadBytes(bytes, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -232,7 +232,7 @@ export interface XlsxTableImportBackend {
 
 let tableImportBackend: XlsxTableImportBackend | null = null;
 
-/** Registers the optional table XLSX import implementation used by core. */
+/** Sets the table XLSX import implementation that the XLSX add-on installs. */
 export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
   tableImportBackend = next;
 }
@@ -245,10 +245,10 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  *
  * @example
  * ```ts
- * import { registerXlsxBackends } from "@sheetwrite/xlsx";
- * import { fromXlsxTable } from "@sheetwrite/core";
+ * import { xlsx } from "@sheetwrite/xlsx";
+ * import { fromXlsxTable, initSheetwrite } from "@sheetwrite/core";
  *
- * registerXlsxBackends();
+ * await initSheetwrite({ addons: [xlsx()] });
  * async function openTable(file: File) {
  *   return fromXlsxTable(await file.arrayBuffer());
  * }
@@ -344,7 +344,7 @@ export interface XlsxWorkbookBackend {
 
 let workbookBackend: XlsxWorkbookBackend | null = null;
 
-/** Registers the optional workbook XLSX implementation used by core. */
+/** Sets the workbook XLSX implementation that the XLSX add-on installs; `null` clears it. */
 export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend | null): void {
   workbookBackend = next;
   setXlsxSourceVerifier(next?.verifySource?.bind(next));
@@ -394,10 +394,10 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
  *
  * @example
  * ```ts
- * import { registerXlsxBackends } from "@sheetwrite/xlsx";
- * import { toXlsxWorkbook, downloadBytes, type Grid } from "@sheetwrite/core";
+ * import { xlsx } from "@sheetwrite/xlsx";
+ * import { initSheetwrite, toXlsxWorkbook, downloadBytes, type Grid } from "@sheetwrite/core";
  *
- * registerXlsxBackends();
+ * await initSheetwrite({ addons: [xlsx()] });
  * async function download(grid: Grid) {
  *   const bytes = await toXlsxWorkbook(grid);
  *   downloadBytes(bytes, "workbook.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -474,12 +474,11 @@ export async function fromXlsxWorkbookFile(
  *
  * @example
  * ```ts
- * import { registerXlsxBackends } from "@sheetwrite/xlsx";
+ * import { xlsx } from "@sheetwrite/xlsx";
  * import { fromXlsxWorkbook, createGridFromSnapshot, initSheetwrite } from "@sheetwrite/core";
  *
- * registerXlsxBackends();
  * async function openWorkbook(host: HTMLElement, file: File) {
- *   await initSheetwrite();
+ *   await initSheetwrite({ addons: [xlsx()] });
  *   const snapshot = await fromXlsxWorkbook(await file.arrayBuffer());
  *   return createGridFromSnapshot(host, snapshot);
  * }

@@ -1,23 +1,16 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import type {
-  Workbook,
-  WorkbookSnapshot,
-  XlsxTableExportBackend,
-  XlsxTableImportBackend,
-  XlsxWorkbookBackend,
-} from "@sheetwrite/core";
+import type { Workbook, WorkbookSnapshot } from "@sheetwrite/core";
 import {
   fromXlsxTable,
   fromXlsxWorkbook,
   initSheetwrite,
   SheetwriteStore,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
   toXlsxTable,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
+
+import { xlsx } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -68,7 +61,7 @@ function workbookSnapshot(): WorkbookSnapshot {
   };
 }
 
-describe("XLSX package registration", () => {
+describe("XLSX add-on", () => {
   it("leaves literal and range-only workbooks engine-free and batches cells with names", async () => {
     const snapshot = workbookSnapshot();
     snapshot.workbook.namedRanges = [
@@ -92,7 +85,7 @@ describe("XLSX package registration", () => {
       let instances = 0;
       let batches = 0;
       let scalars = 0;
-      await initSheetwrite(undefined, {
+      await initSheetwrite({ engine: {
         ...wasm,
         createEngine: async (...args) => {
           instances += 1;
@@ -104,7 +97,7 @@ describe("XLSX package registration", () => {
             formulaFromXlsx: (...args) => { scalars += 1; return engine.formulaFromXlsx(...args); },
           };
         },
-      });
+      } });
       const bytes = await backend.toXlsxWorkbook(snapshot);
       const exportBatches = batches;
       batches = 0;
@@ -139,35 +132,13 @@ describe("XLSX package registration", () => {
     });
   });
 
-  it("keeps the root side-effect free and registers every backend idempotently", async () => {
+  it("installs every backend through initSheetwrite, and a repeated install is a no-op", async () => {
     const store = new SheetwriteStore(workbook());
     const snapshot = workbookSnapshot();
-    const tableExportBackend: XlsxTableExportBackend = {
-      name: "root-side-effect-tripwire-export",
-      toXlsxTable: async () => new Uint8Array([1]),
-    };
-    const tableImportBackend: XlsxTableImportBackend = {
-      name: "root-side-effect-tripwire-import",
-      fromXlsxTable: async () => ({ rowCount: 0, columns: {} }),
-    };
-    const workbookBackend: XlsxWorkbookBackend = {
-      name: "root-side-effect-tripwire-workbook",
-      toXlsxWorkbook: async () => new Uint8Array([2]),
-      fromXlsxWorkbook: async () => snapshot,
-    };
-    setXlsxTableExportBackend(tableExportBackend);
-    setXlsxTableImportBackend(tableImportBackend);
-    setXlsxWorkbookBackend(workbookBackend);
 
-    // Dynamic import is the behavior under test: registration must not occur on root load.
-    const xlsx = await import("../src/index.js");
-    await expect(toXlsxTable(store.getWorkbook(), store)).resolves.toEqual(new Uint8Array([1]));
-    await expect(fromXlsxTable(new Uint8Array())).resolves.toEqual({ rowCount: 0, columns: {} });
-    await expect(toXlsxWorkbook(snapshot)).resolves.toEqual(new Uint8Array([2]));
-    await expect(fromXlsxWorkbook(new Uint8Array())).resolves.toBe(snapshot);
+    await initSheetwrite({ addons: [xlsx()] });
+    await initSheetwrite({ addons: [xlsx()] });
 
-    xlsx.registerXlsxBackends();
-    xlsx.registerXlsxBackends();
     store.applyTransaction({
       patches: [
         {
@@ -183,15 +154,13 @@ describe("XLSX package registration", () => {
       rowCount: 1,
       columns: { Value: ["registered"] },
     });
+
     const workbookBytes = await toXlsxWorkbook(snapshot);
     expect((await fromXlsxWorkbook(workbookBytes)).sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
       kind: "literal",
       value: "registered",
     });
 
-    setXlsxTableExportBackend(null as never);
-    setXlsxTableImportBackend(null as never);
-    setXlsxWorkbookBackend(null as never);
     store.dispose();
   });
 });

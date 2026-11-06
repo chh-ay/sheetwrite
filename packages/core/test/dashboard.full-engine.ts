@@ -15,7 +15,7 @@ import {
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 let restore: () => void;

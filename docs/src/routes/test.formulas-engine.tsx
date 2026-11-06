@@ -35,7 +35,7 @@ function FormulasEngineFixture() {
     let disposed = false;
     let grid: Grid | undefined;
     const fullEngine = new URLSearchParams(location.search).get("engine") === "full";
-    void initSheetwrite(undefined, fullEngine ? formulas : undefined).then(
+    void initSheetwrite({ engine: fullEngine ? formulas : undefined }).then(
       () => {
         if (disposed) return;
         grid = createGrid(element, { workbook });

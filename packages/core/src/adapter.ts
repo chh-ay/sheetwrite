@@ -336,7 +336,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     const operation = initialization.next();
     const alreadyReady = isSheetwriteReady();
     if (!alreadyReady) publication.setInitializationState("loading");
-    const pending = initSheetwrite(input.wasmSource);
+    const pending = initSheetwrite({ source: input.wasmSource });
     const attachment = lifetime;
     void pending
       .then(

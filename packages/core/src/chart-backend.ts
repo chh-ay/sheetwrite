@@ -5,13 +5,13 @@ import type { ChartRendererFactory, ChartViewProviderFactory, Store } from "./ty
 let chartViewProviderFactory: ChartViewProviderFactory | null = null;
 let chartRendererFactory: ChartRendererFactory | null = null;
 
-/** Register an optional chart provider; `null` removes the current provider. */
+/** Set the chart provider that the charts add-on installs; `null` clears it. */
 export function setChartViewProviderFactory(factory: ChartViewProviderFactory | null): void {
   chartViewProviderFactory = factory;
 }
 
 /**
- * Register the renderer that draws charts in the grid's object layer; `null`
+ * Set the renderer that draws charts in the grid's object layer; `null`
  * removes it. Grids created later use it. Without a renderer, the grid draws
  * a plain frame with the chart title.
  */
@@ -25,17 +25,17 @@ export function createChartRenderer(store: Store): ChartRenderer | null {
 }
 
 /**
- * Open cached chart views through the optional backend. Import
- * `@sheetwrite/charts/register` or call its `registerChartsBackend` first.
- * Throws a `SheetwriteError` with code `"optional-backend-unavailable"` if no
- * provider is registered. The caller must dispose the result.
+ * Open cached chart views through the charts add-on. Call
+ * `initSheetwrite({ addons: [charts()] })` from `@sheetwrite/charts` first.
+ * Throws a `SheetwriteError` with code `"optional-backend-unavailable"` if the
+ * add-on is not installed. The caller must dispose the result.
  */
 export function openChartViews(store: Store): ChartViewProvider {
   if (!chartViewProviderFactory) {
     throw new SheetwriteError(
       "optional-backend-unavailable",
       "chart-view",
-      "Sheetwrite: chart backend not registered. Install @sheetwrite/charts and import @sheetwrite/charts/register before calling openChartViews.",
+      "Sheetwrite: charts add-on not installed. Install @sheetwrite/charts and call initSheetwrite({ addons: [charts()] }) before calling openChartViews.",
       { context: { backend: "charts" }, retryable: false },
     );
   }

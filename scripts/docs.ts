@@ -650,9 +650,9 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/react": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
-  "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/xlsx": ["xlsx"],
   "@sheetwrite/queries": ["loadQueryEngine"],
-  "@sheetwrite/charts": ["createChartViewCache", "registerChartsBackend"],
+  "@sheetwrite/charts": ["createChartViewCache", "charts"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],
 };

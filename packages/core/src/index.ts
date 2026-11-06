@@ -1,3 +1,12 @@
+export {
+  type SheetwriteAddon,
+  type SheetwriteAddonContext,
+  type SheetwriteAddonGridContext,
+  type SheetwriteAddonSettings,
+  type SheetwriteChartParts,
+  type SheetwriteXlsxParts,
+} from "./addons.js";
+
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
 
 export {
@@ -9,11 +18,7 @@ export {
 
 export { isCellFontFamily, sanitizeCellStyle } from "./cell-style-fields.js";
 
-export {
-  openChartViews,
-  setChartRendererFactory,
-  setChartViewProviderFactory,
-} from "./chart-backend.js";
+export { openChartViews } from "./chart-backend.js";
 
 export { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "./charts-live.js";
 
@@ -110,9 +115,6 @@ export {
   fromXlsxTable,
   fromXlsxWorkbookFile,
   fromXlsxWorkbook,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
   toXlsxTable,
   toXlsxTableStream,
   toXlsxWorkbook,
@@ -131,6 +133,7 @@ export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.j
 export {
   createGrid,
   DEFAULT_THEME,
+  type InitSheetwriteOptions,
   initSheetwrite,
   isSheetwriteReady,
   resolveThemeFromCss,

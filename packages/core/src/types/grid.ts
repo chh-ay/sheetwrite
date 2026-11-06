@@ -1,6 +1,7 @@
 // Grid configuration, events, actions, search, and imperative API contracts.
 // No runtime values live here.
 
+import type { SheetwriteAddonSettings } from "../addons.js";
 import type { SheetwriteError } from "../errors.js";
 import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
@@ -685,6 +686,11 @@ export interface GridOptions {
   minColumns?: number;
   /** Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false. */
   config?: GridConfig;
+  /**
+   * Settings for add-ons installed by `initSheetwrite({ addons })`, keyed by
+   * add-on name. A name that was not installed rejects.
+   */
+  addons?: SheetwriteAddonSettings;
 }
 
 /** Case, whole-cell, sheet, and column constraints for grid search. */
@@ -1061,15 +1067,14 @@ export interface Grid {
    */
   exportCsv(filename: string): void;
   /**
-   * Download the active sheet through the registered XLSX backend.
+   * Download the active sheet through the installed XLSX add-on.
    *
    * @example
    * ```ts
    * import type { Grid } from "@sheetwrite/core";
-   * import { registerXlsxBackends } from "@sheetwrite/xlsx";
    *
+   * // Requires `initSheetwrite({ addons: [xlsx()] })` from `@sheetwrite/xlsx`.
    * async function downloadXlsx(grid: Grid) {
-   *   await registerXlsxBackends();
    *   await grid.exportXlsx("sales.xlsx");
    * }
    * ```

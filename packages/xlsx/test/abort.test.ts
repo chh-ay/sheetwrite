@@ -15,12 +15,11 @@ import {
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsx } from "../src/index.js";
 import { rawXlsx, TRANSITIONAL_REL, worksheet } from "./raw-opc.js";
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsx()] });
 });
 
 const ROWS_PER_SHEET = 2_000;

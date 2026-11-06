@@ -49,7 +49,7 @@ function setFormula(store: SheetwriteStore, row: number, col: number, src: strin
 }
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 describe("host formula functions", () => {

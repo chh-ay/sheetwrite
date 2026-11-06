@@ -2900,7 +2900,7 @@ async function runBenchmark(
     baseline = readCommittedFormulaBaseline();
   }
 
-  await initSheetwrite(undefined, engine);
+  await initSheetwrite({ engine: engine });
 
   // Raw CellStore workloads use the published singleton, not core's instance.
   await engine.load();
@@ -2969,7 +2969,7 @@ async function runBenchmark(
 if (import.meta.main) {
   const sampleIndex = process.argv.indexOf("--sample");
   if (process.argv.includes("--grid-constant-edit")) {
-    await initSheetwrite(undefined, engine);
+    await initSheetwrite({ engine: engine });
     process.stdout.write(`${JSON.stringify(gridConstantEditSample(100_000))}\n`);
     process.exit(0);
   }

@@ -1,3 +1,4 @@
+import { addonRegistry, type SheetwriteAddon } from "./addons.js";
 import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import { AriaMirror } from "./aria-mirror.js";
@@ -370,29 +371,42 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
   return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
 }
 
+/** Options of {@link initSheetwrite}. */
+export interface InitSheetwriteOptions {
+  /** Engine module; defaults to `@sheetwrite/wasm`. Pass `@sheetwrite/formulas` for the full engine. */
+  engine?: SheetwriteEngine;
+  /** Explicit WASM bytes or location, for bundlers that cannot resolve the engine asset. */
+  source?: BufferSource | URL | string | Request | WebAssembly.Module;
+  /**
+   * Add-ons to install, in this order, after the engine loads. A name listed
+   * twice rejects; a name installed by an earlier call is kept.
+   */
+  addons?: readonly SheetwriteAddon[];
+}
+
 /**
- * Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
- * Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+ * Load one WASM engine and install add-ons before `createGrid`.
  *
  * @example
  * ```ts
+ * import { charts } from "@sheetwrite/charts";
  * import { initSheetwrite } from "@sheetwrite/core";
  * import * as formulas from "@sheetwrite/formulas";
+ * import { xlsx } from "@sheetwrite/xlsx";
  *
- * await initSheetwrite(undefined, formulas);
+ * await initSheetwrite({ engine: formulas, addons: [charts(), xlsx()] });
  * ```
  * @see /docs/start/choose-an-engine/
  * @see createGrid
  */
-export async function initSheetwrite(
-  source?: BufferSource | URL | string | Request | WebAssembly.Module,
-  engine?: SheetwriteEngine,
-): Promise<void> {
+export async function initSheetwrite(options: InitSheetwriteOptions = {}): Promise<void> {
   try {
-    await loadEngine(source, engine);
+    await loadEngine(options.source, options.engine);
   } catch (error) {
     throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
   }
+
+  addonRegistry.install(options.addons ?? []);
 }
 
 /** Whether `initSheetwrite` has completed — the single readiness source. */
@@ -474,7 +488,18 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
       `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
     );
   }
-  return new GridImpl(host, opts);
+
+  addonRegistry.assertGridSettings(opts.addons);
+  const grid = new GridImpl(host, opts);
+
+  try {
+    grid.attachAddons(addonRegistry.attachGrid(grid, opts.addons));
+  } catch (error) {
+    grid.destroy();
+    throw error;
+  }
+
+  return grid;
 }
 
 /** One chunked auto-fit run; its scope cancels the pending frame when it closes. */
@@ -3996,6 +4021,11 @@ export class GridImpl implements Grid {
       this.actionFeedback.show(`The command did not finish: ${errorDetail(error)}`);
       throw error;
     });
+  }
+
+  /** Run add-on grid cleanups when the root scope closes. */
+  attachAddons(cleanups: readonly (() => void)[]): void {
+    for (const cleanup of cleanups) this.lifetime.add(cleanup);
   }
 
   /**

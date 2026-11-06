@@ -30,7 +30,7 @@ WebAssembly.Instance = class extends NativeInstance {
   }
 };
 
-await initSheetwrite(undefined, {
+await initSheetwrite({ engine: {
   ...provider,
   async createEngine(source): Promise<EngineInstance> {
     const instance = await provider.createEngine(source);
@@ -48,7 +48,7 @@ await initSheetwrite(undefined, {
     candidateCreated?.resolve();
     return instance;
   },
-});
+} });
 
 assert.equal(instancesCreated, 1, "Core boot must not eagerly instantiate the public singleton");
 

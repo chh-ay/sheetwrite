@@ -4,9 +4,7 @@ import * as Adapter from "@sheetwrite/core/adapter";
 import * as Shell from "@sheetwrite/core/shell";
 import * as Worker from "@sheetwrite/core/worker";
 import * as Xlsx from "@sheetwrite/xlsx";
-import "@sheetwrite/xlsx/register";
 import * as Charts from "@sheetwrite/charts";
-import "@sheetwrite/charts/register";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as SvelteAdapter from "@sheetwrite/svelte";
 import * as VueAdapter from "@sheetwrite/vue";
@@ -15,15 +13,11 @@ import type {
   DataSource,
   DataSourceRequest,
   DocumentOp,
+  SheetwriteAddon,
   XlsxTableExportBackend,
   XlsxTableImportBackend,
 } from "@sheetwrite/core";
-import {
-  fromXlsxTable,
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  toXlsxTable,
-} from "@sheetwrite/core";
+import { fromXlsxTable, initSheetwrite, toXlsxTable } from "@sheetwrite/core";
 
 // @ts-expect-error removed pre-release operation alias.
 import type { Patch as RemovedPatch } from "@sheetwrite/core";
@@ -37,10 +31,14 @@ import type { XlsxImportBackend as RemovedXlsxImportBackend } from "@sheetwrite/
 import type { toXlsx as removedToXlsx } from "@sheetwrite/core";
 // @ts-expect-error use `fromXlsxTable`.
 import type { fromXlsx as removedFromXlsx } from "@sheetwrite/core";
-// @ts-expect-error use `setXlsxTableExportBackend`.
+// @ts-expect-error use `initSheetwrite({ addons })`.
 import type { setXlsxBackend as removedSetXlsxBackend } from "@sheetwrite/core";
-// @ts-expect-error use `setXlsxTableImportBackend`.
+// @ts-expect-error use `initSheetwrite({ addons })`.
 import type { setXlsxImportBackend as removedSetXlsxImportBackend } from "@sheetwrite/core";
+// @ts-expect-error use `initSheetwrite({ addons })`.
+import type { setXlsxTableExportBackend as removedSetXlsxTableExportBackend } from "@sheetwrite/core";
+// @ts-expect-error use `charts()` from `@sheetwrite/charts`.
+import type { setChartRendererFactory as removedSetChartRendererFactory } from "@sheetwrite/core";
 
 export type RemovedExportsMustStayAbsent = [
   RemovedPatch,
@@ -51,6 +49,8 @@ export type RemovedExportsMustStayAbsent = [
   typeof removedFromXlsx,
   typeof removedSetXlsxBackend,
   typeof removedSetXlsxImportBackend,
+  typeof removedSetXlsxTableExportBackend,
+  typeof removedSetChartRendererFactory,
 ];
 
 const publicEntries: readonly Record<string, unknown>[] = [
@@ -93,8 +93,13 @@ const canonicalTableImporter: XlsxTableImportBackend = {
     return { rowCount: 0, columns: {} };
   },
 };
-setXlsxTableExportBackend(canonicalTableExporter);
-setXlsxTableImportBackend(canonicalTableImporter);
+const canonicalTableAddon: SheetwriteAddon = {
+  name: "packed-consumer-table",
+  setup(context) {
+    context.xlsx({ tableExport: canonicalTableExporter, tableImport: canonicalTableImporter });
+  },
+};
+void initSheetwrite({ addons: [Xlsx.xlsx(), Charts.charts(), canonicalTableAddon] });
 void canonicalOperation;
 void canonicalDatasource;
 void toXlsxTable;

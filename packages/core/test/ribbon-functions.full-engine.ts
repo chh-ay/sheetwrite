@@ -27,7 +27,7 @@ let restore: () => void;
 const cleanups: (() => void)[] = [];
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
   // Load the chrome chunk once, so each grid's own import resolves at once.
   await import(RIBBON_MODULE);
 });

@@ -426,7 +426,7 @@ function Landing() {
                   <b>{kib(downloads.fullEngineBrotliBytes)}</b> WASM, Brotli
                 </p>
               ) : null}
-              <code>await initSheetwrite(undefined, formulas);</code>
+              <code>await initSheetwrite({ engine: formulas });</code>
             </article>
           </div>
           {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
