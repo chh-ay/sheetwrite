@@ -6,6 +6,15 @@
    Stroke and colour are inherited into each <use>d symbol; the accent marks
    the selected part of an icon. A filled control (primary button, active
    badge) sets --sw-icon-accent to its ink so the accent never vanishes. */
+/* The page's inline symbol sheet (IconSprite): takes no space and is never
+   painted itself. */
+.sw-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .sw-icon {
   flex: none;
   width: var(--sw-icon-sm);

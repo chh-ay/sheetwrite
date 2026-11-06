@@ -14,9 +14,9 @@ import { preload } from "react-dom";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
+import { IconSprite } from "../components/IconSprite.js";
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import headingFont from "../fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
-import spriteUrl from "../icons/sprite.svg?url";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
@@ -172,11 +172,10 @@ const FONT_PRELOAD = {
 /** The `<html>` document: always rendered on the server, around every page, error, and 404. */
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   // React writes these preloads first in the head, ahead of the module
-  // preloads, so the heading and body fonts and the icon sprite load with the
-  // stylesheets and are ready for the first paint on slow links.
+  // preloads, so the heading and body fonts load with the stylesheets and are
+  // ready for the first paint on slow links.
   preload(headingFont, FONT_PRELOAD);
   preload(bodyFont, FONT_PRELOAD);
-  preload(spriteUrl, { as: "image", type: "image/svg+xml", fetchPriority: "high" });
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
@@ -187,6 +186,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
       </head>
       <body>
+        <IconSprite />
         {children}
         <Analytics />
         <SpeedInsights />
