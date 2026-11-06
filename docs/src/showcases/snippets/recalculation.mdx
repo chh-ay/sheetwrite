@@ -1,18 +1,20 @@
 ```ts prelude="core" title="recalculation.ts"
-declare const data: ColumnarData; // SKU, price and units for 100,000 rows
+// 5,000 rows of SKU, price and units, each with a revenue formula such as
+// =B1*C1*(1+$G$1) that reads the price-change cell G1
+declare function orderBlock(start: number, rows: number): PackedCellBlock;
 
-// The values mount with the grid; the revenue formulas, which all read the
-// price-change cell G1, follow in batches with a yield between them
-const grid = createGrid(host, { workbook, data });
-for (let start = 0; start < data.rowCount; start += 5_000) {
+// The grid mounts empty; the rows follow in blocks with a yield between them,
+// so the page paints and takes input while 100,000 formulas load
+const grid = createGrid(host, { workbook });
+for (let start = 0; start < 100_000; start += 5_000) {
   await new Promise((resolve) => setTimeout(resolve, 0));
-  grid.applyRemoteOperations(
-    Array.from({ length: 5_000 }, (_, offset) => ({
-      op: "set" as const,
-      addr: { sheet: "model", row: start + offset, col: 3 },
-      value: { kind: "formula" as const, src: `=B${start + offset + 1}*C${start + offset + 1}*(1+$G$1)` },
-    })),
-  );
+  grid.applyRemoteOperations([
+    {
+      op: "setBlock",
+      range: { sheet: "model", start: { row: start, col: 0 }, end: { row: start + 4_999, col: 3 } },
+      block: orderBlock(start, 5_000),
+    },
+  ]);
 }
 
 // One edit, timed until a dependent total is readable, then until the next frame
