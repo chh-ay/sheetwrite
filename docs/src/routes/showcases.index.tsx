@@ -146,7 +146,8 @@ function PerformanceScene({ medianMs }: Readonly<{ medianMs?: number }>) {
           <i key={id} />
         ))}
       </span>
-      <span className="sw-hub-scene__caption">scroll · edit · cache</span>
+      {/* A no-break space before each separator keeps it with the word before. */}
+      <span className="sw-hub-scene__caption">{"scroll\u00a0· edit\u00a0· cache"}</span>
     </span>
   );
 }
@@ -181,7 +182,9 @@ function DatabaseScene() {
           <code>reload</code>
         </span>
       </span>
-      <span className="sw-hub-scene__caption">IndexedDB · append-only log · recovery</span>
+      <span className="sw-hub-scene__caption">
+        {"IndexedDB\u00a0· append-only log\u00a0· recovery"}
+      </span>
     </span>
   );
 }
@@ -207,7 +210,9 @@ function InteroperabilityScene() {
           <span className="sw-hub-file">.tsv</span>
         </span>
       </span>
-      <span className="sw-hub-scene__caption">import · fidelity warnings · export</span>
+      <span className="sw-hub-scene__caption">
+        {"import\u00a0· fidelity warnings\u00a0· export"}
+      </span>
     </span>
   );
 }
@@ -264,7 +269,7 @@ function FormulasScene() {
         ))}
       </span>
       <span className="sw-hub-scene__caption">
-        {functionCount} function names · LAMBDA · spill references
+        {functionCount} function names{"\u00a0· "}LAMBDA{"\u00a0· "}spill references
       </span>
     </span>
   );
@@ -461,7 +466,11 @@ const RIBBON_SCENE_GROUPS = [
   "Editing",
 ] as const;
 
-/** A miniature ribbon: tab row over labeled groups, Home selected. */
+/** Cells in the miniature sheet: three rows of six; the last is the SUM cell. */
+const RIBBON_SCENE_CELLS = 18;
+
+/** A miniature spreadsheet app: ribbon tabs and groups, the formula bar, a few
+    rows of cells and the sheet tabs, Home and Sales selected. */
 function SpreadsheetScene() {
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--spreadsheet">
@@ -491,8 +500,19 @@ function SpreadsheetScene() {
             <span className="sw-code-punctuation">)</span>
           </code>
         </span>
+        <span className="sw-hub-ribbon__sheet">
+          {Array.from({ length: RIBBON_SCENE_CELLS }, (_, cell) => (
+            <i data-selected={cell === RIBBON_SCENE_CELLS - 1} key={cell} />
+          ))}
+        </span>
+        <span className="sw-hub-ribbon__sheettabs">
+          <i data-selected="true">Sales</i>
+          <i>Summary</i>
+        </span>
       </span>
-      <span className="sw-hub-scene__caption">ribbon · formula bar · tabs · folds when narrow</span>
+      <span className="sw-hub-scene__caption">
+        {"ribbon\u00a0· formula bar\u00a0· tabs\u00a0· folds when narrow"}
+      </span>
     </span>
   );
 }

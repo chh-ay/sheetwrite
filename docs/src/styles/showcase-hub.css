@@ -1024,6 +1024,45 @@
   flex: 1;
 }
 
+/* A few rows of cells under the formula bar; the last one holds the SUM. */
+.sw-hub-ribbon__sheet {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--sw-border);
+  background: var(--sw-border);
+}
+
+.sw-hub-ribbon__sheet i {
+  height: 1.25rem;
+  background: var(--sw-surface-1);
+}
+
+.sw-hub-ribbon__sheet i[data-selected="true"] {
+  background: color-mix(in srgb, var(--sw-hub-accent) 14%, var(--sw-surface-1));
+  outline: 2px solid var(--sw-hub-accent);
+  outline-offset: -2px;
+}
+
+.sw-hub-ribbon__sheettabs {
+  display: flex;
+  gap: var(--sw-space-1);
+}
+
+.sw-hub-ribbon__sheettabs i {
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-xs);
+  color: var(--sw-fg-muted);
+  font-style: normal;
+  font-size: var(--sw-text-eyebrow);
+}
+
+.sw-hub-ribbon__sheettabs i[data-selected="true"] {
+  background: var(--sw-surface-2);
+  color: var(--sw-accent-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
 @media (hover: hover) {
   .sw-hub-launch:hover {
     border-color: var(--sw-hub-accent);

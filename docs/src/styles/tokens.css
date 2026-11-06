@@ -233,6 +233,10 @@
   --sw-tracking-display: -0.01em;
   --sw-tracking-heading: -0.005em;
   --sw-tracking-eyebrow: 0.08em;
+  /* Instrument Sans has a narrow word space (0.21 em); body text adds a
+     little, so short captions and dense 13–14 px text read as separate
+     words. Code and headings keep their own spacing. */
+  --sw-word-spacing-body: 0.05em;
 
   /* Line lengths: prose stays near 70 characters, leads a little shorter. */
   --sw-measure-prose: 70ch;

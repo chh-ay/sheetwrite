@@ -60,6 +60,16 @@ a:not([class]) > .sw-icon:last-child {
   mask: var(--sw-icon-mask) center / contain no-repeat;
 }
 
+/* ── Body text: the body face's word space ────────────────────────────── */
+body {
+  word-spacing: var(--sw-word-spacing-body);
+}
+
+/* Code keeps one character per column, so its spaces stay the font's own. */
+:where(code, pre, kbd, samp, .expressive-code) {
+  word-spacing: normal;
+}
+
 /* ── Headings: every heading is in the display face ──────────────────────
    Zero specificity, so a component's own heading style still applies; an
    unstyled heading never falls back to the body face. Eyebrow-styled panel
@@ -67,10 +77,11 @@ a:not([class]) > .sw-icon:last-child {
 :where(h1, h2, h3, h4, h5, h6) {
   font-family: var(--sw-font-display);
   letter-spacing: var(--sw-tracking-heading);
+  word-spacing: normal;
 }
 
-/* Numbers in tables line up: tabular figures in every table on the site. */
-:where(table) {
+/* Numbers line up: tabular figures in every table and fact list. */
+:where(table, dd) {
   font-variant-numeric: tabular-nums;
 }
 
