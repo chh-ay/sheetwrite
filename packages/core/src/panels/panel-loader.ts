@@ -20,6 +20,7 @@ import type {
   openDataModelPanel,
   openExplainPanel,
   openKpiPanel,
+  openMeasurePanel,
   openNamePanel,
   openPivotPanel,
   openQueryPanel,
@@ -38,6 +39,7 @@ interface PanelController {
   openDataModelPanel: typeof openDataModelPanel;
   openExplainPanel: typeof openExplainPanel;
   openKpiPanel: typeof openKpiPanel;
+  openMeasurePanel: typeof openMeasurePanel;
   openNamePanel: typeof openNamePanel;
   openPivotPanel: typeof openPivotPanel;
   openQueryPanel: typeof openQueryPanel;

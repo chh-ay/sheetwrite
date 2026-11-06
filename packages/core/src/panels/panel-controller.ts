@@ -17,6 +17,7 @@ import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
 import { explainPanel } from "./explain-panel.js";
 import { kpiPanel } from "./kpi-panel.js";
+import { measurePanel } from "./measure-panel.js";
 import { namePanel } from "./name-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
@@ -35,6 +36,7 @@ type OpenPanel =
         | "queries"
         | "sort"
         | "dataModel"
+        | "measures"
         | "history"
         | "slicer"
         | "kpi";
@@ -106,6 +108,17 @@ export function openNamePanel(grid: Grid, define = false): void {
   const state = stateOf(grid);
   const open: OpenPanel = { kind: "names" };
   const panel = namePanel(grid, define);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
+/** Data › Measures opens the measures panel. */
+export function openMeasurePanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "measures" };
+  const panel = measurePanel(grid);
   grid.openPanel({
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),
