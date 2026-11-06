@@ -45,16 +45,16 @@ export interface DocsTab {
 
 /** The top-bar tabs, in order. Showcases leaves the documentation. */
 export const DOCS_TABS: readonly DocsTab[] = [
-  { id: "guides", label: "Guides", href: "/docs/", icon: "book" },
-  { id: "api", label: "API Reference", href: "/docs/api/", icon: "code" },
+  { id: "guides", label: "Guides", href: "/docs/", icon: "tab-guides" },
+  { id: "api", label: "API Reference", href: "/docs/api/", icon: "tab-api" },
   {
     id: "formulas",
     label: "Formulas",
     href: "/docs/reference/formula-functions/",
-    icon: "formula",
+    icon: "tab-formulas",
   },
-  { id: "changelog", label: "Changelog", href: RELEASES_HREF, icon: "history" },
-  { id: "showcases", label: "Showcases", href: "/showcases/", icon: "play" },
+  { id: "changelog", label: "Changelog", href: RELEASES_HREF, icon: "tab-changelog" },
+  { id: "showcases", label: "Showcases", href: "/showcases/", icon: "tab-showcases" },
 ];
 
 export interface NavigationSection {
@@ -64,6 +64,27 @@ export interface NavigationSection {
   /** The section's overview page, which lists its pages as cards. */
   href?: string;
   items: readonly NavigationItem[];
+}
+
+/** Each formula family page's icon, by the family's route slug. */
+const FORMULA_FAMILY_ICONS: Readonly<Record<string, IconName>> = {
+  array: "spill",
+  database: "database",
+  "date-time": "clock",
+  engineering: "sliders",
+  financial: "currency",
+  "information-error": "info",
+  "logical-control": "check",
+  "lookup-reference": "search",
+  math: "plus",
+  statistical: "chart",
+  text: "type",
+};
+
+/** A formula family page's icon; a family without its own reads as a function. */
+function formulaFamilyIcon(href: string): IconName {
+  const slug = /\/formula-functions\/([^/]+)\/$/.exec(href)?.[1] ?? "";
+  return FORMULA_FAMILY_ICONS[slug] ?? "function";
 }
 
 /** Narrows a linkable entry without copying its authored metadata. */
@@ -111,10 +132,10 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     tab: "guides",
     href: "/docs/frameworks/",
     items: [
-      { label: "Vanilla", href: "/docs/frameworks/vanilla/", icon: "code" },
-      { label: "React", href: "/docs/frameworks/react/", icon: "code" },
-      { label: "Vue", href: "/docs/frameworks/vue/", icon: "code" },
-      { label: "Svelte", href: "/docs/frameworks/svelte/", icon: "code" },
+      { label: "Vanilla", href: "/docs/frameworks/vanilla/", icon: "framework-vanilla" },
+      { label: "React", href: "/docs/frameworks/react/", icon: "framework-react" },
+      { label: "Vue", href: "/docs/frameworks/vue/", icon: "framework-vue" },
+      { label: "Svelte", href: "/docs/frameworks/svelte/", icon: "framework-svelte" },
       { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/", icon: "refresh" },
     ],
   },
@@ -156,13 +177,13 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
           {
             label: "Toolbar and ribbon",
             href: "/docs/features/grid/toolbar-and-ribbon/",
-            icon: "layers",
+            icon: "ribbon",
             added: RELEASE,
           },
           {
             label: "Selection and keyboard",
             href: "/docs/features/grid/selection-and-keyboard/",
-            icon: "check",
+            icon: "keyboard",
           },
           {
             label: "Editing and clipboard",
@@ -170,45 +191,45 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
             icon: "copy",
             updated: RELEASE,
           },
-          { label: "Custom editors", href: "/docs/features/grid/custom-editors/", icon: "code" },
+          { label: "Custom editors", href: "/docs/features/grid/custom-editors/", icon: "edit" },
           {
             label: "Resize, merge and fill",
             href: "/docs/features/grid/resize-merge-and-fill/",
             icon: "merge",
           },
-          { label: "Context menu", href: "/docs/features/grid/context-menu/", icon: "menu" },
+          { label: "Context menu", href: "/docs/features/grid/context-menu/", icon: "context-menu" },
           { label: "Search", href: "/docs/features/grid/search/", icon: "search" },
           {
             label: "Status bar",
             href: "/docs/features/grid/status-bar/",
-            icon: "gauge",
+            icon: "status-bar",
             added: RELEASE,
           },
-          { label: "Touch", href: "/docs/features/grid/touch/", icon: "monitor" },
+          { label: "Touch", href: "/docs/features/grid/touch/", icon: "touch" },
           { label: "Grid methods", href: "/docs/features/grid/grid-methods/", icon: "code" },
         ],
       },
       {
         label: "Formatting",
         href: "/docs/features/formatting/",
-        icon: "sparkle",
+        icon: "brush",
         items: [
-          { label: "Styles and themes", href: "/docs/features/formatting/styles/", icon: "sun" },
+          { label: "Styles and themes", href: "/docs/features/formatting/styles/", icon: "palette" },
           {
             label: "Fonts and alignment",
             href: "/docs/features/formatting/fonts-and-alignment/",
-            icon: "sliders",
+            icon: "type",
             updated: RELEASE,
           },
           {
             label: "Number formats",
             href: "/docs/features/formatting/number-formats/",
-            icon: "function",
+            icon: "hash",
           },
           {
             label: "Conditional formats",
             href: "/docs/features/formatting/conditional-formats/",
-            icon: "filter",
+            icon: "conditional",
           },
         ],
       },
@@ -264,7 +285,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
           {
             label: "Iterative calculation",
             href: "/docs/features/formulas/iterative-calculation/",
-            icon: "redo",
+            icon: "loop",
             added: RELEASE,
           },
           {
@@ -312,7 +333,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       },
       { label: "Collaboration", href: "/docs/features/collaboration/", icon: "users" },
       { label: "Worker rendering", href: "/docs/features/worker-rendering/", icon: "monitor" },
-      { label: "Accessibility", href: "/docs/features/accessibility/", icon: "eye" },
+      { label: "Accessibility", href: "/docs/features/accessibility/", icon: "accessibility" },
     ],
   },
   {
@@ -351,25 +372,25 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       {
         label: "Excel in JavaScript",
         href: "/docs/tutorials/excel-in-javascript/",
-        icon: "code",
+        icon: "framework-vanilla",
         added: RELEASE,
       },
       {
         label: "Excel in React",
         href: "/docs/tutorials/excel-in-react/",
-        icon: "code",
+        icon: "framework-react",
         added: RELEASE,
       },
       {
         label: "Excel in Vue",
         href: "/docs/tutorials/excel-in-vue/",
-        icon: "code",
+        icon: "framework-vue",
         added: RELEASE,
       },
       {
         label: "Excel in Svelte",
         href: "/docs/tutorials/excel-in-svelte/",
-        icon: "code",
+        icon: "framework-svelte",
         added: RELEASE,
       },
       {
@@ -381,7 +402,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       {
         label: "Spreadsheet app with the ribbon",
         href: "/docs/tutorials/spreadsheet-app-with-ribbon/",
-        icon: "layers",
+        icon: "ribbon",
         added: RELEASE,
       },
     ],
@@ -397,7 +418,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Formula engine", href: "/docs/performance/formula-engine/", icon: "function" },
       { label: "XLSX codec", href: "/docs/performance/xlsx-codec/", icon: "file" },
       { label: "Delivery size", href: "/docs/performance/delivery-size/", icon: "download" },
-      { label: "Memory", href: "/docs/performance/memory/", icon: "gauge" },
+      { label: "Memory", href: "/docs/performance/memory/", icon: "memory" },
       {
         label: "Release comparison",
         href: "/docs/performance/release-comparison/",
@@ -441,7 +462,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     tab: "api",
     items: [
       { label: "All entry points", href: "/docs/api/", icon: "layers" },
-      ...apiNav.map((entry) => ({ ...entry, icon: "code" as const })),
+      ...apiNav.map((entry) => ({ ...entry, icon: "package" as const })),
     ],
   },
   {
@@ -449,7 +470,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     tab: "formulas",
     items: [
       { label: "Overview", href: "/docs/reference/formula-functions/", icon: "formula" },
-      ...formulaNav.map((entry) => ({ ...entry, icon: "function" as const })),
+      ...formulaNav.map((entry) => ({ ...entry, icon: formulaFamilyIcon(entry.href) })),
       {
         label: "Excel function coverage",
         href: "/docs/reference/excel-function-coverage/",
