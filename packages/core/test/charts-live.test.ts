@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
-import { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "../src/charts-live.js";
+import { MAX_CHART_POINTS } from "../src/chart-definition.js";
+import { resolveChartView, subscribeChartChanges } from "../src/charts-live.js";
 import { initSheetwrite } from "../src/grid.js";
 import type {
   ChartChangeEvent,
@@ -311,6 +312,20 @@ describe("chart change events for pivot output", () => {
 
   it("leaves a chart on a sheet without pivots alone when another sheet's pivot changes", async () => {
     expect(await runProbe("other-sheet")).toEqual(passed);
+  });
+});
+
+it("plots the leaf items of worksheet pivots on the full engine, in its own process", async () => {
+  // Engine selection is process-wide, so the full-engine checks run apart.
+  const probe = Bun.spawn(
+    [process.execPath, "test", "./packages/core/test/pivot-chart.full-engine.ts"],
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+  );
+  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+
+  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+    exitCode: 0,
+    failures: [],
   });
 });
 

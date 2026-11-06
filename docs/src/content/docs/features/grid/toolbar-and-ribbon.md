@@ -100,7 +100,7 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Data Model** and **Relationships** (Data › Data Tools) open the [data model](/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
 
-**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
+**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. On a worksheet, **PivotChart** shows while the active cell is in a pivot and [charts that pivot](/docs/features/analysis/charts/#charts-over-pivots). Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
 
 **Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
 

@@ -819,8 +819,9 @@ impl CellStore {
         PivotFields { names, types }
     }
 
-    /// The output cells of pivot `index` on a sheet without cells (a
-    /// dashboard), in row-major order; empty while the pivot has no layout.
+    /// The output cells of pivot `index` on `sheet`, in row-major order; empty
+    /// while the pivot has no layout. It serves the pivots that place no
+    /// output: those of a dashboard and the chart copies of a worksheet pivot.
     #[wasm_bindgen(js_name = pivotOutput)]
     pub fn pivot_output(&self, sheet: usize, index: usize) -> PivotOutput {
         let mut output = PivotOutput::default();
@@ -860,7 +861,7 @@ impl CellStore {
     }
 }
 
-/// The output cells of a dashboard pivot, in row-major order.
+/// The output cells of a pivot that places none in cells, in row-major order.
 #[wasm_bindgen]
 #[derive(Default)]
 pub struct PivotOutput {
@@ -1164,10 +1165,12 @@ impl CellStore {
             Ok(layout) => layout,
             Err(error) => return self.show_pivot_error(owner, pivot, error, None),
         };
-        // A sheet without columns is a dashboard: it has no cells to hold
-        // output, so the pivot keeps its layout and `pivotOutput` reads the
-        // cells from the cache. No cell changes, so no sheet is dirty.
-        if self.sheets[owner].cells.n_cols() == 0 {
+        // A pivot anchored right of the last column of its sheet has no cells
+        // to hold output: a dashboard has no columns, and core anchors a
+        // chart's copy of a worksheet pivot right of the last column. The
+        // pivot keeps its layout and `pivotOutput` reads the cells from the
+        // cache. No cell changes, so no sheet is dirty.
+        if anchor.1 as usize >= self.sheets[owner].cells.n_cols() {
             footprints[index].attempt = None;
             pivot.attempt = None;
             pivot.error = None;

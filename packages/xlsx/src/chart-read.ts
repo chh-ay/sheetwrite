@@ -219,12 +219,18 @@ function axisTitles(
   };
 }
 
-/** The chart before model validation, or undefined when its DrawingML has no model equivalent. */
+/**
+ * The chart before model validation, or undefined when its DrawingML has no
+ * model equivalent. A chart over a pivot that Sheetwrite wrote (`pivot` from
+ * the authored chart) holds the pivot's values as literal data, so it keeps
+ * no series and reads the pivot again.
+ */
 function readDefinition(
   root: XmlElement,
   anchor: ChartAnchor,
   id: string,
   snapshot: WorkbookSnapshot,
+  pivot: Pick<ChartDefinition, "pivot" | "pivotValues"> | undefined,
 ): ChartDefinition | undefined {
   const chart = xmlChild(root, "chart");
   const plotArea = chart && xmlChild(chart, "plotArea");
@@ -237,7 +243,7 @@ function readDefinition(
   if (!plot || !kind) return undefined;
 
   const series: ChartSeries[] = [];
-  for (const entry of xmlChildren(plot, "ser")) {
+  for (const entry of pivot?.pivot === undefined ? xmlChildren(plot, "ser") : []) {
     const read = readSeries(entry, kind, snapshot);
     if (!read) return undefined;
     series.push(read);
@@ -258,6 +264,8 @@ function readDefinition(
     legend,
     ...(title === undefined ? {} : { title }),
     ...(axes ? { axes } : {}),
+    ...(pivot?.pivot === undefined ? {} : { pivot: pivot.pivot }),
+    ...(pivot?.pivotValues === undefined ? {} : { pivotValues: [...pivot.pivotValues] }),
   };
 }
 
@@ -457,7 +465,7 @@ async function readDrawing(
       const id = authored?.id ?? `xlsx-chart-${sheetNumber}-${charts.length + 1}`;
       const candidate =
         anchor && xmlRootMatches(chartRoot, "chartSpace", CHART_NAMESPACES)
-          ? readDefinition(chartRoot, anchor, id, input.snapshot)
+          ? readDefinition(chartRoot, anchor, id, input.snapshot, authored)
           : undefined;
       if (candidate && authored) reconcileAuthored(candidate, authored);
       const admitted = admitChart(candidate, sheet, charts, input, context);

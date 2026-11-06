@@ -28,7 +28,7 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
     /** Full engine only: source fields of the pivot at `index` in the sheet's payload. */
     pivotFields?(sheet: number, index: number): PivotFieldList;
 
-    /** Full engine only: the output cells of a pivot on a dashboard, which places none in cells. */
+    /** Full engine only: the output cells of a pivot that places none in cells, such as a dashboard pivot. */
     pivotOutput?(sheet: number, index: number): PivotOutputCells;
 
     /**
