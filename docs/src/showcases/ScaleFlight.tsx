@@ -1,8 +1,10 @@
 import { cellA1, type Grid } from "@sheetwrite/core";
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { formatBytes } from "../lib/format.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
+import { ShowcaseReadout } from "./layout/ShowcaseLayout.js";
 import {
   type DatasourceTile,
   FEED_SHEET,
@@ -11,6 +13,7 @@ import {
   SCALE_LOGICAL_CELLS,
   SCALE_ROWS,
 } from "./scenarios/scale.js";
+import { DemoButton } from "./ui/DemoButton.js";
 
 /** A route the live Grid travels through, using only the public `scrollToCell` API. */
 export type FlightKind = "depth" | "corner" | "teleport";
@@ -137,38 +140,24 @@ function percentile(sorted: readonly number[], fraction: number): number {
   return sorted[Math.max(0, index)] ?? 0;
 }
 
-interface ScaleFlightDeckProps {
-  grid: () => Grid | null;
-  ready: boolean;
-  requests: number;
-  /** The latest paged-store sample from the page, shown when no flight is running. */
-  resident: { bytes: number; cells: number };
-  tiles: readonly (DatasourceTile & { residence: string })[];
-  window: {
-    firstRow: number;
-    lastRow: number;
-    firstColumn: number;
-    lastColumn: number;
-  };
-  onJump(row: number, col: number): void;
-  onStatus(message: string): void;
+/** The flights, their live sample and the last flight's report. */
+export interface ScaleFlight {
+  readonly live: LiveFlight | null;
+  readonly report: FlightReport | null;
+  readonly flying: boolean;
+  fly(kind: FlightKind): void;
+  stop(): void;
 }
 
 /**
- * The showpiece of the billion-cell page: flights that move the real Grid
- * through the address space while a live HUD and an address-space map show
- * how little of it ever becomes resident.
+ * Flights that move the real Grid through the address space with public
+ * `scrollToCell` calls, timing every frame and sampling the paged store.
  */
-export function ScaleFlightDeck({
-  grid,
-  ready,
-  requests,
-  resident,
-  tiles,
-  window: view,
-  onJump,
-  onStatus,
-}: Readonly<ScaleFlightDeckProps>) {
+export function useScaleFlight(
+  grid: () => Grid | null,
+  requests: number,
+  onStatus: (message: string) => void,
+): ScaleFlight {
   const [live, setLive] = useState<LiveFlight | null>(null);
   const [report, setReport] = useState<FlightReport | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -253,14 +242,13 @@ export function ScaleFlightDeck({
       previousFrame = now;
       // Reduced motion: no animation. The Grid goes straight to the destination.
       const progress = reducedMotion ? 1 : Math.min(1, (now - start) / plan.durationMs);
-      const shown = progress;
       const hop =
         kind === "teleport"
           ? Math.min(TELEPORT_HOPS - 1, Math.floor(progress * TELEPORT_HOPS))
           : -1;
       if (kind !== "teleport" || hop !== lastHop) {
         const next =
-          progress >= 1 && kind !== "teleport" ? plan.at(1, random) : plan.at(shown, random);
+          progress >= 1 && kind !== "teleport" ? plan.at(1, random) : plan.at(progress, random);
         lastHop = hop;
         if (next.row !== last.row || next.col !== last.col || visited.size === 0) {
           last = next;
@@ -274,8 +262,8 @@ export function ScaleFlightDeck({
         }
       }
       const resident = sample();
-      // The HUD redraws about eight times a second, so its own rendering does not
-      // distort the frame timing it reports.
+      // The readout redraws about eight times a second, so its own rendering
+      // does not distort the frame timing it reports.
       if (now - lastPublish >= 120) {
         lastPublish = now;
         const elapsed = Math.max(1, now - start);
@@ -301,109 +289,125 @@ export function ScaleFlightDeck({
     onStatus("Flight stopped. The Grid stays where it is; you can edit any visible cell.");
   };
 
-  const flying = live !== null;
+  return { live, report, flying: live !== null, fly, stop };
+}
+
+/** The three flights as side-panel buttons, and Stop while one runs. */
+export function FlightControls({
+  flight,
+  ready,
+}: Readonly<{ flight: ScaleFlight; ready: boolean }>) {
+  return (
+    <div
+      className="sw-sp-flights"
+      data-flying={flight.flying ? "true" : "false"}
+      data-testid="scale-flight"
+    >
+      {(Object.keys(FLIGHTS) as FlightKind[]).map((kind) => (
+        <DemoButton
+          aria-pressed={flight.live?.kind === kind}
+          className="sw-sp-flight-route"
+          data-testid={`scale-flight-${kind}`}
+          disabled={!ready}
+          key={kind}
+          onClick={() => flight.fly(kind)}
+        >
+          <Icon name="play" />
+          <span>
+            <strong>{FLIGHTS[kind].label}</strong>
+            <small>{FLIGHTS[kind].summary}</small>
+          </span>
+        </DemoButton>
+      ))}
+      {flight.flying && (
+        <DemoButton className="sw-sp-flight-stop" onClick={flight.stop} variant="quiet">
+          <Icon name="pause" />
+          Stop flight
+        </DemoButton>
+      )}
+    </div>
+  );
+}
+
+/** Props of {@link FlightReadout}. */
+interface FlightReadoutProps {
+  flight: ScaleFlight;
+  requests: number;
+  /** The latest paged-store sample from the page, shown when no flight is running. */
+  resident: { bytes: number; cells: number };
+  /** The top-left cell of the visible window, shown before any flight. */
+  origin: string;
+}
+
+/** What the running or last flight measured, as a side-panel readout. */
+export function FlightReadout({
+  flight,
+  requests,
+  resident,
+  origin,
+}: Readonly<FlightReadoutProps>) {
+  const { live, report, flying } = flight;
   const shownBytes = live?.residentBytes ?? resident.bytes;
   const shownCells = live?.loadedCells ?? resident.cells;
   const residentShare = (shownCells / SCALE_LOGICAL_CELLS) * 100;
+  const measured = report !== null && !report.instant;
+  const unmeasured = report?.instant ? "No frames with reduced motion" : "Run a flight";
 
   return (
-    <section
-      aria-labelledby="scale-flight-title"
-      className="sw-sp-flight"
-      data-flying={flying ? "true" : "false"}
-      data-testid="scale-flight"
-    >
-      <div className="sw-sp-flight__intro">
-        <p className="sw-sp-flight__kicker">Flight deck</p>
-        <h2 id="scale-flight-title">Fly the Grid through a billion cells.</h2>
-        <p>
-          Each flight drives the real Grid below with public API calls. Nothing is pre-rendered.
-        </p>
-        <fieldset className="sw-sp-flight__routes" aria-label="Choose a flight">
-          {(Object.keys(FLIGHTS) as FlightKind[]).map((kind) => (
-            <button
-              aria-pressed={live?.kind === kind}
-              data-testid={`scale-flight-${kind}`}
-              disabled={!ready}
-              key={kind}
-              onClick={() => fly(kind)}
-              type="button"
-            >
-              <strong>{FLIGHTS[kind].label}</strong>
-              <span>{FLIGHTS[kind].summary}</span>
-            </button>
-          ))}
-        </fieldset>
-        {flying && (
-          <button className="sw-sp-flight__stop" onClick={stop} type="button">
-            Stop flight
-          </button>
-        )}
-      </div>
-
-      <dl className="sw-sp-flight__hud" aria-label="Live flight readout" aria-live="off">
-        <div className="sw-sp-flight__hud-address">
-          <dt>Now at</dt>
-          <dd data-testid="scale-flight-address">
-            {live?.address ?? report?.finalAddress ?? cellA1(view.firstRow, view.firstColumn)}
-          </dd>
-          {flying && (
-            <dd className="sw-sp-flight__progress" aria-hidden="true">
-              <i style={{ width: `${(live?.progress ?? 0) * 100}%` }} />
-            </dd>
-          )}
-        </div>
-        <div>
-          <dt>Frames per second</dt>
-          <dd data-testid="scale-flight-fps" data-empty={!live && (!report || report.instant)}>
-            {live
-              ? live.fps.toFixed(0)
-              : report && !report.instant
-                ? report.fps.toFixed(0)
-                : report?.instant
-                  ? "Reduced motion: no frames measured"
-                  : "Run a flight to measure"}
-          </dd>
-        </div>
-        <div>
-          <dt>Slowest 5% of frames</dt>
-          <dd data-empty={!report || flying || report.instant}>
-            {report && !flying && !report.instant
-              ? `${report.p95FrameMs.toFixed(1)} ms`
-              : flying
-                ? "Flight in progress"
-                : report?.instant
-                  ? "Reduced motion: no frames measured"
-                  : "Run a flight to measure"}
-          </dd>
-        </div>
-        <div>
-          <dt>Cells loaded in memory</dt>
-          <dd>{shownCells.toLocaleString()}</dd>
-          <dd className="sw-sp-flight__fine">
-            {residentShare < 0.0001 && shownCells > 0 ? "<0.0001" : residentShare.toFixed(4)}% of
-            the billion · {formatBytes(shownBytes, { kib: 1, mib: 1, gib: 2 })}
-          </dd>
-        </div>
-        <div>
-          <dt>Tile requests</dt>
-          <dd>{(report && !flying ? report.requests : requests).toLocaleString()}</dd>
-          <dd className="sw-sp-flight__fine">
-            {report && !flying ? "during the last flight" : "since the page opened"}
-          </dd>
-        </div>
-      </dl>
-
-      <ScaleMinimap onJump={onJump} tiles={tiles} window={view} />
-
-      <p aria-live="polite" className="sw-sp-flight__report" data-testid="scale-flight-report">
+    <>
+      <ShowcaseReadout
+        items={[
+          {
+            label: "Now at",
+            value: (
+              <span data-testid="scale-flight-address">
+                {live?.address ?? report?.finalAddress ?? origin}
+              </span>
+            ),
+          },
+          {
+            label: "Frames per second",
+            value: (
+              <span data-testid="scale-flight-fps">
+                {live ? live.fps.toFixed(0) : measured ? report.fps.toFixed(0) : unmeasured}
+              </span>
+            ),
+          },
+          {
+            label: "Slowest 5% of frames",
+            value: flying
+              ? "In flight"
+              : measured
+                ? `${report.p95FrameMs.toFixed(1)} ms`
+                : unmeasured,
+          },
+          {
+            label: "Cells in memory",
+            value: `${shownCells.toLocaleString()} · ${residentShare < 0.0001 && shownCells > 0 ? "<0.0001" : residentShare.toFixed(4)}%`,
+          },
+          {
+            label: "Resident payload",
+            value: formatBytes(shownBytes, { kib: 1, mib: 1, gib: 2 }),
+          },
+          {
+            label: report && !flying ? "Tile requests, last flight" : "Tile requests",
+            value: (report && !flying ? report.requests : requests).toLocaleString(),
+          },
+        ]}
+      />
+      {flying && (
+        <span aria-hidden="true" className="sw-sp-flight-progress">
+          <i style={{ width: `${(live?.progress ?? 0) * 100}%` }} />
+        </span>
+      )}
+      <p aria-live="polite" className="sw-sp-flight-report" data-testid="scale-flight-report">
         {report && !flying
           ? report.instant
             ? `${FLIGHTS[report.kind].label}: jumped straight to ${report.finalAddress} because reduced motion is on. Peak resident ${formatBytes(report.peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
-            : `${FLIGHTS[report.kind].label}: ${report.frames.toLocaleString()} frames in ${(report.durationMs / 1000).toFixed(1)} s, ${report.fps.toFixed(0)} frames per second, slowest frame ${report.maxFrameMs.toFixed(0)} ms. Peak resident ${formatBytes(report.peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
+            : `${FLIGHTS[report.kind].label}: ${report.frames.toLocaleString()} frames in ${(report.durationMs / 1000).toFixed(1)} s, slowest frame ${report.maxFrameMs.toFixed(0)} ms. Peak resident ${formatBytes(report.peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
           : ""}
       </p>
-    </section>
+    </>
   );
 }
 
@@ -424,10 +428,10 @@ interface ScaleMinimapProps {
 /**
  * The whole 1,000,000 × 1,000 address space at a glance. Each visited tile
  * lights up; the crosshair marks the visible window. Clicking teleports there
- * as a pointer shortcut; the jump form and the row and column sliders beside
- * the Grid are the keyboard controls for the same navigation.
+ * as a pointer shortcut; the jump form and the row and column sliders in the
+ * side panel are the keyboard controls for the same navigation.
  */
-function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProps>) {
+export function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const seenRef = useRef(new Map<number, DatasourceTile & { residence: string }>());
   // Canvas colors are resolved at draw time, so a theme change must redraw.

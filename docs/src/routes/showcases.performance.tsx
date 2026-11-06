@@ -18,12 +18,24 @@ import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { errorText } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { ShowcaseLayout } from "../showcases/layout/ShowcaseLayout.js";
-import { ScaleFlightDeck } from "../showcases/ScaleFlight.js";
+import {
+  ShowcaseControlGroup,
+  ShowcaseLayout,
+  ShowcaseReadout,
+  ShowcaseStatus,
+} from "../showcases/layout/ShowcaseLayout.js";
+import {
+  FlightControls,
+  FlightReadout,
+  type ScaleFlight,
+  ScaleMinimap,
+  useScaleFlight,
+} from "../showcases/ScaleFlight.js";
 import {
   attemptColumnScan,
   attemptFullCsvExport,
@@ -50,6 +62,8 @@ import {
   SCALE_THEME,
   type ScanAttempt,
 } from "../showcases/scenarios/scale.js";
+import PerformanceSnippet from "../showcases/snippets/performance.mdx";
+import { DemoButton } from "../showcases/ui/DemoButton.js";
 import type { RendererState, RenderingMode } from "../showcases/ui/rendering-mode.js";
 
 import "@sheetwrite/core/styles.css";
@@ -72,13 +86,6 @@ export const Route = createFileRoute("/showcases/performance")({
   component: PerformanceRoute,
 });
 
-const LANDMARKS = [
-  { label: "0%", ratio: 0 },
-  { label: "25%", ratio: 0.25 },
-  { label: "50%", ratio: 0.5 },
-  { label: "75%", ratio: 0.75 },
-  { label: "100%", ratio: 1 },
-] as const;
 const SCALE_OVERSCAN = 4;
 const COMPARISON_LOG_MAX_EXPONENT = COMPARISON_EVIDENCE.available
   ? Math.max(
@@ -699,27 +706,32 @@ type PerformanceWorkbench = ReturnType<typeof usePerformanceWorkbench>;
 
 function PerformanceRoute() {
   const workbench = usePerformanceWorkbench();
+  const flight = useScaleFlight(
+    () => workbench.gridRef.current,
+    workbench.telemetry.requests,
+    workbench.setStatus,
+  );
 
   return (
     <ShowcaseLayout
-      demo={
-        <div className="sw-sp-page">
-          <WorkbenchSection workbench={workbench} />
-        </div>
-      }
+      code={{ title: "The code behind it", Snippet: PerformanceSnippet }}
+      controls={<WorkbenchControls flight={flight} workbench={workbench} />}
+      demo={<WorkbenchDemo workbench={workbench} />}
+      demoActions={<GridZoom workbench={workbench} />}
       demoLabel="Billion-address Grid workbench"
+      demoTitle={`Financial operations · ${SCALE_ROWS.toLocaleString()} × ${SCALE_COLUMNS.toLocaleString()}`}
       eyebrow="Data and scale"
       facts={[
         { label: "Rows", value: SCALE_ROWS.toLocaleString() },
         { label: "Columns", value: SCALE_COLUMNS.toLocaleString() },
-        { label: "Addresses", value: (SCALE_ROWS * SCALE_COLUMNS).toLocaleString() },
+        { label: "Addresses", value: SCALE_LOGICAL_CELLS.toLocaleString() },
       ]}
       guide={{ href: "/docs/features/data/datasources/", label: "Read the datasource guide" }}
       id="performance"
       task={
         <>
-          Explore {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns of
-          financial operations. Visit any cell; only the tiles you visit load.
+          Fly through {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns
+          of financial operations, or go to any cell. Only the tiles you visit load.
         </>
       }
       title="A billion cells. Within reach."
@@ -734,449 +746,373 @@ function PerformanceRoute() {
   );
 }
 
-/** The billion-address Grid with flight controls and the live cache readout. */
-function WorkbenchSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const {
-    hostRef,
-    gridRef,
-    renderer,
-    setRenderer,
-    rendererState,
-    gridState,
-    telemetry,
-    stats,
-    selection,
-    zoom,
-    evictionStress,
-    setEvictionStress,
-    jumpRow,
-    setJumpRow,
-    jumpColumn,
-    setJumpColumn,
-    status,
-    setStatus,
-    evictionWatch,
-    activeStorage,
-    jumpTo,
-    handleJump,
-    handleZoom,
-    firstColumn,
-    lastColumn,
-    firstRow,
-    lastRow,
-    windowA1,
-    cachePercent,
-    cacheCeilingMiB,
-    stressCeilingMiB,
-    defaultCeilingMiB,
-    recentTiles,
-    recentEvictions,
-    residentTiles,
-    selectedFormula,
-  } = workbench;
+const GRID_STATE_LABEL = {
+  ready: "Grid ready",
+  error: "Grid unavailable",
+  loading: "Loading Grid",
+};
 
+/** The Grid's status and zoom, in the demo window bar. */
+function GridZoom({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const { gridState, zoom, handleZoom } = workbench;
+  const ready = gridState === "ready";
   return (
-    <section
-      aria-label="Billion-address Grid workbench"
-      className="sw-sp-section sw-sp-stage-section"
-      id="million-rows"
-    >
-      <div className="sw-sp-workbench" data-state={gridState}>
-        <ScaleFlightDeck
-          grid={() => gridRef.current}
-          onJump={(row, column) => jumpTo(row, column, "landmark")}
-          onStatus={setStatus}
-          ready={gridState === "ready"}
+    <span className="sw-sp-window-actions">
+      <ShowcaseStatus tone={ready ? "ok" : gridState === "error" ? "error" : "neutral"}>
+        {GRID_STATE_LABEL[gridState]}
+      </ShowcaseStatus>
+      <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
+        <DemoButton
+          aria-label="Zoom out"
+          disabled={!ready || zoom <= 0.5}
+          onClick={() => handleZoom(zoom - 0.25)}
+          variant="quiet"
+        >
+          <Icon name="minus" />
+        </DemoButton>
+        <output aria-label="Current zoom" data-testid="scale-zoom-value">
+          {Math.round(zoom * 100)}%
+        </output>
+        <DemoButton
+          aria-label="Zoom in"
+          disabled={!ready || zoom >= 2}
+          onClick={() => handleZoom(zoom + 0.25)}
+          variant="quiet"
+        >
+          <Icon name="plus" />
+        </DemoButton>
+        <DemoButton disabled={!ready || zoom === 1} onClick={() => handleZoom(1)} variant="quiet">
+          Reset
+        </DemoButton>
+      </fieldset>
+    </span>
+  );
+}
+
+/** The billion-address Grid, the sparse-edit watch and the status line. */
+function WorkbenchDemo({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const { hostRef, gridState, activeStorage, evictionWatch, status } = workbench;
+  return (
+    <div className="sw-sp-demo" data-state={gridState} id="million-rows">
+      {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
+      <div
+        aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
+        className="sw-sp-grid"
+        data-cache-bytes={activeStorage.cacheBytes}
+        data-chunk-rows={activeStorage.chunkRows}
+        data-testid="scale-grid"
+        ref={hostRef}
+        role="grid"
+      />
+      {evictionWatch && (
+        <p
+          className="sw-sp-eviction-watch"
+          data-clean-state={evictionWatch.cleanState}
+          data-testid="scale-eviction-watch"
+        >
+          <strong>
+            Edited {cellA1(evictionWatch.dirty.row, evictionWatch.dirty.col)} ={" "}
+            {evictionWatch.value}
+          </strong>
+          <span>
+            dirty owner {evictionWatch.dirtyState} · clean comparison{" "}
+            {cellA1(evictionWatch.clean.row, evictionWatch.clean.col)} {evictionWatch.cleanState}
+          </span>
+          {evictionWatch.cleanState === "unloaded" && (
+            <em>Clean tile evicted; sparse dirty value retained for revisit.</em>
+          )}
+        </p>
+      )}
+      <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
+        {status}
+      </p>
+    </div>
+  );
+}
+
+/** The side panel: flights, exact jumps, the live window and the drawing path. */
+function WorkbenchControls({
+  flight,
+  workbench,
+}: Readonly<{ flight: ScaleFlight; workbench: PerformanceWorkbench }>) {
+  const { gridState, telemetry, stats, firstRow, firstColumn } = workbench;
+  return (
+    <>
+      <ShowcaseControlGroup
+        title="Fly the Grid"
+        description="Each flight scrolls the real Grid with public API calls. Nothing is pre-rendered."
+      >
+        <FlightControls flight={flight} ready={gridState === "ready"} />
+        <FlightReadout
+          flight={flight}
+          origin={cellA1(firstRow, firstColumn)}
           requests={telemetry.requests}
           resident={{
             bytes: stats.paged?.allocatedBytes ?? 0,
             cells: stats.paged?.loadedCells ?? 0,
           }}
-          tiles={recentTiles}
-          window={{ firstRow, lastRow, firstColumn, lastColumn }}
         />
-        <div className="sw-sp-scale-strip">
-          <div className="sw-sp-position">
-            <span>YOUR WINDOW IN {SCALE_ROWS.toLocaleString()} ROWS</span>
-            <strong data-testid="scale-readable-rows">
-              Rows {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
-            </strong>
-            {/* An ARIA meter keeps the same track geometry in every browser. */}
-            <div
-              aria-label="Position in the million-row sheet"
-              aria-valuemin={0}
-              aria-valuemax={SCALE_ROWS - 1}
-              aria-valuenow={firstRow}
-              className="sw-sp-position-gauge"
-              role="meter"
-            >
-              <span style={{ width: `${(firstRow / (SCALE_ROWS - 1)) * 100}%` }} />
-            </div>
-            <div className="sw-sp-scale-ticks" aria-hidden="true">
-              <span>1</span>
-              <span>{Math.floor(SCALE_ROWS / 2).toLocaleString()}</span>
-              <span>{SCALE_ROWS.toLocaleString()}</span>
-            </div>
-            <small>
-              {((firstRow / (SCALE_ROWS - 1)) * 100).toFixed(2)}% through the sheet ·{" "}
-              {(lastRow - firstRow + 1).toLocaleString()} rows in view
-            </small>
-          </div>
-          <fieldset className="sw-sp-quick-jumps" aria-label="Explore the sheet">
-            {[
-              { label: "Start", row: 0 },
-              { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
-              { label: "End", row: SCALE_ROWS - 1 },
-            ].map(({ label, row }) => (
-              <button
-                disabled={gridState !== "ready"}
-                key={label}
-                onClick={() => jumpTo(row, firstColumn, "landmark")}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              disabled={gridState !== "ready"}
-              onClick={() =>
-                jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")
-              }
-              type="button"
-            >
-              Random row
-            </button>
-          </fieldset>
-          <div className="sw-sp-live-loading" aria-live="polite">
-            <strong>
-              {recentTiles.filter((tile) => tile.state === "requested").length > 0
-                ? "Loading requested tiles…"
-                : "Visited tiles loaded"}
-            </strong>
-            <span>
-              {telemetry.requests.toLocaleString()} requests · {telemetry.aborted.toLocaleString()}{" "}
-              aborted
-            </span>
-            <span>
-              {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })} resident /{" "}
-              {cacheCeilingMiB.toLocaleString()} MiB ceiling
-            </span>
-          </div>
-        </div>
-        <div className="sw-sp-stage-body">
-          <div className="sw-sp-grid-shell">
-            <div className="sw-sp-grid-instructions">
-              <span data-state={gridState}>
-                {gridState === "ready"
-                  ? "Grid ready"
-                  : gridState === "error"
-                    ? "Grid unavailable"
-                    : "Loading Grid"}
-              </span>
-              <span>
-                Columns {colToA1(firstColumn)}–{colToA1(lastColumn)} of {colToA1(SCALE_COLUMNS - 1)}{" "}
-                · Shift-wheel to scroll wide
-              </span>
-              <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
-                <button
-                  aria-label="Zoom out"
-                  disabled={gridState !== "ready" || zoom <= 0.5}
-                  onClick={() => handleZoom(zoom - 0.25)}
-                  type="button"
-                >
-                  −
-                </button>
-                <output aria-label="Current zoom" data-testid="scale-zoom-value">
-                  {Math.round(zoom * 100)}%
-                </output>
-                <button
-                  aria-label="Zoom in"
-                  disabled={gridState !== "ready" || zoom >= 2}
-                  onClick={() => handleZoom(zoom + 0.25)}
-                  type="button"
-                >
-                  +
-                </button>
-                <button
-                  className="sw-sp-zoom__reset"
-                  disabled={gridState !== "ready" || zoom === 1}
-                  onClick={() => handleZoom(1)}
-                  type="button"
-                >
-                  Reset
-                </button>
-              </fieldset>
-            </div>
-            {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
-            <div
-              aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
-              className="sw-sp-grid"
-              data-cache-bytes={activeStorage.cacheBytes}
-              data-chunk-rows={activeStorage.chunkRows}
-              data-testid="scale-grid"
-              ref={hostRef}
-              role="grid"
-            />
-          </div>
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup title="Go to any cell">
+        <JumpControls workbench={workbench} />
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup
+        title="Where you are"
+        description="The whole sheet: lit tiles were loaded. Click the map to teleport."
+      >
+        <WindowNavigator workbench={workbench} />
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup title="Drawing and cache">
+        <DrawingControls workbench={workbench} />
+      </ShowcaseControlGroup>
+    </>
+  );
+}
 
-          <aside className="sw-sp-instrument" aria-label="Grid navigator and live instrument">
-            <section className="sw-sp-challenge" aria-labelledby="scale-challenge-title">
-              <p>Go to any address</p>
-              <h3 id="scale-challenge-title">Choose a row and column</h3>
-              <form
-                className="sw-sp-jump"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleJump();
-                }}
-              >
-                <fieldset>
-                  <legend>Exact accessible jump</legend>
-                  <label htmlFor="scale-jump-row">
-                    Row
-                    <input
-                      data-testid="scale-jump-row"
-                      id="scale-jump-row"
-                      inputMode="numeric"
-                      max={SCALE_ROWS}
-                      min={1}
-                      onChange={(event) => setJumpRow(event.currentTarget.value)}
-                      type="number"
-                      value={jumpRow}
-                    />
-                  </label>
-                  <label htmlFor="scale-jump-column">
-                    Column
-                    <input
-                      data-testid="scale-jump-column"
-                      id="scale-jump-column"
-                      inputMode="numeric"
-                      max={SCALE_COLUMNS}
-                      min={1}
-                      onChange={(event) => setJumpColumn(event.currentTarget.value)}
-                      type="number"
-                      value={jumpColumn}
-                    />
-                  </label>
-                  <button data-testid="scale-jump" disabled={gridState !== "ready"} type="submit">
-                    Jump to cell
-                  </button>
-                </fieldset>
-              </form>
-            </section>
-
-            <section className="sw-sp-navigator" aria-labelledby="scale-navigator-title">
-              <div className="sw-sp-overview-head">
-                <span id="scale-navigator-title">Sheet navigator</span>
-                <strong>
-                  Row {Math.round((firstRow / (SCALE_ROWS - 1)) * 100)}% · Column{" "}
-                  {Math.round((firstColumn / (SCALE_COLUMNS - 1)) * 100)}%
-                </strong>
-              </div>
-              <div className="sw-sp-overview-track">
-                <input
-                  aria-label="Vertical sheet overview"
-                  aria-valuetext={`Row ${firstRow + 1} of ${SCALE_ROWS}`}
-                  data-testid="scale-overview"
-                  disabled={gridState !== "ready"}
-                  max={SCALE_ROWS - 1}
-                  min={0}
-                  onChange={(event) =>
-                    jumpTo(Number(event.currentTarget.value), firstColumn, "overview")
-                  }
-                  step={1}
-                  type="range"
-                  value={firstRow}
-                />
-                <div aria-hidden="true" className="sw-sp-tile-map">
-                  {recentTiles.map((tile) => (
-                    <span
-                      data-state={tile.residence}
-                      key={tile.id}
-                      style={{ top: `${(tile.start / (SCALE_ROWS - 1)) * 100}%` }}
-                    />
-                  ))}
-                </div>
-                <div className="sw-sp-landmarks">
-                  {LANDMARKS.map((landmark) => (
-                    <button
-                      data-testid={`scale-landmark-${landmark.label.replace("%", "")}`}
-                      key={landmark.label}
-                      onClick={() =>
-                        jumpTo(
-                          Math.round((SCALE_ROWS - 1) * landmark.ratio),
-                          firstColumn,
-                          "landmark",
-                        )
-                      }
-                      style={{ top: `${landmark.ratio * 100}%` }}
-                      type="button"
-                    >
-                      {landmark.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="sw-sp-column-overview">
-                <span>
-                  <strong>Columns</strong>
-                  <small>
-                    {colToA1(firstColumn)} of {colToA1(SCALE_COLUMNS - 1)}
-                  </small>
-                </span>
-                <input
-                  aria-label="Horizontal sheet overview"
-                  aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
-                  data-testid="scale-column-overview"
-                  disabled={gridState !== "ready"}
-                  max={SCALE_COLUMNS - 1}
-                  min={0}
-                  onChange={(event) =>
-                    jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
-                  }
-                  step={1}
-                  type="range"
-                  value={firstColumn}
-                />
-              </label>
-            </section>
-          </aside>
-        </div>
-        <div className="sw-sp-secondary">
-          <dl className="sw-sp-readout" aria-label="Live window and residency instrument">
-            <div>
-              <dt>Address / window</dt>
-              <dd data-testid="scale-current-a1">{selection}</dd>
-              <dd data-testid="scale-window-a1">{windowA1}</dd>
-              <dd className="sw-sp-readout__bounds">
-                <span data-testid="scale-window-rows">
-                  {firstRow + 1}–{lastRow + 1}
-                </span>
-                <span data-testid="scale-window-columns">
-                  {colToA1(firstColumn)}–{colToA1(lastColumn)}
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt>Selected cell input</dt>
-              <dd className="sw-sp-readout__formula" data-testid="scale-selected-formula">
-                {selectedFormula ?? "Literal value"}
-              </dd>
-            </div>
-            <div>
-              <dt>Requests / aborts</dt>
-              <dd>
-                {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
-              </dd>
-            </div>
-            <div>
-              <dt>Resident tiles</dt>
-              <dd>
-                {residentTiles} live · {recentEvictions} evicted
-              </dd>
-            </div>
-            <div>
-              <dt>Resident tile payload</dt>
-              <dd>{formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}</dd>
-              <dd className="sw-sp-readout__context">
-                {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%
-                resident
-              </dd>
-            </div>
-            <div>
-              <dt>Renderer</dt>
-              <dd data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</dd>
-            </div>
-          </dl>
-
-          <div className="sw-sp-instrument-stack">
-            <details className="sw-sp-render-details">
-              <summary>
-                <span className="sw-sp-disclosure-copy">
-                  <strong>Drawing path</strong>
-                  <small>{rendererState?.active ?? renderer} renderer</small>
-                </span>
-                <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                  ›
-                </span>
-              </summary>
-              <fieldset className="sw-sp-render-switch">
-                <legend>Grid drawing path</legend>
-                <button
-                  aria-pressed={renderer === "canvas"}
-                  data-testid="scale-renderer-canvas"
-                  onClick={() => setRenderer("canvas")}
-                  type="button"
-                >
-                  Main canvas
-                </button>
-                <button
-                  aria-pressed={renderer === "worker"}
-                  data-testid="scale-renderer-worker"
-                  onClick={() => setRenderer("worker")}
-                  type="button"
-                >
-                  Worker canvas
-                </button>
-              </fieldset>
-              {rendererState && (
-                <p className="sw-sp-rendererstate" data-testid="scale-renderer-state">
-                  Requested <strong>{rendererState.requested}</strong>; running{" "}
-                  <strong>{rendererState.active}</strong>
-                  {rendererState.fallback
-                    ? ` — Worker construction failed, so Grid reported and used its main-canvas fallback: ${rendererState.fallback}`
-                    : "."}
-                </p>
-              )}
-            </details>
-            <div className="sw-sp-stress">
-              <h3>Clean-cache ceiling</h3>
-              <p id="scale-stress-description">
-                Remounts this Grid with a deliberately tight {stressCeilingMiB} MiB ceiling so clean
-                tiles evict early; sparse edits survive.
-              </p>
-              <button
-                aria-describedby="scale-stress-description"
-                aria-pressed={evictionStress}
-                data-testid="scale-eviction-stress"
-                disabled={gridState === "loading"}
-                onClick={() => setEvictionStress((active) => !active)}
-                type="button"
-              >
-                {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
-              </button>
-              <small>
-                Currently {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB (
-                {evictionStress ? "stress" : "product default"}).
-              </small>
-            </div>
-          </div>
-        </div>
-
-        {evictionWatch && (
-          <p
-            className="sw-sp-eviction-watch"
-            data-clean-state={evictionWatch.cleanState}
-            data-testid="scale-eviction-watch"
+/** The exact row and column form, and jumps to the start, middle, end or a random row. */
+function JumpControls({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const { gridState, jumpRow, setJumpRow, jumpColumn, setJumpColumn, handleJump, jumpTo } =
+    workbench;
+  const ready = gridState === "ready";
+  const { firstColumn } = workbench;
+  return (
+    <>
+      <form
+        className="sw-sp-jump"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleJump();
+        }}
+      >
+        <label htmlFor="scale-jump-row">
+          Row
+          <input
+            data-testid="scale-jump-row"
+            id="scale-jump-row"
+            inputMode="numeric"
+            max={SCALE_ROWS}
+            min={1}
+            onChange={(event) => setJumpRow(event.currentTarget.value)}
+            type="number"
+            value={jumpRow}
+          />
+        </label>
+        <label htmlFor="scale-jump-column">
+          Column
+          <input
+            data-testid="scale-jump-column"
+            id="scale-jump-column"
+            inputMode="numeric"
+            max={SCALE_COLUMNS}
+            min={1}
+            onChange={(event) => setJumpColumn(event.currentTarget.value)}
+            type="number"
+            value={jumpColumn}
+          />
+        </label>
+        <DemoButton data-testid="scale-jump" disabled={!ready} type="submit" variant="primary">
+          <Icon name="arrow-right" />
+          Jump to cell
+        </DemoButton>
+      </form>
+      <fieldset aria-label="Jump to a row" className="sw-sp-quick-jumps">
+        {[
+          { label: "Start", row: 0 },
+          { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
+          { label: "End", row: SCALE_ROWS - 1 },
+        ].map(({ label, row }) => (
+          <DemoButton
+            disabled={!ready}
+            key={label}
+            onClick={() => jumpTo(row, firstColumn, "landmark")}
           >
-            <strong>
-              Edited {cellA1(evictionWatch.dirty.row, evictionWatch.dirty.col)} ={" "}
-              {evictionWatch.value}
-            </strong>
-            <span>
-              dirty owner {evictionWatch.dirtyState} · clean comparison{" "}
-              {cellA1(evictionWatch.clean.row, evictionWatch.clean.col)} {evictionWatch.cleanState}
-            </span>
-            {evictionWatch.cleanState === "unloaded" && (
-              <em>Clean tile evicted; sparse dirty value retained for revisit.</em>
-            )}
+            {label}
+          </DemoButton>
+        ))}
+        <DemoButton
+          disabled={!ready}
+          onClick={() => jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")}
+        >
+          Random row
+        </DemoButton>
+      </fieldset>
+    </>
+  );
+}
+
+/** The address-space map, row and column sliders, and the live window readout. */
+function WindowNavigator({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const {
+    gridState,
+    jumpTo,
+    firstRow,
+    lastRow,
+    firstColumn,
+    lastColumn,
+    recentTiles,
+    selection,
+    windowA1,
+    selectedFormula,
+    telemetry,
+    residentTiles,
+    recentEvictions,
+    rendererState,
+    renderer,
+  } = workbench;
+  const ready = gridState === "ready";
+  return (
+    <>
+      <ScaleMinimap
+        onJump={(row, column) => jumpTo(row, column, "landmark")}
+        tiles={recentTiles}
+        window={{ firstRow, lastRow, firstColumn, lastColumn }}
+      />
+      <label className="sw-sp-slider">
+        <span>
+          Rows
+          <strong data-testid="scale-readable-rows">
+            {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
+          </strong>
+        </span>
+        <input
+          aria-label="Vertical sheet overview"
+          aria-valuetext={`Row ${firstRow + 1} of ${SCALE_ROWS}`}
+          data-testid="scale-overview"
+          disabled={!ready}
+          max={SCALE_ROWS - 1}
+          min={0}
+          onChange={(event) => jumpTo(Number(event.currentTarget.value), firstColumn, "overview")}
+          step={1}
+          type="range"
+          value={firstRow}
+        />
+      </label>
+      <label className="sw-sp-slider">
+        <span>
+          Columns
+          <strong>
+            {colToA1(firstColumn)}–{colToA1(lastColumn)} of {colToA1(SCALE_COLUMNS - 1)}
+          </strong>
+        </span>
+        <input
+          aria-label="Horizontal sheet overview"
+          aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
+          data-testid="scale-column-overview"
+          disabled={!ready}
+          max={SCALE_COLUMNS - 1}
+          min={0}
+          onChange={(event) =>
+            jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
+          }
+          step={1}
+          type="range"
+          value={firstColumn}
+        />
+      </label>
+      <ShowcaseReadout
+        items={[
+          { label: "Selected", value: <span data-testid="scale-current-a1">{selection}</span> },
+          {
+            label: "Window",
+            value: (
+              <span data-testid="scale-window-a1">
+                {windowA1}
+                <span className="sw-sp-visually-hidden">
+                  <span data-testid="scale-window-rows">
+                    {firstRow + 1}–{lastRow + 1}
+                  </span>
+                  <span data-testid="scale-window-columns">
+                    {colToA1(firstColumn)}–{colToA1(lastColumn)}
+                  </span>
+                </span>
+              </span>
+            ),
+          },
+          {
+            label: "Cell input",
+            value: (
+              <code data-testid="scale-selected-formula">{selectedFormula ?? "Literal value"}</code>
+            ),
+          },
+          {
+            label: "Requests / aborts",
+            value: `${telemetry.requests.toLocaleString()} / ${telemetry.aborted.toLocaleString()}`,
+          },
+          { label: "Resident tiles", value: `${residentTiles} live · ${recentEvictions} evicted` },
+          {
+            label: "Renderer",
+            value: (
+              <span data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</span>
+            ),
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+/** The renderer switch and the tight clean-cache ceiling. */
+function DrawingControls({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
+  const {
+    renderer,
+    setRenderer,
+    rendererState,
+    gridState,
+    evictionStress,
+    setEvictionStress,
+    stressCeilingMiB,
+    defaultCeilingMiB,
+  } = workbench;
+  return (
+    <>
+      <details className="sw-sp-render-details">
+        <summary>
+          <span>Drawing path</span>
+          <strong>{rendererState?.active ?? renderer} renderer</strong>
+          <Icon name="chevron-down" />
+        </summary>
+        <fieldset className="sw-sp-render-switch">
+          <legend>Grid drawing path</legend>
+          <DemoButton
+            aria-pressed={renderer === "canvas"}
+            data-testid="scale-renderer-canvas"
+            onClick={() => setRenderer("canvas")}
+          >
+            Main canvas
+          </DemoButton>
+          <DemoButton
+            aria-pressed={renderer === "worker"}
+            data-testid="scale-renderer-worker"
+            onClick={() => setRenderer("worker")}
+          >
+            Worker canvas
+          </DemoButton>
+        </fieldset>
+        {rendererState && (
+          <p className="sw-sp-rendererstate" data-testid="scale-renderer-state">
+            Requested <strong>{rendererState.requested}</strong>; running{" "}
+            <strong>{rendererState.active}</strong>
+            {rendererState.fallback
+              ? ` — Worker construction failed, so Grid reported and used its main-canvas fallback: ${rendererState.fallback}`
+              : "."}
           </p>
         )}
-        <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
-          {status}
-        </p>
-      </div>
-    </section>
+      </details>
+      <p className="sw-showcase__control-description" id="scale-stress-description">
+        A tight {stressCeilingMiB} MiB ceiling remounts the Grid so clean tiles evict early; sparse
+        edits survive. Now {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB.
+      </p>
+      <DemoButton
+        aria-describedby="scale-stress-description"
+        aria-pressed={evictionStress}
+        data-testid="scale-eviction-stress"
+        disabled={gridState === "loading"}
+        onClick={() => setEvictionStress((active) => !active)}
+      >
+        <Icon name="gauge" />
+        {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
+      </DemoButton>
+    </>
   );
 }
 
@@ -1199,8 +1135,9 @@ function PagingSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench
 
   return (
     <section aria-labelledby="paging-title" className="sw-sp-section" id="paging">
-      <p className="sw-sp-kicker">Paging</p>
-      <h2 id="paging-title">Only the columns on screen are loaded.</h2>
+      <h2 className="sw-showcase__section-title" id="paging-title">
+        Only the columns on screen are loaded
+      </h2>
       <p>
         Each request names the exact columns it needs, and the source returns only those, with
         explicit <code>null</code> blanks. The source setting is{" "}
@@ -1393,8 +1330,9 @@ function ResourcesSection({ workbench }: Readonly<{ workbench: PerformanceWorkbe
   return (
     <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
       <div className="sw-sp-resource-copy">
-        <p className="sw-sp-kicker">Memory</p>
-        <h2 id="resource-title">Data size, allocated memory and WASM pages, apart.</h2>
+        <h2 className="sw-showcase__section-title" id="resource-title">
+          Data size, allocated memory and WASM pages, apart
+        </h2>
         <p>
           The public resource report
           <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
@@ -1497,8 +1435,9 @@ function CrossingsSection({ workbench }: Readonly<{ workbench: PerformanceWorkbe
 
   return (
     <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">
-      <p className="sw-sp-kicker">Engine calls</p>
-      <h2 id="crossing-title">Every call into the engine is counted.</h2>
+      <h2 className="sw-showcase__section-title" id="crossing-title">
+        Every call into the engine is counted
+      </h2>
       <p>
         Each control commits a real 20,000-cell edit and reads the engine's public counters before
         and after it.
@@ -1585,12 +1524,13 @@ function EvidenceSection({ workbench }: Readonly<{ workbench: PerformanceWorkben
     <section aria-labelledby="evidence-title" className="sw-sp-section sw-sp-proof" id="evidence">
       <div className="sw-sp-proof-heading">
         <div>
-          <p className="sw-sp-kicker">Benchmark</p>
-          <h2 id="evidence-title">The working set stays bounded as the address space grows.</h2>
+          <h2 className="sw-showcase__section-title" id="evidence-title">
+            The working set stays bounded as the address space grows
+          </h2>
         </div>
         <p>
-          The live Grid is the product proof. This secondary record answers one decision: repeated
-          measured runs did not require a resident billion-cell matrix.
+          Repeated measured runs, recorded by the benchmark suite: the Grid never needs a resident
+          billion-cell matrix.
         </p>
       </div>
 
