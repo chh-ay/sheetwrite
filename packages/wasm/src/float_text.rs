@@ -300,27 +300,13 @@ fn ascii(bytes: &[u8]) -> &str {
 }
 
 /// Writes the decimal digits of `value` at the end of `text` and returns them.
-/// A 64-bit division is slow in WebAssembly, so the value is split into
-/// eight-digit chunks once and each chunk is written with 32-bit arithmetic.
 fn write_integer(mut value: u64, text: &mut [u8]) -> &[u8] {
-    const CHUNK: u64 = 100_000_000;
-    const CHUNK_DIGITS: usize = 8;
     let mut start = text.len();
     loop {
-        let mut chunk = (value % CHUNK) as u32;
-        value /= CHUNK;
-        let more = value > 0;
-        let chunk_end = start;
-        loop {
-            start -= 1;
-            text[start] = b'0' + (chunk % 10) as u8;
-            chunk /= 10;
-            let full = chunk_end - start == CHUNK_DIGITS;
-            if (more && full) || (!more && chunk == 0) {
-                break;
-            }
-        }
-        if !more {
+        start -= 1;
+        text[start] = b'0' + (value % 10) as u8;
+        value /= 10;
+        if value == 0 {
             return &text[start..];
         }
     }
