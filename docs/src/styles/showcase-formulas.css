@@ -114,3 +114,32 @@
   color: var(--sw-fg);
   font-size: var(--sw-text-caption);
 }
+
+/* Panel controls stay inside the panel: long labels wrap, long formulas scroll. */
+.sw-showcase__controls [data-testid="formulas-promotion"] {
+  white-space: normal;
+}
+
+.sw-fx-detail > :last-child {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.sw-fx-try input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The family chips are a row of tags, not a bulleted prose list. */
+.sw-showcase__section .sw-fx-families {
+  padding: 0;
+}
+
+.sw-fx-families > li {
+  margin: 0;
+  list-style: none;
+}
+
+.sw-fx-families > li::marker {
+  content: none;
+}
