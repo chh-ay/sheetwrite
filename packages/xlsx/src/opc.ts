@@ -147,7 +147,7 @@ export class OpcPackage {
     for (const part of archive.entries.keys()) {
       if (!part.toLowerCase().endsWith(".rels")) continue;
       const source = relationshipSourcePart(part);
-      package_file.#relationshipCache.set(
+      package_file.#relationship_cache.set(
         asciiFold(source),
         parse_relationships(parseXml(await archive.read(part), part, context), source, context),
       );

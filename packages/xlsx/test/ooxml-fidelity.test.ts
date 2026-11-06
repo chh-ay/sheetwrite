@@ -416,9 +416,9 @@ describe("raw spec-authored OOXML fidelity", () => {
       ],
       ['<calcPr calcId="191029" iterateCount="100" iterateDelta="0.001"/>', undefined],
     ];
-    for (const [calc_pr, expected] of cases) {
+    for (const [calcPr, expected] of cases) {
       const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        raw_workbook(sheet('<dimension ref="A1"/><sheetData/>'), { workbookExtra: calc_pr }),
+        raw_workbook(sheet('<dimension ref="A1"/><sheetData/>'), { workbookExtra: calcPr }),
       );
       expect(imported.workbook.calculation).toEqual(expected);
 

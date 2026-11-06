@@ -522,8 +522,8 @@ function anchored_table_rule(
     const children: WorkbookTableXmlElement[] = [];
     for (const child of rule.children) {
       if (child.name === "filterColumn") {
-        const col_id = Number(child.attributes.colId);
-        if (!Number.isSafeInteger(col_id) || col_id < 0 || col_id > c1 - c0) return null;
+        const colId = Number(child.attributes.colId);
+        if (!Number.isSafeInteger(colId) || colId < 0 || colId > c1 - c0) return null;
         children.push(child);
         continue;
       }
