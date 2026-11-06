@@ -60,6 +60,15 @@ a:not([class]) > .sw-icon:last-child {
   mask: var(--sw-icon-mask) center / contain no-repeat;
 }
 
+/* ── Headings: every heading is in the display face ──────────────────────
+   Zero specificity, so a component's own heading style still applies; an
+   unstyled heading never falls back to the body face. Eyebrow-styled panel
+   titles set the mono eyebrow role themselves. */
+:where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-heading);
+}
+
 /* ── Eyebrow: the label above a title ───────────────────────────────────── */
 .sw-eyebrow {
   margin: 0;
