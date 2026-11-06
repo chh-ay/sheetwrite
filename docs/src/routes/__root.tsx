@@ -14,6 +14,7 @@ import { preload } from "react-dom";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
+import { installFigureTips } from "../components/figures/figure-tips.ts";
 import { IconSprite } from "../components/IconSprite.js";
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import headingFont from "../fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
@@ -91,6 +92,13 @@ export const Route = createRootRoute({
         ...(showcaseChrome ? [] : [{ rel: "stylesheet", href: docsFiguresStylesheet }]),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        // The changelog feed, written by the docs build (scripts/docs-feed.ts).
+        {
+          rel: "alternate",
+          type: "application/rss+xml",
+          title: "Sheetwrite changelog",
+          href: "/changelog/rss.xml",
+        },
       ],
       meta: [
         { charSet: "utf-8" },
@@ -143,8 +151,10 @@ function RootComponent() {
     installExpressiveCodeScripts();
     const uninstallReveal = installAnchorReveal();
     const uninstallScrollHints = installGridScrollHints();
+    const uninstallFigureTips = installFigureTips();
     return () => {
       cleanup();
+      uninstallFigureTips();
       uninstallReveal();
       uninstallScrollHints();
     };

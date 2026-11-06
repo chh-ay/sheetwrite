@@ -205,6 +205,20 @@ describe("prebuilt docs deployment", () => {
   });
 });
 
+describe("feed type", () => {
+  it("serves the changelog feed as RSS", async () => {
+    const root = await fixture();
+    await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
+    await prepareDocsDeployment(root);
+    const response = await requestPackagedFile(root, "/changelog/rss.xml");
+    expect(response?.body).toEqual(Buffer.from('<rss version="2.0" />'));
+    expect(response?.headers["content-type"]).toBe("application/rss+xml; charset=utf-8");
+    expect(
+      (await requestPackagedFile(root, "/sitemap.xml"))?.headers["content-type"],
+    ).toBeUndefined();
+  });
+});
+
 describe("moved docs pages", () => {
   it("redirects every old address, with or without its trailing slash, to its new page", async () => {
     const root = await fixture();

@@ -5,7 +5,7 @@
 // `.sheetwrite-command-toolbar` in styles.css.
 
 import { SheetwriteError } from "../errors.js";
-import type { GridConfig } from "../types/grid.js";
+import type { GridConfig, RibbonConfig, RibbonMode } from "../types/grid.js";
 
 /** Tab row height in CSS pixels. */
 export const RIBBON_TAB_ROW_HEIGHT = 30;
@@ -17,10 +17,26 @@ export const RIBBON_PANEL_HEIGHT = 92;
 export const RIBBON_COMPACT_PANEL_HEIGHT = 36;
 
 /** Automatic layout switches below this width in CSS pixels. */
-export const RIBBON_COMPACT_WIDTH = 768;
+const RIBBON_COMPACT_WIDTH = 768;
 
-/** Height of an expanded ribbon: tab row plus panel. */
-export const RIBBON_EXPANDED_HEIGHT = RIBBON_TAB_ROW_HEIGHT + RIBBON_PANEL_HEIGHT;
+/**
+ * Whether a ribbon `width` CSS pixels wide is compact in `mode`. The ribbon
+ * decides its layout with it, and owners reserve its height with it before
+ * the chunk loads, so the first frame already has the final height.
+ */
+export function ribbonIsCompact(
+  width: number,
+  mode: RibbonMode = "full",
+  compactWidth = RIBBON_COMPACT_WIDTH,
+): boolean {
+  return mode === "compact" || (mode === "auto" && width < compactWidth);
+}
+
+/** Height of a ribbon with this layout at `width` CSS pixels: tab row plus panel. */
+export function ribbonHeight(config: RibbonConfig, width: number): number {
+  const compact = ribbonIsCompact(width, config.mode, config.compactWidth);
+  return RIBBON_TAB_ROW_HEIGHT + (compact ? RIBBON_COMPACT_PANEL_HEIGHT : RIBBON_PANEL_HEIGHT);
+}
 
 /** The toolbar's one row, the same height as a compact ribbon panel. */
 export const TOOLBAR_HEIGHT = RIBBON_COMPACT_PANEL_HEIGHT;

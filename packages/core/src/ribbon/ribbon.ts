@@ -32,9 +32,9 @@ import {
 import {
   assertRibbonConfig,
   RIBBON_COMPACT_PANEL_HEIGHT,
-  RIBBON_COMPACT_WIDTH,
   RIBBON_PANEL_HEIGHT,
   RIBBON_TAB_ROW_HEIGHT,
+  ribbonIsCompact,
 } from "./ribbon-metrics.js";
 import { RIBBON_TABS } from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
@@ -440,10 +440,7 @@ export class Ribbon {
   };
 
   private updateLayout(): void {
-    const compact =
-      this.mode === "compact" ||
-      (this.mode === "auto" &&
-        this.element.clientWidth < (this.options.compactWidth ?? RIBBON_COMPACT_WIDTH));
+    const compact = ribbonIsCompact(this.element.clientWidth, this.mode, this.options.compactWidth);
     this.modeButton.setAttribute("aria-pressed", String(compact));
     this.element.dataset.mode = compact ? "compact" : "full";
     if (compact === this.compact) return;
