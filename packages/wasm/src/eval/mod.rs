@@ -883,15 +883,19 @@ impl CellStore {
             .index()
             .is_some_and(|index| !index.has_dynamic_arrays())
         {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.evaluate_pass(&mut pass, found_cycle);
+            if self.independent_pass() {
+                self.evaluate_independent_pass(&affected, &mut memo);
+            } else {
+                let mut pass = EvalPass {
+                    affected: &affected,
+                    results: &mut memo,
+                };
+                self.evaluate_pass(&mut pass, found_cycle);
 
-            for id in affected.ids() {
-                if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(id, result);
+                for id in affected.ids() {
+                    if let Some(result) = pass.results.remove(id) {
+                        self.store_formula_result(id, result);
+                    }
                 }
             }
 
@@ -1340,6 +1344,32 @@ impl CellStore {
         data.spill.install(range, &mut data.cells, |offset| {
             calculated_slot(strings, &matrix.values[offset])
         })
+    }
+
+    /// Whether no selected formula can read another one during the pass: no
+    /// static formula-to-formula reads, no runtime references (`OFFSET` and
+    /// `INDIRECT` are volatile) and no iteration. Each formula then reads
+    /// only stored values, so its result can go to storage at once.
+    fn independent_pass(&self) -> bool {
+        self.iteration.is_none()
+            && !self.formula_slots.has_volatile()
+            && self
+                .graph
+                .index()
+                .is_some_and(|index| !index.has_formula_dependencies())
+    }
+
+    /// Evaluates each selected formula once and writes its result to storage
+    /// at once: no pass result table, active-call bits or second write loop.
+    fn evaluate_independent_pass(&mut self, affected: &FormulaWork, memo: &mut FormulaResults) {
+        for id in affected.ids() {
+            let mut pass = EvalPass {
+                affected,
+                results: memo,
+            };
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            self.store_formula_result(id, result);
+        }
     }
 
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
