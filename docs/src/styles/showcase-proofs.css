@@ -645,8 +645,9 @@
   font-weight: var(--sw-weight-semibold);
 }
 
-/* What the scenario proves: one numbered list. */
-.sw-proofs-points {
+/* What the scenario proves, and the lanes below: lists inside the prose
+   sections drop the prose markers and indents. */
+.sw-prose ol.sw-proofs-points {
   display: grid;
   gap: var(--sw-space-3);
   margin: 0;
@@ -654,9 +655,11 @@
   list-style: none;
 }
 
-.sw-proofs-points li {
+.sw-prose .sw-proofs-points li {
   display: grid;
   gap: var(--sw-space-1);
+  max-width: none;
+  margin: 0;
 }
 
 .sw-proofs-points strong {
@@ -717,15 +720,17 @@
   font-size: var(--sw-text-small);
 }
 
-.sw-proofs-boundary__lane ul {
+.sw-prose .sw-proofs-boundary__lane ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sw-proofs-boundary__lane li {
+.sw-prose .sw-proofs-boundary__lane li {
   display: grid;
   gap: var(--sw-space-1);
+  max-width: none;
+  margin: 0;
   padding: var(--sw-space-3) var(--sw-space-4);
   border-bottom: 1px solid var(--sw-border);
   font-size: var(--sw-text-small);
