@@ -186,8 +186,7 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
     if number >= f64::MIN_POSITIVE {
         // One 17-digit scaling gives the 15- and 16-digit candidates too:
         // their dropped digits join the remainder.
-        if let Some((parts, exponent)) =
-            small_digits(&binary, MAX_DIGITS, binary.exponent_guess())
+        if let Some((parts, exponent)) = small_digits(&binary, MAX_DIGITS, binary.exponent_guess())
         {
             for dropped in (0..=MAX_DIGITS - EXCEL_DIGITS).rev() {
                 let digits = parts.digits as u64 / 10u64.pow(dropped);
@@ -195,7 +194,11 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
                 let below_fits = fits(below, binary.inclusive);
                 let above_fits = fits(above, binary.inclusive);
                 if let Some(round_up) = shortest_round_up(half, below_fits, above_fits) {
-                    return Digits::new(digits + u64::from(round_up), MAX_DIGITS - dropped, exponent);
+                    return Digits::new(
+                        digits + u64::from(round_up),
+                        MAX_DIGITS - dropped,
+                        exponent,
+                    );
                 }
             }
         }
@@ -457,10 +460,7 @@ impl Powers {
 /// `number × 10^places`: its integer part and where the remainder sits.
 fn scale(binary: &Binary, places: i32) -> Scale {
     match scale_small(binary, places) {
-        Some(parts) => (
-            parts.digits,
-            parts.comparisons(0, binary.narrow_below),
-        ),
+        Some(parts) => (parts.digits, parts.comparisons(0, binary.narrow_below)),
         None => scale_big(binary, places),
     }
 }
