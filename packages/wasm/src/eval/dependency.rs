@@ -328,6 +328,11 @@ impl DepIndex {
         (nodes, edges)
     }
 
+    /// Whether any formula reads another formula through its static reads.
+    pub(super) fn has_formula_dependencies(&self) -> bool {
+        self.has_formula_dependencies
+    }
+
     pub(super) fn has_dynamic_arrays(&self) -> bool {
         self.dynamic_array_formulas > 0
     }

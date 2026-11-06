@@ -1966,9 +1966,16 @@ function missingCellStoreMethod(error: unknown): string | undefined {
  * fresh Bun process on Linux, `unicode-text-date-edit` takes 4.5–4.8 ms per run
  * for the first 50 ms and 1.6 ms after one second, so a 50 ms sample measured
  * tier-up timing instead of the engine (#325).
+ *
+ * `independent-first-recompute` at 10,000 formulas runs right after the
+ * 10,000-formula parse/load row, whose code is still being compiled in the
+ * background on the pinned core. Its runs take 7–10 ms until that finishes and
+ * 1.7–1.9 ms after, with no wasm memory growth; with synchronous compilation
+ * or an idle pause before the row they start at steady speed (#463).
  */
 const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
   "workload=unicode-text-date-edit;size=1000": 1_000,
+  "workload=independent-first-recompute;size=10000": 500,
 };
 
 /**

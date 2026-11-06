@@ -103,6 +103,78 @@ export function formulaContainsExternalReference(formula: string): boolean {
   return EXTERNAL_DATA_FUNCTION.test(executable);
 }
 
+/** Whether the formula calls a function that reads live external data, such as `RTD` or `DDE`. */
+export function formulaCallsExternalData(formula: string): boolean {
+  return EXTERNAL_DATA_FUNCTION.test(formula.replace(/"(?:[^"]|"")*"?/g, " "));
+}
+
+/** A sheet of another workbook as a formula names it. */
+export interface ExternalSheetName {
+  /** The text in brackets: a link index such as `1`, or a file name such as `Budget.xlsx`. */
+  readonly book: string;
+  /** The sheet name, or `""` for a defined name of the other workbook (`[1]!Total`). */
+  readonly sheet: string;
+}
+
+/** Characters of a sheet name that Excel writes without quotes after `[book]`. */
+const PLAIN_SHEET_NAME = /^[\p{L}\p{N}_.\\]*/u;
+/** Characters of a book or sheet name that Excel writes without quotes. */
+const PLAIN_NAME = /^[\p{L}\p{N}_.]+$/u;
+
+/** `[book]sheet`, in quotes when either part needs them, as Excel writes it before `!`. */
+export function externalSheetText(book: string, sheet: string): string {
+  const text = `[${book}]${sheet}`;
+  if (PLAIN_NAME.test(book) && PLAIN_NAME.test(sheet)) return text;
+  return `'${text.replaceAll("'", "''")}'`;
+}
+
+/**
+ * The formula with each sheet of another workbook replaced by `replace`,
+ * which returns the new text before `!`, or undefined when the formula cannot
+ * be written that way. Text in quotes and structured references stay as they
+ * are. A folder before `[` in a quoted name is left out.
+ */
+export function rewriteExternalSheets(
+  formula: string,
+  replace: (name: ExternalSheetName) => string | undefined,
+): string | undefined {
+  let output = "";
+  let index = 0;
+  while (index < formula.length) {
+    const char = formula.charAt(index);
+    let end = index + 1;
+    let name: ExternalSheetName | undefined;
+    if (char === '"') {
+      end = closingQuote(formula, index, '"');
+    } else if (char === "'") {
+      end = closingQuote(formula, index, "'");
+      const quoted = formula.slice(index + 1, end - 1).replaceAll("''", "'");
+      const open = quoted.indexOf("[");
+      const close = quoted.indexOf("]", open);
+      if (quotedNameHasExternalBook(quoted)) {
+        name = { book: quoted.slice(open + 1, close), sheet: quoted.slice(close + 1) };
+      }
+    } else if (char === "[") {
+      end = closingBracket(formula, index);
+      if (isExternalBook(formula, index, end)) {
+        const sheet = PLAIN_SHEET_NAME.exec(formula.slice(end))?.[0] ?? "";
+        name = { book: formula.slice(index + 1, end - 1), sheet };
+        end += sheet.length;
+      }
+    }
+
+    if (name) {
+      const replacement = replace(name);
+      if (replacement === undefined) return undefined;
+      output += replacement;
+    } else {
+      output += formula.slice(index, end);
+    }
+    index = end;
+  }
+  return output;
+}
+
 /** The distinct cell and defined-name formula sources of a workbook. */
 export function workbookFormulaSources(snapshot: WorkbookSnapshot): string[] {
   const sources = new Set<string>();

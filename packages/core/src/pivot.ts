@@ -233,6 +233,15 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
   if (name !== undefined && (typeof name !== "string" || name.length > MAX_PIVOT_NAME_LENGTH)) {
     issue(issues, `${path}.name`, `name must be a string of at most ${MAX_PIVOT_NAME_LENGTH}`);
   }
+  // The same bound as a cell's number format.
+  const numberFormat = ownValue(value, "numberFormat");
+  if (numberFormat !== undefined && !isBoundedName(numberFormat)) {
+    issue(
+      issues,
+      `${path}.numberFormat`,
+      "numberFormat must be a format code of 1 to 255 characters",
+    );
+  }
 }
 
 /** A non-empty string no longer than a pivot name. */
@@ -550,6 +559,7 @@ export function clonePivot(pivot: PivotDefinition): PivotDefinition {
           ? { measure: value.measure }
           : { field: value.field, aggregation: value.aggregation };
       if (value.name !== undefined) copy.name = value.name;
+      if (value.numberFormat !== undefined) copy.numberFormat = value.numberFormat;
       return copy;
     }),
   };

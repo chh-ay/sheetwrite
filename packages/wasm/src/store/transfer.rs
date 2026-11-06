@@ -2,7 +2,7 @@
 
 use super::*;
 #[cfg(any(target_arch = "wasm32", test))]
-use crate::calc::{RefFlags, SheetRef};
+use crate::calc::{is_external_sheet, RefFlags, SheetRef};
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferInput, TransferResult};
@@ -186,7 +186,14 @@ impl CellStore {
                 Ok(handle)
             })
             .collect::<TransferResult<Vec<_>>>()?;
-        if order.len() != store.sheet_alive.iter().filter(|&&alive| alive).count() {
+        // Sheets of linked workbooks hold values but are not tabs.
+        let tabs = store
+            .sheet_alive
+            .iter()
+            .zip(&store.sheet_names)
+            .filter(|&(&alive, name)| alive && !is_external_sheet(name))
+            .count();
+        if order.len() != tabs {
             return Err("invalid transferred tab order".into());
         }
         if order != store.tab_order().as_ref() {
@@ -674,5 +681,28 @@ mod tests {
             patch_u32_after(&mut tampered, marker, MISSING_SHEET);
             assert!(CellStore::read_memory_state(&tampered).is_err());
         }
+    }
+
+    #[test]
+    fn memory_transfer_keeps_link_values_out_of_the_tabs() {
+        let mut original = CellStore::new();
+        let report = original.add_sheet(1, 2);
+        original.set_sheet_name(report, "report", "Report");
+        let annual = original.add_external_sheet("Budget.xlsx", "Annual", 1, 1);
+        original.set_number(annual, 0, 0, 7.0, 0);
+        original.set_formula(report, 0, 0, "=[Budget.xlsx]Annual!A1", 0);
+        original.set_formula(report, 1, 0, "=SHEETS()", 0);
+        original.recompute_changed();
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(annual, 0, 0, 9.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(report, 0, 0).num(), 9.0);
+        assert_eq!(replacement.get_cell(report, 1, 0).num(), 1.0);
+        assert_eq!(
+            replacement.add_external_sheet("Budget.xlsx", "Annual", 1, 1),
+            annual
+        );
     }
 }

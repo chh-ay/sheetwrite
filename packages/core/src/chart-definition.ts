@@ -38,7 +38,7 @@ export const CHART_KIND_LABELS: Readonly<Record<ChartKind, string>> = {
 };
 
 const LEGEND_POSITIONS: ReadonlySet<unknown> = new Set(["none", "top", "right", "bottom", "left"]);
-const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "series"]);
+const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "series", "pivot"]);
 const AXES_KEYS = new Set(["xTitle", "yTitle"]);
 const ANCHOR_KEYS = new Set(["row", "col", "offsetX", "offsetY", "width", "height"]);
 const SERIES_KEYS = new Set(["name", "nameRange", "values", "categories"]);
@@ -173,6 +173,7 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       !isChartKind(chart.kind) ||
       (chart.title !== undefined && !validChartText(chart.title)) ||
       (chart.legend !== undefined && !isLegendPosition(chart.legend)) ||
+      (chart.pivot !== undefined && !validChartText(chart.pivot)) ||
       !Array.isArray(chart.series) ||
       chart.series.length > MAX_CHART_SERIES
     ) {
@@ -196,6 +197,7 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       ...(chart.title !== undefined ? { title: chart.title } : {}),
       ...(axes !== undefined ? { axes } : {}),
       ...(chart.legend !== undefined ? { legend: chart.legend } : {}),
+      ...(chart.pivot !== undefined ? { pivot: chart.pivot } : {}),
       anchor,
       series,
     };
