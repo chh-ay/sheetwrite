@@ -10,6 +10,7 @@ import { cpus, hostname } from "node:os";
 
 import * as formulas from "@sheetwrite/formulas";
 
+import { slicerValuesOf } from "../../packages/core/src/dashboard/dashboard-engine.js";
 import {
   createGrid,
   initSheetwrite,
@@ -17,7 +18,6 @@ import {
   type DashboardSlicerItem,
   type PivotDefinition,
 } from "../../packages/core/src/index.js";
-import { slicerValuesOf } from "../../packages/core/src/dashboard/dashboard-engine.js";
 import { insertChart } from "../../packages/core/src/panels/panel-controller.js";
 import { pivotPanel } from "../../packages/core/src/panels/pivot-panel.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
