@@ -228,6 +228,9 @@ impl CellStore {
         formula_sheet: u32,
         placement: &NamePlacement,
     ) -> Option<NameTarget> {
+        if name.contains('!') {
+            return Some(self.external_name_target(name));
+        }
         let mut key = workbook_name_key(name);
         if formula_sheet == NO_SHEET {
             key = self.note_sheet_scoped(key, placement);

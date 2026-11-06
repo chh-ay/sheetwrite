@@ -1905,6 +1905,13 @@ impl<'a> Parser<'a> {
         let names_sheet = matches!(self.cursor.peek_at(0), Some(Tok::Ident(_, false)))
             && matches!(self.cursor.peek_at(1), Some(Tok::Bang));
         if !names_sheet {
+            // `[Budget.xlsx]!Total`: a defined name of the other workbook.
+            let names_name = matches!(self.cursor.peek_at(0), Some(Tok::Bang))
+                && matches!(self.cursor.peek_at(1), Some(Tok::Ident(_, false)));
+            if names_name {
+                let _ = self.next();
+                return self.external_name_at(raw);
+            }
             return self.structured_ref(raw, None);
         }
 
@@ -2014,6 +2021,21 @@ impl<'a> Parser<'a> {
             }
         }
 
+        // `Budget.xlsx!Total` or `[Budget.xlsx]Annual!Total`: a defined
+        // name of another workbook. A name is not a cell and does not start
+        // a range.
+        let names_name = matches!(self.peek(), Some(Tok::Ident(name, false)) if parse_a1(name).is_none())
+            && self.cursor.peek_at(1) != Some(&Tok::Colon)
+            && names_workbook(&sheet_name);
+        if names_name {
+            let qualifier = if quoted {
+                format!("'{}'", sheet_name.replace('\'', "''"))
+            } else {
+                sheet_name
+            };
+            return self.external_name_at(qualifier);
+        }
+
         self.features.sheet_refs = true;
         let start = self.area_end("!")?;
         let qualifier = UnresolvedSheetRef {
@@ -2069,6 +2091,18 @@ impl<'a> Parser<'a> {
             flags: range_flags,
             cell,
         })))
+    }
+
+    /// The defined name after `qualifier!`, where `qualifier` names another
+    /// workbook as the formula writes it. The name keeps that text, which
+    /// `external_name_key` reads to find the name in the link.
+    #[cold]
+    fn external_name_at(&mut self, qualifier: String) -> Result<Ast, String> {
+        let Some(Tok::Ident(name, _)) = self.next() else {
+            return Err(NOT_EXPECTED.into());
+        };
+        self.features.names = true;
+        Ok(Ast::Name(format!("{qualifier}!{name}")))
     }
 
     /// `A1#` refers to the whole spill of the formula in A1. It is stored as
@@ -2134,6 +2168,45 @@ fn missing_area_end(after: &str) -> String {
 pub(crate) fn sheet_name_key(name: &str) -> String {
     let name = name.rfind('[').map_or(name, |start| &name[start..]);
     name.chars().flat_map(char::to_lowercase).collect()
+}
+
+/// The lookup key of a defined name of another workbook, from the text a
+/// formula writes: `Budget.xlsx!Total`, `'C:\Reports\Budget.xlsx'!Total`,
+/// `[Budget.xlsx]!Total` and `'C:\Reports\[Budget.xlsx]'!Total` all give
+/// `[budget.xlsx]!total`; the sheet-scoped `[Budget.xlsx]Annual!Total`
+/// gives `[budget.xlsx]annual!total`. The folder and the letter case are
+/// left out, as for link sheets. `None` for a name without a workbook.
+pub(crate) fn external_name_key(text: &str) -> Option<String> {
+    let (qualifier, name) = text.rsplit_once('!')?;
+    let qualifier = match qualifier
+        .strip_prefix('\'')
+        .and_then(|inner| inner.strip_suffix('\''))
+    {
+        Some(inner) => Cow::Owned(inner.replace("''", "'")),
+        None => Cow::Borrowed(qualifier),
+    };
+    let key = match qualifier.rfind('[') {
+        Some(start) => format!("{}!{name}", &qualifier[start..]),
+        None => {
+            let book = qualifier.rsplit(['\\', '/']).next()?;
+            format!("[{book}]!{name}")
+        }
+    };
+    Some(key.chars().flat_map(char::to_lowercase).collect())
+}
+
+/// Whether the text before `!` names another workbook: a sheet of it
+/// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
+/// `C:\Reports\Budget.xlsx`).
+fn names_workbook(qualifier: &str) -> bool {
+    const EXTENSIONS: [&str; 6] = [".xlsx", ".xlsm", ".xlsb", ".xls", ".xlam", ".ods"];
+
+    let bytes = qualifier.as_bytes();
+    is_external_sheet(qualifier)
+        || EXTENSIONS.iter().any(|extension| {
+            bytes.len() > extension.len()
+                && bytes[bytes.len() - extension.len()..].eq_ignore_ascii_case(extension.as_bytes())
+        })
 }
 
 /// Whether a sheet reference names a sheet of another workbook:
