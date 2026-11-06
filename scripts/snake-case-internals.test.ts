@@ -54,14 +54,19 @@ describe("snake-case-internals", () => {
     expect(plan.renames.map((rename) => rename.oldName)).not.toContain("scaledLine");
   });
 
-  test("finds nothing left to rename after applying", async () => {
+  test("a second run finds nothing to rename and changes no file", async () => {
     const directory = copyInput();
 
     try {
       const tsconfig = join(directory, "tsconfig.json");
       applyPlan(await planRenames(tsconfig, []));
+      const first = readFileSync(join(directory, "rules.ts"), "utf8");
 
-      expect((await planRenames(tsconfig, [])).renames).toEqual([]);
+      const second = await planRenames(tsconfig, []);
+      applyPlan(second);
+
+      expect(second.renames).toEqual([]);
+      expect(readFileSync(join(directory, "rules.ts"), "utf8")).toBe(first);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

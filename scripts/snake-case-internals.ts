@@ -3,6 +3,8 @@
  *
  * Renamed: non-exported functions, local variables, parameters whose names are not
  * emitted in declaration files, and private class members (`private` or `#name`).
+ * Comments inside the symbol's scope that mention the old name, including `@param`
+ * tags, are updated; a mention after `.` is a property path and stays.
  *
  * Never renamed: exported or re-exported names, anything declared outside the target
  * files, object and interface property keys (they can cross persisted, wire, public or
@@ -11,12 +13,16 @@
  * destructured bindings keep their key and only rename the local
  * (`{ rowIndex }` becomes `{ rowIndex: row_index }`).
  *
- * Usage: `bun scripts/snake-case-internals.ts <check|apply> --project <tsconfig.json>
- * [--include <dir>]...`. `check` lists every pending rename and conflict and exits 1
- * when any exist; `apply` rewrites the files.
+ * Every run plans from the type checker's view of the current files, so it can be
+ * re-run at any time: output is sorted, and a second `apply` changes nothing.
+ *
+ * Usage: `bun scripts/snake-case-internals.ts <check|apply> [--project <tsconfig.json>]...
+ * [--include <dir>]...`. Without `--project` it runs every `packages/*\/tsconfig.json`.
+ * `check` lists every pending rename and conflict and exits 1 when any exist; `apply`
+ * rewrites the files. Conflicts need a hand-picked name.
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import {
   NodeFlags,
@@ -268,33 +274,91 @@ function is_target(file_name: string, include: readonly string[]): boolean {
   );
 }
 
-/** Edits that rename the `@param` tags of a renamed parameter in its owner's doc comment. */
-function doc_param_edits(candidate: Candidate): TextEdit[] {
-  let owner = candidate.declaration;
-  while (!isParameterDeclaration(owner)) owner = owner.parent;
-  let documented: Node = owner.parent;
-  if (isArrowFunction(documented) || isFunctionExpression(documented)) {
-    while (
-      !isVariableStatement(documented) &&
-      documented.kind !== SyntaxKind.SourceFile &&
-      documented.kind !== SyntaxKind.Block
-    ) {
-      documented = documented.parent;
-    }
+const SCOPE_KINDS = new Set<SyntaxKind>([
+  SyntaxKind.Block,
+  SyntaxKind.SourceFile,
+  SyntaxKind.ForStatement,
+  SyntaxKind.ForInStatement,
+  SyntaxKind.ForOfStatement,
+  SyntaxKind.CatchClause,
+]);
+
+/**
+ * The source range whose comments may name the symbol: a parameter's owner with its
+ * doc comment, a private member's class, or the block a local or function lives in.
+ */
+function comment_scope(candidate: Candidate): { start: number; end: number } {
+  const declaration = candidate.declaration;
+  if (candidate.kind === "private member") {
+    return { start: declaration.parent.getStart(candidate.file), end: declaration.parent.end };
   }
 
+  if (candidate.kind === "parameter") {
+    let parameter = declaration;
+    while (!isParameterDeclaration(parameter)) parameter = parameter.parent;
+    const owner = parameter.parent;
+    let documented: Node = owner;
+    if (isArrowFunction(owner) || isFunctionExpression(owner)) {
+      while (!isVariableStatement(documented) && !SCOPE_KINDS.has(documented.kind)) {
+        documented = documented.parent;
+      }
+    }
+
+    const start = SCOPE_KINDS.has(documented.kind)
+      ? owner.getStart(candidate.file)
+      : documented.getFullStart();
+    return { start, end: owner.end };
+  }
+
+  let scope = declaration.parent;
+  while (!SCOPE_KINDS.has(scope.kind)) scope = scope.parent;
+
+  return {
+    start: scope.kind === SyntaxKind.SourceFile ? 0 : scope.getStart(candidate.file),
+    end: scope.end,
+  };
+}
+
+/** Collect the trivia (whitespace and comments) ranges between tokens inside `range`. */
+function trivia_in(
+  file: SourceFile,
+  range: { start: number; end: number },
+): Array<[number, number]> {
+  const ranges = new Map<number, number>();
+  const visit = (node: Node): void => {
+    if (node.end < range.start || node.pos > range.end) return;
+
+    const start = Math.max(node.pos, range.start);
+    const end = Math.min(node.getStart(file), range.end);
+    if (end > start) ranges.set(start, end);
+    node.forEachChild(visit);
+  };
+  visit(file);
+  if (file.endOfFileToken.pos < range.end) {
+    ranges.set(file.endOfFileToken.pos, Math.min(file.end, range.end));
+  }
+
+  return [...ranges];
+}
+
+/**
+ * Edits that rename mentions of the old name in comments within the symbol's scope,
+ * including `@param` tags. Mentions after a `.` are property paths and stay.
+ */
+function comment_edits(candidate: Candidate): TextEdit[] {
   const text = candidate.file.text;
-  const start = documented.getFullStart();
-  const end = documented.getStart(candidate.file);
-  const pattern = new RegExp(`(@param\\s+(?:\\{[^}]*\\}\\s+)?\\[?)${candidate.oldName}\\b`, "g");
+  const escaped = candidate.oldName.replaceAll("$", "\\$");
+  const pattern = new RegExp(`(?<![\\w$#.])${escaped}(?![\\w$])`, "g");
   const edits: TextEdit[] = [];
-  for (const match of text.slice(start, end).matchAll(pattern)) {
-    const name_start = start + match.index + (match[1]?.length ?? 0);
-    edits.push({
-      start: name_start,
-      end: name_start + candidate.oldName.length,
-      text: candidate.newName,
-    });
+  for (const [start, end] of trivia_in(candidate.file, comment_scope(candidate))) {
+    for (const match of text.slice(start, end).matchAll(pattern)) {
+      const name_start = start + match.index;
+      edits.push({
+        start: name_start,
+        end: name_start + candidate.oldName.length,
+        text: candidate.newName,
+      });
+    }
   }
 
   return edits;
@@ -468,11 +532,9 @@ export async function planRenames(
         edits.set(occurrence.file.fileName, file_edits);
       }
 
-      if (candidate.kind === "parameter") {
-        const file_edits = edits.get(candidate.file.fileName) ?? [];
-        file_edits.push(...doc_param_edits(candidate));
-        edits.set(candidate.file.fileName, file_edits);
-      }
+      const file_edits = edits.get(candidate.file.fileName) ?? [];
+      file_edits.push(...comment_edits(candidate));
+      edits.set(candidate.file.fileName, file_edits);
     }
 
     const by_position = (
@@ -491,13 +553,20 @@ export async function planRenames(
   }
 }
 
-/** Rewrite each file with its planned edits, applied from the end so offsets stay valid. */
+/**
+ * Rewrite each file with its planned edits, applied from the end so offsets stay valid.
+ * Symbols with the same old name can share a comment mention; it is rewritten once.
+ */
 export function applyPlan(plan: RenamePlan): void {
   for (const [file_name, file_edits] of plan.edits) {
     const ordered = [...file_edits].sort((left, right) => right.start - left.start);
     let text = readFileSync(file_name, "utf8");
+    let previous_start = -1;
     for (const edit of ordered) {
+      if (edit.start === previous_start) continue;
+
       text = text.slice(0, edit.start) + edit.text + text.slice(edit.end);
+      previous_start = edit.start;
     }
 
     writeFileSync(file_name, text);
@@ -519,38 +588,60 @@ function report(plan: RenamePlan, root: string): string {
   return `${lines.join("\n")}\n`;
 }
 
-function parse_arguments(args: readonly string[]): {
-  mode: "check" | "apply";
-  project: string;
-  include: string[];
-} {
+interface CliOptions {
+  readonly mode: "check" | "apply";
+  readonly projects: readonly string[];
+  readonly include: readonly string[];
+}
+
+/** Every workspace package project, in a stable order, for runs without `--project`. */
+function package_projects(root: string): string[] {
+  const packages = join(root, "packages");
+
+  return readdirSync(packages)
+    .sort()
+    .map((name) => join(packages, name, "tsconfig.json"))
+    .filter((project) => existsSync(project));
+}
+
+function parse_arguments(args: readonly string[]): CliOptions {
   const [mode, ...rest] = args;
   if (mode !== "check" && mode !== "apply") {
     throw new Error(
-      "usage: bun scripts/snake-case-internals.ts <check|apply> --project <tsconfig.json> [--include <dir>]...",
+      "usage: bun scripts/snake-case-internals.ts <check|apply> [--project <tsconfig.json>]... [--include <dir>]...",
     );
   }
 
-  let project: string | undefined;
+  const projects: string[] = [];
   const include: string[] = [];
   for (let index = 0; index < rest.length; index += 2) {
     const flag = rest[index];
     const value = rest[index + 1];
     if (value === undefined) throw new Error(`${flag} needs a value`);
-    if (flag === "--project") project = value;
+    if (flag === "--project") projects.push(value);
     else if (flag === "--include") include.push(value);
     else throw new Error(`unknown option ${flag}`);
   }
 
-  if (project === undefined) throw new Error("--project is required");
-  return { mode, project, include };
+  return {
+    mode,
+    projects: projects.length > 0 ? projects : package_projects(process.cwd()),
+    include,
+  };
 }
 
 if (import.meta.main) {
   const options = parse_arguments(process.argv.slice(2));
-  const plan = await planRenames(options.project, options.include);
-  process.stdout.write(report(plan, process.cwd()));
+  let pending = 0;
 
-  if (options.mode === "apply") applyPlan(plan);
-  else if (plan.renames.length > 0 || plan.conflicts.length > 0) process.exitCode = 1;
+  // Projects run one after another so each plan sees the files the previous apply rewrote.
+  for (const project of options.projects) {
+    const plan = await planRenames(project, options.include);
+    process.stdout.write(`${relative(process.cwd(), project)}\n${report(plan, process.cwd())}`);
+    pending += plan.renames.length + plan.conflicts.length;
+
+    if (options.mode === "apply") applyPlan(plan);
+  }
+
+  if (options.mode === "check" && pending > 0) process.exitCode = 1;
 }

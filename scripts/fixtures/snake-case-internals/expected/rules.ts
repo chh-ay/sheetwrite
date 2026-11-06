@@ -1,6 +1,7 @@
 import { publicHelper } from "./shared.js";
 
 export function exportedEntry(inputValue: number): number {
+  // `local_total` is passed to `private_helper`.
   const local_total = inputValue + 1;
   return private_helper(local_total);
 }
@@ -12,6 +13,7 @@ export function exportedEntry(inputValue: number): number {
 function private_helper(raw_value: number): number {
   const { rowIndex: row_index } = { rowIndex: raw_value };
   const payload = JSON.stringify({ rowIndex: row_index, sheetName: "Data" });
+  // Reads decoded.rowIndex back from the persisted key.
   const decoded = JSON.parse(payload) as { rowIndex: number };
   return decoded.rowIndex * 2 + publicHelper(row_index);
 }
@@ -48,6 +50,7 @@ export function listen(target: EventTarget): Counter {
   return new Counter(0);
 }
 
+/** Unlike `doubledValues`, nothing here is renamed. */
 export function collides(lineValue: number): number {
   const scaledLine = lineValue;
   const scaled_line = 2;
