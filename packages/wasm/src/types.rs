@@ -5,7 +5,7 @@ use crate::calc::{
     shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
-use crate::formula_rewrite::rewrite_parsed_references;
+use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use std::rc::Rc;
 
@@ -579,33 +579,22 @@ impl FormulaEntry {
         entry
     }
 
-    /// Applies `rewrite` to each reference of the entry's tree; it returns
-    /// whether it changed the reference it is given. When a reference
-    /// changes, the read metadata follows the new tree, and the source text
-    /// changes only where a reference changed, as Excel keeps the rest of
-    /// what the user wrote. Returns whether anything changed.
-    fn rewrite_ast(
-        &mut self,
-        formula_sheet: u32,
-        rewrite: &mut dyn FnMut(&mut Ast) -> bool,
-    ) -> bool {
-        let is_reference = self.is_reference();
+    /// Applies `rewrite` to the entry's tree. When it reports a change, the
+    /// read metadata follows the new tree, and the source text changes only
+    /// in the references the tree writes differently, as Excel keeps the rest
+    /// of what the user wrote. Returns whether anything changed.
+    fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
         };
-
-        // A plain reference has no source text: its tree is the target.
-        if is_reference {
-            if !rewrite(ast) {
-                return false;
-            }
-        } else {
-            let Some(source) = rewrite_parsed_references(&self.source, ast, rewrite) else {
-                return false;
-            };
-            self.source = source;
+        if !rewrite(ast) {
+            return false;
         }
 
+        // A plain reference has no source text: its tree is the target.
+        if self.flags & Self::REFERENCE == 0 {
+            self.source = write_references(&self.source, ast);
+        }
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
         self.set_volatile(volatile);
@@ -619,7 +608,7 @@ impl FormulaEntry {
         formula_sheet: u32,
         edited_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, &mut |ast| {
+        self.rewrite_ast(formula_sheet, |ast| {
             shift_rows(ast, at, delta, formula_sheet, edited_sheet)
         })
     }
@@ -631,19 +620,17 @@ impl FormulaEntry {
         formula_sheet: u32,
         edited_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, &mut |ast| {
+        self.rewrite_ast(formula_sheet, |ast| {
             shift_cols(ast, at, delta, formula_sheet, edited_sheet)
         })
     }
 
     pub(crate) fn rename_sheet(&mut self, handle: u32, name: &str, formula_sheet: u32) -> bool {
-        self.rewrite_ast(formula_sheet, &mut |ast| {
-            rename_sheet_refs(ast, handle, name)
-        })
+        self.rewrite_ast(formula_sheet, |ast| rename_sheet_refs(ast, handle, name))
     }
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
-        self.rewrite_ast(formula_sheet, &mut |ast| invalidate_sheet_refs(ast, handle))
+        self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
     }
 
     /// Point the entry's references to a sheet of another workbook at the
@@ -678,9 +665,7 @@ impl FormulaEntry {
         names: &[String],
         formula_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, &mut |ast| {
-            refresh_sheet_spans(ast, order, names)
-        })
+        self.rewrite_ast(formula_sheet, |ast| refresh_sheet_spans(ast, order, names))
     }
 
     pub(crate) fn update_table<F>(
@@ -692,7 +677,7 @@ impl FormulaEntry {
     where
         F: Fn(&StructuredRef) -> Option<StructuredRef>,
     {
-        self.rewrite_ast(formula_sheet, &mut |ast| {
+        self.rewrite_ast(formula_sheet, |ast| {
             update_structured_refs(ast, table_id, resolve)
         })
     }

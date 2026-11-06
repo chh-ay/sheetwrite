@@ -30,7 +30,7 @@ use crate::calc::{
     shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef, NamedRangeRef,
     RangeFlags, RefFlags,
 };
-use crate::formula_rewrite::rewrite_parsed_references;
+use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
 
@@ -81,13 +81,13 @@ enum Visit {
 }
 
 impl Definition {
-    /// Rewrite each reference of the tree with `rewrite`; the source changes
-    /// only where a reference changed.
-    fn rewrite(&mut self, rewrite: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
-        let Some(source) = rewrite_parsed_references(&self.source, &mut self.ast, rewrite) else {
+    /// Rewrite the tree with `rewrite`; the source follows a changed tree in
+    /// the references it writes differently.
+    fn rewrite(&mut self, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+        if !rewrite(&mut self.ast) {
             return false;
-        };
-        self.source = source;
+        }
+        self.source = write_references(&self.source, &self.ast);
         true
     }
 }
@@ -213,10 +213,11 @@ impl CellStore {
         to: u32,
     ) -> Option<String> {
         let mut ast = self.resolve_sheets(parse(source).ok()?).ok()?;
-        let moved = rewrite_parsed_references(source, &mut ast, &mut |reference| {
-            crate::calc::move_named_formula_refs(reference, sheet, columns, from, count, to)
-        });
-        Some(moved.unwrap_or_else(|| source.to_owned()))
+        if crate::calc::move_named_formula_refs(&mut ast, sheet, columns, from, count, to) {
+            Some(write_references(source, &ast))
+        } else {
+            Some(source.to_owned())
+        }
     }
 }
 
@@ -477,7 +478,7 @@ impl CellStore {
                 continue;
             };
             refresh |= definition.positional
-                | definition.rewrite(&mut |ast| {
+                | definition.rewrite(|ast| {
                     if columns {
                         shift_cols(ast, at, delta, NO_SHEET, edited_sheet)
                     } else {
@@ -492,7 +493,7 @@ impl CellStore {
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         for definition in self.defined_names.values_mut() {
             if let DefinedName::Formula(definition) = definition {
-                definition.rewrite(&mut |ast| rename_sheet_refs(ast, handle, name));
+                definition.rewrite(|ast| rename_sheet_refs(ast, handle, name));
             }
         }
     }
@@ -503,7 +504,7 @@ impl CellStore {
         let mut changed = false;
         for definition in self.defined_names.values_mut() {
             if let DefinedName::Formula(definition) = definition {
-                changed |= definition.rewrite(&mut |ast| invalidate_sheet_refs(ast, handle));
+                changed |= definition.rewrite(|ast| invalidate_sheet_refs(ast, handle));
             }
         }
         changed

@@ -1,12 +1,11 @@
-//! Reference rewrites that replace only the text of the references that
-//! change, so a formula keeps the spacing, case and parentheses that its
-//! author wrote, as Excel keeps them. Pasted and filled cells and
-//! conditional-format rules are rewritten from their text alone; formulas
-//! and defined names in the store are rewritten through their parse tree,
-//! and their text follows the references that the tree changed. Each
-//! reference follows the rules of formulas in the store (whole columns and
-//! rows, the `XFD1048576` sheet edge, `#REF!` for a reference that leaves the
-//! sheet).
+//! Reference rewrites that replace only the text of references, so a
+//! formula keeps the spacing, case and parentheses that its author wrote, as
+//! Excel keeps them. Pasted and filled cells and conditional-format rules are
+//! rewritten from their text alone; formulas and defined names in the store
+//! are rewritten through their parse tree, and their references are then
+//! written again from the tree. Each reference follows the rules of formulas
+//! in the store (whole columns and rows, the `XFD1048576` sheet edge, `#REF!`
+//! for a reference that leaves the sheet).
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -205,67 +204,54 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
     out
 }
 
-/// Apply `rewrite` to each reference of `ast`, the parse of `source`, and
-/// return `source` with the text of each reference that changed replaced by
-/// its new text, or `None` when no reference changed. A reference is a cell,
-/// range, 3-D or table reference, or `#REF!`; `rewrite` returns whether it
-/// changed the one it is given.
+/// `source` with each reference written again from `ast`, its parse after a
+/// rewrite of the references. A reference is a cell, range, 3-D or table
+/// reference, or `#REF!`. Only a reference whose text differs from what the
+/// tree writes is replaced, in Excel's spelling; the operators, spacing and
+/// parentheses stay as written.
 ///
 /// The references of the tree and of the text are paired in source order.
-/// When the counts differ, the text cannot be paired and is written again
-/// from the tree.
-#[inline(never)]
-pub(crate) fn rewrite_parsed_references(
-    source: &str,
-    ast: &mut Ast,
-    rewrite: &mut dyn FnMut(&mut Ast) -> bool,
-) -> Option<String> {
-    // The new text of the changed references, one after the other, and for
-    // each one its index in source order and its end in `texts`.
-    let mut texts = String::new();
-    let mut changed: Vec<(usize, usize)> = Vec::new();
-    let mut count = 0;
-    for_each_reference(ast, &mut |reference| {
-        if rewrite(reference) {
-            write_ast(reference, &mut texts);
-            changed.push((count, texts.len()));
-        }
-        count += 1;
-    });
-    if changed.is_empty() {
-        return None;
-    }
-
+/// When the counts differ, they cannot be paired, and the whole formula is
+/// written from the tree.
+pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
     let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
-    debug_assert_eq!(spans.len(), count, "references of {source}");
-    if spans.len() != count {
-        return Some(serialize(ast));
-    }
-
-    let mut out = String::with_capacity(source.len() + texts.len());
+    let mut out = String::with_capacity(source.len());
+    let mut text = String::new();
     let mut copied = 0;
-    let mut text_start = 0;
-    for (index, text_end) in changed {
-        let span = &spans[index];
-        let text = &texts[text_start..text_end];
-        out.push_str(&source[copied..span.start]);
-        out.push_str(text);
+    let mut count = 0;
+    for_each_reference(ast, &mut |node| {
+        let Some(span) = spans.get(count) else {
+            count += 1;
+            return;
+        };
+        count += 1;
+        text.clear();
+        write_ast(node, &mut text);
 
         // A deleted spill anchor writes as `#REF!`, without the suffix.
-        if span.spills() && text != "#REF!" {
-            out.push('#');
+        if span.spills() && !matches!(node, Ast::InvalidRef) {
+            text.push('#');
         }
-        copied = span.end;
-        text_start = text_end;
-    }
+        if text == source[span.start..span.end] {
+            return;
+        }
 
+        out.push_str(&source[copied..span.start]);
+        out.push_str(&text);
+        copied = span.end;
+    });
+
+    debug_assert_eq!(count, spans.len(), "references of {source}");
+    if count != spans.len() {
+        return serialize(ast);
+    }
     out.push_str(&source[copied..]);
-    Some(out)
+    out
 }
 
 /// Visit each reference of `ast` in source order: the nodes that
 /// [`references`] finds in the text.
-fn for_each_reference(ast: &mut Ast, visit: &mut dyn FnMut(&mut Ast)) {
+fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     match ast {
         Ast::Cell(..)
         | Ast::SheetCell(..)
@@ -278,7 +264,7 @@ fn for_each_reference(ast: &mut Ast, visit: &mut dyn FnMut(&mut Ast)) {
         | Ast::Structured(_)
         | Ast::InvalidRef => visit(ast),
         _ => {
-            ast.fold_children_mut(&mut |child| {
+            ast.any_child(&mut |child| {
                 for_each_reference(child, visit);
                 false
             });
@@ -294,10 +280,6 @@ fn is_deleted(reference: &Ast) -> bool {
     }
 }
 
-/// The tokens of `source` with their spans, or `None` when it does not lex.
-/// Out of line: the lexer step is inlined here, and every rewrite shares
-/// this one copy.
-#[inline(never)]
 fn lex(source: &str) -> Option<Vec<Lexeme<'_>>> {
     let mut lexemes: Vec<Lexeme<'_>> = Vec::new();
     let mut index = 0;

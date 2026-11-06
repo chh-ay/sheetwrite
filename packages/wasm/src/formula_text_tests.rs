@@ -1,9 +1,9 @@
 //! Formula text after edits that rewrite references. As in Excel, only the
-//! text of a reference that changes is replaced: the formula keeps its
-//! operators, spacing and parentheses, and gets no new ones.
+//! references are written again: the formula keeps its operators, spacing
+//! and parentheses, and gets no new ones.
 
 use crate::calc::parse;
-use crate::formula_rewrite::{rewrite_parsed_references, translate_formula};
+use crate::formula_rewrite::{translate_formula, write_references};
 use crate::store::CellStore;
 
 const COLS: usize = 4;
@@ -159,22 +159,19 @@ fn a_copied_formula_keeps_its_text() {
 }
 
 /// Every kind of reference in the text pairs with its node in the tree, so
-/// rewriting each one replaces exactly its own text.
+/// each reference is written over exactly its own text: here, each one in
+/// Excel's spelling.
 #[test]
 fn each_reference_of_the_text_pairs_with_the_tree() {
     let source = "= sum( a1 , b1:c2 ) & {1,#REF!;TRUE,\"x\"} & 'My Sheet'!b2:c3 \
-                  + First:Last!a1 + [Book.xlsx]S!a1 + a1# + #REF! + 1:3 + a:b \
+                  + First:Last!a1 + [Book.xlsx]S!a1 + a1# + #ref! + 1:3 + a:b \
                   + T[[#Headers],[C]] + [@C] + Name + LOG10(a1) + (a1,b1) + a1 b1";
-    let mut ast = parse(source).expect("formula parses");
-
-    let rewritten = rewrite_parsed_references(source, &mut ast, &mut |_| true);
+    let ast = parse(source).expect("formula parses");
 
     assert_eq!(
-        rewritten.as_deref(),
-        Some(
-            "= sum( A1 , B1:C2 ) & {1,#REF!;TRUE,\"x\"} & 'My Sheet'!B2:C3 \
-             + First:Last!A1 + [Book.xlsx]S!A1 + A1# + #REF! + 1:3 + A:B \
-             + T[[#Headers],[C]] + [@C] + Name + LOG10(A1) + (A1,B1) + A1 B1"
-        )
+        write_references(source, &ast),
+        "= sum( A1 , B1:C2 ) & {1,#REF!;TRUE,\"x\"} & 'My Sheet'!B2:C3 \
+         + First:Last!A1 + [Book.xlsx]S!A1 + A1# + #REF! + 1:3 + A:B \
+         + T[[#Headers],[C]] + [@C] + Name + LOG10(A1) + (A1,B1) + A1 B1"
     );
 }
