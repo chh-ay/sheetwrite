@@ -92,6 +92,7 @@ const entryRoles = {
   "charts.html": "charts-loader-initial",
   "queries.html": "queries-loader-initial",
   "shell.html": "shell-initial",
+  "addons.html": "addons-initial",
 };
 const defaultInitialChunks = new Set();
 const staticGraphsByHtml = new Map();
@@ -104,7 +105,11 @@ for (const [html, role] of Object.entries(entryRoles)) {
   }
 }
 
-/** Classify every chunk reachable through the dynamic imports of one lazy-loader entry. */
+/**
+ * Classify every chunk reachable through the dynamic imports of one lazy-loader
+ * entry. The walk stops at core's initial chunks: what they load lazily is
+ * core's own chrome, which the chrome walk below classifies.
+ */
 function classifyLazyChunks(html, role) {
   const pending = [];
   for (const key of staticGraph(findEntry(html)))
@@ -113,9 +118,9 @@ function classifyLazyChunks(html, role) {
   while (pending.length > 0) {
     const rootKey = pending.pop();
     for (const key of staticGraph(rootKey)) {
-      if (visited.has(key)) continue;
+      if (visited.has(key) || defaultInitialChunks.has(key)) continue;
       visited.add(key);
-      if (!defaultInitialChunks.has(key)) addChunk(key, role);
+      addChunk(key, role);
       pending.push(...(manifest[key].dynamicImports ?? []));
     }
   }
@@ -128,6 +133,7 @@ const chartsChunks = classifyLazyChunks("charts.html", "charts-async");
 if (chartsChunks.size === 0) throw new Error("Vite emitted no lazy charts chunk");
 const queryChunks = classifyLazyChunks("queries.html", "queries-async");
 if (queryChunks.size === 0) throw new Error("Vite emitted no lazy query chunk");
+classifyLazyChunks("addons.html", "addons-async");
 // Chunks already classified as optional-package code; the chrome walk below skips them.
 const optionalPackageChunks = new Set([...xlsxChunks, ...chartsChunks, ...queryChunks]);
 
@@ -142,6 +148,23 @@ if (!chartsSources.some((source) => source.includes(CHARTS_CODE_MARKER))) {
 for (const key of defaultInitialChunks) {
   if ((await chunkSource(key)).includes(CHARTS_CODE_MARKER)) {
     throw new Error(`Charts code is in the initial chunk ${manifest[key].file}`);
+  }
+}
+
+// A page that installs every add-on with static imports keeps each add-on's
+// heavy code out of its initial graph. Minifiers keep these strings.
+const LAZY_ADDON_MARKERS = {
+  "chart drawing": "sheetwrite-chart-legend",
+  "XLSX codec": "xl/workbook.xml",
+  "query engine": "Query engine returned incomplete column metadata",
+  "history panel": ".sheetwrite-history",
+};
+for (const key of staticGraphsByHtml.get("addons.html") ?? []) {
+  const code = await chunkSource(key);
+  for (const [name, marker] of Object.entries(LAZY_ADDON_MARKERS)) {
+    if (code.includes(marker)) {
+      throw new Error(`The ${name} is in the add-on page's initial chunk ${manifest[key].file}`);
+    }
   }
 }
 
@@ -238,7 +261,21 @@ if (queryWasmFiles.length !== 1) {
   throw new Error(`Expected one lazy query WASM asset, got ${queryWasmFiles.length}`);
 }
 
-const defaultWasmFiles = wasmFiles.filter((file) => !queryWasmFiles.includes(file));
+// The add-ons page imports `@sheetwrite/core/history`, whose diff kernel has
+// its own WASM that loads on the first version diff.
+const historyWasmFiles = wasmFiles.filter((file) =>
+  /(?:^|\/)sheetwrite_history_bg-[^/]*\.wasm$/.test(file),
+);
+if (historyWasmFiles.length !== 1) {
+  throw new Error(`Expected one lazy history kernel WASM asset, got ${historyWasmFiles.length}`);
+}
+for (const file of historyWasmFiles) {
+  if (!rolesByFile.has(file)) addFile(file, "addons-async");
+}
+
+const defaultWasmFiles = wasmFiles.filter(
+  (file) => !queryWasmFiles.includes(file) && !historyWasmFiles.includes(file),
+);
 if (defaultWasmFiles.length !== 1) {
   throw new Error(`Expected one default Vite WASM asset, got ${defaultWasmFiles.length}`);
 }

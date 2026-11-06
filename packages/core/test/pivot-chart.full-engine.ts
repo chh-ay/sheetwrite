@@ -13,18 +13,18 @@ import {
   initSheetwrite,
   type PivotDefinition,
   resolveChartView,
-  setXlsxWorkbookBackend,
   subscribeChartChanges,
   toXlsxWorkbook,
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 const RIBBON_MODULE = "../src/ribbon/ribbon.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 let restore: () => void;

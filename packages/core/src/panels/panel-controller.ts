@@ -5,11 +5,14 @@
 // (`openLazyPanel`). Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
+import { MAX_CHART_POINTS } from "../chart-definition.js";
 import { isDashboard } from "../dashboard.js";
 import { firstFreeBox } from "../dashboard/dashboard-layout.js";
+import { readRowValues, scanColumnValues } from "../data-window-reads.js";
 import { sheetNameKey } from "../name-key.js";
+import type { CellScalar } from "../types/cell.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
-import type { CellAddress, SheetId } from "../types/coordinates.js";
+import type { CellAddress, Range, SheetId } from "../types/coordinates.js";
 import type { DashboardItem } from "../types/dashboard.js";
 import type { SheetSnapshot } from "../types/document.js";
 import type { Grid, GridPanel, IconOverrides } from "../types/grid.js";
@@ -267,7 +270,7 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
 
   const chart = chartFromRange(
     range,
-    (row, col) => grid.store.getCell({ sheet: range.sheet, row, col }).resolved,
+    chartSourceReader(grid, range),
     nextChartId(grid.getCharts(range.sheet)),
     owner.columns.length,
     kind,
@@ -355,6 +358,37 @@ function insertWorksheetPivotChart(grid: Grid, kind: ChartKind): boolean {
   grid.selectChart(id, sheet);
   openChartPanel(grid, { sheet, id });
   return true;
+}
+
+/**
+ * Reader over the cells that chart inference inspects: the first row and the
+ * first column up to `MAX_CHART_POINTS` rows below it, each read in bulk.
+ */
+function chartSourceReader(grid: Grid, range: Range): (row: number, col: number) => CellScalar {
+  const { sheet, start, end } = range;
+  const header = readRowValues(grid.store, {
+    sheet,
+    row: start.row,
+    startCol: start.col,
+    endCol: end.col,
+  });
+
+  const categories: CellScalar[] = [];
+  const categorySpan = {
+    sheet,
+    col: start.col,
+    startRow: start.row + 1,
+    endRow: Math.min(end.row, start.row + MAX_CHART_POINTS),
+  };
+  scanColumnValues(grid.store, categorySpan, (value) => {
+    categories.push(value);
+    return true;
+  });
+
+  return (row, col) =>
+    row === start.row
+      ? (header[col - start.col] ?? null)
+      : (categories[row - categorySpan.startRow] ?? null);
 }
 
 /** Where Insert › PivotTable puts the new pivot. */

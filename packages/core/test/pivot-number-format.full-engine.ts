@@ -15,7 +15,7 @@ import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 let restore: () => void;

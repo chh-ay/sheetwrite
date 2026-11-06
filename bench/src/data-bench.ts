@@ -1528,7 +1528,7 @@ async function runMemMode(): Promise<void> {
   const engine = process.argv[3];
   const rows = Number(process.argv[4]);
   if (engine === "sheetwrite") {
-    await initSheetwrite(readFileSync(WASM_PATH));
+    await initSheetwrite({ source: readFileSync(WASM_PATH) });
     console.log(JSON.stringify(probeSheetwriteMemory(rows)));
   } else {
     console.log(JSON.stringify(probeHandsontableMemory(rows)));
@@ -1712,7 +1712,7 @@ export async function runSheetwriteDataBench(
   rowsList: readonly number[] = SHEETWRITE_ROWS,
   mode: BenchmarkMode = "full",
 ): Promise<Map<number, TimedEngineResult>> {
-  await initSheetwrite(readFileSync(WASM_PATH));
+  await initSheetwrite({ source: readFileSync(WASM_PATH) });
   warmSheetwriteDataPath();
 
   const results = new Map<number, TimedEngineResult>();

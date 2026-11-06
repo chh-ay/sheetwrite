@@ -12,7 +12,7 @@ import {
 } from "@sheetwrite/core";
 import { deflateSync, strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 import { packageProblems } from "./raw-opc.js";
 
 interface CorpusFixture {
@@ -133,8 +133,7 @@ async function load(file: string): Promise<Uint8Array> {
 }
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 describe("XLSX unmodelled-part preservation", () => {

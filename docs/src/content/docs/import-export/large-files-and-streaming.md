@@ -4,8 +4,10 @@ description: Read seekable files and write bounded chunks while retaining explic
 ---
 
 ```ts prelude="core" partial="requires an initialized store and a host-owned WritableStream<Uint8Array> named destination" title="Stream a workbook to a destination"
-import { toXlsxWorkbookStream } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { toXlsxWorkbookStream, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const destination: WritableStream<Uint8Array>;
 const controller = new AbortController();
@@ -32,8 +34,10 @@ The output contains the same XLSX parts as buffered export. ZIP entry order and 
 This browser example reads a selected `File` without calling `arrayBuffer()` on the whole compressed input. Its writable consumer counts bytes instead of collecting them:
 
 ```ts compile title="Seekable import and bounded output consumption"
-import { fromXlsxWorkbookFile, toXlsxWorkbookStream } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbookFile, toXlsxWorkbookStream, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 const input = document.querySelector<HTMLInputElement>('input[type="file"]');
 const file = input?.files?.[0];
@@ -108,8 +112,10 @@ Hard resource bounds are checked before unsafe decompression or allocation. Exce
 An abort is not a failure. After `signal` fires, every import and export call rejects (and every stream errors) with `signal.reason` itself, not with a `SheetwriteError`. CSV and TSV parsing and export do the same with `DelimitedTextOptions.signal`, checked once per 1,024 records and once per store window. An aborted import keeps no partial snapshot, and an aborted export does not change the store. Compare the rejection with the reason to tell an abort from a failure:
 
 ```ts compile title="Tell an abort from a failure"
-import { fromXlsxWorkbook, isSheetwriteError } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbook, isSheetwriteError, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const bytes: Uint8Array;
 const controller = new AbortController();
