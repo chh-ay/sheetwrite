@@ -355,6 +355,9 @@ function activeSheetIsDashboard(grid: Grid): boolean {
 const openDataModel = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openDataModelPanel(grid);
 
+const openMeasures = async (grid: Grid): Promise<void> =>
+  (await loadPanels(grid)).openMeasurePanel(grid);
+
 /** The data model needs workbook tables: one to manage, two to relate. */
 function workbookTableCount(grid: Grid): number {
   let count = 0;
@@ -900,6 +903,11 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           {
             ...button("Relationships", "relationships", openDataModel, "view", { large: true }),
             available: (grid) => workbookTableCount(grid) > 1,
+          },
+          {
+            ...button("Measures", "measure", openMeasures, "view", { large: true }),
+            description: "Manage Measures",
+            available: (grid) => workbookTableCount(grid) > 0,
           },
         ],
       },
