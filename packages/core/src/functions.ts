@@ -2,6 +2,7 @@ import { HostFunctionRegistry, invalidFunction, storeFunctions } from "./functio
 import type { FormulaFunction, FormulaFunctionMetadata } from "./functions/types.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
+import type { SheetwriteAddon } from "./types/addon.js";
 import type { Store } from "./types/store.js";
 
 export {
@@ -43,47 +44,16 @@ function registryOf(engine: StoreDataEngine): HostFunctionRegistry | undefined {
   return registry;
 }
 
-/**
- * Registers a synchronous JavaScript function that formulas in `store` can
- * call, then recalculates every formula. Registering a name again replaces the
- * function. The function receives each argument as a scalar, or as row arrays
- * for a block of more than one cell, and returns a number, text, boolean, or
- * `null` for an empty result. A thrown error or any other result shows
- * `#VALUE!`. The function must not read calculated cells or change the store:
- * calls that need the engine throw a `blocked` error. Snapshots keep only
- * formula text, so register the function after loading.
- *
- * @throws {SheetwriteError} `invalid-function` when the store is not a
- * `SheetwriteStore`, when the name is a built-in function, a cell reference, or
- * not a function name, or when the metadata is malformed; `blocked` when a
- * host function calls it; `optional-backend-unavailable` on the default
- * engine, because only the full engine (`@sheetwrite/formulas`) has host
- * functions.
- * @example
- * ```ts
- * import type { Store } from "@sheetwrite/core";
- * import { registerFunction } from "@sheetwrite/core/functions";
- *
- * function addTaxRate(store: Store) {
- *   registerFunction(
- *     store,
- *     {
- *       name: "TAXRATE",
- *       description: "Sales tax rate of a region.",
- *       arguments: [{ name: "region", types: ["text"] }],
- *       returnKind: "number",
- *     },
- *     (region) => (region === "EU" ? 0.2 : 0.07),
- *   );
- * }
- * ```
- * @see /docs/features/formulas/custom-functions/
- */
-export function registerFunction(
-  store: Store,
-  metadata: FormulaFunctionMetadata,
-  implementation: FormulaFunction,
-): void {
+/** One host function: its metadata and the JavaScript that computes it. */
+export interface FormulaFunctionDefinition {
+  readonly metadata: FormulaFunctionMetadata;
+  readonly implementation: FormulaFunction;
+}
+
+/** Register `functions` on the store of a new grid, then recalculate once. */
+function registerFunctions(store: Store, functions: readonly FormulaFunctionDefinition[]): void {
+  if (functions.length === 0) return;
+
   const engine = engineOf(store);
   let registry = registryOf(engine);
   if (registry === undefined) {
@@ -92,7 +62,7 @@ export function registerFunction(
     registries.set(engine, registry);
   }
 
-  registry.register(metadata, implementation);
+  for (const { metadata, implementation } of functions) registry.register(metadata, implementation);
 
   // The engine already recalculated every formula. This public call sends the
   // change event that a grid repaints on; it also refreshes volatile values.
@@ -100,16 +70,60 @@ export function registerFunction(
 }
 
 /**
- * Removes a host function from `store`. Formulas that call it show `#NAME?`.
- * Returns whether the function existed.
+ * The custom functions add-on. Each function is a synchronous JavaScript
+ * function that formulas can call. `functions` apply to every grid created
+ * after `initSheetwrite`; grid-specific functions go in
+ * `createGrid(host, { addons: { functions: [...] } })` and apply to that grid
+ * only. A grid-specific function replaces an init function with the same name
+ * in that grid. Functions register when the grid is created; there is no
+ * later add or remove.
  *
- * @throws {SheetwriteError} `blocked` when a host function calls it.
+ * A function receives each argument as a scalar, or as row arrays for a block
+ * of more than one cell, and returns a number, text, boolean, or `null` for an
+ * empty result. A thrown error or any other result shows `#VALUE!`. The
+ * function must not read calculated cells or change the store: calls that
+ * need the engine throw a `blocked` error. Snapshots keep only formula text.
+ *
+ * `createGrid` throws a `SheetwriteError` with code `invalid-function` when a
+ * name is a built-in function, a cell reference or not a function name, or the
+ * metadata is malformed, and `optional-backend-unavailable` on the default
+ * engine, because only the full engine (`@sheetwrite/formulas`) has host
+ * functions.
+ *
+ * @example
+ * ```ts
+ * import { initSheetwrite } from "@sheetwrite/core";
+ * import { functionsAddon } from "@sheetwrite/core/functions";
+ * import * as formulas from "@sheetwrite/formulas";
+ *
+ * await initSheetwrite({
+ *   engine: formulas,
+ *   addons: [
+ *     functionsAddon([
+ *       {
+ *         metadata: {
+ *           name: "TAXRATE",
+ *           description: "Sales tax rate of a region.",
+ *           arguments: [{ name: "region", types: ["text"] }],
+ *           returnKind: "number",
+ *         },
+ *         implementation: (region) => (region === "EU" ? 0.2 : 0.07),
+ *       },
+ *     ]),
+ *   ],
+ * });
+ * ```
+ * @see /docs/features/formulas/custom-functions/
  */
-export function unregisterFunction(store: Store, name: string): boolean {
-  const removed = registryOf(engineOf(store))?.unregister(name) === true;
-  if (removed) store.recalculateVolatile();
-
-  return removed;
+export function functionsAddon(
+  functions: readonly FormulaFunctionDefinition[] = [],
+): SheetwriteAddon<readonly FormulaFunctionDefinition[]> {
+  return {
+    name: "functions",
+    grid({ grid, settings }) {
+      registerFunctions(grid.store, [...functions, ...(settings ?? [])]);
+    },
+  };
 }
 
 /**

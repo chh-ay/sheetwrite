@@ -1,6 +1,7 @@
 // Public data model and API contract for @sheetwrite/core.
 // Renderer-agnostic, framework-agnostic. No runtime values live here.
 
+export type * from "./types/addon.js";
 export type * from "./types/cell.js";
 export type * from "./types/chart.js";
 export type * from "./types/coordinates.js";
@@ -16,3 +17,4 @@ export type * from "./types/render.js";
 export type * from "./types/store.js";
 export type * from "./types/table.js";
 export type * from "./types/transaction.js";
+export type * from "./types/xlsx.js";

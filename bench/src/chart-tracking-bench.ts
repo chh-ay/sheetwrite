@@ -172,7 +172,7 @@ function fixture(
 
 /** Setup, index construction, and correctness checks are outside the timed interval. */
 export async function captureChartTracking(smoke: boolean): Promise<ChartTrackingArtifact> {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
   // Smoke must check full-size admission even though it records only short timing rows.
   if (smoke) {
     const largest = Math.max(...FULL_COUNTS);

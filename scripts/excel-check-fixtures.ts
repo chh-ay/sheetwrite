@@ -27,7 +27,7 @@ GlobalRegistrator.register();
 const NODE_LOADER = "../packages/formulas/loader-node.mjs";
 const formulas: typeof Formulas = await import(NODE_LOADER);
 const core = await import("../packages/core/dist/index.js");
-const { registerXlsxBackends } = await import("../packages/xlsx/dist/index.js");
+const { xlsxAddon } = await import("../packages/xlsx/dist/index.js");
 
 const OUT = resolve(import.meta.dir, "../test/fixtures/excel-checks");
 
@@ -575,8 +575,7 @@ async function exportThroughGrid(name: string, snapshot: Snapshot): Promise<void
   }
 }
 
-await core.initSheetwrite(undefined, formulas);
-registerXlsxBackends();
+await core.initSheetwrite({ engine: formulas, addons: [xlsxAddon()] });
 const { installCanvasTestStubs } = await import("../packages/core/dist/testing.js");
 const restoreCanvas = installCanvasTestStubs();
 

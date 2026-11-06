@@ -13,15 +13,14 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 import { rawXlsx, stylesXml, worksheet } from "./raw-opc.js";
 
 const FIXTURES = new URL("./fixtures/", import.meta.url);
 const FIXED_ZIP_TIME = new Date(1980, 0, 1);
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 async function fixture(name: string): Promise<Uint8Array> {

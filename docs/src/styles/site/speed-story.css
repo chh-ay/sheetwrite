@@ -1,0 +1,538 @@
+/* The speed story (docs/src/lib/speedup-story.ts): headline cards, one
+   overview of every interaction's speedup, and every number on demand. Each
+   machine is a panel behind a CSS-only switch, so machines never share a chart. */
+
+.speed-story {
+  container: speed-story / inline-size;
+  margin: var(--sw-space-6) 0 var(--sw-space-8);
+  padding: var(--sw-space-6);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .speed-story :is(p, ul, figure) {
+  margin: 0;
+}
+
+.sw-prose .speed-story ul,
+.speed-story ul {
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .speed-story li,
+.speed-story li {
+  margin: 0;
+}
+
+.speed-story__panel {
+  display: none;
+  margin-top: var(--sw-space-5);
+}
+
+.speed-story:has(input[value="linux"]:checked) .speed-story__panel[data-machine="linux"],
+.speed-story:has(input[value="mac"]:checked) .speed-story__panel[data-machine="mac"],
+.speed-story:has(input[value="all"]:checked) .speed-story__panel[data-machine="all"] {
+  display: block;
+  animation: speed-story-in 280ms ease both;
+}
+
+@keyframes speed-story-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.speed-story__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-1) var(--sw-space-2);
+  margin-bottom: var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.speed-story__meta b {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.speed-story__meta span:not(.speed-story__note) + span:not(.speed-story__note)::before {
+  margin-right: var(--sw-space-2);
+  content: "·";
+}
+
+/* The capture line starts under the icon, on the same edge as the cards below. */
+.speed-story__note {
+  flex-basis: 100%;
+}
+
+/* ---- Headline cards ---- */
+
+.speed-story__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sw-space-3);
+}
+
+.speed-story__card {
+  padding: var(--sw-space-4);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.speed-story__kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sw-prose .speed-story__big,
+.speed-story__big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--sw-space-1-5);
+  margin-top: var(--sw-space-2);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.speed-story__big b {
+  font: 700 clamp(1.625rem, 1.2rem + 1.6cqi, 2.125rem) / 1.05 var(--sw-font-display, inherit);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.speed-story__what {
+  margin-top: var(--sw-space-1) !important;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.speed-story__vs {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.speed-story__vs b {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-mono);
+}
+
+/* ---- Overview: one dot per interaction on a shared ratio axis ---- */
+
+.speed-story__overview {
+  margin-top: var(--sw-space-6) !important;
+}
+
+.speed-story__axis,
+.speed-story__dot-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  column-gap: var(--sw-space-4);
+}
+
+.speed-story__axis {
+  padding-bottom: var(--sw-space-1-5);
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.speed-story__axis-title {
+  grid-column: 1 / -1;
+  margin-bottom: var(--sw-space-1);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.speed-story__ticks {
+  position: relative;
+  grid-column: 2;
+  height: 1.25rem;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.25rem var(--sw-font-mono);
+}
+
+.speed-story__ticks span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* The end labels stay inside the lane; the others centre on their gridline. */
+.speed-story__ticks span:first-child {
+  transform: none;
+}
+
+.speed-story__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+.speed-story__group {
+  padding: var(--sw-space-2) 0;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.speed-story__category {
+  padding: var(--sw-space-1) 0;
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speed-story__dot-row {
+  min-height: 1.875rem;
+  margin: 0 calc(var(--sw-space-2) * -1) !important;
+  padding: 0 var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  transition: background-color var(--sw-motion-fast, 120ms) ease;
+}
+
+.speed-story__dot-row:hover {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.speed-story__label {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.speed-story__lane {
+  min-width: 0;
+}
+
+.speed-story__ratio {
+  color: var(--sw-fg-strong);
+  font: 600 var(--sw-text-small) var(--sw-font-mono);
+  text-align: right;
+}
+
+.speed-story__missing {
+  grid-column: 2 / -1;
+  color: var(--sw-warning);
+  font-size: var(--sw-text-caption);
+  font-weight: 600;
+}
+
+/* ---- Every number ---- */
+
+.speed-story__details {
+  margin-top: var(--sw-space-4);
+}
+
+.speed-story__details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.speed-story__details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.speed-story__details > summary::before {
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentcolor;
+  content: "";
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: rotate var(--sw-motion-fast, 120ms) ease;
+}
+
+.speed-story__details[open] > summary::before {
+  rotate: 90deg;
+}
+
+.speed-story__details > summary:hover {
+  color: var(--sw-accent-strong);
+}
+
+.speed-story__table {
+  margin-top: var(--sw-space-3);
+  overflow-x: auto;
+}
+
+.sw-prose .speed-story__data,
+.speed-story__data {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+.sw-prose .speed-story__data :is(th, td),
+.speed-story__data :is(th, td) {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  background: none;
+  color: var(--sw-fg-muted);
+  font: 400 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  letter-spacing: normal;
+  text-align: right;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+/* Names and headings wrap, so the table fits its frame at desktop widths. */
+.sw-prose .speed-story__data :is(thead th, th[scope="row"]),
+.speed-story__data :is(thead th, th[scope="row"]) {
+  white-space: normal;
+}
+
+.speed-story__data thead small {
+  display: block;
+  font-weight: 400;
+}
+
+.sw-prose .speed-story__data :is(th[scope="row"], thead th:first-child),
+.speed-story__data :is(th[scope="row"], thead th:first-child) {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+  text-align: left;
+}
+
+.sw-prose .speed-story__data thead th,
+.speed-story__data thead th {
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+}
+
+.speed-story__data tbody tr:hover :is(td, th) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.speed-story__ours b {
+  display: block;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.speed-story__ours small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
+}
+
+/* ---- Every number: lanes grouped by kind, or "Numbers only" ---- */
+
+.speed-story__numbers {
+  position: relative;
+  margin-top: var(--sw-space-2);
+}
+
+.speed-story__toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+/* A small switch: the track fills when the plain table shows. */
+.speed-story__toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-2);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.speed-story__toggle-label::before {
+  width: 1.75rem;
+  height: 1rem;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-pill);
+  background:
+    radial-gradient(circle at 0.5rem 50%, var(--sw-fg-muted) 0.3rem, transparent 0.32rem),
+    var(--sw-surface-2);
+  content: "";
+  transition: background var(--sw-motion-fast, 120ms) ease;
+}
+
+.speed-story__toggle:checked + .speed-story__toggle-label::before {
+  border-color: var(--sw-accent);
+  background:
+    radial-gradient(circle at 1.25rem 50%, var(--sw-surface-1) 0.3rem, transparent 0.32rem),
+    var(--sw-accent);
+}
+
+.speed-story__toggle:focus-visible + .speed-story__toggle-label {
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
+}
+
+.speed-story__toggle:checked ~ :is(.lane-legend, .lane-table),
+.speed-story__toggle:not(:checked) ~ .speed-story__table {
+  display: none;
+}
+
+.lane-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-1) var(--sw-space-5);
+  margin-top: var(--sw-space-3) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.lane-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+}
+
+.lane-legend__range {
+  width: 1.25rem;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--sw-icon-accent) 45%, transparent);
+}
+
+/* The hint has its own line, under the keys it explains. */
+.lane-legend__hint {
+  flex-basis: 100%;
+}
+
+.lane-table {
+  --fig-row-columns: minmax(10rem, 16rem) minmax(0, 1fr) 8.5rem;
+  margin-top: var(--sw-space-2) !important;
+}
+
+.lane-group {
+  padding: var(--sw-space-2) 0;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.lane-group__head {
+  display: grid;
+  grid-template-columns: var(--fig-row-columns);
+  align-items: end;
+  column-gap: var(--sw-space-4);
+  padding-bottom: var(--sw-space-1);
+}
+
+.lane-group__head b {
+  color: var(--sw-fg-muted);
+  font: 600 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lane-group__ticks {
+  position: relative;
+  height: 1.125rem;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.125rem var(--sw-font-mono);
+}
+
+.lane-group__ticks span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.lane-group__ticks span:first-child {
+  transform: none;
+}
+
+.lane-group__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+.speed-story__data caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.speed-story__data td small {
+  display: block;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speed-story__panel {
+    animation: none !important;
+  }
+
+  .speed-story__toggle-label::before {
+    transition: none;
+  }
+}
+
+/* ---- Phones: cards in two columns, labels on their own line ---- */
+
+@container speed-story (max-width: 40rem) {
+  /* A phone lane labels every other decade: 1×, 100×, 10,000×. */
+  .speed-story__ticks span:nth-child(even):not(:last-child) {
+    visibility: hidden;
+  }
+
+  .speed-story__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .speed-story__axis,
+  .speed-story__dot-row {
+    grid-template-columns: minmax(0, 1fr) 4rem;
+  }
+
+  .speed-story__ticks {
+    grid-column: 1;
+  }
+
+  .speed-story__label {
+    grid-column: 1 / -1;
+    padding-top: var(--sw-space-1);
+    font-size: var(--sw-text-caption);
+  }
+
+  /* A phone lane labels every other decade from the first, so labels never touch. */
+  .lane-group__ticks span:nth-child(even) {
+    visibility: hidden;
+  }
+
+  /* The group's ticks sit over the lane column, which spans the row on phones. */
+  .lane-group__head {
+    grid-template-columns: minmax(0, 1fr) 7.5rem;
+    row-gap: var(--sw-space-1);
+  }
+
+  .lane-group__head b {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 40rem) {
+  .speed-story {
+    margin-inline: calc(var(--sw-space-2) * -1);
+    padding: var(--sw-space-4);
+  }
+}

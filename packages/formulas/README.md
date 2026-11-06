@@ -46,7 +46,7 @@ The full engine has every 0.6.0 engine feature of `@sheetwrite/wasm`:
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 Select the engine before you create a grid or store. Engine selection is an app-level choice, not a formula plug-in. You can pass a custom module source as the first argument to `initSheetwrite`.

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
+import { GENERATED_CONTENT_DIRECTORIES } from "../docs/src/lib/generated-content.js";
 import { MOVED_HEADINGS } from "../docs/src/lib/moved-headings.js";
 import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
@@ -46,11 +47,13 @@ import {
   unresolvedCssTokens,
   validateMarkdown,
 } from "./docs-content-checks.js";
+import { expectedChangelogFeed } from "./docs-feed.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import { entrySlug } from "./docs-paths.js";
 import {
   renderEvidenceText,
   renderLandingBench,
+  renderLandingStory,
   splitPerformancePages,
 } from "./docs-performance.js";
 import {
@@ -59,8 +62,8 @@ import {
   exists,
   type ExpectedFile,
   generatedDataRoot,
-  GENERATED_CONTENT_DIRECTORIES,
   generatedManifestPath,
+  generatedPublicRoots,
   isGeneratedContent,
   type MarkdownDocument,
   MIGRATION_ROUTES,
@@ -75,6 +78,7 @@ import {
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
+import { extractFigureAssets } from "./perf-figures.js";
 import type { ApiExport, PublicApiAnalysis, PublicApiManifest } from "./public-api.js";
 import { writeIfChanged } from "./script-io.js";
 
@@ -116,6 +120,7 @@ export const ADAPTER_DOC_CONTRACT = {
     "mutationPolicy",
     "transactionResourceLimits",
     "hyperlinkActivation",
+    "addons",
     "theme",
     "readOnly",
     "config",
@@ -279,6 +284,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
+    { path: join(generatedDataRoot, "landing-story.html"), content: await renderLandingStory() },
   ];
   const symbolOwners = new Map<string, string>();
   for (const pkg of manifest.packages) {
@@ -411,14 +417,22 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(generatedDataRoot, "compatibility-summary.json"),
       content: stableJson(publishedCompatibilityResults.testSet),
     },
-    ...splitPerformancePages(await renderEvidenceText()).map((page) => ({
-      path: join(contentRoot, page.route),
-      content: page.content,
-    })),
+    // Each figure leaves its page for a static HTML asset, so the page's script carries a placeholder.
+    ...splitPerformancePages(await renderEvidenceText()).flatMap((page) => {
+      const { content, assets } = extractFigureAssets(page.slug, page.content);
+      return [
+        { path: join(contentRoot, page.route), content },
+        ...assets.map((asset) => ({
+          path: join(generatedDataRoot, `perf-figures/${asset.name}.html`),
+          content: asset.html,
+        })),
+      ];
+    }),
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
   ];
   files.push(...(await expectedLlmsFiles(manifest, repositoryRoot, files)));
+  files.push(expectedChangelogFeed());
   const unowned = files.filter(
     (file) => file.path.startsWith(`${contentRoot}${sep}`) && !isGeneratedContent(file.path),
   );
@@ -449,6 +463,7 @@ async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Pro
   const roots = [
     generatedDataRoot,
     ...GENERATED_CONTENT_DIRECTORIES.map((directory) => join(contentRoot, directory)),
+    ...generatedPublicRoots,
   ];
   for (const root of roots) {
     for (const path of await filesUnder(root)) {
@@ -502,7 +517,13 @@ async function checkDocs(
   }
   failures.push(...movedPageIssues(MOVED_PAGES, documents, MOVED_HEADINGS));
   failures.push(...(await siteLinkIssues(documents)));
-  failures.push(...(await validateMarkdown(documents, manifest)));
+  const publicRoot = join(repositoryRoot, "docs/public");
+  const generatedPublicFiles = new Set(
+    expected
+      .filter((file) => file.path.startsWith(`${publicRoot}${sep}`))
+      .map((file) => `/${posix(relative(publicRoot, file.path))}`),
+  );
+  failures.push(...(await validateMarkdown(documents, manifest, generatedPublicFiles)));
   failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
   failures.push(...adapterContractIssues(manifest));
 
@@ -668,9 +689,9 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/react": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
-  "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/xlsx": ["xlsxAddon"],
   "@sheetwrite/queries": ["loadQueryEngine"],
-  "@sheetwrite/charts": ["createChartViewCache", "registerChartsBackend"],
+  "@sheetwrite/charts": ["createChartViewCache", "chartsAddon"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],
 };

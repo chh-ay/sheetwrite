@@ -169,35 +169,6 @@
   font-size: var(--sw-text-caption);
 }
 
-/* Group overview pages: one card per page, with its New/Updated badge. */
-/* Cards in one row share a height; keep the extra space below the text, not between rows. */
-.sw-prose .sw-section-cards a {
-  align-content: start;
-}
-.sw-prose .sw-section-cards a p {
-  margin: 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-}
-/* The card's generic `span` rule would stretch the badge and dim its text. */
-.sw-prose .sw-section-cards .sw-nav-badge {
-  justify-self: start;
-  font: var(--sw-weight-bold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-}
-.sw-prose .sw-section-cards .sw-nav-badge[data-badge="new"] {
-  color: var(--sw-accent-ink);
-}
-.sw-prose .sw-section-cards .sw-nav-badge[data-badge="updated"] {
-  color: var(--sw-accent-strong);
-}
-.sw-prose > .sw-section-cards:first-child {
-  margin-top: 0;
-}
-.sw-prose .sw-section-cards strong::after {
-  content: none;
-}
-
 /* These figures show chrome without pretending that static controls work. */
 .sw-prose .sw-chrome-result {
   margin: var(--sw-space-3) 0 var(--sw-space-6);

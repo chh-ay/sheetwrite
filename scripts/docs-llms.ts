@@ -56,9 +56,9 @@ const SITE_SUMMARY =
 const AGENT_WORKFLOW: readonly string[] = [
   "Choose one base package for your framework: `@sheetwrite/core` for vanilla, or `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte`. Adapters bring core and the WebAssembly engine transitively and expose a package-local `styles.css`. Add optional feature packages, such as `@sheetwrite/xlsx`, only when the relevant guide requires them.",
   "Initialize the runtime before mounting a grid. The imperative core awaits `initSheetwrite()` once per document; framework components initialize WebAssembly automatically after client mount, so server-rendered hosts need a client-only boundary.",
-  'Choose the formula engine once, before the first Grid or store: `@sheetwrite/wasm` is the default; `@sheetwrite/formulas` is the full engine with the analysis families, selected with `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`. A function the active engine lacks evaluates to `#NAME?`. Read Choose an engine and the Formula function contract before you use a function.',
+  'Choose the formula engine once, before the first Grid or store: `@sheetwrite/wasm` is the default; `@sheetwrite/formulas` is the full engine with the analysis families, selected with `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite({ engine: formulas });`. A function the active engine lacks evaluates to `#NAME?`. Read Choose an engine and the Formula function contract before you use a function.',
   "Formulas follow the documented Excel rules, not assumptions: `OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit; space is the intersection operator, a parenthesized comma list is a union, and `Jan:Mar!B2` is a 3-D reference; a circular reference shows `#CYCLE!` unless the workbook turns on iterative calculation, a document setting that snapshots and XLSX files keep.",
-  'Built-in chrome is opt-in: `config` shows the toolbar and `config: { ribbon: true }` shows the Excel-style ribbon. XLSX import and export need `@sheetwrite/xlsx` and `import "@sheetwrite/xlsx/register"`; workbook import keeps parts Sheetwrite does not model and writes them back on save.',
+  "Built-in chrome is opt-in: `config` shows the toolbar and `config: { ribbon: true }` shows the Excel-style ribbon. XLSX import and export need `@sheetwrite/xlsx` and `initSheetwrite({ addons: [xlsxAddon()] })`; workbook import keeps parts Sheetwrite does not model and writes them back on save.",
   "The host owns the document. Sheetwrite never mutates host rows, so read Runtime ownership and Adapter lifecycle before choosing `defaultRows` seeding or explicit `workbook` plus `data`/`datasource` ownership.",
   "Readiness is generation-scoped: adapters publish `{ grid, generation, reason }` with reason `initial`, `input-reset`, or `renderer-reset`, and replacing reset-bound inputs replaces the grid. Destroy the grid when its host element's lifetime ends.",
   "Verify every symbol, option, event, and error code against the public API declarations in `llms-full.txt` or the generated API pages before using it. Anything absent from those declarations is not public API.",
@@ -490,7 +490,15 @@ function convertDocumentBody(body: string): string {
       continue;
     }
 
-    const prose = convertProseLine(formatTokens(lines[index] ?? ""));
+    // A component tag can span lines; read it whole.
+    let line = lines[index] ?? "";
+    if (/^\s*<[A-Z][A-Za-z]*\b/.test(line) && !/>\s*$/.test(line)) {
+      while (index + 1 < lines.length && !/>\s*$/.test(line)) {
+        index += 1;
+        line += ` ${(lines[index] ?? "").trim()}`;
+      }
+    }
+    const prose = convertProseLine(formatTokens(line));
     const blank = prose.trim() === "";
     if (!(blank && previousProseBlank)) output.push(blank ? "" : prose);
     previousProseBlank = blank;
@@ -499,13 +507,56 @@ function convertDocumentBody(body: string): string {
   return output.join("\n");
 }
 
+/** Callout components and the label each gets in plain text. */
+const CALLOUT_LABELS: Readonly<Record<string, string>> = {
+  Note: "Note",
+  Info: "Note",
+  Tip: "Tip",
+  Check: "Done",
+  Warning: "Warning",
+  Danger: "Caution",
+};
+
+/** An attribute of a component tag, as written. */
+function tagAttribute(tag: string, name: string): string | undefined {
+  return new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+}
+
+/**
+ * One content component tag as plain text: a titled block keeps its title in
+ * bold, a figure keeps its alt text, a callout its label, and the rest of the
+ * chrome is dropped.
+ */
+function componentText(tag: string): string {
+  const name = /^<\/?([A-Z][A-Za-z0-9]*)/.exec(tag.trim())?.[1] ?? "";
+  if (tag.trim().startsWith("</")) return "";
+  const title = tagAttribute(tag, "title");
+  if (name === "Update") return `### ${tagAttribute(tag, "version") ?? ""}`;
+  if (name in CALLOUT_LABELS)
+    return title === undefined ? `${CALLOUT_LABELS[name]}:` : `**${title}**`;
+  if (name === "Card") {
+    const href = tagAttribute(tag, "href");
+    return title === undefined
+      ? ""
+      : href === undefined
+        ? `**${title}**`
+        : `**[${title}](${href})**`;
+  }
+  if (title !== undefined) return `**${title}**`;
+  const alt = tagAttribute(tag, "alt") ?? tagAttribute(tag, "label");
+  return alt === undefined ? "" : `(Figure: ${alt})`;
+}
+
 function convertProseLine(line: string): string {
   if (isMdxImport(line)) return "";
-  const tabItem = /^\s*<TabItem\s+label="([^"]*)">\s*$/.exec(line);
-  if (tabItem !== null) return `**${tabItem[1]}**`;
-  if (/^\s*<\/?Tabs\b[^>]*>\s*$/.test(line)) return "";
-  if (/^\s*<\/?TabItem\b[^>]*>\s*$/.test(line)) return "";
-  if (/^\s*<\/?[A-Z][A-Za-z0-9]*(\s[^>]*)?\/?>\s*$/.test(line)) return "";
+  if (/^\s*<\/?[A-Z][A-Za-z0-9]*(\s[^>]*)?\/?>\s*$/.test(line)) {
+    return plainText(absolutizeMarkdownLinks(componentText(line)));
+  }
+  // A one-line callout: `<Note>text</Note>`.
+  const callout = /^\s*<(Note|Info|Tip|Check|Warning|Danger)>(.*)<\/\1>\s*$/.exec(line);
+  if (callout !== null) {
+    return `${CALLOUT_LABELS[callout[1] ?? ""]}: ${plainText(absolutizeMarkdownLinks(convertInlineHtml(callout[2] ?? "")))}`;
+  }
   return plainText(absolutizeMarkdownLinks(convertInlineHtml(line)));
 }
 
