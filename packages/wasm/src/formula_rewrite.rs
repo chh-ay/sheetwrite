@@ -127,6 +127,13 @@ fn column_span(raw: &str) -> std::ops::Range<usize> {
     start..raw.len() - 1
 }
 
+/// Tokens past half the source length that the first token buffer holds.
+const TOKEN_SLACK: usize = 4;
+
+/// Tokens per reference in a typical formula, for the first reference buffer:
+/// a reference and the operator or separator around it.
+const TOKENS_PER_REFERENCE: usize = 4;
+
 /// One token of the source and its byte span.
 struct Lexeme<'a> {
     tok: Tok<'a>,
@@ -280,7 +287,9 @@ fn is_deleted(reference: &Ast) -> bool {
 }
 
 fn lex(source: &str) -> Option<Vec<Lexeme<'_>>> {
-    let mut lexemes: Vec<Lexeme<'_>> = Vec::new();
+    // A token is about two bytes of a formula on average, so one
+    // allocation holds the tokens of most formulas.
+    let mut lexemes: Vec<Lexeme<'_>> = Vec::with_capacity(source.len() / 2 + TOKEN_SLACK);
     let mut index = 0;
     while index < source.len() {
         let start = index;
@@ -303,7 +312,7 @@ fn lex(source: &str) -> Option<Vec<Lexeme<'_>>> {
 /// reference. An array constant holds values only.
 fn references(lexemes: &[Lexeme<'_>]) -> Vec<Reference> {
     let tok = |index: usize| lexemes.get(index).map(|lexeme| &lexeme.tok);
-    let mut found = Vec::new();
+    let mut found = Vec::with_capacity(lexemes.len() / TOKENS_PER_REFERENCE + 1);
     let mut open_arrays = 0usize;
     let mut index = 0;
     while index < lexemes.len() {
