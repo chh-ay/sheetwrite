@@ -37,9 +37,10 @@ export type CaptureMachine = keyof typeof CAPTURE_MACHINES;
 const XLSX_BASELINE_ROOT = "{xlsx-baseline-root}";
 
 /**
- * The release capture's suites, in its order, with the package script each runs
- * and the artifacts the Performance pages read. The render regression baseline
- * is left out: it pins the release machine for local gates and is not published.
+ * The release capture's suites, in its order, with the `bun run` arguments each
+ * uses and the artifacts the Performance pages read. The render regression
+ * baseline is left out: it pins the release machine for local gates and is not
+ * published.
  */
 export const MACHINE_CAPTURE_SUITES = [
   { name: "render-scale", script: ["bench:render:scale"], artifacts: ["render-scale.json"] },
@@ -53,7 +54,13 @@ export const MACHINE_CAPTURE_SUITES = [
     artifacts: ["chart-tracking-results.json"],
   },
   { name: "pivot", script: ["bench:pivot"], artifacts: ["pivot-results.json"] },
-  { name: "formula", script: ["bench:formula"], artifacts: ["formula-results.json"] },
+  {
+    name: "formula",
+    // Output mode: `bench:formula` gates against the release machine's committed
+    // capture, which another machine's timings cannot be held to.
+    script: ["src/formula-bench.ts", "--output", "results/formula-results.json"],
+    artifacts: ["formula-results.json"],
+  },
   {
     name: "formula-engines",
     script: ["bench:formula:engines"],
