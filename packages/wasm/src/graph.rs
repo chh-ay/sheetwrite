@@ -158,6 +158,29 @@ impl DirtyCells {
         self.cells.push(key);
     }
 
+    /// Appends a batch, then folds it with one sort unless it continued the
+    /// sorted list. A batch is a few ascending runs (a vacated spill, then
+    /// its reinstalled cells), which a stable sort merges in linear time,
+    /// where a binary search per cell is not.
+    fn extend(&mut self, keys: impl IntoIterator<Item = CellKey>) {
+        let mut ascending = self.sorted_len == self.cells.len();
+        for key in keys {
+            let last = self.cells.last().copied();
+            if last == Some(key) {
+                continue;
+            }
+
+            ascending &= last.is_none_or(|last| last < key);
+            self.cells.push(key);
+        }
+
+        if !ascending {
+            self.cells.sort();
+            self.cells.dedup();
+        }
+        self.sorted_len = self.cells.len();
+    }
+
     fn is_empty(&self) -> bool {
         self.cells.is_empty()
     }
@@ -702,12 +725,14 @@ impl SheetFormulas {
 
     /// A bulk writer adds seeds without collecting a second temporary set.
     pub(crate) fn mark_cells_dirty(&mut self, keys: impl IntoIterator<Item = CellKey>) {
-        if matches!(self.dirty, DirtyState::All) {
-            return;
-        }
-
-        for key in keys {
-            self.mark_cell_dirty(key);
+        match &mut self.dirty {
+            DirtyState::Cells(cells) => cells.extend(keys),
+            DirtyState::Ranges(ranges) => {
+                for key in keys {
+                    Self::add_dirty_rect(ranges, DirtyRect::cell(key));
+                }
+            }
+            DirtyState::All => {}
         }
     }
 
@@ -1045,6 +1070,24 @@ mod tests {
 
         assert_eq!(cells.sorted_len, 100);
         assert_eq!(cells.cells.len(), 100);
+    }
+
+    /// A spill edit marks one source cell, then the vacated column and the
+    /// reinstalled column: the second run repeats the first and adds nothing.
+    #[test]
+    fn repeated_column_run_after_a_later_cell_adds_nothing() {
+        let mut cells = DirtyCells::default();
+        cells.insert((999, 1));
+        for _ in 0..2 {
+            for row in 0..999 {
+                cells.insert((row, 2));
+            }
+        }
+
+        let mut expected: Vec<_> = (0..999).map(|row| (row, 2)).collect();
+        expected.push((999, 1));
+        assert_eq!(distinct(&cells), expected);
+        assert_eq!(cells.cells.len(), expected.len());
     }
 
     /// Scattered repeated writes keep every cell and fold duplicates, so the
