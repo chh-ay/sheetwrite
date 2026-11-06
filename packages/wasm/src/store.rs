@@ -3459,11 +3459,19 @@ impl CellStore {
             if let Some(moved) = moved_span(*span.0, *span.1, from, count, to) {
                 (*span.0, *span.1) = moved;
             }
+            // Core refuses a move that splits a table, so the moved columns
+            // fill the table's span again; each takes its new place.
             if columns {
-                for column in &mut table.columns {
+                let mut placed: Vec<Option<TableColumnDefinition>> =
+                    table.columns.iter().map(|_| None).collect();
+                for mut column in std::mem::take(&mut table.columns) {
                     column.col = moved_index(column.col, from, count, to);
+                    let slot = column.col.saturating_sub(table.col_start) as usize;
+                    if let Some(empty) = placed.get_mut(slot) {
+                        *empty = Some(column);
+                    }
                 }
-                table.columns.sort_by_key(|column| column.col);
+                table.columns = placed.into_iter().flatten().collect();
             }
         }
 
