@@ -8,10 +8,10 @@ import {
   createGridFromSnapshot,
   initSheetwrite,
   releaseEngineMemory,
-  setXlsxWorkbookBackend,
   SheetwriteStore,
   toXlsxWorkbook,
 } from "../src/index.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 import type {
   DashboardExport,
   DocumentOp,

@@ -92,6 +92,7 @@ const entryRoles = {
   "charts.html": "charts-loader-initial",
   "queries.html": "queries-loader-initial",
   "shell.html": "shell-initial",
+  "addons.html": "addons-initial",
 };
 const defaultInitialChunks = new Set();
 const staticGraphsByHtml = new Map();
@@ -142,6 +143,23 @@ if (!chartsSources.some((source) => source.includes(CHARTS_CODE_MARKER))) {
 for (const key of defaultInitialChunks) {
   if ((await chunkSource(key)).includes(CHARTS_CODE_MARKER)) {
     throw new Error(`Charts code is in the initial chunk ${manifest[key].file}`);
+  }
+}
+
+// A page that installs every add-on with static imports keeps each add-on's
+// heavy code out of its initial graph. Minifiers keep these strings.
+const LAZY_ADDON_MARKERS = {
+  "chart drawing": "sheetwrite-chart-legend",
+  "XLSX codec": "xl/workbook.xml",
+  "query engine": "Query engine returned incomplete column metadata",
+  "history panel": ".sheetwrite-history",
+};
+for (const key of staticGraphsByHtml.get("addons.html") ?? []) {
+  const code = await chunkSource(key);
+  for (const [name, marker] of Object.entries(LAZY_ADDON_MARKERS)) {
+    if (code.includes(marker)) {
+      throw new Error(`The ${name} is in the add-on page's initial chunk ${manifest[key].file}`);
+    }
   }
 }
 

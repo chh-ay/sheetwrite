@@ -84,7 +84,7 @@ export function buildXlsxModel(
 }
 
 /** Default bounded first-sheet table export backend. */
-export const sheetwriteTableExportBackend = {
+export const sheetwriteTableExportBackend: XlsxTableExportBackend & Required<Pick<XlsxTableExportBackend, "toXlsxTableStream">> = {
   name: "sheetwrite-ooxml-table",
   async toXlsxTable(workbook, store, options) {
     try {
@@ -100,4 +100,4 @@ export const sheetwriteTableExportBackend = {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml-table", options?.signal);
     }
   },
-} satisfies XlsxTableExportBackend;
+};

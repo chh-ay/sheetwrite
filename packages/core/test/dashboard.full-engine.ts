@@ -11,11 +11,11 @@ import {
   type Grid,
   initSheetwrite,
   resolveChartView,
-  setXlsxWorkbookBackend,
   toXlsxWorkbook,
   type PivotDefinition,
   type WorkbookSnapshot,
 } from "../src/index.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {

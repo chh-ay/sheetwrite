@@ -10,11 +10,11 @@ import {
   type PivotDefinition,
   rebaseDocumentOperations,
   SheetwriteStore,
-  setXlsxWorkbookBackend,
   toXlsxWorkbook,
   validateWorkbookSnapshot,
   type WorkbookSnapshot,
 } from "../src/index.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
