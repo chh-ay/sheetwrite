@@ -187,6 +187,18 @@ a:not([class]) > .sw-icon:last-child {
   height: var(--sw-icon-md);
 }
 
+/* An icon button that draws its own path (no sprite class) takes the same
+   size and stroke as a sprite icon. */
+.sw-icon-button > svg:not(.sw-icon) {
+  width: var(--sw-icon-md);
+  height: var(--sw-icon-md);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--sw-icon-stroke);
+}
+
 /* ── Links ──────────────────────────────────────────────────────────────── */
 .sw-link-arrow {
   display: inline-flex;
