@@ -203,6 +203,25 @@ const MONTHLY_CHART: ChartDefinition = {
   pivot: BY_MONTH.id,
 };
 
+/** Where the dashboard's items sit: the full layout, or the phone layout, one column of KPI cards above the chart. */
+export type DashboardLayout = "wide" | "phone";
+
+/** The phone layout's boxes, by item ID; it shows only these items. */
+const PHONE_BOXES: Readonly<Record<string, { x: number; y: number; w: number; h: number }>> = {
+  revenue: { x: 0, y: 0, w: 12, h: 3 },
+  units: { x: 0, y: 3, w: 6, h: 3 },
+  target: { x: 6, y: 3, w: 6, h: 3 },
+  chart: { x: 0, y: 6, w: 12, h: 6 },
+};
+
+function phoneLayout(sheet: SheetSnapshot): SheetSnapshot {
+  const items = (sheet.dashboard?.items ?? []).flatMap((item) => {
+    const box = PHONE_BOXES[item.id];
+    return box === undefined ? [] : [{ ...item, box }];
+  });
+  return { ...sheet, dashboard: { items } };
+}
+
 function dashboardSheet(): SheetSnapshot {
   return {
     id: FIGURE_SHEETS.dashboard,
@@ -288,8 +307,11 @@ const SAVED_QUERIES: SavedQuery[] = [
   },
 ];
 
-/** The screenshot workbook, opened on `activeSheet`. */
-export function figureWorkbook(activeSheet: string = FIGURE_SHEETS.dashboard): WorkbookSnapshot {
+/** The screenshot workbook, opened on `activeSheet`, with the dashboard in `layout`. */
+export function figureWorkbook(
+  activeSheet: string = FIGURE_SHEETS.dashboard,
+  layout: DashboardLayout = "wide",
+): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     workbook: {
@@ -321,6 +343,10 @@ export function figureWorkbook(activeSheet: string = FIGURE_SHEETS.dashboard): W
         ],
       },
     },
-    sheets: [ordersSheet(), regionsSheet(), dashboardSheet()],
+    sheets: [
+      ordersSheet(),
+      regionsSheet(),
+      layout === "phone" ? phoneLayout(dashboardSheet()) : dashboardSheet(),
+    ],
   };
 }

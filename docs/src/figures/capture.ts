@@ -38,10 +38,8 @@ interface Shot {
   name: string;
   /** The size of the written capture. */
   size: ShotSize;
-  /** The stage size when the capture is a crop of a larger view; absent means `size`. */
-  stage?: ShotSize;
-  /** The part of the stage the capture keeps, in CSS pixels. */
-  crop?: { x: number; y: number };
+  /** `items`: keep only the dashboard's items, with the dashboard's 12 px margin. */
+  crop?: "items";
   query: Record<string, string>;
   steps?: (page: Page) => Promise<void>;
 }
@@ -69,14 +67,13 @@ const SHOTS: readonly Shot[] = [
   // Panel size: shown at about its own width in the docs column, so its labels stay
   // at their 12 px and up.
   { name: "dashboard", size: "panel", query: { sheet: "dashboard", ribbon: "compact" } },
-  // The phone version of the dashboard hero: its KPI cards and chart, cropped,
-  // so phones show the labels near their own size.
+  // The phone version of the dashboard hero: the KPI cards above the chart,
+  // laid out for a phone and cropped to the items.
   {
     name: "dashboard-phone",
     size: "phone",
-    stage: "panel",
-    crop: { x: 0, y: 104 },
-    query: { sheet: "dashboard", ribbon: "compact" },
+    query: { sheet: "dashboard", ribbon: "compact", layout: "phone" },
+    crop: "items",
   },
   // The Dashboards page: an item's actions menu, where Move and Resize start.
   {
@@ -155,6 +152,23 @@ const SHOTS: readonly Shot[] = [
   },
 ];
 
+/** A stage tall enough to show a phone dashboard's items without scrolling. */
+const STAGE_HEIGHT_FOR_CROP = 1000;
+/** The dashboard view's padding around its items. */
+const DASHBOARD_MARGIN = 12;
+
+/** The box around every dashboard item, with the dashboard's margin. */
+async function itemsBox(page: Page) {
+  const boxes = await page
+    .locator(".sheetwrite-dashboard-item")
+    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().toJSON()));
+  const left = Math.min(...boxes.map((box) => box.left)) - DASHBOARD_MARGIN;
+  const top = Math.min(...boxes.map((box) => box.top)) - DASHBOARD_MARGIN;
+  const right = Math.max(...boxes.map((box) => box.right)) + DASHBOARD_MARGIN;
+  const bottom = Math.max(...boxes.map((box) => box.bottom)) + DASHBOARD_MARGIN;
+  return { x: left, y: top, width: Math.round(right - left), height: Math.round(bottom - top) };
+}
+
 /** Two frames after the last change, so a panel's open transition has drawn. */
 async function settle(page: Page) {
   await page.evaluate(
@@ -164,8 +178,9 @@ async function settle(page: Page) {
 }
 
 async function capture(shot: Shot, origin: string, scratch: string) {
-  const { width, height } = SHOT_SIZES[shot.stage ?? shot.size];
-  const clip = shot.crop === undefined ? undefined : { ...shot.crop, ...SHOT_SIZES[shot.size] };
+  // An items crop renders on a tall stage of the capture's width, then keeps the items.
+  const { width } = SHOT_SIZES[shot.size];
+  const height = shot.crop === "items" ? STAGE_HEIGHT_FOR_CROP : SHOT_SIZES[shot.size].height;
   const browser = await chromium.launch();
   try {
     for (const theme of THEMES)
@@ -201,9 +216,16 @@ async function capture(shot: Shot, origin: string, scratch: string) {
         ]);
         await shot.steps?.(page);
         const png = join(scratch, `${shot.name}-${theme}-${scale}x.png`);
-        await (clip === undefined
-          ? page.locator("#stage").screenshot({ path: png, animations: "disabled" })
-          : page.screenshot({ path: png, clip, animations: "disabled" }));
+        if (shot.crop === "items") {
+          const clip = await itemsBox(page);
+          const expected = SHOT_SIZES[shot.size];
+          if (clip.width !== expected.width || clip.height !== expected.height) {
+            throw new Error(`${shot.name} crops to ${clip.width}×${clip.height}, not its size`);
+          }
+          await page.screenshot({ path: png, clip, animations: "disabled" });
+        } else {
+          await page.locator("#stage").screenshot({ path: png, animations: "disabled" });
+        }
         const avif = join(OUTPUT, basename(shotUrl(shot.name, theme, scale)));
         execFileSync("avifenc", [...AVIF_ARGS, png, avif], { stdio: "ignore" });
         console.log(`${avif.slice(ROOT.length + 1)}  ${statSync(avif).size} B`);
