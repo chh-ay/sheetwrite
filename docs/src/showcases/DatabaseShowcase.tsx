@@ -12,6 +12,7 @@ import {
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { errorText } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 
@@ -25,6 +26,13 @@ import {
   DATABASE_TOTAL_CELL,
   makeDatabaseSeedSnapshot,
 } from "./database-seed.js";
+import {
+  ShowcaseControlGroup,
+  ShowcaseReadout,
+  ShowcaseSection,
+  ShowcaseStatus,
+} from "./layout/ShowcaseLayout.js";
+import { ProofPage, type ProofPageContent } from "./ProofPage.js";
 import { makeUsageSheet, USAGE_RANGE, USAGE_TOTAL_CELL } from "./scenarios/durable-usage.js";
 import {
   deleteShowcaseDatabase,
@@ -32,6 +40,8 @@ import {
   ShowcaseIndexedDbAdapter,
 } from "./showcase-database.js";
 import { siteColorScheme, siteGridTheme } from "./site-grid-theme.js";
+import DatabaseSnippet from "./snippets/database.mdx";
+import { DemoButton } from "./ui/DemoButton.js";
 
 const DOCUMENT_DATABASE = "sheetwrite-showcase-subscription-revenue";
 const QUEUE_DATABASE = "sheetwrite-showcase-subscription-revenue-queue";
@@ -328,7 +338,7 @@ function disposeSession(session: DatabaseSession, keepStores = false): void {
   }
 }
 
-export default function DatabaseShowcase() {
+export default function DatabaseShowcase({ content }: Readonly<{ content: ProofPageContent }>) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<DatabaseSession | null>(null);
   const autosaveRef = useRef(true);
@@ -924,7 +934,7 @@ export default function DatabaseShowcase() {
     { id: "dbx-writes", label: "IDB writes", value: String(stats?.writes ?? 0) },
   ];
 
-  return (
+  const demo = (
     <section
       aria-busy={status === "loading"}
       aria-label="IndexedDB persistence showcase"
@@ -934,344 +944,304 @@ export default function DatabaseShowcase() {
     >
       <ActionError error={status === "error" ? statusDetail : action.error} />
       {status === "error" && (
-        <button
-          className="sw-dbx__button"
-          type="button"
-          disabled={isBusy}
+        <DemoButton
           aria-busy={isBusy || undefined}
+          disabled={isBusy}
           onClick={() => run(() => boot(null, "Loaded from IndexedDB"))}
         >
+          <Icon name="refresh" />
           {isBusy ? "Retrying…" : "Retry loading"}
-        </button>
+        </DemoButton>
       )}
-      <header className="sw-dbx__bar">
-        <div className="sw-dbx__bar-title">
-          <p>IndexedDB · versioned document</p>
-          <h2>Reload. Keep every unsaved edit.</h2>
-        </div>
-        <div className="sw-dbx__bar-actions">
-          <button
-            className="sw-dbx__button"
-            data-testid="dbx-crash"
-            data-variant="primary"
+      <div
+        aria-label="Quarterly subscription revenue workbook"
+        className="sw-dbx__grid"
+        data-testid="dbx-grid"
+        ref={hostRef}
+        role="application"
+      />
+    </section>
+  );
+
+  const controls = (
+    <>
+      <ShowcaseControlGroup
+        title="Reload and undo"
+        description="Reload the real page with unsaved edits, or clear 100,000 usage cells and undo them as one step."
+      >
+        <DemoButton
+          data-testid="dbx-crash"
+          disabled={!ready}
+          onClick={reloadWithUnsavedEdits}
+          variant="primary"
+        >
+          <Icon name="refresh" />
+          Reload with unsaved edits
+        </DemoButton>
+        <DemoButton
+          data-testid="dbx-large-undo"
+          disabled={!ready || undoRunning}
+          onClick={clearAndUndoUsage}
+        >
+          <Icon name="undo" />
+          {undoRunning ? "Restoring usage…" : "Clear 100,000 cells, then undo"}
+        </DemoButton>
+        {crashReport && <CrashReportView report={crashReport} />}
+        {undoReport && <UndoReportView report={undoReport} />}
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup title="Durable state">
+        <ShowcaseReadout
+          items={[
+            {
+              label: "Revision",
+              value: <span data-testid="dbx-version">{stats?.currentVersion ?? 0}</span>,
+            },
+            {
+              label: "Pending writes",
+              value: (
+                <span
+                  data-state={pendingCount > 0 ? "queued" : undefined}
+                  data-testid="dbx-pending"
+                >
+                  {pendingCount}
+                </span>
+              ),
+            },
+            { label: "Q1 revenue", value: <span data-testid="dbx-total">${total}</span> },
+            {
+              label: "Allocated",
+              value: (
+                <span data-testid="dbx-bytes">
+                  {stats
+                    ? formatBytes(stats.storedBytes, { kib: 0, mib: 1, groupKib: true })
+                    : "0 B"}
+                </span>
+              ),
+            },
+            { label: "Session", value: <span data-testid="dbx-reload">{recoveryState}</span> },
+          ]}
+        />
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup
+        title="Save by hand"
+        description="Add one subscriber seat. Pause autosave, save the queue, or reopen this session."
+      >
+        <fieldset aria-label="Durability actions" className="sw-dbx__controls">
+          <DemoButton
+            aria-label="Add one subscriber seat — Commit sample edit"
             disabled={!ready}
-            onClick={reloadWithUnsavedEdits}
-            type="button"
+            onClick={commitSampleEdit}
           >
-            Reload with unsaved edits
-          </button>
-          <button
-            className="sw-dbx__button"
-            data-testid="dbx-large-undo"
-            disabled={!ready || undoRunning}
-            onClick={clearAndUndoUsage}
-            type="button"
+            <Icon name="plus" />
+            Add one seat
+          </DemoButton>
+          <label className="sw-proofs-switch" data-state={autosave ? "on" : "paused"}>
+            <input
+              aria-label="Autosave"
+              checked={autosave}
+              disabled={!ready}
+              onChange={(event) => {
+                autosaveRef.current = event.currentTarget.checked;
+                setAutosave(event.currentTarget.checked);
+                if (event.currentTarget.checked) saveNow();
+              }}
+              type="checkbox"
+            />
+            <span aria-hidden="true" className="sw-proofs-switch-track">
+              <span className="sw-proofs-switch-thumb" />
+            </span>
+            <span aria-hidden="true" className="sw-proofs-switch-copy">
+              <span>Autosave</span>
+              <span className="sw-proofs-switch-state">{autosave ? "On" : "Paused"}</span>
+            </span>
+          </label>
+          <DemoButton aria-label="Save pending now" disabled={!ready} onClick={saveNow}>
+            <Icon name="save" />
+            Save pending
+          </DemoButton>
+          <DemoButton
+            aria-label="Close and reopen session"
+            disabled={!ready}
+            onClick={simulateReload}
           >
-            {undoRunning ? "Restoring usage…" : "Clear 100,000 cells, then undo"}
-          </button>
-        </div>
-        <p
+            <Icon name="restore" />
+            Reopen session
+          </DemoButton>
+        </fieldset>
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup title="Commit journal">
+        <ol aria-live="polite" className="sw-dbx__log" data-testid="dbx-log">
+          {log.length === 0 ? (
+            <li className="sw-dbx__log-empty">
+              Change an amount in the Grid. The durable write and acknowledgement appear here.
+            </li>
+          ) : (
+            log.map((entry) => (
+              <li data-kind={entry.kind} key={entry.id}>
+                {entry.text}
+              </li>
+            ))
+          )}
+        </ol>
+      </ShowcaseControlGroup>
+    </>
+  );
+
+  return (
+    <ProofPage
+      code={{ title: "The code behind it", Snippet: DatabaseSnippet }}
+      content={content}
+      controls={controls}
+      demo={demo}
+      demoActions={
+        <span
           className="sw-dbx__status"
           data-activity={activity}
           data-status={status}
           data-testid="dbx-status"
         >
-          {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
+          <ShowcaseStatus
+            tone={status === "ready" ? "ok" : status === "error" ? "error" : "neutral"}
+          >
+            {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
+          </ShowcaseStatus>
           <span className="sw-dbx__status-detail">{statusDetail}</span>
-        </p>
-        <dl aria-label="Authoritative durability state" className="sw-dbx__hud">
-          <div>
-            <dt>Revision</dt>
-            <dd data-testid="dbx-version">{stats?.currentVersion ?? 0}</dd>
-          </div>
-          <div>
-            <dt>Pending writes</dt>
-            <dd data-state={pendingCount > 0 ? "queued" : undefined} data-testid="dbx-pending">
-              {pendingCount}
-            </dd>
-          </div>
-          <div>
-            <dt>Q1 revenue</dt>
-            <dd data-testid="dbx-total">${total}</dd>
-          </div>
-          <div>
-            <dt>Allocated</dt>
-            <dd data-testid="dbx-bytes">
-              {stats ? formatBytes(stats.storedBytes, { kib: 0, mib: 1, groupKib: true }) : "0 B"}
-            </dd>
-          </div>
-          <div>
-            <dt>Session</dt>
-            <dd data-testid="dbx-reload">{recoveryState}</dd>
-          </div>
-        </dl>
-      </header>
-
-      {crashReport && (
-        <div
-          className="sw-dbx__crash"
-          data-state={reloadTestPassed(crashReport) ? "passed" : "failed"}
-          data-testid="dbx-crash-report"
-          role="status"
-        >
-          <strong>
-            {reloadTestPassed(crashReport)
-              ? "Reload test passed."
-              : "Reload test failed: the restored state differs."}
-          </strong>{" "}
-          <p>
-            The page reloaded with {crashReport.expected} unsaved edits. IndexedDB restored{" "}
-            {crashReport.restored}, and autosave saved them.
-          </p>
-          <dl className="sw-dbx__recovery-totals">
-            <div>
-              <dt>Before reload</dt>
-              <dd>${Number(crashReport.totalBefore).toLocaleString("en-US")}</dd>
-            </div>
-            <div>
-              <dt>After recovery</dt>
-              <dd>${Number(crashReport.totalAfter).toLocaleString("en-US")}</dd>
-            </div>
-          </dl>
-        </div>
-      )}
-
-      {undoReport && (
-        <div
-          className="sw-dbx__undo-report"
-          data-state={undoReport.passed ? "passed" : "failed"}
-          data-testid="dbx-undo-report"
-          role="status"
-        >
-          <strong>
-            {undoReport.passed
-              ? "Large undo passed: one history step, one commit."
-              : "The large undo did not pass every check."}
-          </strong>
-          <p>
-            Cleared 100,000 usage cells; the undo restored them as{" "}
-            {undoReport.versions === 1
-              ? "one server version"
-              : `${undoReport.versions} server versions`}{" "}
-            in {undoReport.undoSteps} history step{undoReport.undoSteps === 1 ? "" : "s"}.
-          </p>
-          <dl className="sw-dbx__recovery-totals">
-            <div>
-              <dt>Billable units</dt>
-              <dd>
-                {undoReport.before.toLocaleString()} → {undoReport.cleared.toLocaleString()} →{" "}
-                {undoReport.after.toLocaleString()}
-              </dd>
-            </div>
-            <div>
-              <dt>Restore block</dt>
-              <dd>
-                {formatBytes(undoReport.decodedBytes, { kib: 0, mib: 1, groupKib: true })} decoded →{" "}
-                {formatBytes(undoReport.wireBytes, { kib: 0, mib: 1, groupKib: true })} wire
-              </dd>
-            </div>
-          </dl>
-        </div>
-      )}
-
-      <div className="sw-dbx__stage">
-        <div
-          aria-label="Quarterly subscription revenue workbook"
-          className="sw-dbx__grid"
-          data-testid="dbx-grid"
-          ref={hostRef}
-          role="application"
-        />
-        <aside className="sw-dbx__rail">
-          <section aria-labelledby="dbx-log-title" className="sw-dbx__journal">
-            <header>
-              <div>
-                <span>Adjacent evidence</span>
-                <h3 id="dbx-log-title">Commit journal</h3>
-              </div>
-              <span className="sw-dbx__chip" data-activity={activity}>
-                {activity}
-              </span>
-            </header>
-            <ol aria-live="polite" className="sw-dbx__log" data-testid="dbx-log">
-              {log.length === 0 ? (
-                <li className="sw-dbx__log-empty">
-                  Change an amount in the Grid. The durable write and acknowledgement will appear
-                  here.
-                </li>
-              ) : (
-                log.map((entry) => (
-                  <li data-kind={entry.kind} key={entry.id}>
-                    {entry.text}
-                  </li>
-                ))
+        </span>
+      }
+      demoTitle="Subscription revenue · IndexedDB"
+    >
+      <ShowcaseSection id="database-failure-lab" title="Failure lab and storage">
+        <details className="sw-dbx__diagnostics" data-testid="dbx-diagnostics">
+          <summary>
+            <Icon name="chevron-right" />
+            Lose acknowledgements, force conflicts, and read the storage counters
+          </summary>
+          <div className="sw-dbx__diagnostics-body">
+            <section className="sw-dbx__limit-proof">
+              <h3>Oversized undo</h3>
+              <DemoButton data-testid="dbx-tight-limit" disabled={!ready} onClick={tryTightUndo}>
+                Try a 128-byte undo limit
+              </DemoButton>
+              <div className="sw-dbx__limit-grid" ref={limitHostRef} />
+              {limitReport && (
+                <p
+                  data-state={limitReport.passed ? "passed" : "failed"}
+                  data-testid="dbx-limit-report"
+                  role="status"
+                >
+                  {limitReport.passed
+                    ? "resource-limit: the oversized undo changed nothing and was dropped. The older edit still undid normally."
+                    : "The tight-limit proof did not meet every check."}
+                </p>
               )}
-            </ol>
-          </section>
-
-          <section className="sw-dbx__drill">
-            <p id="dbx-challenge-copy">
-              <strong>Manual save drill</strong>
-              <span>
-                Add one subscriber seat. Pause autosave, save the queue, or reopen this session.
-              </span>
-            </p>
-            <fieldset aria-label="Durability actions" className="sw-dbx__controls">
-              <div className="sw-dbx__primary-actions">
-                <button
-                  aria-label="Add one subscriber seat — Commit sample edit"
-                  aria-describedby="dbx-challenge-copy"
-                  className="sw-dbx__button"
-                  disabled={!ready}
-                  onClick={commitSampleEdit}
-                  type="button"
-                >
-                  Add one seat
-                </button>
-                <label className="sw-proofs-switch" data-state={autosave ? "on" : "paused"}>
-                  <input
-                    aria-label="Autosave"
-                    checked={autosave}
-                    disabled={!ready}
-                    onChange={(event) => {
-                      autosaveRef.current = event.currentTarget.checked;
-                      setAutosave(event.currentTarget.checked);
-                      if (event.currentTarget.checked) saveNow();
-                    }}
-                    type="checkbox"
-                  />
-                  <span aria-hidden="true" className="sw-proofs-switch-track">
-                    <span className="sw-proofs-switch-thumb" />
-                  </span>
-                  <span aria-hidden="true" className="sw-proofs-switch-copy">
-                    <span>Autosave</span>
-                    <span className="sw-proofs-switch-state">{autosave ? "On" : "Paused"}</span>
-                  </span>
-                </label>
-              </div>
-              <div className="sw-dbx__session-actions">
-                <button
-                  aria-label="Save pending now"
-                  className="sw-dbx__button"
-                  disabled={!ready}
-                  onClick={saveNow}
-                  type="button"
-                >
-                  Save pending
-                </button>
-                <button
-                  aria-label="Close and reopen session"
-                  className="sw-dbx__button"
-                  disabled={!ready}
-                  onClick={simulateReload}
-                  type="button"
-                >
-                  Reopen session
-                </button>
-              </div>
-            </fieldset>
-          </section>
-        </aside>
-      </div>
-
-      <details className="sw-dbx__diagnostics" data-testid="dbx-diagnostics">
-        <summary>Failure lab &amp; storage diagnostics</summary>
-        <div className="sw-dbx__diagnostics-body">
-          <section className="sw-dbx__limit-proof">
-            <h3>Oversized undo</h3>
-            <button
-              className="sw-dbx__button"
-              data-testid="dbx-tight-limit"
-              disabled={!ready}
-              onClick={tryTightUndo}
-              type="button"
-            >
-              Try a 128-byte undo limit
-            </button>
-            <div className="sw-dbx__limit-grid" ref={limitHostRef} />
-            {limitReport && (
-              <p
-                data-state={limitReport.passed ? "passed" : "failed"}
-                data-testid="dbx-limit-report"
-                role="status"
-              >
-                {limitReport.passed
-                  ? "resource-limit: the oversized undo changed nothing and was dropped. The older edit still undid normally."
-                  : "The tight-limit proof did not meet every check."}
-              </p>
-            )}
-          </section>
-          <div className="sw-dbx__diagnostic-controls">
+            </section>
             <fieldset className="sw-dbx__control-group">
               <legend>Lost acknowledgement</legend>
-              <button
-                className="sw-dbx__button"
-                data-variant="quiet"
-                disabled={!ready}
-                onClick={loseNextAck}
-                type="button"
-              >
+              <DemoButton disabled={!ready} onClick={loseNextAck}>
                 Lose next acknowledgement
-              </button>
-              <button
-                className="sw-dbx__button"
-                data-variant="quiet"
-                disabled={!ready}
-                onClick={retryPending}
-                type="button"
-              >
+              </DemoButton>
+              <DemoButton disabled={!ready} onClick={retryPending}>
                 Retry pending commit
-              </button>
+              </DemoButton>
             </fieldset>
             <fieldset className="sw-dbx__control-group">
-              <legend>Conflict &amp; reset</legend>
-              <button
-                className="sw-dbx__button"
-                data-variant="quiet"
-                disabled={!ready}
-                onClick={externalCommit}
-                type="button"
-              >
+              <legend>Conflict and reset</legend>
+              <DemoButton disabled={!ready} onClick={externalCommit}>
                 External writer commit
-              </button>
-              <button
-                className="sw-dbx__button"
-                data-variant="danger"
-                disabled={isBusy || status === "loading"}
+              </DemoButton>
+              <DemoButton
                 aria-busy={isBusy || undefined}
+                disabled={isBusy || status === "loading"}
                 onClick={resetDemo}
-                type="button"
               >
                 {isBusy ? "Resetting…" : "Reset demo data"}
-              </button>
+              </DemoButton>
             </fieldset>
+            <section aria-labelledby="dbx-counters-title" className="sw-dbx__storage">
+              <h3 id="dbx-counters-title">Storage internals</h3>
+              <dl className="sw-dbx__counters">
+                {diagnosticCounters.map((counter) => (
+                  <div key={counter.id}>
+                    <dt>{counter.label}</dt>
+                    <dd data-testid={counter.id}>{counter.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="sw-dbx__note">
+                Compaction folds the operation tail into snapshot revision after{" "}
+                {COMPACTION.maxTailRecords} tail records or{" "}
+                {formatBytes(COMPACTION.maxTailBytes, { kib: 0, mib: 1, groupKib: true })}.
+              </p>
+            </section>
           </div>
-          <section aria-labelledby="dbx-counters-title" className="sw-dbx__storage">
-            <h3 id="dbx-counters-title">Storage internals</h3>
-            <dl className="sw-dbx__counters">
-              {diagnosticCounters.map((counter) => (
-                <div key={counter.id}>
-                  <dt>{counter.label}</dt>
-                  <dd data-testid={counter.id}>{counter.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="sw-dbx__note">
-              Compaction folds the operation tail into snapshot revision after{" "}
-              {COMPACTION.maxTailRecords} tail records or{" "}
-              {formatBytes(COMPACTION.maxTailBytes, { kib: 0, mib: 1, groupKib: true })}.
-            </p>
-          </section>
-          <section aria-labelledby="dbx-architecture-title" className="sw-dbx__architecture">
-            <h3 id="dbx-architecture-title">Architecture boundary</h3>
-            <p>
-              The Grid feeds a durable pending queue. The demo adapter sequences commits into
-              IndexedDB; your product supplies the same PersistenceAdapter contract over its own
-              database and transport.
-            </p>
-          </section>
-        </div>
-      </details>
-    </section>
+        </details>
+      </ShowcaseSection>
+    </ProofPage>
+  );
+}
+
+function CrashReportView({ report }: Readonly<{ report: CrashReport }>) {
+  const passed = reloadTestPassed(report);
+  return (
+    <div
+      className="sw-dbx__report"
+      data-state={passed ? "passed" : "failed"}
+      data-testid="dbx-crash-report"
+      role="status"
+    >
+      <strong>
+        {passed ? "Reload test passed." : "Reload test failed: the restored state differs."}
+      </strong>
+      <p>
+        The page reloaded with {report.expected} unsaved edits. IndexedDB restored {report.restored}
+        , and autosave saved them.
+      </p>
+      <ShowcaseReadout
+        items={[
+          {
+            label: "Before reload",
+            value: `$${Number(report.totalBefore).toLocaleString("en-US")}`,
+          },
+          {
+            label: "After recovery",
+            value: `$${Number(report.totalAfter).toLocaleString("en-US")}`,
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+function UndoReportView({ report }: Readonly<{ report: UndoReport }>) {
+  return (
+    <div
+      className="sw-dbx__report"
+      data-state={report.passed ? "passed" : "failed"}
+      data-testid="dbx-undo-report"
+      role="status"
+    >
+      <strong>
+        {report.passed
+          ? "Large undo passed: one history step, one commit."
+          : "The large undo did not pass every check."}
+      </strong>
+      <p>
+        Cleared 100,000 usage cells; the undo restored them as{" "}
+        {report.versions === 1 ? "one server version" : `${report.versions} server versions`} in{" "}
+        {report.undoSteps} history step{report.undoSteps === 1 ? "" : "s"}.
+      </p>
+      <ShowcaseReadout
+        items={[
+          {
+            label: "Billable units",
+            value: `${report.before.toLocaleString()} → ${report.cleared.toLocaleString()} → ${report.after.toLocaleString()}`,
+          },
+          {
+            label: "Restore block",
+            value: `${formatBytes(report.decodedBytes, { kib: 0, mib: 1, groupKib: true })} → ${formatBytes(report.wireBytes, { kib: 0, mib: 1, groupKib: true })}`,
+          },
+        ]}
+      />
+    </div>
   );
 }

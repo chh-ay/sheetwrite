@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { pageMeta } from "../lib/seo.js";
 import DatabaseShowcase from "../showcases/DatabaseShowcase.js";
-import { ProofPage } from "../showcases/ProofPage.js";
+import type { ProofPageContent } from "../showcases/ProofPage.js";
 
 import proofStylesheet from "../styles/showcase-proofs.css?url";
 
@@ -18,89 +18,86 @@ export const Route = createFileRoute("/showcases/database")({
 });
 
 function DatabaseProofRoute() {
-  return (
-    <ProofPage
-      boundary={[
-        {
-          concern: "Persistence contract",
-          owner: "sheetwrite",
-          detail:
-            "PersistenceAdapter: snapshot load plus append-only DocumentOp[] commits with applied / duplicate / conflict acknowledgements.",
-        },
-        {
-          concern: "Durable offline queue",
-          owner: "sheetwrite",
-          detail:
-            "IndexedDbPendingCommitStorage keeps unacknowledged local commits durable across reloads, with bounded restore.",
-        },
-        {
-          concern: "Server database",
-          owner: "host",
-          detail:
-            "The IndexedDB adapter on this page is demo-only. Production documents live in your database behind your own PersistenceAdapter.",
-        },
-        {
-          concern: "Authentication & authorization",
-          owner: "host",
-          detail:
-            "Sheetwrite never sees credentials. Identity, session, and per-document permissions are enforced by your backend before a commit is sequenced.",
-        },
-        {
-          concern: "Transport & deployment",
-          owner: "host",
-          detail:
-            "HTTP, WebSocket, queues, regions, backups: the adapter interface is transport-neutral by design and ships no network code.",
-        },
-      ]}
-      boundaryContract="PersistenceAdapter"
-      boundaryLede="This showcase runs the full save-and-reload flow against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours."
-      description={description}
-      eyebrow="Data"
-      facts={[
-        { label: "Storage", value: "Browser IndexedDB" },
-        { label: "Commits", value: "Append-only operations" },
-        { label: "Durability", value: "Pending queue survives reload" },
-      ]}
-      guideHref="/docs/features/data/persistence/"
-      guideLabel="Read the persistence guide"
-      prompt="Pause autosave, hold unsaved edits, and reload the real page. Then clear 100,000 usage cells and undo them as one step."
-      slug="database"
-      sourcePath="docs/src/showcases/showcase-database.ts"
-      title="Edit once. Reload the same durable document."
-      verification={[
-        {
-          title: "Atomic sequencing",
-          detail:
-            "Each commit compares its base version against the stored head inside one serialized adapter queue. Stale writers get a recoverable conflict, never a lost update.",
-        },
-        {
-          title: "Idempotent retries",
-          detail:
-            "Lose an acknowledgement and retry with the same mutation id: the server answers duplicate with the original version and applies nothing twice.",
-        },
-        {
-          title: "Bounded storage",
-          detail:
-            "The operation tail is capped by record count and bytes; crossing either bound folds the tail into one compacted snapshot record. Watch the gauges.",
-        },
-        {
-          title: "Reload recovery",
-          detail:
-            "Close and reopen the session (or reload this page): committed state and the durable pending queue come back from IndexedDB exactly once.",
-        },
-        {
-          title: "Large undo",
-          detail:
-            "Clearing 100,000 cells and undoing once restores them through one compressed restoreBlock commit: one history step, one server version, and the commit journal shows the bytes before and after compression.",
-        },
-        {
-          title: "Oversized undo",
-          detail:
-            "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that entry, and keeps older history undoable. Try it under the 128-byte limit in the failure lab.",
-        },
-      ]}
-    >
-      <DatabaseShowcase />
-    </ProofPage>
-  );
+  return <DatabaseShowcase content={DATABASE_PAGE} />;
 }
+
+const DATABASE_PAGE: ProofPageContent = {
+  boundary: [
+    {
+      concern: "Persistence contract",
+      owner: "sheetwrite",
+      detail:
+        "PersistenceAdapter: snapshot load plus append-only DocumentOp[] commits with applied / duplicate / conflict acknowledgements.",
+    },
+    {
+      concern: "Durable offline queue",
+      owner: "sheetwrite",
+      detail:
+        "IndexedDbPendingCommitStorage keeps unacknowledged local commits durable across reloads, with bounded restore.",
+    },
+    {
+      concern: "Server database",
+      owner: "host",
+      detail:
+        "The IndexedDB adapter on this page is demo-only. Production documents live in your database behind your own PersistenceAdapter.",
+    },
+    {
+      concern: "Authentication & authorization",
+      owner: "host",
+      detail:
+        "Sheetwrite never sees credentials. Identity, session, and per-document permissions are enforced by your backend before a commit is sequenced.",
+    },
+    {
+      concern: "Transport & deployment",
+      owner: "host",
+      detail:
+        "HTTP, WebSocket, queues, regions, backups: the adapter interface is transport-neutral by design and ships no network code.",
+    },
+  ],
+  boundaryContract: "PersistenceAdapter",
+  boundaryLede:
+    "This showcase runs the full save-and-reload flow against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours.",
+  description,
+  eyebrow: "Data",
+  facts: [
+    { label: "Storage", value: "Browser IndexedDB" },
+    { label: "Commits", value: "Append-only operations" },
+    { label: "Durability", value: "Pending queue survives reload" },
+  ],
+  guideHref: "/docs/features/data/persistence/",
+  guideLabel: "Read the persistence guide",
+  slug: "database",
+  title: "Edit once. Reload the same durable document.",
+  verification: [
+    {
+      title: "Atomic sequencing",
+      detail:
+        "Each commit compares its base version against the stored head inside one serialized adapter queue. Stale writers get a recoverable conflict, never a lost update.",
+    },
+    {
+      title: "Idempotent retries",
+      detail:
+        "Lose an acknowledgement and retry with the same mutation id: the server answers duplicate with the original version and applies nothing twice.",
+    },
+    {
+      title: "Bounded storage",
+      detail:
+        "The operation tail is capped by record count and bytes; crossing either bound folds the tail into one compacted snapshot record. Watch the gauges.",
+    },
+    {
+      title: "Reload recovery",
+      detail:
+        "Close and reopen the session (or reload this page): committed state and the durable pending queue come back from IndexedDB exactly once.",
+    },
+    {
+      title: "Large undo",
+      detail:
+        "Clearing 100,000 cells and undoing once restores them through one compressed restoreBlock commit: one history step, one server version, and the commit journal shows the bytes before and after compression.",
+    },
+    {
+      title: "Oversized undo",
+      detail:
+        "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that entry, and keeps older history undoable. Try it under the 128-byte limit in the failure lab.",
+    },
+  ],
+};
