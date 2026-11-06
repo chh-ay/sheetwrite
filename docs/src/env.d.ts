@@ -14,6 +14,12 @@ declare module "virtual:expressive-code-scripts" {
 
 /** Formula family tables; see `formulaTables` in src/lib/formula-tables.ts. */
 /** The landing page's speed story; see `speedStoryMarkup` in src/lib/speed-story-markup.ts. */
+/** Performance page figures; see `perfFigureMarkup` in src/lib/perf-figure-markup.ts. */
+declare module "virtual:perf-figures" {
+  export function perfFigureHtml(name: string): string | null;
+  export function perfFigureUrl(name: string): string | null;
+}
+
 declare module "virtual:speed-story" {
   export const speedStoryHtml: string | null;
   export const speedStoryUrl: string | null;

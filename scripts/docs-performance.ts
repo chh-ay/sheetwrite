@@ -4,9 +4,14 @@ import { join, relative, resolve } from "node:path";
 import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { median } from "../bench/src/stats.js";
+import { inlineIcon } from "../docs/src/icons/inline-icon.js";
 import { formatTimes, type PerfRow, type PerfStat } from "../docs/src/lib/perf-bars.js";
 import type { ChangeMachine } from "../docs/src/lib/release-change.js";
-import { STORY_CATEGORIES, type StoryMachine } from "../docs/src/lib/speedup-story.js";
+import {
+  renderSpeedupStory,
+  STORY_CATEGORIES,
+  type StoryMachine,
+} from "../docs/src/lib/speedup-story.js";
 import { exists, frontmatter, posix, repositoryRoot } from "./docs-shared.js";
 import {
   allMeasurements,
@@ -169,11 +174,10 @@ export async function renderLandingStory(): Promise<string> {
   );
   return scale.machines.length === 0
     ? ""
-    : speedStory({
-        id: "story",
-        baseName: "Handsontable",
-        machines: storyMachines(scale.machines),
-      });
+    : renderSpeedupStory(
+        { id: "story", baseName: "Handsontable", machines: storyMachines(scale.machines) },
+        (name) => inlineIcon(name),
+      );
 }
 
 /** Download sizes on the landing page, Brotli-compressed as browsers fetch them. */
@@ -1746,7 +1750,7 @@ function liftHeadings(markdown: string): string {
  */
 export function splitPerformancePages(
   evidence: string,
-): Array<{ readonly route: string; readonly content: string }> {
+): Array<{ readonly slug: string; readonly route: string; readonly content: string }> {
   const sections = new Map<string, string>();
   for (const part of evidence.split(/^(?=## )/m)) {
     if (!part.startsWith("## ")) continue;
@@ -1771,6 +1775,7 @@ export function splitPerformancePages(
           ? liftHeadings((present[0] ?? "").replace(/^## [^\n]*\n+/, ""))
           : present.join("\n\n");
     return {
+      slug: page.slug,
       route: `performance/${page.slug}.md`,
       content: `${frontmatter(page.title, page.description)}${body}\n`,
     };
@@ -1793,7 +1798,7 @@ export function splitPerformancePages(
     ),
     "",
   ].join("\n");
-  return [{ route: "performance/index.md", content: overview }, ...pages];
+  return [{ slug: "index", route: "performance/index.md", content: overview }, ...pages];
 }
 
 /** Every benchmark and delivery section as `##` Markdown; `splitPerformancePages` publishes it. */

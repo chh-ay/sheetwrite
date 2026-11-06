@@ -20,19 +20,72 @@ import { renderSpeedupStory, type SpeedupStory } from "../docs/src/lib/speedup-s
 import { repositoryRoot } from "./docs-shared.js";
 import { formatCaptureTime, html, provenanceList, shortHash } from "./evidence-format.js";
 
-/** Bars as static HTML for a Markdown page; icons are inlined, so the figure needs no JavaScript. */
+/** The markers around a Performance page's figure; see `extractFigureAssets`. */
+const FIGURE_START = "<!--perf-figure:";
+const FIGURE_END = "<!--/perf-figure-->";
+
+/**
+ * A figure for a Performance page, marked so `extractFigureAssets` moves it
+ * out of the page into its own static HTML asset: the page's script then
+ * carries a placeholder, not the figure.
+ */
+function pageFigure(id: string, markup: string): string {
+  return `${FIGURE_START}${id}-->\n${markup}\n${FIGURE_END}`;
+}
+
+/** Bars as static HTML for a Performance page; icons are inlined, so the figure needs no JavaScript. */
 export function perfFigure(figure: PerfFigure): string {
-  return renderPerfBars(figure, (name) => inlineIcon(name));
+  return pageFigure(
+    figure.id,
+    renderPerfBars(figure, (name) => inlineIcon(name)),
+  );
 }
 
-/** The speed story as static HTML for a Markdown page. */
+/** The speed story as static HTML for a Performance page. */
 export function speedStory(story: SpeedupStory): string {
-  return renderSpeedupStory(story, (name) => inlineIcon(name));
+  return pageFigure(
+    story.id,
+    renderSpeedupStory(story, (name) => inlineIcon(name)),
+  );
 }
 
-/** An engine change across every workload, as static HTML for a Markdown page. */
+/** An engine change across every workload, as static HTML for a Performance page. */
 export function releaseChange(change: ReleaseChange): string {
-  return renderReleaseChange(change, (name) => inlineIcon(name));
+  return pageFigure(
+    change.id,
+    renderReleaseChange(change, (name) => inlineIcon(name)),
+  );
+}
+
+/** A figure moved out of its page: where the page refers to it, and its markup. */
+export interface FigureAsset {
+  /** "render--render-scale-time": the page's slug and the figure's id. */
+  readonly name: string;
+  readonly html: string;
+}
+
+/**
+ * Moves every marked figure out of a Performance page. Each becomes a
+ * `<PerfFigure>` placeholder, which the docs build turns into a component that
+ * shows the figure's static HTML asset (docs/src/lib/perf-figure-markup.ts).
+ */
+export function extractFigureAssets(
+  slug: string,
+  content: string,
+): { content: string; assets: FigureAsset[] } {
+  const assets: FigureAsset[] = [];
+  const pattern = new RegExp(`${FIGURE_START}([\\w-]+)-->\\n([\\s\\S]*?)\\n${FIGURE_END}`, "gu");
+  const rest = content.replace(pattern, (_match, id: string, markup: string) => {
+    const name = `${slug}--${id}`;
+    if (assets.some((asset) => asset.name === name)) {
+      throw new Error(`two figures on performance/${slug} share the id ${id}`);
+    }
+    assets.push({ name, html: markup });
+    // The open tag alone on its line starts an HTML block, so the figure is not wrapped in a paragraph.
+    return `<PerfFigure name="${name}">\n</PerfFigure>`;
+  });
+  if (rest.includes(FIGURE_START)) throw new Error(`performance/${slug} has an unclosed figure`);
+  return { content: rest, assets };
 }
 
 /** "Linux · x86-64 · Intel Core i9-12900H" splits into "Linux" and the rest. */

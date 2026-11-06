@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
-import { Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
@@ -16,11 +16,15 @@ import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageMeta, pageTitle } from "../lib/seo.js";
 
+/** Figures appear on Performance pages only, so their component loads with them. */
+const PerfFigure = lazy(() => import("../components/PerfFigure.js"));
+
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
   a: ContentLink,
   FormulaReference,
   PackageCommand,
+  PerfFigure,
 };
 
 export const Route = createFileRoute("/docs/$")({
