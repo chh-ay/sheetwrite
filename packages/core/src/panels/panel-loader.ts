@@ -18,6 +18,7 @@ import type {
   insertPivotChart,
   openChartPanel,
   openDataModelPanel,
+  openEditLinksPanel,
   openExplainPanel,
   openKpiPanel,
   openNamePanel,
@@ -36,6 +37,7 @@ interface PanelController {
   insertPivotChart: typeof insertPivotChart;
   openChartPanel: typeof openChartPanel;
   openDataModelPanel: typeof openDataModelPanel;
+  openEditLinksPanel: typeof openEditLinksPanel;
   openExplainPanel: typeof openExplainPanel;
   openKpiPanel: typeof openKpiPanel;
   openNamePanel: typeof openNamePanel;

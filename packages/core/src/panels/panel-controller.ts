@@ -33,6 +33,7 @@ type OpenPanel =
         | "explain"
         | "names"
         | "queries"
+        | "links"
         | "sort"
         | "dataModel"
         | "history"
@@ -152,6 +153,14 @@ export function openQueryPanel(grid: Grid, create: boolean): void {
   openLazyPanel(grid, { kind: "queries" }, async () => {
     const { queryPanel } = await import("./query-panel.js");
     return (target) => queryPanel(target, create);
+  });
+}
+
+/** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
+export function openEditLinksPanel(grid: Grid): void {
+  openLazyPanel(grid, { kind: "links" }, async () => {
+    const { editLinksPanel } = await import("./edit-links-panel.js");
+    return editLinksPanel;
   });
 }
 
