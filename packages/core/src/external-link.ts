@@ -170,8 +170,8 @@ export function installExternalLinks(
 
     // A name is a defined name of this workbook named as formulas write it,
     // `'[Budget.xlsx]'!Total` or `'[Budget.xlsx]Annual'!Total`, whose sheet
-    // references name the link's sheets. The engine refuses one that names a
-    // sheet the link does not hold, so formulas that use it show `#REF!`.
+    // references name the link's sheets. A reference to a sheet the link
+    // does not hold reads `#REF!`, as in Excel.
     for (const { name, refersTo, sheet } of link.names ?? []) {
       const qualified = `${linkSheet(link.book, sheet ?? "")}!${name}`;
       const source = refersTo.replace(SHEET_QUALIFIER, (_, quoted?: string, plain?: string) =>

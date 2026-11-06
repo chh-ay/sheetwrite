@@ -279,7 +279,13 @@ fn a_link_name_follows_its_values_and_its_removal() {
 }
 
 #[test]
-fn a_name_needs_a_sheet_the_link_holds() {
-    let (mut store, _, _) = linked_store();
-    assert!(!store.set_named_formula("[Budget.xlsx]!Other", -1, "='[Budget.xlsx]Other'!$A$1"));
+fn a_name_on_a_sheet_the_link_does_not_hold_is_a_ref_error() {
+    let (mut store, report, _) = linked_store();
+    assert!(store.set_named_formula("'[Budget.xlsx]'!Other", -1, "='[Budget.xlsx]Other'!$A$1"));
+    store.set_formula(report, 0, 0, "=Budget.xlsx!Other", 0);
+    store.recompute(report);
+    assert_eq!(
+        store.get_cell(report, 0, 0).string().as_deref(),
+        Some("#REF!")
+    );
 }
