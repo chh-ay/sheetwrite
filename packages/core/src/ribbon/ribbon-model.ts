@@ -745,7 +745,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             id: "newDashboard",
           },
           {
-            ...button("KPI Card", "dashboard", insertKpi, "newDashboard", { large: true }),
+            ...button("KPI Card", "kpiCard", insertKpi, "newDashboard", { large: true }),
             // A KPI card is a dashboard item over a data model measure.
             available: (grid) =>
               activeSheetIsDashboard(grid) &&
