@@ -742,6 +742,26 @@ commit, command, machine and each artifact's capture time, and names any suite
 that did not complete. `--suites core-paths,formula` reruns only those suites.
 The pages give each machine its own group and axis and never compare them.
 
+### The next engine against the last release
+
+The Formula engine page compares the formula engine on develop with the last
+release, per machine:
+
+```sh
+# Clean checkouts of the release and of develop, each with packages built.
+# From bench/ of this tree, on an otherwise idle machine, on every CPU:
+bun run bench:engine-comparison -- --base 0.6.0 \
+  --base-checkout <v0.6.0 checkout> --candidate-checkout <develop checkout>
+```
+
+The base and candidate captures run develop's formula benchmark, one after the
+other, so both engines share the harness and the CPUs. A third, control capture
+runs the release's own benchmark on its own engine in the same window; the page
+sets it beside the release capture, to say how much of any difference in
+absolute time is the machine on the day. The captures and `capture.json`, which
+records both commits, the command, the CPUs, the power profile and the times,
+go to `results/engine-comparison/<linux|darwin>/`. A machine without that
+directory reads "pending" on the page.
 
 ### Chart tracking and pivot evidence
 

@@ -12,9 +12,12 @@
  * compiles the WASM engine on other cores, and a capture pinned to one core
  * measures that compilation as well. The script refuses a restricted CPU set.
  *
- * Both captures run the candidate's own formula benchmark, one after the
- * other in one process tree, so both sides share the harness and the CPUs.
- * The base side loads the release's engine through
+ * The base and candidate captures run the candidate's own formula benchmark,
+ * one after the other in one process tree, so both sides share the harness and
+ * the CPUs. A third, control capture runs the release's own benchmark on its
+ * own engine in the same window: set beside the release's committed capture,
+ * it shows how much of a difference in absolute time is the machine on the
+ * day rather than the harness. The base side loads the release's engine through
  * `SHEETWRITE_BENCH_ENGINE_ROOT`, which records the engine's provenance in the
  * capture. The captures, and `capture.json` with both commits, the order, the
  * command and the machine, go to `results/engine-comparison/<platform>/`.
@@ -27,12 +30,13 @@ import { optionValue, requiredOption } from "./cli-options.js";
 
 const BENCH_ROOT = resolve(import.meta.dir, "..");
 
-export const ENGINE_COMPARISON_PROTOCOL = "sheetwrite-engine-comparison-v2";
+export const ENGINE_COMPARISON_PROTOCOL = "sheetwrite-engine-comparison-v3";
 
 /** Artifact names, inside the candidate checkout's results and the output directory. */
 export const ENGINE_COMPARISON_ARTIFACTS = {
   base: "formula-base.json",
   candidate: "formula-candidate.json",
+  control: "formula-control.json",
 } as const;
 
 function run(command: readonly string[], cwd: string): string {
@@ -55,13 +59,13 @@ function cleanCommit(checkout: string): string {
 
 function capture(
   side: keyof typeof ENGINE_COMPARISON_ARTIFACTS,
-  candidateCheckout: string,
+  checkout: string,
   environment: Record<string, string>,
 ): void {
   const output = `results/${ENGINE_COMPARISON_ARTIFACTS[side]}`;
   process.stderr.write(`\n=== ${side}: bun run src/formula-bench.ts --output ${output}\n`);
   const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--output", output], {
-    cwd: resolve(candidateCheckout, "bench"),
+    cwd: resolve(checkout, "bench"),
     env: { ...process.env, ...environment },
     stdout: "inherit",
     stderr: "inherit",
@@ -81,6 +85,20 @@ async function cpuAffinity(): Promise<string> {
   const allowed = /^Cpus_allowed_list:\s*(\S+)$/mu.exec(status)?.[1];
   if (allowed === undefined) throw new Error("cannot read this process's CPU affinity");
   return allowed;
+}
+
+/** The platform power profile and CPU energy preference, where Linux reports them. */
+async function powerProfile(): Promise<string> {
+  if (platform() !== "linux") return "not reported";
+  const read = async (path: string): Promise<string | undefined> => {
+    const file = Bun.file(path);
+    return (await file.exists()) ? (await file.text()).trim() : undefined;
+  };
+  const profile = await read("/sys/firmware/acpi/platform_profile");
+  const preference = await read(
+    "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference",
+  );
+  return [profile, preference].filter((value) => value !== undefined).join(" · ") || "not reported";
 }
 
 async function main(): Promise<void> {
@@ -115,27 +133,27 @@ async function main(): Promise<void> {
     SHEETWRITE_BENCH_BASELINE_VERSION: baseVersion,
   });
   capture("candidate", candidateCheckout, {});
+  capture("control", baseCheckout, {});
   const finishedAt = new Date().toISOString();
 
   await mkdir(outputDir, { recursive: true });
-  for (const artifact of Object.values(ENGINE_COMPARISON_ARTIFACTS)) {
-    await copyFile(
-      resolve(candidateCheckout, "bench/results", artifact),
-      resolve(outputDir, artifact),
-    );
+  for (const [side, artifact] of Object.entries(ENGINE_COMPARISON_ARTIFACTS)) {
+    const checkout = side === "control" ? baseCheckout : candidateCheckout;
+    await copyFile(resolve(checkout, "bench/results", artifact), resolve(outputDir, artifact));
   }
   const processors = cpus();
   const manifest = {
     protocol: ENGINE_COMPARISON_PROTOCOL,
     base: { version: baseVersion, commit: baseCommit },
     candidate: { commit: candidateCommit },
-    order: ["base", "candidate"],
+    order: ["base", "candidate", "control"],
     machine: {
       os: `${platform()} ${kernelRelease()}`,
       arch: arch(),
       cpu: processors[0]?.model ?? "unknown",
       logicalCores: processors.length,
       cpuAffinity: affinity,
+      powerProfile: await powerProfile(),
       memoryBytes: totalmem(),
       bun: Bun.version,
     },
