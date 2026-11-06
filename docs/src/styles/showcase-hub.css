@@ -34,15 +34,10 @@
   padding: clamp(var(--sw-space-6), 3vh, var(--sw-space-8)) 0 var(--sw-space-12);
 }
 
-.sw-hub :is(a, button, summary):focus-visible {
-  border-radius: var(--sw-radius-xs);
-  outline: 0.125rem solid var(--sw-accent);
-  outline-offset: var(--sw-space-1);
-}
-
-/* A short opening, then straight into the gallery. */
+/* A short opening, then straight into the gallery. The title spans the
+   content width, so it stays on one line at desktop and tablet widths; the
+   lede keeps a reading measure. */
 .sw-hub__hero {
-  max-width: 46rem;
   padding-block: clamp(var(--sw-space-8), 5vw, var(--sw-space-16)) var(--sw-space-2);
 }
 
@@ -63,6 +58,7 @@
 }
 
 .sw-hub__lede {
+  max-width: 46rem;
   margin: var(--sw-space-4) 0 0;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-h4);

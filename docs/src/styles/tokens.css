@@ -139,7 +139,10 @@
   --sw-radius-xl: 1rem;
   --sw-radius-pill: 999px;
   --sw-border-width: 1px;
+  /* One keyboard focus ring for every control: a solid outline in
+     `--sw-focus-ring`, at least 3:1 on every surface. */
   --sw-focus-ring-width: 2px;
+  --sw-focus-ring-offset: 2px;
 
   /* ── Icons ────────────────────────────────────────────────────────────
      The Sheetwrite sprite (src/icons/sprite.svg): one stroke, three sizes on
@@ -213,6 +216,7 @@
   --sw-accent-strong: #005a3d;
   --sw-accent-soft: #d6f5e6;
   --sw-accent-ink: #ffffff;
+  --sw-focus-ring: #005a3d;
   /* The icon accent: a brighter brand green for the selected part of an
      icon; a graphic, so it clears 3:1 on every surface. */
   --sw-icon-accent: #00936a;
@@ -295,6 +299,7 @@
   --sw-accent-strong: #7eeabd;
   --sw-accent-soft: #0b3a2a;
   --sw-accent-ink: #03190f;
+  --sw-focus-ring: #7eeabd;
   --sw-icon-accent: #3edc9b;
   --sw-violet: #b69cff;
   --sw-violet-soft: #2a1f4d;

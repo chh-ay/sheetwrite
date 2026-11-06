@@ -15,7 +15,6 @@
     --sw-sp-grid-height: clamp(28rem, calc(100dvh - var(--sw-sp-stage-offset)), 34rem);
     --sw-sp-instrument-width: 16rem;
     --sw-sp-line: 1px;
-    --sw-sp-focus: 0 0 0 0.2rem color-mix(in srgb, var(--sw-accent) 35%, transparent);
 
     display: flex;
     min-height: 100dvh;
@@ -429,14 +428,6 @@
   .sw-sp-page button:hover:not(:disabled) {
     border-color: var(--sw-accent);
     background: color-mix(in srgb, var(--sw-accent) 8%, var(--sw-surface-1));
-  }
-
-  .sw-sp-page button:focus-visible,
-  .sw-sp-page input:focus-visible,
-  .sw-sp-page a:focus-visible,
-  .sw-sp-page summary:focus-visible {
-    outline: none;
-    box-shadow: var(--sw-sp-focus);
   }
 
   .sw-sp-page button:disabled {

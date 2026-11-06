@@ -54,6 +54,7 @@ function measuredPairs(): ColourPair[] {
     for (const foreground of TEXT_ON_SURFACES) add(foreground, background);
     add("--sw-field-edge", background, UI_CONTRAST);
     add("--sw-icon-accent", background, UI_CONTRAST);
+    add("--sw-focus-ring", background, UI_CONTRAST);
   }
   for (const role of ["accent", "violet", "info", "success", "warning", "danger"]) {
     add(`--sw-${role}`, `--sw-${role}-soft`);

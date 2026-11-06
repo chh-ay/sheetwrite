@@ -498,9 +498,11 @@ samp,
     color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
+/* Hover: a deeper tint and the strong text colour, visible on the bar in both
+   themes. */
 .sw-header__nav a:hover,
 .sw-header__link:hover {
-  background: var(--sw-surface-2);
+  background: var(--sw-surface-3);
   color: var(--sw-fg-strong);
 }
 
@@ -530,29 +532,57 @@ samp,
   justify-self: end;
 }
 
-/* Phones: the section links move to a second, scrollable row. Documentation
-   pages keep one row (brand, search, theme, menu): their menu drawer holds
-   the same destinations, so the reading area starts higher. */
+/* Wide screens: GitHub sits in the actions and the menu button is hidden. */
+.sw-header__nav .sw-header__nav-github,
+.sw-header__menu {
+  display: none;
+}
+
+/* Phones: one row (brand, search or menu, theme). The site links open from
+   the menu button as a panel under the bar; documentation pages hold the same
+   links in their own menu drawer. */
 @media (max-width: 54rem) {
-  .sw-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .sw-header__nav {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
+  .sw-header,
   .sw-header[data-has-search="true"] {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     min-height: var(--sw-header-height-compact);
     padding-block: var(--sw-space-1);
   }
 
-  .sw-header[data-has-search="true"] :is(.sw-header__nav, .sw-header__link) {
+  .sw-header[data-has-search="true"] {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .sw-header__link {
     display: none;
+  }
+
+  .sw-header__menu {
+    display: inline-flex;
+  }
+
+  .sw-header__nav {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--sw-space-2) var(--sw-page-inset) var(--sw-space-4);
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+    background: var(--sw-surface-0);
+    box-shadow: var(--sw-shadow-md);
+  }
+
+  .sw-header[data-menu-open="true"]:not([data-has-search="true"]) .sw-header__nav {
+    display: flex;
+  }
+
+  .sw-header__nav a,
+  .sw-header__nav .sw-header__nav-github {
+    display: flex;
+    min-height: var(--sw-control-height-lg);
   }
 
   .sw-header__search {

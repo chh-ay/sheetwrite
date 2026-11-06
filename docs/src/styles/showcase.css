@@ -407,8 +407,7 @@
   }
 
   .sw-demo-radio-item:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--demo-accent) 32%, transparent);
+    outline-offset: calc(-1 * var(--sw-focus-ring-width));
   }
 
   .sw-demo-radio-item {
@@ -1308,15 +1307,15 @@
    inset and radius-following rather than bleeding around a neighboring edge. */
 .sw-demo-app :focus-visible:not(.sheetwrite),
 .sw-vanilla-app :focus-visible:not(.sheetwrite) {
-  outline: none;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--demo-accent) 48%, transparent);
+  outline-offset: calc(-1 * var(--sw-focus-ring-width));
 }
 
 :is(
   .sw-demo-heading__actions button[data-primary="true"],
   .sw-demo-radio-item[data-checked]
 ):focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent-ink) 58%, transparent);
+  outline-offset: calc(-1 * var(--sw-focus-ring-width));
+  outline-color: var(--sw-accent-ink);
 }
 
 /* Live showcase workbench: one compact host control row, with framework-tinted
@@ -1379,7 +1378,7 @@
 :is(.sw-demo-app, .sw-vanilla-app)
   :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula):focus-visible {
   border-color: var(--sw-accent);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 42%, transparent);
+  outline-offset: calc(-1 * var(--sw-focus-ring-width));
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-shell-namebox[aria-invalid="true"] {
@@ -1442,7 +1441,7 @@
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-active:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 48%, transparent);
+  outline-offset: calc(-1 * var(--sw-focus-ring-width));
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-close {
@@ -1632,7 +1631,7 @@
 
   .sw-demo-controlbar__search input:focus-visible {
     border-color: var(--sw-accent);
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 42%, transparent);
+    outline-offset: calc(-1 * var(--sw-focus-ring-width));
   }
 
   .sw-demo-controlbar__controls .sw-demo-select {
