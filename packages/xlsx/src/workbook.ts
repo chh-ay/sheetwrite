@@ -10,18 +10,18 @@ import { streamWorkbook, type WorkbookWriteHookResolver, writeWorkbook } from ".
  * Power Query parts. The Power Query module loads only for such workbooks, so
  * the XLSX chunk every import and export loads stays small.
  */
-async function writeHook(
+async function write_hook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
-  sourceTracked: boolean,
+  source_tracked: boolean,
 ): Promise<WorkbookWriteHookResolver> {
-  const powerQuery = snapshot.workbook.queries?.length
+  const power_query = snapshot.workbook.queries?.length
     ? await import("./power-query.js")
     : undefined;
 
   return (validated) => {
-    const preserved = preparePreserved(validated, context, sourceTracked);
-    return powerQuery ? powerQuery.withPowerQuery(preserved, validated, context) : preserved;
+    const preserved = preparePreserved(validated, context, source_tracked);
+    return power_query ? power_query.withPowerQuery(preserved, validated, context) : preserved;
   };
 }
 
@@ -31,19 +31,19 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
   verifySource(snapshot) {
     return admitPreserved(snapshot, createCodecContext("import"));
   },
-  async toXlsxWorkbook(snapshot, options, exportContext) {
+  async toXlsxWorkbook(snapshot, options, export_context) {
     try {
       const context = createCodecContext("export", options);
-      const hook = await writeHook(snapshot, context, exportContext?.sourceTracked === true);
+      const hook = await write_hook(snapshot, context, export_context?.sourceTracked === true);
       return await writeWorkbook(snapshot, context, hook);
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);
     }
   },
-  async *toXlsxWorkbookStream(snapshot, options, exportContext) {
+  async *toXlsxWorkbookStream(snapshot, options, export_context) {
     try {
       const context = createCodecContext("export", options);
-      const hook = await writeHook(snapshot, context, exportContext?.sourceTracked === true);
+      const hook = await write_hook(snapshot, context, export_context?.sourceTracked === true);
       yield* streamWorkbook(snapshot, context, hook);
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);

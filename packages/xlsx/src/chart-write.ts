@@ -41,7 +41,7 @@ export interface SheetCharts {
   readonly charts: readonly DrawingChart[];
 }
 
-function chartText(value: string): string {
+function chart_text(value: string): string {
   return escapeXml(encodeXstring(value));
 }
 
@@ -55,12 +55,12 @@ function formula(reference: ChartRange, snapshot: WorkbookSnapshot): string {
   return `'${sheet.name.replaceAll("'", "''")}'!${start}:${end}`;
 }
 
-function richTitle(title: string | undefined): string {
+function rich_title(title: string | undefined): string {
   if (title === undefined) return "";
-  return `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${chartText(title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
+  return `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${chart_text(title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
 }
 
-function referenceXml(
+function reference_xml(
   tag: string,
   reference: ChartRange,
   snapshot: WorkbookSnapshot,
@@ -70,7 +70,7 @@ function referenceXml(
   return `<c:${tag}><c:${type}><c:f>${escapeXml(formula(reference, snapshot))}</c:f></c:${type}></c:${tag}>`;
 }
 
-function pointCount(reference: ChartRange): number {
+function point_count(reference: ChartRange): number {
   if (reference === "#REF!") return 0;
   return (
     (reference.end.row - reference.start.row + 1) * (reference.end.col - reference.start.col + 1)
@@ -78,46 +78,46 @@ function pointCount(reference: ChartRange): number {
 }
 
 /** A scatter series needs X values; the renderer plots a series without categories at positions 1..n. */
-function positionLiteral(count: number): string {
+function position_literal(count: number): string {
   let points = "";
   for (let index = 0; index < count; index++)
     points += `<c:pt idx="${index}"><c:v>${index + 1}</c:v></c:pt>`;
   return `<c:xVal><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="${count}"/>${points}</c:numLit></c:xVal>`;
 }
 
-function seriesXml(chart: ChartDefinition, snapshot: WorkbookSnapshot, xml: XmlBuffer): void {
+function series_xml(chart: ChartDefinition, snapshot: WorkbookSnapshot, xml: XmlBuffer): void {
   const scatter = chart.kind === "scatter";
   for (const [index, series] of chart.series.entries()) {
     xml.append(`<c:ser><c:idx val="${index}"/><c:order val="${index}"/>`);
     if (series.nameRange !== undefined)
-      xml.append(referenceXml("tx", series.nameRange, snapshot, false));
+      xml.append(reference_xml("tx", series.nameRange, snapshot, false));
     else if (series.name !== undefined)
-      xml.append(`<c:tx><c:v>${chartText(series.name)}</c:v></c:tx>`);
+      xml.append(`<c:tx><c:v>${chart_text(series.name)}</c:v></c:tx>`);
 
     if (series.categories !== undefined) {
-      xml.append(referenceXml(scatter ? "xVal" : "cat", series.categories, snapshot, scatter));
+      xml.append(reference_xml(scatter ? "xVal" : "cat", series.categories, snapshot, scatter));
     } else if (scatter) {
-      xml.append(positionLiteral(pointCount(series.values)));
+      xml.append(position_literal(point_count(series.values)));
     }
-    xml.append(referenceXml(scatter ? "yVal" : "val", series.values, snapshot, true));
+    xml.append(reference_xml(scatter ? "yVal" : "val", series.values, snapshot, true));
     xml.append("</c:ser>");
   }
 }
 
-function axisXml(
+function axis_xml(
   tag: "catAx" | "valAx",
   id: number,
-  crossAxis: number,
+  cross_axis: number,
   position: string,
   title: string | undefined,
 ): string {
-  const categoryFields = '<c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/>';
-  const tail = tag === "catAx" ? categoryFields : '<c:crossBetween val="between"/>';
-  return `<c:${tag}><c:axId val="${id}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${richTitle(title)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${crossAxis}"/><c:crosses val="autoZero"/>${tail}</c:${tag}>`;
+  const category_fields = '<c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/>';
+  const tail = tag === "catAx" ? category_fields : '<c:crossBetween val="between"/>';
+  return `<c:${tag}><c:axId val="${id}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${rich_title(title)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${cross_axis}"/><c:crosses val="autoZero"/>${tail}</c:${tag}>`;
 }
 
 /** Element order follows CT_ChartSpace, CT_PlotArea and each CT_*Chart sequence. */
-function chartXml(
+function chart_xml(
   chart: ChartDefinition,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
@@ -131,7 +131,7 @@ function chartXml(
     `<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${DRAWINGML_NS}" xmlns:r="${RELATIONSHIPS_NS}"><c:chart>`,
   );
   xml.append(
-    `${richTitle(chart.title)}<c:autoTitleDeleted val="${chart.title === undefined ? 1 : 0}"/>`,
+    `${rich_title(chart.title)}<c:autoTitleDeleted val="${chart.title === undefined ? 1 : 0}"/>`,
   );
   xml.append(`<c:plotArea><c:layout/><c:${plot}>`);
 
@@ -143,7 +143,7 @@ function chartXml(
     xml.append('<c:grouping val="standard"/>');
   else if (chart.kind === "scatter") xml.append('<c:scatterStyle val="lineMarker"/>');
   xml.append(`<c:varyColors val="${circular ? 1 : 0}"/>`);
-  seriesXml(chart, snapshot, xml);
+  series_xml(chart, snapshot, xml);
   if (chart.kind === "doughnut")
     xml.append(`<c:firstSliceAng val="0"/><c:holeSize val="${DOUGHNUT_HOLE_PERCENT}"/>`);
   if (!circular) xml.append(`<c:axId val="${CATEGORY_AXIS_ID}"/><c:axId val="${VALUE_AXIS_ID}"/>`);
@@ -151,21 +151,21 @@ function chartXml(
 
   // The renderer draws `xTitle` under the plot; a bar chart has its category axis at the left.
   if (!circular) {
-    const horizontalBar = chart.kind === "bar";
-    const categoryTitle = horizontalBar ? chart.axes?.yTitle : chart.axes?.xTitle;
-    const valueTitle = horizontalBar ? chart.axes?.xTitle : chart.axes?.yTitle;
-    const categoryTag = chart.kind === "scatter" ? "valAx" : "catAx";
+    const horizontal_bar = chart.kind === "bar";
+    const category_title = horizontal_bar ? chart.axes?.yTitle : chart.axes?.xTitle;
+    const value_title = horizontal_bar ? chart.axes?.xTitle : chart.axes?.yTitle;
+    const category_tag = chart.kind === "scatter" ? "valAx" : "catAx";
     xml.append(
-      axisXml(
-        categoryTag,
+      axis_xml(
+        category_tag,
         CATEGORY_AXIS_ID,
         VALUE_AXIS_ID,
-        horizontalBar ? "l" : "b",
-        categoryTitle,
+        horizontal_bar ? "l" : "b",
+        category_title,
       ),
     );
     xml.append(
-      axisXml("valAx", VALUE_AXIS_ID, CATEGORY_AXIS_ID, horizontalBar ? "b" : "l", valueTitle),
+      axis_xml("valAx", VALUE_AXIS_ID, CATEGORY_AXIS_ID, horizontal_bar ? "b" : "l", value_title),
     );
   }
   xml.append("</c:plotArea>");
@@ -179,11 +179,11 @@ function chartXml(
   return xml.finish();
 }
 
-function anchorXml(chart: ChartDefinition, objectId: number, relationshipId: string): string {
+function anchor_xml(chart: ChartDefinition, object_id: number, relationship_id: string): string {
   const emu = (pixels: number) => Math.round(pixels * EMU_PER_PIXEL);
   const { anchor } = chart;
   const from = `<xdr:from><xdr:col>${anchor.col}</xdr:col><xdr:colOff>${emu(anchor.offsetX)}</xdr:colOff><xdr:row>${anchor.row}</xdr:row><xdr:rowOff>${emu(anchor.offsetY)}</xdr:rowOff></xdr:from>`;
-  const frame = `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${objectId}" name="${chartText(chart.id)}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="${CHART_NS}"><c:chart r:id="${escapeXml(relationshipId)}"/></a:graphicData></a:graphic></xdr:graphicFrame>`;
+  const frame = `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${object_id}" name="${chart_text(chart.id)}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="${CHART_NS}"><c:chart r:id="${escapeXml(relationship_id)}"/></a:graphicData></a:graphic></xdr:graphicFrame>`;
   // A one-cell anchor keeps the model's pixel size when rows or columns are resized.
   return `<xdr:oneCellAnchor xmlns:xdr="${SPREADSHEET_DRAWING_NS}" xmlns:a="${DRAWINGML_NS}" xmlns:c="${CHART_NS}" xmlns:r="${RELATIONSHIPS_NS}">${from}<xdr:ext cx="${emu(anchor.width)}" cy="${emu(anchor.height)}"/>${frame}<xdr:clientData/></xdr:oneCellAnchor>`;
 }
@@ -210,11 +210,11 @@ export function writeCharts(
   const charts: DrawingChart[] = [];
   for (const [index, chart] of sheet.charts.entries()) {
     const part = freePartName(`xl/charts/sheetwrite-chart${sheetNumber}-${index + 1}`, keptParts);
-    parts.push({ name: part, data: chartXml(chart, snapshot, context) });
+    parts.push({ name: part, data: chart_xml(chart, snapshot, context) });
     overrides.push({ part, contentType: CHART_CONTENT });
     charts.push({
       target: `/${part}`,
-      anchorXml: (objectId, relationshipId) => anchorXml(chart, objectId, relationshipId),
+      anchorXml: (object_id, relationship_id) => anchor_xml(chart, object_id, relationship_id),
     });
   }
   return { parts, overrides, charts };

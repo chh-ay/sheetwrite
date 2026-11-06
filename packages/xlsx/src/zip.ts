@@ -44,11 +44,11 @@ export interface StoredZipEntry {
 const CODEC_INPUT_CHUNK_BYTES = 8 * 1024;
 const DEFLATE_PUSH_BYTES = 64 * 1024;
 /** Entry objects whose exact bytes already passed CRC; objects are never handed to user code. */
-const verifiedEntries = new WeakSet<StoredZipEntry>();
+const verified_entries = new WeakSet<StoredZipEntry>();
 
 /** Record an entry rebuilt from bytes that `preservation.ts` verified earlier in this process. */
 export function markStoredEntryVerified(entry: StoredZipEntry): void {
-  verifiedEntries.add(entry);
+  verified_entries.add(entry);
 }
 
 /** Build a stored entry when only part of an opaque XML drawing is modelled. */
@@ -94,7 +94,7 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
   if (entry.method === 0 && entry.compressedSize !== entry.uncompressedSize) {
     fail("retained stored size mismatch");
   }
-  if (verifiedEntries.has(entry)) return;
+  if (verified_entries.has(entry)) return;
   let written = 0;
   let checksum = 0xffffffff;
   const accept = (chunk: Uint8Array): void => {
@@ -121,7 +121,7 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
   }
   if (written !== entry.uncompressedSize) fail("retained inflated size mismatch");
   if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail("retained CRC mismatch");
-  verifiedEntries.add(entry);
+  verified_entries.add(entry);
 }
 
 function fail(message: string, cause?: unknown): never {
@@ -131,7 +131,7 @@ function fail(message: string, cause?: unknown): never {
   );
 }
 
-function findEocd(bytes: Uint8Array, view: DataView): number {
+function find_eocd(bytes: Uint8Array, view: DataView): number {
   const start = Math.max(0, bytes.byteLength - MAX_EOCD_SEARCH);
   for (let offset = bytes.byteLength - 22; offset >= start; offset--) {
     if (view.getUint32(offset, true) === EOCD_SIGNATURE) return offset;
@@ -169,38 +169,38 @@ export function normalizePartName(value: string): string {
   return normalizeDecodedPartName(decoded, value);
 }
 
-function* parseEntries(
+function* parse_entries(
   bytes: Uint8Array,
   context: XlsxCodecContext,
-  baseOffset = 0,
+  base_offset = 0,
 ): Generator<{ offset: number; length: number }, ZipEntry[], Uint8Array> {
   if (bytes.byteLength < 22) return fail("archive is truncated");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const eocd = findEocd(bytes, view);
+  const eocd = find_eocd(bytes, view);
   const disk = view.getUint16(eocd + 4, true);
-  const centralDisk = view.getUint16(eocd + 6, true);
-  const diskEntries = view.getUint16(eocd + 8, true);
-  const entryCount = view.getUint16(eocd + 10, true);
-  const centralSize = view.getUint32(eocd + 12, true);
-  const centralOffset = view.getUint32(eocd + 16, true);
-  const commentLength = view.getUint16(eocd + 20, true);
-  if (eocd + 22 + commentLength !== bytes.byteLength)
+  const central_disk = view.getUint16(eocd + 6, true);
+  const disk_entries = view.getUint16(eocd + 8, true);
+  const entry_count = view.getUint16(eocd + 10, true);
+  const central_size = view.getUint32(eocd + 12, true);
+  const central_offset = view.getUint32(eocd + 16, true);
+  const comment_length = view.getUint16(eocd + 20, true);
+  if (eocd + 22 + comment_length !== bytes.byteLength)
     return fail("trailing or truncated EOCD data");
-  if (disk !== 0 || centralDisk !== 0 || diskEntries !== entryCount) {
+  if (disk !== 0 || central_disk !== 0 || disk_entries !== entry_count) {
     return fail("multi-disk archives are unsupported");
   }
-  if (entryCount === 0xffff || centralSize === 0xffffffff || centralOffset === 0xffffffff) {
+  if (entry_count === 0xffff || central_size === 0xffffffff || central_offset === 0xffffffff) {
     return fail("ZIP64 archives are unsupported");
   }
-  assertResource(context, "maxArchiveEntries", entryCount);
-  if (centralOffset + centralSize !== eocd + baseOffset) {
+  assertResource(context, "maxArchiveEntries", entry_count);
+  if (central_offset + central_size !== eocd + base_offset) {
     return fail("central directory bounds are inconsistent");
   }
 
   const entries: ZipEntry[] = [];
   const names = new Set<string>();
-  let offset = centralOffset - baseOffset;
-  for (let index = 0; index < entryCount; index++) {
+  let offset = central_offset - base_offset;
+  for (let index = 0; index < entry_count; index++) {
     checkAbort(context);
     if (offset + 46 > eocd || view.getUint32(offset, true) !== CENTRAL_SIGNATURE) {
       return fail(`central directory entry ${index} is truncated`);
@@ -208,28 +208,28 @@ function* parseEntries(
     const flags = view.getUint16(offset + 8, true);
     const method = view.getUint16(offset + 10, true);
     const crc32 = view.getUint32(offset + 16, true);
-    const compressedSize = view.getUint32(offset + 20, true);
-    const uncompressedSize = view.getUint32(offset + 24, true);
-    const nameLength = view.getUint16(offset + 28, true);
-    const extraLength = view.getUint16(offset + 30, true);
-    const entryCommentLength = view.getUint16(offset + 32, true);
-    const diskStart = view.getUint16(offset + 34, true);
-    const localOffset = view.getUint32(offset + 42, true);
-    const end = offset + 46 + nameLength + extraLength + entryCommentLength;
+    const compressed_size = view.getUint32(offset + 20, true);
+    const uncompressed_size = view.getUint32(offset + 24, true);
+    const name_length = view.getUint16(offset + 28, true);
+    const extra_length = view.getUint16(offset + 30, true);
+    const entry_comment_length = view.getUint16(offset + 32, true);
+    const disk_start = view.getUint16(offset + 34, true);
+    const local_offset = view.getUint32(offset + 42, true);
+    const end = offset + 46 + name_length + extra_length + entry_comment_length;
     if (end > eocd) return fail(`central directory entry ${index} exceeds its directory`);
     if ((flags & 1) !== 0) return fail("encrypted entries are unsupported");
     if (method !== 0 && method !== 8) return fail(`compression method ${method} is unsupported`);
-    if (diskStart !== 0) return fail("multi-disk entry is unsupported");
+    if (disk_start !== 0) return fail("multi-disk entry is unsupported");
     if (
-      compressedSize === 0xffffffff ||
-      uncompressedSize === 0xffffffff ||
-      localOffset === 0xffffffff
+      compressed_size === 0xffffffff ||
+      uncompressed_size === 0xffffffff ||
+      local_offset === 0xffffffff
     ) {
       return fail("ZIP64 entry is unsupported");
     }
     let name: string;
     try {
-      name = UTF8.decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
+      name = UTF8.decode(bytes.subarray(offset + 46, offset + 46 + name_length));
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
       return fail(`entry ${index} has an invalid UTF-8 name`, error);
@@ -237,49 +237,55 @@ function* parseEntries(
     const directory = name.endsWith("/");
     const normalized = normalizePartName(directory ? name.slice(0, -1) : name);
     name = directory ? `${normalized}/` : normalized;
-    const foldedName = asciiFold(normalized);
+    const folded_name = asciiFold(normalized);
     if (!directory) {
-      if (names.has(foldedName)) return fail(`duplicate logical part name ${name}`);
-      names.add(foldedName);
+      if (names.has(folded_name)) return fail(`duplicate logical part name ${name}`);
+      names.add(folded_name);
     }
-    if (localOffset + 30 + nameLength > centralOffset) {
+    if (local_offset + 30 + name_length > central_offset) {
       return fail(`local header for ${name} is invalid`);
     }
-    const localBytes = yield { offset: localOffset, length: 30 + nameLength };
-    const localView = new DataView(localBytes.buffer, localBytes.byteOffset, localBytes.byteLength);
-    if (localView.getUint32(0, true) !== LOCAL_SIGNATURE) {
+    const local_bytes = yield { offset: local_offset, length: 30 + name_length };
+    const local_view = new DataView(
+      local_bytes.buffer,
+      local_bytes.byteOffset,
+      local_bytes.byteLength,
+    );
+    if (local_view.getUint32(0, true) !== LOCAL_SIGNATURE) {
       return fail(`local header for ${name} is invalid`);
     }
-    const localFlags = localView.getUint16(6, true);
-    const localMethod = localView.getUint16(8, true);
-    const localNameLength = localView.getUint16(26, true);
-    const localExtraLength = localView.getUint16(28, true);
-    if (localFlags !== flags || localMethod !== method) return fail(`headers disagree for ${name}`);
-    if (localOffset + 30 + localNameLength + localExtraLength > centralOffset) {
+    const local_flags = local_view.getUint16(6, true);
+    const local_method = local_view.getUint16(8, true);
+    const local_name_length = local_view.getUint16(26, true);
+    const local_extra_length = local_view.getUint16(28, true);
+    if (local_flags !== flags || local_method !== method)
+      return fail(`headers disagree for ${name}`);
+    if (local_offset + 30 + local_name_length + local_extra_length > central_offset) {
       return fail(`local header for ${name} exceeds the file-data area`);
     }
-    if (localNameLength !== nameLength) return fail(`local filename length disagrees for ${name}`);
-    for (let byte = 0; byte < nameLength; byte++) {
-      if (localBytes[30 + byte] !== bytes[offset + 46 + byte]) {
+    if (local_name_length !== name_length)
+      return fail(`local filename length disagrees for ${name}`);
+    for (let byte = 0; byte < name_length; byte++) {
+      if (local_bytes[30 + byte] !== bytes[offset + 46 + byte]) {
         return fail(`local filename disagrees for ${name}`);
       }
     }
-    const localCrc = localView.getUint32(14, true);
-    const localCompressedSize = localView.getUint32(18, true);
-    const localUncompressedSize = localView.getUint32(22, true);
+    const local_crc = local_view.getUint32(14, true);
+    const local_compressed_size = local_view.getUint32(18, true);
+    const local_uncompressed_size = local_view.getUint32(22, true);
     if (
       (flags & 8) === 0
-        ? localCrc !== crc32 ||
-          localCompressedSize !== compressedSize ||
-          localUncompressedSize !== uncompressedSize
-        : (localCrc !== 0 && localCrc !== crc32) ||
-          (localCompressedSize !== 0 && localCompressedSize !== compressedSize) ||
-          (localUncompressedSize !== 0 && localUncompressedSize !== uncompressedSize)
+        ? local_crc !== crc32 ||
+          local_compressed_size !== compressed_size ||
+          local_uncompressed_size !== uncompressed_size
+        : (local_crc !== 0 && local_crc !== crc32) ||
+          (local_compressed_size !== 0 && local_compressed_size !== compressed_size) ||
+          (local_uncompressed_size !== 0 && local_uncompressed_size !== uncompressed_size)
     ) {
       return fail(`local sizes or CRC disagree for ${name}`);
     }
-    const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
-    if (dataOffset + compressedSize > centralOffset)
+    const data_offset = local_offset + 30 + local_name_length + local_extra_length;
+    if (data_offset + compressed_size > central_offset)
       return fail(`compressed data for ${name} is truncated`);
     if (!directory) {
       entries.push({
@@ -287,18 +293,18 @@ function* parseEntries(
         method,
         flags,
         crc32,
-        compressedSize,
-        uncompressedSize,
-        dataOffset,
-        localOffset,
+        compressedSize: compressed_size,
+        uncompressedSize: uncompressed_size,
+        dataOffset: data_offset,
+        localOffset: local_offset,
       });
     }
     offset = end;
   }
-  const localOrder = [...entries].sort((left, right) => left.localOffset - right.localOffset);
-  for (let index = 0; index + 1 < localOrder.length; index++) {
-    const current = localOrder[index];
-    const next = localOrder[index + 1];
+  const local_order = [...entries].sort((left, right) => left.localOffset - right.localOffset);
+  for (let index = 0; index + 1 < local_order.length; index++) {
+    const current = local_order[index];
+    const next = local_order[index + 1];
     if (!current || !next) return fail("local entry ordering is inconsistent");
     if (current.dataOffset + current.compressedSize > next.localOffset) {
       return fail(`local file records overlap near ${current.name}`);
@@ -309,28 +315,28 @@ function* parseEntries(
 }
 
 /** Reject declared expansion before reading local headers or constructing entry records. */
-function preflightExpansion(bytes: Uint8Array, context: XlsxCodecContext): void {
+function preflight_expansion(bytes: Uint8Array, context: XlsxCodecContext): void {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const eocd = findEocd(bytes, view);
-  const entryCount = view.getUint16(eocd + 10, true);
+  const eocd = find_eocd(bytes, view);
+  const entry_count = view.getUint16(eocd + 10, true);
   let offset = 0;
-  let totalUncompressed = 0;
+  let total_uncompressed = 0;
 
-  for (let index = 0; index < entryCount; index++) {
+  for (let index = 0; index < entry_count; index++) {
     checkAbort(context);
     if (offset + 46 > eocd || view.getUint32(offset, true) !== CENTRAL_SIGNATURE) {
       return fail(`central directory entry ${index} is truncated`);
     }
-    const compressedSize = view.getUint32(offset + 20, true);
-    const uncompressedSize = view.getUint32(offset + 24, true);
+    const compressed_size = view.getUint32(offset + 20, true);
+    const uncompressed_size = view.getUint32(offset + 24, true);
     // ZIP64 sentinels are not real sizes; the entry parser reports them as unsupported.
-    if (compressedSize !== ZIP64_SIZE && uncompressedSize !== ZIP64_SIZE) {
-      assertResource(context, "maxEntryUncompressedBytes", uncompressedSize);
-      if (uncompressedSize > 0) {
-        assertResource(context, "maxCompressionRatio", uncompressedSize / compressedSize);
+    if (compressed_size !== ZIP64_SIZE && uncompressed_size !== ZIP64_SIZE) {
+      assertResource(context, "maxEntryUncompressedBytes", uncompressed_size);
+      if (uncompressed_size > 0) {
+        assertResource(context, "maxCompressionRatio", uncompressed_size / compressed_size);
       }
-      totalUncompressed += uncompressedSize;
-      assertResource(context, "maxTotalUncompressedBytes", totalUncompressed);
+      total_uncompressed += uncompressed_size;
+      assertResource(context, "maxTotalUncompressedBytes", total_uncompressed);
     }
 
     offset +=
@@ -373,27 +379,27 @@ export class ZipReader {
     const size = source instanceof Uint8Array ? source.byteLength : source.size;
     assertResource(context, "maxInputBytes", size);
     checkAbort(context);
-    const readRange = async (offset: number, length: number): Promise<Uint8Array> =>
+    const read_range = async (offset: number, length: number): Promise<Uint8Array> =>
       source instanceof Uint8Array
         ? source.subarray(offset, offset + length)
         : new Uint8Array(await source.slice(offset, offset + length).arrayBuffer());
-    const tailOffset = Math.max(0, size - MAX_EOCD_SEARCH);
-    const tail = await readRange(tailOffset, size - tailOffset);
+    const tail_offset = Math.max(0, size - MAX_EOCD_SEARCH);
+    const tail = await read_range(tail_offset, size - tail_offset);
     if (tail.length < 22) return fail("archive is truncated");
-    const tailView = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
-    const eocd = findEocd(tail, tailView);
-    const centralOffset = tailView.getUint32(eocd + 16, true);
-    const centralSize = tailView.getUint32(eocd + 12, true);
-    assertResource(context, "maxArchiveEntries", tailView.getUint16(eocd + 10, true));
-    if (centralOffset + centralSize !== tailOffset + eocd)
+    const tail_view = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+    const eocd = find_eocd(tail, tail_view);
+    const central_offset = tail_view.getUint32(eocd + 16, true);
+    const central_size = tail_view.getUint32(eocd + 12, true);
+    assertResource(context, "maxArchiveEntries", tail_view.getUint16(eocd + 10, true));
+    if (central_offset + central_size !== tail_offset + eocd)
       return fail("central directory bounds are inconsistent");
-    const directory = await readRange(centralOffset, size - centralOffset);
-    preflightExpansion(directory, context);
-    const parser = parseEntries(directory, context, centralOffset);
+    const directory = await read_range(central_offset, size - central_offset);
+    preflight_expansion(directory, context);
+    const parser = parse_entries(directory, context, central_offset);
     let step = parser.next();
     while (!step.done) {
       checkAbort(context);
-      step = parser.next(await readRange(step.value.offset, step.value.length));
+      step = parser.next(await read_range(step.value.offset, step.value.length));
     }
     return new ZipReader(source, context, step.value);
   }
@@ -444,17 +450,17 @@ export class ZipReader {
     if (entry.method === 0 && entry.compressedSize !== entry.uncompressedSize)
       fail(`stored size mismatch for ${name}`);
     const inflater = entry.method === 8 ? new Inflate(accept) : undefined;
-    const readBytes = 256 * 1024;
-    for (let rangeOffset = 0; rangeOffset < entry.compressedSize; rangeOffset += readBytes) {
+    const read_bytes = 256 * 1024;
+    for (let range_offset = 0; range_offset < entry.compressedSize; range_offset += read_bytes) {
       const range = await this.#range(
-        entry.dataOffset + rangeOffset,
-        Math.min(readBytes, entry.compressedSize - rangeOffset),
+        entry.dataOffset + range_offset,
+        Math.min(read_bytes, entry.compressedSize - range_offset),
       );
       for (let offset = 0; offset < range.length; offset += CODEC_INPUT_CHUNK_BYTES) {
         const chunk = range.subarray(offset, offset + CODEC_INPUT_CHUNK_BYTES);
-        const isFinal = rangeOffset + offset + chunk.length === entry.compressedSize;
+        const is_final = range_offset + offset + chunk.length === entry.compressedSize;
         try {
-          if (inflater) inflater.push(chunk, isFinal);
+          if (inflater) inflater.push(chunk, is_final);
           else accept(chunk);
         } catch (error) {
           if (error instanceof TypeError && error.message.startsWith("Sheetwrite:")) throw error;
@@ -498,14 +504,14 @@ export function* zipChunks(
   context: XlsxCodecContext,
 ): Generator<Uint8Array> {
   const pending: Uint8Array[] = [];
-  let outputBytes = 0;
-  let totalBytes = 0;
+  let output_bytes = 0;
+  let total_bytes = 0;
   const names = new Set<string>();
   const archive = new Zip((error, chunk) => {
     if (error) throw error;
     if (chunk.length === 0) return;
-    outputBytes += chunk.length;
-    assertResource(context, "maxOutputBytes", outputBytes);
+    output_bytes += chunk.length;
+    assertResource(context, "maxOutputBytes", output_bytes);
     pending.push(chunk);
   });
   let output = new Uint8Array(ZIP_OUTPUT_CHUNK_BYTES);
@@ -538,9 +544,9 @@ export function* zipChunks(
       assertResource(context, "maxArchiveEntries", names.size);
       if ("stored" in part) {
         validateStoredEntry(part.stored, context);
-        totalBytes += part.stored.uncompressedSize;
-        assertResource(context, "maxTotalUncompressedBytes", totalBytes);
-        assertResource(context, "maxOutputBytes", totalBytes + names.size * ENTRY_OVERHEAD_BYTES);
+        total_bytes += part.stored.uncompressedSize;
+        assertResource(context, "maxTotalUncompressedBytes", total_bytes);
+        assertResource(context, "maxOutputBytes", total_bytes + names.size * ENTRY_OVERHEAD_BYTES);
         const file: ZipInputFile = {
           filename: name,
           compression: part.stored.method,
@@ -567,21 +573,21 @@ export function* zipChunks(
         file.mtime = DOS_EPOCH;
         archive.add(file);
         yield* drain();
-        let entryBytes = 0;
+        let entry_bytes = 0;
         const chunks = part.data instanceof Uint8Array ? [part.data] : part.data;
         for (const chunk of chunks) {
           // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
           for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
             checkAbort(context);
             const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
-            entryBytes += piece.length;
-            totalBytes += piece.length;
-            assertResource(context, "maxEntryUncompressedBytes", entryBytes);
-            assertResource(context, "maxTotalUncompressedBytes", totalBytes);
+            entry_bytes += piece.length;
+            total_bytes += piece.length;
+            assertResource(context, "maxEntryUncompressedBytes", entry_bytes);
+            assertResource(context, "maxTotalUncompressedBytes", total_bytes);
             assertResource(
               context,
               "maxOutputBytes",
-              totalBytes + names.size * ENTRY_OVERHEAD_BYTES,
+              total_bytes + names.size * ENTRY_OVERHEAD_BYTES,
             );
             file.push(piece);
             yield* drain();

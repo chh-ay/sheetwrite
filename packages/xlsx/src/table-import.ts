@@ -3,7 +3,7 @@ import type { CellScalar, ColumnarData, XlsxTableImportBackend } from "@sheetwri
 import { readWorkbook } from "./reader.js";
 import { assertResource, createCodecContext, xlsxFailure } from "./resources.js";
 
-function headerKeys(header: readonly CellScalar[]): string[] {
+function header_keys(header: readonly CellScalar[]): string[] {
   const keys = new Array<string>(header.length);
   const seen = new Set<string>();
   for (let column = 0; column < header.length; column++) {
@@ -42,16 +42,16 @@ export const sheetwriteTableImportBackend: XlsxTableImportBackend = {
         }
       }
       const header = sheet.columns.map((_column, col) => values.get(col) ?? null);
-      const keys = headerKeys(header);
-      const rowCount = Math.max(0, sheet.rowCount - 1);
-      assertResource(context, "maxCells", rowCount * keys.length);
-      for (const key of keys) columns[key] = new Array<CellScalar>(rowCount).fill(null);
-      for (let row = 0; row < rowCount; row++) {
+      const keys = header_keys(header);
+      const row_count = Math.max(0, sheet.rowCount - 1);
+      assertResource(context, "maxCells", row_count * keys.length);
+      for (const key of keys) columns[key] = new Array<CellScalar>(row_count).fill(null);
+      for (let row = 0; row < row_count; row++) {
         for (let col = 0; col < keys.length; col++) {
           columns[keys[col]!]![row] = values.get((row + 1) * sheet.columns.length + col) ?? null;
         }
       }
-      return { rowCount, columns };
+      return { rowCount: row_count, columns };
     } catch (error) {
       throw xlsxFailure(error, "import", "sheetwrite-ooxml-table", options?.signal);
     }

@@ -72,16 +72,16 @@ describe("table XLSX export", () => {
     expect(model.rows[2]![1]).toBeNull();
     expect(model.rows[3]![1]).toMatchObject({ value: 1234.5, numberFormat: "#,##0.00" });
     expect(model.rowHeights[2]).toBe(42);
-    const roundTripped = await fromXlsxWorkbook(await toXlsxTable(store.getWorkbook(), store));
-    expect(roundTripped.sheets[0]?.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
+    const round_tripped = await fromXlsxWorkbook(await toXlsxTable(store.getWorkbook(), store));
+    expect(round_tripped.sheets[0]?.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
     store.dispose();
 
     const projected = workbook();
     projected.sheets[0]!.columns[0]!.visible = false;
-    const projectedStore = new SheetwriteStore(projected);
-    const projectedModel = buildXlsxModel(projectedStore.getWorkbook(), projectedStore)!;
-    expect(projectedModel.columnWidths).toEqual([75]);
-    expect(projectedModel.rows[0]!.map((cell) => cell?.value)).toEqual(["B"]);
-    projectedStore.dispose();
+    const projected_store = new SheetwriteStore(projected);
+    const projected_model = buildXlsxModel(projected_store.getWorkbook(), projected_store)!;
+    expect(projected_model.columnWidths).toEqual([75]);
+    expect(projected_model.rows[0]!.map((cell) => cell?.value)).toEqual(["B"]);
+    projected_store.dispose();
   });
 });

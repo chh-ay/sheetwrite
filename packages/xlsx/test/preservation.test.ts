@@ -42,7 +42,7 @@ async function fixture(file: string): Promise<Uint8Array> {
 }
 
 /** Compressed payload of every entry, read straight from the ZIP records. */
-function rawEntries(
+function raw_entries(
   bytes: Uint8Array,
 ): Map<string, { method: number; crc32: number; data: Uint8Array }> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -52,9 +52,9 @@ function rawEntries(
   let offset = view.getUint32(eocd + 16, true);
   const entries = new Map<string, { method: number; crc32: number; data: Uint8Array }>();
   for (let index = 0; index < count; index++) {
-    const nameLength = view.getUint16(offset + 28, true);
+    const name_length = view.getUint16(offset + 28, true);
     const name = strFromU8(
-      bytes.subarray(offset + CENTRAL_HEADER_BYTES, offset + CENTRAL_HEADER_BYTES + nameLength),
+      bytes.subarray(offset + CENTRAL_HEADER_BYTES, offset + CENTRAL_HEADER_BYTES + name_length),
     );
     const local = view.getUint32(offset + 42, true);
     const start =
@@ -69,14 +69,14 @@ function rawEntries(
     });
     offset +=
       CENTRAL_HEADER_BYTES +
-      nameLength +
+      name_length +
       view.getUint16(offset + 30, true) +
       view.getUint16(offset + 32, true);
   }
   return entries;
 }
 
-function withWarnings(): {
+function with_warnings(): {
   warnings: XlsxWorkbookWarning[];
   onWarning: (warning: XlsxWorkbookWarning) => void;
 } {
@@ -84,14 +84,14 @@ function withWarnings(): {
   return { warnings, onWarning: (warning) => warnings.push(warning) };
 }
 
-function droppedTargets(warnings: readonly XlsxWorkbookWarning[]): string[] {
+function dropped_targets(warnings: readonly XlsxWorkbookWarning[]): string[] {
   return warnings.flatMap((warning) =>
     warning.message.startsWith("Preserved XLSX part graph") && warning.part ? [warning.part] : [],
   );
 }
 
 /** Replace the value of the first stored cell, as a host editing persisted JSON would. */
-function editFirstCell(snapshot: WorkbookSnapshot, value: string): WorkbookSnapshot {
+function edit_first_cell(snapshot: WorkbookSnapshot, value: string): WorkbookSnapshot {
   const edited = structuredClone(snapshot);
   const cell = edited.sheets.flatMap((sheet) => sheet.cells.flatMap((block) => block.cells))[0];
   if (!cell) throw new Error("fixture has no cells");
@@ -99,7 +99,7 @@ function editFirstCell(snapshot: WorkbookSnapshot, value: string): WorkbookSnaps
   return edited;
 }
 
-function storeOf(snapshot: WorkbookSnapshot): SheetwriteStore {
+function store_of(snapshot: WorkbookSnapshot): SheetwriteStore {
   return SheetwriteStore.fromSnapshot(snapshot);
 }
 
@@ -179,8 +179,8 @@ describe("XLSX unmodelled-part preservation", () => {
       const snapshot = await fromXlsxWorkbook(original);
       const saved = await toXlsxWorkbook(snapshot);
 
-      const before = rawEntries(original);
-      const after = rawEntries(saved);
+      const before = raw_entries(original);
+      const after = raw_entries(saved);
       for (const part of parts) {
         expect(after.get(part)).toEqual(before.get(part));
       }
@@ -207,7 +207,7 @@ describe("XLSX unmodelled-part preservation", () => {
       [OPAQUE_CHART_SAMPLE, "xl/drawings/drawing1.xml"],
       [OPAQUE_PIVOT_SAMPLE, "xl/pivotCache/pivotCacheDefinition1.xml"],
     ] as const) {
-      const store = storeOf(await fromXlsxWorkbook(await load(file)));
+      const store = store_of(await fromXlsxWorkbook(await load(file)));
       const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
       store.applyTransaction({
         patches: [
@@ -218,12 +218,12 @@ describe("XLSX unmodelled-part preservation", () => {
           },
         ],
       });
-      const { warnings, onWarning } = withWarnings();
+      const { warnings, onWarning: on_warning } = with_warnings();
 
-      const saved = await toXlsxWorkbook(store, { onWarning });
+      const saved = await toXlsxWorkbook(store, { onWarning: on_warning });
       const files = unzipSync(saved);
 
-      expect(droppedTargets(warnings)).toContain(target);
+      expect(dropped_targets(warnings)).toContain(target);
       expect(Object.keys(files).some((part) => /chart|pivot/i.test(part))).toBe(false);
       expect(strFromU8(files["xl/workbook.xml"] ?? new Uint8Array())).not.toContain("pivotCaches");
       expect(packageProblems(saved)).toEqual([]);
@@ -236,7 +236,7 @@ describe("XLSX unmodelled-part preservation", () => {
       ["preserve-54399.xlsx", "customXml/item1.xml"],
     ] as const) {
       const original = await fixture(file);
-      const store = storeOf(await fromXlsxWorkbook(original));
+      const store = store_of(await fromXlsxWorkbook(original));
       const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
       store.applyTransaction({
         patches: [
@@ -251,9 +251,9 @@ describe("XLSX unmodelled-part preservation", () => {
 
       const saved = await toXlsxWorkbook(store);
 
-      expect(rawEntries(saved).get(part)).toEqual(rawEntries(original).get(part));
-      expect(rawEntries(saved).get("xl/theme/theme1.xml")).toEqual(
-        rawEntries(original).get("xl/theme/theme1.xml"),
+      expect(raw_entries(saved).get(part)).toEqual(raw_entries(original).get(part));
+      expect(raw_entries(saved).get("xl/theme/theme1.xml")).toEqual(
+        raw_entries(original).get("xl/theme/theme1.xml"),
       );
       expect(packageProblems(saved)).toEqual([]);
     }
@@ -261,7 +261,7 @@ describe("XLSX unmodelled-part preservation", () => {
 
   it("keeps images across value edits and drops them when their sheet's rows move", async () => {
     const image = "xl/media/10000000000006450000032120C875D8.jpg";
-    const store = storeOf(await fromXlsxWorkbook(await fixture("preserve-picture.xlsx")));
+    const store = store_of(await fromXlsxWorkbook(await fixture("preserve-picture.xlsx")));
     const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
     store.applyTransaction({
       patches: [
@@ -272,16 +272,16 @@ describe("XLSX unmodelled-part preservation", () => {
     expect(unzipSync(await toXlsxWorkbook(store))[image]).toBeDefined();
 
     store.applyTransaction({ patches: [{ op: "addRows", sheet, at: 0, count: 1 }] });
-    const { warnings, onWarning } = withWarnings();
-    const saved = await toXlsxWorkbook(store, { onWarning });
+    const { warnings, onWarning: on_warning } = with_warnings();
+    const saved = await toXlsxWorkbook(store, { onWarning: on_warning });
 
     expect(unzipSync(saved)[image]).toBeUndefined();
-    expect(droppedTargets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
+    expect(dropped_targets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
     expect(packageProblems(saved)).toEqual([]);
   });
 
   it("drops a sheet's graphs when the sheet is removed", async () => {
-    const store = storeOf(await fromXlsxWorkbook(await fixture("preserve-picture.xlsx")));
+    const store = store_of(await fromXlsxWorkbook(await fixture("preserve-picture.xlsx")));
     const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
     store.applyTransaction({ patches: [{ op: "removeSheet", sheet }] });
 
@@ -326,33 +326,33 @@ describe("XLSX unmodelled-part preservation", () => {
 
   it("keeps images when an untracked snapshot changes only cell values", async () => {
     const imported = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
-    const saved = await toXlsxWorkbook(editFirstCell(imported, "changed"));
+    const saved = await toXlsxWorkbook(edit_first_cell(imported, "changed"));
     expect(unzipSync(saved)["xl/media/10000000000006450000032120C875D8.jpg"]).toBeDefined();
   });
 
   it("fingerprints snapshots edited outside a store", async () => {
     const snapshot = await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE));
-    const edited = editFirstCell(snapshot, "edited outside");
+    const edited = edit_first_cell(snapshot, "edited outside");
 
     for (const input of [edited, { exportSnapshot: () => edited }]) {
-      const { warnings, onWarning } = withWarnings();
-      const saved = await toXlsxWorkbook(input, { onWarning });
+      const { warnings, onWarning: on_warning } = with_warnings();
+      const saved = await toXlsxWorkbook(input, { onWarning: on_warning });
 
-      expect(droppedTargets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
+      expect(dropped_targets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
       expect(unzipSync(saved)["xl/charts/chart1.xml"]).toBeUndefined();
     }
   });
 
   it("reads a store-backed look-alike through the store, not its own snapshot", async () => {
-    const store = storeOf(await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)));
-    const edited = editFirstCell(store.exportSnapshot(), "edited outside");
+    const store = store_of(await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)));
+    const edited = edit_first_cell(store.exportSnapshot(), "edited outside");
 
-    const lookAlike = {
+    const look_alike = {
       store,
       getActiveSheet: () => edited.workbook.activeSheet,
       exportSnapshot: () => edited,
     };
-    const saved = await toXlsxWorkbook(lookAlike);
+    const saved = await toXlsxWorkbook(look_alike);
     const files = unzipSync(saved);
 
     expect(files["xl/charts/chart1.xml"]).toBeDefined();
@@ -362,9 +362,9 @@ describe("XLSX unmodelled-part preservation", () => {
   });
 
   it("drops opaque graphs beyond maxPreservedBytes on import", async () => {
-    const { warnings, onWarning } = withWarnings();
+    const { warnings, onWarning: on_warning } = with_warnings();
     const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"), {
-      onWarning,
+      onWarning: on_warning,
       resourceLimits: { maxPreservedBytes: 4096 },
     });
 
@@ -383,11 +383,11 @@ describe("XLSX unmodelled-part preservation", () => {
     const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
     const source = snapshot.workbook.xlsxSource;
     if (!source) throw new Error("picture.xlsx kept no graphs");
-    const relationshipsTo = (target: string) =>
+    const relationships_to = (target: string) =>
       strToU8(
         `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}"><Relationship Id="rId1" Type="${PACKAGE_RELATIONSHIPS}/image" Target="${target}"/></Relationships>`,
       );
-    const withRelationships =
+    const with_relationships =
       (relationships: Uint8Array) =>
       (part: XlsxSourceSnapshot["parts"][number]): XlsxSourceSnapshot["parts"][number] => ({
         ...part,
@@ -406,11 +406,11 @@ describe("XLSX unmodelled-part preservation", () => {
       ],
       [
         "xl/drawings/_rels/drawing1.xml.rels",
-        withRelationships(relationshipsTo("../worksheets/sheet1.xml")),
+        with_relationships(relationships_to("../worksheets/sheet1.xml")),
       ],
       [
         "xl/drawings/_rels/drawing1.xml.rels",
-        withRelationships(relationshipsTo("../../../../escaped.xml")),
+        with_relationships(relationships_to("../../../../escaped.xml")),
       ],
     ];
     for (const [name, tamper] of tampered) {
@@ -419,11 +419,11 @@ describe("XLSX unmodelled-part preservation", () => {
         ...source,
         parts: source.parts.map((part) => (part.name === name ? tamper(part) : part)),
       };
-      const { warnings, onWarning } = withWarnings();
+      const { warnings, onWarning: on_warning } = with_warnings();
 
-      const saved = await toXlsxWorkbook(persisted, { onWarning });
+      const saved = await toXlsxWorkbook(persisted, { onWarning: on_warning });
 
-      expect(droppedTargets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
+      expect(dropped_targets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
       expect(Object.keys(unzipSync(saved)).some((part) => part.startsWith("xl/media/"))).toBe(
         false,
       );
@@ -446,8 +446,8 @@ describe("XLSX unmodelled-part preservation", () => {
 
     const saved = await toXlsxWorkbook(persisted);
 
-    const contentTypes = strFromU8(unzipSync(saved)["[Content_Types].xml"] ?? new Uint8Array());
-    expect(contentTypes).toContain(
+    const content_types = strFromU8(unzipSync(saved)["[Content_Types].xml"] ?? new Uint8Array());
+    expect(content_types).toContain(
       `<Override PartName="/${drawing}" ContentType="application/x-a&amp;b"/>`,
     );
     const reopened = await fromXlsxWorkbook(saved);
@@ -461,14 +461,16 @@ describe("XLSX unmodelled-part preservation", () => {
       [OPAQUE_CHART_SAMPLE, "xl/charts/chart1.xml"],
       ["preserve-picture.xlsx", "xl/media/10000000000006450000032120C875D8.jpg"],
     ] as const) {
-      const store = storeOf(await fromXlsxWorkbook(await load(file)));
+      const store = store_of(await fromXlsxWorkbook(await load(file)));
       const persisted = JSON.parse(JSON.stringify(store.exportSnapshot())) as WorkbookSnapshot;
-      const { warnings, onWarning } = withWarnings();
+      const { warnings, onWarning: on_warning } = with_warnings();
 
-      const saved = await toXlsxWorkbook(SheetwriteStore.fromSnapshot(persisted), { onWarning });
+      const saved = await toXlsxWorkbook(SheetwriteStore.fromSnapshot(persisted), {
+        onWarning: on_warning,
+      });
 
       expect(unzipSync(saved)[part]).toBeDefined();
-      expect(droppedTargets(warnings)).toEqual([]);
+      expect(dropped_targets(warnings)).toEqual([]);
     }
   });
 
@@ -480,9 +482,9 @@ describe("XLSX unmodelled-part preservation", () => {
     const reloaded = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(imported)));
     expect(unzipSync(await toXlsxWorkbook(reloaded))[image]).toBeDefined();
 
-    const { warnings, onWarning } = withWarnings();
+    const { warnings, onWarning: on_warning } = with_warnings();
     const saved = await toXlsxWorkbook(imported, {
-      onWarning,
+      onWarning: on_warning,
       resourceLimits: { maxPreservedBytes: 4096 },
     });
     expect(unzipSync(saved)[image]).toBeUndefined();

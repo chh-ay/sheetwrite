@@ -49,12 +49,12 @@ export function buildXlsxModel(
         continue;
       }
 
-      const numberFormat =
+      const number_format =
         style?.numberFormat ?? sheet.columns[columns[cell.col] ?? -1]?.numberFormat;
       output[cell.col] = {
         value,
         ...(style ? { style } : {}),
-        ...(numberFormat ? { numberFormat } : {}),
+        ...(number_format ? { numberFormat: number_format } : {}),
       };
     }
     rows.push(output);
@@ -64,9 +64,12 @@ export function buildXlsxModel(
   for (const merge of merges) {
     const row = rows[merge.r0];
     if (!row) continue;
-    const numberFormat = sheet.columns[columns[merge.c0] ?? -1]?.numberFormat;
+    const number_format = sheet.columns[columns[merge.c0] ?? -1]?.numberFormat;
     row[merge.c0] = {
-      ...(row[merge.c0] ?? { value: null, ...(numberFormat ? { numberFormat } : {}) }),
+      ...(row[merge.c0] ?? {
+        value: null,
+        ...(number_format ? { numberFormat: number_format } : {}),
+      }),
       columnSpan: merge.c1 - merge.c0 + 1,
       rowSpan: merge.r1 - merge.r0 + 1,
     };

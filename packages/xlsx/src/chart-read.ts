@@ -66,7 +66,7 @@ export interface ChartReadInput {
   readonly extendSheet: (sheet: SheetSnapshot, row: number, col: number) => void;
 }
 
-function valueOf(element: XmlElement | undefined, name: string): string | undefined {
+function value_of(element: XmlElement | undefined, name: string): string | undefined {
   const node = element && xmlChild(element, name);
   return node && xmlAttribute(node, "val");
 }
@@ -78,7 +78,7 @@ function descendants(element: XmlElement, name: string): XmlElement[] {
 }
 
 /** Rich text joins its runs; a literal `c:v` holds plain series text. */
-function chartText(element: XmlElement | undefined): string | undefined {
+function chart_text(element: XmlElement | undefined): string | undefined {
   if (!element) return undefined;
 
   const runs = descendants(element, "t");
@@ -87,7 +87,7 @@ function chartText(element: XmlElement | undefined): string | undefined {
   return text === undefined ? undefined : decodeXstring(text);
 }
 
-function parseRange(formula: string, snapshot: WorkbookSnapshot): ChartRange | undefined {
+function parse_range(formula: string, snapshot: WorkbookSnapshot): ChartRange | undefined {
   if (formula === "#REF!") return formula;
 
   const match = A1_RANGE.exec(formula.trim());
@@ -97,15 +97,15 @@ function parseRange(formula: string, snapshot: WorkbookSnapshot): ChartRange | u
   const sheet = snapshot.sheets.find(
     (candidate) => sheetNameKey(candidate.name) === sheetNameKey(name),
   );
-  const startColumn = match[3];
-  const startRow = match[4];
-  if (!sheet || startColumn === undefined || startRow === undefined) return undefined;
+  const start_column = match[3];
+  const start_row = match[4];
+  if (!sheet || start_column === undefined || start_row === undefined) return undefined;
 
   // The pattern is case-insensitive, but column labels convert from upper case only.
-  const firstColumn = startColumn.toUpperCase();
-  const lastColumn = (match[5] ?? startColumn).toUpperCase();
-  const start = { row: Number(startRow) - 1, col: labelToCol(firstColumn) };
-  const end = { row: Number(match[6] ?? startRow) - 1, col: labelToCol(lastColumn) };
+  const first_column = start_column.toUpperCase();
+  const last_column = (match[5] ?? start_column).toUpperCase();
+  const start = { row: Number(start_row) - 1, col: labelToCol(first_column) };
+  const end = { row: Number(match[6] ?? start_row) - 1, col: labelToCol(last_column) };
   if (end.row < start.row || end.col < start.col || end.row >= MAX_ROWS || end.col >= MAX_COLUMNS) {
     return undefined;
   }
@@ -117,7 +117,7 @@ function parseRange(formula: string, snapshot: WorkbookSnapshot): ChartRange | u
  * `null` means the source exists but is not one range (literal data, unions,
  * names), which the model cannot hold.
  */
-function sourceRange(
+function source_range(
   element: XmlElement | undefined,
   snapshot: WorkbookSnapshot,
 ): ChartRange | null | undefined {
@@ -125,11 +125,11 @@ function sourceRange(
 
   const formula = descendants(element, "f")[0]?.text;
   if (formula === undefined) return null;
-  return parseRange(formula, snapshot) ?? null;
+  return parse_range(formula, snapshot) ?? null;
 }
 
 /** Sheetwrite writes a missing scatter X source as the literal positions 1..n. */
-function isPositionLiteral(element: XmlElement | undefined): boolean {
+function is_position_literal(element: XmlElement | undefined): boolean {
   const literal = element && xmlChild(element, "numLit");
   if (!literal) return false;
 
@@ -140,38 +140,38 @@ function isPositionLiteral(element: XmlElement | undefined): boolean {
   );
 }
 
-function readSeries(
+function read_series(
   entry: XmlElement,
   kind: ChartKind,
   snapshot: WorkbookSnapshot,
 ): ChartSeries | undefined {
   const scatter = kind === "scatter";
-  const values = sourceRange(xmlChild(entry, scatter ? "yVal" : "val"), snapshot);
-  const categoriesNode = xmlChild(entry, scatter ? "xVal" : "cat");
+  const values = source_range(xmlChild(entry, scatter ? "yVal" : "val"), snapshot);
+  const categories_node = xmlChild(entry, scatter ? "xVal" : "cat");
   const categories =
-    scatter && isPositionLiteral(categoriesNode)
+    scatter && is_position_literal(categories_node)
       ? undefined
-      : sourceRange(categoriesNode, snapshot);
+      : source_range(categories_node, snapshot);
   const tx = xmlChild(entry, "tx");
-  const nameRange = tx && xmlChild(tx, "strRef") ? sourceRange(tx, snapshot) : undefined;
-  const name = nameRange === undefined ? chartText(tx) : undefined;
-  if (!values || categories === null || nameRange === null) return undefined;
+  const name_range = tx && xmlChild(tx, "strRef") ? source_range(tx, snapshot) : undefined;
+  const name = name_range === undefined ? chart_text(tx) : undefined;
+  if (!values || categories === null || name_range === null) return undefined;
 
   return {
     values,
     ...(categories === undefined ? {} : { categories }),
-    ...(nameRange === undefined ? {} : { nameRange }),
+    ...(name_range === undefined ? {} : { nameRange: name_range }),
     ...(name === undefined ? {} : { name }),
   };
 }
 
-function chartKind(plot: XmlElement): ChartKind | undefined {
-  const grouping = valueOf(plot, "grouping");
+function chart_kind(plot: XmlElement): ChartKind | undefined {
+  const grouping = value_of(plot, "grouping");
   if (grouping !== undefined && !MODELLED_GROUPINGS[grouping]) return undefined;
 
   switch (xmlLocalName(plot.name)) {
     case "barChart":
-      return valueOf(plot, "barDir") === "bar" ? "bar" : "column";
+      return value_of(plot, "barDir") === "bar" ? "bar" : "column";
     case "lineChart":
       return "line";
     case "areaChart":
@@ -192,64 +192,64 @@ function chartKind(plot: XmlElement): ChartKind | undefined {
  * first. A bar chart draws that axis on the left, where the renderer draws
  * `yTitle`. Producers disagree on `c:axPos` for bar charts, so it is not read.
  */
-function axisTitles(
-  plotArea: XmlElement,
+function axis_titles(
+  plot_area: XmlElement,
   plot: XmlElement,
   kind: ChartKind,
 ): ChartDefinition["axes"] {
-  const titleOf = (axisId: XmlElement | undefined) => {
-    const id = axisId && xmlAttribute(axisId, "val");
-    const axis = plotArea.children.find(
+  const title_of = (axis_id: XmlElement | undefined) => {
+    const id = axis_id && xmlAttribute(axis_id, "val");
+    const axis = plot_area.children.find(
       (entry) =>
         ["catAx", "dateAx", "valAx"].includes(xmlLocalName(entry.name)) &&
-        valueOf(entry, "axId") === id,
+        value_of(entry, "axId") === id,
     );
-    return chartText(axis && xmlChild(axis, "title"));
+    return chart_text(axis && xmlChild(axis, "title"));
   };
 
   const [first, second] = xmlChildren(plot, "axId");
-  const categoryTitle = titleOf(first);
-  const valueTitle = titleOf(second);
-  const xTitle = kind === "bar" ? valueTitle : categoryTitle;
-  const yTitle = kind === "bar" ? categoryTitle : valueTitle;
-  if (xTitle === undefined && yTitle === undefined) return undefined;
+  const category_title = title_of(first);
+  const value_title = title_of(second);
+  const x_title = kind === "bar" ? value_title : category_title;
+  const y_title = kind === "bar" ? category_title : value_title;
+  if (x_title === undefined && y_title === undefined) return undefined;
   return {
-    ...(xTitle === undefined ? {} : { xTitle }),
-    ...(yTitle === undefined ? {} : { yTitle }),
+    ...(x_title === undefined ? {} : { xTitle: x_title }),
+    ...(y_title === undefined ? {} : { yTitle: y_title }),
   };
 }
 
 /** The chart before model validation, or undefined when its DrawingML has no model equivalent. */
-function readDefinition(
+function read_definition(
   root: XmlElement,
   anchor: ChartAnchor,
   id: string,
   snapshot: WorkbookSnapshot,
 ): ChartDefinition | undefined {
   const chart = xmlChild(root, "chart");
-  const plotArea = chart && xmlChild(chart, "plotArea");
-  if (!chart || !plotArea || xmlChild(root, "pivotSource")) return undefined;
+  const plot_area = chart && xmlChild(chart, "plotArea");
+  if (!chart || !plot_area || xmlChild(root, "pivotSource")) return undefined;
 
   // Combination charts hold several plots; the model has one kind per chart.
-  const plots = plotArea.children.filter((node) => xmlLocalName(node.name).endsWith("Chart"));
+  const plots = plot_area.children.filter((node) => xmlLocalName(node.name).endsWith("Chart"));
   const plot = plots[0];
-  const kind = plots.length === 1 && plot ? chartKind(plot) : undefined;
+  const kind = plots.length === 1 && plot ? chart_kind(plot) : undefined;
   if (!plot || !kind) return undefined;
 
   const series: ChartSeries[] = [];
   for (const entry of xmlChildren(plot, "ser")) {
-    const read = readSeries(entry, kind, snapshot);
+    const read = read_series(entry, kind, snapshot);
     if (!read) return undefined;
     series.push(read);
   }
 
-  const title = chartText(xmlChild(chart, "title"));
-  const legendNode = xmlChild(chart, "legend");
-  const position = valueOf(legendNode, "legendPos");
-  const legend: ChartDefinition["legend"] = legendNode
+  const title = chart_text(xmlChild(chart, "title"));
+  const legend_node = xmlChild(chart, "legend");
+  const position = value_of(legend_node, "legendPos");
+  const legend: ChartDefinition["legend"] = legend_node
     ? (Object.entries(LEGEND_POSITIONS).find(([code]) => code === position)?.[1] ?? DEFAULT_LEGEND)
     : "none";
-  const axes = axisTitles(plotArea, plot, kind);
+  const axes = axis_titles(plot_area, plot, kind);
   return {
     id,
     kind,
@@ -261,58 +261,58 @@ function readDefinition(
   };
 }
 
-function anchorNumber(element: XmlElement | undefined, name: string): number {
+function anchor_number(element: XmlElement | undefined, name: string): number {
   const node = element && xmlChild(element, name);
   return Number(node?.text ?? Number.NaN);
 }
 
 /** Pixel anchor of a one- or two-cell anchor; absolute anchors have no cell and stay preserved. */
-function readAnchor(element: XmlElement, sheet: SheetSnapshot): ChartAnchor | undefined {
+function read_anchor(element: XmlElement, sheet: SheetSnapshot): ChartAnchor | undefined {
   const from = xmlChild(element, "from");
   if (!from) return undefined;
 
-  const row = anchorNumber(from, "row");
-  const col = anchorNumber(from, "col");
+  const row = anchor_number(from, "row");
+  const col = anchor_number(from, "col");
   // Bounded before the sheet grows to hold the anchor cell.
-  const insideSheet = (value: number, limit: number) =>
+  const inside_sheet = (value: number, limit: number) =>
     Number.isSafeInteger(value) && value >= 0 && value < limit;
-  if (!insideSheet(row, MAX_ROWS) || !insideSheet(col, MAX_COLUMNS)) return undefined;
-  const offsetX = anchorNumber(from, "colOff") / EMU_PER_PIXEL;
-  const offsetY = anchorNumber(from, "rowOff") / EMU_PER_PIXEL;
+  if (!inside_sheet(row, MAX_ROWS) || !inside_sheet(col, MAX_COLUMNS)) return undefined;
+  const offset_x = anchor_number(from, "colOff") / EMU_PER_PIXEL;
+  const offset_y = anchor_number(from, "rowOff") / EMU_PER_PIXEL;
   // One-cell anchors carry `xdr:ext`. A two-cell anchor from LibreOffice also
   // gives the frame size in `a:ext`; Excel writes zero there.
   const frame = descendants(element, "xfrm")[0];
-  const frameExtent = frame && xmlChild(frame, "ext");
-  const extents = [xmlChild(element, "ext"), frameExtent].map((extent) => ({
+  const frame_extent = frame && xmlChild(frame, "ext");
+  const extents = [xmlChild(element, "ext"), frame_extent].map((extent) => ({
     width: Number(extent && xmlAttribute(extent, "cx")) / EMU_PER_PIXEL,
     height: Number(extent && xmlAttribute(extent, "cy")) / EMU_PER_PIXEL,
   }));
   const extent = extents.find(({ width, height }) => width > 0 && height > 0);
-  if (extent) return { row, col, offsetX, offsetY, ...extent };
+  if (extent) return { row, col, offsetX: offset_x, offsetY: offset_y, ...extent };
 
   // Otherwise the size follows the widths and heights of the spanned columns and rows.
   const to = xmlChild(element, "to");
-  let width = anchorNumber(to, "colOff") / EMU_PER_PIXEL - offsetX;
-  let height = anchorNumber(to, "rowOff") / EMU_PER_PIXEL - offsetY;
-  const lastCol = anchorNumber(to, "col");
-  const lastRow = anchorNumber(to, "row");
-  if (!insideSheet(lastCol, MAX_COLUMNS) || !insideSheet(lastRow, MAX_ROWS)) return undefined;
+  let width = anchor_number(to, "colOff") / EMU_PER_PIXEL - offset_x;
+  let height = anchor_number(to, "rowOff") / EMU_PER_PIXEL - offset_y;
+  const last_col = anchor_number(to, "col");
+  const last_row = anchor_number(to, "row");
+  if (!inside_sheet(last_col, MAX_COLUMNS) || !inside_sheet(last_row, MAX_ROWS)) return undefined;
   // Only stored columns and rows can differ from the default dimensions.
   // Full-sheet spans must not walk all the implicit cells.
-  width += (lastCol - col) * DEFAULT_COLUMN_PIXELS;
-  for (let index = col; index < Math.min(lastCol, sheet.columns.length); index++) {
-    const columnWidth = sheet.columns[index]?.width;
-    if (columnWidth !== undefined) width += columnWidth - DEFAULT_COLUMN_PIXELS;
+  width += (last_col - col) * DEFAULT_COLUMN_PIXELS;
+  for (let index = col; index < Math.min(last_col, sheet.columns.length); index++) {
+    const column_width = sheet.columns[index]?.width;
+    if (column_width !== undefined) width += column_width - DEFAULT_COLUMN_PIXELS;
   }
 
-  height += (lastRow - row) * DEFAULT_ROW_PIXELS;
+  height += (last_row - row) * DEFAULT_ROW_PIXELS;
   for (const [index, meta] of sheet.rowMeta ?? []) {
-    if (index >= row && index < lastRow && meta.height !== undefined) {
+    if (index >= row && index < last_row && meta.height !== undefined) {
       height += meta.height - DEFAULT_ROW_PIXELS;
     }
   }
 
-  return { row, col, offsetX, offsetY, width, height };
+  return { row, col, offsetX: offset_x, offsetY: offset_y, width, height };
 }
 
 /**
@@ -320,22 +320,22 @@ function readAnchor(element: XmlElement, sheet: SheetSnapshot): ChartAnchor | un
  * its sheet so the per-sheet chart limit applies too. Only sheet bounds and
  * charts are checked, so no cell or other metadata is validated again.
  */
-function admitChart(
+function admit_chart(
   candidate: ChartDefinition | undefined,
   sheet: SheetSnapshot,
   imported: readonly ChartDefinition[],
-  { snapshot, extendSheet }: ChartReadInput,
+  { snapshot, extendSheet: extend_sheet }: ChartReadInput,
   context: XlsxCodecContext,
 ): { chart?: ChartDefinition; atLimit: boolean } {
   if (candidate === undefined) return { atLimit: false };
 
   const { anchor, series } = candidate;
-  extendSheet(sheet, anchor.row, anchor.col);
+  extend_sheet(sheet, anchor.row, anchor.col);
   for (const entry of series) {
     for (const reference of [entry.values, entry.categories, entry.nameRange]) {
       if (!reference || reference === "#REF!") continue;
       const owner = snapshot.sheets.find((target) => target.id === reference.sheet);
-      if (owner) extendSheet(owner, reference.end.row, reference.end.col);
+      if (owner) extend_sheet(owner, reference.end.row, reference.end.col);
     }
   }
 
@@ -357,20 +357,20 @@ function admitChart(
   // Core keeps the per-sheet chart limit private, so its validation result is
   // the signal. A probe with one more chart reports the array-level
   // resource error when this sheet is full; its repeated ID is irrelevant.
-  const isFull = (result: DocumentValidationResult) =>
+  const is_full = (result: DocumentValidationResult) =>
     !result.ok &&
     result.errors.some(
       (error) => error.code === "resource-limit" && error.path.endsWith(".charts"),
     );
   const checked = validateCodecSnapshot(probe, context);
-  if (!checked.ok) return { atLimit: isFull(checked) };
+  if (!checked.ok) return { atLimit: is_full(checked) };
 
   candidates.push(candidate);
   const chart = checked.value.sheets.find((entry) => entry.id === sheet.id)?.charts?.at(-1);
-  return { ...(chart ? { chart } : {}), atLimit: isFull(validateCodecSnapshot(probe, context)) };
+  return { ...(chart ? { chart } : {}), atLimit: is_full(validateCodecSnapshot(probe, context)) };
 }
 
-function chartRelationship(
+function chart_relationship(
   anchor: XmlElement,
   relationships: readonly OpcRelationship[],
 ): OpcRelationship | undefined {
@@ -394,7 +394,7 @@ const ANCHOR_ROUNDING_PIXELS = 0.5;
  * omitted legend default, and its subpixel anchor while the native anchor
  * still matches it. Native content wins everywhere else.
  */
-function reconcileAuthored(chart: ChartDefinition, authored: ChartDefinition): void {
+function reconcile_authored(chart: ChartDefinition, authored: ChartDefinition): void {
   if (authored.legend === undefined && chart.legend === DEFAULT_LEGEND) delete chart.legend;
 
   const { anchor } = chart;
@@ -419,19 +419,19 @@ interface DrawingReader {
   readonly modelled: Set<string>;
 }
 
-async function readDrawing(
-  { packageFile, input, context, modelled }: DrawingReader,
-  drawingPart: string,
+async function read_drawing(
+  { packageFile: package_file, input, context, modelled }: DrawingReader,
+  drawing_part: string,
   sheet: SheetSnapshot,
-  sheetNumber: number,
+  sheet_number: number,
 ): Promise<DrawingRead & { root: XmlElement; relationships: readonly OpcRelationship[] }> {
-  const relationships = packageFile.relationships(drawingPart);
-  const root = parseXml(await packageFile.readBytes(drawingPart), drawingPart, context);
+  const relationships = package_file.relationships(drawing_part);
+  const root = parseXml(await package_file.readBytes(drawing_part), drawing_part, context);
   const charts: ChartDefinition[] = [...(sheet.charts ?? [])];
   const retained: XmlElement[] = [];
-  const readTargets = new Set<string>();
-  const retainedTargets = new Set<string>();
-  let atLimit = false;
+  const read_targets = new Set<string>();
+  const retained_targets = new Set<string>();
+  let at_limit = false;
   // Sheetwrite names each chart frame with its chart ID, so the sidecar matches by name.
   const sidecar = new Map(
     (input.metadata?.sheets.find((entry) => entry.id === sheet.id)?.charts ?? []).map((chart) => [
@@ -440,35 +440,35 @@ async function readDrawing(
     ]),
   );
 
-  for (const anchorNode of root.children) {
+  for (const anchor_node of root.children) {
     checkAbort(context);
-    const relationship = chartRelationship(anchorNode, relationships);
+    const relationship = chart_relationship(anchor_node, relationships);
     let chart: ChartDefinition | undefined;
-    if (relationship && !readTargets.has(relationship.target) && !atLimit) {
-      readTargets.add(relationship.target);
-      const anchor = readAnchor(anchorNode, sheet);
-      const chartRoot = parseXml(
-        await packageFile.readBytes(relationship.target),
+    if (relationship && !read_targets.has(relationship.target) && !at_limit) {
+      read_targets.add(relationship.target);
+      const anchor = read_anchor(anchor_node, sheet);
+      const chart_root = parseXml(
+        await package_file.readBytes(relationship.target),
         relationship.target,
         context,
       );
-      const frame = descendants(anchorNode, "cNvPr")[0];
+      const frame = descendants(anchor_node, "cNvPr")[0];
       const authored = sidecar.get((frame && xmlAttribute(frame, "name")) ?? "");
-      const id = authored?.id ?? `xlsx-chart-${sheetNumber}-${charts.length + 1}`;
+      const id = authored?.id ?? `xlsx-chart-${sheet_number}-${charts.length + 1}`;
       const candidate =
-        anchor && xmlRootMatches(chartRoot, "chartSpace", CHART_NAMESPACES)
-          ? readDefinition(chartRoot, anchor, id, input.snapshot)
+        anchor && xmlRootMatches(chart_root, "chartSpace", CHART_NAMESPACES)
+          ? read_definition(chart_root, anchor, id, input.snapshot)
           : undefined;
-      if (candidate && authored) reconcileAuthored(candidate, authored);
-      const admitted = admitChart(candidate, sheet, charts, input, context);
+      if (candidate && authored) reconcile_authored(candidate, authored);
+      const admitted = admit_chart(candidate, sheet, charts, input, context);
       chart = admitted.chart;
-      atLimit = admitted.atLimit;
+      at_limit = admitted.atLimit;
     }
     if (!chart || !relationship) {
-      retained.push(anchorNode);
+      retained.push(anchor_node);
       // One warning per chart part: repeated frames must not flood the host.
-      if (relationship && !retainedTargets.has(relationship.target)) {
-        retainedTargets.add(relationship.target);
+      if (relationship && !retained_targets.has(relationship.target)) {
+        retained_targets.add(relationship.target);
         emitWarning(context, {
           code: "unsupported-feature",
           message:
@@ -487,7 +487,7 @@ async function readDrawing(
   }
   // A repeated frame still points at the original part, even when its first
   // frame became editable. Keep that part and relationship for the opaque frame.
-  for (const target of retainedTargets) modelled.delete(target);
+  for (const target of retained_targets) modelled.delete(target);
   return { charts, retained, root, relationships };
 }
 
@@ -506,11 +506,11 @@ export async function readCharts(
   const replacements = new Map<string, Uint8Array>();
 
   for (const [index, sheet] of input.snapshot.sheets.entries()) {
-    const sheetPart = input.sheetParts[index];
-    if (sheetPart === undefined) continue;
+    const sheet_part = input.sheetParts[index];
+    if (sheet_part === undefined) continue;
 
     const drawings = packageFile
-      .relationships(sheetPart)
+      .relationships(sheet_part)
       .filter((entry) => !entry.external && relationshipTypeMatches(entry.type, "drawing"));
     for (const drawing of drawings) {
       if (
@@ -520,7 +520,7 @@ export async function readCharts(
       )
         continue;
 
-      const read = await readDrawing(reader, drawing.target, sheet, index + 1);
+      const read = await read_drawing(reader, drawing.target, sheet, index + 1);
       // Earlier drawings may already fill `Sheet.charts`; untouched drawings keep their bytes.
       if (read.charts.length === (sheet.charts?.length ?? 0)) continue;
       sheet.charts = read.charts;

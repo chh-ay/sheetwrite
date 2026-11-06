@@ -19,8 +19,8 @@ import { decodeXstring, type XmlElement, xmlAttribute, xmlChild, xmlChildren } f
 const DATA_MODEL_EXTENSION = "{FCE2AD5D-F65C-4FA6-A056-5C36A1767C68}";
 
 /** The `x15:dataModel` element of a workbook root, if it has one. */
-function dataModelElement(workbookRoot: XmlElement): XmlElement | undefined {
-  const extensions = xmlChild(workbookRoot, "extLst");
+function data_model_element(workbook_root: XmlElement): XmlElement | undefined {
+  const extensions = xmlChild(workbook_root, "extLst");
   if (extensions === undefined) return undefined;
   for (const extension of xmlChildren(extensions, "ext")) {
     if (xmlAttribute(extension, "uri")?.toUpperCase() !== DATA_MODEL_EXTENSION) continue;
@@ -32,10 +32,10 @@ function dataModelElement(workbookRoot: XmlElement): XmlElement | undefined {
 
 /** Whether the workbook root declares an Excel data model. */
 export function hasExcelDataModel(workbookRoot: XmlElement): boolean {
-  return dataModelElement(workbookRoot) !== undefined;
+  return data_model_element(workbookRoot) !== undefined;
 }
 /** Worksheet table name of each connection that loads a range into the model, by connection name. */
-function connectionSources(connections: XmlElement | undefined): Map<string, string> {
+function connection_sources(connections: XmlElement | undefined): Map<string, string> {
   const sources = new Map<string, string>();
   for (const connection of connections === undefined
     ? []
@@ -61,10 +61,10 @@ function joined(parents: Map<string, string>, left: string, right: string): bool
     }
     return current;
   };
-  const leftRoot = root(left);
-  const rightRoot = root(right);
-  if (leftRoot === rightRoot) return true;
-  parents.set(leftRoot, rightRoot);
+  const left_root = root(left);
+  const right_root = root(right);
+  if (left_root === right_root) return true;
+  parents.set(left_root, right_root);
   return false;
 }
 
@@ -79,26 +79,26 @@ export function readExcelDataModel(
   sheets: readonly SheetSnapshot[],
   context: XlsxCodecContext,
 ): DataModel | undefined {
-  const model = dataModelElement(workbookRoot);
+  const model = data_model_element(workbookRoot);
   const listed = model === undefined ? undefined : xmlChild(model, "modelRelationships");
   if (model === undefined || listed === undefined) return undefined;
 
-  const sources = connectionSources(connections);
-  const worksheetTables = new Map<string, WorkbookTable>();
+  const sources = connection_sources(connections);
+  const worksheet_tables = new Map<string, WorkbookTable>();
   for (const sheet of sheets) {
-    for (const table of sheet.tables ?? []) worksheetTables.set(table.name.toUpperCase(), table);
+    for (const table of sheet.tables ?? []) worksheet_tables.set(table.name.toUpperCase(), table);
   }
 
   // A model table names its worksheet table through its connection; without
   // one, the model table name is the worksheet table name.
-  const modelTables = new Map<string, WorkbookTable>();
+  const model_tables = new Map<string, WorkbookTable>();
   for (const element of xmlChildren(xmlChild(model, "modelTables") ?? model, "modelTable")) {
     const name = xmlAttribute(element, "name");
     const connection = xmlAttribute(element, "connection");
     if (name === undefined) continue;
     const source = connection === undefined ? undefined : sources.get(decodeXstring(connection));
-    const table = worksheetTables.get((source ?? decodeXstring(name)).toUpperCase());
-    if (table !== undefined) modelTables.set(decodeXstring(name), table);
+    const table = worksheet_tables.get((source ?? decodeXstring(name)).toUpperCase());
+    if (table !== undefined) model_tables.set(decodeXstring(name), table);
   }
 
   const relationships: TableRelationship[] = [];
@@ -108,13 +108,13 @@ export function readExcelDataModel(
       const value = xmlAttribute(element, key);
       return value === undefined ? undefined : decodeXstring(value);
     });
-    const [fromTable, fromColumn, toTable, toColumn] = names;
-    const from = fromTable === undefined ? undefined : modelTables.get(fromTable);
-    const to = toTable === undefined ? undefined : modelTables.get(toTable);
-    const fromId = from?.columns.find((column) => column.name === fromColumn)?.id;
-    const toId = to?.columns.find((column) => column.name === toColumn)?.id;
-    const described = `${fromTable ?? "?"}[${fromColumn ?? "?"}] → ${toTable ?? "?"}[${toColumn ?? "?"}]`;
-    if (from === undefined || to === undefined || fromId === undefined || toId === undefined) {
+    const [from_table, from_column, to_table, to_column] = names;
+    const from = from_table === undefined ? undefined : model_tables.get(from_table);
+    const to = to_table === undefined ? undefined : model_tables.get(to_table);
+    const from_id = from?.columns.find((column) => column.name === from_column)?.id;
+    const to_id = to?.columns.find((column) => column.name === to_column)?.id;
+    const described = `${from_table ?? "?"}[${from_column ?? "?"}] → ${to_table ?? "?"}[${to_column ?? "?"}]`;
+    if (from === undefined || to === undefined || from_id === undefined || to_id === undefined) {
       emitWarning(context, {
         code: "unsupported-feature",
         message: `Excel data model relationship ${described} was not imported because a table is not a worksheet table`,
@@ -130,8 +130,8 @@ export function readExcelDataModel(
     }
     relationships.push({
       id: `excel-relationship-${relationships.length + 1}`,
-      from: { table: from.id, column: fromId },
-      to: { table: to.id, column: toId },
+      from: { table: from.id, column: from_id },
+      to: { table: to.id, column: to_id },
     });
   }
   return relationships.length > 0 ? { relationships } : undefined;
