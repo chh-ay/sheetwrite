@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, spyOn } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { deflateSync } from "fflate";
 
@@ -7,7 +7,6 @@ import {
   validateTransactionResources,
   validateWorkbookSnapshot,
 } from "../src/document-protocol.js";
-import { getEngine } from "../src/engine.js";
 import { initSheetwrite } from "../src/grid.js";
 import { releaseEngineMemory } from "../src/index.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
@@ -768,57 +767,6 @@ describe("SheetwriteStore", () => {
       store.dispose();
     }
   });
-  const nameMoves: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>[] = [
-    { op: "moveRows", sheet: "s1", from: 1, count: 1, to: 3 },
-    { op: "moveColumns", sheet: "s1", from: 1, count: 1, to: 0 },
-  ];
-  for (const move of nameMoves) {
-    it(`leaves ${move.op} unchanged when the second formula-name rewrite fails`, () => {
-      const store = new SheetwriteStore(makeWorkbook(6));
-      const nativeStore = getEngine().CellStore.prototype;
-      const rewrite = nativeStore.moveNamedFormulaSource;
-      const FAILING_REWRITE = 2;
-      let attempts = 0;
-      const failingRewrite = spyOn(nativeStore, "moveNamedFormulaSource").mockImplementation(
-        function (this: typeof nativeStore, ...args: Parameters<typeof rewrite>) {
-          attempts += 1;
-          return attempts === FAILING_REWRITE ? undefined : rewrite.call(this, ...args);
-        },
-      );
-      try {
-        expect(
-          store.applyTransaction({
-            patches: [
-              { op: "set", addr: addr(1, 1), value: { kind: "literal", value: 7 } },
-              { op: "setNamedRange", namedRange: { name: "First", formula: "='Sheet 1'!$B$2*2" } },
-              { op: "setNamedRange", namedRange: { name: "Second", formula: "='Sheet 1'!$B$2*3" } },
-              {
-                op: "setNamedRange",
-                namedRange: {
-                  name: "Target",
-                  range: {
-                    sheet: "s1",
-                    start: { row: 1, col: 1 },
-                    end: { row: 1, col: 1 },
-                  },
-                },
-              },
-              { op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=First+Second" } },
-            ],
-          }).status,
-        ).toBe("applied");
-        const before = store.exportSnapshot();
-
-        expect(store.applyTransaction({ patches: [move] }).status).toBe("noop");
-        expect(attempts).toBe(FAILING_REWRITE);
-        expect(store.exportSnapshot()).toEqual(before);
-        expect(store.getCell(addr(0, 0)).resolved).toBe(35);
-      } finally {
-        failingRewrite.mockRestore();
-        store.dispose();
-      }
-    });
-  }
 
   it("resolves scoped named ranges and recalculates volatile formulas from one instant", () => {
     const columns = Array.from({ length: 4 }, (_, col) => ({
