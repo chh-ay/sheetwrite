@@ -10,7 +10,7 @@ const SHARED_COPIES: usize = 4;
 
 /// Columns: A mixed list, B ascending numbers with duplicates, C ascending
 /// text, D a list with an error, E results, F a list with formula cells, G
-/// descending numbers. Rows 1-10.
+/// descending numbers, H numbers around an infinity. Rows 1-10.
 fn store() -> (CellStore, usize) {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(12, 20);
