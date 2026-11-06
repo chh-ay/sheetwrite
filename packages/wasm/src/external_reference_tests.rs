@@ -255,12 +255,15 @@ fn a_link_name_follows_its_values_and_its_removal() {
     store.recompute(annual);
     assert_eq!(store.get_cell(report, 0, 0).num(), 10.0);
 
-    store.remove_external_names("budget.xlsx");
+    // Removing the link sheet removes the names that refer to it.
+    assert!(store.remove_external_sheet("budget.xlsx", "annual"));
     assert_eq!(
         store.get_cell(report, 0, 0).string().as_deref(),
         Some("#REF!")
     );
 
+    let annual = store.add_external_sheet("Budget.xlsx", "Annual", 3, 11);
+    store.set_number(annual, 10, 2, 5.0, 0);
     assert!(store.add_external_name("Budget.xlsx", "", "Total", "=Annual!$C$11"));
     assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
     assert_eq!(

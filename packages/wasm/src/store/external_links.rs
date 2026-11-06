@@ -78,7 +78,8 @@ impl CellStore {
     /// of that workbook. Formulas that use the name read the saved values of
     /// that sheet, so add the sheet first. Returns `false`, adding nothing,
     /// when `refers_to` is not a cell or range of a sheet the store holds;
-    /// formulas that use the name then show `#REF!`, as in Excel.
+    /// formulas that use the name then show `#REF!`, as in Excel. Removing
+    /// the sheet removes the name.
     #[wasm_bindgen(js_name = addExternalName)]
     pub fn add_external_name(
         &mut self,
@@ -106,20 +107,6 @@ impl CellStore {
         self.refresh_named_formula_entries();
         self.recompute_all_sheets();
         true
-    }
-
-    /// Remove every defined name of the linked workbook `book`. Formulas
-    /// that use one show `#REF!` until it is added again.
-    #[wasm_bindgen(js_name = removeExternalNames)]
-    pub fn remove_external_names(&mut self, book: &str) {
-        let prefix = sheet_name_key(&format!("[{book}]").replace('\'', "''"));
-        let before = self.defined_names.len();
-        self.defined_names
-            .retain(|(scope, key), _| scope.is_some() || !key.starts_with(&prefix));
-        if self.defined_names.len() != before {
-            self.refresh_named_formula_entries();
-            self.recompute_all_sheets();
-        }
     }
 }
 

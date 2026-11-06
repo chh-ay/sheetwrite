@@ -99,16 +99,17 @@ export interface ExternalLinkEngine {
   recompute(sheet: number): void;
   removeExternalSheet(book: string, sheet: string): boolean;
   addExternalName(book: string, sheet: string, name: string, refersTo: string): boolean;
-  removeExternalNames(book: string): void;
 }
 
-/** Remove the values of every link from the engine; formulas that read them show `#REF!`. */
+/**
+ * Remove the values of every link from the engine, and with its sheets the
+ * names that refer to them; formulas that read them show `#REF!`.
+ */
 export function removeExternalLinks(
   engine: ExternalLinkEngine,
   links: readonly ExternalLink[],
 ): void {
   for (const link of links) {
-    engine.removeExternalNames(link.book);
     for (const sheet of link.sheets) engine.removeExternalSheet(link.book, sheet.name);
   }
 }
