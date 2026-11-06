@@ -15,7 +15,7 @@ import type {
   VisibleWindowView,
   Workbook,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
@@ -38,12 +38,6 @@ afterEach(() => {
   restoreStubs();
   globalThis.requestAnimationFrame = originalRaf;
 });
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
-}
 
 // A renderer that records the frame contracts each test inspects: plain paints
 // (with a snapshot of the frame's row geometry, since Viewport.rowHeights aliases

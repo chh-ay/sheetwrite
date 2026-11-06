@@ -4,7 +4,7 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellChange, Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -19,12 +19,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
-}
 
 /** Pointer-capture recorder: happy-dom lacks the capture API entirely. */
 interface CaptureLog {

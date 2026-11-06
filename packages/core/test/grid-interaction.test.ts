@@ -14,7 +14,7 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { elementAdded, makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -64,12 +64,6 @@ function requestColumnIndices(request: DataSourceRequest): number[] {
     for (let column = band.start; column < band.end; column++) indices.push(column);
   }
   return indices;
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
 }
 
 describe("find-bar keystroke isolation", () => {

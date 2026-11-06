@@ -58,6 +58,13 @@ export function mountHost(): HTMLDivElement {
   return host;
 }
 
+/** The grid's scroll container under `host`. */
+export function scrollerOf(host: HTMLElement): HTMLDivElement {
+  const node = host.querySelector(".sheetwrite-scroller");
+  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
+  return node;
+}
+
 /**
  * Resolve with the first element under `host` that matches `selector`, now or
  * when it is added. Use it for chrome that loads its own chunk, such as the
