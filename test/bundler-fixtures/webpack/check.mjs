@@ -54,6 +54,8 @@ const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
 // and the pivot field model, whose aggregation captions start like the function table.
 const DASHBOARD_SHARED_MARKERS = ["chart-data-", '["SUM","Sum"]'];
+// The add-on registry loads only when a page installs an add-on; its error text survives minifiers.
+const ADDON_REGISTRY_MARKER = "is listed more than once.";
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
@@ -66,12 +68,14 @@ const functionTableChunks = [];
 const findChunks = [];
 const dashboardChunks = [];
 const workers = [];
+const addonRegistryChunks = [];
 const documentChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
   if (code.includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(file);
   else if (code.includes(EDIT_LINKS_PANEL_MARKER)) editLinksPanelChunks.push(file);
+  else if (code.includes(ADDON_REGISTRY_MARKER)) addonRegistryChunks.push(file);
   else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
   // Before the function table: the shared dashboard code also lists the pivot aggregations.
@@ -108,6 +112,11 @@ if (editLinksPanelChunks.length !== 1) {
 }
 if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
+if (addonRegistryChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
+  );
+}
 if (functionTableChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack function table chunk, got ${functionTableChunks.length}`,
@@ -130,6 +139,9 @@ if (mainCode.includes(QUERY_PANEL_MARKER)) {
 }
 if (mainCode.includes(EDIT_LINKS_PANEL_MARKER)) {
   throw new Error("The Edit Links panel is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(ADDON_REGISTRY_MARKER)) {
+  throw new Error("The add-on registry is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
