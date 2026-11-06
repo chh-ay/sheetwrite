@@ -93,7 +93,8 @@ describe("section overview pages", () => {
 describe("sidebar icons", () => {
   it("gives every sidebar entry and every section overview an icon", () => {
     for (const section of DOCS_NAVIGATION) {
-      if (section.href !== undefined) expect(`${section.label}: ${section.icon}`).not.toEndWith("undefined");
+      if (section.href !== undefined)
+        expect(`${section.label}: ${section.icon}`).not.toEndWith("undefined");
       const visit = (items: readonly NavigationItem[]): void => {
         for (const item of items) {
           expect(`${section.label} › ${item.label}: ${item.icon}`).not.toEndWith("undefined");
