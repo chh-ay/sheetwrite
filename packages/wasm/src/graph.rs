@@ -4,10 +4,6 @@
 //! [`FormulaGraph`] owns the workbook dependency index and keeps it in step
 //! with entry replacements, dropping it for rewrites it cannot patch.
 
-use std::collections::hash_set;
-
-use rustc_hash::FxHashSet;
-
 use crate::eval::{build_dep_index, DepIndex};
 use crate::formula_slots::{FormulaId, FormulaStore};
 use crate::memory::{
@@ -19,9 +15,8 @@ use crate::transfer::Writer;
 use crate::transfer::{Reader, TransferResult};
 use crate::types::{AbsCellKey, CellKey, FormulaEntry};
 
-/// `FxHashSet::clear` walks every retained bucket, so a dirty set inflated by
-/// one giant paste is dropped instead of cleared; otherwise it would tax every
-/// later single-cell transaction.
+/// A dirty list inflated by one giant paste is dropped instead of cleared, so
+/// later single-cell transactions do not keep its memory.
 const RETAINED_DIRTY_CAPACITY: usize = 4096;
 
 /// Bulk writes stay range-scoped without letting many disjoint edits grow
@@ -94,10 +89,56 @@ impl DirtyRect {
     }
 }
 
+/// Exact dirty source cells in one flat list. Writes in address order (a load
+/// or a fill) keep it sorted and unique as they append. Other orders append
+/// too, and the list is sorted and deduplicated in place before it grows, so
+/// repeated edits of a few cells stay bounded without hashing.
+struct DirtyCells {
+    cells: Vec<CellKey>,
+    sorted: bool,
+}
+
+impl Default for DirtyCells {
+    fn default() -> Self {
+        Self {
+            cells: Vec::new(),
+            sorted: true,
+        }
+    }
+}
+
+impl DirtyCells {
+    fn insert(&mut self, key: CellKey) {
+        match self.cells.last() {
+            Some(&last) if last == key => return,
+            Some(&last) if last > key => self.sorted = false,
+            _ => {}
+        }
+
+        // Fold duplicates before growing; a sorted list has none.
+        if !self.sorted && self.cells.len() == self.cells.capacity() {
+            self.cells.sort_unstable();
+            self.cells.dedup();
+            if self.cells.binary_search(&key).is_ok() {
+                self.sorted = true;
+                return;
+            }
+
+            self.sorted = self.cells.last().is_none_or(|&last| last < key);
+        }
+
+        self.cells.push(key);
+    }
+
+    fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+}
+
 /// What one sheet contributes to the next recompute.
 pub(crate) enum DirtySeeds<'a> {
     All,
-    Cells(hash_set::Iter<'a, CellKey>),
+    Cells(std::slice::Iter<'a, CellKey>),
     Ranges(&'a [DirtyRect]),
 }
 
@@ -105,14 +146,14 @@ pub(crate) enum DirtySeeds<'a> {
 /// writes store bounds, and structural/load paths stay whole-sheet. Switching
 /// from cells to ranges carries every earlier cell into the bounded list.
 enum DirtyState {
-    Cells(FxHashSet<CellKey>),
+    Cells(DirtyCells),
     Ranges(Vec<DirtyRect>),
     All,
 }
 
 impl Default for DirtyState {
     fn default() -> Self {
-        Self::Cells(FxHashSet::default())
+        Self::Cells(DirtyCells::default())
     }
 }
 
@@ -654,7 +695,7 @@ impl SheetFormulas {
 
         if let DirtyState::Cells(cells) = std::mem::take(&mut self.dirty) {
             let mut ranges = vec![rect];
-            for cell in cells {
+            for cell in cells.cells {
                 Self::add_dirty_rect(&mut ranges, DirtyRect::cell(cell));
             }
             self.dirty = DirtyState::Ranges(ranges);
@@ -706,8 +747,9 @@ impl SheetFormulas {
     /// Keep only small seed capacity after the pass consumes it.
     pub(crate) fn clear_dirty(&mut self) {
         if let DirtyState::Cells(cells) = &mut self.dirty {
-            if cells.capacity() <= RETAINED_DIRTY_CAPACITY {
-                cells.clear();
+            if cells.cells.capacity() <= RETAINED_DIRTY_CAPACITY {
+                cells.cells.clear();
+                cells.sorted = true;
                 return;
             }
         }
@@ -719,7 +761,7 @@ impl SheetFormulas {
     pub(crate) fn dirty_seeds(&self) -> DirtySeeds<'_> {
         match &self.dirty {
             DirtyState::All => DirtySeeds::All,
-            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.iter()),
+            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.cells.iter()),
             DirtyState::Ranges(ranges) => DirtySeeds::Ranges(ranges),
         }
     }
@@ -737,7 +779,7 @@ impl SheetFormulas {
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         match &self.dirty {
             DirtyState::Cells(cells) => {
-                metadata.add_hash_table::<CellKey, ()>(cells.len(), cells.capacity())
+                metadata.add_vec::<CellKey>(cells.cells.len(), cells.cells.capacity())
             }
             DirtyState::Ranges(ranges) => {
                 metadata.add_vec::<DirtyRect>(ranges.len(), ranges.capacity())
@@ -751,8 +793,8 @@ impl SheetFormulas {
             DirtyState::All => out.u32(0),
             DirtyState::Cells(cells) => {
                 out.u32(1);
-                out.usize(cells.len());
-                for &(row, col) in cells {
+                out.usize(cells.cells.len());
+                for &(row, col) in &cells.cells {
                     out.u32(row);
                     out.u32(col);
                 }
@@ -775,7 +817,7 @@ impl SheetFormulas {
         let dirty = match input.u32()? {
             0 => DirtyState::All,
             1 => {
-                let mut cells = FxHashSet::default();
+                let mut cells = DirtyCells::default();
                 for _ in 0..input.count()? {
                     cells.insert((input.u32()?, input.u32()?));
                 }
