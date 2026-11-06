@@ -426,6 +426,13 @@ samp,
     "liga" 0;
 }
 
+/* Phones: code steps down a size; long lines wrap (Expressive Code `wrap`). */
+@media (max-width: 30rem) {
+  :root .expressive-code pre {
+    font-size: var(--sw-text-caption);
+  }
+}
+
 /* ── Brand mark ─────────────────────────────────────────────────────────── */
 .sw-brand-mark {
   flex: none;
