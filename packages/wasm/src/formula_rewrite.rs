@@ -343,6 +343,11 @@ fn references(lexemes: &[Lexeme<'_>]) -> Vec<Reference> {
                 index += 2;
                 continue;
             }
+            // `[Budget.xlsx]!Total`: a defined name of another workbook.
+            (Some(Tok::Structured(_)), Some(Tok::Bang)) => {
+                index += 2;
+                continue;
+            }
             (Some(Tok::Structured(_)), Some(Tok::Ident(_, false)))
                 if tok(index + 2) == Some(&Tok::Bang) =>
             {
