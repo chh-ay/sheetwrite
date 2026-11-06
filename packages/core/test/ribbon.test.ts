@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { renderControl } from "../src/ribbon/ribbon-controls.js";
+import { ribbonHeight } from "../src/ribbon/ribbon-metrics.js";
 import { RibbonPopup } from "../src/ribbon/ribbon-popup.js";
 import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -542,6 +543,42 @@ it("gives the grid the panel's height back when minimized", async () => {
   home.focus();
   key(home, "Escape");
   expect(document.activeElement).toBe(host);
+});
+
+it("reserves a compact ribbon's own height before its chunk mounts, so the grid never moves", async () => {
+  const workbook: Workbook = {
+    activeSheet: "s1",
+    sheets: [
+      {
+        id: "s1",
+        name: "Sheet",
+        rowCount: 1,
+        columns: [{ key: "a", header: "A", type: "number", width: 100 }],
+      },
+    ],
+  };
+  const host = document.createElement("div");
+  Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
+  document.body.appendChild(host);
+  const config: GridConfig = { ribbon: { mode: "compact" } };
+  const grid = new GridImpl(host, { workbook, config }, new SheetwriteStore(workbook));
+  grids.push(grid);
+  const viewport = host.querySelector<HTMLElement>(".sheetwrite-viewport");
+  if (viewport === null) throw new Error("grid not mounted");
+
+  // Tab row (30 px) plus the compact panel (36 px), in the first frame and after mount.
+  expect(viewport.style.top).toBe("66px");
+  await ribbonMounted(host);
+  expect(host.querySelector(".sheetwrite-ribbon")?.getAttribute("data-mode")).toBe("compact");
+  expect(viewport.style.top).toBe("66px");
+});
+
+it("sizes the reserved ribbon by its layout and the host width", () => {
+  expect(ribbonHeight({}, 300)).toBe(122);
+  expect(ribbonHeight({ mode: "compact" }, 1_600)).toBe(66);
+  expect(ribbonHeight({ mode: "auto" }, 767)).toBe(66);
+  expect(ribbonHeight({ mode: "auto" }, 768)).toBe(122);
+  expect(ribbonHeight({ mode: "auto", compactWidth: 1_000 }, 900)).toBe(66);
 });
 
 it("replaces a glyph in every ribbon control that shows it, by glyph name", async () => {

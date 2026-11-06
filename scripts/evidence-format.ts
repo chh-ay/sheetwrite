@@ -23,10 +23,6 @@ function formatMs(value: number): string {
   return `${fixed(value, value < 10 ? 2 : value < 100 ? 1 : 0)} ms`;
 }
 
-function formatMb(value: number): string {
-  return `${(value / 1_000_000).toFixed(1)} MB`;
-}
-
 /** Binary units, as the WASM and package size reports use. */
 function formatBytes(value: number): string {
   if (value >= 1024 * 1024) return `${fixed(value / (1024 * 1024), 1)} MiB`;
@@ -37,11 +33,6 @@ function formatBytes(value: number): string {
 /** Paired ratios sit near 1, so they keep two decimals. */
 function formatRatio(value: number): string {
   return `${value.toFixed(2)}×`;
-}
-
-/** Speedups span 1× to 10,000×; decimals only help below 100×. */
-function formatSpeedup(value: number): string {
-  return `${fixed(value, value < 100 ? 1 : 0)}×`;
 }
 
 function fixed(value: number, digits: number): string {
@@ -164,10 +155,11 @@ function provenanceList(rows: ReadonlyArray<readonly [label: string, value: stri
  * Detail that supports the headline but is not the result: full tables,
  * counters, checkpoints. It stays in the page (and in search) but closed.
  */
-function allMeasurements(lines: readonly string[]): string[] {
+/** Measurements on demand, under a summary that names what they are. */
+function allMeasurements(summary: string, lines: readonly string[]): string[] {
   // Blank lines around the body let Markdown inside the HTML block render.
   return [
-    '<details class="bench-all"><summary>All measurements</summary>',
+    `<details class="bench-all"><summary>${html(summary)}</summary>`,
     "",
     ...lines,
     "",
@@ -183,10 +175,8 @@ export {
   formatCaptureTime,
   formatBytes,
   formatCount,
-  formatMb,
   formatMs,
   formatRatio,
-  formatSpeedup,
   html,
   provenanceList,
   reductionText,

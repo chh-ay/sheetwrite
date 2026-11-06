@@ -246,16 +246,6 @@
   }
 }
 
-@media (min-width: 40.01rem) {
-  .bench-viz--unlabelled .bench-bar {
-    grid-template-columns: minmax(0, 1fr) var(--bench-value);
-    grid-template-areas: "track value";
-  }
-  .bench-viz--unlabelled .bench-bar__engine {
-    display: none;
-  }
-}
-
 .sw-prose .sw-moved-guides code {
   font-size: var(--sw-text-eyebrow);
 }

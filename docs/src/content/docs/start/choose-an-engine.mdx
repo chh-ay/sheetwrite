@@ -4,16 +4,15 @@ description: Use the default engine for standard formulas or select the full eng
 added: "0.6.0"
 ---
 
-Sheetwrite ships its formula engine in two builds. Both run the same Rust calculation engine; the
-full build adds the analysis functions and costs a larger download. Pick one before the first grid
-is created.
+Sheetwrite ships its formula engine in two builds. The full build adds the analysis functions and
+costs a larger download. Pick one before the first grid is created.
 
 <Diagram
   name="engines"
   alt="The default engine has math, lookup, text, logic, date, dynamic array and LET functions. The full engine has every default function plus statistics, finance, regex, database, matrix, LAMBDA helpers, GROUPBY and PIVOTBY. Both share one calculation engine."
   width="640"
   height="292"
-  caption="Both builds share storage, recalculation and limits; the full build adds function families."
+  caption="The full build adds function families to everything in the default build."
 />
 
 ## Compare the builds

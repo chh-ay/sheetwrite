@@ -36,7 +36,12 @@ const READY_TIMEOUT_MS = 60_000;
 /** One screenshot: the stage query, its size, and the steps that open its view. */
 interface Shot {
   name: string;
+  /** The size of the written capture. */
   size: ShotSize;
+  /** The stage size when the capture is a crop of a larger view; absent means `size`. */
+  stage?: ShotSize;
+  /** The part of the stage the capture keeps, in CSS pixels. */
+  crop?: { x: number; y: number };
   query: Record<string, string>;
   steps?: (page: Page) => Promise<void>;
 }
@@ -61,7 +66,28 @@ async function selectRows(page: Page, rows: number) {
 }
 
 const SHOTS: readonly Shot[] = [
-  { name: "dashboard", size: "app", query: { sheet: "dashboard" } },
+  // Panel size: shown at about its own width in the docs column, so its labels stay
+  // at their 12 px and up.
+  { name: "dashboard", size: "panel", query: { sheet: "dashboard", ribbon: "compact" } },
+  // The phone version of the dashboard hero: its KPI cards and chart, cropped,
+  // so phones show the labels near their own size.
+  {
+    name: "dashboard-phone",
+    size: "phone",
+    stage: "panel",
+    crop: { x: 0, y: 104 },
+    query: { sheet: "dashboard", ribbon: "compact" },
+  },
+  // The Dashboards page: an item's actions menu, where Move and Resize start.
+  {
+    name: "dashboard-items",
+    size: "panel",
+    query: { sheet: "dashboard", ribbon: "compact" },
+    steps: async (page) => {
+      await page.getByRole("button", { name: "Revenue item actions" }).click();
+      await settle(page);
+    },
+  },
   {
     name: "data-model",
     size: "app",
@@ -138,7 +164,8 @@ async function settle(page: Page) {
 }
 
 async function capture(shot: Shot, origin: string, scratch: string) {
-  const { width, height } = SHOT_SIZES[shot.size];
+  const { width, height } = SHOT_SIZES[shot.stage ?? shot.size];
+  const clip = shot.crop === undefined ? undefined : { ...shot.crop, ...SHOT_SIZES[shot.size] };
   const browser = await chromium.launch();
   try {
     for (const theme of THEMES)
@@ -174,7 +201,9 @@ async function capture(shot: Shot, origin: string, scratch: string) {
         ]);
         await shot.steps?.(page);
         const png = join(scratch, `${shot.name}-${theme}-${scale}x.png`);
-        await page.locator("#stage").screenshot({ path: png, animations: "disabled" });
+        await (clip === undefined
+          ? page.locator("#stage").screenshot({ path: png, animations: "disabled" })
+          : page.screenshot({ path: png, clip, animations: "disabled" }));
         const avif = join(OUTPUT, basename(shotUrl(shot.name, theme, scale)));
         execFileSync("avifenc", [...AVIF_ARGS, png, avif], { stdio: "ignore" });
         console.log(`${avif.slice(ROOT.length + 1)}  ${statSync(avif).size} B`);

@@ -197,8 +197,8 @@
   font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
 }
 
+/* Four columns fold to two on tablets; three stay three, so no row leaves one card alone. */
 @media (max-width: 64rem) {
-  .sw-card-group[data-cols="3"],
   .sw-card-group[data-cols="4"] {
     --sw-card-cols: 2;
   }

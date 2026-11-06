@@ -121,7 +121,10 @@ grid.setViewSort([{ col: 2, ascending: true }]);
     expect(html).toContain(
       '<time class="sw-update__date" dateTime="2026-10-30">Oct 30, 2026</time>',
     );
-    expect(html).toContain('<a class="sw-update__version" href="/docs/releases/0.6.1/">0.6.1</a>');
+    // The version is the entry's heading, so the page outline lists versions.
+    expect(html).toContain(
+      '<h2 class="sw-update__version" id="v0-6-1"><a href="/docs/releases/0.6.1/">0.6.1</a></h2>',
+    );
     const next = await render(`<Update version="0.7.0">Next.</Update>`);
     expect(next).toContain('<span class="sw-update__date">Next release</span>');
     expect(next).toContain(">0.7.0 (next)</a>");
