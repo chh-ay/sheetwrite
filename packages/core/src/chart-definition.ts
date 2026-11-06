@@ -19,6 +19,11 @@ import type { Range, SheetId } from "./types/coordinates.js";
 export const MAX_CHARTS_PER_SHEET = 100;
 /** Series one chart may plot. */
 export const MAX_CHART_SERIES = 32;
+/**
+ * Most points resolved per series range. Cells are read in row-major order and
+ * cells past this count are dropped; the series view reports `truncated`.
+ */
+export const MAX_CHART_POINTS = 10_000;
 /** Stable chart identifier ceiling. */
 const MAX_CHART_ID_LENGTH = 128;
 /** Title, axis-title, and series-name ceiling; Excel's chart text limit. */

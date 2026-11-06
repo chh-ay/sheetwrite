@@ -112,6 +112,8 @@ step and returns the transaction result, so a rejected chart reports why.
 | `legend` | `none`, `top`, `right`, `bottom` or `left`. |
 | `anchor` | The top-left cell (`row`, `col`), the offset from that cell, and the size, all in CSS pixels. |
 | `series` | One entry for each series: `values`, optional `categories`, and a `name` or a `nameRange`. |
+| `pivot` | The ID of a pivot on the same sheet. The chart then shows that pivot, as an Excel PivotChart does, and `series` is empty. See [Charts over pivots](#charts-over-pivots). |
+| `pivotValues` | With `pivot`, the value fields to plot, by position in the pivot's `values`. Without it, the chart plots every value field. |
 
 Ranges can be on any sheet. Pie and doughnut charts draw the first series.
 Scatter charts use numeric categories as x values.
@@ -158,6 +160,32 @@ On a read-only grid you can select a chart, but not change it.
 The grid emits `chart-select` with `{ sheet, id }`, or `null`, when the
 selection changes, and `chart-activate` when Enter is pressed on a chart.
 
+## Charts over pivots
+
+A chart with `pivot` shows the result of that pivot, as an Excel PivotChart
+does ([Create a PivotChart](https://support.microsoft.com/en-us/office/create-a-pivotchart-c1b1e057-6990-4c38-b52b-8255538e7b1c)):
+
+- The categories are the leaf row items. When the pivot has more than one row
+  field, each label joins the items from the outside in, such as
+  `East / Retail`. Excel draws such labels as [multi-level category labels](https://support.microsoft.com/en-us/office/change-the-display-of-chart-axes-422c97af-1483-4bad-a3db-3a9ef630b5a9).
+- Each value field, for each column item, is one series.
+- Subtotals and grand totals are never points, whatever the pivot's layout
+  and total settings. Excel PivotCharts do not plot them either
+  ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/4838157/how-to-show-grand-totals-on-pivot-chart)).
+- The chart follows the pivot's fields, filters and sort, and each edit of its
+  source. Changes to an Excel PivotTable show in its PivotChart the same way
+  ([Overview of PivotTables and PivotCharts](https://support.microsoft.com/en-us/office/overview-of-pivottables-and-pivotcharts-527c8fa3-02c0-445a-a2db-7794676bce96)).
+- A measure point is the pivot's measure cell for the same items.
+
+The chart keeps no values of its own. Charts over pivots need the full engine,
+which computes the pivot, and the code that reads them loads the first time
+such a chart is drawn. With the default engine, the chart has no series.
+
+On a worksheet, select a cell of a pivot to show **Insert › Charts ›
+PivotChart**. It adds a chart of the chosen kind over that pivot, to the right
+of its output, and opens the chart panel. On a dashboard, see
+[PivotCharts](/docs/features/analysis/dashboards/#pivotcharts).
+
 ## Charts in XLSX files
 
 With `@sheetwrite/xlsx`, `fromXlsxWorkbook` reads Excel charts into
@@ -177,8 +205,14 @@ parts. Excel and LibreOffice open these files with the charts shown.
 Imported charts read the same cells as the Excel chart, so a cell edit updates
 them. Import keeps an Excel chart that this table cannot hold as an opaque part
 and emits an `unsupported-feature` warning. Examples are 3-D, stacked and
-combination charts, and series that read literal values or several ranges. See
+combination charts, Excel PivotCharts, and series that read literal values or
+several ranges. See
 [Kept parts and round trips](/docs/import-export/kept-parts-and-round-trips/).
+
+Export writes a chart over a pivot with the values it shows as literal data,
+so Excel opens it as a standard chart of those values. Sheetwrite keeps the
+chart's `pivot` in its metadata, so the file opens in Sheetwrite as a chart
+over the pivot again.
 
 Import reads each chart part once per drawing. Repeated frames for that part
 stay opaque and emit the same warning. Once a sheet reaches its chart limit,

@@ -116,7 +116,13 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   "external-link": {
     source: "packages/core/src/types/external-link.ts",
     dependencies: [],
-    exports: ["ExternalLink", "ExternalLinkCell", "ExternalLinkSheet", "ExternalLinkValue"],
+    exports: [
+      "ExternalLink",
+      "ExternalLinkCell",
+      "ExternalLinkName",
+      "ExternalLinkSheet",
+      "ExternalLinkValue",
+    ],
   },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
@@ -335,7 +341,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   xlsx: {
     source: "packages/core/src/types/xlsx.ts",
-    dependencies: ["dashboard", "data", "document", "query", "store"],
+    dependencies: ["chart", "coordinates", "dashboard", "data", "document", "query", "store"],
     exports: [
       "XlsxResourceLimits",
       "XlsxTableExportBackend",

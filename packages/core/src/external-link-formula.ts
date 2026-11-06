@@ -10,6 +10,12 @@ const EXTERNAL_BOOK = /^(?:\d+|[^\]]+\.(?:xlsx?|xlsm|xlsb|xlam|ods|csv))$/i;
 const TABLE_NAME_END = /[\p{L}\p{N}_.\\]/u;
 /** Characters that start the sheet name or `!` after an external-book qualifier. */
 const QUALIFIED_NAME_START = /[\p{L}_\\!']/u;
+/** A workbook file name at the end of a qualifier: `Budget.xlsx` in `Budget.xlsx!Total`. */
+const BOOK_FILE = /[^\\/]+\.(?:xlsx?|xlsm|xlsb|xlam|ods)$/i;
+/** A cell reference such as `A1` or `$XFD$1048576`. */
+const CELL_REFERENCE = /^\$?[A-Z]{1,3}\$?\d+$/i;
+/** The characters of a qualifier written without quotes. */
+const PLAIN_QUALIFIER = /^[\p{L}\p{N}_.\\]+/u;
 
 /**
  * Index after the bracket that closes the `[` at `open`. Brackets nest, and
@@ -110,7 +116,10 @@ export function formulaCallsExternalData(formula: string): boolean {
 export interface ExternalSheetName {
   /** The text in brackets: a link index such as `1`, or a file name such as `Budget.xlsx`. */
   readonly book: string;
-  /** The sheet name, or `""` for a defined name of the other workbook (`[1]!Total`). */
+  /**
+   * The sheet name, or `""` for a defined name of the other workbook
+   * (`[1]!Total`, `Budget.xlsx!Total`).
+   */
   readonly sheet: string;
   /** The formula text of the name before `!`, folder and quotes included. */
   readonly text: string;
@@ -121,11 +130,37 @@ const PLAIN_SHEET_NAME = /^[\p{L}\p{N}_.\\]*/u;
 /** Characters of a book or sheet name that Excel writes without quotes. */
 const PLAIN_NAME = /^[\p{L}\p{N}_.]+$/u;
 
-/** `[book]sheet`, in quotes when either part needs them, as Excel writes it before `!`. */
+/**
+ * `[book]sheet`, in quotes when either part needs them, as Excel writes it
+ * before `!`. Without a sheet, the book alone, as Excel writes it before a
+ * defined name of that workbook: `Budget.xlsx` in `Budget.xlsx!Total`.
+ */
 export function externalSheetText(book: string, sheet: string): string {
+  if (!sheet) return PLAIN_NAME.test(book) ? book : `'${book.replaceAll("'", "''")}'`;
   const text = `[${book}]${sheet}`;
   if (PLAIN_NAME.test(book) && PLAIN_NAME.test(sheet)) return text;
   return `'${text.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Whether `!` at `bang` is followed by a defined name rather than a cell,
+ * column or row range: `Budget.xlsx!Total`, not `Budget.xlsx!A1` on a sheet
+ * named `Budget.xlsx`.
+ */
+function namesDefinedName(formula: string, bang: number): boolean {
+  if (formula.charAt(bang) !== "!") return false;
+  const name = PLAIN_QUALIFIER.exec(formula.slice(bang + 1))?.[0] ?? "";
+  return (
+    /^[\p{L}_\\]/u.test(name) &&
+    !CELL_REFERENCE.test(name) &&
+    formula.charAt(bang + 1 + name.length) !== ":"
+  );
+}
+
+/** The workbook whose defined name follows `qualifier!`, when the qualifier ends with a workbook file name. */
+function bookName(qualifier: string, text: string): ExternalSheetName | undefined {
+  const book = BOOK_FILE.exec(qualifier)?.[0];
+  return book ? { book, sheet: "", text } : undefined;
 }
 
 /**
@@ -157,6 +192,8 @@ export function rewriteExternalSheets(
           sheet: quoted.slice(close + 1),
           text: formula.slice(index, end),
         };
+      } else if (namesDefinedName(formula, end)) {
+        name = bookName(quoted, formula.slice(index, end));
       }
     } else if (char === "[") {
       end = closingBracket(formula, index);
@@ -169,6 +206,12 @@ export function rewriteExternalSheets(
         };
         end += sheet.length;
       }
+    } else {
+      // A name is copied whole. Before `!`, a workbook file name qualifies a
+      // defined name of that workbook: `Budget.xlsx!Total`.
+      const qualifier = PLAIN_QUALIFIER.exec(formula.slice(index))?.[0] ?? "";
+      end = index + Math.max(qualifier.length, 1);
+      if (qualifier && namesDefinedName(formula, end)) name = bookName(qualifier, qualifier);
     }
 
     if (name) {

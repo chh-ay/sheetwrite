@@ -1,23 +1,27 @@
-// The static content of dashboards and worksheet pivots for an XLSX export
-// (#231, #495). Excel has no dashboard sheet, so the export writes each item's
-// current values: what the dashboard shows, with its slicer filters. A
-// worksheet pivot that the export cannot write natively also writes its
-// current output as cells, as Excel files carry every pivot's output. Loaded
-// only for an export of a workbook with a dashboard or a pivot.
+// The static content of dashboards and worksheet pivots, and the values of
+// charts over pivots, for an XLSX export (#231, #487, #495). Excel has no
+// dashboard sheet, so the export writes each item's current values: what the
+// dashboard shows, with its slicer filters. A worksheet pivot that the export
+// cannot write natively also writes its current output as cells, as Excel
+// files carry every pivot's output. A chart over a pivot is written with the
+// values it plots. Loaded only for an export of a workbook with a dashboard or
+// a pivot.
 
-import { resolveChartView } from "../charts-live.js";
+import { resolveChartView, setPivotChartViews } from "../charts-live.js";
 import { isDashboard } from "../dashboard.js";
 import type { SheetwriteStore } from "../store.js";
 import type { CellScalar } from "../types/cell.js";
+import type { ChartView } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { DashboardExport, DashboardItem, DashboardItemExport } from "../types/dashboard.js";
 import type { Store } from "../types/store.js";
 import {
-  applyDashboardPayload,
+  applyPivotViews,
   dashboardItemTitle,
-  dashboardPivotOutputOf,
   dashboardsOf,
   hiddenPivotIndex,
+  pivotChartViewOf,
+  pivotOutputOf,
   slicerOverridesOf,
   slicerValuesOf,
 } from "./dashboard-engine.js";
@@ -41,7 +45,7 @@ function pivotExport(store: Store, sheet: SheetId, item: DashboardItem & { kind:
   const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
   const index = owner?.pivots?.findIndex((pivot) => pivot.id === item.pivot) ?? -1;
   const formats = owner?.pivots?.[index]?.values.map((value) => value.numberFormat ?? null) ?? [];
-  const output = dashboardPivotOutputOf(store, sheet, index);
+  const output = pivotOutputOf(store, sheet, index);
   const content =
     output === null ? { cells: [], numberFormats: [] } : pivotOutputContent(output, formats);
   const caption = dashboardItemTitle(store, sheet, item);
@@ -60,7 +64,7 @@ function itemExport(store: Store, sheet: SheetId, item: DashboardItem): Dashboar
     return { id: item.id, cells: [], numberFormats: [], ...(chart ? { chart } : {}) };
   }
   if (item.kind === "kpi") {
-    const output = dashboardPivotOutputOf(store, sheet, hiddenPivotIndex(store, sheet, item.id));
+    const output = pivotOutputOf(store, sheet, hiddenPivotIndex(store, sheet, item.id));
     const value = output?.cells.at(-1) ?? null;
     return {
       id: item.id,
@@ -77,19 +81,49 @@ function itemExport(store: Store, sheet: SheetId, item: DashboardItem): Dashboar
   return { id: item.id, cells, numberFormats: generalFormats(cells) };
 }
 
+/** What an XLSX export writes from the pivot views of a store. */
+interface PivotViewExports {
+  /** The static content of every dashboard. */
+  readonly dashboards: DashboardExport[];
+  /** The resolved view of each worksheet chart over a pivot, by sheet and chart ID. */
+  readonly pivotCharts: Map<SheetId, Map<string, ChartView>>;
+}
+
 /**
  * The static content of every dashboard of `store`, with the slicer filters
- * applied. The engine computes the dashboards first, so the values match the
- * view even if no dashboard has been shown.
+ * applied, and the view of every worksheet chart over a pivot. The engine
+ * computes the pivot views first, so the values match the view even if no
+ * dashboard or chart has been shown.
  */
-export function dashboardExports(store: Store): DashboardExport[] {
+export function pivotViewExports(store: Store): PivotViewExports {
   const dashboards = dashboardsOf(store);
-  applyDashboardPayload(store, dashboards);
-  return dashboards.map((sheet) => {
-    const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-    const items = owner?.dashboard?.items ?? [];
-    return { sheet, items: items.map((item) => itemExport(store, sheet, item)) };
-  });
+  applyPivotViews(store, dashboards);
+  setPivotChartViews(store, pivotChartViewOf);
+
+  const pivotCharts = new Map<SheetId, Map<string, ChartView>>();
+  for (const sheet of store.getWorkbook().sheets) {
+    if (isDashboard(sheet)) continue;
+    for (const chart of sheet.charts ?? []) {
+      if (chart.pivot === undefined) continue;
+      const view = resolveChartView(store, sheet.id, chart.id);
+      if (view === null) continue;
+      let views = pivotCharts.get(sheet.id);
+      if (views === undefined) {
+        views = new Map();
+        pivotCharts.set(sheet.id, views);
+      }
+      views.set(chart.id, view);
+    }
+  }
+
+  return {
+    dashboards: dashboards.map((sheet) => {
+      const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
+      const items = owner?.dashboard?.items ?? [];
+      return { sheet, items: items.map((item) => itemExport(store, sheet, item)) };
+    }),
+    pivotCharts,
+  };
 }
 
 /** A computed pivot output: cells in row-major order and its layout counts. */

@@ -3,6 +3,7 @@ import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
+
 import type { ColumnarData } from "./types/data.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -203,6 +204,7 @@ export async function fromXlsxTable(
   }
 }
 
+
 /** Whether workbook import can be offered without loading an optional backend. */
 export function hasXlsxWorkbookBackend(): boolean {
   return xlsxWorkbookBackend() !== null;
@@ -247,8 +249,9 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
 
 /**
  * The export context with what only the store's engine can compute: the
- * current output of worksheet pivots and the static content of dashboards.
- * The module loads only for a workbook with a pivot or a dashboard.
+ * current output of worksheet pivots, the static content of dashboards and
+ * the values of charts over pivots. The module loads only for a workbook with
+ * a pivot or a dashboard.
  */
 async function withEngineContent(
   source: ReturnType<typeof workbookSnapshotOf>,
@@ -259,12 +262,13 @@ async function withEngineContent(
   const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
   const dashboards = sheets.some(isDashboard);
   if (!pivots && !dashboards) return source.context;
-  const { dashboardExports, worksheetPivotExports } =
+  const charts = sheets.some((sheet) => sheet.charts?.some((chart) => chart.pivot !== undefined));
+  const { pivotViewExports, worksheetPivotExports } =
     await import("./dashboard/dashboard-export.js");
   return {
     ...source.context,
     ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
-    ...(dashboards ? { dashboards: dashboardExports(store) } : {}),
+    ...(dashboards || charts ? pivotViewExports(store) : {}),
   };
 }
 

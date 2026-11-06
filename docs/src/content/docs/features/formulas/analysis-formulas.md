@@ -117,7 +117,7 @@ the cells they fill.
 `GROUPBY` groups rows by one or more key columns and aggregates the values. It
 adds a total row by default.
 
-```text partial="formula examples" title="Revenue by region"
+```formula partial="formula examples" title="Revenue by region"
 =GROUPBY(A1:A12, E1:E12, SUM)
 ```
 
@@ -130,7 +130,7 @@ adds a total row by default.
 
 `PIVOTBY` adds column keys:
 
-```text partial="formula examples" title="Revenue by region and product"
+```formula partial="formula examples" title="Revenue by region and product"
 =PIVOTBY(A1:A12, B1:B12, E1:E12, SUM)
 ```
 

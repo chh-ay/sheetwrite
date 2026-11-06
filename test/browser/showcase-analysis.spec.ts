@@ -151,7 +151,8 @@ test("the Chart menu inserts the picked kind", async ({ page }) => {
 
   const ribbon = page.getByRole("region", { name: "Ribbon" });
   await ribbon.getByRole("tab", { name: "Insert" }).click();
-  await ribbon.getByRole("button", { name: "Chart options" }).click();
+  // A2 is in the pivot, so PivotChart and its "PivotChart options" show too.
+  await ribbon.getByRole("button", { name: "Chart options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Pie" }).click();
 
   await expect

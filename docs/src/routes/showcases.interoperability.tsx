@@ -24,6 +24,8 @@ import {
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { HighlightedCode } from "../components/HighlightedCode.js";
+import { Icon } from "../components/Icon.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
@@ -343,7 +345,11 @@ function ExpectedValue({ result, testId }: { result: CheckedValue; testId?: stri
       </p>
     );
   }
-  return <pre data-testid={testId}>{JSON.stringify(result, null, 2)}</pre>;
+  return (
+    <pre data-testid={testId}>
+      <HighlightedCode code={JSON.stringify(result, null, 2)} language="json" />
+    </pre>
+  );
 }
 
 interface ChoiceOption {
@@ -664,7 +670,7 @@ function useInteroperabilityWorkbench() {
       const report = await roundTripWorkbook(grid);
       setRoundTrip(report);
       setWarningLog({
-        operation: "XLSX export → re-import round-trip",
+        operation: "XLSX export, then re-import",
         warnings: [...report.exportWarnings, ...report.importWarnings],
       });
       setStatus(
@@ -986,7 +992,8 @@ function InteroperabilityRoute() {
               A real editable Grid sits in the exchange path: load source bytes, make a change, then
               export, re-import, and inspect the fidelity result beside the workbook.{" "}
               <Link to="/docs/$/" params={{ _splat: "import-export/xlsx-export" }}>
-                XLSX interchange guide →
+                XLSX interchange guide
+                <Icon name="arrow-right" size="sm" />
               </Link>
             </>
           }
@@ -1657,7 +1664,8 @@ function WarningsSection({ workbench }: Readonly<{ workbench: InteroperabilityWo
             Every import and export reports what it could not preserve as structured{" "}
             <code>XlsxWorkbookWarning</code> records, coded per sheet and per cell.{" "}
             <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-workbook-warning" }}>
-              Warning codes →
+              Warning codes
+              <Icon name="arrow-right" size="sm" />
             </Link>
           </p>
           <div className="sw-si-panel sw-si-warnings" data-testid="interop-warnings">
@@ -1865,7 +1873,8 @@ function LimitsSection({ workbench }: Readonly<{ workbench: InteroperabilityWork
             Ceilings are enforced before anything allocates, and hand-authored hostile
             OPC/SpreadsheetML packages are rejected with typed errors.{" "}
             <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-resource-limits" }}>
-              Resource limits →
+              Resource limits
+              <Icon name="arrow-right" size="sm" />
             </Link>
           </p>
           <div className="sw-si-panel">
@@ -2203,7 +2212,8 @@ function ContractSection() {
               boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or
               OpenFormula compatibility.{" "}
               <Link to="/docs/$/" params={{ _splat: "reference/compatibility-results" }}>
-                Read the detailed checked results →
+                Read the detailed checked results
+                <Icon name="arrow-right" size="sm" />
               </Link>
             </p>
 
@@ -2602,7 +2612,12 @@ function CompatibilityResultDetail({
               .join(", ")}
             .
           </p>
-          <pre>{JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}</pre>
+          <pre>
+            <HighlightedCode
+              code={JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}
+              language="json"
+            />
+          </pre>
         </aside>
       )}
 
@@ -2612,7 +2627,7 @@ function CompatibilityResultDetail({
         </h4>
         {selectedResult.formula && (
           <p>
-            Formula <code>{selectedResult.formula}</code>
+            Formula <HighlightedCode code={selectedResult.formula} language="formula" />
             {selectedResult.target ? (
               <>
                 {" "}
@@ -2637,7 +2652,10 @@ function CompatibilityResultDetail({
         ) : null}
         {selectedResult.operations && (
           <pre data-testid="compatibility-workbook-preview">
-            {JSON.stringify(selectedResult.operations, null, 2)}
+            <HighlightedCode
+              code={JSON.stringify(selectedResult.operations, null, 2)}
+              language="json"
+            />
           </pre>
         )}
         <dl>
@@ -2825,7 +2843,9 @@ function TestedAppResult({
         observation?.result && (
           <details>
             <summary>Technical captured result</summary>
-            <pre>{JSON.stringify(observation.result, null, 2)}</pre>
+            <pre>
+              <HighlightedCode code={JSON.stringify(observation.result, null, 2)} language="json" />
+            </pre>
           </details>
         )
       )}

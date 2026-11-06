@@ -1,8 +1,8 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, shift_cols,
-    shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    invalidate_sheet_refs, move_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs,
+    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::formula_rewrite::write_references;
@@ -653,6 +653,20 @@ impl FormulaEntry {
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
         self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
+    }
+
+    /// Follow `block` (`from`, `count`, `to`) rows or, with `columns`,
+    /// columns of `edited_sheet` that moved; see [`move_refs`].
+    pub(crate) fn move_axis(
+        &mut self,
+        edited_sheet: u32,
+        formula_sheet: u32,
+        columns: bool,
+        block: (u32, u32, u32),
+    ) -> bool {
+        self.rewrite_ast(formula_sheet, |ast| {
+            move_refs(ast, edited_sheet, formula_sheet, columns, block)
+        })
     }
 
     /// Point the entry's references to a sheet of another workbook at the

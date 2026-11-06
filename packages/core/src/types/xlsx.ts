@@ -1,6 +1,8 @@
 // XLSX backend contracts shared by core's XLSX bridge and the XLSX add-on.
 // No runtime values live here.
 
+import type { ChartView } from "./chart.js";
+import type { SheetId } from "./coordinates.js";
 import type { DashboardExport } from "./dashboard.js";
 import type { ColumnarData } from "./data.js";
 import type { Workbook, WorkbookSnapshot } from "./document.js";
@@ -127,6 +129,8 @@ export interface XlsxWorkbookExportContext {
    * pivot's output as cell values.
    */
   readonly pivotOutputs?: readonly DashboardExport[];
+  /** The resolved view of each worksheet chart over a pivot, by sheet and chart ID. */
+  readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
 }
 
 /** Optional backend contract for complete workbook XLSX interchange. */

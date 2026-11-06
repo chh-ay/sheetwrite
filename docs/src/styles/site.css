@@ -1,8 +1,10 @@
-/* Documentation site styles, in cascade order. Shared prose and controls come
-   first; the API reference, evidence pages, upgrade guides, formula reference
-   and release pages each own their blocks; content blocks used across pages
-   come last. */
+/* Site styles, in cascade order. Core components come first; shared prose and
+   controls next; code hovers, the API reference, evidence pages, upgrade
+   guides, formula reference and release pages each own their blocks; content
+   blocks used across pages come last. Every route loads this file. */
+@import "./components.css";
 @import "./site/base.css";
+@import "./site/code-hovers.css";
 @import "./site/api-reference.css";
 @import "./site/evidence.css";
 @import "./site/upgrade-guide.css";

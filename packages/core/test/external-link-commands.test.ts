@@ -115,6 +115,34 @@ describe("external link commands", () => {
     expect(shown(grid, 0)).toBe(7);
   });
 
+  it("changes the source of and breaks formulas that use a name of the link", () => {
+    const grid = linkedGrid();
+    const links = grid.store.getWorkbook().externalLinks ?? [];
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "setExternalLinks",
+          links: links.map((entry) => ({
+            ...entry,
+            names: [{ name: "Total", refersTo: "=Annual!$A$1" }],
+          })),
+        },
+        { op: "set", addr: at(2), value: { kind: "formula", src: "=Sales.xlsx!Total+1" } },
+      ],
+    });
+    expect(shown(grid, 2)).toBe(6);
+
+    expect(
+      changeExternalLinkSource(grid, "Sales.xlsx", { book: "Q 1.xlsx", target: "Q1.xlsx" }),
+    ).toBe(true);
+    expect(grid.store.getFormula(at(2))).toBe("='Q 1.xlsx'!Total+1");
+    expect(shown(grid, 2)).toBe(6);
+
+    expect(breakExternalLinks(grid, ["Q 1.xlsx"])).toBe(true);
+    expect(grid.store.getFormula(at(2))).toBeNull();
+    expect(shown(grid, 2)).toBe(6);
+  });
+
   it("reads a link that is added after the formula", () => {
     const grid = linkedGrid();
     grid.applyTransaction({

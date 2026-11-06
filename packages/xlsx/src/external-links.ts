@@ -145,7 +145,22 @@ function readLink(
     });
     sheet.cells = [];
   }
-  return { book: bookName(target), target, sheets: sheets.filter((sheet) => sheet.name) };
+  // A name's `sheetId` is the index of its sheet in `sheetNames`.
+  const names = xmlChildren(xmlChild(book, "definedNames") ?? book, "definedName").flatMap(
+    (definedName) => {
+      const name = decodeXstring(xmlAttribute(definedName, "name") ?? "");
+      const refersTo = decodeXstring(xmlAttribute(definedName, "refersTo") ?? "");
+      const sheetId = xmlAttribute(definedName, "sheetId");
+      const sheet = sheetId === undefined ? undefined : sheets[Number(sheetId)]?.name;
+      return name && refersTo ? [sheet ? { name, refersTo, sheet } : { name, refersTo }] : [];
+    },
+  );
+  return {
+    book: bookName(target),
+    target,
+    sheets: sheets.filter((sheet) => sheet.name),
+    ...(names.length > 0 ? { names } : {}),
+  };
 }
 
 /** Read the workbook links that file formulas name by `[n]`. */
@@ -188,8 +203,9 @@ export async function readExternalLinks(
 
 /**
  * An imported formula with each `[n]` link index replaced by the book name,
- * or undefined when it calls a live external-data function, names a link that
- * was not read, or names a defined name of another workbook.
+ * or undefined when it calls a live external-data function or names a link
+ * that was not read. A defined name of a link, `[1]!Total`, becomes
+ * `Budget.xlsx!Total`, as Excel shows it.
  */
 export function linkedFormula(
   formula: string,
@@ -198,7 +214,7 @@ export function linkedFormula(
   if (formulaCallsExternalData(formula)) return undefined;
   return rewriteExternalSheets(formula, ({ book, sheet }) => {
     const name = /^\d+$/.test(book) ? books[Number(book) - 1] : undefined;
-    return name && sheet ? externalSheetText(name, sheet) : undefined;
+    return name ? externalSheetText(name, sheet) : undefined;
   });
 }
 
@@ -220,8 +236,9 @@ export class ExternalLinkExport {
   }
 
   /**
-   * The formula with each book name replaced by its `[n]` index. A book with
-   * no link gets one without saved values, so Excel can still find the file.
+   * The formula with each book name replaced by its `[n]` index: `[1]Annual`
+   * for a sheet, `[1]` for a defined name. A book with no link gets one
+   * without saved values, so Excel can still find the file.
    */
   fileFormula(formula: string): string {
     const rewritten = rewriteExternalSheets(formula, ({ book, sheet }) => {
@@ -237,7 +254,7 @@ export class ExternalLinkExport {
       if (link && sheet && !link.sheets.some((known) => known.name === sheet)) {
         link.sheets.push({ name: sheet, cells: [] });
       }
-      return externalSheetText(String(index), sheet);
+      return sheet ? externalSheetText(String(index), sheet) : `[${index}]`;
     });
     return rewritten ?? formula;
   }
@@ -274,11 +291,22 @@ export function externalLinkPartXml(link: ExternalLink): { part: string; relatio
   const sheetNames = link.sheets
     .map((sheet) => `<sheetName val="${escapeXml(encodeXstring(sheet.name))}"/>`)
     .join("");
+  const definedNames = (link.names ?? [])
+    .map(({ name, refersTo, sheet }) => {
+      const sheetId =
+        sheet === undefined ? -1 : link.sheets.findIndex((candidate) => candidate.name === sheet);
+      return (
+        `<definedName name="${escapeXml(encodeXstring(name))}" refersTo="${escapeXml(encodeXstring(refersTo))}"` +
+        (sheetId >= 0 ? ` sheetId="${sheetId}"/>` : "/>")
+      );
+    })
+    .join("");
   return {
     part:
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<externalLink xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><externalBook r:id="rId1">` +
       `<sheetNames>${sheetNames}</sheetNames>` +
+      (definedNames ? `<definedNames>${definedNames}</definedNames>` : "") +
       (sheetData ? `<sheetDataSet>${sheetData}</sheetDataSet>` : "") +
       `</externalBook></externalLink>`,
     relationships:

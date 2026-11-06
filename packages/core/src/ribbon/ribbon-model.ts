@@ -33,6 +33,7 @@ import {
   showFormulaExplanation,
   showNameManager,
 } from "../panels/panel-loader.js";
+import { selectedPivot } from "../panels/selected-pivot.js";
 import { queryCommandsOf, queryRefreshRunning, toggleQueryRefresh } from "../query-commands.js";
 import { selectionCell } from "../selection.js";
 import { storeEngine } from "../store/engine-registry.js";
@@ -333,7 +334,7 @@ const insertChartOf =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
 
-/** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard pivot. */
+/** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard or worksheet pivot. */
 const insertPivotChartOf =
   (kind: ChartKind) =>
   async (grid: Grid): Promise<boolean> =>
@@ -380,7 +381,10 @@ const chart: RibbonMenuSpec = {
   items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insertChartOf(kind) })),
 };
 
-/** Excel's PivotChart: on a dashboard with a pivot, a chart over that pivot. */
+/**
+ * Excel's PivotChart: on a dashboard with a pivot, or with the active cell in
+ * a worksheet pivot, a chart over that pivot.
+ */
 const pivotChart: RibbonMenuSpec = {
   kind: "menu",
   id: "pivotChart",
@@ -394,7 +398,7 @@ const pivotChart: RibbonMenuSpec = {
     icon,
     run: insertPivotChartOf(kind),
   })),
-  available: (grid) => activeSheetIsDashboard(grid),
+  available: (grid) => activeSheetIsDashboard(grid) || selectedPivot(grid) !== null,
 };
 
 function outline(group: boolean): (grid: Grid) => void {

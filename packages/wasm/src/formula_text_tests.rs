@@ -166,9 +166,11 @@ fn a_defined_name_formula_keeps_its_text_through_edits() {
         Some("=(North!$B$3 + North!$B$4) * 2")
     );
 
-    let moved =
-        store.move_named_formula_source("=(North!$B$3 + 1) * 2", sales as u32, false, 2, 1, 4);
-    assert_eq!(moved.as_deref(), Some("=(North!$B$5 + 1) * 2"));
+    assert_eq!(store.move_rows(sales, 2, 1, 4), crate::store::BLOCK_OK);
+    assert_eq!(
+        store.named_formula_source("Total", -1).as_deref(),
+        Some("=(North!$B$5 + North!$B$3) * 2")
+    );
 }
 
 #[test]

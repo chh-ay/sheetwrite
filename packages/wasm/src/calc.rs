@@ -1919,6 +1919,13 @@ impl<'a> Parser<'a> {
         let names_sheet = matches!(self.cursor.peek_at(0), Some(Tok::Ident(_, false)))
             && matches!(self.cursor.peek_at(1), Some(Tok::Bang));
         if !names_sheet {
+            // `[Budget.xlsx]!Total`: a defined name of the other workbook.
+            let names_name = matches!(self.cursor.peek_at(0), Some(Tok::Bang))
+                && matches!(self.cursor.peek_at(1), Some(Tok::Ident(_, false)));
+            if names_name {
+                let _ = self.next();
+                return self.external_name_at(raw);
+            }
             return self.structured_ref(raw, None);
         }
 
@@ -2021,11 +2028,26 @@ impl<'a> Parser<'a> {
     fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
         // Sheet names cannot contain `:`, so a quoted name with one is the
         // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`. The `:` of a
-        // drive in the path of another workbook is not.
-        if quoted && !is_external_sheet(&sheet_name) {
+        // drive in the path of another workbook or file is not.
+        if quoted && !is_external_sheet(&sheet_name) && !sheet_name.contains(['\\', '/']) {
             if let Some((first, last)) = sheet_name.split_once(':') {
                 return self.sheet_span_at(first.to_string(), last.to_string(), true);
             }
+        }
+
+        // `Budget.xlsx!Total` or `[Budget.xlsx]Annual!Total`: a defined
+        // name of another workbook. A name is not a cell and does not start
+        // a range.
+        let names_name = matches!(self.peek(), Some(Tok::Ident(name, false)) if parse_a1(name).is_none())
+            && self.cursor.peek_at(1) != Some(&Tok::Colon)
+            && names_workbook(&sheet_name);
+        if names_name {
+            let qualifier = if quoted {
+                format!("'{}'", sheet_name.replace('\'', "''"))
+            } else {
+                sheet_name
+            };
+            return self.external_name_at(qualifier);
         }
 
         self.features.sheet_refs = true;
@@ -2083,6 +2105,18 @@ impl<'a> Parser<'a> {
             flags: range_flags,
             cell,
         })))
+    }
+
+    /// The defined name after `qualifier!`, where `qualifier` names another
+    /// workbook as the formula writes it. The name keeps that text, which
+    /// `external_name_key` reads to find the name in the link.
+    #[cold]
+    fn external_name_at(&mut self, qualifier: String) -> Result<Ast, String> {
+        let Some(Tok::Ident(name, _)) = self.next() else {
+            return Err(NOT_EXPECTED.into());
+        };
+        self.features.names = true;
+        Ok(Ast::Name(format!("{qualifier}!{name}")))
     }
 
     /// `A1#` refers to the whole spill of the formula in A1. It is stored as
@@ -2148,6 +2182,39 @@ fn missing_area_end(after: &str) -> String {
 pub(crate) fn sheet_name_key(name: &str) -> String {
     let name = name.rfind('[').map_or(name, |start| &name[start..]);
     name.chars().flat_map(char::to_lowercase).collect()
+}
+
+/// The lookup key of a defined name of another workbook, from the text a
+/// formula writes: `Budget.xlsx!Total`, `'C:\Reports\Budget.xlsx'!Total`,
+/// `[Budget.xlsx]!Total` and `'C:\Reports\[Budget.xlsx]'!Total` all give
+/// `[BUDGET.XLSX]!TOTAL`; the sheet-scoped `[Budget.xlsx]Annual!Total`
+/// gives `[BUDGET.XLSX]ANNUAL!TOTAL`. The folder and the letter case are
+/// left out, as for link sheets. A quote in a book or sheet name stays
+/// doubled, as a quoted formula writes it. `None` for a name without a
+/// workbook.
+pub(crate) fn external_name_key(text: &str) -> Option<String> {
+    let (qualifier, name) = text.rsplit_once('!')?;
+    let qualifier = qualifier
+        .strip_prefix('\'')
+        .and_then(|inner| inner.strip_suffix('\''))
+        .unwrap_or(qualifier);
+    let key = match qualifier.rfind('[') {
+        Some(start) => format!("{}!{name}", &qualifier[start..]),
+        None => {
+            let folder_end = qualifier.rfind('\\').max(qualifier.rfind('/'));
+            let book = folder_end.map_or(qualifier, |at| &qualifier[at + 1..]);
+            format!("[{book}]!{name}")
+        }
+    };
+    Some(key.to_uppercase())
+}
+
+/// Whether the text before `!` names another workbook: a sheet of it
+/// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
+/// `C:\Reports\Budget.xlsx`). A file name has an extension, and a path
+/// has a folder; Excel sheet names hold neither `\\` nor `/`.
+fn names_workbook(qualifier: &str) -> bool {
+    is_external_sheet(qualifier) || qualifier.contains(['.', '\\', '/'])
 }
 
 /// Whether a sheet reference names a sheet of another workbook:
@@ -2891,13 +2958,7 @@ impl AxisEdit {
 
         let span = match self.change {
             AxisChange::Shift { at, delta } => shift_range(*start, *end, at, delta),
-            // A move deletes nothing. When the block moves past one end, the
-            // ends can swap, and the range keeps the cells between them.
-            AxisChange::Move { from, count, to } => {
-                let first = moved_index(*start, from, count, to);
-                let second = moved_index(*end, from, count, to);
-                Some((first.min(second), first.max(second)))
-            }
+            AxisChange::Move { from, count, to } => moved_span(*start, *end, from, count, to),
         };
         match span {
             Some((shifted_start, shifted_end)) if shifted_start <= last => {
@@ -2968,22 +3029,24 @@ pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChan
     )
 }
 
-/// A moved block must not first delete a defined name's references: rewrite
-/// the saved definition once, after the store's remove/add move completes.
-pub(crate) fn move_named_formula_refs(
+/// Follow `count` rows or columns of `edited_sheet` moved from `from` to
+/// `to`, in a formula on `formula_sheet`: references to moved cells and to
+/// the cells the block passes over follow those cells. A defined name's
+/// formula has no sheet: pass `u32::MAX`, so only the references that name
+/// `edited_sheet` move. Returns whether any reference changed.
+pub(crate) fn move_refs(
     ast: &mut Ast,
     edited_sheet: u32,
+    formula_sheet: u32,
     columns: bool,
-    from: u32,
-    count: u32,
-    to: u32,
+    (from, count, to): (u32, u32, u32),
 ) -> bool {
     rewrite_axis(
         ast,
         AxisEdit {
             axis: if columns { Axis::Col } else { Axis::Row },
             change: AxisChange::Move { from, count, to },
-            formula_sheet: u32::MAX,
+            formula_sheet,
             edited_sheet,
         },
     )
@@ -3027,8 +3090,9 @@ fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
 }
 
 /// Where `index` is after `count` indices move from `from` to `to`; `to` is
-/// the first index of the moved block after the move.
-fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
+/// the first index of the moved block after the move. A moved cell takes its
+/// references along, so a reference to one cell follows it.
+pub(crate) fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
     let block_end = from.saturating_add(count);
     if (from..block_end).contains(&index) {
         return to + (index - from);
@@ -3040,6 +3104,30 @@ fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
     } else {
         without_block
     }
+}
+
+/// The inclusive span `start..=end` after `count` indices move from `from`
+/// to `to`, as Excel's Insert Cut Cells changes a range. A span inside the
+/// moved block moves with it. Any other span changes as if the block were
+/// deleted where it was and inserted where it lands: it loses the moved
+/// indices it held, a cut corner included, and grows by the block when the
+/// block lands after its first index and at or before its last.
+pub(crate) fn moved_span(
+    start: u32,
+    end: u32,
+    from: u32,
+    count: u32,
+    to: u32,
+) -> Option<(u32, u32)> {
+    if from <= start && end < from.saturating_add(count) {
+        return Some((
+            moved_index(start, from, count, to),
+            moved_index(end, from, count, to),
+        ));
+    }
+
+    let (start, end) = shift_range(start, end, from, -i64::from(count))?;
+    shift_range(start, end, to, i64::from(count))
 }
 
 /// Shift or contract an inclusive range; deleting every target invalidates it.

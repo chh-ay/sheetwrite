@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useState } from "react";
 
+import { Icon } from "../Icon.js";
 import { onTabListKey } from "../tabKeys.js";
 import { AnalysisStory } from "./AnalysisStory.js";
 import { OfflineStory } from "./OfflineStory.js";
@@ -135,7 +136,10 @@ export function StoryReel() {
         <div className="sw-reel__copy" key={`copy-${story.id}`}>
           <h3>{story.title}</h3>
           <p>{story.detail}</p>
-          <a href={story.href}>{story.link} →</a>
+          <a href={story.href}>
+            {story.link}
+            <Icon name="arrow-right" />
+          </a>
           <button
             aria-pressed={pausedByReader}
             className="sw-reel__pause"

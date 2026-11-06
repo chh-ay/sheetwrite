@@ -11,6 +11,8 @@ import { ExpressiveCode } from "expressive-code";
 import { format } from "prettier";
 import { svelte2tsx } from "svelte2tsx";
 
+import { CODE_ROLES, type CodeRole } from "./code-roles.js";
+import { themeTokens, tokenColour } from "./design-tokens.js";
 import { hashIdentifier } from "./hash-identifier.js";
 import {
   injectHoverPrelude,
@@ -21,6 +23,8 @@ import { SheetwriteTypeEngine, type SheetwriteTypeHover } from "./sheetwrite-typ
 import { lineStartOffsets } from "./source-offsets.js";
 
 const SUPPORTED_LANGUAGES = new Set(["ts", "tsx", "vue", "svelte"]);
+/** Generated API fences: whole declarations (`ts`) and single members (`ts-member`). */
+const GENERATED_LANGUAGES = new Set(["ts", "ts-member"]);
 const LOW_QUALITY_HOVER = /\bany\b|\/\*unresolved\*\//;
 const LEADING_KIND = /^\(([\w-]+)\)\s+/gm;
 const IMPORT_SUFFIX = /\nimport .*$/s;
@@ -196,11 +200,12 @@ interface RenderedHover {
   narrowSignature: ElementContent[];
   docs?: string;
   tags: readonly [name: string, text: string | undefined][];
-  examples?: ReadonlyMap<string, ElementContent[]>;
   seeRoutes?: ReadonlyMap<string, string>;
   referenceRoute?: string;
   /** When set, the trigger itself is an anchor: hover previews, click navigates. */
   navigable?: boolean;
+  /** The token is an exported Sheetwrite API name, not a local or a member. */
+  isApiName?: boolean;
 }
 
 function nestedRendererConfig(config: ResolvedExpressiveCodeEngineConfig) {
@@ -291,6 +296,60 @@ function capPreviewLines(formatted: string, maxLines: number): string {
   return [...kept, `  // … ${remaining} more lines — see the API reference`, "}"].join("\n");
 }
 
+/** Light-theme token colour -> syntax role; each role's colour is unique. */
+let roleByColour: ReadonlyMap<string, CodeRole> | undefined;
+
+function codeRoleOf(colour: string): CodeRole | undefined {
+  if (roleByColour === undefined) {
+    const tokens = themeTokens("light");
+    roleByColour = new Map(
+      CODE_ROLES.map((role) => [tokenColour(tokens, `--sw-code-${role}`), role]),
+    );
+  }
+  return roleByColour.get(colour.toLowerCase());
+}
+
+const LIGHT_COLOUR = /--0:\s*(#[0-9a-fA-F]{3,8})/;
+
+/**
+ * Highlighted tokens as role classes (`sw-code-keyword`) instead of the
+ * per-span `--0`/`--1` colour properties Expressive Code writes. A panel can
+ * hold a few hundred token spans; custom properties on every one made the
+ * browser build a separate style for each when the panel first opened.
+ * Plain-text tokens lose their span altogether.
+ */
+function withRoleClasses(nodes: readonly ElementContent[]): ElementContent[] {
+  const output: ElementContent[] = [];
+  const pushText = (value: string): void => {
+    const last = output.at(-1);
+    if (last?.type === "text") last.value += value;
+    else output.push({ type: "text", value });
+  };
+  for (const node of nodes) {
+    if (node.type === "text") {
+      pushText(node.value);
+      continue;
+    }
+    if (node.type !== "element") continue;
+    const colour = LIGHT_COLOUR.exec(String(node.properties.style ?? ""))?.[1];
+    const children = withRoleClasses(node.children);
+    if (colour === undefined) {
+      output.push({ ...node, children });
+      continue;
+    }
+    const role = codeRoleOf(colour);
+    if (role === undefined) {
+      for (const child of children) {
+        if (child.type === "text") pushText(child.value);
+        else output.push(child);
+      }
+      continue;
+    }
+    output.push(h(`span.sw-code-${role}`, children));
+  }
+  return output;
+}
+
 function codeLineContents(ast: Element): ElementContent[] {
   const lines = selectAll(".ec-line > .code", ast);
   const output: ElementContent[] = [];
@@ -300,7 +359,7 @@ function codeLineContents(ast: Element): ElementContent[] {
       line.children.length === 1 &&
       line.children[0]?.type === "text" &&
       line.children[0].value === "\n";
-    output.push(h("span.sw-code-popover__line", placeholder ? [] : line.children));
+    output.push(h("span.sw-code-popover__line", placeholder ? [] : withRoleClasses(line.children)));
     if (index < lines.length - 1) output.push({ type: "text", value: "\n" });
   }
   return output;
@@ -405,7 +464,10 @@ function remapThroughInjection(
   const lines = originalSource.split("\n");
   const remapped: SheetwriteTypeHover[] = [];
   for (const hover of hovers) {
-    const position = injection.toOriginal({ line: hover.line, character: hover.character });
+    const position = injection.toOriginal({
+      line: hover.line,
+      character: hover.character,
+    });
     if (position === null) continue;
     const line = lines[position.line];
     if (
@@ -464,15 +526,6 @@ export function hoverPopoverId(
   return `sheetwrite-code-popover-${blockIdentity}-${hoverIndex}-${hover.line}-${hover.character}-${hover.length}-${hashIdentifier(hover.target)}`;
 }
 
-/**
- * An `@example` is code: keep its own line breaks and indentation, which the
- * prose cleanup would fold into one line. A fenced example loses its fence.
- */
-function exampleCode(value: string): string {
-  const fenced = /```[\w-]*\n?([\s\S]*?)```/.exec(value);
-  return (fenced?.[1] ?? value).replace(/^\n+|\s+$/g, "");
-}
-
 /** Make external URLs and site paths clickable in tag text. */
 function tagValueContents(value: string): ElementContent[] {
   const cleaned = cleanDocumentation(value);
@@ -500,6 +553,122 @@ function tagValueContents(value: string): ElementContent[] {
   return contents;
 }
 
+/** Reader-facing names of JSDoc tags; others show as `@name`. */
+const TAG_LABELS: Readonly<Record<string, string>> = {
+  defaultValue: "Default",
+  deprecated: "Deprecated",
+  param: "Parameter",
+  remarks: "Remarks",
+  returns: "Returns",
+  throws: "Throws",
+};
+
+function tagLabel(name: string): Element {
+  return h("span.sw-code-popover__tag-name", TAG_LABELS[name] ?? `@${name}`);
+}
+
+/**
+ * A panel links to a symbol's examples instead of rendering them: a full
+ * example is hundreds of highlighted spans, which made the first open of a
+ * large panel one long style task. Symbol pages hold them under "Examples";
+ * a member route already points at the member row that holds its own.
+ */
+function exampleHref(referenceRoute: string): string {
+  return referenceRoute.includes("#") ? referenceRoute : `${referenceRoute}#examples`;
+}
+
+/** `@see` targets separated by commas, each linked when it names a page. */
+function seeAlsoTargets(values: readonly string[], rendered: RenderedHover): ElementContent[] {
+  return values.flatMap((value, index): ElementContent[] => [
+    ...(index > 0 ? [{ type: "text" as const, value: ", " }] : []),
+    ...(rendered.seeRoutes?.has(value)
+      ? [
+          h(
+            "a.sw-code-popover__tag-link",
+            { href: rendered.seeRoutes.get(value) },
+            cleanDocumentation(value),
+          ),
+        ]
+      : tagValueContents(value)),
+  ]);
+}
+
+/** The panel's one link line: "See also Grid, GridOptions · Example". */
+function linksLine(seeAlso: readonly string[], rendered: RenderedHover, hasExample: boolean) {
+  const example =
+    hasExample && rendered.referenceRoute !== undefined
+      ? h("a.sw-code-popover__tag-link", { href: exampleHref(rendered.referenceRoute) }, "Example")
+      : undefined;
+  if (seeAlso.length === 0 && example === undefined) return undefined;
+  const parts: ElementContent[] = [];
+  if (seeAlso.length > 0) {
+    parts.push(
+      h("span.sw-code-popover__tag-name", "See also"),
+      ...seeAlsoTargets(seeAlso, rendered),
+    );
+  }
+  if (example !== undefined) {
+    if (parts.length > 0)
+      parts.push(h("span.sw-code-popover__separator", { ariaHidden: "true" }, "·"));
+    parts.push(example);
+  }
+  return h("span.sw-code-popover__tag.sw-code-popover__links", parts);
+}
+
+/** Other tags in source order, then the link line. */
+function panelTags(rendered: RenderedHover): Element[] {
+  const seeAlso: string[] = [];
+  const tags: Element[] = [];
+  let hasExample = false;
+  for (const [name, value] of rendered.tags) {
+    if (name === "see" && value) seeAlso.push(value);
+    else if (name === "example") hasExample = true;
+    else
+      tags.push(h("span.sw-code-popover__tag", [tagLabel(name), ...tagValueContents(value ?? "")]));
+  }
+  const links = linksLine(seeAlso, rendered, hasExample);
+  if (links !== undefined) tags.push(links);
+  return tags;
+}
+
+/**
+ * The hover panel: a visually hidden plain signature for screen readers,
+ * the highlighted signature at two widths, the docs, the tags and the link to
+ * the API reference. `dedupe-code-popovers.ts` moves it into the page's store.
+ */
+function popoverPanel(rendered: RenderedHover, popoverId: string): Element {
+  const tags = panelTags(rendered);
+  return h(
+    "span.sw-code-popover__panel",
+    {
+      id: popoverId,
+      role: "tooltip",
+      dataSwCodePopoverPanel: "",
+      // Popover text is preview chrome; indexing it lets giant embedded
+      // declarations (e.g. Grid) hijack search rankings on every page.
+      dataPagefindIgnore: "",
+    },
+    [
+      h("span.sw-code-popover__accessible-signature", rendered.accessibleSignature),
+      h(
+        "span.sw-code-popover__signature.sw-code-popover__signature--wide",
+        { ariaHidden: "true" },
+        rendered.wideSignature,
+      ),
+      h(
+        "span.sw-code-popover__signature.sw-code-popover__signature--narrow",
+        { ariaHidden: "true" },
+        rendered.narrowSignature,
+      ),
+      rendered.docs ? h("span.sw-code-popover__docs", cleanDocumentation(rendered.docs)) : [],
+      tags.length > 0 ? h("span.sw-code-popover__tags", tags) : [],
+      rendered.referenceRoute
+        ? h("a.sw-code-popover__link", { href: rendered.referenceRoute }, "API reference")
+        : [],
+    ],
+  );
+}
+
 class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   override readonly name = "sheetwrite-code-hover";
 
@@ -517,100 +686,27 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   }
 
   override render({ nodesToTransform }: AnnotationRenderOptions): Element[] {
-    const kind = this.rendered.docs
-      ? "documented"
-      : this.rendered.referenceRoute
-        ? "reference"
-        : "type";
+    const { docs, navigable, referenceRoute } = this.rendered;
+    const kind = docs ? "documented" : referenceRoute ? "reference" : "type";
+    const isLink = navigable === true && referenceRoute !== undefined;
     return nodesToTransform.map((node) =>
       h("span.sw-code-popover", [
         h(
-          this.rendered.navigable && this.rendered.referenceRoute
-            ? "a.sw-code-popover__trigger"
-            : "span.sw-code-popover__trigger",
+          isLink ? "a.sw-code-popover__trigger" : "span.sw-code-popover__trigger",
           {
-            ...(this.rendered.navigable && this.rendered.referenceRoute
-              ? { href: this.rendered.referenceRoute }
-              : { tabIndex: 0 }),
+            ...(isLink ? { href: referenceRoute } : {}),
+            // One Tab stop per code block: `rovingCodeFocus` gives the block's
+            // first trigger tabindex 0; arrow keys move between the others.
+            tabIndex: -1,
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
             dataHoverKind: kind,
+            // An exported Sheetwrite API name: the only kind marked at rest.
+            ...(this.rendered.isApiName === true ? { dataSwApi: "" } : {}),
           },
           [node],
         ),
-        h(
-          "span.sw-code-popover__panel",
-          {
-            id: this.popoverId,
-            role: "tooltip",
-            hidden: true,
-            ariaHidden: "true",
-            dataSwCodePopoverPanel: "",
-            // Popover text is preview chrome; indexing it lets giant embedded
-            // declarations (e.g. Grid) hijack search rankings on every page.
-            dataPagefindIgnore: "",
-          },
-          [
-            h("span.sw-code-popover__accessible-signature", this.rendered.accessibleSignature),
-            h(
-              "span.sw-code-popover__signature.sw-code-popover__signature--wide",
-              { ariaHidden: "true" },
-              this.rendered.wideSignature,
-            ),
-            h(
-              "span.sw-code-popover__signature.sw-code-popover__signature--narrow",
-              { ariaHidden: "true" },
-              this.rendered.narrowSignature,
-            ),
-            this.rendered.docs
-              ? h("span.sw-code-popover__docs", cleanDocumentation(this.rendered.docs))
-              : [],
-            this.rendered.tags.length > 0
-              ? h(
-                  "span.sw-code-popover__tags",
-                  this.rendered.tags.map(([name, value]) =>
-                    name === "example" && value
-                      ? h("span.sw-code-popover__tag.sw-code-popover__tag--example", [
-                          h("span.sw-code-popover__tag-name", "Example"),
-                          h(
-                            "code.sw-code-popover__example",
-                            structuredClone(
-                              this.rendered.examples?.get(value) ?? [
-                                { type: "text" as const, value: exampleCode(value) },
-                              ],
-                            ),
-                          ),
-                        ])
-                      : h("span.sw-code-popover__tag", [
-                          h(
-                            "span.sw-code-popover__tag-name",
-                            name === "see" ? "See also" : `@${name}`,
-                          ),
-                          ...(value ? [{ type: "text", value: " " } as ElementContent] : []),
-                          ...(value
-                            ? name === "see" && this.rendered.seeRoutes?.has(value)
-                              ? [
-                                  h(
-                                    "a.sw-code-popover__tag-link",
-                                    { href: this.rendered.seeRoutes.get(value) },
-                                    cleanDocumentation(value),
-                                  ),
-                                ]
-                              : tagValueContents(value)
-                            : []),
-                        ]),
-                  ),
-                )
-              : [],
-            this.rendered.referenceRoute
-              ? h(
-                  "a.sw-code-popover__link",
-                  { href: this.rendered.referenceRoute },
-                  "API reference →",
-                )
-              : [],
-          ],
-        ),
+        popoverPanel(this.rendered, this.popoverId),
       ]),
     );
   }
@@ -649,7 +745,12 @@ export function collectReferenceLinks(
       const start = match.index;
       const before = start > 0 ? text[start - 1] : "";
       if (before === "." || before === '"' || before === "'") continue;
-      links.push({ line: lineIndex, columnStart: start, columnEnd: start + name.length, route });
+      links.push({
+        line: lineIndex,
+        columnStart: start,
+        columnEnd: start + name.length,
+        route,
+      });
     }
   }
   return links;
@@ -687,7 +788,10 @@ class SheetwriteReferenceLinkAnnotation extends ExpressiveCodeAnnotation {
 }
 
 export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
-  const analyzer = new SheetwriteTypeEngine({ cwd: options.cwd, fsMap: options.fsMap });
+  const analyzer = new SheetwriteTypeEngine({
+    cwd: options.cwd,
+    fsMap: options.fsMap,
+  });
   let signatureRenderer: ExpressiveCode | undefined;
   let referenceRoutes: ReadonlyMap<string, string> | undefined;
   let memberReferences: ReadonlyMap<string, MemberReference> | undefined;
@@ -696,7 +800,6 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     string,
     { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
   >();
-  const exampleParts = new Map<string, ElementContent[]>();
 
   const resolveManifest = async (): Promise<void> => {
     if (referenceRoutes && memberReferences && symbolPreviews) return;
@@ -720,11 +823,11 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     name: "sheetwrite-code-hovers",
     hooks: {
       async preprocessCode({ codeBlock, config }) {
-        if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
         // Generated declaration fences carry no imports, so the type engine
         // cannot resolve their identifiers. The manifest can: each public
         // symbol gets a preview popover, and the token itself navigates.
         if (/\bgenerated\b/.test(codeBlock.meta)) {
+          if (!GENERATED_LANGUAGES.has(codeBlock.language)) return;
           await resolveManifest();
           signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
           const previews = symbolPreviews ?? new Map<string, SymbolPreview>();
@@ -793,6 +896,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                   tags: [],
                   referenceRoute: link.route,
                   navigable: true,
+                  isApiName: true,
                 },
                 hoverPopoverId(codeBlock, hover, linkIndex),
               ),
@@ -800,6 +904,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           }
           return;
         }
+        if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
         if (options.shouldTransform && !options.shouldTransform(codeBlock)) return;
 
         signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
@@ -820,16 +925,22 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           if (!accessibleSignature) continue;
           // Import aliases and self-restating declarations waste the reader's hover.
           if (/^import\s/.test(accessibleSignature)) continue;
-          const memberReference = memberDocsFor(hover.target, accessibleSignature, members);
+          // DOM and standard-library names (`document`, `style.height`) are
+          // never Sheetwrite APIs, even when a Sheetwrite member shares the name.
+          const isLibrarySymbol = hover.origin === "lib";
+          const memberReference = isLibrarySymbol
+            ? undefined
+            : memberDocsFor(hover.target, accessibleSignature, members);
           const hasDetails =
             Boolean(hover.docs ?? memberReference?.docs) || (hover.tags?.length ?? 0) > 0;
           if (!hasDetails) {
             const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
             if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
           }
-          const referenceRoute =
-            referenceRouteForHover(hover.target, accessibleSignature, routes) ??
-            memberReference?.route;
+          const referenceRoute = isLibrarySymbol
+            ? undefined
+            : (referenceRouteForHover(hover.target, accessibleSignature, routes) ??
+              memberReference?.route);
           const [wideSignature, narrowSignature] = await Promise.all([
             formatSignature(accessibleSignature, 68),
             formatSignature(accessibleSignature, 34),
@@ -846,26 +957,12 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
               meta: "",
             }),
           ]);
-          const examples = new Map<string, ElementContent[]>();
           const seeRoutes = new Map<string, string>();
           for (const [name, value] of hover.tags ?? []) {
-            if (name === "see" && value) {
-              const label = cleanDocumentation(value);
-              const route = referenceRouteForHover(label, label, routes);
-              if (route) seeRoutes.set(value, route);
-            }
-            if (name !== "example" || !value) continue;
-            let contents = exampleParts.get(value);
-            if (contents === undefined) {
-              const rendered = await signatureRenderer.render({
-                code: exampleCode(value),
-                language: /```([\w-]+)/.exec(value)?.[1] ?? "ts",
-                meta: "",
-              });
-              contents = codeLineContents(rendered.renderedGroupAst);
-              exampleParts.set(value, contents);
-            }
-            examples.set(value, contents);
+            if (name !== "see" || !value) continue;
+            const label = cleanDocumentation(value);
+            const route = referenceRouteForHover(label, label, routes);
+            if (route) seeRoutes.set(value, route);
           }
           const popoverId = hoverPopoverId(codeBlock, hover, hoverIndex);
           line.addAnnotation(
@@ -877,10 +974,10 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
                 docs: hover.docs ?? memberReference?.docs,
                 tags: hover.tags ?? [],
-                examples,
                 seeRoutes,
                 referenceRoute,
                 navigable: referenceRoute !== undefined,
+                isApiName: !isLibrarySymbol && routes.has(hover.target),
               },
               popoverId,
             ),

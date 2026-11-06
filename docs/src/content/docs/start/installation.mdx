@@ -111,10 +111,10 @@ import wasmUrl from "@sheetwrite/wasm/wasm?url";
 await initSheetwrite({ source: wasmUrl });
 
 // webpack asset URL
-await initSheetwrite(new URL("@sheetwrite/wasm/wasm", import.meta.url));
+await initSheetwrite({ source: new URL("@sheetwrite/wasm/wasm", import.meta.url) });
 
 // Public-copy fallback
-await initSheetwrite("/sheetwrite_wasm_bg.wasm");
+await initSheetwrite({ source: "/sheetwrite_wasm_bg.wasm" });
 ```
 
 webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node filesystem code out of browser graphs.

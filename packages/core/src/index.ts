@@ -11,7 +11,9 @@ export { isCellFontFamily, sanitizeCellStyle } from "./cell-style-fields.js";
 
 export { openChartViews } from "./chart-backend.js";
 
-export { MAX_CHART_POINTS, resolveChartView, subscribeChartChanges } from "./charts-live.js";
+export { MAX_CHART_POINTS } from "./chart-definition.js";
+
+export { resolveChartView, subscribeChartChanges } from "./charts-live.js";
 
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 
@@ -325,6 +327,7 @@ export type {
   DocumentOp,
   ExternalLink,
   ExternalLinkCell,
+  ExternalLinkName,
   ExternalLinkSheet,
   ExternalLinkValue,
   Grid,

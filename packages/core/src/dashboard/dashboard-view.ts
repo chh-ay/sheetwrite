@@ -6,6 +6,7 @@
 
 import { cellScalarToText } from "../cell-input.js";
 import { createChartRenderer } from "../chart-backend.js";
+import { setPivotChartViews } from "../charts-live.js";
 import { formatNumber } from "../number-format.js";
 import { pivotsAvailable } from "../panels/panel-loader.js";
 import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
@@ -26,12 +27,13 @@ import type { Grid } from "../types/grid.js";
 import type { PivotResultView } from "../types/pivot.js";
 import type { PivotOutputRead } from "./dashboard-chart.js";
 import {
-  applyDashboardPayload,
+  applyPivotViews,
   chartOf,
   dashboardItemTitle,
-  dashboardPivotOutputOf,
   dashboardsOf,
   hiddenPivotIndex,
+  pivotChartViewOf,
+  pivotOutputOf,
   slicerOverridesOf,
   slicerValuesOf,
 } from "./dashboard-engine.js";
@@ -95,8 +97,10 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   // A read-only viewer's slicer selections: they filter this view only, not the document.
   const overrides = slicerOverridesOf(grid.store);
   // Slicers filter the dashboard pivots that the engine computes; the saved definitions keep theirs.
-  const filterPivots = (dashboards: readonly SheetId[]): void =>
-    applyDashboardPayload(grid.store, dashboards);
+  const filterPivots = (dashboards: readonly SheetId[]): void => {
+    applyPivotViews(grid.store, dashboards);
+    setPivotChartViews(grid.store, pivotChartViewOf);
+  };
   const hiddenIndex = (owner: SheetId, itemId: string): number =>
     hiddenPivotIndex(grid.store, owner, itemId);
 
@@ -319,13 +323,13 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       body.dataset.chartId = item.chart;
       body.classList.add("sheetwrite-dashboard-chart");
     } else if (item.kind === "kpi") {
-      const output = dashboardPivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
+      const output = pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
       body.appendChild(output === null ? note(NEEDS_FULL_ENGINE) : kpiValue(item, output));
     } else {
       const kept = readOnly ? slicerSelection(item, overrides) : item.selected;
       const withData = slicerValuesWithData(
         item,
-        dashboardPivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id)),
+        pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id)),
       );
       renderSlicer(body, grid, item, kept, withData, (next) => chooseSlicer(item, next));
     }
@@ -375,7 +379,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const list = items();
     const results = list.map((item) => {
       if (item.kind === "pivot") return dashboardPivotResult(grid, owner, item.pivot);
-      const output = dashboardPivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
+      const output = pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
       if (item.kind === "chart") return [chartOf(grid.store, owner, item.chart), output];
       if (item.kind === "kpi") return output;
       return [slicerValuesOf(grid.store, item), output];
@@ -466,7 +470,7 @@ export function dashboardPivotResult(
 ): PivotResultView | null {
   const result = grid.getPivotResult(sheet, id);
   const index = grid.getPivots(sheet).findIndex((pivot) => pivot.id === id);
-  const output = dashboardPivotOutputOf(grid.store, sheet, index);
+  const output = pivotOutputOf(grid.store, sheet, index);
   if (result === null || result.status !== "ok" || output === null) return result;
   return { ...result, cells: output.cells };
 }

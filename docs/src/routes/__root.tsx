@@ -1,3 +1,4 @@
+import bodyFont from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
 import {
   createRootRoute,
   HeadContent,
@@ -9,11 +10,14 @@ import {
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { type ReactNode, useEffect, useLayoutEffect } from "react";
+import { preload } from "react-dom";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
+import { IconSprite } from "../components/IconSprite.js";
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
-import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
+import headingFont from "../fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
+import { initializeCodeEnhancements } from "../lib/code-enhancements.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import { SITE_URL } from "../lib/seo.js";
@@ -158,8 +162,20 @@ function RootComponent() {
   return <Outlet />;
 }
 
+const FONT_PRELOAD = {
+  as: "font",
+  type: "font/woff2",
+  crossOrigin: "anonymous",
+  fetchPriority: "high",
+} as const;
+
 /** The `<html>` document: always rendered on the server, around every page, error, and 404. */
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
+  // React writes these preloads first in the head, ahead of the module
+  // preloads, so the heading and body fonts load with the stylesheets and are
+  // ready for the first paint on slow links.
+  preload(headingFont, FONT_PRELOAD);
+  preload(bodyFont, FONT_PRELOAD);
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
@@ -170,6 +186,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
       </head>
       <body>
+        <IconSprite />
         {children}
         <Analytics />
         <SpeedInsights />
