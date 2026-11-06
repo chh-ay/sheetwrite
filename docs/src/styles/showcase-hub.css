@@ -929,6 +929,14 @@
   grid-template-rows: minmax(12rem, auto);
 }
 
+/* Desktop, every card shown: the app card takes two thirds beside Analysis,
+   so the nine cards after them fill three rows of thirds with no orphan. */
+@media (min-width: 80rem) {
+  .sw-hub-scenes[data-group="all"] > li[data-owner="spreadsheet"] {
+    grid-column: span 8;
+  }
+}
+
 /* Miniature ribbon: a tab row, labeled groups, then a formula bar. */
 .sw-hub-ribbon {
   display: grid;

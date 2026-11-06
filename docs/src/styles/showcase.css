@@ -1043,6 +1043,9 @@
   }
 
   .sw-showcase-page__footer-links a strong {
+    display: inline-flex;
+    gap: var(--sw-space-1-5);
+    align-items: center;
     color: var(--sw-fg-strong);
     font: var(--sw-weight-semibold) var(--sw-text-body) / 1.35 var(--sw-font-body);
   }
