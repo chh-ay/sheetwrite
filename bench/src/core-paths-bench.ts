@@ -1491,7 +1491,7 @@ export async function runCorePathsBenchmark(
 ): Promise<CorePathsBenchmarkArtifact> {
   const scale = mode === "smoke" ? SMOKE_SCALE : FULL_SCALE;
   const bytes = readFileSync(WASM_PATH);
-  await initSheetwrite(bytes);
+  await initSheetwrite({ source: bytes });
   const memory = getEngine().getMemory();
 
   const restoreCanvas = installCanvasTestStubs();

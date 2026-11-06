@@ -4,9 +4,10 @@ description: "Add column, bar, line, area, pie, doughnut and scatter charts that
 ---
 
 ```ts prelude="core" partial="requires a grid with month names in A2:A4 and revenue in B2:B4" title="A line chart of three months"
-import { registerChartsBackend } from "@sheetwrite/charts";
+import { chartsAddon } from "@sheetwrite/charts";
+import { initSheetwrite } from "@sheetwrite/core";
 
-registerChartsBackend();
+await initSheetwrite({ addons: [chartsAddon()] });
 grid.setChart({
   id: "revenue",
   kind: "line",
@@ -36,7 +37,7 @@ grid.setChart({
 <summary>Full setup</summary>
 
 ```ts compile title="A grid with three months of revenue and a line chart"
-import { registerChartsBackend } from "@sheetwrite/charts";
+import { chartsAddon } from "@sheetwrite/charts";
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 
@@ -44,9 +45,8 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (!host) throw new Error("Missing #grid host");
 host.style.height = "360px";
 
-await initSheetwrite();
-// Without this call a chart shows as a frame with its title.
-registerChartsBackend();
+// Without the charts add-on a chart shows as a frame with its title.
+await initSheetwrite({ addons: [chartsAddon()] });
 
 const workbook: Workbook = {
   activeSheet: "s",
@@ -86,8 +86,8 @@ belongs to a sheet and floats over its cells.
 ## Add the charts package
 
 Core keeps the chart definitions, and `@sheetwrite/charts` draws them. Install
-it and call `registerChartsBackend()` once, before or after you create grids.
-To register by import only, import `@sheetwrite/charts/register`.
+it and pass `chartsAddon()` to `initSheetwrite({ addons })` before you create
+grids. Grids created before that draw each chart as a frame with its title.
 
 ```sh verify title="Install the charts package"
 npm install @sheetwrite/charts

@@ -4,8 +4,10 @@ description: Understand the checked LibreOffice round trips, display fixes and k
 ---
 
 ```ts prelude="core" partial="bytes contains an XLSX workbook saved by LibreOffice" title="Read producer output and retain warnings"
-import { fromXlsxWorkbook, toXlsxWorkbook } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbook, toXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const bytes: Uint8Array;
 const snapshot = await fromXlsxWorkbook(bytes, {
@@ -33,8 +35,10 @@ A passing semantic comparison does **not** mean byte-identical files or full Exc
 Use the public importer on bytes from a host-selected LibreOffice file. No special LibreOffice backend is required:
 
 ```ts compile title="Read a LibreOffice-saved file"
-import { fromXlsxWorkbookFile, toXlsxWorkbook } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbookFile, toXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 const input = document.querySelector<HTMLInputElement>('input[type="file"]');
 const file = input?.files?.[0];

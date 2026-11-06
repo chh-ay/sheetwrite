@@ -12,11 +12,10 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
-import { registerXlsxBackends, sheetwriteWorkbookBackend } from "../src/index.js";
+import { sheetwriteWorkbookBackend, xlsxAddon } from "../src/index.js";
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 const table = (

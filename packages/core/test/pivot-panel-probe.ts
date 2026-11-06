@@ -11,7 +11,7 @@ import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import { elementAdded } from "./fixtures.js";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const restore = installCanvasTestStubs();
 const host = document.createElement("div");
 Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });

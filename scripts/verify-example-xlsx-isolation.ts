@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const distRoot = resolve(import.meta.dir, "../docs/dist/client");
 const defaultPages = [
@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   ).flat();
   const defaultGraph = await collectStaticGraph(defaultEntrypoints);
   for (const [path, content] of defaultGraph) {
-    if (basename(path).startsWith("register.") || content.includes(xlsxMarker)) {
+    if (content.includes(xlsxMarker)) {
       throw new Error(`Default example graph eagerly includes the XLSX backend through ${path}`);
     }
   }

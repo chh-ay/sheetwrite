@@ -11,15 +11,15 @@ import {
   type Grid,
   initSheetwrite,
   resolveChartView,
-  setXlsxWorkbookBackend,
   toXlsxWorkbook,
   type PivotDefinition,
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 let restore: () => void;

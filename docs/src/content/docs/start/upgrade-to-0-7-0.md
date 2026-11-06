@@ -170,14 +170,52 @@ kinds before you accept 0.7.0 clients.
 
 ## Add-on registration
 
-<!-- Before and after examples for #366: initSheetwrite({ engine, addons }) and createGrid(host, { addons }). -->
+0.7.0 installs add-ons in one way: `initSheetwrite({ engine, source, addons })`,
+plus per-grid settings in `createGrid(host, { addons: { [name]: settings } })`
+([#366](https://github.com/chh-ay/sheetwrite/issues/366)). Each add-on package
+exports a factory named `<name>Addon`.
 
-0.7.0 registers every add-on in one way: `initSheetwrite({ engine, addons })`,
-plus per-grid settings in `createGrid(host, { addons })`. The `/register`
-imports, `registerChartsBackend`, `registerXlsxBackends`, the `set*Backend`
-and `set*Factory` exports and the positional engine argument of
-`initSheetwrite` are removed
-([#366](https://github.com/chh-ay/sheetwrite/issues/366)).
+Before:
+
+```text partial="0.6 code; these imports and arguments no longer exist"
+import "@sheetwrite/charts/register";
+import "@sheetwrite/xlsx/register";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+After:
+
+```ts compile title="Install the engine and add-ons"
+import { chartsAddon } from "@sheetwrite/charts";
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] });
+```
+
+| 0.6 | 0.7.0 |
+| --- | --- |
+| `import "@sheetwrite/charts/register"` or `registerChartsBackend()` | `initSheetwrite({ addons: [chartsAddon()] })` |
+| `import "@sheetwrite/xlsx/register"` or `registerXlsxBackends()` | `initSheetwrite({ addons: [xlsxAddon()] })` |
+| `setChartRendererFactory`, `setChartViewProviderFactory` | An add-on whose `setup` calls `context.charts({ views, renderer })` |
+| `setXlsxWorkbookBackend`, `setXlsxTableImportBackend`, `setXlsxTableExportBackend` | An add-on whose `setup` calls `context.xlsx({ workbook, tableImport, tableExport })` |
+| `initSheetwrite(source, engine)` | `initSheetwrite({ source, engine })` |
+| `registerFunction(store, metadata, fn)` from `@sheetwrite/core/functions` | `functionsAddon([{ metadata, implementation: fn }])` for every grid, or `createGrid(host, { addons: { functions: [...] } })` for one grid |
+| `unregisterFunction(store, name)` | None: functions register when a grid is created. Create the grid again without the function. |
+| `createQuerySession(grid, { fetchSource })` from `@sheetwrite/queries` | `queriesAddon({ fetchSource })`, or `addons: { queries: { fetchSource } }` for one grid; then `await querySessionOf(grid)` |
+| `registerQueryCommands(grid, commands)` from `@sheetwrite/core` | An add-on whose `grid` hook calls `context.queryCommands(commands)` |
+| `GridConfig.history` with `createHistoryCommands({ archive, authorId })` | `historyAddon()` from `@sheetwrite/core/history`, and `addons: { history: { archive, authorId } }` for the grid |
+| `connectExternalLinks(grid, resolve)` from `@sheetwrite/core/external-links` | `externalLinksAddon({ resolve })`, or `addons: { externalLinks: { resolve } }` for one grid |
+
+Add-ons set up once, in list order. A name listed twice in one call rejects
+with `invalid-argument`; a name installed by an earlier call is kept. Settings
+in `createGrid` for an add-on that `initSheetwrite` did not install reject with
+`invalid-argument`. Each add-on loads its heavy code on first use: the XLSX codec
+on the first XLSX call, the chart drawing code and the query engine when a grid
+that uses them is created, and the history panel on its first command.
 
 ## Errors and cancellation
 

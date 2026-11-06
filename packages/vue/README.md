@@ -74,8 +74,8 @@ Events are `grid-change`, `viewport-change`, `selection-change`, `edit-begin`, `
 For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://www.sheetwrite.dev/docs/start/installation/), [Vue tutorial](https://www.sheetwrite.dev/docs/tutorials/excel-in-vue/), and [collaboration](https://www.sheetwrite.dev/docs/features/collaboration/).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
-XLSX export, install `@sheetwrite/xlsx` and import
-`@sheetwrite/xlsx/register` before the action (or lazily inside its handler).
+XLSX export, install `@sheetwrite/xlsx` and call
+`initSheetwrite({ addons: [xlsxAddon()] })` before the action (or lazily inside its handler).
 CSV/TSV require no optional package.
 
 For workbook streaming and kept XLSX parts, use the registered core workbook
