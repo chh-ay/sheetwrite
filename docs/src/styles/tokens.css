@@ -23,13 +23,26 @@
  * `test/design-tokens.test.ts` measures every text and icon pair below
  * against WCAG AA in both themes.
  */
+/* Arial (Liberation Sans on Linux) scaled to Space Grotesk's width and line
+   metrics, so headings keep their line breaks while the web font loads.
+   Values from both fonts' hhea and advance widths over a heading sample. */
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial"), local("Liberation Sans"), local("Helvetica");
+  size-adjust: 108.01%;
+  ascent-override: 91.1%;
+  descent-override: 27.03%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* ── Type ─────────────────────────────────────────────────────────────
      Three families: Space Grotesk for display and headings, Inter for body
      and interface text, JetBrains Mono for code and eyebrows. Roles, not raw
      sizes: a stylesheet picks the role that matches the text's job. */
   --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
-  --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --sw-font-display:
+    "Space Grotesk Variable", "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
   --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
@@ -214,12 +227,12 @@
   --sw-code-bg: #f7f9fc;
   --sw-code-fg: #1f2a3c;
   --sw-code-comment: #5c6779;
-  --sw-code-keyword: #8a2bb9;
-  --sw-code-function: #1a5fc8;
-  --sw-code-string: #0d7148;
-  --sw-code-number: #a64300;
-  --sw-code-type: #00728a;
-  --sw-code-property: #b0225a;
+  --sw-code-keyword: #8417c4;
+  --sw-code-function: #0f5bd6;
+  --sw-code-string: #027a45;
+  --sw-code-number: #b04200;
+  --sw-code-type: #00748f;
+  --sw-code-property: #c0185a;
   --sw-code-punctuation: #4b5567;
   --sw-code-line-highlight: #e3ecff;
   --sw-code-line-marker: #1d5fd6;
@@ -287,12 +300,12 @@
   --sw-code-bg: #0d1524;
   --sw-code-fg: #d9e1ec;
   --sw-code-comment: #8a96aa;
-  --sw-code-keyword: #d49bff;
-  --sw-code-function: #7cb4ff;
-  --sw-code-string: #6fe0a8;
-  --sw-code-number: #ffb370;
-  --sw-code-type: #5fd4e8;
-  --sw-code-property: #ff8fb8;
+  --sw-code-keyword: #c38bff;
+  --sw-code-function: #6aa8ff;
+  --sw-code-string: #3ddc91;
+  --sw-code-number: #ff9f4a;
+  --sw-code-type: #2fd0ea;
+  --sw-code-property: #ff6fa3;
   --sw-code-punctuation: #a2adbf;
   --sw-code-line-highlight: #16284a;
   --sw-code-line-marker: #6aa5ff;
