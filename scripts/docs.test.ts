@@ -23,6 +23,7 @@ import {
 import { GENERATED_CONTENT_DIRECTORIES, GENERATED_CONTENT_PAGES } from "./docs-shared.js";
 import { ADAPTER_DOC_CONTRACT, adapterContractIssues } from "./docs.js";
 import { headingAnchors } from "./markdown-anchors.js";
+import { extractFigureAssets, perfFigure } from "./perf-figures.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
@@ -552,7 +553,39 @@ describe("performance pages", () => {
     );
     expect(pages.get("performance/xlsx-codec.md")).toContain("no validated evidence yet");
   });
+
+  it("moves every figure out of its page into a static asset, leaving a placeholder", () => {
+    const figure = {
+      id: "sort",
+      title: "Median sort time",
+      unit: "ms" as const,
+      scale: "log" as const,
+      rowHeader: "Rows",
+      groups: [
+        {
+          label: "Linux",
+          rows: [
+            {
+              label: "1k rows",
+              bars: [{ label: "", role: "measured" as const, stat: { value: 2 } }],
+            },
+          ],
+        },
+      ],
+    };
+    const page = `Intro.\n\n${perfFigure(figure)}\n\nAfter.\n`;
+    const { content, assets } = extractFigureAssets("data-engine", page);
+    expect(content).toBe(
+      'Intro.\n\n<PerfFigure name="data-engine--sort">\n</PerfFigure>\n\nAfter.\n',
+    );
+    expect(assets.map((asset) => asset.name)).toEqual(["data-engine--sort"]);
+    expect(assets[0]?.html).toStartWith('<figure class="perf-bars"');
+    expect(() => extractFigureAssets("data-engine", `${page}${perfFigure(figure)}`)).toThrow(
+      "two figures on performance/data-engine share the id sort",
+    );
+  });
 });
+
 describe("adapter documentation contract", () => {
   const memberDocs = (names: readonly string[]) =>
     names.map((name) => ({ name, documentation: `${name} documentation.` }));

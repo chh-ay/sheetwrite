@@ -23,6 +23,8 @@ export interface DocumentComponents {
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
   /** A formula family's table and filter; see FormulaReference.tsx. */
   FormulaReference?: ComponentType<{ family: string }>;
+  /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
+  PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
 }
 
 type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;

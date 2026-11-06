@@ -110,9 +110,15 @@ function ratioLabel(ratio: number): string {
   return ratio >= 1 ? `${ratio.toLocaleString("en-US")}×` : `1/${Math.round(1 / ratio)}×`;
 }
 
+/** An axis with more steps than this labels every other one (and 1×), so labels never touch. */
+const MAX_AXIS_LABELS = 4;
+
 function ticks(axis: RatioAxis): string {
   const scale = { kind: "log", domain: axis.domain } as const;
   return axis.ticks
+    .filter(
+      (ratio, index) => axis.ticks.length <= MAX_AXIS_LABELS || index % 2 === 0 || ratio === 1,
+    )
     .map(
       (ratio) =>
         `<span style="left:${scalePosition(scale, ratio).toFixed(2)}%"${ratio === 1 ? " data-parity" : ""}>${ratioLabel(ratio)}</span>`,

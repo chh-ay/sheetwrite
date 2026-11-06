@@ -30,6 +30,7 @@ import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
 import { exportOutline } from "./src/lib/outline.ts";
 import { renderPerfBars } from "./src/lib/perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
+import { perfFigureMarkup } from "./src/lib/perf-figure-markup.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
@@ -154,6 +155,28 @@ function hydrateFormulaReference() {
         node.name = "FormulaReference";
         node.attributes = [
           { type: "mdxJsxAttribute", name: "family", value: String(node.properties?.family ?? "") },
+        ];
+        delete node.tagName;
+        delete node.properties;
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
+/**
+ * A Performance page's `<PerfFigure name>` becomes the figure component; the
+ * figure is static HTML outside the page (see perf-figure-markup.ts).
+ */
+function hydratePerfFigure() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (node.tagName === "perffigure") {
+        node.type = "mdxJsxFlowElement";
+        node.name = "PerfFigure";
+        node.attributes = [
+          { type: "mdxJsxAttribute", name: "name", value: String(node.properties?.name ?? "") },
         ];
         delete node.tagName;
         delete node.properties;
@@ -458,6 +481,7 @@ export default defineConfig({
             { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
           ],
           hydrateFormulaReference,
+          hydratePerfFigure,
           dedupeCodePopovers,
           rovingCodeFocus,
           // Prerendered heading ids: fragment links must resolve before hydration.
@@ -474,6 +498,7 @@ export default defineConfig({
     expressiveCodeAssets(),
     formulaTables(),
     speedStoryMarkup(),
+    perfFigureMarkup(),
     tailwindcss(),
     tanstackStart({
       pages: [
