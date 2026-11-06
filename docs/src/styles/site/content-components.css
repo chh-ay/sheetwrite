@@ -13,7 +13,9 @@
   counter-reset: sw-step;
 }
 
-.sw-prose .sw-step {
+/* At the docs prose specificity: its 70ch measure on list items would size
+   each step to the font that is loaded, and shift it when the web font swaps in. */
+.sw-docs .sw-prose .sw-step {
   position: relative;
   max-width: none;
   margin: 0;
