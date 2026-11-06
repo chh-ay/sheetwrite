@@ -1415,10 +1415,7 @@ export async function writeWorkbook(
   content?: EngineContent,
 ): Promise<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  return writeZip(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook, content),
-    context,
-  );
+  return writeZip(writeWorkbookParts(snapshot, { ...context, formulas }, hook, content), context);
 }
 
 export async function* streamWorkbook(
@@ -1428,8 +1425,5 @@ export async function* streamWorkbook(
   content?: EngineContent,
 ): AsyncGenerator<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  yield* zipChunks(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook, content),
-    context,
-  );
+  yield* zipChunks(writeWorkbookParts(snapshot, { ...context, formulas }, hook, content), context);
 }

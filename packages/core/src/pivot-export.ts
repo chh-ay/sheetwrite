@@ -10,11 +10,11 @@ import type { DashboardExport, DashboardItemExport } from "./types/dashboard.js"
 
 /** A computed pivot output: cells in row-major order and its layout counts. */
 export interface PivotOutputCells {
- readonly cells: readonly CellScalar[];
- readonly rows: number;
- readonly cols: number;
- readonly headerRows: number;
- readonly labelCols: number;
+  readonly cells: readonly CellScalar[];
+  readonly rows: number;
+  readonly cols: number;
+  readonly headerRows: number;
+  readonly labelCols: number;
 }
 
 /**
@@ -23,21 +23,21 @@ export interface PivotOutputCells {
  * labels and headers use General.
  */
 export function pivotOutputContent(
- output: PivotOutputCells,
- formats: readonly (string | null)[],
+  output: PivotOutputCells,
+  formats: readonly (string | null)[],
 ): Pick<DashboardItemExport, "cells" | "numberFormats"> {
- const cells: CellScalar[][] = [];
- const numberFormats: (string | null)[][] = [];
- for (let row = 0; row < output.rows; row++) {
-  cells.push(output.cells.slice(row * output.cols, (row + 1) * output.cols));
-  numberFormats.push(
-   Array.from({ length: output.cols }, (_, col) => {
-    const value = row >= output.headerRows && col >= output.labelCols;
-    return value ? (formats[(col - output.labelCols) % formats.length] ?? null) : null;
-   }),
-  );
- }
- return { cells, numberFormats };
+  const cells: CellScalar[][] = [];
+  const numberFormats: (string | null)[][] = [];
+  for (let row = 0; row < output.rows; row++) {
+    cells.push(output.cells.slice(row * output.cols, (row + 1) * output.cols));
+    numberFormats.push(
+      Array.from({ length: output.cols }, (_, col) => {
+        const value = row >= output.headerRows && col >= output.labelCols;
+        return value ? (formats[(col - output.labelCols) % formats.length] ?? null) : null;
+      }),
+    );
+  }
+  return { cells, numberFormats };
 }
 
 /**
@@ -46,17 +46,17 @@ export function pivotOutputContent(
  * anchor. A pivot with an error or no output is left out.
  */
 export function worksheetPivotExports(store: SheetwriteStore): DashboardExport[] {
- const exports: DashboardExport[] = [];
- for (const sheet of store.getWorkbook().sheets) {
-  if (isDashboard(sheet) || !sheet.pivots?.length) continue;
-  const items: DashboardItemExport[] = [];
-  for (const pivot of sheet.pivots) {
-   const result = store.getPivotResult(sheet.id, pivot.id);
-   if (result?.status !== "ok" || result.cells.length === 0) continue;
-   const formats = pivot.values.map((value) => value.numberFormat ?? null);
-   items.push({ id: pivot.id, ...pivotOutputContent(result, formats) });
+  const exports: DashboardExport[] = [];
+  for (const sheet of store.getWorkbook().sheets) {
+    if (isDashboard(sheet) || !sheet.pivots?.length) continue;
+    const items: DashboardItemExport[] = [];
+    for (const pivot of sheet.pivots) {
+      const result = store.getPivotResult(sheet.id, pivot.id);
+      if (result?.status !== "ok" || result.cells.length === 0) continue;
+      const formats = pivot.values.map((value) => value.numberFormat ?? null);
+      items.push({ id: pivot.id, ...pivotOutputContent(result, formats) });
+    }
+    if (items.length > 0) exports.push({ sheet: sheet.id, items });
   }
-  if (items.length > 0) exports.push({ sheet: sheet.id, items });
- }
- return exports;
+  return exports;
 }

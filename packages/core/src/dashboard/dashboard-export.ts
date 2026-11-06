@@ -4,6 +4,7 @@
 // dashboard.
 
 import { resolveChartView } from "../charts-live.js";
+import { pivotOutputContent } from "../pivot-export.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { DashboardExport, DashboardItem, DashboardItemExport } from "../types/dashboard.js";
@@ -17,7 +18,6 @@ import {
   slicerOverridesOf,
   slicerValuesOf,
 } from "./dashboard-engine.js";
-import { pivotOutputContent } from "../pivot-export.js";
 import { slicerSelection } from "./dashboard-payload.js";
 
 /** A caption row over value rows that use General. */

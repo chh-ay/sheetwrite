@@ -472,7 +472,12 @@ it("passes each worksheet pivot's current output, measures included, to the XLSX
   try {
     const store = grid.store;
     if (!(store instanceof SheetwriteStore)) throw new Error("the grid must use a SheetwriteStore");
-    const measure = { id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" };
+    const measure = {
+      id: "twice",
+      name: "Twice",
+      table: "orders",
+      formula: "=SUM(Orders[Amount])*2",
+    };
     expect(store.setMeasure(measure).status).toBe("applied");
     expect(
       grid.setPivot({

@@ -15,8 +15,8 @@ import type {
 } from "@sheetwrite/core";
 import { cellA1, sheetNameKey } from "@sheetwrite/core";
 
-import { staticCell } from "./dashboard.js";
 import { type CellRect, parseCellRect, rectA1 } from "./cell-reference.js";
+import { staticCell } from "./dashboard.js";
 import { isoDateSerial, MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
 import {
   type ContentTypeOverride,
@@ -1055,7 +1055,9 @@ function dropSavedOutputCells(sheet: SheetSnapshot, pivot: PivotDefinition): voi
       const row = block.startRow + cell.rowOffset - pivot.anchor.row;
       const col = block.startCol + cell.colOffset - pivot.anchor.col;
       if (row < 0 || row >= saved.rows || col < 0 || col >= saved.cols) return true;
-      return cell.value.kind !== "literal" || cell.value.value !== saved.cells[row * saved.cols + col];
+      return (
+        cell.value.kind !== "literal" || cell.value.value !== saved.cells[row * saved.cols + col]
+      );
     });
   }
 }
@@ -1264,7 +1266,9 @@ export function preparePivots(
         rows: block.rowCount,
         cols: block.colCount,
         cells: Array.from({ length: block.rowCount * block.colCount }, (_, offset) => {
-          return output.cells[Math.floor(offset / block.colCount)]?.[offset % block.colCount] ?? null;
+          return (
+            output.cells[Math.floor(offset / block.colCount)]?.[offset % block.colCount] ?? null
+          );
         }),
       });
     }

@@ -192,7 +192,11 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
   ];
   const { warnings, onWarning } = collect();
 
-  const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(input, { onWarning }, { pivotOutputs });
+  const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(
+    input,
+    { onWarning },
+    { pivotOutputs },
+  );
 
   const sheet = strFromU8(unzipSync(saved)["xl/worksheets/sheet1.xml"] ?? new Uint8Array());
   expect(sheet).toMatch(/<c r="A5"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Region<\/t>/u);
@@ -238,7 +242,9 @@ it("keeps a cell another application changed inside a kept pivot's output", asyn
   const pivotOutputs = [
     {
       sheet: "data",
-      items: [{ id: "by-region", cells: [["Sum of Amount"], [7]], numberFormats: [[null], [null]] }],
+      items: [
+        { id: "by-region", cells: [["Sum of Amount"], [7]], numberFormats: [[null], [null]] },
+      ],
     },
   ];
   const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(
@@ -249,7 +255,9 @@ it("keeps a cell another application changed inside a kept pivot's output", asyn
   // Excel saves 9 over the value 7.
   const files = unzipSync(saved);
   const sheet = strFromU8(files["xl/worksheets/sheet1.xml"] ?? new Uint8Array());
-  files["xl/worksheets/sheet1.xml"] = strToU8(sheet.replace(/(<c r="A6"[^>]*><v>)7(<\/v>)/u, "$19$2"));
+  files["xl/worksheets/sheet1.xml"] = strToU8(
+    sheet.replace(/(<c r="A6"[^>]*><v>)7(<\/v>)/u, "$19$2"),
+  );
 
   const reopened = await sheetwriteWorkbookBackend.fromXlsxWorkbook(zipSync(files));
   const kept = (reopened.sheets[0]?.cells ?? []).flatMap((block) =>
