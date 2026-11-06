@@ -289,3 +289,29 @@ fn a_name_on_a_sheet_the_link_does_not_hold_is_a_ref_error() {
         Some("#REF!")
     );
 }
+
+/// A rename rewrites only the references of the text: the names of a link
+/// stay as written (#491).
+#[test]
+fn a_rename_keeps_the_link_names_of_a_formula() {
+    let (mut store, report, _) = store_with_names();
+    store.set_formula(report, 0, 0, "=[Budget.xlsx]!Total + Report!A3", 0);
+    store.set_formula(
+        report,
+        1,
+        0,
+        "='C:\\Reports\\Budget.xlsx'!Total*2+Report!A3",
+        0,
+    );
+
+    assert!(store.rename_sheet(report, "report", "Summary"));
+
+    assert_eq!(
+        store.formula_source(report, 0, 0).as_deref(),
+        Some("=[Budget.xlsx]!Total + Summary!A3")
+    );
+    assert_eq!(
+        store.formula_source(report, 1, 0).as_deref(),
+        Some("='C:\\Reports\\Budget.xlsx'!Total*2+Summary!A3")
+    );
+}
