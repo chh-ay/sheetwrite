@@ -963,9 +963,10 @@ html:has(.sw-nav-dialog[open]) {
     padding: var(--sw-space-8) var(--sw-page-gutter) var(--sw-space-12);
   }
 }
-@media (max-width: 42rem) {
-  /* Phones: the search control is an icon button beside the brand; its
-     label stays as the accessible name. */
+/* The search control as its icon; its label stays as the accessible name.
+   Phones use it beside the brand; between the sidebar's breakpoint and a wide
+   screen it keeps the tabs their room, and GitHub leaves the bar. */
+@media (min-width: 64rem) and (max-width: 79.999rem), (max-width: 42rem) {
   .sw-docs .sw-search-button {
     width: var(--sw-control-height);
     height: var(--sw-control-height);
@@ -980,14 +981,15 @@ html:has(.sw-nav-dialog[open]) {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-  .sw-docs .sw-search-button kbd {
-    display: none;
-  }
-  .sw-document {
-    padding-top: var(--sw-space-6);
-  }
+  .sw-docs .sw-search-button kbd,
   .sw-docs-bar__link {
     display: none;
+  }
+}
+
+@media (max-width: 42rem) {
+  .sw-document {
+    padding-top: var(--sw-space-6);
   }
   .sw-doc-home .sw-doc-start {
     grid-template-columns: 1fr;
