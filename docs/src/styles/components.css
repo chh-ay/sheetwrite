@@ -485,9 +485,10 @@ samp,
     "liga" 0;
 }
 
-/* Wrapped code lines continue under a two-character hanging indent. */
+/* Wrapped code lines continue under a two-character hanging indent, inside
+   Expressive Code's own inline padding. */
 :root .expressive-code .ec-line .code {
-  padding-inline-start: 2ch;
+  padding-inline-start: calc(var(--ec-codePadInl) - var(--ecGtrBrdWd, 0px) + 2ch);
   text-indent: -2ch;
 }
 
