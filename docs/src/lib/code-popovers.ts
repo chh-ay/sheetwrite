@@ -7,29 +7,23 @@
  * of document listeners serves all triggers on all pages.
  *
  * Panels are prepared ahead of use: while the browser is idle, the panels of
- * code blocks near the viewport are cloned from the store into `document.body`,
- * hidden but laid out. Opening one then only measures, picks a side, positions
- * it and shows it, so a first hover does no style or layout work on the
- * panel's content. A panel whose page leaves the document leaves with it.
+ * code blocks in view are cloned from the store into `document.body`, hidden
+ * but laid out. Opening one then only measures, picks a side, positions it and
+ * shows it, so a first hover does no style or layout work on the panel's
+ * content. A panel whose page leaves the document leaves with it.
+ *
+ * Positioning is the placement module's geometry: the panel is fixed to the
+ * viewport and follows its line once per frame while the page scrolls.
  *
  * Pointer hover and keyboard focus open the same panel, which is the trigger's
  * accessible description (`aria-describedby`).
  */
 import {
-  autoUpdate,
-  computePosition,
-  offset,
-  type Placement,
-  shift,
-  size,
-  type VirtualElement,
-} from "@floating-ui/dom";
-
-import {
   type Box,
   choosePanelPlacement,
   type PanelPlacement,
-  type PanelSide,
+  panelFrame,
+  type PlacementInput,
 } from "./code-popover-placement.js";
 
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
@@ -49,9 +43,6 @@ const PANEL_OPEN_ATTRIBUTE = "data-open";
 const CLOSE_DELAY_MS = 90;
 const PANEL_OFFSET_PX = 8;
 const VIEWPORT_PADDING_PX = 12;
-/** The 34rem design cap; the inline style wins over the CSS max-width. */
-const PANEL_MAX_WIDTH_PX = 544;
-const PANEL_MAX_HEIGHT_PX = 480;
 /** A panel taller than the room beside its line shrinks and scrolls, down to this. */
 const PANEL_MIN_HEIGHT_PX = 160;
 /**
@@ -63,21 +54,27 @@ const MAX_PREPARED_PANELS = 64;
 /** An idle callback prepares another panel only with this much time left. */
 const PREPARE_SLICE_MS = 6;
 
-const FLOATING_PLACEMENT: Readonly<Record<PanelSide, Placement>> = {
-  below: "bottom-start",
-  above: "top-start",
-  beside: "right-start",
-};
+interface PanelSize {
+  readonly width: number;
+  readonly height: number;
+}
 
 interface OpenPopover {
   trigger: HTMLElement;
   panel: HTMLElement;
   related: readonly HTMLElement[];
-  stopPositioning: () => void;
+  placement: PanelPlacement;
+  size: PanelSize;
+  stopFollowing: () => void;
 }
 
 /** Prepared panels by the store they were cloned from. */
 const panelsByStore = new Map<HTMLTemplateElement, Map<string, HTMLElement>>();
+/**
+ * Each prepared panel's size before any height limit; the viewport width
+ * bounds a panel's width, so a resize starts a new map.
+ */
+let naturalSizes = new WeakMap<HTMLElement, PanelSize>();
 /** Prepared panels, oldest first, with where each came from. */
 const preparedOrder: { panel: HTMLElement; store: HTMLTemplateElement; id: string }[] = [];
 let activePopover: OpenPopover | null = null;
@@ -169,9 +166,9 @@ function closePopover(): void {
   cancelScheduledClose();
   if (activePopover === null) return;
 
-  const { trigger, panel, related, stopPositioning } = activePopover;
+  const { trigger, panel, related, stopFollowing } = activePopover;
   activePopover = null;
-  stopPositioning();
+  stopFollowing();
   panel.removeAttribute(PANEL_OPEN_ATTRIBUTE);
   trigger.removeAttribute(OPEN_ATTRIBUTE);
   for (const mention of related) mention.removeAttribute(RELATED_ATTRIBUTE);
@@ -227,80 +224,72 @@ function lineTextEnd(line: Element): number {
   return end;
 }
 
-function virtualBox(read: () => Box, contextElement: Element): VirtualElement {
+/**
+ * A panel's size without a height limit. Read once per panel and viewport
+ * width; a prepared panel is already laid out, so the read forces no layout.
+ */
+function naturalSize(panel: HTMLElement): PanelSize {
+  const known = naturalSizes.get(panel);
+  if (known !== undefined) return known;
+  panel.style.removeProperty("max-height");
+  const size = { width: panel.offsetWidth, height: panel.offsetHeight };
+  naturalSizes.set(panel, size);
+  return size;
+}
+
+/** Everything placement needs, read from the page in one pass. */
+function measure(
+  trigger: HTMLElement,
+  mentions: readonly HTMLElement[],
+  panel: PanelSize,
+): PlacementInput {
+  const line = lineOf(trigger);
   return {
-    contextElement,
-    getBoundingClientRect() {
-      const { left, top, right, bottom } = read();
-      return {
-        x: left,
-        y: top,
-        left,
-        top,
-        right,
-        bottom,
-        width: right - left,
-        height: bottom - top,
-      };
-    },
+    trigger: boxOf(trigger),
+    line: boxOf(line),
+    lineEnd: lineTextEnd(line),
+    panel,
+    mentions: mentions.map(boxOf),
+    viewport: panelArea(),
+    gap: PANEL_OFFSET_PX,
+    minHeight: PANEL_MIN_HEIGHT_PX,
   };
+}
+
+function positionPanel(panel: HTMLElement, placement: PanelPlacement, input: PlacementInput): void {
+  const { left, top, maxHeight } = panelFrame(placement, input);
+  Object.assign(panel.style, { left: `${left}px`, top: `${top}px`, maxHeight: `${maxHeight}px` });
 }
 
 /**
- * The anchor box for `side`: the trigger's horizontal extent over its whole
- * line for below and above, so the panel clears the line; the line's text
- * end for beside.
+ * Keeps the open panel on its line while the page or a code block scrolls and
+ * while the window resizes, at most once per frame, on the side chosen when it
+ * opened. Returns the stopper.
  */
-function anchorFor(side: PanelSide, trigger: HTMLElement): VirtualElement {
-  const line = lineOf(trigger);
-  if (side === "beside") {
-    return virtualBox(() => {
-      const { top, bottom } = line.getBoundingClientRect();
-      const end = lineTextEnd(line);
-      return { left: end, top, right: end, bottom };
-    }, trigger);
-  }
-  return virtualBox(() => {
-    const { left, right } = trigger.getBoundingClientRect();
-    const { top, bottom } = line.getBoundingClientRect();
-    return { left, top, right, bottom };
-  }, trigger);
-}
-
-async function positionPopover(
-  anchor: VirtualElement,
-  panel: HTMLElement,
-  { side, shift: extra }: PanelPlacement,
-): Promise<void> {
-  const area = panelArea();
-  const padding = {
-    top: area.top,
-    right: VIEWPORT_PADDING_PX,
-    bottom: VIEWPORT_PADDING_PX,
-    left: VIEWPORT_PADDING_PX,
+function followLine(): () => void {
+  let frame: number | undefined;
+  const reposition = (): void => {
+    frame = undefined;
+    if (activePopover === null) return;
+    const { trigger, panel, placement, size } = activePopover;
+    positionPanel(panel, placement, measure(trigger, [], size));
   };
-  const result = await computePosition(anchor, panel, {
-    strategy: "fixed",
-    placement: FLOATING_PLACEMENT[side],
-    middleware: [
-      // The side was chosen on open; it holds while the page scrolls, and a
-      // panel without room on its side shrinks and scrolls instead of moving
-      // onto the mentions it was placed to keep clear.
-      offset(PANEL_OFFSET_PX + extra),
-      shift({ padding }),
-      size({
-        padding,
-        apply({ availableHeight, availableWidth, elements }) {
-          Object.assign(elements.floating.style, {
-            maxWidth: `${Math.min(PANEL_MAX_WIDTH_PX, availableWidth)}px`,
-            maxHeight: `${Math.min(PANEL_MAX_HEIGHT_PX, availableHeight)}px`,
-          });
-        },
-      }),
-    ],
-  });
-  panel.dataset.placement = result.placement;
-  Object.assign(panel.style, { left: `${result.x}px`, top: `${result.y}px` });
+  const schedule = (): void => {
+    frame ??= window.requestAnimationFrame(reposition);
+  };
+  const resize = (): void => {
+    naturalSizes = new WeakMap();
+    if (activePopover !== null) activePopover.size = naturalSize(activePopover.panel);
+    schedule();
+  };
+  const options = { capture: true, passive: true } as const;
+  document.addEventListener("scroll", schedule, options);
+  window.addEventListener("resize", resize, { passive: true });
+  return () => {
+    document.removeEventListener("scroll", schedule, options);
+    window.removeEventListener("resize", resize);
+    if (frame !== undefined) window.cancelAnimationFrame(frame);
+  };
 }
 
 function boxOf(element: Element): Box {
@@ -316,34 +305,19 @@ export function openCodePopover(trigger: HTMLElement): void {
   const panel = panelId === undefined ? null : panelFor(panelId);
   if (panelId === undefined || panel === null) return;
 
-  // Every layout read before the first write. A prepared panel's size is
-  // already laid out, so these reads force no layout.
+  // Every layout read before the first write. A prepared panel is already
+  // laid out, so these reads force no layout of its content.
   const related = relatedTriggers(trigger, panelId);
-  const line = lineOf(trigger);
-  const placement = choosePanelPlacement({
-    trigger: boxOf(trigger),
-    line: boxOf(line),
-    lineEnd: lineTextEnd(line),
-    panel: { width: panel.offsetWidth, height: panel.offsetHeight },
-    mentions: related.map(boxOf),
-    viewport: panelArea(),
-    gap: PANEL_OFFSET_PX,
-    minHeight: PANEL_MIN_HEIGHT_PX,
-  });
+  const size = naturalSize(panel);
+  const input = measure(trigger, related, size);
+  const placement = choosePanelPlacement(input);
 
   closePopover();
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
-  const anchor = anchorFor(placement.side, trigger);
-  // Positions in microtasks before the next frame, so the first painted frame
-  // shows the panel in place.
-  const stopPositioning = autoUpdate(
-    anchor,
-    panel,
-    () => void positionPopover(anchor, panel, placement),
-  );
+  positionPanel(panel, placement, input);
   panel.setAttribute(PANEL_OPEN_ATTRIBUTE, "");
-  activePopover = { trigger, panel, related, stopPositioning };
+  activePopover = { trigger, panel, related, placement, size, stopFollowing: followLine() };
 }
 
 function handlePointerOver(event: PointerEvent): void {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   type Box,
   choosePanelPlacement,
+  panelFrame,
   type PlacementInput,
 } from "../src/lib/code-popover-placement.js";
 
@@ -55,5 +56,23 @@ describe("code popover placement", () => {
       viewport: box(12, 68, 366, 764),
     };
     expect(choosePanelPlacement(atBottom)).toEqual({ side: "above", shift: 65 });
+  });
+
+  it("positions a panel below its line and cuts its height to the room left", () => {
+    const tall = { ...input([]), panel: { width: 360, height: 480 } };
+    expect(panelFrame({ side: "below", shift: 0 }, tall)).toEqual({
+      left: 400,
+      top: 428,
+      maxHeight: 460,
+    });
+  });
+
+  it("never cuts a panel below its minimum height", () => {
+    const nearBottom = {
+      ...input([]),
+      line: box(380, 840, 700, 20),
+      panel: { width: 360, height: 480 },
+    };
+    expect(panelFrame({ side: "below", shift: 0 }, nearBottom).maxHeight).toBe(120);
   });
 });

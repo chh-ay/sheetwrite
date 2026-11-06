@@ -2,7 +2,8 @@
  * Where a code hover panel opens: below its code line, above it, or beside the
  * line's end. The choice keeps the open symbol's other mentions in the same
  * block visible, since they are highlighted together with the open one.
- * Pure geometry on viewport boxes, so it is testable without layout.
+ * Pure geometry on viewport boxes, so it is testable without layout; the
+ * runtime positions the panel from the same boxes.
  */
 
 /** A box in viewport coordinates. */
@@ -49,8 +50,8 @@ export interface PanelPlacement {
 }
 
 /**
- * The panel's box for `placement`, as Floating UI would place it before
- * shifting: below and above, a panel taller than the room shrinks to it.
+ * The panel's box for `placement`, kept inside the viewport horizontally;
+ * below and above, a panel taller than the room shrinks to it.
  */
 export function panelBox(placement: PanelPlacement, input: PlacementInput): Box {
   const { trigger, line, lineEnd, panel, viewport, gap } = input;
@@ -136,4 +137,21 @@ export function choosePanelPlacement(input: PlacementInput): PanelPlacement {
     if (best === undefined || covered < best.covered) best = { placement, covered };
   }
   return best?.placement ?? { side: "below", shift: 0 };
+}
+
+/** Where to put a panel: its viewport position and the height it may take. */
+export interface PanelFrame {
+  readonly left: number;
+  readonly top: number;
+  readonly maxHeight: number;
+}
+
+/**
+ * The panel's position and height limit for `placement`: its box, with the
+ * height cut to the viewport room below its top (never under `minHeight`).
+ */
+export function panelFrame(placement: PanelPlacement, input: PlacementInput): PanelFrame {
+  const box = panelBox(placement, input);
+  const room = Math.max(input.minHeight, Math.min(box.bottom, input.viewport.bottom) - box.top);
+  return { left: box.left, top: box.top, maxHeight: Math.min(input.panel.height, room) };
 }
