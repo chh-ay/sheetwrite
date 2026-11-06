@@ -729,6 +729,11 @@ function planWorkbook(
     }
   }
 
+  const links = historical.workbook.externalLinks ?? [];
+  if (!same(current.externalLinks ?? [], links)) {
+    plan.additions.push({ op: "setExternalLinks", links: structuredClone(links) });
+  }
+
   const calculation = historical.workbook.calculation ?? DEFAULT_CALCULATION_SETTINGS;
   if (!same(current.calculation ?? DEFAULT_CALCULATION_SETTINGS, calculation)) {
     plan.additions.push({ op: "setCalculation", calculation: { ...calculation } });

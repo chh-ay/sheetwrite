@@ -65,7 +65,7 @@
 .sw-vw-panel > span,
 .sw-vw-challenge > header span {
   color: var(--sw-accent-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -296,7 +296,7 @@
 
 .sw-vw-teardown > div > span {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -336,6 +336,7 @@
 .sw-vw-statusbar__label {
   flex: none;
   color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -408,7 +409,7 @@
 
 .sw-vw-ownership dt {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -439,7 +440,7 @@
   border: 1px solid currentcolor;
   border-radius: var(--sw-radius-xs);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -678,7 +679,7 @@
 
 .sw-vw-field__label {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -741,7 +742,7 @@
 .sw-vw-proofs__label {
   grid-column: 1 / -1;
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }

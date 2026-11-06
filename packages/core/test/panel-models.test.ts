@@ -1,11 +1,16 @@
 import { describe, expect, it } from "bun:test";
 
+import { sanitizeChartDefinition } from "../src/chart-definition.js";
+import { pivotChartView } from "../src/dashboard/dashboard-chart.js";
 import {
   chartFromRange,
   DEFAULT_CHART_HEIGHT,
   DEFAULT_CHART_WIDTH,
   nextChartId,
+  pivotValueCaptions,
+  plotsPivotValue,
   selectionRange,
+  withPivotValue,
 } from "../src/panels/chart-model.js";
 import {
   defaultAggregation,
@@ -139,6 +144,72 @@ describe("chart from a selection", () => {
     );
     expect(selectionRange({ kind: "row", sheet: "s2", row: 3 }, SHEETS)).toEqual(
       range("s2", 3, 0, 3, 3),
+    );
+  });
+});
+
+describe("values of a chart over a pivot", () => {
+  const chart = {
+    id: "c1",
+    kind: "column" as const,
+    anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+    series: [],
+    pivot: "p1",
+  };
+
+  it("captions values as the Field List does: own name, measure name, or aggregation of field", () => {
+    const captions = pivotValueCaptions(
+      [
+        { field: 1, aggregation: "SUM" },
+        { measure: "m1" },
+        { field: 2, aggregation: "COUNTA", name: "Orders" },
+        { measure: "gone" },
+      ],
+      (field) => ["Region", "Amount", "Id"][field] ?? "",
+      (id) => (id === "m1" ? "Margin" : undefined),
+    );
+    expect(captions).toEqual(["Sum of Amount", "Margin", "Orders", "gone"]);
+  });
+
+  it("toggles one value, keeps at least one, and drops the list when every value is plotted", () => {
+    const one = withPivotValue(chart, 3, 0, false);
+    expect(one?.pivotValues).toEqual([1, 2]);
+    expect(plotsPivotValue(one ?? chart, 0)).toBe(false);
+    const only = withPivotValue(withPivotValue(one ?? chart, 3, 1, false) ?? chart, 3, 2, false);
+    expect(only).toBeNull();
+    expect(withPivotValue(one ?? chart, 3, 0, true)).toEqual(chart);
+  });
+
+  it("accepts value positions only on a chart over a pivot, distinct and in bounds", () => {
+    expect(sanitizeChartDefinition({ ...chart, pivotValues: [2, 0] })?.pivotValues).toEqual([2, 0]);
+    const { pivot: _pivot, ...plain } = chart;
+    for (const invalid of [
+      { ...plain, pivotValues: [0] },
+      { ...chart, pivotValues: [] },
+      { ...chart, pivotValues: [1, 1] },
+      { ...chart, pivotValues: [-1] },
+      { ...chart, pivotValues: [0.5] },
+      { ...chart, pivotValues: [32] },
+    ]) {
+      expect(sanitizeChartDefinition(invalid)).toBeNull();
+    }
+  });
+
+  it("plots the data columns of the chosen values only, for each column item", () => {
+    // Two column items (A, B) by two values (V0, V1): data columns A/V0, A/V1, B/V0, B/V1.
+    const output = {
+      rows: 3,
+      cols: 5,
+      headerRows: 2,
+      labelCols: 1,
+      cells: ["", "A", "A", "B", "B", "", "V0", "V1", "V0", "V1", "East", 1, 2, 3, 4],
+    };
+    const view = pivotChartView({ ...chart, pivotValues: [1] }, output, ["0", "0.0"]);
+    expect(view.series.map((series) => [series.name, series.values, series.numberFormats])).toEqual(
+      [
+        ["A / V1", [2], ["0.0"]],
+        ["B / V1", [4], ["0.0"]],
+      ],
     );
   });
 });

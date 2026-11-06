@@ -310,7 +310,7 @@ fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Valu
     } else {
         format!("#,##{digits}")
     };
-    text_value(format_number(rounded, &code).ok_or(FormulaError::Value)?)
+    text_value(format_number(rounded, &code)?.ok_or(FormulaError::Value)?)
 }
 
 /// Append directly so ARRAYTOTEXT does not allocate a string for each cell.

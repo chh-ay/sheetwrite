@@ -76,7 +76,7 @@ parts for the current queries instead. See
 
 ## Drops and warnings
 
-Parts reached through a relationship into worksheet, table, styles or workbook parts are dropped because Sheetwrite rewrites those parts. External links, chart sheets, digital signatures and graphs whose relationships point outside the kept parts are also dropped with warnings.
+Parts reached through a relationship into worksheet, table, styles or workbook parts are dropped because Sheetwrite rewrites those parts. External links that are not workbooks (DDE and OLE links), chart sheets, digital signatures and graphs whose relationships point outside the kept parts are also dropped with warnings.
 
 `resourceLimits.maxPreservedBytes` defaults to 64 MiB of compressed data. A graph over this kept-part budget is dropped with a warning rather than making preservation unbounded. This is distinct from hard input/decompression resource failures.
 

@@ -974,7 +974,8 @@ export class SheetwriteStore implements Store {
       if (
         patch.op === "setNamedRange" ||
         patch.op === "removeNamedRange" ||
-        patch.op === "setCalculation"
+        patch.op === "setCalculation" ||
+        patch.op === "setExternalLinks"
       ) {
         // A chart or pivot may read through a defined name, whose target is not tracked,
         // and a calculation change can move any formula result.

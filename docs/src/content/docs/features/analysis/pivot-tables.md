@@ -111,6 +111,7 @@ sheet or a cell. Then the field list opens in the side panel.
 - Drag fields into **Rows**, **Columns**, **Values** and **Filters**, or use the
   actions menu on each field to move it with the keyboard.
 - A value field has an aggregation, and a row or column field has a sort order.
+- **Number Format…** in a value field's actions menu sets the format of its value cells: a category (Number, Currency, Percentage, Scientific) or a custom format code. A new value field shows General, as in Excel.
 - Each change is one undo step. Select a cell in a pivot's output, or
   right-click it and choose **PivotTable Fields**, to open its field list again.
   Hosts can do the same with `grid.actions.showPivotFields()`.
@@ -149,6 +150,7 @@ grid.removePivot("sales-by-region");
 | `source` | A range with its header row, or `{ table: tableId }` for a workbook table. A table source excludes the header and totals rows. |
 | `anchor` | The top-left output cell on the owning sheet. |
 | `rows`, `columns` | Source field indices that group the output rows and columns, outermost first. A field can be on one axis only. |
+| `values[i].numberFormat` | The Excel number-format code of the field's value cells, including subtotals and grand totals, as Excel's Value Field Settings › Number Format sets it. Absent shows General. Header rows and labels keep their own style. XLSX files keep it as the `dataField` `numFmtId`. |
 | `values` | Aggregated fields: `SUM`, `COUNT`, `AVERAGE`, `MIN`, `MAX`, `COUNTA` or `DISTINCTCOUNT`. These use the `PIVOTBY` semantics. `SUM` and `AVERAGE` round the exact sum one time. `PIVOTBY` rounds after each value, so the results can be different. |
 | `filters` | Keep-lists: a source row contributes only if its value is in the list. |
 | `sort` | The label order of axis fields. Fields without a key sort ascending. |

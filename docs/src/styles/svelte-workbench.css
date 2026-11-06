@@ -157,7 +157,7 @@
 
 .sw-svw-gridstage > header strong {
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
@@ -339,7 +339,7 @@
 /* ---- Durable outbox ----------------------------------------------------- */
 
 .sw-svw-sectionhead h3 {
-  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
