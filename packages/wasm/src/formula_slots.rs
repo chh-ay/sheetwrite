@@ -5,8 +5,6 @@ use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, For
 
 const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
-const NO_RESULT_POSITION: u32 = u32::MAX;
-const SLOT_CAPACITY_SLACK: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
 
@@ -98,6 +96,14 @@ impl FormulaBits {
         *word &= !mask;
         self.count -= 1;
         true
+    }
+
+    /// Clears every bit in one pass over the words, keeping their storage.
+    pub(crate) fn clear_all(&mut self) {
+        if self.count != 0 {
+            self.words.fill(0);
+            self.count = 0;
+        }
     }
 
     /// Empty membership permits flag storage to be released.
@@ -200,11 +206,6 @@ pub(crate) struct FormulaStore {
 }
 
 impl FormulaStore {
-    /// Include vacant slots because dense pass state uses the same id span.
-    pub(crate) fn slots(&self) -> usize {
-        self.locations.len()
-    }
-
     fn slot(&self, id: FormulaId) -> Option<&FormulaSlot> {
         let index = id.index();
         self.entries
@@ -563,15 +564,25 @@ impl IntoIterator for FormulaWork {
     }
 }
 
-/// Results exist only during a pass. The retained id-to-position array lets a
-/// small edit clear only its own slots instead of initializing the whole sheet.
+/// Pass-scoped evaluation state. Results are not kept here: the pass writes
+/// each formula's result to its cell and marks it settled, and readers read
+/// it from storage. A formula that a runtime reference (`OFFSET`,
+/// `INDIRECT`) or a runtime cycle pulls in the middle of another formula's
+/// evaluation cannot be written from there, so its result waits in `pulled`
+/// until the pass writes it after that formula.
 #[derive(Default)]
 pub(crate) struct FormulaResults {
-    positions: Vec<u32>,
-    values: Vec<Option<EvalResult>>,
-    used: Vec<FormulaId>,
+    /// Formulas whose result this pass has written to storage.
+    settled: FormulaBits,
+    /// Results not yet written, at most the formulas pulled during one
+    /// top-level evaluation plus the errors the depth walk seeded.
+    pulled: Vec<(FormulaId, EvalResult)>,
+    pulled_bits: FormulaBits,
+    /// Formulas in dependency order, from the depth walk.
+    pub(crate) order: Vec<FormulaId>,
+    /// Whether the depth walk ran and `order` lists the pass.
+    pub(crate) ordered: bool,
     work: FormulaWork,
-    count: usize,
     /// Active calls are separate from results so back edges do not recurse.
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
@@ -650,73 +661,98 @@ impl FormulaResults {
         std::mem::take(&mut self.work)
     }
 
-    /// Reserve values for selected ids, not for every formula in the workbook.
-    pub(crate) fn prepare(&mut self, slots: usize, selected: usize) {
+    /// Starts a pass with no settled or pulled formulas.
+    pub(crate) fn prepare(&mut self) {
         self.clear();
-        let retained = slots.saturating_add(slots / SLOT_GROWTH_DIVISOR);
-        if self.positions.capacity() < slots {
-            self.positions
-                .reserve_exact(retained.saturating_sub(self.positions.len()));
-        }
-        self.positions.resize(slots, NO_RESULT_POSITION);
-        if self.positions.capacity() > retained.saturating_add(SLOT_CAPACITY_SLACK) {
-            self.positions.shrink_to(retained);
-        }
-        self.values.reserve_exact(selected);
-        self.used.reserve_exact(selected);
     }
 
+    /// Whether this pass has a result for `id`, stored or pulled.
     #[inline]
-    fn position(&self, id: FormulaId) -> Option<usize> {
-        let position = *self.positions.get(id.index())?;
-        (position != NO_RESULT_POSITION).then_some(position as usize)
+    pub(crate) fn has(&self, id: FormulaId) -> bool {
+        self.settled.contains(id) || self.pulled_bits.contains(id)
     }
 
-    /// Read only values calculated or seeded during the current pass.
+    /// Whether `id`'s result for this pass is in storage.
     #[inline]
-    pub(crate) fn get(&self, id: FormulaId) -> Option<&EvalResult> {
-        self.values.get(self.position(id)?).and_then(Option::as_ref)
+    pub(crate) fn is_settled(&self, id: FormulaId) -> bool {
+        self.settled.contains(id)
     }
 
-    /// Iterative calculation updates a result without another allocation.
-    pub(crate) fn get_mut(&mut self, id: FormulaId) -> Option<&mut EvalResult> {
-        let position = self.position(id)?;
-        self.values.get_mut(position).and_then(Option::as_mut)
+    /// Records that `id`'s result for this pass is in storage.
+    #[inline]
+    pub(crate) fn settle(&mut self, id: FormulaId) {
+        self.settled.insert(id);
     }
 
-    /// A re-evaluated spill keeps its existing indexed result position.
-    pub(crate) fn insert(&mut self, id: FormulaId, value: EvalResult) {
-        if self.positions.len() <= id.index() {
-            self.positions.resize(id.index() + 1, NO_RESULT_POSITION);
-        }
-        if let Some(position) = self.position(id) {
-            let Some(slot) = self.values.get_mut(position) else {
-                return;
-            };
-            self.count += usize::from(slot.replace(value).is_none());
-        } else {
-            let Some(position) = self.positions.get_mut(id.index()) else {
-                return;
-            };
-            // There is at most one position per allocated FormulaId.
-            *position = self.values.len() as u32;
-            self.used.push(id);
-            self.values.push(Some(value));
-            self.count += 1;
+    /// Forgets `id`'s result for this pass, so it is evaluated again.
+    pub(crate) fn unsettle(&mut self, id: FormulaId) {
+        self.settled.remove(id);
+        if self.pulled_bits.remove(id) {
+            self.pulled.retain(|&(pulled, _)| pulled != id);
         }
     }
 
-    /// Consume write-back output without losing the id's pass position.
-    pub(crate) fn remove(&mut self, id: FormulaId) -> Option<EvalResult> {
-        let position = self.position(id)?;
-        let value = self.values.get_mut(position)?.take()?;
-        self.count -= 1;
-        Some(value)
+    /// A result waiting to be written. The list is short, so it is searched
+    /// from its newest entry.
+    #[inline]
+    pub(crate) fn pulled(&self, id: FormulaId) -> Option<&EvalResult> {
+        if !self.pulled_bits.contains(id) {
+            return None;
+        }
+        self.pulled
+            .iter()
+            .rev()
+            .find(|&&(pulled, _)| pulled == id)
+            .map(|(_, value)| value)
     }
 
-    /// A fully seeded error pass can skip evaluator dispatch.
-    pub(crate) fn len(&self) -> usize {
-        self.count
+    /// Iterative calculation updates a pulled result in place.
+    pub(crate) fn pulled_mut(&mut self, id: FormulaId) -> Option<&mut EvalResult> {
+        if !self.pulled_bits.contains(id) {
+            return None;
+        }
+        self.pulled
+            .iter_mut()
+            .rev()
+            .find(|(pulled, _)| *pulled == id)
+            .map(|(_, value)| value)
+    }
+
+    /// Keeps `id`'s result until the pass writes it to storage.
+    pub(crate) fn pull(&mut self, id: FormulaId, value: EvalResult) {
+        self.settled.remove(id);
+        if self.pulled_bits.insert(id) {
+            self.pulled.push((id, value));
+        } else if let Some(current) = self.pulled_mut(id) {
+            *current = value;
+        }
+    }
+
+    /// Hands the waiting results to the pass to write; give the list back
+    /// with [`Self::restore_pulled`] to keep its capacity.
+    pub(crate) fn take_pulled(&mut self) -> Vec<(FormulaId, EvalResult)> {
+        for &(id, _) in &self.pulled {
+            self.pulled_bits.remove(id);
+        }
+        std::mem::take(&mut self.pulled)
+    }
+
+    pub(crate) fn restore_pulled(&mut self, mut pulled: Vec<(FormulaId, EvalResult)>) {
+        pulled.clear();
+        if self.pulled.is_empty() {
+            self.pulled = pulled;
+        }
+    }
+
+    /// Whether any result waits to be written.
+    #[inline]
+    pub(crate) fn has_pulled(&self) -> bool {
+        !self.pulled.is_empty()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pulled_len(&self) -> usize {
+        self.pulled.len()
     }
 
     /// The shared sum of `range` when it was the last range shared.
@@ -800,15 +836,14 @@ impl FormulaResults {
         std::mem::swap(&mut self.regexes, &mut other.regexes);
     }
 
-    /// Clear touched positions so a small edit does not scan all slots.
+    /// Clears this pass's settled, pulled and active-call bits.
     pub(crate) fn clear(&mut self) {
-        for id in self.used.drain(..) {
-            if let Some(position) = self.positions.get_mut(id.index()) {
-                *position = NO_RESULT_POSITION;
-            }
-            self.visiting.remove(id);
-        }
-        self.values.clear();
+        self.settled.clear_all();
+        self.visiting.clear_all();
+        self.pulled_bits.clear_all();
+        self.pulled.clear();
+        self.order.clear();
+        self.ordered = false;
         self.range_sums.sums.clear();
         self.range_sums.last = None;
         self.lookups.clear();
@@ -816,7 +851,6 @@ impl FormulaResults {
         {
             self.regexes = None;
         }
-        self.count = 0;
     }
 
     /// Release wide result buffers before saving the cleared primary work space.
@@ -825,11 +859,11 @@ impl FormulaResults {
 
         // Small edits reuse one page of empty buffers instead of two
         // allocations per pass; wide passes must not pin their size.
-        if self.values.capacity() > SLOT_PAGE_LEN {
-            self.values = Vec::new();
+        if self.pulled.capacity() > SLOT_PAGE_LEN {
+            self.pulled = Vec::new();
         }
-        if self.used.capacity() > SLOT_PAGE_LEN {
-            self.used = Vec::new();
+        if self.order.capacity() > SLOT_PAGE_LEN {
+            self.order = Vec::new();
         }
         if self.range_sums.sums.capacity() > SLOT_PAGE_LEN {
             self.range_sums.sums = Vec::new();
@@ -844,9 +878,10 @@ impl FormulaResults {
     /// Count buffers here; the store accounts for this workspace's boxed header.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
-        formulas.add_vec::<u32>(self.positions.len(), self.positions.capacity());
-        formulas.add_vec::<Option<EvalResult>>(self.values.len(), self.values.capacity());
-        formulas.add_vec::<FormulaId>(self.used.len(), self.used.capacity());
+        self.settled.add_memory_stats(formulas);
+        self.pulled_bits.add_memory_stats(formulas);
+        formulas.add_vec::<(FormulaId, EvalResult)>(self.pulled.len(), self.pulled.capacity());
+        formulas.add_vec::<FormulaId>(self.order.len(), self.order.capacity());
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);

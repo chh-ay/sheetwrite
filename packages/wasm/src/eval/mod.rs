@@ -865,7 +865,7 @@ impl CellStore {
             return;
         }
 
-        memo.prepare(self.formula_slots.slots(), affected.len());
+        memo.prepare();
 
         let found_cycle = self.graph.index().is_some_and(|index| {
             seed_dependency_depth_errors(
@@ -887,17 +887,7 @@ impl CellStore {
             if self.independent_pass() {
                 self.evaluate_independent_pass(&affected, &mut memo);
             } else {
-                let mut pass = EvalPass {
-                    affected: &affected,
-                    results: &mut memo,
-                };
-                self.evaluate_pass(&mut pass, found_cycle);
-
-                for id in affected.ids() {
-                    if let Some(result) = pass.results.remove(id) {
-                        self.store_formula_result(id, result);
-                    }
-                }
+                self.evaluate_selected(&affected, &mut memo, found_cycle);
             }
 
             self.finish_recompute(seeds.iter().copied(), Some(&affected));
@@ -908,12 +898,9 @@ impl CellStore {
         }
 
         if let Some(limits) = self.iteration.as_deref().copied().filter(|_| found_cycle) {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.settle_circular_references(&mut pass, limits, false);
+            self.settle_circular_references(&affected, &mut memo, limits, false);
         }
+        self.flush_seeded(&mut memo);
 
         let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
@@ -985,7 +972,7 @@ impl CellStore {
                 let vacated_range = data.spill.installed(local);
                 let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
 
-                memo.remove(id);
+                memo.unsettle(id);
                 let mut pass = EvalPass {
                     affected: &affected,
                     results: &mut memo,
@@ -1073,16 +1060,19 @@ impl CellStore {
                         if data.spill.attempt(local).is_some() {
                             data.spill.forget(local, &mut data.cells);
                         }
-                        pass.results.insert(id, matrix.into_first());
+                        pass.results.pull(id, matrix.into_first());
                         Vec::new()
                     }
                     evaluated => self.install_spill_result(key, evaluated, pass.results),
                 };
                 if self.iteration.is_some() {
                     if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
-                        pass.results.insert(id, value);
+                        pass.results.pull(id, value);
                     }
                 }
+                // The anchor and any formula it pulled are written before the
+                // next anchor runs, after its spill is installed.
+                self.flush_pulled(&mut memo);
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
@@ -1158,6 +1148,7 @@ impl CellStore {
             }
 
             let Some(index) = self.graph.index() else {
+                self.flush_pulled(&mut memo);
                 memo.finish(affected);
                 self.formula_results = Some(memo);
                 return;
@@ -1243,6 +1234,7 @@ impl CellStore {
                     &mut memo,
                 );
             }
+            self.flush_seeded(&mut memo);
         }
 
         #[cfg(test)]
@@ -1271,17 +1263,7 @@ impl CellStore {
             }
         });
 
-        let mut pass = EvalPass {
-            affected: &affected,
-            results: &mut memo,
-        };
-        self.evaluate_pass(&mut pass, found_cycle);
-
-        for id in affected.ids() {
-            if let Some(result) = pass.results.remove(id) {
-                self.store_formula_result(id, result);
-            }
-        }
+        self.evaluate_selected(&affected, &mut memo, found_cycle);
 
         self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
         memo.finish(affected);
@@ -1304,19 +1286,19 @@ impl CellStore {
             Err(error) => {
                 let data = &mut self.sheets[sheet];
                 data.spill.forget(local, &mut data.cells);
-                results.insert(id, Value::Error(error));
+                results.pull(id, Value::Error(error));
                 return Vec::new();
             }
         };
         let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
             let data = &mut self.sheets[sheet];
             data.spill.forget(local, &mut data.cells);
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         };
         let data = &mut self.sheets[sheet];
         if let Err(error) = data.spill.admit(range, &mut data.cells, &data.formulas) {
-            results.insert(id, Value::Error(error));
+            results.pull(id, Value::Error(error));
             return Vec::new();
         }
 
@@ -1331,16 +1313,16 @@ impl CellStore {
         let data = &mut self.sheets[sheet];
         if !within_budget {
             data.spill.compact(&mut data.cells);
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
         if !data.spill.reserve(range, &mut data.cells) {
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
 
         let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
-        results.insert(id, first);
+        results.pull(id, first);
         let strings = &mut self.strings;
         data.spill.install(range, &mut data.cells, |offset| {
             calculated_slot(strings, &matrix.values[offset])
@@ -1371,6 +1353,119 @@ impl CellStore {
             let result = self.eval_formula_body(id, &mut pass, 0);
             self.store_formula_result(id, result);
         }
+    }
+
+    /// This pass's result for `id`: a pulled result not yet written, or the
+    /// value written to its cell.
+    pub(crate) fn pass_result(
+        &self,
+        id: FormulaId,
+        results: &FormulaResults,
+    ) -> Option<EvalResult> {
+        if let Some(result) = results.pulled(id) {
+            return Some(result.clone());
+        }
+        if !results.is_settled(id) {
+            return None;
+        }
+        self.stored_formula_value(id)
+    }
+
+    /// The value a formula's cell holds, as a clean formula is read.
+    fn stored_formula_value(&self, id: FormulaId) -> Option<EvalResult> {
+        let key = self.formula_slots.location(id)?;
+        let sheet = self.sheets.get(key.sheet as usize)?;
+        let (row, col) = key.local();
+        if !sheet.cells.contains_cell(row as usize, col as usize) {
+            return Some(Value::Error(FormulaError::Ref));
+        }
+        let index = sheet.cells.idx(row as usize, col as usize);
+        Some(cached_formula_value(
+            sheet,
+            &self.strings,
+            index,
+            formula_error_with_entry(sheet, key.local(), self.formula_slots.get(id)),
+        ))
+    }
+
+    /// Writes the pulled results to storage and marks them settled.
+    pub(super) fn flush_pulled(&mut self, results: &mut FormulaResults) {
+        if !results.has_pulled() {
+            return;
+        }
+        let mut pulled = results.take_pulled();
+        for (id, result) in pulled.drain(..) {
+            self.store_formula_result(id, result);
+            results.settle(id);
+        }
+        results.restore_pulled(pulled);
+    }
+
+    /// Writes the errors the depth walk seeded. With iteration on, `#CYCLE!`
+    /// results wait: the component pass replaces them and starts from the
+    /// values the cells held before this pass.
+    fn flush_seeded(&mut self, results: &mut FormulaResults) {
+        if self.iteration.is_none() {
+            self.flush_pulled(results);
+            return;
+        }
+        let mut pulled = results.take_pulled();
+        let mut kept = Vec::new();
+        for (id, result) in pulled.drain(..) {
+            if result == Value::Error(FormulaError::Cycle) {
+                kept.push((id, result));
+            } else {
+                self.store_formula_result(id, result);
+                results.settle(id);
+            }
+        }
+        results.restore_pulled(pulled);
+        for (id, result) in kept {
+            results.pull(id, result);
+        }
+    }
+
+    /// Evaluates every selected formula once, each after the formulas it
+    /// reads, and writes its result before the next one runs.
+    fn evaluate_selected(
+        &mut self,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
+        found_cycle: bool,
+    ) {
+        match self.iteration.as_deref().copied() {
+            Some(limits) if found_cycle => {
+                self.settle_circular_references(affected, results, limits, true)
+            }
+            _ => self.flush_pulled(results),
+        }
+        if results.ordered {
+            let order = std::mem::take(&mut results.order);
+            for &id in &order {
+                self.evaluate_one(id, affected, results);
+            }
+            results.order = order;
+        }
+        // Formulas the walk did not list, or every formula when it did not run.
+        for id in affected.ids() {
+            self.evaluate_one(id, affected, results);
+        }
+    }
+
+    /// Evaluates `id` unless this pass already has its result, then writes it
+    /// and any formula it pulled.
+    pub(super) fn evaluate_one(
+        &mut self,
+        id: FormulaId,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
+    ) {
+        if results.has(id) {
+            return;
+        }
+        let mut pass = EvalPass { affected, results };
+        let _ = self.eval_formula_id(id, &mut pass, 0);
+        self.flush_pulled(results);
     }
 
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
@@ -1474,18 +1569,6 @@ impl CellStore {
         Value::number(s.cells.num_at(i))
     }
 
-    pub(crate) fn eval_formula_cell(
-        &self,
-        key: AbsCellKey,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> EvalResult {
-        let Some(id) = self.formula_id(key) else {
-            return Value::Number(0.0);
-        };
-        self.eval_formula_id(id, pass, depth)
-    }
-
     /// Evaluate a selected id without repeating its address-index lookup.
     pub(crate) fn eval_formula_id(
         &self,
@@ -1499,11 +1582,11 @@ impl CellStore {
         let Some(key) = self.formula_slots.location(id) else {
             return Value::Error(FormulaError::Ref);
         };
-        if let Some(result) = pass.results.get(id) {
+        if let Some(result) = self.pass_result(id, pass.results) {
             if self.iteration.is_some() {
                 iteration::record_iteration_read(key);
             }
-            return result.clone();
+            return result;
         }
         if !pass.results.visiting.insert(id) {
             return self.back_edge_value(key);
@@ -1514,7 +1597,7 @@ impl CellStore {
         }
         let result = self.eval_formula_body(id, pass, depth);
         pass.results.visiting.remove(id);
-        pass.results.insert(id, result.clone());
+        pass.results.pull(id, result.clone());
         if self.iteration.is_some() {
             self.finish_runtime_formula(key, pass).unwrap_or(result)
         } else {

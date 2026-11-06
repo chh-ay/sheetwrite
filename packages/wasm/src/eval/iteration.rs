@@ -25,6 +25,7 @@ use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 use super::dependency::circular_components;
 use super::value::cached_formula_value;
 use super::EvalPass;
+use crate::formula_slots::{FormulaResults, FormulaWork};
 
 /// Excel accepts 1 to 32,767 iterations.
 const MAX_ITERATIONS: u32 = 32_767;
@@ -137,30 +138,6 @@ pub(super) fn record_iteration_read(key: AbsCellKey) {
 }
 
 impl CellStore {
-    /// Evaluates every affected formula of a pass. `found_cycle` reports
-    /// whether the depth walk seeded a `#CYCLE!`.
-    pub(super) fn evaluate_pass(&self, pass: &mut EvalPass<'_>, found_cycle: bool) {
-        let affected = pass.affected;
-        let Some(limits) = self.iteration.as_deref().copied() else {
-            // The depth walk can resolve the whole pass to errors. Those
-            // stored errors need no formula dispatch or value cloning.
-            if pass.results.len() == affected.len() {
-                return;
-            }
-            for id in affected.ids() {
-                let _ = self.eval_formula_id(id, pass, 0);
-            }
-            return;
-        };
-
-        if found_cycle {
-            self.settle_circular_references(pass, limits, true);
-        }
-        for id in affected.ids() {
-            let _ = self.eval_formula_id(id, pass, 0);
-        }
-    }
-
     /// The value a runtime reference reads from a formula still on the
     /// evaluation path: its previous value while the pass iterates.
     pub(super) fn back_edge_value(&self, key: AbsCellKey) -> EvalResult {
@@ -221,29 +198,38 @@ impl CellStore {
     }
 
     /// Before spill installation, settle cycles but leave ordinary readers
-    /// unevaluated: they may read spill cells that do not exist yet.
+    /// unevaluated: they may read spill cells that do not exist yet. The
+    /// depth walk's `#CYCLE!` results are still pulled, not written, so the
+    /// cells hold the values each component starts from.
     pub(super) fn settle_circular_references(
-        &self,
-        pass: &mut EvalPass<'_>,
+        &mut self,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
         limits: IterationLimits,
         evaluate_readers: bool,
     ) {
-        let cyclic: Vec<AbsCellKey> = pass
-            .affected
+        let mut cyclic_ids = Vec::new();
+        let mut pulled = results.take_pulled();
+        for (id, result) in pulled.drain(..) {
+            if result == Value::Error(FormulaError::Cycle) {
+                cyclic_ids.push(id);
+            } else {
+                self.store_formula_result(id, result);
+                results.settle(id);
+            }
+        }
+        results.restore_pulled(pulled);
+        // Selection order, as the memo listed them.
+        cyclic_ids.sort_unstable_by_key(|id| id.index());
+        let cyclic: Vec<AbsCellKey> = affected
             .ids()
-            .filter(|&id| {
-                matches!(
-                    pass.results.get(id),
-                    Some(Value::Error(FormulaError::Cycle))
-                )
+            .filter(|id| {
+                cyclic_ids
+                    .binary_search_by_key(&id.index(), |c| c.index())
+                    .is_ok()
             })
             .filter_map(|id| self.formula_slots.location(id))
             .collect();
-        for key in &cyclic {
-            if let Some(id) = self.formula_id(*key) {
-                pass.results.remove(id);
-            }
-        }
 
         // A pass applies the index before it seeds cycle errors.
         let Some(index) = self.graph.index() else {
@@ -252,17 +238,20 @@ impl CellStore {
         let components = circular_components(&self.sheets, &self.formula_slots, index, &cyclic);
         for (members, circular) in components.iter() {
             if circular && members.iter().all(|&key| self.is_scalar_formula(key)) {
-                self.iterate_component(members, pass, limits);
+                self.iterate_component(members, affected, results, limits);
             } else if circular {
                 for &key in members {
                     if let Some(id) = self.formula_id(key) {
-                        pass.results.insert(id, Value::Error(FormulaError::Cycle));
+                        self.store_formula_result(id, Value::Error(FormulaError::Cycle));
+                        results.settle(id);
                     }
                 }
             } else if evaluate_readers {
                 for &key in members {
                     if self.is_scalar_formula(key) {
-                        let _ = self.eval_formula_cell(key, pass, 0);
+                        if let Some(id) = self.formula_id(key) {
+                            self.evaluate_one(id, affected, results);
+                        }
                     }
                 }
             }
@@ -270,12 +259,13 @@ impl CellStore {
     }
 
     /// Sweeps one circular component until it converges or the iteration
-    /// limit is spent. Members read each other through the memo, so a sweep
-    /// costs one evaluation per member and allocates nothing.
+    /// limit is spent. Each member's new value is written before the next
+    /// member reads it, so a sweep costs one evaluation per member.
     fn iterate_component(
-        &self,
+        &mut self,
         members: &[AbsCellKey],
-        pass: &mut EvalPass<'_>,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
         limits: IterationLimits,
     ) {
         let mut members = members.to_vec();
@@ -289,7 +279,9 @@ impl CellStore {
         });
         for &key in &members {
             if let Some(id) = self.formula_id(key) {
-                pass.results.insert(id, self.starting_value(key));
+                let start = self.starting_value(key);
+                self.store_formula_result(id, start);
+                results.settle(id);
             }
         }
 
@@ -299,11 +291,17 @@ impl CellStore {
                 let Some(id) = self.formula_id(key) else {
                     continue;
                 };
-                let next = self.eval_formula_body(id, pass, 0);
-                if let Some(current) = pass.results.get_mut(id) {
-                    converged &= !limits.moved(current, &next);
-                    *current = next;
+                let next = {
+                    let mut pass = EvalPass { affected, results };
+                    self.eval_formula_body(id, &mut pass, 0)
+                };
+                if let Some(current) = self.pass_result(id, results) {
+                    converged &= !limits.moved(&current, &next);
                 }
+                results.unsettle(id);
+                self.flush_pulled(results);
+                self.store_formula_result(id, next);
+                results.settle(id);
             }
             BACK_EDGES.with(|state| {
                 if let Some(active) = state
@@ -358,7 +356,7 @@ impl CellStore {
             for &member in &members {
                 let id = self.formula_id(member)?;
                 let next = self.eval_formula_body(id, pass, 0);
-                if let Some(current) = pass.results.get_mut(id) {
+                if let Some(current) = pass.results.pulled_mut(id) {
                     converged &= !limits.moved(current, &next);
                     *current = next;
                 }
@@ -367,6 +365,6 @@ impl CellStore {
                 break;
             }
         }
-        pass.results.get(self.formula_id(key)?).cloned()
+        pass.results.pulled(self.formula_id(key)?).cloned()
     }
 }
