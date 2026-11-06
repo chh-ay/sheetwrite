@@ -3444,7 +3444,9 @@ export class GridImpl implements Grid {
       versionHistory: () => this.config?.history?.(this, "open"),
       // The dashboard chunk names and adds the sheet; first paint carries only this call.
       newDashboard: () =>
-        void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
+        void import("./dashboard/dashboard-layout.js").then((m) => {
+          if (!this.lifetime.closed) m.newDashboard(this);
+        }),
       saveVersion: () => {
         if (!this.readOnly) this.config?.history?.(this, "save");
       },

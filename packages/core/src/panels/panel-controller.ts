@@ -492,8 +492,11 @@ function pivotSheet(
 
 /** Attach the loaded panels to one grid. Returns the disposer. */
 export function attachPanels(grid: Grid, icons?: IconOverrides): () => void {
-  stateOf(grid).icons = icons;
+  const state = stateOf(grid);
+  state.icons = icons;
   return () => {
+    // A lazy panel whose chunk loads after the grid is destroyed opens nothing.
+    state.lazyRequest = null;
     STATES.delete(grid);
   };
 }

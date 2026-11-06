@@ -425,6 +425,10 @@ async function withEngineContent(
   const charts = sheets.some((sheet) => sheet.charts?.some((chart) => chart.pivot !== undefined));
   const { pivotViewExports, worksheetPivotExports } =
     await import("./dashboard/dashboard-export.js");
+  // The store can be disposed, with its grid, while the module loads.
+  if (storeEngine(store)?.isDisposed) {
+    throw new SheetwriteError("aborted", "xlsx-export", "The store was disposed during the export");
+  }
   return {
     ...source.context,
     ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
