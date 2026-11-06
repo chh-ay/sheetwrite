@@ -14,31 +14,22 @@ grid.setPivot(
   "dashboard",
 );
 
-// Each item change is one undo step, saved and synced with the workbook.
-// The slicer filters the KPI card and the pivot together.
+const items: DashboardItem[] = [
+  // A KPI card shows a data model measure
+  { id: "revenue-kpi", kind: "kpi", measure: "revenue", box: { x: 0, y: 0, w: 3, h: 3 } },
+  { id: "region-pivot", kind: "pivot", pivot: "by-region", box: { x: 0, y: 3, w: 6, h: 6 } },
+  // The slicer filters the KPI card and the pivot together
+  {
+    id: "region-slicer",
+    kind: "slicer",
+    field: { table: "orders", column: "region" },
+    selected: ["EMEA"],
+    box: { x: 6, y: 0, w: 3, h: 3 },
+  },
+];
+
+// Each item change is one undo step, saved and synced with the workbook
 grid.applyTransaction({
-  patches: [
-    {
-      op: "setDashboardItem",
-      sheet: "dashboard",
-      item: { id: "revenue-kpi", kind: "kpi", measure: "revenue", box: { x: 0, y: 0, w: 3, h: 3 } },
-    },
-    {
-      op: "setDashboardItem",
-      sheet: "dashboard",
-      item: { id: "region-pivot", kind: "pivot", pivot: "by-region", box: { x: 0, y: 3, w: 6, h: 6 } },
-    },
-    {
-      op: "setDashboardItem",
-      sheet: "dashboard",
-      item: {
-        id: "region-slicer",
-        kind: "slicer",
-        field: { table: "orders", column: "region" },
-        selected: ["EMEA"],
-        box: { x: 6, y: 0, w: 3, h: 6 },
-      },
-    },
-  ],
+  patches: items.map((item) => ({ op: "setDashboardItem", sheet: "dashboard", item })),
 });
 ```
