@@ -4,10 +4,10 @@ import corePackage from "../../../packages/core/package.json" with { type: "json
 import { Icon } from "../components/Icon.js";
 import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
+import { EngineDefaultSnippet, EngineFullSnippet } from "../components/landing/EngineSnippets.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
 import { GridGlow } from "../components/landing/GridGlow.js";
 import { HeroApp } from "../components/landing/HeroApp.js";
-import { EngineDefaultSnippet, EngineFullSnippet } from "../components/landing/EngineSnippets.js";
 import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { PackageCommand } from "../components/PackageCommand.js";
