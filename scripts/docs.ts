@@ -76,6 +76,7 @@ import {
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
+import { extractFigureAssets } from "./perf-figures.js";
 import type { ApiExport, PublicApiAnalysis, PublicApiManifest } from "./public-api.js";
 import { writeIfChanged } from "./script-io.js";
 
@@ -414,10 +415,17 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(generatedDataRoot, "compatibility-summary.json"),
       content: stableJson(publishedCompatibilityResults.testSet),
     },
-    ...splitPerformancePages(await renderEvidenceText()).map((page) => ({
-      path: join(contentRoot, page.route),
-      content: page.content,
-    })),
+    // Each figure leaves its page for a static HTML asset, so the page's script carries a placeholder.
+    ...splitPerformancePages(await renderEvidenceText()).flatMap((page) => {
+      const { content, assets } = extractFigureAssets(page.slug, page.content);
+      return [
+        { path: join(contentRoot, page.route), content },
+        ...assets.map((asset) => ({
+          path: join(generatedDataRoot, `perf-figures/${asset.name}.html`),
+          content: asset.html,
+        })),
+      ];
+    }),
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
   ];
