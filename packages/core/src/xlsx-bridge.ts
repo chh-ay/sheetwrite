@@ -16,7 +16,7 @@ import {
   xlsxTableExportBackend,
   xlsxTableImportBackend,
   xlsxWorkbookBackend,
-} from "./xlsx-backends.js";
+} from "./xlsx-slots.js";
 import { hasAdmittedXlsxSource } from "./xlsx-source.js";
 
 /**

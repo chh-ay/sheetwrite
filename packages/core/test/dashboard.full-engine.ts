@@ -16,7 +16,7 @@ import {
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 beforeAll(async () => {
   await initSheetwrite({ engine: formulas });

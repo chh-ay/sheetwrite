@@ -25,7 +25,7 @@ import type {
   Workbook,
   XlsxTableExportBackend,
 } from "../src/types.js";
-import { setXlsxTableExportBackend } from "../src/xlsx-backends.js";
+import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */

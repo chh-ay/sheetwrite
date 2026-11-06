@@ -17,11 +17,11 @@ import type {
   Selection,
   Workbook,
 } from "../packages/core/src/index.js";
-import type * as XlsxBackends from "../packages/core/src/xlsx-backends.js";
+import type * as XlsxBackends from "../packages/core/src/xlsx-slots.js";
 
 // The adapters load core's built entry, and the built package keeps no declarations for this
 // internal module, so the test loads its runtime from dist with the source module's types.
-const BUILT_XLSX_BACKENDS: string = "../packages/core/dist/xlsx-backends.js";
+const BUILT_XLSX_BACKENDS: string = "../packages/core/dist/xlsx-slots.js";
 const { setXlsxTableExportBackend } = (await import(BUILT_XLSX_BACKENDS)) as typeof XlsxBackends;
 
 export interface AdapterLifecycleCase {

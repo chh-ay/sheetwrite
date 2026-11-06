@@ -22,7 +22,7 @@ import {
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
-} from "../src/xlsx-backends.js";
+} from "../src/xlsx-slots.js";
 import {
   fromXlsxTable,
   fromXlsxWorkbook,

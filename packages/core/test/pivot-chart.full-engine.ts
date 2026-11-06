@@ -18,7 +18,7 @@ import {
 } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 const RIBBON_MODULE = "../src/ribbon/ribbon.js";
 

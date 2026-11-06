@@ -33,6 +33,10 @@
       "reason": "Type-only module is verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/addon.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/cell.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
@@ -90,6 +94,10 @@
     },
     {
       "path": "packages/core/src/types/transaction.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
+      "path": "packages/core/src/types/xlsx.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {

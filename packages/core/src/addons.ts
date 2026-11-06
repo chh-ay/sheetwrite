@@ -20,7 +20,7 @@ const setupContext: SheetwriteAddonContext = {
     setChartRendererFactory(parts.renderer);
   },
   xlsx(parts) {
-    const written = import("./xlsx-backends.js").then((slots) => {
+    const written = import("./xlsx-slots.js").then((slots) => {
       if (parts.workbook) slots.setXlsxWorkbookBackend(parts.workbook);
 
       if (parts.tableImport) slots.setXlsxTableImportBackend(parts.tableImport);
