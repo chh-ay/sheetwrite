@@ -298,6 +298,17 @@ function changedAnalyticalResults(
   return labels;
 }
 
+/** "pass" when every cell, formula, sheet, merge and frozen row came back. */
+function roundTripOutcome(report: RoundTripReport): "pass" | "partial" {
+  return report.formulasPreserved === report.formulasBefore &&
+    report.sheetsPreserved &&
+    report.mergePreserved &&
+    report.frozenRowsPreserved &&
+    report.cellsMatched === report.cellsCompared
+    ? "pass"
+    : "partial";
+}
+
 function formatCurrency(value: number | null): string {
   return value === null
     ? "Unavailable"
@@ -1272,7 +1283,11 @@ function ExchangeControls({ workbench }: Readonly<{ workbench: InteroperabilityW
           <Icon name="refresh" />
           {action.pending ? "Comparing workbook…" : "Export, re-import & compare"}
         </DemoButton>
-        <div aria-live="polite" data-testid="interop-fidelity-ledger">
+        <div
+          aria-live="polite"
+          data-state={roundTrip ? roundTripOutcome(roundTrip) : "ready"}
+          data-testid={roundTrip ? "interop-roundtrip-report" : "interop-fidelity-ledger"}
+        >
           <ShowcaseReadout
             items={[
               {
