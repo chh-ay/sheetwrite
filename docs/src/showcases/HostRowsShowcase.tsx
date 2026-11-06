@@ -55,14 +55,14 @@ const SERVER_NORMALIZED_OPERATIONS: DocumentOp[] = [
   },
 ];
 
-// Widths sum to 1,080 px so every column is visible beside the page gutters
-// at desktop widths; a clipped last column reads as a broken layout.
+// Widths sum to 880 px so every column is visible in the demo beside the side
+// panel at desktop widths; a clipped last column reads as a broken layout.
 const columns = [
-  { key: "name" as const, title: "Account", width: 340 },
-  { key: "amount" as const, title: "ARR · USD", type: "number" as const, width: 170 },
-  { key: "region" as const, title: "Region", width: 150 },
-  { key: "owner" as const, title: "Owner", width: 200 },
-  { key: "stage" as const, title: "Stage", width: 220 },
+  { key: "name" as const, title: "Account", width: 280 },
+  { key: "amount" as const, title: "ARR · USD", type: "number" as const, width: 130 },
+  { key: "region" as const, title: "Region", width: 110 },
+  { key: "owner" as const, title: "Owner", width: 170 },
+  { key: "stage" as const, title: "Stage", width: 190 },
 ];
 const owners = ["Ada Chen", "Lin Patel", "Maya Reyes", "Noah Ellis"];
 const regions = ["North", "South", "West", "East"];

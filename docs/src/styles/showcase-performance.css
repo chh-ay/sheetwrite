@@ -19,7 +19,8 @@
     color: var(--sw-fg);
   }
 
-  /* The demo: the Grid, then the sparse-edit watch and the status line. */
+  /* The demo: the Grid, the sparse-edit watch and the status line, then the
+     instruments that read the live window. */
   .sw-sp-demo {
     display: grid;
     min-width: 0;
@@ -36,6 +37,48 @@
   .sw-sp-grid .sheetwrite-scroller {
     scrollbar-width: thin;
     scrollbar-color: var(--sw-border-strong) var(--sw-surface-2);
+  }
+
+  .sw-sp-instruments {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: var(--sw-space-6);
+    align-items: start;
+    padding: var(--sw-space-5);
+    border-top: var(--sw-border-width) solid var(--sw-border);
+  }
+
+  .sw-sp-instruments > .sw-showcase__control-group + .sw-showcase__control-group {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  /* The map beside its sliders and readout. */
+  .sw-sp-navigator {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--sw-space-3) var(--sw-space-5);
+    align-items: start;
+  }
+
+  .sw-sp-navigator > .sw-sp-flight__map {
+    grid-row: span 3;
+  }
+
+  @media (max-width: 60rem) {
+    .sw-sp-instruments {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 30rem) {
+    .sw-sp-navigator {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-sp-navigator > .sw-sp-flight__map {
+      grid-row: auto;
+    }
   }
 
   .sw-sp-status {
