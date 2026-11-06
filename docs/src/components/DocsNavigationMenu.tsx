@@ -12,12 +12,12 @@ const RAIL_VIEWPORT_QUERY = "(min-width: 64rem)";
 const NAVIGATION_DIALOG_ID = "sw-docs-navigation";
 
 interface NavigationDrawerProps {
- activeHref?: string;
- tab: DocsTabId;
- dialogRef: RefObject<HTMLDialogElement | null>;
- /** Asks the modal to close; Escape and the browser's own close report via onClosed. */
- onDismiss: () => void;
- onClosed: () => void;
+  activeHref?: string;
+  tab: DocsTabId;
+  dialogRef: RefObject<HTMLDialogElement | null>;
+  /** Asks the modal to close; Escape and the browser's own close report via onClosed. */
+  onDismiss: () => void;
+  onClosed: () => void;
 }
 
 /**
@@ -26,39 +26,39 @@ interface NavigationDrawerProps {
  * the header button only opens it.
  */
 function NavigationDrawer({
- activeHref,
- tab,
- dialogRef,
- onDismiss,
- onClosed,
+  activeHref,
+  tab,
+  dialogRef,
+  onDismiss,
+  onClosed,
 }: Readonly<NavigationDrawerProps>) {
- return (
-  // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
-  <dialog
-   aria-label="Documentation"
-   className="sw-nav-dialog"
-   id={NAVIGATION_DIALOG_ID}
-   onClick={(event) => {
-    // Only the backdrop targets the dialog itself: its children fill it.
-    if (event.target === event.currentTarget) onDismiss();
-   }}
-   onClose={onClosed}
-   ref={dialogRef}
-  >
-   <div className="sw-nav-dialog__head">
-    <span className="sw-nav-dialog__title">Documentation</span>
-    <button
-     aria-label="Close documentation menu"
-     className="sw-icon-button"
-     onClick={onDismiss}
-     type="button"
+  return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
+    <dialog
+      aria-label="Documentation"
+      className="sw-nav-dialog"
+      id={NAVIGATION_DIALOG_ID}
+      onClick={(event) => {
+        // Only the backdrop targets the dialog itself: its children fill it.
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+      onClose={onClosed}
+      ref={dialogRef}
     >
-     <Icon name="close" size="md" />
-    </button>
-   </div>
-   <NavigationSections activeHref={activeHref} onNavigate={onDismiss} tab={tab} />
-  </dialog>
- );
+      <div className="sw-nav-dialog__head">
+        <span className="sw-nav-dialog__title">Documentation</span>
+        <button
+          aria-label="Close documentation menu"
+          className="sw-icon-button"
+          onClick={onDismiss}
+          type="button"
+        >
+          <Icon name="close" size="md" />
+        </button>
+      </div>
+      <NavigationSections activeHref={activeHref} onNavigate={onDismiss} tab={tab} />
+    </dialog>
+  );
 }
 
 /**
