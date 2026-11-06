@@ -1120,19 +1120,25 @@ mod tests {
         assert_slots_indexed(&store, "load");
 
         store.set_formula(data, 3, 1, "=A4-1", 0);
+        assert_slots_indexed(&store, "formula edit");
         store.set_number(data, 4, 1, 7.0, 0);
+        assert_slots_indexed(&store, "literal over a formula");
         store.clear_cell(data, 5, 2, 0);
-        assert_slots_indexed(&store, "edits");
+        assert_slots_indexed(&store, "clear");
 
         assert!(store.add_rows(data, 2, 3));
+        assert_slots_indexed(&store, "row insert");
         assert!(store.remove_rows(data, 10, 2));
+        assert_slots_indexed(&store, "row delete");
         assert!(store.insert_cols(data, 1, 1));
+        assert_slots_indexed(&store, "column insert");
         assert!(store.remove_cols(data, 4, 1));
-        assert_slots_indexed(&store, "insert and delete");
+        assert_slots_indexed(&store, "column delete");
 
         store.move_rows(data, 0, 2, 12);
+        assert_slots_indexed(&store, "row move");
         store.move_cols(data, 1, 1, 4);
-        assert_slots_indexed(&store, "moves");
+        assert_slots_indexed(&store, "column move");
 
         let order: Vec<u32> = (0..8).rev().collect();
         store.permute_rows(data, 0, 0, 5, &order);
