@@ -235,3 +235,114 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+/* ---- Demo window bar ---------------------------------------------------- */
+.sw-showcase__demo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-4);
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--sw-control-height-lg);
+  padding: var(--sw-space-2) var(--sw-space-4);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-showcase__demo-title {
+  display: inline-flex;
+  gap: var(--sw-space-2);
+  align-items: center;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+/* ---- Walkthrough steps --------------------------------------------------- */
+.sw-showcase__steps {
+  display: grid;
+  gap: var(--sw-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: showcase-step;
+}
+
+.sw-showcase__steps li {
+  position: relative;
+  display: grid;
+  gap: var(--sw-space-1);
+  justify-items: start;
+  padding-left: var(--sw-space-8);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+  counter-increment: showcase-step;
+}
+
+.sw-showcase__steps li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: var(--sw-icon-lg);
+  height: var(--sw-icon-lg);
+  place-items: center;
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent-strong);
+  background: var(--sw-accent-soft);
+  font: var(--sw-weight-bold) var(--sw-text-caption) / 1 var(--sw-font-mono);
+  content: counter(showcase-step);
+}
+
+.sw-showcase__steps strong {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-showcase__step-result {
+  display: flex;
+  gap: var(--sw-space-1-5);
+  align-items: flex-start;
+  color: var(--sw-fg-muted);
+}
+
+.sw-showcase__step-result .sw-icon {
+  margin-top: var(--sw-space-0-5);
+  color: var(--sw-icon-accent);
+}
+
+/* ---- Keyboard ------------------------------------------------------------ */
+.sw-showcase__keys {
+  display: grid;
+  gap: var(--sw-space-2);
+  margin: 0;
+  font-size: var(--sw-text-small);
+}
+
+.sw-showcase__keys > div {
+  display: flex;
+  gap: var(--sw-space-3);
+  align-items: center;
+}
+
+.sw-showcase__keys dt {
+  display: flex;
+  flex: none;
+  gap: var(--sw-space-1);
+  min-width: 6rem;
+}
+
+.sw-showcase__keys dd {
+  margin: 0;
+  color: var(--sw-fg-muted);
+}
+
+.sw-showcase kbd {
+  padding: var(--sw-space-0-5) var(--sw-space-1-5);
+  border: var(--sw-border-width) solid var(--sw-border-strong);
+  border-bottom-width: var(--sw-space-0-5);
+  border-radius: var(--sw-radius-xs);
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-1);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+}
