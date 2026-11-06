@@ -53,6 +53,9 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
       height: Math.min(180, box.height - 40),
     },
   });
+  // Return the typed array itself: Playwright sends it as one binary payload,
+  // while a plain number array serializes every channel value separately,
+  // which can exceed the poll timeout on a loaded Firefox page.
   const rgba = await page.evaluate(async (encoded) => {
     const source = new Image();
     source.src = `data:image/png;base64,${encoded}`;
@@ -61,9 +64,9 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
     canvas.width = source.naturalWidth;
     canvas.height = source.naturalHeight;
     const context = canvas.getContext("2d");
-    if (!context) return [];
+    if (!context) return new Uint8ClampedArray();
     context.drawImage(source, 0, 0);
-    return Array.from(context.getImageData(0, 0, canvas.width, canvas.height).data);
+    return context.getImageData(0, 0, canvas.width, canvas.height).data;
   }, image.toString("base64"));
 
   return hasOpaqueForeground(rgba);

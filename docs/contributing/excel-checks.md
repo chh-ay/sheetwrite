@@ -1,6 +1,6 @@
 # Excel checks
 
-Some behavior of Sorting (#353), table relationships (#229) and saved queries (#227) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
+Some behavior of Sorting (#353), table relationships (#229), saved queries (#227) and number formats (#433) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
 
 For each check, save the result file under the name given and attach it to the issue in a comment. A test then compares the file with Sheetwrite's result. When a result differs from the expected one, also write down what Excel showed.
 
@@ -14,6 +14,7 @@ For each check, save the result file under the name given and attach it to the i
 | 6 | #229 | `test/fixtures/excel-checks/model-tables-input.xlsx` | `model-relationship-excel.xlsx` |
 | 7 | #229 | `test/fixtures/excel-checks/model-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 8 | #227 | `test/fixtures/excel-checks/power-query-csv.xlsx` | `power-query-csv-excel.xlsx` |
+| 9 | #433 | none; type the formulas into a new workbook | none; record what Excel shows |
 
 ## 1. Sort order (#353)
 
@@ -121,3 +122,15 @@ Expected:
 - Step 3: the table `People` refreshes without an error and shows `Name` and `Age` with Ana 34, Ben 27, Chloe 41.
 - Step 4: the query and the table are still there.
 - After import with the query codec, Sheetwrite still has query `People` bound to table `People`.
+
+## 9. TEXT with a percent code past the largest number (#433)
+
+A percent sign multiplies the number by 100 before TEXT writes it. Near Excel's largest number, 9.99999999999999E+307 ([Excel specifications and limits](https://support.microsoft.com/en-us/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)), that product no longer fits.
+
+1. In a new workbook, type these formulas in A1:A3:
+   - `=TEXT(9.99999999999999E+307,"0%")`
+   - `=TEXT(-9.99999999999999E+307,"0.0%;(0.0%)")`
+   - `=TEXT(1E+305,"0%%")`
+2. Write down what each cell shows.
+
+Expected: `#NUM!` in all three cells, the error Excel gives a result too large to show ([How to correct a #NUM! error](https://support.microsoft.com/en-us/office/how-to-correct-a-num-error-f5193bfc-4400-43f4-88c4-8e1dcca0428b)). Sheetwrite returns `#NUM!` for these cells. If Excel shows text or another error, attach a screenshot to #433.
