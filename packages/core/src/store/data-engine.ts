@@ -44,7 +44,7 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorContext,
 } from "../errors.js";
-import { externalLinkBlock, MAX_EXTERNAL_CELLS } from "../external-link.js";
+import { installExternalLinks } from "../external-link.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -143,7 +143,6 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
-import type { ExternalLink } from "../types/external-link.js";
 import type {
   PivotDefinition,
   PivotFieldType,
@@ -824,7 +823,7 @@ export class StoreDataEngine {
     }
 
     // Before any formula is loaded, so formulas find the links they read.
-    if (!this.installExternalLinks(workbook.externalLinks ?? [])) {
+    if (!installExternalLinks(this.wasm, workbook.externalLinks ?? [])) {
       this.wasm.free();
       throw storeFailure("invalid-snapshot", "invalid external link values");
     }
@@ -2700,47 +2699,8 @@ export class StoreDataEngine {
     );
   }
 
-  /**
-   * Give the engine the saved values of every link, through the same sparse
-   * block load as sheet cells. Returns false at the first invalid link sheet.
-   */
-  private installExternalLinks(links: readonly ExternalLink[]): boolean {
-    let total = 0;
-    for (const link of links) {
-      for (const sheet of link.sheets) {
-        total += sheet.cells.length;
-        const block = externalLinkBlock(sheet);
-        if (!block || total > MAX_EXTERNAL_CELLS) return false;
-
-        const handle = this.wasm.addExternalSheet(link.book, sheet.name, block.cols, block.rows);
-        if (!this.writeSparseCells(handle, 0, 0, block.rows, block.cols, block.cells)) return false;
-        this.wasm.recompute(handle);
-      }
-    }
-    return true;
-  }
-
   private writeSparseBlock(
     bounds: Range,
-    cells: readonly { offset: number; value: CellValue; style?: CellStyle }[],
-  ): boolean {
-    return this.writeSparseCells(
-      this.sheets.handleOf(bounds.sheet),
-      bounds.start.row,
-      bounds.start.col,
-      bounds.end.row - bounds.start.row + 1,
-      bounds.end.col - bounds.start.col + 1,
-      cells,
-    );
-  }
-
-  /** Write sparse cells into a block of the engine sheet `handle`, offsets row-major. */
-  private writeSparseCells(
-    handle: number,
-    startRow: number,
-    startCol: number,
-    rows: number,
-    cols: number,
     cells: readonly { offset: number; value: CellValue; style?: CellStyle }[],
   ): boolean {
     const offsets = new Uint32Array(cells.length);
@@ -2780,11 +2740,11 @@ export class StoreDataEngine {
 
     return (
       this.wasm.setSparseBlock(
-        handle,
-        startRow,
-        startCol,
-        rows,
-        cols,
+        this.sheets.handleOf(bounds.sheet),
+        bounds.start.row,
+        bounds.start.col,
+        bounds.end.row - bounds.start.row + 1,
+        bounds.end.col - bounds.start.col + 1,
         offsets,
         kinds,
         numbers,
