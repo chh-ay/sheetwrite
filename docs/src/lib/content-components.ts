@@ -54,8 +54,8 @@ export const CONTENT_COMPONENTS = {
   CodeGroup: ["sync"],
   AccordionGroup: [],
   Accordion: ["title", "description", "defaultOpen", "id"],
-  Frame: ["caption", "phoneCaption", "hint"],
-  Screenshot: ["name", "alt", "size", "phone", "phoneAlt"],
+  Frame: ["caption", "tabletCaption", "phoneCaption", "hint"],
+  Screenshot: ["name", "alt", "size", "tablet", "tabletAlt", "phone", "phoneAlt"],
   Diagram: ["name", "alt", "caption", "width", "height"],
   Annotated: ["name", "alt", "size", "caption", "points"],
   Compare: ["before", "after"],
@@ -100,8 +100,10 @@ export const SHOT_SIZES = {
   panel: { width: 720, height: 480 },
   wide: { width: 1200, height: 480 },
   card: { width: 640, height: 400 },
+  /** The tablet layout of a dashboard, cropped to its items: shown near its own width. */
+  tablet: { width: 560, height: 632 },
   /** The phone layout of a dashboard, cropped to its items: shown near its own width. */
-  phone: { width: 320, height: 688 },
+  phone: { width: 320, height: 800 },
 } as const;
 
 export type ShotSize = keyof typeof SHOT_SIZES;
@@ -347,18 +349,20 @@ function accordionGroup(node: ContentNode): ContentNode {
 
 function frame(node: ContentNode): ContentNode {
   const caption = attribute(node, "caption");
+  const tabletCaption = attribute(node, "tabletCaption");
   const phoneCaption = attribute(node, "phoneCaption");
   const hint = attribute(node, "hint");
-  // With a phone crop inside, each width shows the caption of its own image.
+  // With narrow crops inside, each width shows the caption of its own image.
   const captionText =
-    caption === undefined || phoneCaption === undefined
-      ? caption === undefined
-        ? []
-        : [text(caption)]
-      : [
-          element("span", [text(caption)], { className: ["sw-frame__caption--wide"] }),
-          element("span", [text(phoneCaption)], { className: ["sw-frame__caption--narrow"] }),
-        ];
+    caption === undefined
+      ? []
+      : tabletCaption === undefined || phoneCaption === undefined
+        ? [text(caption)]
+        : [
+            element("span", [text(caption)], { className: ["sw-frame__caption--wide"] }),
+            element("span", [text(tabletCaption)], { className: ["sw-frame__caption--tablet"] }),
+            element("span", [text(phoneCaption)], { className: ["sw-frame__caption--narrow"] }),
+          ];
   return element(
     "figure",
     [
@@ -376,8 +380,8 @@ function frame(node: ContentNode): ContentNode {
 const PAGE_SHOT_SIZES = "(max-width: 48rem) 100vw, 46rem";
 /** The width of a screenshot across the top of a card in a two-column card group. */
 const CARD_SHOT_SIZES = "(max-width: 40rem) 100vw, 23rem";
-/** The width a phone crop shows at: the column, at most 26rem (figures.css). */
-const PHONE_SHOT_SIZES = "min(26rem, 100vw)";
+/** The width a narrow crop shows at: the column, the page and frame gutters taken off. */
+const NARROW_SHOT_SIZES = "calc(100vw - 4rem)";
 
 /**
  * One theme's capture: the 1× and 2× AVIF files, lazy, so only the shown
@@ -411,7 +415,7 @@ function themedShots(
   alt: string,
   size: ShotSize,
   sizes: string,
-  variant?: "wide" | "narrow",
+  variant?: "wide" | "tablet" | "narrow",
 ): ContentNode {
   return element(
     "span",
@@ -431,15 +435,19 @@ function screenshot(node: ContentNode): ContentNode {
   const size = (attribute(node, "size") ?? "app") as ShotSize;
   if (!(size in SHOT_SIZES))
     throw new Error(`<Screenshot size> is one of ${Object.keys(SHOT_SIZES)}`);
+  const tablet = attribute(node, "tablet");
   const phone = attribute(node, "phone");
-  if (phone === undefined) return themedShots(name, alt, size, PAGE_SHOT_SIZES);
-  // Narrow screens show the phone crop, with its own alt text; CSS shows one
-  // of the two, and the hidden one never loads.
+  if (tablet === undefined || phone === undefined) {
+    return themedShots(name, alt, size, PAGE_SHOT_SIZES);
+  }
+  // Tablets and phones show their own crops, each with its own alt text; CSS
+  // shows one of the three, and the hidden ones never load.
   return element(
     "span",
     [
       themedShots(name, alt, size, PAGE_SHOT_SIZES, "wide"),
-      themedShots(phone, required(node, "phoneAlt"), "phone", PHONE_SHOT_SIZES, "narrow"),
+      themedShots(tablet, required(node, "tabletAlt"), "tablet", NARROW_SHOT_SIZES, "tablet"),
+      themedShots(phone, required(node, "phoneAlt"), "phone", NARROW_SHOT_SIZES, "narrow"),
     ],
     { className: ["sw-shots-set"] },
   );

@@ -156,27 +156,41 @@
   }
 }
 
-/* A screenshot with a phone crop: up to 820 px the crop shows, at most
-   26rem wide and centred, so its labels stay 11 px and up; wider screens
-   show the full capture. Each caption goes with its image. */
+/* A screenshot with tablet and phone crops: up to 600 px the phone crop
+   shows, and its frame narrows to it (at most 26rem, centred); up to 820 px
+   the tablet crop fills the column; wider screens show the full capture.
+   Each caption goes with its image. */
 .sw-shots-set {
   display: block;
 }
 
-@media (max-width: 51.25rem) {
+@media (max-width: 37.5rem) {
   .sw-shots--wide,
-  .sw-frame__caption--wide {
+  .sw-shots--tablet,
+  .sw-frame__caption--wide,
+  .sw-frame__caption--tablet {
     display: none;
   }
 
-  .sw-shots--narrow {
+  .sw-frame:has(.sw-shots-set) {
     max-width: 26rem;
     margin-inline: auto;
   }
 }
 
-@media (min-width: 51.3125rem) {
+@media (min-width: 37.5625rem) and (max-width: 51.25rem) {
+  .sw-shots--wide,
   .sw-shots--narrow,
+  .sw-frame__caption--wide,
+  .sw-frame__caption--narrow {
+    display: none;
+  }
+}
+
+@media (min-width: 51.3125rem) {
+  .sw-shots--tablet,
+  .sw-shots--narrow,
+  .sw-frame__caption--tablet,
   .sw-frame__caption--narrow {
     display: none;
   }
