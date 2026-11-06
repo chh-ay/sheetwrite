@@ -616,8 +616,7 @@
 .sw-sp-stats dt {
   margin-bottom: var(--sw-sp-space-1);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -648,8 +647,7 @@
 
 .sw-sp-cache-meter > span {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -679,8 +677,7 @@
 
 .sw-sp-last-tile span {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -736,8 +733,7 @@
 
 .sw-sp-tile-list li > span {
   color: var(--sw-state-requested);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -874,8 +870,7 @@
 
 .sw-sp-table thead th {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -1089,8 +1084,7 @@
 
 .sw-sp-proof-wins article > span {
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
