@@ -7,8 +7,10 @@
 //! starts from those 15 decimal digits and works on the digits, never on a
 //! scaled binary value, so ROUND, TEXT and `&` agree with what a cell shows.
 
+use crate::float_text::rounded_digits;
+
 /// Significant decimal digits that Excel keeps for a number.
-const SIGNIFICANT_DIGITS: usize = 15;
+const SIGNIFICANT_DIGITS: u32 = 15;
 /// General writes a number in plain decimal form when its decimal exponent is
 /// in this range, and in scientific form otherwise (`1E+15`, `1E-10`).
 const PLAIN_EXPONENTS: std::ops::Range<i32> = -9..15;
@@ -31,11 +33,11 @@ pub(super) enum Rounding {
 }
 
 /// The value `0.d1 d2 ... dn × 10^point` of a number's magnitude, with at most
-/// 15 digits, no leading or trailing zero digits, and no digits for zero.
+/// 15 ASCII digits, no leading or trailing zero digits, and no digits for zero.
 #[derive(Clone, Debug, PartialEq)]
 struct Decimal {
     negative: bool,
-    digits: Vec<u8>,
+    digits: String,
     point: i32,
 }
 
@@ -46,29 +48,22 @@ impl Decimal {
         if number == 0.0 {
             return Self {
                 negative,
-                digits: Vec::new(),
+                digits: String::new(),
                 point: 0,
             };
         }
 
-        let scientific = format!("{:.*e}", SIGNIFICANT_DIGITS - 1, number.abs());
-        let (mantissa, exponent) = scientific
-            .split_once('e')
-            .expect("scientific formatting writes an exponent");
-        let exponent: i32 = exponent.parse().expect("scientific exponent is an integer");
-        let mut digits: Vec<u8> = mantissa
-            .bytes()
-            .filter(u8::is_ascii_digit)
-            .map(|digit| digit - b'0')
-            .collect();
-        while digits.last() == Some(&0) {
-            digits.pop();
-        }
-
+        // A percent or scale code can take a number past the largest double
+        // (#433); such a value has no digits.
+        assert!(
+            number.is_finite(),
+            "a number format scaled past the largest double"
+        );
+        let rounded = rounded_digits(number.abs(), SIGNIFICANT_DIGITS);
         Self {
             negative,
-            digits,
-            point: exponent + 1,
+            digits: rounded.digits.to_string(),
+            point: rounded.exponent + 1,
         }
     }
 
@@ -83,7 +78,7 @@ impl Decimal {
         let Ok(kept_len) = usize::try_from(kept) else {
             // Every digit is below the kept place; only a round-up keeps a unit there.
             let round_up = rounding == Rounding::Away && !self.is_zero();
-            self.digits = if round_up { vec![1] } else { Vec::new() };
+            self.digits = if round_up { "1".into() } else { String::new() };
             self.point = 1 - places;
             return self.normalized();
         };
@@ -93,35 +88,34 @@ impl Decimal {
 
         let dropped = self.digits.split_off(kept_len);
         let round_up = match rounding {
-            Rounding::Nearest => dropped[0] >= 5,
-            Rounding::Away => dropped.iter().any(|&digit| digit != 0),
+            Rounding::Nearest => dropped.as_bytes()[0] >= b'5',
+            Rounding::Away => dropped.bytes().any(|digit| digit != b'0'),
             Rounding::Toward => false,
         };
         if round_up {
-            self.increment_last(places);
+            self.increment_last();
         }
         self.normalized()
     }
 
-    /// Adds one unit at the last kept place, carrying into new leading digits.
-    fn increment_last(&mut self, places: i32) {
-        for digit in self.digits.iter_mut().rev() {
-            if *digit < 9 {
-                *digit += 1;
-                return;
-            }
-            *digit = 0;
+    /// Adds one unit at the last kept place. The nines it carries through
+    /// become trailing zeros and are dropped; a carry past the first digit
+    /// (or into an empty kept part) starts a new leading `1`.
+    fn increment_last(&mut self) {
+        while self.digits.ends_with('9') {
+            self.digits.pop();
         }
-        self.digits.insert(0, 1);
-        self.point = if self.digits.len() == 1 {
-            1 - places
-        } else {
-            self.point + 1
-        };
+        match self.digits.pop() {
+            Some(digit) => self.digits.push(char::from(digit as u8 + 1)),
+            None => {
+                self.digits.push('1');
+                self.point += 1;
+            }
+        }
     }
 
     fn normalized(mut self) -> Self {
-        while self.digits.last() == Some(&0) {
+        while self.digits.ends_with('0') {
             self.digits.pop();
         }
         if self.is_zero() {
@@ -135,38 +129,38 @@ impl Decimal {
             return 0.0;
         }
 
-        let mut text = String::with_capacity(self.digits.len() + 8);
+        let magnitude: f64 = format!("0.{}e{}", self.digits, self.point)
+            .parse()
+            .expect("decimal digits form a valid number");
         if self.negative {
-            text.push('-');
+            -magnitude
+        } else {
+            magnitude
         }
-        text.push_str("0.");
-        text.extend(self.digits.iter().map(|&digit| char::from(b'0' + digit)));
-        text.push('e');
-        text.push_str(&self.point.to_string());
-        text.parse().expect("decimal digits form a valid number")
     }
 
     /// The digits before the decimal point, without leading zeros.
     fn integer_digits(&self) -> String {
         let point = usize::try_from(self.point).unwrap_or(0);
-        (0..point)
-            .map(|index| char::from(b'0' + self.digits.get(index).copied().unwrap_or(0)))
-            .collect()
+        let kept = point.min(self.digits.len());
+        let mut text = String::with_capacity(point);
+        text.push_str(&self.digits[..kept]);
+        push_zeros(&mut text, point - kept);
+        text
     }
 
     /// The digits after the decimal point, without trailing zeros.
     fn fraction_digits(&self) -> String {
-        let leading_zeros = usize::try_from(-self.point).unwrap_or(0);
-        let skipped = usize::try_from(self.point).unwrap_or(0);
-        std::iter::repeat_n('0', leading_zeros)
-            .chain(
-                self.digits
-                    .iter()
-                    .skip(skipped)
-                    .map(|&digit| char::from(b'0' + digit)),
-            )
-            .collect()
+        let point = usize::try_from(self.point).unwrap_or(0);
+        let mut text = String::new();
+        push_zeros(&mut text, self.point.min(0).unsigned_abs() as usize);
+        text.push_str(self.digits.get(point..).unwrap_or(""));
+        text
     }
+}
+
+fn push_zeros(text: &mut String, count: usize) {
+    text.extend(std::iter::repeat_n('0', count));
 }
 
 /// `number` rounded at a decimal place the way ROUND, ROUNDUP and ROUNDDOWN
@@ -219,26 +213,29 @@ fn push_plain(decimal: &Decimal, text: &mut String) {
 }
 
 fn push_scientific(decimal: &Decimal, exponent: i32, text: &mut String) {
-    let mut digits = decimal.digits.iter().map(|&digit| char::from(b'0' + digit));
-    text.extend(digits.next());
-    let rest: String = digits.collect();
+    let (first, rest) = decimal.digits.split_at(1);
+    text.push_str(first);
     if !rest.is_empty() {
         text.push('.');
-        text.push_str(&rest);
+        text.push_str(rest);
     }
     text.push('E');
     text.push(if exponent < 0 { '-' } else { '+' });
-    text.push_str(&format!(
-        "{:0width$}",
-        exponent.unsigned_abs(),
-        width = MIN_EXPONENT_DIGITS
-    ));
+    push_exponent_digits(exponent, MIN_EXPONENT_DIGITS, text);
 }
 
-/// One element of a number format section.
+/// The exponent's magnitude with leading zeros up to `width` digits.
+fn push_exponent_digits(exponent: i32, width: usize, text: &mut String) {
+    let digits = exponent.unsigned_abs().to_string();
+    push_zeros(text, width.saturating_sub(digits.len()));
+    text.push_str(&digits);
+}
+
+/// One element of a number format section; literal text borrows from the
+/// format code.
 #[derive(Clone, Debug, PartialEq)]
-enum Token {
-    Literal(String),
+enum Token<'a> {
+    Literal(&'a str),
     /// `0` always shows a digit, `#` only a significant one, `?` a space for
     /// an insignificant one.
     Digit(char),
@@ -253,8 +250,8 @@ enum Token {
 
 /// A parsed number format section and the scaling it implies.
 #[derive(Debug, Default)]
-struct Section {
-    tokens: Vec<Token>,
+struct Section<'a> {
+    tokens: Vec<Token<'a>>,
     grouped: bool,
     thousands_scale: i32,
 }
@@ -287,23 +284,39 @@ fn is_date_letter(ch: char) -> bool {
     matches!(ch.to_ascii_lowercase(), 'd' | 'm' | 'y' | 'h' | 's')
 }
 
-fn parse_section(code: &str) -> Option<Section> {
+/// The text of the character at `index` of `code`.
+fn char_at(code: &str, index: usize, ch: char) -> &str {
+    &code[index..index + ch.len_utf8()]
+}
+
+fn parse_section(code: &str) -> Option<Section<'_>> {
+    const GENERAL_REST: &str = "eneral";
     let mut section = Section::default();
-    let mut chars = code.chars().peekable();
-    while let Some(ch) = chars.next() {
+    let mut chars = code.char_indices().peekable();
+    while let Some((index, ch)) = chars.next() {
         let token = match ch {
             '0' | '#' | '?' => Token::Digit(ch),
             '.' => Token::Point,
             '%' => Token::Percent,
             ',' => {
-                section.tokens.push(Token::Literal(",".into()));
+                section.tokens.push(Token::Literal(","));
                 continue;
             }
-            '"' => Token::Literal(chars.by_ref().take_while(|&next| next != '"').collect()),
-            '\\' => Token::Literal(chars.next()?.to_string()),
+            '"' => {
+                let start = index + 1;
+                let end = chars
+                    .by_ref()
+                    .find(|&(_, next)| next == '"')
+                    .map_or(code.len(), |(end, _)| end);
+                Token::Literal(&code[start..end])
+            }
+            '\\' => {
+                let (next_index, next) = chars.next()?;
+                Token::Literal(char_at(code, next_index, next))
+            }
             '_' => {
                 chars.next();
-                Token::Literal(" ".into())
+                Token::Literal(" ")
             }
             '*' => {
                 chars.next();
@@ -311,21 +324,22 @@ fn parse_section(code: &str) -> Option<Section> {
             }
             // Colors and conditions change no characters.
             '[' => {
-                chars.by_ref().find(|&next| next == ']');
+                chars.by_ref().find(|&(_, next)| next == ']');
                 continue;
             }
-            'E' | 'e' if matches!(chars.peek(), Some('+' | '-')) => Token::Exponent {
-                always_signed: chars.next() == Some('+'),
+            'E' | 'e' if matches!(chars.peek(), Some((_, '+' | '-'))) => Token::Exponent {
+                always_signed: chars.next().map(|(_, sign)| sign) == Some('+'),
             },
             'G' | 'g' => {
-                let rest: String = chars.by_ref().take(6).collect();
-                if !rest.eq_ignore_ascii_case("eneral") {
+                let rest = code.get(index + 1..index + 1 + GENERAL_REST.len())?;
+                if !rest.eq_ignore_ascii_case(GENERAL_REST) {
                     return None;
                 }
+                chars.nth(GENERAL_REST.len() - 1);
                 Token::General
             }
             _ if is_date_letter(ch) => return None,
-            _ => Token::Literal(ch.to_string()),
+            _ => Token::Literal(char_at(code, index, ch)),
         };
         section.tokens.push(token);
     }
@@ -336,7 +350,7 @@ fn parse_section(code: &str) -> Option<Section> {
 /// A comma between integer digit placeholders groups thousands; commas
 /// after the last integer placeholder divide the value by 1,000 each.
 /// Other commas are literal text.
-fn resolve_commas(section: &mut Section) {
+fn resolve_commas(section: &mut Section<'_>) {
     let integer_end = section
         .tokens
         .iter()
@@ -352,18 +366,23 @@ fn resolve_commas(section: &mut Section) {
         return;
     };
 
-    let is_comma = |token: &Token| matches!(token, Token::Literal(text) if text == ",");
-    let mut kept = Vec::with_capacity(section.tokens.len());
-    for (index, token) in section.tokens.drain(..).enumerate() {
-        if is_comma(&token) && index > first_digit && index < last_digit {
-            section.grouped = true;
-        } else if is_comma(&token) && index > last_digit && index < integer_end {
-            section.thousands_scale += 1;
-        } else {
-            kept.push(token);
+    let mut index = 0;
+    section.tokens.retain(|token| {
+        let position = index;
+        index += 1;
+        if *token != Token::Literal(",") {
+            return true;
         }
-    }
-    section.tokens = kept;
+        if position > first_digit && position < last_digit {
+            section.grouped = true;
+            return false;
+        }
+        if position > last_digit && position < integer_end {
+            section.thousands_scale += 1;
+            return false;
+        }
+        true
+    });
 }
 
 /// Formats a number with an Excel number format code, or `None` when the code
@@ -381,16 +400,16 @@ pub(super) fn format_number(number: f64, code: &str) -> Option<String> {
     Some(render(&section, value))
 }
 
-fn render(section: &Section, value: f64) -> String {
+fn render(section: &Section<'_>, value: f64) -> String {
     if section.tokens.contains(&Token::General) {
-        return section
-            .tokens
-            .iter()
-            .map(|token| match token {
-                Token::General => general_text(value),
-                other => literal_text(other),
-            })
-            .collect();
+        let mut text = String::new();
+        for token in &section.tokens {
+            match token {
+                Token::General => text.push_str(&general_text(value)),
+                other => text.push_str(literal_text(other)),
+            }
+        }
+        return text;
     }
 
     let percents = section
@@ -431,12 +450,12 @@ fn render(section: &Section, value: f64) -> String {
     text
 }
 
-fn literal_text(token: &Token) -> String {
+fn literal_text<'a>(token: &Token<'a>) -> &'a str {
     match token {
-        Token::Literal(text) => text.clone(),
-        Token::Percent => "%".into(),
-        Token::Point => ".".into(),
-        _ => String::new(),
+        Token::Literal(text) => text,
+        Token::Percent => "%",
+        Token::Point => ".",
+        _ => "",
     }
 }
 
@@ -449,7 +468,7 @@ struct Layout {
 }
 
 impl Layout {
-    fn of(tokens: &[Token]) -> Self {
+    fn of(tokens: &[Token<'_>]) -> Self {
         let mut layout = Self {
             integer_placeholders: 0,
             integer_zeros: 0,
@@ -505,7 +524,7 @@ fn scientific_parts(value: f64, layout: &Layout) -> (f64, i32) {
 
 fn grouped(integer: &str) -> String {
     let mut text = String::with_capacity(integer.len() + integer.len() / GROUP_SIZE);
-    for (index, digit) in integer.chars().enumerate() {
+    for (index, digit) in integer.char_indices() {
         if index != 0 && (integer.len() - index).is_multiple_of(GROUP_SIZE) {
             text.push(',');
         }
@@ -514,7 +533,7 @@ fn grouped(integer: &str) -> String {
     text
 }
 
-/// The digit strings a section's placeholders consume.
+/// The ASCII digit strings a section's placeholders consume.
 struct Digits<'a> {
     integer: &'a str,
     fraction: &'a str,
@@ -524,10 +543,11 @@ struct Digits<'a> {
 /// Writes the section with its placeholders filled. Integer digits fill the
 /// integer placeholders from the right, and digits beyond them go before the
 /// first placeholder; fraction digits fill from the left.
-fn write_tokens(section: &Section, layout: &Layout, digits: &Digits<'_>, text: &mut String) {
-    let integer: Vec<char> = digits.integer.chars().collect();
-    let fraction: Vec<char> = digits.fraction.chars().collect();
+fn write_tokens(section: &Section<'_>, layout: &Layout, digits: &Digits<'_>, text: &mut String) {
+    let integer = digits.integer.as_bytes();
+    let fraction = digits.fraction.as_bytes();
     let overflow = integer.len().saturating_sub(layout.integer_placeholders);
+    let missing = layout.integer_placeholders - (integer.len() - overflow);
     let mut integer_slot = 0usize;
     let mut fraction_slot = 0usize;
     let mut exponent_written = false;
@@ -536,17 +556,16 @@ fn write_tokens(section: &Section, layout: &Layout, digits: &Digits<'_>, text: &
 
     for token in &section.tokens {
         match token {
-            Token::Digit(placeholder) if in_exponent => {
+            Token::Digit(_) if in_exponent => {
                 if !exponent_written {
                     let width = layout.exponent_digits.unwrap_or(1);
-                    text.push_str(&format!("{:0width$}", digits.exponent.unsigned_abs()));
+                    push_exponent_digits(digits.exponent, width, text);
                     exponent_written = true;
                 }
-                let _ = placeholder;
             }
             Token::Digit(placeholder) if after_point => {
                 match fraction.get(fraction_slot) {
-                    Some(&digit) => text.push(digit),
+                    Some(&digit) => text.push(char::from(digit)),
                     None if *placeholder == '0' => text.push('0'),
                     None if *placeholder == '?' => text.push(' '),
                     None => {}
@@ -555,12 +574,10 @@ fn write_tokens(section: &Section, layout: &Layout, digits: &Digits<'_>, text: &
             }
             Token::Digit(placeholder) => {
                 if integer_slot == 0 {
-                    text.extend(&integer[..overflow]);
+                    text.push_str(&digits.integer[..overflow]);
                 }
-                let missing =
-                    layout.integer_placeholders - integer.len().min(layout.integer_placeholders);
                 if integer_slot >= missing {
-                    text.push(integer[overflow + integer_slot - missing]);
+                    text.push(char::from(integer[overflow + integer_slot - missing]));
                 } else if *placeholder == '?' {
                     text.push(' ');
                 }
@@ -581,7 +598,7 @@ fn write_tokens(section: &Section, layout: &Layout, digits: &Digits<'_>, text: &
                     text.push('+');
                 }
             }
-            other => text.push_str(&literal_text(other)),
+            other => text.push_str(literal_text(other)),
         }
     }
 }
