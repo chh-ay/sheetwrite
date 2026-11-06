@@ -499,14 +499,13 @@ it("passes each worksheet pivot's current output, measures included, to the XLSX
       }).status,
     ).toBe("applied");
     const result = grid.getPivotResult("report", "related");
-    expect(result?.status).toBe("ok");
+    if (result?.status !== "ok") throw new Error("the pivot computes");
 
     await toXlsxWorkbook(grid);
 
     const item = passed?.find((entry) => entry.sheet === "report")?.items[0];
-    const cols = result?.cols ?? 0;
-    const rows = Array.from({ length: result?.rows ?? 0 }, (_, row) =>
-      result?.cells.slice(row * cols, (row + 1) * cols),
+    const rows = Array.from({ length: result.rows }, (_, row) =>
+      result.cells.slice(row * result.cols, (row + 1) * result.cols),
     );
     expect(item?.id).toBe("related");
     expect(item?.cells).toEqual(rows);

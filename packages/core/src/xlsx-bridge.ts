@@ -406,24 +406,24 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
 /**
  * The export context with what only the store's engine can compute: the
  * current output of worksheet pivots and the static content of dashboards.
- * Each module loads only for a workbook that needs it.
+ * The module loads only for a workbook with a pivot or a dashboard.
  */
 async function withEngineContent(
   source: ReturnType<typeof workbookSnapshotOf>,
 ): Promise<XlsxWorkbookExportContext> {
   const store = source.store;
   if (store === undefined) return source.context;
-  let context = source.context;
   const sheets = source.snapshot.sheets;
-  if (sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0)) {
-    const { worksheetPivotExports } = await import("./pivot-export.js");
-    context = { ...context, pivotOutputs: worksheetPivotExports(store) };
-  }
-  if (sheets.some(isDashboard)) {
-    const { dashboardExports } = await import("./dashboard/dashboard-export.js");
-    context = { ...context, dashboards: dashboardExports(store) };
-  }
-  return context;
+  const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
+  const dashboards = sheets.some(isDashboard);
+  if (!pivots && !dashboards) return source.context;
+  const { dashboardExports, worksheetPivotExports } =
+    await import("./dashboard/dashboard-export.js");
+  return {
+    ...source.context,
+    ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
+    ...(dashboards ? { dashboards: dashboardExports(store) } : {}),
+  };
 }
 
 /**
