@@ -110,20 +110,28 @@ impl Default for DirtyCells {
 impl DirtyCells {
     fn insert(&mut self, key: CellKey) {
         match self.cells.last() {
+            None => {}
+            Some(&last) if last < key => {}
             Some(&last) if last == key => return,
-            Some(&last) if last > key => self.sorted = false,
-            _ => {}
+            Some(_) => {
+                if self.sorted && self.cells.binary_search(&key).is_ok() {
+                    return;
+                }
+                self.sorted = false;
+            }
         }
 
-        // Fold duplicates before growing; a sorted list has none.
+        // Fold duplicates before growing; a sorted list has none. Room for as
+        // many cells again as survive the fold keeps each fold amortized.
         if !self.sorted && self.cells.len() == self.cells.capacity() {
             self.cells.sort_unstable();
             self.cells.dedup();
+            self.sorted = true;
             if self.cells.binary_search(&key).is_ok() {
-                self.sorted = true;
                 return;
             }
 
+            self.cells.reserve(self.cells.len());
             self.sorted = self.cells.last().is_none_or(|&last| last < key);
         }
 
@@ -976,5 +984,67 @@ impl FormulaGraph {
             epoch: input.u64()?,
             index: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DirtyCells;
+
+    /// The distinct cells a list holds, in address order.
+    fn distinct(cells: &DirtyCells) -> Vec<(u32, u32)> {
+        let mut cells = cells.cells.clone();
+        cells.sort_unstable();
+        cells.dedup();
+        cells
+    }
+
+    /// Address-order writes append without a fold and stay sorted.
+    #[test]
+    fn address_order_writes_stay_sorted() {
+        let mut cells = DirtyCells::default();
+        for row in 0..1_000 {
+            cells.insert((row, 1));
+            cells.insert((row, 1));
+        }
+
+        assert!(cells.sorted);
+        assert_eq!(cells.cells.len(), 1_000);
+    }
+
+    /// Re-marking cells of a sorted list adds nothing.
+    #[test]
+    fn sorted_list_ignores_repeated_cells() {
+        let mut cells = DirtyCells::default();
+        for row in 0..100 {
+            cells.insert((row, 0));
+        }
+        for row in (0..100).rev() {
+            cells.insert((row, 0));
+        }
+
+        assert!(cells.sorted);
+        assert_eq!(cells.cells.len(), 100);
+    }
+
+    /// Scattered repeated writes keep every cell and fold duplicates, so the
+    /// list stays within twice the distinct cells.
+    #[test]
+    fn scattered_repeats_fold_and_keep_every_cell() {
+        let mut cells = DirtyCells::default();
+        let keys: Vec<_> = (0..300u32)
+            .map(|index| ((index * 37) % 101, index % 3))
+            .collect();
+        for _ in 0..20 {
+            for &key in &keys {
+                cells.insert(key);
+            }
+        }
+
+        let mut expected = keys.clone();
+        expected.sort_unstable();
+        expected.dedup();
+        assert_eq!(distinct(&cells), expected);
+        assert!(cells.cells.len() <= 2 * expected.len());
     }
 }
