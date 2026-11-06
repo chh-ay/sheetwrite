@@ -26,6 +26,7 @@ use rustc_hash::{FxHashMap, FxHasher};
 use crate::eval::analysis::grouping::{
     compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL,
 };
+use crate::float_text::NumberText;
 use crate::store::pivot_output::MAX_PIVOT_OUTPUT_CELLS;
 use crate::types::{FormulaError, Value};
 
@@ -1114,7 +1115,7 @@ impl PivotLayout {
 pub(crate) fn field_name(header: &Value, field: usize) -> String {
     match header {
         Value::Text(text) if !text.is_empty() => text.to_string(),
-        Value::Number(number) => number.to_string(),
+        Value::Number(number) => NumberText::of(*number).as_str().to_string(),
         Value::Bool(true) => "TRUE".into(),
         Value::Bool(false) => "FALSE".into(),
         _ => format!("Column{}", field + 1),

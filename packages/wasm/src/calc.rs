@@ -28,6 +28,7 @@
 //! The evaluator lives on `CellStore` (it needs cell access); this module is the
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
+use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
 use std::{borrow::Cow, cmp::Ordering};
@@ -791,6 +792,43 @@ impl Ast {
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => test(left) || test(right),
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => test(inner),
             Ast::LetSlot { expression, .. } => test(expression),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } => false,
+            #[cfg(feature = "analysis")]
+            Ast::RegexPattern(_) => false,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Array { .. } => false,
+        }
+    }
+
+    /// Run `visit` on every direct child expression, as [`Ast::any_child`]
+    /// finds them, and return whether any visit reported a change. Every
+    /// child is visited, so one rewrite does not stop the others. Every node
+    /// kind is listed, so a new kind must say whether it has children.
+    pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
+        match self {
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args
+                .iter_mut()
+                .fold(false, |changed, arg| visit(arg) | changed),
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => visit(left) | visit(right),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => visit(inner),
+            Ast::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { .. } => false,
             #[cfg(feature = "analysis")]
@@ -1834,8 +1872,9 @@ impl<'a> Parser<'a> {
 
     fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
         // Sheet names cannot contain `:`, so a quoted name with one is the
-        // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`.
-        if quoted {
+        // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`. The `:` of a
+        // drive in the path of another workbook is not.
+        if quoted && !is_external_sheet(&sheet_name) {
             if let Some((first, last)) = sheet_name.split_once(':') {
                 return self.sheet_span_at(first.to_string(), last.to_string(), true);
             }
@@ -1953,7 +1992,11 @@ fn missing_area_end(after: &str) -> String {
     format!("Enter a cell, column or row after {after}.")
 }
 
+/// The lookup key of a sheet name: the name without case. For a sheet of
+/// another workbook, the folder before `[` is left out, so
+/// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
 pub(crate) fn sheet_name_key(name: &str) -> String {
+    let name = name.rfind('[').map_or(name, |start| &name[start..]);
     name.chars().flat_map(char::to_lowercase).collect()
 }
 
@@ -2021,10 +2064,10 @@ where
     F: Fn(&str) -> Option<u32>,
     S: Fn(&mut SheetSpanRef) -> bool,
 {
-    // A sheet of another workbook has no handle here; it stays a sheet
-    // reference, which reads as #REF! without values for that workbook.
+    // A sheet of another workbook that the store holds no values for stays
+    // an unresolved sheet reference, which reads as #REF!.
     if let Ast::SheetCell(sheet_ref, ..) | Ast::SheetRange(sheet_ref, ..) = &ast {
-        if is_external_sheet(&sheet_ref.name) {
+        if is_external_sheet(&sheet_ref.name) && resolve(&sheet_ref.name).is_none() {
             return Ok(ast);
         }
     }
@@ -2152,21 +2195,7 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
                 true
             }
         },
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            let mut changed = false;
-            for arg in args {
-                changed |= refresh_sheet_spans(arg, order, names);
-            }
-            changed
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            let left_changed = refresh_sheet_spans(left, order, names);
-            refresh_sheet_spans(right, order, names) || left_changed
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            refresh_sheet_spans(inner, order, names)
-        }
-        _ => false,
+        _ => ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names)),
     }
 }
 
@@ -2812,18 +2841,7 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
             Axis::Row => edit.move_span(&mut reference.row_start, &mut reference.row_end),
             Axis::Col => edit.move_index(&mut reference.col),
         },
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            return args
-                .iter_mut()
-                .fold(false, |changed, arg| rewrite_axis(arg, edit) | changed);
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            return rewrite_axis(left, edit) | rewrite_axis(right, edit);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            return rewrite_axis(inner, edit);
-        }
-        _ => Moved::Unchanged,
+        _ => return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit)),
     };
 
     if moved == Moved::Deleted {
@@ -2925,14 +2943,14 @@ fn sheet_name_needs_quotes(name: &str) -> bool {
 
 /// Rewrite resolved references by stable numeric handle and regenerate quoting metadata.
 pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool {
-    let mut changed = false;
     match ast {
         Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) if sheet.handle == handle => {
             sheet.name = name.to_string();
             sheet.quoted = sheet_name_needs_quotes(name);
-            changed = true;
+            true
         }
         Ast::SheetSpan(span) => {
+            let mut changed = false;
             for endpoint in [&mut span.first, &mut span.last] {
                 if endpoint.handle == handle {
                     endpoint.name = name.to_string();
@@ -2940,22 +2958,10 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
                     changed = true;
                 }
             }
+            changed
         }
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                changed |= rename_sheet_refs(arg, handle, name);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            changed |= rename_sheet_refs(left, handle, name);
-            changed |= rename_sheet_refs(right, handle, name);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            changed |= rename_sheet_refs(inner, handle, name);
-        }
-        _ => {}
+        _ => ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name)),
     }
-    changed
 }
 
 pub(crate) fn update_structured_refs<F>(ast: &mut Ast, table_id: &str, resolve: &F) -> bool
@@ -2970,23 +2976,7 @@ where
             return true;
         }
     }
-    let mut changed = false;
-    match ast {
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                changed |= update_structured_refs(arg, table_id, resolve);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            changed |= update_structured_refs(left, table_id, resolve);
-            changed |= update_structured_refs(right, table_id, resolve);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            changed |= update_structured_refs(inner, table_id, resolve);
-        }
-        _ => {}
-    }
-    changed
+    ast.fold_children_mut(&mut |child| update_structured_refs(child, table_id, resolve))
 }
 
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
@@ -3002,23 +2992,7 @@ pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
         return true;
     }
 
-    let mut changed = false;
-    match ast {
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            for arg in args {
-                changed |= invalidate_sheet_refs(arg, handle);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            changed |= invalidate_sheet_refs(left, handle);
-            changed |= invalidate_sheet_refs(right, handle);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            changed |= invalidate_sheet_refs(inner, handle);
-        }
-        _ => {}
-    }
-    changed
+    ast.fold_children_mut(&mut |child| invalidate_sheet_refs(child, handle))
 }
 
 fn write_structured_ref(
@@ -3057,7 +3031,7 @@ fn write_structured_ref(
 
 pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
-        Ast::Num(value) => out.push_str(&value.to_string()),
+        Ast::Num(value) => out.push_str(NumberText::of(*value).as_str()),
         Ast::Str(value) => write_text(value, out),
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
@@ -3141,7 +3115,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                     });
                 }
                 match value {
-                    Value::Number(number) => out.push_str(&number.to_string()),
+                    Value::Number(number) => out.push_str(NumberText::of(*number).as_str()),
                     Value::Text(text) => write_text(text, out),
                     Value::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
                     Value::Error(error) => out.push_str(error.sentinel()),

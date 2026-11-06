@@ -178,6 +178,7 @@ import {
   tableSortState,
   tableWithBody,
 } from "./permute-rows.js";
+import { type PivotStatusRecord, pivotStatusAt } from "./pivot-status.js";
 import {
   cellRange,
   deleteRemap,
@@ -232,9 +233,6 @@ const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
   "mixed",
 ];
 
-/** `pivotStatus` values per pivot: error, row, col, rows, cols, headerRows, labelCols. */
-const PIVOT_STATUS_STRIDE = 7;
-
 /** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
 export const PIVOT_ERRORS: readonly string[] = [
   "#CYCLE!",
@@ -249,32 +247,6 @@ export const PIVOT_ERRORS: readonly string[] = [
   "#LOADING!",
   "#NULL!",
 ];
-
-interface PivotStatusRecord {
-  /** 0 when the output rendered; otherwise the anchor shows an error. */
-  readonly error: number;
-  readonly row: number;
-  readonly col: number;
-  readonly rows: number;
-  readonly cols: number;
-  readonly headerRows: number;
-  readonly labelCols: number;
-}
-
-function pivotStatusAt(status: Uint32Array, index: number): PivotStatusRecord | null {
-  const base = index * PIVOT_STATUS_STRIDE;
-  if (base + PIVOT_STATUS_STRIDE > status.length) return null;
-  const at = (offset: number): number => status[base + offset] ?? 0;
-  return {
-    error: at(0),
-    row: at(1),
-    col: at(2),
-    rows: at(3),
-    cols: at(4),
-    headerRows: at(5),
-    labelCols: at(6),
-  };
-}
 
 /** Values in a `relationshipStatus` record: code, firstRow, secondRow, unmatched. */
 const RELATIONSHIP_STATUS_STRIDE = 4;
