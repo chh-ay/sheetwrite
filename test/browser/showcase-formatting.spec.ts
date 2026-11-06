@@ -61,7 +61,7 @@ test("formatting controls change the live budget and XLSX preserves the edited s
     await expect(page.locator("html")).toHaveAttribute("data-theme", colorTheme);
     expect(
       await page
-        .locator(".sw-formatting-frame")
+        .locator(".sw-showcase")
         .evaluate((element) => getComputedStyle(element).backgroundColor),
     ).not.toBe("rgba(0, 0, 0, 0)");
   }

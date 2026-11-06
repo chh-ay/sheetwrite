@@ -197,3 +197,17 @@
     }
   }
 }
+
+/* The caption under the budget, the status in the window bar and the round-trip report. */
+.sw-showcase__demo .sw-formatting-caption {
+  margin: 0;
+  padding: var(--sw-space-2) var(--sw-space-4);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-formatting-status,
+.sw-formatting-report {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: var(--sw-leading-ui);
+}

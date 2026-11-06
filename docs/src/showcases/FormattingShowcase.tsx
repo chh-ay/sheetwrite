@@ -1,13 +1,11 @@
 import { createGridFromSnapshot, initSheetwrite, type Grid, type Theme } from "@sheetwrite/core";
 import { createFormulaBar, createNameBox, type ShellPiece } from "@sheetwrite/core/shell";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
 import { errorText } from "../lib/errors.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
-import { CapabilityHero } from "./CapabilityHero.js";
+import { ShowcaseControlGroup, ShowcaseLayout, ShowcaseSection } from "./layout/ShowcaseLayout.js";
 import {
   applyNumberFormat,
   applyStyleCommand,
@@ -18,6 +16,8 @@ import {
   STYLE_COMMANDS,
 } from "./scenarios/formatting.js";
 import { siteGridTheme } from "./site-grid-theme.js";
+import FormattingSnippet from "./snippets/formatting.mdx";
+import { DemoButton } from "./ui/DemoButton.js";
 
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -28,6 +28,9 @@ declare global {
   }
 }
 
+/** A family no browser has, to show the fallback to the theme font. */
+const UNAVAILABLE_FONT = "Northstar Unavailable Font";
+const FONT_FAMILIES = ["Arial", "Georgia", "Courier New", UNAVAILABLE_FONT] as const;
 const ROW_HEIGHT = 42;
 const theme = (): Partial<Theme> => ({ ...siteGridTheme(), rowHeight: ROW_HEIGHT });
 type RoundTrip = Awaited<ReturnType<typeof roundTripFormatting>>;
@@ -113,163 +116,132 @@ export default function FormattingShowcase() {
     );
   };
 
-  return (
-    <div className="sw-formatting-frame">
-      <SiteTopbar active="formatting" />
-      <main className="sw-formatting" id="main-content">
-        <CapabilityHero
-          eyebrow="CAPABILITY / FORMATTING"
-          title="Formatting & number formats"
-          description="An operating budget with a point of view. Shape the type, make the numbers legible, then prove the workbook keeps its formatting through XLSX."
-          facts={[
-            { label: "Workbook", value: "Q1 operating budget" },
-            { label: "Number formats", value: "7 · mixed in one column" },
-            { label: "Proof", value: "Export → decode → compare" },
-          ]}
-        />
-        <section
-          aria-label="Live budget and formatting controls"
-          className="sw-formatting-workspace"
+  const disabled = !ready || action.pending;
+  const styleButtons = (
+    <div className="sw-formatting-buttons">
+      {STYLE_COMMANDS.map((command) => (
+        <DemoButton
+          data-size="sm"
+          disabled={disabled}
+          key={command}
+          onClick={() =>
+            run((grid) => {
+              applyStyleCommand(grid, command);
+              setStatus(`${command} applied · B3:C3`);
+            })
+          }
         >
-          <div className="sw-formatting-ledger">
-            <div className="sw-formatting-toolbar">
-              <strong>Northstar / Finance</strong>
-              <span role="status" data-testid="formatting-status">
-                {status}
-              </span>
-            </div>
-            <div className="sw-formatting-formula" ref={formulaRef} />
-            <div aria-label="Operating budget" className="sw-formatting-grid" ref={hostRef} />
-            <div className="sw-formatting-caption">
-              Negative variance is highlighted by a live conditional rule. Edit the actuals to
-              change it.
-            </div>
-          </div>
-          <aside className="sw-formatting-controls" aria-label="Formatting inspector">
-            <div>
-              <h2>Make it yours</h2>
-              <p>
-                Controls style the revenue pair <strong>B3:C3</strong>. Other cells remain a
-                reference palette.
-              </p>
-            </div>
-            <fieldset disabled={!ready || action.pending}>
-              <legend>Emphasis & decoration</legend>
-              <div className="sw-formatting-buttons">
-                {STYLE_COMMANDS.map((command) => (
-                  <button
-                    key={command}
-                    onClick={() =>
-                      run((grid) => {
-                        applyStyleCommand(grid, command);
-                        setStatus(`${command} applied · B3:C3`);
-                      })
-                    }
-                    type="button"
-                  >
-                    {command}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset disabled={!ready || action.pending}>
-              <legend>Number format</legend>
-              <div className="sw-formatting-buttons">
-                {FORMAT_OPTIONS.map((option) => (
-                  <button
-                    aria-pressed={format === option.code}
-                    key={option.label}
-                    onClick={() =>
-                      run((grid) => {
-                        applyNumberFormat(grid, option.code);
-                        setFormat(option.code);
-                        setStatus(`${option.label} applied · B3:C3`);
-                      })
-                    }
-                    type="button"
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset disabled={!ready || action.pending}>
-              <legend>Font family</legend>
-              <div className="sw-formatting-buttons">
-                {["Arial", "Georgia", "Courier New", "Northstar Unavailable Font"].map((family) => (
-                  <button
-                    key={family}
-                    onClick={() =>
-                      run((grid) => {
-                        grid.styleRange(FORMATTING_TARGET, { fontFamily: family });
-                        setStatus(`${family} applied · B3:C3`);
-                      })
-                    }
-                    type="button"
-                  >
-                    {family === "Northstar Unavailable Font" ? "Theme fallback" : family}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset disabled={!ready || action.pending}>
-              <legend>Placement & size</legend>
-              <div className="sw-formatting-buttons">
-                {(["left", "center", "right"] as const).map((align) => (
-                  <button
-                    key={align}
-                    onClick={() => run((grid) => grid.styleRange(FORMATTING_TARGET, { align }))}
-                    type="button"
-                  >
-                    Align {align}
-                  </button>
-                ))}
-                {(["top", "middle", "bottom"] as const).map((verticalAlign) => (
-                  <button
-                    key={verticalAlign}
-                    onClick={() =>
-                      run((grid) => grid.styleRange(FORMATTING_TARGET, { verticalAlign }))
-                    }
-                    type="button"
-                  >
-                    {verticalAlign}
-                  </button>
-                ))}
-                <button
+          {command}
+        </DemoButton>
+      ))}
+    </div>
+  );
+
+  return (
+    <ShowcaseLayout
+      code={{ title: "How it is built", Snippet: FormattingSnippet }}
+      controls={
+        <>
+          <ShowcaseControlGroup
+            title="Emphasis and decoration"
+            description={
+              <>
+                Controls style the revenue pair <strong>B3:C3</strong>; other cells stay a reference
+                palette.
+              </>
+            }
+          >
+            {styleButtons}
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup
+            title="Number format"
+            description="General opts out of the column's currency format. Column G shows every format at once."
+          >
+            <div className="sw-formatting-buttons">
+              {FORMAT_OPTIONS.map((option) => (
+                <DemoButton
+                  aria-pressed={format === option.code}
+                  data-size="sm"
+                  disabled={disabled}
+                  key={option.label}
                   onClick={() =>
-                    run((grid) => grid.styleRange(FORMATTING_TARGET, { fontSize: 18 }))
+                    run((grid) => {
+                      applyNumberFormat(grid, option.code);
+                      setFormat(option.code);
+                      setStatus(`${option.label} applied · B3:C3`);
+                    })
                   }
-                  type="button"
                 >
-                  18 px
-                </button>
-                <button
-                  onClick={() => run((grid) => grid.styleRange(FORMATTING_TARGET, { wrap: true }))}
-                  type="button"
-                >
-                  Wrap
-                </button>
-              </div>
-            </fieldset>
-            <p>
-              General explicitly opts out of the column’s currency format. Column G demonstrates all
-              seven formats at once.
-            </p>
-            <ActionError error={bootError ?? action.error} />
-          </aside>
-        </section>
-        <section aria-labelledby="formatting-proof-title" className="sw-formatting-proof">
-          <header>
-            <div>
-              <h2 id="formatting-proof-title">Not just a screenshot. A workbook.</h2>
-              <p>
-                Export the current edits to XLSX bytes, decode them with @sheetwrite/xlsx, compare
-                effective cell styles, column defaults and conditional rules, then mount the
-                imported workbook below.
-              </p>
+                  {option.label}
+                </DemoButton>
+              ))}
             </div>
-            <button
-              disabled={!ready || action.pending}
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup title="Font family">
+            <div className="sw-formatting-buttons">
+              {FONT_FAMILIES.map((family) => (
+                <DemoButton
+                  data-size="sm"
+                  disabled={disabled}
+                  key={family}
+                  onClick={() =>
+                    run((grid) => {
+                      grid.styleRange(FORMATTING_TARGET, { fontFamily: family });
+                      setStatus(`${family} applied · B3:C3`);
+                    })
+                  }
+                >
+                  {family === UNAVAILABLE_FONT ? "Theme fallback" : family}
+                </DemoButton>
+              ))}
+            </div>
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup title="Placement and size">
+            <div className="sw-formatting-buttons">
+              {(["left", "center", "right"] as const).map((align) => (
+                <DemoButton
+                  data-size="sm"
+                  disabled={disabled}
+                  key={align}
+                  onClick={() => run((grid) => grid.styleRange(FORMATTING_TARGET, { align }))}
+                >
+                  Align {align}
+                </DemoButton>
+              ))}
+              {(["top", "middle", "bottom"] as const).map((verticalAlign) => (
+                <DemoButton
+                  data-size="sm"
+                  disabled={disabled}
+                  key={verticalAlign}
+                  onClick={() =>
+                    run((grid) => grid.styleRange(FORMATTING_TARGET, { verticalAlign }))
+                  }
+                >
+                  {verticalAlign}
+                </DemoButton>
+              ))}
+              <DemoButton
+                data-size="sm"
+                disabled={disabled}
+                onClick={() => run((grid) => grid.styleRange(FORMATTING_TARGET, { fontSize: 18 }))}
+              >
+                18 px
+              </DemoButton>
+              <DemoButton
+                data-size="sm"
+                disabled={disabled}
+                onClick={() => run((grid) => grid.styleRange(FORMATTING_TARGET, { wrap: true }))}
+              >
+                Wrap
+              </DemoButton>
+            </div>
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup
+            title="Prove it in XLSX"
+            description="Export the current edits, decode them with @sheetwrite/xlsx and compare styles, column defaults and conditional rules."
+          >
+            <DemoButton
+              disabled={disabled}
               {...pendingProps(action.pending)}
               onClick={() =>
                 run(async (grid) => {
@@ -277,59 +249,83 @@ export default function FormattingShowcase() {
                   setReport(result);
                 })
               }
-              type="button"
+              variant="primary"
             >
               Export → re-import XLSX
-            </button>
-          </header>
-          <output aria-live="polite" data-testid="formatting-roundtrip">
-            {report
-              ? `${report.differences.length === 0 ? "Verified" : "Mismatch"} · ${report.checkedCells} cells compared · ${report.byteLength.toLocaleString("en-US")} XLSX bytes · ${report.differences.length} differences · ${report.warnings.length} warnings`
-              : "Not run yet. The proof uses your current workbook, including live edits."}
-          </output>
-          {report && (
-            <>
-              <div
-                aria-label="Re-imported operating budget"
-                className="sw-formatting-imported"
-                ref={importedHostRef}
-              />
-              {report.differences.length > 0 && <p>{report.differences.join(", ")}</p>}
-              {report.warnings.map((warning, index) => (
-                <p key={`${warning.code}-${index}`}>{warning.message}</p>
-              ))}
-            </>
-          )}
-        </section>
-        <section aria-label="Formatting behavior and boundaries" className="sw-formatting-notes">
-          <article>
-            <h2>Typography, with a safety net</h2>
-            <p>
-              Georgia, Arial and Courier New coexist with the theme font. A deliberately unavailable
-              family demonstrates fallback. The ledger includes bold, italic, underline, strike,
-              wrap, three alignments and independently styled border sides.
-            </p>
-          </article>
-          <article>
-            <h2>Values stay values</h2>
-            <p>
-              General, Number, Currency, Accounting, Percentage, Date and Scientific change display,
-              not stored numbers. G3 opts out of a currency column with General; G15 inherits the
-              column default. Negative variances retain a minus sign as well as their conditional
-              fill.
-            </p>
-          </article>
-          <article>
-            <h2>Host-owned presentation</h2>
-            <p>
-              The controls are host UI calling GridActions and styleRange. Font availability remains
-              a browser concern. For independent file fixtures and broader fidelity boundaries, open{" "}
-              <Link to="/showcases/interoperability/">spreadsheet interoperability</Link> or the{" "}
-              <a href="/docs/features/formatting/styles/">styling guide</a>.
-            </p>
-          </article>
-        </section>
-      </main>
-    </div>
+            </DemoButton>
+            <output
+              aria-live="polite"
+              className="sw-formatting-report"
+              data-testid="formatting-roundtrip"
+            >
+              {report
+                ? `${report.differences.length === 0 ? "Verified" : "Mismatch"} · ${report.checkedCells} cells compared · ${report.byteLength.toLocaleString("en-US")} XLSX bytes · ${report.differences.length} differences · ${report.warnings.length} warnings`
+                : "Not run yet. The proof uses your current workbook, including live edits."}
+            </output>
+            <ActionError error={bootError ?? action.error} />
+          </ShowcaseControlGroup>
+        </>
+      }
+      demo={
+        <>
+          <div className="sw-formatting-formula" ref={formulaRef} />
+          <div aria-label="Operating budget" className="sw-formatting-grid" ref={hostRef} />
+          <p className="sw-formatting-caption">
+            Negative variance is highlighted by a live conditional rule. Edit the actuals to change
+            it.
+          </p>
+        </>
+      }
+      demoActions={
+        <span className="sw-formatting-status" data-testid="formatting-status" role="status">
+          {status}
+        </span>
+      }
+      demoLabel="Live budget"
+      demoTitle="Northstar / Finance"
+      eyebrow="Formatting"
+      facts={[
+        { label: "Number formats", value: FORMAT_OPTIONS.length.toLocaleString("en") },
+        { label: "Style commands", value: STYLE_COMMANDS.length.toLocaleString("en") },
+        { label: "Fonts", value: FONT_FAMILIES.length.toLocaleString("en") },
+      ]}
+      guide={{ href: "/docs/features/formatting/styles/", label: "Read the styling guide" }}
+      id="formatting"
+      task="Shape the type of an operating budget, make its numbers legible, then prove the workbook keeps its formatting through XLSX."
+      title="Formatting and number formats"
+    >
+      {report && (
+        <ShowcaseSection id="formatting-imported" title="The re-imported workbook">
+          <div
+            aria-label="Re-imported operating budget"
+            className="sw-formatting-imported"
+            ref={importedHostRef}
+          />
+          {report.differences.length > 0 && <p>{report.differences.join(", ")}</p>}
+          {report.warnings.map((warning, index) => (
+            <p key={`${warning.code}-${index}`}>{warning.message}</p>
+          ))}
+        </ShowcaseSection>
+      )}
+      <ShowcaseSection id="formatting-notes" title="How formatting behaves">
+        <ul>
+          <li>
+            Georgia, Arial and Courier New coexist with the theme font, and an unavailable family
+            falls back to it. The ledger also shows bold, italic, underline, strike, wrap, three
+            alignments and independently styled border sides.
+          </li>
+          <li>
+            Number formats change the display, not the stored numbers. G3 opts out of a currency
+            column with General; G15 inherits the column default. Negative variances keep a minus
+            sign as well as their conditional fill.
+          </li>
+          <li>
+            The controls are host UI calling <code>grid.styleRange</code>. For independent file
+            fixtures and fidelity boundaries, open{" "}
+            <a href="/showcases/interoperability/">spreadsheet interoperability</a>.
+          </li>
+        </ul>
+      </ShowcaseSection>
+    </ShowcaseLayout>
   );
 }
