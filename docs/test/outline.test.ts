@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { collectOutline } from "../src/lib/outline.js";
+import { collectOutline, type HastElement } from "../src/lib/outline.js";
 
-const text = (value: string) => ({ type: "text", value });
+const text = (value: string): HastElement => ({ type: "text", value });
 const element = (
   tagName: string,
   properties: Record<string, unknown>,
-  children: object[] = [],
-) => ({
+  children: HastElement[] = [],
+): HastElement => ({
   type: "element",
   tagName,
   properties,

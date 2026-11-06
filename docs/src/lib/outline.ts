@@ -15,7 +15,8 @@ export interface OutlineItem {
 /** Fewer than two entries is not an outline worth a navigation surface. */
 export const MIN_OUTLINE_ENTRIES = 2;
 
-interface HastElement {
+/** The hast node shape the outline reads. */
+export interface HastElement {
   type: string;
   tagName?: string;
   value?: string;
