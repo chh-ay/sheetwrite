@@ -4,7 +4,7 @@
   "exports": {
     "@sheetwrite/charts#.#ChartAnchor": "eaa458ae4fed",
     "@sheetwrite/charts#.#ChartChangeEvent": "10b634d11f34",
-    "@sheetwrite/charts#.#ChartDefinition": "04e371d6478c",
+    "@sheetwrite/charts#.#ChartDefinition": "858020ccc05a",
     "@sheetwrite/charts#.#ChartKind": "03d9fa540668",
     "@sheetwrite/charts#.#ChartRange": "341e8313bb81",
     "@sheetwrite/charts#.#ChartRef": "aa3ecf1caf31",
@@ -53,7 +53,7 @@
     "@sheetwrite/core#.#ChartAnchor": "eaa458ae4fed",
     "@sheetwrite/core#.#ChartChangeEvent": "10b634d11f34",
     "@sheetwrite/core#.#ChartChangeListener": "0e75a354d0d5",
-    "@sheetwrite/core#.#ChartDefinition": "e10d9ef618f3",
+    "@sheetwrite/core#.#ChartDefinition": "0285a5bea060",
     "@sheetwrite/core#.#ChartKind": "03d9fa540668",
     "@sheetwrite/core#.#ChartRange": "341e8313bb81",
     "@sheetwrite/core#.#ChartRef": "aa3ecf1caf31",
