@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { HighlightedCode } from "../components/HighlightedCode.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
 import landingBench from "../generated/landing-bench.json";
@@ -243,11 +242,13 @@ function CollaborationScene() {
 function FormulasScene() {
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--formulas">
-      <HighlightedCode
-        className="sw-hub-spill__formula"
-        code="=GROUPBY(region, revenue, SUM)"
-        language="formula"
-      />
+      {/* Static formulas are coloured in markup, so the hub ships no tokenizer. */}
+      <code className="sw-hub-spill__formula">
+        <span className="sw-code-punctuation">=</span>
+        <span className="sw-code-function">GROUPBY</span>
+        <span className="sw-code-punctuation">(</span>region, revenue, SUM
+        <span className="sw-code-punctuation">)</span>
+      </code>
       <span className="sw-hub-spill">
         {[
           ["Americas", "10.9M"],
@@ -481,7 +482,13 @@ function SpreadsheetScene() {
         </span>
         <span className="sw-hub-ribbon__formula">
           <code>G50</code>
-          <HighlightedCode code="=SUM(G2:G49)" language="formula" />
+          <code>
+            <span className="sw-code-punctuation">=</span>
+            <span className="sw-code-function">SUM</span>
+            <span className="sw-code-punctuation">(</span>
+            <span className="sw-code-type">G2:G49</span>
+            <span className="sw-code-punctuation">)</span>
+          </code>
         </span>
       </span>
       <span className="sw-hub-scene__caption">ribbon · formula bar · tabs · folds when narrow</span>

@@ -82,7 +82,7 @@
   font: var(--sw-weight-semibold) var(--sw-text-small) / 1.3 var(--sw-font-mono);
   color: var(--sw-stage-fg);
 }
-.sw-workbench-stage .sw-demo-button {
+.sw-workbench-stage .sw-button {
   min-height: 2rem;
   height: 2rem;
 }
