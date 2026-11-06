@@ -102,7 +102,7 @@
     "@sheetwrite/core#.#DashboardBox": "0521b649dd46",
     "@sheetwrite/core#.#DashboardItem": "0ee70c60c42d",
     "@sheetwrite/core#.#DashboardPivotItem": "5a0a8c9d7460",
-    "@sheetwrite/core#.#DashboardSlicerItem": "a528ccbb8b7c",
+    "@sheetwrite/core#.#DashboardSlicerItem": "3a641c237614",
     "@sheetwrite/core#.#DataCell": "1eae7a9ff4df",
     "@sheetwrite/core#.#DataModel": "49b8ebe6d07c",
     "@sheetwrite/core#.#DataSource": "27c5b7992c07",
