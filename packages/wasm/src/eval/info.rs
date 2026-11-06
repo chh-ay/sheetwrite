@@ -123,7 +123,7 @@ impl CellStore {
 
         match source {
             Some(source) if source.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
-                Ok(Value::text(&source))
+                Ok(Value::text(&*source))
             }
             _ => Err(FormulaError::Na),
         }
