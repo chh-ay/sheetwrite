@@ -4,8 +4,8 @@ import { join, relative, resolve } from "node:path";
 import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { median } from "../bench/src/stats.js";
-import type { PerfRow, PerfStat } from "../docs/src/lib/perf-bars.js";
-import type { ReleaseChange } from "../docs/src/lib/release-change.js";
+import { formatTimes, type PerfRow, type PerfStat } from "../docs/src/lib/perf-bars.js";
+import type { ChangeMachine } from "../docs/src/lib/release-change.js";
 import type { StoryMachine } from "../docs/src/lib/speedup-story.js";
 import { exists, frontmatter, posix, repositoryRoot } from "./docs-shared.js";
 import {
@@ -303,7 +303,12 @@ export function landingBenchPayload(
     heroStats,
     sizes,
     /** The speed story's data: every interaction at 100,000 rows, per machine. */
-    story: storyMachines(machines),
+    // The landing page and the showcase carry the Render page's story as built HTML.
+    storyHtml: speedStory({
+      id: "story",
+      baseName: "Handsontable",
+      machines: storyMachines(machines),
+    }),
     ...downloadsField,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
@@ -1082,45 +1087,72 @@ interface EngineComparisonManifest {
   readonly protocol: string;
   readonly base: { readonly version: string; readonly commit: string };
   readonly candidate: { readonly commit: string };
-  readonly machine: { readonly cpu: string; readonly bun: string };
+  readonly machine: { readonly cpu: string; readonly bun: string; readonly powerProfile: string };
   readonly finishedAt: string;
 }
 
 /** The name the pages use for the engine on develop, before its release. */
 const NEXT_ENGINE = "0.7.0 engine";
 
+/** The workloads both formula captures timed, keyed "id/size". */
+function sharedMedians(
+  left: FormulaEvidence,
+  right: FormulaEvidence,
+): Array<readonly [left: number, right: number]> {
+  return left.workloads.flatMap((workload) => {
+    const other = right.workloads.find(
+      (entry) => entry.id === workload.id && entry.size === workload.size,
+    );
+    return other === undefined ? [] : [[workload.stat.median, other.stat.median] as const];
+  });
+}
+
 /**
- * The next release's formula engine against the last release, per machine
- * with a capture; a machine without one says so. Both sides ran in one
- * process tree on one CPU, so the comparison holds only within a machine.
+ * The next release's formula engine against the last release, on every
+ * machine; a machine without a capture reads "pending". Both sides ran in one
+ * process tree on the same CPUs, so the comparison holds only within a machine.
  */
-async function renderEngineChange(): Promise<string[]> {
-  const changes: ReleaseChange[] = [];
-  const pending: string[] = [];
+async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<string[]> {
+  const entries: ChangeMachine[] = [];
+  let baseName = "";
+  let windowNote = "";
   for (const { machine, directory } of ENGINE_COMPARISON_DIRECTORIES) {
+    const owner = machines.find((entry) => entry.machine === machine);
+    const { name, detail } =
+      owner === undefined
+        ? { name: machine === "linux" ? "Linux" : "Mac", detail: "" }
+        : machineName(owner);
     const manifestPath = join(repositoryRoot, directory, "capture.json");
-    const label = machine === "linux" ? "Linux · x86-64" : "Mac · Apple Silicon";
     if (!(await exists(manifestPath))) {
-      pending.push(`${label}: not measured yet; it follows with the next release capture.`);
+      entries.push({
+        machine,
+        name,
+        detail,
+        pending: "Pending: this machine's capture follows with the next release capture.",
+      });
       continue;
     }
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as EngineComparisonManifest;
-    if (manifest.protocol !== "sheetwrite-engine-comparison-v2") {
+    if (manifest.protocol !== "sheetwrite-engine-comparison-v3") {
       throw new Error(`${directory}/capture.json is not an engine comparison manifest`);
     }
-    const base = await loadEvidence(
-      `${directory}/formula-base.json`,
-      "cd bench && bun run bench:engine-comparison",
-      validateFormulaArtifact,
+    const command = "cd bench && bun run bench:engine-comparison";
+    const [base, candidate, control] = await Promise.all(
+      ["formula-base.json", "formula-candidate.json", "formula-control.json"].map((file) =>
+        loadEvidence(`${directory}/${file}`, command, validateFormulaArtifact),
+      ),
     );
-    const candidate = await loadEvidence(
-      `${directory}/formula-candidate.json`,
-      "cd bench && bun run bench:engine-comparison",
-      validateFormulaArtifact,
-    );
-    if (!("evidence" in base) || !("evidence" in candidate)) {
+    if (
+      base === undefined ||
+      candidate === undefined ||
+      control === undefined ||
+      !("evidence" in base) ||
+      !("evidence" in candidate) ||
+      !("evidence" in control)
+    ) {
       throw new Error(`${directory} holds an engine comparison whose captures do not validate`);
     }
+    baseName = manifest.base.version;
     const workloads = candidate.evidence.workloads.flatMap((measured) => {
       const before = base.evidence.workloads.find(
         (workload) => workload.id === measured.id && workload.size === measured.size,
@@ -1136,25 +1168,37 @@ async function renderEngineChange(): Promise<string[]> {
             },
           ];
     });
-    changes.push({
-      id: `engine-change-${machine}`,
-      baseName: manifest.base.version,
-      measuredName: NEXT_ENGINE,
+    entries.push({
       machine,
-      machineLabel: `${label} · ${manifest.machine.cpu.replaceAll(/\((R|TM)\)/gu, "").replace(/^\d+(st|nd|rd|th) Gen /u, "")}`,
+      name,
+      detail,
       note: `Captured ${manifest.finishedAt.slice(0, 10)} · develop ${manifest.candidate.commit.slice(0, 7)} against ${manifest.base.version} (${manifest.base.commit.slice(0, 7)}) · Bun ${manifest.machine.bun}`,
       workloads,
     });
+    // The release's own benchmark on its own engine, timed in the same window, set beside the release capture.
+    const release =
+      owner === undefined
+        ? undefined
+        : await loadEvidence(
+            `${owner.directory}/formula-results.json`,
+            "bun run --filter @sheetwrite/bench bench:formula",
+            validateFormulaArtifact,
+          );
+    if (release !== undefined && "evidence" in release) {
+      const pairs = sharedMedians(control.evidence, release.evidence);
+      const slowdown = median(pairs.map(([window, captured]) => window / captured));
+      windowNote = `On ${name}, the absolute times here are not comparable with the release capture under "Every workload": ${manifest.base.version}'s own benchmark, run on its own engine in this window, took a median ${formatTimes(slowdown)} its release-capture time (power profile ${manifest.machine.powerProfile}). Compare times only within this figure.`;
+    }
   }
-  if (changes.length === 0) return [];
+  if (entries.every((entry) => entry.workloads === undefined)) return [];
   return [
     `### The ${NEXT_ENGINE}`,
     "",
-    `The formula engine on develop, measured against the last release on the same machine and CPU. A workload is faster or slower only when its run ranges (fastest to p95 run) do not overlap.`,
+    `The formula engine on develop, measured against the last release on the same machine and CPUs. A workload is faster or slower only when its run ranges (fastest to p95 run) do not overlap.`,
     "",
-    // Each figure names the machines that have no capture yet, so a reader never takes one machine for both.
-    ...changes.map((change) => releaseChange({ ...change, pending })),
+    releaseChange({ id: "engine-change", baseName, measuredName: NEXT_ENGINE, machines: entries }),
     "",
+    ...(windowNote === "" ? [] : [windowNote, ""]),
     "Reproduce with clean, built checkouts of the last release and of develop, from `bench/`:",
     "",
     '```sh partial="needs clean, built checkouts of the release and of develop" title="Engine comparison"',
@@ -1363,83 +1407,86 @@ function renderCorePathsSection(
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
     ...evidenceHeadline(headlines),
-    ...allMeasurements(`All ${evidence.scenarios.length} scenarios · median time, scale, samples and checkpoints`, [
-      perfFigure({
-        id: "core-paths",
-        title: "Median time per scenario",
-        unit: "ms",
-        scale: "log",
-        rowHeader: "Scenario",
-        spreadLabel: FASTEST_TO_P95,
-        groups: machineGroups(
-          machines,
-          (capture) =>
-            capture.scenarios.flatMap((scenario) => [
-              {
-                label: readableId(scenario.id),
-                id: scenario.id,
-                detail: readableText(scenarioLabel(scenario.unit)),
-                bars: [{ label: "", role: "measured", stat: fastestToP95(scenario.timing) }],
-              },
-              ...(scenario.variants ?? []).map((variant): PerfRow => ({
-                label: readableId(variant.id),
-                id: variant.id,
-                detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
-                bars: [{ label: "", role: "measured", stat: fastestToP95(variant.timing) }],
-              })),
+    ...allMeasurements(
+      `All ${evidence.scenarios.length} scenarios · median time, scale, samples and checkpoints`,
+      [
+        perfFigure({
+          id: "core-paths",
+          title: "Median time per scenario",
+          unit: "ms",
+          scale: "log",
+          rowHeader: "Scenario",
+          spreadLabel: FASTEST_TO_P95,
+          groups: machineGroups(
+            machines,
+            (capture) =>
+              capture.scenarios.flatMap((scenario) => [
+                {
+                  label: readableId(scenario.id),
+                  id: scenario.id,
+                  detail: readableText(scenarioLabel(scenario.unit)),
+                  bars: [{ label: "", role: "measured", stat: fastestToP95(scenario.timing) }],
+                },
+                ...(scenario.variants ?? []).map((variant): PerfRow => ({
+                  label: readableId(variant.id),
+                  id: variant.id,
+                  detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
+                  bars: [{ label: "", role: "measured", stat: fastestToP95(variant.timing) }],
+                })),
+              ]),
+            (capture) => captureNote(capture.metadata),
+          ),
+        }),
+        "",
+        ...provenanceList([
+          ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
+          ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
+          [
+            "Environment",
+            `Bun ${html(evidence.toolchain.bun)} · Node compatibility ${html(evidence.toolchain.nodeCompat)} · ${html(evidence.toolchain.cpu)}`,
+          ],
+          ["Raw artifact", `<code>${html(source)}</code>`],
+        ]),
+        "### Scale",
+        "",
+        "| Parameter | Value |",
+        "| --- | ---: |",
+        ...Object.entries(evidence.scale).map(
+          ([name, value]) => `| \`${name}\` | ${formatCount(value)} |`,
+        ),
+        "",
+        "### Samples",
+        "",
+        "| Scenario | Samples |",
+        "| --- | ---: |",
+        ...evidence.scenarios.flatMap((scenario) => [
+          `| \`${scenario.id}\` | ${scenario.timing.iters} |`,
+          ...(scenario.variants ?? []).map(
+            (variant) => `| \`${variant.id}\` | ${variant.timing.iters} |`,
+          ),
+        ]),
+        "",
+        ...(counters.length === 0
+          ? []
+          : [
+              "### Counters",
+              "",
+              "Non-time evidence recorded by the same runs.",
+              "",
+              "| Scenario | Counter | Value |",
+              "| --- | --- | ---: |",
+              ...counters,
+              "",
             ]),
-          (capture) => captureNote(capture.metadata),
+        "### Correctness checkpoints",
+        "",
+        "| Scenario | Checkpoint |",
+        "| --- | --- |",
+        ...evidence.scenarios.map(
+          (scenario) => `| \`${scenario.id}\` | ${markdownCell(scenario.validation)} |`,
         ),
-      }),
-      "",
-      ...provenanceList([
-        ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
-        ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
-        [
-          "Environment",
-          `Bun ${html(evidence.toolchain.bun)} · Node compatibility ${html(evidence.toolchain.nodeCompat)} · ${html(evidence.toolchain.cpu)}`,
-        ],
-        ["Raw artifact", `<code>${html(source)}</code>`],
-      ]),
-      "### Scale",
-      "",
-      "| Parameter | Value |",
-      "| --- | ---: |",
-      ...Object.entries(evidence.scale).map(
-        ([name, value]) => `| \`${name}\` | ${formatCount(value)} |`,
-      ),
-      "",
-      "### Samples",
-      "",
-      "| Scenario | Samples |",
-      "| --- | ---: |",
-      ...evidence.scenarios.flatMap((scenario) => [
-        `| \`${scenario.id}\` | ${scenario.timing.iters} |`,
-        ...(scenario.variants ?? []).map(
-          (variant) => `| \`${variant.id}\` | ${variant.timing.iters} |`,
-        ),
-      ]),
-      "",
-      ...(counters.length === 0
-        ? []
-        : [
-            "### Counters",
-            "",
-            "Non-time evidence recorded by the same runs.",
-            "",
-            "| Scenario | Counter | Value |",
-            "| --- | --- | ---: |",
-            ...counters,
-            "",
-          ]),
-      "### Correctness checkpoints",
-      "",
-      "| Scenario | Checkpoint |",
-      "| --- | --- |",
-      ...evidence.scenarios.map(
-        (scenario) => `| \`${scenario.id}\` | ${markdownCell(scenario.validation)} |`,
-      ),
-    ]),
+      ],
+    ),
     "Reproduce with:",
     "",
     '```sh verify title="Core write-path evidence"',
@@ -2013,7 +2060,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   if ("evidence" in formula) {
     const { evidence, source } = formula;
     // The engine change leads; the release capture's own evidence sits with its figure below.
-    lines.push(...(await renderEngineChange()));
+    lines.push(...(await renderEngineChange(captureMachines())));
     lines.push(
       "### Every workload",
       "",

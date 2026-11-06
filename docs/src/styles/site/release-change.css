@@ -54,6 +54,32 @@
   font-size: var(--sw-text-caption);
 }
 
+/* ---- Machine switch: one machine's panel, or every machine side by side ---- */
+
+.change > .machine-switch {
+  margin-top: var(--sw-space-3);
+}
+
+.change:has(> .machine-switch) .change__panel {
+  display: none;
+}
+
+.change:has(input[value="linux"]:checked) .change__panel[data-machine="linux"],
+.change:has(input[value="mac"]:checked) .change__panel[data-machine="mac"],
+.change:has(input[value="all"]:checked) .change__panel[data-machine="all"] {
+  display: block;
+}
+
+.change__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--sw-space-5);
+}
+
+.change__column {
+  padding-top: var(--sw-space-1);
+}
+
 .change__pending {
   margin-top: var(--sw-space-1) !important;
   color: var(--sw-fg-muted);
@@ -230,49 +256,7 @@
 }
 
 .change__lane {
-  position: relative;
-  height: 1.125rem;
-  background:
-    linear-gradient(var(--sw-fg-muted), var(--sw-fg-muted)) var(--change-origin, 50%) 0 / 1px 100%
-      no-repeat,
-    repeating-linear-gradient(
-      to right,
-      var(--sw-border) 0 1px,
-      transparent 1px calc(100% / var(--change-steps, 2))
-    );
-}
-
-.change__stem {
-  position: absolute;
-  top: calc(50% - 1px);
-  height: 2px;
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--change-colour) 55%, transparent);
-}
-
-.change__dot {
-  position: absolute;
-  top: calc(50% - 0.375rem);
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-left: -0.375rem;
-  border-radius: 50%;
-  background: var(--change-colour);
-  box-shadow: 0 0 0 2px var(--sw-surface-1);
-}
-
-.change__row[data-verdict="better"] {
-  --change-colour: var(--sw-icon-accent);
-}
-
-.change__row[data-verdict="worse"] {
-  --change-colour: var(--sw-danger);
-}
-
-.change__row:hover .change__dot {
-  box-shadow:
-    0 0 0 2px var(--sw-surface-1),
-    0 0 0 5px color-mix(in srgb, var(--change-colour) 30%, transparent);
+  min-width: 0;
 }
 
 .change__verdict {
@@ -388,6 +372,12 @@
 .change__data thead th {
   font-family: var(--sw-font-body, inherit);
   font-weight: 600;
+}
+
+/* Headings and names wrap, so the numbers fit the figure at desktop and tablet widths. */
+.sw-prose .change__data :is(thead th, th[scope="row"]),
+.change__data :is(thead th, th[scope="row"]) {
+  white-space: normal;
 }
 
 .change__data td b {

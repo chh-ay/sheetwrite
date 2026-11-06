@@ -1,8 +1,16 @@
 import { describe, expect, it } from "bun:test";
 
-import { type PerfFigure, type PerfRow, perfVerdict, renderPerfBars } from "../src/lib/perf-bars.ts";
+import { scalePosition } from "../src/components/figures/scale.ts";
+import { laneHtml } from "../src/components/figures/static.ts";
+import {
+  type PerfFigure,
+  type PerfRow,
+  perfVerdict,
+  renderPerfBars,
+} from "../src/lib/perf-bars.ts";
 import { parsePerfCompare } from "../src/lib/perf-compare.ts";
 import { renderReleaseChange } from "../src/lib/release-change.ts";
+import { renderSpeedupStory } from "../src/lib/speedup-story.ts";
 
 const TIME_FIGURE: PerfFigure = {
   id: "test",
@@ -105,32 +113,44 @@ describe("release-note comparisons", () => {
   });
 });
 
+const changeWorkload = (id: string, base: number, measured: number) => ({
+  id,
+  label: id,
+  base: { value: base, spread: [base * 0.95, base * 1.05] as const },
+  measured: { value: measured, spread: [measured * 0.95, measured * 1.05] as const },
+});
+
 describe("engine change", () => {
+  const html = renderReleaseChange(
+    {
+      id: "change",
+      baseName: "0.6.0",
+      measuredName: "0.7.0 engine",
+      machines: [
+        {
+          machine: "linux",
+          name: "Linux",
+          detail: "x86-64",
+          note: "",
+          workloads: [
+            changeWorkload("faster", 10, 5),
+            changeWorkload("same", 10, 10.2),
+            changeWorkload("slower", 10, 20),
+          ],
+        },
+        { machine: "mac", name: "Mac", detail: "Apple Silicon", pending: "Pending: not captured." },
+      ],
+    },
+    () => "",
+  );
+  const linux = html.slice(
+    html.indexOf('data-machine="linux"'),
+    html.indexOf('data-machine="mac"'),
+  );
+
   it("draws only workloads whose run ranges do not overlap, and counts the rest as noise", () => {
-    const workload = (id: string, base: number, measured: number) => ({
-      id,
-      label: id,
-      base: { value: base, spread: [base * 0.95, base * 1.05] as const },
-      measured: { value: measured, spread: [measured * 0.95, measured * 1.05] as const },
-    });
-    const html = renderReleaseChange(
-      {
-        id: "change",
-        baseName: "0.6.0",
-        measuredName: "0.7.0 engine",
-        machine: "linux",
-        machineLabel: "Linux",
-        note: "",
-        workloads: [
-          workload("faster", 10, 5),
-          workload("same", 10, 10.2),
-          workload("slower", 10, 20),
-        ],
-      },
-      () => "",
-    );
     const drawn = [
-      ...html.matchAll(
+      ...linux.matchAll(
         /class="change__row" data-verdict="(\w+)"><span class="change__label">(\w+)/gu,
       ),
     ];
@@ -138,9 +158,124 @@ describe("engine change", () => {
       ["faster", "better"],
       ["slower", "worse"],
     ]);
-    expect(html).toContain("1 workload within noise");
-    expect(html).toContain("Median <b>2.0× faster</b>");
-    expect(html).toContain("Median <b>2.0× slower</b>");
+    expect(linux).toContain("1 workload within noise");
+    expect(linux).toContain("Median <b>2.0× faster</b>");
+    expect(linux).toContain("Median <b>2.0× slower</b>");
+  });
+
+  it("shows every machine side by side, a pending machine with no mark", () => {
+    const all = html.slice(html.indexOf('class="change__panel" data-machine="all"'));
+    expect(all).toContain("Pending: not captured.");
+    // One mark per measured workload: three on Linux, none on the pending Mac.
+    expect([...all.matchAll(/<g data-tone="(\w+)"/gu)].map(([, tone]) => tone)).toEqual([
+      "accent",
+      "accent",
+      "accent",
+    ]);
+    expect(all).toContain('<th scope="col">Mac: times faster than 0.6.0</th>');
+  });
+});
+
+describe("speed story", () => {
+  const html = renderSpeedupStory(
+    {
+      id: "story",
+      baseName: "Handsontable",
+      machines: [
+        {
+          machine: "linux",
+          name: "Linux",
+          detail: "x86-64",
+          note: "captured",
+          interactions: [
+            {
+              id: "scroll",
+              label: "Scroll down",
+              category: "Scroll",
+              measured: { value: 0.5, spread: [0.4, 0.6] },
+              base: 8.3,
+            },
+          ],
+        },
+        {
+          machine: "mac",
+          name: "Mac",
+          detail: "Apple Silicon",
+          note: "captured",
+          interactions: [
+            {
+              id: "scroll",
+              label: "Scroll down",
+              category: "Scroll",
+              measured: { value: 1, spread: [0.9, 1.1] },
+            },
+          ],
+        },
+      ],
+    },
+    () => "",
+  );
+
+  it("offers Linux, Mac and All, with the first machine checked", () => {
+    expect(
+      [...html.matchAll(/<input type="radio"[^>]*value="(\w+)"([^>]*)>/gu)].map(
+        ([, value, rest]) => [value, (rest ?? "").includes("checked")],
+      ),
+    ).toEqual([
+      ["linux", true],
+      ["mac", false],
+      ["all", false],
+    ]);
+  });
+
+  it("gives each interaction a focusable row with every value, and a ratio chip", () => {
+    expect(html).toContain(
+      '<button aria-controls="story-linux-scroll-values" aria-describedby="story-linux-scroll-values" aria-expanded="false" class="fig-range-row__name" type="button">',
+    );
+    expect(html).toContain("<dt>Lowest–highest round</dt><dd>0.40\u00a0ms – 0.60\u00a0ms</dd>");
+    expect(html).toContain("16.6× faster</span>");
+  });
+
+  it("lists a library that did not complete in words, not as a mark", () => {
+    const mac = html.slice(html.indexOf('data-machine="mac" aria-label="Mac results"'));
+    expect(mac).toContain("Handsontable median</dt><dd>did not complete");
+  });
+});
+
+describe("figure kit", () => {
+  it("places values on a log scale and clamps them to the lane", () => {
+    const scale = { kind: "log", domain: [1, 1000] } as const;
+    expect(scalePosition(scale, 10)).toBeCloseTo(33.33, 2);
+    expect(scalePosition(scale, 0.5)).toBe(0);
+    expect(scalePosition(scale, 5000)).toBe(100);
+  });
+
+  it("describes every series in the lane's SVG, and draws no mark for a pending one", () => {
+    const html = laneHtml({
+      label: "Countif",
+      scale: { kind: "log", domain: [1, 16] },
+      origin: 1,
+      series: [
+        {
+          key: "a",
+          label: "Linux",
+          value: 4,
+          valueText: "4.0× faster",
+          shape: "circle",
+          tone: "accent",
+        },
+        {
+          key: "b",
+          label: "Mac",
+          value: null,
+          valueText: "pending",
+          shape: "diamond",
+          tone: "violet",
+        },
+      ],
+    });
+    expect(html).toContain("<title>Countif</title><desc>Linux: 4.0× faster; Mac: pending</desc>");
+    expect(html).not.toContain('data-tone="violet"');
   });
 });
 
@@ -149,16 +284,23 @@ describe("machine switch", () => {
     const group = (machine: "linux" | "mac") => ({
       label: machine === "linux" ? "Linux · x86-64" : "Mac · Apple Silicon",
       machine,
-      rows: [{ label: "Sort", bars: [{ label: "", role: "measured" as const, stat: { value: 1 } }] }],
+      rows: [
+        { label: "Sort", bars: [{ label: "", role: "measured" as const, stat: { value: 1 } }] },
+      ],
     });
     const html = renderPerfBars(
-      { ...TIME_FIGURE, title: "Median recalculation time", groups: [group("linux"), group("mac")] },
+      {
+        ...TIME_FIGURE,
+        title: "Median recalculation time",
+        groups: [group("linux"), group("mac")],
+      },
       () => "",
     );
     expect(html).toContain('aria-label="Machine for median recalculation time"');
-    expect([...html.matchAll(/<input type="radio"[^>]*>/gu)].map(([input]) => input.includes(" checked"))).toEqual([
-      true,
-      false,
-    ]);
+    expect(
+      [...html.matchAll(/<input type="radio"[^>]*>/gu)].map(([input]) =>
+        input.includes(" checked"),
+      ),
+    ).toEqual([true, false, false]);
   });
 });

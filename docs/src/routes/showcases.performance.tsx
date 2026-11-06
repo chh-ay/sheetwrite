@@ -16,9 +16,10 @@ import {
 } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { SpeedupBars } from "../components/SpeedupBars.js";
 import { errorText } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
@@ -55,9 +56,6 @@ import type { RendererState, RenderingMode } from "../showcases/ui/rendering-mod
 
 import "@sheetwrite/core/styles.css";
 import stylesheet from "../styles/showcase-performance.css?url";
-
-/** The comparison bars sit below the fold, so their renderer loads with them. */
-const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
 
 declare global {
   interface Window {
@@ -1582,9 +1580,7 @@ function EvidenceSection({ workbench }: Readonly<{ workbench: PerformanceWorkben
       <div className="sw-sp-proof-layout">
         {COMPARISON_EVIDENCE.available && (
           <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
-            <Suspense fallback={null}>
-              <SpeedupBars id="showcase-story" machines={COMPARISON_EVIDENCE.story} />
-            </Suspense>
+            <SpeedupBars html={COMPARISON_EVIDENCE.storyHtml} />
           </article>
         )}
 

@@ -10,6 +10,13 @@
  * because build scripts inline sprite icons while pages reference the sprite
  * file.
  */
+import {
+  ALL_MACHINES,
+  MACHINE_ICONS,
+  type MachineRow,
+  machineSwitch,
+  renderMachineComparison,
+} from "./machine-compare.js";
 
 /** The quantity a figure plots. Times are milliseconds; sizes are bytes. */
 export type PerfUnit = "ms" | "bytes" | "ratio";
@@ -78,7 +85,7 @@ export interface PerfFigure {
 /** Icon markup for one sprite icon; inline SVG at build time, a sprite reference on pages. */
 export type PerfIconMarkup = (name: PerfIconName) => string;
 
-export type PerfIconName = "arrow-down" | "arrow-up" | "minus" | "laptop" | "server";
+export type PerfIconName = "arrow-down" | "arrow-up" | "minus" | "laptop" | "layers" | "server";
 
 export type PerfVerdictKind = "better" | "worse" | "noise" | "missing";
 
@@ -89,11 +96,6 @@ export interface PerfVerdict {
   /** Signed change of the measured value against the base: "−94%", "+110%". */
   readonly change?: string;
 }
-
-const MACHINE_ICONS: Readonly<Record<PerfMachine, PerfIconName>> = {
-  linux: "server",
-  mac: "laptop",
-};
 
 const DEFAULT_VERDICT_WORDS: Readonly<Record<PerfUnit, readonly [string, string]>> = {
   ms: ["faster", "slower"],
@@ -510,21 +512,71 @@ function tableMarkup(figure: PerfFigure): string {
 }
 
 /**
- * A Linux | Mac switch over a figure's machine groups, so one machine shows at a
- * time in place. Radios and `:has()` do the switching; the figure needs no script.
+ * Every machine's comparison on one ratio axis: for each row, how much lower
+ * or higher each machine's measured value is than its own base. Rows match
+ * across machines by benchmark ID, or by label when a row has none.
  */
-function machineSwitch(figure: PerfFigure, groups: readonly PerfGroup[], icon: PerfIconMarkup): string {
-  const id = figure.id;
-  const radios = groups.flatMap((group, index) => {
-    if (group.machine === undefined) return [];
-    const inputId = `${id}-machine-${group.machine}`;
-    const name = group.label.split(" · ")[0] ?? group.label;
-    return [
-      `<input type="radio" name="${id}-machine" id="${inputId}" value="${group.machine}"${index === 0 ? " checked" : ""}><label for="${inputId}">${icon(MACHINE_ICONS[group.machine])}${escapeHtml(name)}</label>`,
-    ];
-  });
-  // Each switch names its figure, so a page with several reads "Machine for median recalculation time".
-  return `<div class="machine-switch" role="radiogroup" aria-label="Machine for ${escapeHtml(lowerFirst(figure.title))}">${radios.join("")}</div>`;
+function allMachines(
+  figure: PerfFigure,
+  groups: readonly PerfGroup[],
+  icon: PerfIconMarkup,
+): string {
+  const machineGroups = groups.flatMap((group) =>
+    group.machine === undefined ? [] : [{ group, machine: group.machine }],
+  );
+  const keys = new Map<string, string>();
+  for (const { group } of machineGroups) {
+    for (const row of group.rows) keys.set(row.id ?? row.label, row.label);
+  }
+  const [lower] = figure.verdictWords ?? DEFAULT_VERDICT_WORDS[figure.unit];
+  const baseName = figure.series?.base ?? "the base";
+  const rows: MachineRow[] = [...keys].map(([key, label]) => ({
+    label,
+    id: key,
+    results: Object.fromEntries(
+      machineGroups.map(({ group, machine }) => {
+        const row = group.rows.find((entry) => (entry.id ?? entry.label) === key);
+        const pair = row === undefined ? undefined : measuredPair(row);
+        const verdict = row === undefined ? undefined : perfVerdict(row, figure);
+        if (
+          pair?.base.stat === undefined ||
+          pair.measured.stat === undefined ||
+          verdict === undefined
+        ) {
+          return [
+            machine,
+            { pending: row === undefined ? "no result" : (verdict?.text ?? "no result") },
+          ];
+        }
+        return [
+          machine,
+          {
+            ratio: pair.base.stat.value / pair.measured.stat.value,
+            text: verdict.text,
+            noise: verdict.kind === "noise",
+          },
+        ];
+      }),
+    ),
+  }));
+  return renderMachineComparison(
+    {
+      id: `${figure.id}-all`,
+      measure: `Times ${lower} than ${baseName}`,
+      parity: `the same as ${baseName}`,
+      rowHeader: figure.rowHeader,
+      machines: machineGroups.map(({ group, machine }) => {
+        const [name = group.label, ...rest] = group.label.split(" · ");
+        return {
+          machine,
+          name,
+          detail: [...rest, ...(group.note === undefined ? [] : [group.note])].join(" · "),
+        };
+      }),
+      rows,
+    },
+    icon,
+  );
 }
 
 /** The figure as HTML, every group on its own axis; machines behind a switch. */
@@ -538,9 +590,23 @@ export function renderPerfBars(figure: PerfFigure, icon: PerfIconMarkup): string
   const parts = [
     `<figure class="perf-bars" data-unit="${UNIT_NAMES[figure.unit]}" data-scale="${figure.scale}"${series}${switched ? " data-switched" : ""} aria-labelledby="${figure.id}-title" data-pagefind-ignore>`,
     `<div class="perf-bars__head"><p class="perf-bars__title" id="${figure.id}-title">${escapeHtml(figure.title)}</p>${legendMarkup(figure, hasComparison)}</div>`,
-    switched ? machineSwitch(figure, groups, icon) : "",
+    switched
+      ? machineSwitch(
+          {
+            id: figure.id,
+            // Each switch names its figure, so a page with several reads "Machine for median recalculation time".
+            label: `Machine for ${lowerFirst(figure.title)}`,
+            machines: groups.flatMap((group) =>
+              group.machine === undefined
+                ? []
+                : [{ machine: group.machine, name: group.label.split(" · ")[0] ?? group.label }],
+            ),
+          },
+          icon,
+        )
+      : "",
   ];
-  for (const [index, group] of groups.entries()) {
+  for (const group of groups) {
     const values = figureValues([group]);
     const axis =
       figure.scale === "log" ? logAxis(values, figure.unit) : linearAxis(values, figure.unit);
@@ -552,6 +618,12 @@ export function renderPerfBars(figure: PerfFigure, icon: PerfIconMarkup): string
       axisMarkup(axis),
       `<ul class="perf-bars__rows">${group.rows.map((row) => rowMarkup(row, axis, figure, icon)).join("")}</ul>`,
       "</section>",
+    );
+  }
+  // "All" shows every machine's ratios on one axis; without a base to compare with, it shows every machine's own axis in turn.
+  if (switched && hasComparison) {
+    parts.push(
+      `<section class="perf-bars__all" data-machine="${ALL_MACHINES}">${allMachines(figure, groups, icon)}</section>`,
     );
   }
   parts.push(tableMarkup({ ...figure, groups }));

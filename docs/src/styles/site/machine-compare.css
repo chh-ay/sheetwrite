@@ -1,0 +1,250 @@
+/* Every machine at once (docs/src/lib/machine-compare.ts): a legend naming each
+   machine with its CPU and capture, then one row per workload with one mark
+   per machine on a shared ratio axis, and each machine's value in words. */
+
+.machines {
+  container: machines / inline-size;
+  margin-top: var(--sw-space-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .machines :is(p, ul),
+.machines :is(p, ul) {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .machines li,
+.machines li {
+  margin: 0;
+}
+
+.machines__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-6);
+}
+
+.machines__legend li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  column-gap: var(--sw-space-1-5);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.machines__legend .sw-icon {
+  color: var(--sw-fg-muted);
+}
+
+.machines__legend span {
+  grid-column: 1 / -1;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.machines__axis-title {
+  margin-top: var(--sw-space-5) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.machines__axis,
+.machines__row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 15rem) minmax(0, 1fr) minmax(10rem, 13rem);
+  align-items: center;
+  column-gap: var(--sw-space-4);
+}
+
+.machines__axis {
+  margin-top: var(--sw-space-1);
+  padding-bottom: var(--sw-space-1-5);
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.machines__ticks {
+  position: relative;
+  grid-column: 2;
+  height: 1.25rem;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.25rem var(--sw-font-mono);
+}
+
+.machines__ticks span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.machines__ticks span:first-child {
+  transform: none;
+}
+
+.machines__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+.machines__ticks span[data-parity] {
+  color: var(--sw-fg-strong);
+  font-weight: 700;
+}
+
+.machines__row {
+  min-height: 2.75rem;
+  margin: 0 calc(var(--sw-space-2) * -1) !important;
+  padding: var(--sw-space-1) var(--sw-space-2);
+  border-bottom: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+}
+
+.machines__row:hover {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.machines__label {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.machines__values {
+  display: grid;
+  gap: var(--sw-space-0-5);
+  font-size: var(--sw-text-caption);
+}
+
+.machines__values span {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  color: var(--sw-fg-muted);
+  white-space: nowrap;
+}
+
+.machines__values b {
+  margin-left: auto;
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-mono);
+  font-weight: 600;
+}
+
+.machines__values [data-pending] b {
+  color: var(--sw-fg-muted);
+  font-weight: 500;
+}
+
+/* ---- Every machine as a table ---- */
+
+.machines__more {
+  margin-top: var(--sw-space-4);
+}
+
+.machines__more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.machines__more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.machines__more > summary::before {
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentcolor;
+  content: "";
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: rotate var(--sw-motion-fast, 120ms) ease;
+}
+
+.machines__more[open] > summary::before {
+  rotate: 90deg;
+}
+
+.machines__more > summary:hover {
+  color: var(--sw-accent-strong);
+}
+
+.machines__table {
+  margin-top: var(--sw-space-3);
+}
+
+.sw-prose .machines__data,
+.machines__data {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.machines__data caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sw-prose .machines__data :is(th, td),
+.machines__data :is(th, td) {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  background: none;
+  color: var(--sw-fg);
+  font: 400 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
+  text-transform: none;
+}
+
+.sw-prose .machines__data :is(th[scope="row"], thead th),
+.machines__data :is(th[scope="row"], thead th) {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+}
+
+.sw-prose .machines__data :is(th[scope="row"], thead th:first-child),
+.machines__data :is(th[scope="row"], thead th:first-child) {
+  text-align: left;
+}
+
+/* ---- Phones: the label above, lane and values side by side ---- */
+
+@container machines (max-width: 40rem) {
+  .machines__axis,
+  .machines__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--sw-space-1);
+  }
+
+  .machines__ticks {
+    grid-column: 1;
+  }
+
+  .machines__label {
+    grid-column: 1 / -1;
+    font-size: var(--sw-text-caption);
+  }
+
+  .machines__values b {
+    margin-left: var(--sw-space-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .machines__more > summary::before {
+    transition: none;
+  }
+}

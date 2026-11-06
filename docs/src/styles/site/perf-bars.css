@@ -79,7 +79,7 @@
     color-mix(in srgb, var(--perf-measured) 32%, transparent);
 }
 
-/* ---- Machine switch: one machine at a time, shared by the bars and the speed story ---- */
+/* ---- Machine switch: one machine or all, shared by the bars, the speed story and the engine change ---- */
 
 .machine-switch {
   display: inline-flex;
@@ -154,8 +154,18 @@
 .perf-bars[data-switched]:has(input[value="linux"]:checked)
   .perf-bars__group[data-machine]:not([data-machine="linux"]),
 .perf-bars[data-switched]:has(input[value="mac"]:checked)
-  .perf-bars__group[data-machine]:not([data-machine="mac"]) {
+  .perf-bars__group[data-machine]:not([data-machine="mac"]),
+.perf-bars[data-switched]:not(:has(input[value="all"]:checked)) .perf-bars__all,
+.perf-bars[data-switched]:has(input[value="all"]:checked):has(.perf-bars__all)
+  .perf-bars__group[data-machine] {
   display: none;
+}
+
+/* "All" without a comparison shows every machine's group in turn, each on its own axis. */
+.perf-bars[data-switched]:has(input[value="all"]:checked) .perf-bars__group + .perf-bars__group {
+  margin-top: var(--sw-space-3);
+  padding-top: var(--sw-space-4);
+  border-top: 1px solid var(--sw-border-strong);
 }
 
 /* The machine leads its group; the capture line and the axis caption share its left edge. */
@@ -546,6 +556,13 @@
 .perf-bars__table thead th {
   color: var(--sw-fg-muted);
   font-weight: 600;
+}
+
+/* Headings and names wrap, so the numbers fit the figure at desktop and tablet widths. */
+.sw-prose .perf-bars__table :is(thead th, tbody th),
+.perf-bars__table :is(thead th, tbody th) {
+  min-width: 8rem;
+  white-space: normal;
 }
 
 .sw-prose .perf-bars__table tbody th,

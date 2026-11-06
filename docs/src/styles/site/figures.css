@@ -1,0 +1,208 @@
+/* The figure kit's marks (docs/src/components/figures/): lanes, range rows,
+   ratio chips and value panels. Each series has a shape and a tone, so no
+   value is told by colour alone; every colour is a design token, so the marks
+   follow light and dark. */
+
+[data-tone="accent"] {
+  --fig-tone: var(--sw-icon-accent);
+}
+
+[data-tone="violet"] {
+  --fig-tone: var(--sw-violet);
+}
+
+[data-tone="muted"] {
+  --fig-tone: var(--sw-fg-muted);
+}
+
+[data-tone="danger"] {
+  --fig-tone: var(--sw-danger);
+}
+
+/* ---- Lane ---- */
+
+.fig-lane {
+  display: block;
+  overflow: visible;
+}
+
+.fig-lane__grid {
+  stroke: var(--sw-border);
+  stroke-width: 1;
+}
+
+.fig-lane__origin {
+  stroke: var(--sw-fg-muted);
+  stroke-width: 1;
+}
+
+.fig-lane__stem {
+  stroke: color-mix(in srgb, var(--fig-tone) 50%, transparent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.fig-lane__range {
+  fill: color-mix(in srgb, var(--fig-tone) 45%, transparent);
+}
+
+/* A ring in the surface colour keeps overlapping marks apart. */
+.fig-mark path,
+.fig-key path {
+  fill: var(--fig-tone);
+  stroke: var(--sw-surface-1);
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.fig-key {
+  flex: none;
+  overflow: visible;
+}
+
+/* ---- Range row: name and value, lane, chip; every value in a panel ---- */
+
+.fig-range-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--fig-row-columns, minmax(10rem, 16rem) minmax(0, 1fr) 8.5rem);
+  align-items: center;
+  column-gap: var(--sw-space-4);
+  min-height: 2rem;
+  margin: 0 calc(var(--sw-space-2) * -1) !important;
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  outline: none;
+  transition: background-color var(--sw-motion-fast, 120ms) ease;
+}
+
+.fig-range-row:is(:hover, :focus-within, [data-tip-open]) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+/* The name is the row's button; its focus ring frames the whole row. */
+.fig-range-row:has(.fig-range-row__name:focus-visible) {
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: calc(var(--sw-focus-ring-width) * -1);
+}
+
+.fig-range-row__name {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  font-family: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sw-space-2);
+  min-width: 0;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.fig-range-row__name b {
+  flex: none;
+  color: var(--sw-fg);
+  font: 600 var(--sw-text-caption) var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ratio chip: its fill grows with the ratio, on a log scale. */
+.fig-chip {
+  justify-self: end;
+  min-width: 100%;
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-pill);
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--fig-tone, var(--sw-icon-accent)) 24%, transparent)
+      var(--fig-chip-fill, 0%),
+    var(--sw-surface-2) var(--fig-chip-fill, 0%)
+  );
+  color: var(--sw-fg-strong);
+  font: 600 var(--sw-text-caption) / 1.5 var(--sw-font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fig-chip:empty {
+  background: none;
+}
+
+/* Every value on hover and keyboard focus, in the site's panel style. */
+.fig-tip {
+  position: absolute;
+  top: calc(100% + var(--sw-space-1));
+  left: var(--fig-tip-left, 30%);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  margin: 0;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  border: var(--sw-border-width) solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow-lg);
+  font-size: var(--sw-text-caption);
+  transition: opacity var(--sw-motion-fast, 120ms) ease;
+}
+
+.fig-tip div {
+  display: contents;
+}
+
+.fig-tip dt {
+  color: var(--sw-fg-muted);
+}
+
+.fig-tip dd {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 600 var(--sw-text-caption) var(--sw-font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fig-range-row:is(:hover, :has(.fig-range-row__name:focus-visible), [data-tip-open]):not(
+    [data-tip-dismissed]
+  )
+  .fig-tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fig-tip {
+    transition: none;
+  }
+}
+
+/* Phones: the lane and chip stack under the name. */
+@container (max-width: 40rem) {
+  .fig-range-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--sw-space-1);
+    padding-block: var(--sw-space-1-5);
+  }
+
+  .fig-range-row__name {
+    grid-column: 1 / -1;
+  }
+
+  .fig-chip {
+    min-width: 7.5rem;
+  }
+
+  .fig-tip {
+    left: var(--sw-space-2);
+  }
+}
