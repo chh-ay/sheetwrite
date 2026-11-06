@@ -1,0 +1,73 @@
+{
+  "protocol": "sheetwrite-machine-capture-v1",
+  "machine": {
+    "id": "mac",
+    "label": "Mac",
+    "os": "macOS 27.2 (26B123)",
+    "arch": "arm64",
+    "cpu": "Apple M5 Pro",
+    "logicalCores": 15,
+    "memoryBytes": 51539607552,
+    "bun": "1.4.4"
+  },
+  "release": "0.6.0",
+  "commit": "e2f59ab7b65c30c4d20546386c9fe7c073f70697",
+  "startedAt": "2026-11-05T23:59:03.283Z",
+  "finishedAt": "2026-11-06T00:14:18.884Z",
+  "command": "cd bench && bun run bench:release:machine -- --machine mac --release 0.6.0 --checkout <clean checkout of v0.6.0, packages built> --xlsx-baseline-root <checkout of the XLSX baseline, packages built>",
+  "artifacts": [
+    {
+      "artifact": "render-scale.json",
+      "timestamp": "2026-11-05T23:59:03.283Z"
+    },
+    {
+      "artifact": "interaction-results.json",
+      "timestamp": "2026-11-05T23:59:11.852Z"
+    },
+    {
+      "artifact": "paged-results.json",
+      "timestamp": "2026-11-05T23:59:13.451Z"
+    },
+    {
+      "artifact": "data-results.json",
+      "timestamp": "2026-11-06T00:02:48.771Z"
+    },
+    {
+      "artifact": "core-paths-results.json",
+      "timestamp": "2026-11-06T00:06:21.882Z"
+    },
+    {
+      "artifact": "chart-tracking-results.json",
+      "timestamp": "2026-11-06T00:06:53.693Z"
+    },
+    {
+      "artifact": "pivot-results.json",
+      "timestamp": "2026-11-06T00:06:55.398Z"
+    },
+    {
+      "artifact": "formula-results.json",
+      "timestamp": "2026-11-06T00:14:18.884Z"
+    },
+    {
+      "artifact": "formula-default-results.json",
+      "timestamp": "2026-11-06T00:07:02.655Z"
+    },
+    {
+      "artifact": "formula-full-results.json",
+      "timestamp": "2026-11-06T00:07:11.127Z"
+    },
+    {
+      "artifact": "full-engine-results.json",
+      "timestamp": "2026-11-06T00:07:02.542Z"
+    },
+    {
+      "artifact": "full-engine-matched-results.json",
+      "timestamp": "2026-11-06T00:07:19.966Z"
+    },
+    {
+      "artifact": "xlsx-results.json",
+      "timestamp": "2026-11-06T00:09:02.326Z"
+    }
+  ],
+  "failed": []
+}
