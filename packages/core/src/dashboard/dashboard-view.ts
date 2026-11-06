@@ -37,6 +37,12 @@ const NEEDS_FULL_ENGINE =
 const TAKEN = "Another item is in that place.";
 const MOVE_HINT = "Arrow keys move the item. Enter or Escape ends.";
 const RESIZE_HINT = "Arrow keys resize the item. Enter or Escape ends.";
+/** The slicer settings for values with no data, in Excel's words; `dim` is the default. */
+const NO_DATA_SETTINGS: readonly (readonly ["dim" | "hide" | "show", string])[] = [
+  ["dim", "Dim Items with No Data"],
+  ["hide", "Hide Items with No Data"],
+  ["show", "Show Items with No Data"],
+];
 /** Most values one slicer lists; more would not fit a box and would read every row. */
 const MAX_SLICER_VALUES = 1_000;
 
@@ -222,6 +228,19 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     element.addEventListener("pointercancel", onUp);
   };
 
+  /** Excel's slicer settings for values with no data, one saved change each. */
+  const noDataSettings = (item: DashboardSlicerItem): PanelMenuItem[] =>
+    NO_DATA_SETTINGS.map(([setting, label]) => ({
+      label,
+      disabled: (item.itemsWithNoData ?? "dim") === setting,
+      run: () => {
+        const changed: DashboardSlicerItem = { ...item };
+        if (setting === "dim") delete changed.itemsWithNoData;
+        else changed.itemsWithNoData = setting;
+        commit(changed);
+      },
+    }));
+
   const itemMenu = (item: DashboardItem): HTMLElement =>
     menuButton(
       `${itemTitle(grid, item)} item actions`,
@@ -229,6 +248,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       (): readonly PanelMenuItem[] => [
         { label: "Move", run: () => startMode(item, "move") },
         { label: "Resize", run: () => startMode(item, "resize") },
+        ...(item.kind === "slicer" ? noDataSettings(item) : []),
         { label: "Remove", run: () => remove(item) },
       ],
       lifetime.signal,

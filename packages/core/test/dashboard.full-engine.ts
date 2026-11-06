@@ -327,10 +327,17 @@ it("dims the slicer values that no row has under the other slicers, or hides the
   // Only West has the amount 2.
   expect(regionValues()).toEqual(["East (no data)", "West"]);
 
-  grid.applyTransaction({
-    patches: [
-      { op: "setDashboardItem", sheet: "dash", item: { ...region, itemsWithNoData: "hide" } },
-    ],
-  });
+  // The item menu sets Excel's "Hide items with no data" as one saved change.
+  const press = (target: Element | null | undefined) =>
+    target?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+  press(host.querySelector('[aria-label="Region item actions"]'));
+  press(
+    [...host.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (entry) => entry.textContent === "Hide Items with No Data",
+    ),
+  );
   expect(regionValues()).toEqual(["West"]);
+  expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items[1]).toMatchObject({
+    itemsWithNoData: "hide",
+  });
 });
