@@ -5,6 +5,7 @@ import {
   lazy,
 } from "react";
 
+import { normalizeDocumentHref } from "./document-href.js";
 import type { OutlineItem } from "./outline.js";
 
 export interface DocumentFrontmatter {
@@ -23,8 +24,8 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  /** A formula family's table and filter; see FormulaReference.tsx. */
-  FormulaReference?: ComponentType<{ family: string }>;
+  /** A formula family's table and filter, loaded with its page; see FormulaReference.tsx. */
+  FormulaReference?: LazyExoticComponent<ComponentType<{ family: string }>>;
   /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
   PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
 }
@@ -70,11 +71,6 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     return [href, { component: lazy(load), fallbackTitle, load, key: source }];
   }),
 );
-
-export function normalizeDocumentHref(splat: string | undefined): string {
-  const path = splat?.replace(/^\/+|\/+$/g, "") ?? "";
-  return `/docs/${path}${path.length === 0 ? "" : "/"}`;
-}
 
 export async function documentForSplat(
   splat: string | undefined,

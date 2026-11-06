@@ -3,13 +3,9 @@ import { lazy, Suspense, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
-import { FormulaReference } from "../components/FormulaReference.js";
 import { PackageCommand } from "../components/PackageCommand.js";
-import {
-  type DocumentComponents,
-  documentComponentForSplat,
-  normalizeDocumentHref,
-} from "../lib/content.js";
+import { type DocumentComponents, documentComponentForSplat } from "../lib/content.js";
+import { normalizeDocumentHref } from "../lib/document-href.js";
 import { forwardedHeading } from "../lib/moved-headings.js";
 import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
@@ -18,6 +14,12 @@ import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../l
 
 /** Figures appear on Performance pages only, so their component loads with them. */
 const PerfFigure = lazy(() => import("../components/PerfFigure.js"));
+/** The family filter appears on formula family pages only; it brings the select with it. */
+const FormulaReference = lazy(() =>
+  import("../components/FormulaReference.js").then((module) => ({
+    default: module.FormulaReference,
+  })),
+);
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
