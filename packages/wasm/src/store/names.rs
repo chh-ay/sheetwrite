@@ -27,9 +27,10 @@ use wasm_bindgen::prelude::*;
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
     invalidate_sheet_refs, parse, rename_sheet_refs, resolve_named_ranges, resolve_structured_refs,
-    serialize, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef,
-    NamedRangeRef, RangeFlags, RefFlags,
+    shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef, NamedRangeRef,
+    RangeFlags, RefFlags,
 };
+use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
 
@@ -80,12 +81,13 @@ enum Visit {
 }
 
 impl Definition {
-    /// Rewrite the tree with `rewrite`; the source follows a changed tree.
+    /// Rewrite the tree with `rewrite`; the source follows a changed tree in
+    /// the references it writes differently.
     fn rewrite(&mut self, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         if !rewrite(&mut self.ast) {
             return false;
         }
-        self.source = serialize(&self.ast);
+        self.source = write_references(&self.source, &self.ast);
         true
     }
 }
@@ -212,7 +214,7 @@ impl CellStore {
     ) -> Option<String> {
         let mut ast = self.resolve_sheets(parse(source).ok()?).ok()?;
         if crate::calc::move_named_formula_refs(&mut ast, sheet, columns, from, count, to) {
-            Some(serialize(&ast))
+            Some(write_references(source, &ast))
         } else {
             Some(source.to_owned())
         }

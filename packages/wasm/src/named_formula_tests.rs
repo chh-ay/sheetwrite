@@ -259,7 +259,7 @@ fn a_formula_rewritten_by_a_row_edit_keeps_the_name() {
     store.recompute(sheet);
     assert_eq!(
         store.formula_source(sheet, 4, 3).as_deref(),
-        Some("=(B4*Tax)")
+        Some("=B4*Tax")
     );
     assert_eq!(number(&store, sheet, 4, 3), 6.0);
 }

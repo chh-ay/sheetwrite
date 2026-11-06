@@ -42,7 +42,7 @@ fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<S
 }
 
 pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) {
-    out.text(&entry.source);
+    out.text(&entry.source());
     out.bool(entry.is_reference());
 
     if entry.is_reference() {
