@@ -98,8 +98,7 @@
   margin: 0 0 var(--sw-space-2);
   padding-inline: var(--sw-space-3);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-body);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
