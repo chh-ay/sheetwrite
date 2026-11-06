@@ -131,11 +131,22 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   });
 
   // Charts mount after each build, when their boxes have a size; a rebuild mounts them again.
-  let mountedCharts: MountedChart[] = [];
+  let mountedCharts = new Map<Element, MountedChart>();
   let chartRenderer: ChartRenderer | null = null;
+  // The grid columns stretch with the viewport, so a chart follows its box size.
+  const chartSizes =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const { width, height } = entry.contentRect;
+            mountedCharts.get(entry.target)?.resize(width, height);
+          }
+        });
   const unmountCharts = (): void => {
-    for (const mounted of mountedCharts) mounted.dispose();
-    mountedCharts = [];
+    chartSizes?.disconnect();
+    for (const mounted of mountedCharts.values()) mounted.dispose();
+    mountedCharts = new Map();
     chartRenderer?.dispose();
     chartRenderer = null;
   };
@@ -152,7 +163,8 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
         continue;
       }
       const size = { width: host.clientWidth, height: host.clientHeight };
-      mountedCharts.push(chartRenderer.mount(host, { sheet, id }, size));
+      mountedCharts.set(host, chartRenderer.mount(host, { sheet, id }, size));
+      chartSizes?.observe(host);
     }
   };
   filterPivots(

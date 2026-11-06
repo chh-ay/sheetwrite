@@ -11,7 +11,7 @@ import type { ChartDefinition, ChartSeriesView, ChartView } from "../types/chart
 
 /** One pivot output from the engine, decoded: cells in row-major order and the layout counts. */
 export interface PivotOutputRead {
-  readonly cells: readonly CellScalar[];
+  readonly cells: CellScalar[];
   readonly rows: number;
   readonly cols: number;
   readonly headerRows: number;

@@ -9,6 +9,7 @@ import {
   createGridFromSnapshot,
   type Grid,
   initSheetwrite,
+  resolveChartView,
   type PivotDefinition,
   type WorkbookSnapshot,
 } from "../src/index.js";
@@ -340,4 +341,36 @@ it("dims the slicer values that no row has under the other slicers, or hides the
   expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items[1]).toMatchObject({
     itemsWithNoData: "hide",
   });
+});
+
+it("charts a dashboard pivot without its total, through the slicers, and one undo removes it", async () => {
+  const { grid, press } = await withSlicer();
+  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
+
+  expect(insertPivotChart(grid, "column")).toBe(true);
+  const chart = grid.getCharts("dash")[0];
+  expect(chart).toMatchObject({ kind: "column", title: "By region", pivot: "on-dashboard" });
+  const id = chart?.id ?? "";
+  expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items).toContainEqual(
+    expect.objectContaining({ kind: "chart", chart: id }),
+  );
+  // As an Excel PivotChart: row items are categories, the value field is a series, no total.
+  const points = () =>
+    resolveChartView(grid.store, "dash", id)?.series.map((series) => [
+      series.name,
+      series.categories,
+      series.values,
+    ]);
+  expect(points()).toEqual([["Sum of Amount", ["East", "West"], [4, 2]]]);
+
+  press("West");
+  expect(points()).toEqual([["Sum of Amount", ["West"], [2]]]);
+
+  grid.undo();
+  grid.undo();
+  expect(grid.getCharts("dash")).toEqual([]);
+  expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items.map((item) => item.kind)).toEqual([
+    "pivot",
+    "slicer",
+  ]);
 });
