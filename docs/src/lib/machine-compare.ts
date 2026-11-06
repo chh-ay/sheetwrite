@@ -40,6 +40,11 @@ export interface MachineComparison {
   readonly rows: readonly MachineRow[];
   /** Header of the table's first column. */
   readonly rowHeader: string;
+  /**
+   * Rows within noise on every machine: listed by name under `summary` and
+   * kept in the table, but not drawn, so the lanes show only what changed.
+   */
+  readonly quiet?: { readonly summary: string; readonly rows: readonly MachineRow[] };
 }
 
 export const MACHINE_ICONS: Readonly<Record<PerfMachine, "server" | "laptop">> = {
@@ -57,6 +62,9 @@ export const MACHINE_MARKS: Readonly<
 
 /** Up to this many doublings, the axis steps in powers of two; a wider one steps in powers of ten. */
 const MAX_DOUBLINGS = 6;
+
+/** Phones list this many rows; the rest open on request. */
+const PHONE_ROWS = 10;
 
 /** A ratio axis: its ends and the values its gridlines and labels sit on. */
 interface RatioAxis {
@@ -155,7 +163,7 @@ function table(comparison: MachineComparison): string {
   ]
     .map((column) => `<th scope="col">${escapeHtml(column)}</th>`)
     .join("");
-  const body = comparison.rows
+  const body = [...comparison.rows, ...(comparison.quiet?.rows ?? [])]
     .map(
       (entry) =>
         `<tr><th scope="row">${escapeHtml(entry.label)}</th>${comparison.machines
@@ -200,6 +208,19 @@ export function machineSwitch(
   ].join("")}</div>`;
 }
 
+/** The rows; on phones the first `PHONE_ROWS`, and a toggle for the rest. */
+function phoneRows(comparison: MachineComparison, axis: RatioAxis): string[] {
+  const rows = `<ul class="machines__rows">${comparison.rows.map((entry) => row(entry, comparison, axis)).join("")}</ul>`;
+  const overflow = comparison.rows.length - PHONE_ROWS;
+  if (overflow <= 0) return [rows];
+  const toggle = `${comparison.id}-rows`;
+  return [
+    `<input type="checkbox" class="machines__toggle" id="${toggle}">`,
+    rows,
+    `<label class="machines__toggle-label" for="${toggle}"><span data-closed>Show ${overflow} more</span><span data-open>Show the first ${PHONE_ROWS} only</span></label>`,
+  ];
+}
+
 /** Every machine's result per row on one ratio axis, with a legend and a table per machine column. */
 export function renderMachineComparison(
   comparison: MachineComparison,
@@ -211,7 +232,10 @@ export function renderMachineComparison(
     legend(comparison, icon),
     `<p class="machines__axis-title">${escapeHtml(comparison.measure)} on each machine, against its own baseline; log scale, 1× is ${escapeHtml(comparison.parity)}. Machines are never compared with each other.</p>`,
     `<div class="machines__axis" aria-hidden="true"><span class="machines__ticks">${ticks(axis)}</span></div>`,
-    `<ul class="machines__rows">${comparison.rows.map((entry) => row(entry, comparison, axis)).join("")}</ul>`,
+    ...phoneRows(comparison, axis),
+    comparison.quiet === undefined || comparison.quiet.rows.length === 0
+      ? ""
+      : `<details class="machines__more"><summary>${escapeHtml(comparison.quiet.summary)}</summary><p class="machines__quiet">${comparison.quiet.rows.map((entry) => escapeHtml(entry.label)).join(" · ")}</p></details>`,
     table(comparison),
     "</div>",
   ].join("");

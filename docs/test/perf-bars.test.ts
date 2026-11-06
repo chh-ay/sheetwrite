@@ -166,12 +166,12 @@ describe("engine change", () => {
   it("shows every machine side by side, a pending machine with no mark", () => {
     const all = html.slice(html.indexOf('class="change__panel" data-machine="all"'));
     expect(all).toContain("Pending: not captured.");
-    // One mark per measured workload: three on Linux, none on the pending Mac.
+    // One mark per changed workload on Linux, none on the pending Mac; the one within noise is listed.
     expect([...all.matchAll(/<g data-tone="(\w+)"/gu)].map(([, tone]) => tone)).toEqual([
       "accent",
       "accent",
-      "accent",
     ]);
+    expect(all).toContain("1 workload within noise on every measured machine");
     expect(all).toContain('<th scope="col">Mac: times faster than 0.6.0</th>');
   });
 });

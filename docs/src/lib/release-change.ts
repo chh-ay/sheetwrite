@@ -295,7 +295,7 @@ function allPanel(change: ReleaseChange, icon: PerfIconMarkup): string {
   for (const { machine } of perMachine) {
     for (const workload of machine.workloads ?? []) labels.set(workload.id, workload.label);
   }
-  const rows = [...labels].map(([id, label]) => ({
+  const allRows = [...labels].map(([id, label]) => ({
     label,
     results: Object.fromEntries(
       perMachine.map(({ machine, verdicts }) => {
@@ -309,6 +309,11 @@ function allPanel(change: ReleaseChange, icon: PerfIconMarkup): string {
       }),
     ),
   }));
+  // A row is drawn when some machine measured a change; rows within noise everywhere are listed.
+  const changed = (entry: (typeof allRows)[number]) =>
+    Object.values(entry.results).some((result) => "ratio" in result && !result.noise);
+  const rows = allRows.filter(changed);
+  const quiet = allRows.filter((entry) => !changed(entry));
   return `<section class="change__panel" data-machine="${ALL_MACHINES}" aria-label="Every machine"><div class="change__columns">${columns}</div>${renderMachineComparison(
     {
       id: `${change.id}-all`,
@@ -318,9 +323,17 @@ function allPanel(change: ReleaseChange, icon: PerfIconMarkup): string {
       machines: change.machines.map((machine) => ({
         machine: machine.machine,
         name: machine.name,
-        detail: machine.pending ?? `${machine.detail} · ${machine.note ?? ""}`,
+        // A pending machine's reason is already in its column above.
+        detail:
+          machine.workloads === undefined
+            ? `${machine.detail} · pending`
+            : `${machine.detail} · ${machine.note ?? ""}`,
       })),
       rows,
+      quiet: {
+        summary: `${quiet.length} ${quiet.length === 1 ? "workload" : "workloads"} within noise on every measured machine`,
+        rows: quiet,
+      },
     },
     icon,
   )}</section>`;

@@ -32,18 +32,22 @@ export interface LaneProps {
 }
 
 const MARK_RADIUS = 5;
-const LANE_HEIGHT = 18;
+/** One series sits on the lane's middle line; each further series adds a track this far apart. */
+const TRACK_GAP = 10;
+const SINGLE_TRACK_HEIGHT = 18;
 
 /**
  * A lane: each series' value as a mark of its own shape and tone on one scale,
- * with an optional stem from an origin. Static SVG, sized by its container.
+ * with an optional stem from an origin. Several series each get their own
+ * track, so equal values never hide one another. Static SVG, sized by its
+ * container.
  */
 export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps) {
   const description = series.map((entry) => `${entry.label}: ${entry.valueText}`).join("; ");
-  const middle = LANE_HEIGHT / 2;
+  const height = SINGLE_TRACK_HEIGHT + TRACK_GAP * (series.length - 1);
   const originAt = origin === undefined ? undefined : scalePosition(scale, origin);
   return (
-    <svg className="fig-lane" height={LANE_HEIGHT} role="img" width="100%">
+    <svg className="fig-lane" height={height} role="img" width="100%">
       <title>{label}</title>
       <desc>{description}</desc>
       {gridlines.map((value) => (
@@ -53,7 +57,7 @@ export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps
           x1={`${scalePosition(scale, value)}%`}
           x2={`${scalePosition(scale, value)}%`}
           y1="0"
-          y2={LANE_HEIGHT}
+          y2={height}
         />
       ))}
       {originAt === undefined ? null : (
@@ -62,12 +66,13 @@ export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps
           x1={`${originAt}%`}
           x2={`${originAt}%`}
           y1="0"
-          y2={LANE_HEIGHT}
+          y2={height}
         />
       )}
-      {series.map((entry) => {
+      {series.map((entry, index) => {
         if (entry.value === null) return null;
         const at = scalePosition(scale, entry.value);
+        const middle = SINGLE_TRACK_HEIGHT / 2 + TRACK_GAP * index;
         return (
           <g data-tone={entry.tone} key={entry.key}>
             {originAt === undefined ? null : (

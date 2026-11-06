@@ -135,6 +135,39 @@
   font-weight: 500;
 }
 
+/* The phone toggle: a real checkbox behind its label, shown only on phones. */
+.machines__toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.machines__toggle-label {
+  display: none;
+  margin-top: var(--sw-space-2);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.machines__toggle-label:hover {
+  color: var(--sw-accent-strong);
+}
+
+.machines__toggle:focus-visible + .machines__rows + .machines__toggle-label {
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
+}
+
+.machines__toggle:not(:checked) ~ .machines__toggle-label [data-open],
+.machines__toggle:checked ~ .machines__toggle-label [data-closed] {
+  display: none;
+}
+
 /* ---- Every machine as a table ---- */
 
 .machines__more {
@@ -172,6 +205,13 @@
 
 .machines__more > summary:hover {
   color: var(--sw-accent-strong);
+}
+
+.machines__quiet {
+  margin-top: var(--sw-space-2) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.7;
 }
 
 .machines__table {
@@ -223,9 +263,10 @@
 /* ---- Phones: the label above, lane and values side by side ---- */
 
 @container machines (max-width: 40rem) {
+  /* Name, lane and values each take the full width, one under the other. */
   .machines__axis,
   .machines__row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: var(--sw-space-1);
   }
 
@@ -233,13 +274,28 @@
     grid-column: 1;
   }
 
+  .machines__values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sw-space-1) var(--sw-space-4);
+  }
+
+  /* Row 11 on: PHONE_ROWS in docs/src/lib/machine-compare.ts is 10. */
+  .machines__toggle:not(:checked) + .machines__rows .machines__row:nth-child(n + 11) {
+    display: none;
+  }
+
+  .machines__toggle-label {
+    display: inline-flex;
+  }
+
   .machines__label {
     grid-column: 1 / -1;
     font-size: var(--sw-text-caption);
   }
 
-  /* A phone axis labels every other step, so labels never touch. */
-  .machines__ticks span:nth-child(even):not(:last-child) {
+  /* A phone axis labels every other step, counted from the right end, so labels never touch. */
+  .machines__ticks span:nth-last-child(even):not(:first-child, [data-parity]) {
     visibility: hidden;
   }
 
