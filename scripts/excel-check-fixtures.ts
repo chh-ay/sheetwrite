@@ -1,6 +1,7 @@
 /**
- * Writes the input files of the Excel checks for external links (#226),
- * measures (#230) and dashboards (#231) to test/fixtures/excel-checks/.
+ * Writes the input files of the Excel checks for a model pivot (#229),
+ * external links (#226), measures (#230) and dashboards (#231) to
+ * test/fixtures/excel-checks/.
  * Sheetwrite writes each file, through the same export a user runs, with the
  * full engine, so model pivots, measures and dashboards hold their values.
  *
@@ -119,6 +120,113 @@ const modelPivot = (id: string, anchorRow: number, anchorCol: number): Pivot => 
     { measure: "share", numberFormat: "0%" },
   ],
 });
+
+/**
+ * Check 7: orders related to customers, and a model pivot at A8 with the
+ * customers' regions by the sum of the order amounts.
+ */
+function relatedModelWorkbook(): Snapshot {
+  const orders: Array<[string, number]> = [
+    ["c1", 10],
+    ["c2", 20],
+    ["c1", 5],
+    ["c3", 7],
+  ];
+  const customers: Array<[string, string]> = [
+    ["c1", "North"],
+    ["c2", "South"],
+    ["c3", "West"],
+  ];
+  const table = (
+    id: string,
+    name: string,
+    col: number,
+    rows: number,
+    ids: [string, string][],
+  ): Table => ({
+    id,
+    name,
+    range: { sheet: "s", start: { row: 0, col }, end: { row: rows, col: col + 1 } },
+    columns: ids.map(([column, header]) => ({ id: column, name: header })),
+    headerRow: true,
+    totalsRow: false,
+  });
+  return {
+    schemaVersion: 1,
+    workbook: {
+      activeSheet: "s",
+      dataModel: {
+        relationships: [
+          {
+            id: "orders-customers",
+            from: { table: "orders", column: "customer" },
+            to: { table: "customers", column: "id" },
+          },
+        ],
+      },
+    },
+    sheets: [
+      {
+        id: "s",
+        name: "Data",
+        order: 0,
+        rowCount: 20,
+        columns: columns(6),
+        tables: [
+          table("orders", "Orders", 0, orders.length, [
+            ["customer", "Customer"],
+            ["amount", "Amount"],
+          ]),
+          table("customers", "Customers", 3, customers.length, [
+            ["id", "ID"],
+            ["region", "Region"],
+          ]),
+        ],
+        pivots: [
+          {
+            id: "by-region",
+            name: "By region",
+            source: {
+              model: {
+                table: "orders",
+                fields: [
+                  { table: "customers", column: "region" },
+                  { table: "orders", column: "amount" },
+                ],
+              },
+            },
+            anchor: { row: 7, col: 0 },
+            rows: [0],
+            columns: [],
+            values: [{ field: 1, aggregation: "SUM" }],
+          },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: orders.length + 1,
+            colCount: 5,
+            cells: [
+              literal(0, 0, "Customer"),
+              literal(0, 1, "Amount"),
+              literal(0, 3, "ID"),
+              literal(0, 4, "Region"),
+              ...orders.flatMap(([customer, amount], index) => [
+                literal(index + 1, 0, customer),
+                literal(index + 1, 1, amount),
+              ]),
+              ...customers.flatMap(([id, region], index) => [
+                literal(index + 1, 3, id),
+                literal(index + 1, 4, region),
+              ]),
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
 
 /** Check 10: a link with saved values, and a formula that names a book without a link. */
 function linksWorkbook(): Snapshot {
@@ -295,6 +403,7 @@ registerXlsxBackends();
 const { installCanvasTestStubs } = await import("../packages/core/dist/testing.js");
 const restoreCanvas = installCanvasTestStubs();
 
+await exportThroughGrid("model-sheetwrite-export.xlsx", relatedModelWorkbook());
 await exportThroughGrid("links-sheetwrite-export.xlsx", linksWorkbook());
 await exportThroughGrid("Budget.xlsx", budgetWorkbook());
 await exportThroughGrid("measures-model-pivot.xlsx", measuresWorkbook(true));

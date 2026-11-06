@@ -1,11 +1,15 @@
-// The static content of dashboards and the values of charts over pivots for
-// an XLSX export (#231, #487). Excel has no dashboard sheet, so the export
-// writes each item's current values: what the dashboard shows, with its
-// slicer filters. A chart over a pivot is written with the values it plots.
-// Loaded only for workbooks with a dashboard or a chart over a pivot.
+// The static content of dashboards and worksheet pivots, and the values of
+// charts over pivots, for an XLSX export (#231, #487, #495). Excel has no
+// dashboard sheet, so the export writes each item's current values: what the
+// dashboard shows, with its slicer filters. A worksheet pivot that the export
+// cannot write natively also writes its current output as cells, as Excel
+// files carry every pivot's output. A chart over a pivot is written with the
+// values it plots. Loaded only for an export of a workbook with a dashboard or
+// a pivot.
 
 import { resolveChartView, setPivotChartViews } from "../charts-live.js";
 import { isDashboard } from "../dashboard.js";
+import type { SheetwriteStore } from "../store.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartView } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -42,19 +46,13 @@ function pivotExport(store: Store, sheet: SheetId, item: DashboardItem & { kind:
   const index = owner?.pivots?.findIndex((pivot) => pivot.id === item.pivot) ?? -1;
   const formats = owner?.pivots?.[index]?.values.map((value) => value.numberFormat ?? null) ?? [];
   const output = pivotOutputOf(store, sheet, index);
-  const rows: CellScalar[][] = [];
-  const rowFormats: (string | null)[][] = [];
-  for (let row = 0; output !== null && row < output.rows; row++) {
-    rows.push(output.cells.slice(row * output.cols, (row + 1) * output.cols));
-    rowFormats.push(
-      Array.from({ length: output.cols }, (_, col) => {
-        const value = row >= output.headerRows && col >= output.labelCols;
-        return value ? (formats[(col - output.labelCols) % formats.length] ?? null) : null;
-      }),
-    );
-  }
+  const content =
+    output === null ? { cells: [], numberFormats: [] } : pivotOutputContent(output, formats);
   const caption = dashboardItemTitle(store, sheet, item);
-  return { cells: captioned(caption, rows), numberFormats: [[null], ...rowFormats] };
+  return {
+    cells: captioned(caption, content.cells),
+    numberFormats: [[null], ...content.numberFormats],
+  };
 }
 
 /** The static content of one item. */
@@ -126,4 +124,57 @@ export function pivotViewExports(store: Store): PivotViewExports {
     }),
     pivotCharts,
   };
+}
+
+/** A computed pivot output: cells in row-major order and its layout counts. */
+interface PivotOutputCells {
+  readonly cells: readonly CellScalar[];
+  readonly rows: number;
+  readonly cols: number;
+  readonly headerRows: number;
+  readonly labelCols: number;
+}
+
+/**
+ * The rows of `output` and the number format of each cell: value cells take
+ * their value field's format (data columns cycle through the value fields),
+ * labels and headers use General.
+ */
+function pivotOutputContent(
+  output: PivotOutputCells,
+  formats: readonly (string | null)[],
+): Pick<DashboardItemExport, "cells" | "numberFormats"> {
+  const cells: CellScalar[][] = [];
+  const numberFormats: (string | null)[][] = [];
+  for (let row = 0; row < output.rows; row++) {
+    cells.push(output.cells.slice(row * output.cols, (row + 1) * output.cols));
+    numberFormats.push(
+      Array.from({ length: output.cols }, (_, col) => {
+        const value = row >= output.headerRows && col >= output.labelCols;
+        return value ? (formats[(col - output.labelCols) % formats.length] ?? null) : null;
+      }),
+    );
+  }
+  return { cells, numberFormats };
+}
+
+/**
+ * The current output of each worksheet pivot that the engine computed, by
+ * sheet; each item's `id` is a pivot ID and its cells start at the pivot's
+ * anchor. A pivot with an error or no output is left out.
+ */
+export function worksheetPivotExports(store: SheetwriteStore): DashboardExport[] {
+  const exports: DashboardExport[] = [];
+  for (const sheet of store.getWorkbook().sheets) {
+    if (isDashboard(sheet) || !sheet.pivots?.length) continue;
+    const items: DashboardItemExport[] = [];
+    for (const pivot of sheet.pivots) {
+      const result = store.getPivotResult(sheet.id, pivot.id);
+      if (result?.status !== "ok" || result.cells.length === 0) continue;
+      const formats = pivot.values.map((value) => value.numberFormat ?? null);
+      items.push({ id: pivot.id, ...pivotOutputContent(result, formats) });
+    }
+    if (items.length > 0) exports.push({ sheet: sheet.id, items });
+  }
+  return exports;
 }
