@@ -756,7 +756,7 @@
   }
 
   .sw-showcase-page__hero h1 {
-    max-width: 20ch;
+    max-width: 12.4em;
     margin: 0;
     color: var(--sw-fg-strong);
     font: var(--sw-weight-bold) var(--sw-text-display) / 1.08 var(--sw-font-display);

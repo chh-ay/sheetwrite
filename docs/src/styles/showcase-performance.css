@@ -34,7 +34,7 @@
   }
 
   .sw-sp-page .sw-capability-hero h1 {
-    max-width: 24ch;
+    max-width: 14.8em;
     font-size: var(--sw-text-display);
     line-height: 1.08;
   }
@@ -1696,7 +1696,7 @@
   }
 
   .sw-sp-proof-heading h2 {
-    max-width: 30ch;
+    max-width: 18.5em;
     color: var(--sw-fg-strong);
     font: var(--sw-weight-semibold) var(--sw-text-h1) / 1.12 var(--sw-font-display);
     letter-spacing: var(--sw-tracking-display);
