@@ -244,7 +244,7 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
   const controller = new AbortController();
   const listeners = createListeners();
   let grid: Grid | null = null;
-  let dispose = () => { };
+  let dispose = () => {};
 
   const items = (): DashboardItem[] =>
     grid?.store.getWorkbook().sheets.find((sheet) => sheet.id === DASHBOARD_SHEET)?.dashboard

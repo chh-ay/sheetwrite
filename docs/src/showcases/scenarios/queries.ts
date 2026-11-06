@@ -6,7 +6,12 @@ import {
   type SavedQuery,
   type Workbook,
 } from "@sheetwrite/core";
-import { queriesAddon, querySessionOf, type QueryRefreshResult, type QuerySession } from "@sheetwrite/queries";
+import {
+  queriesAddon,
+  querySessionOf,
+  type QueryRefreshResult,
+  type QuerySession,
+} from "@sheetwrite/queries";
 
 import type { LiveScenario } from "../use-live-scenario.js";
 import {
@@ -73,16 +78,16 @@ function regionTotalsQuery(statuses: StatusFilter): SavedQuery {
     steps: [
       ...(statuses === "shipped"
         ? [
-          {
-            kind: "filter" as const,
-            predicate: {
-              kind: "compare" as const,
-              column: "status",
-              op: "eq" as const,
-              value: "Shipped",
+            {
+              kind: "filter" as const,
+              predicate: {
+                kind: "compare" as const,
+                column: "status",
+                op: "eq" as const,
+                value: "Shipped",
+              },
             },
-          },
-        ]
+          ]
         : []),
       { kind: "join", input: "regions", keys: [["region", "code"]], join: "left" },
       {
@@ -250,7 +255,7 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
   let grid: Grid | null = null;
   let shellElement: HTMLElement | null = null;
   let session: QuerySession | null = null;
-  let dispose = () => { };
+  let dispose = () => {};
   let fetches = 0;
   let statuses: StatusFilter = "shipped";
   let definitionChanged = false;
