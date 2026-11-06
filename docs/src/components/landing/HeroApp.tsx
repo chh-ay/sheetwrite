@@ -273,7 +273,7 @@ function Ribbon() {
         </Group>
         <Group label="Font">
           <span className="ha-stack">
-            <span className="ha-select">Inter</span>
+            <span className="ha-select">Instrument Sans</span>
             <span className="ha-row">
               <Small icon="bold" />
               <Small icon="italic" />
