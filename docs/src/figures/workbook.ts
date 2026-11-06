@@ -203,20 +203,38 @@ const MONTHLY_CHART: ChartDefinition = {
   pivot: BY_MONTH.id,
 };
 
-/** Where the dashboard's items sit: the full layout, or the phone layout, one column of KPI cards above the chart. */
-export type DashboardLayout = "wide" | "phone";
+/**
+ * Where the dashboard's items sit: the full layout; the tablet layout, the
+ * KPI cards in a column beside the chart; or the phone layout, one column.
+ * The narrow layouts keep the Region slicer, as a strip on top, so their
+ * numbers are the desktop's.
+ */
+export type DashboardLayout = "wide" | "tablet" | "phone";
 
-/** The phone layout's boxes, by item ID; it shows only these items. */
-const PHONE_BOXES: Readonly<Record<string, { x: number; y: number; w: number; h: number }>> = {
-  revenue: { x: 0, y: 0, w: 12, h: 3 },
-  units: { x: 0, y: 3, w: 6, h: 3 },
-  target: { x: 6, y: 3, w: 6, h: 3 },
-  chart: { x: 0, y: 6, w: 12, h: 6 },
+type Box = { x: number; y: number; w: number; h: number };
+
+/** The boxes of the narrow layouts, by item ID; they show only these items. */
+const NARROW_BOXES: Readonly<Record<"tablet" | "phone", Readonly<Record<string, Box>>>> = {
+  tablet: {
+    region: { x: 0, y: 0, w: 12, h: 2 },
+    revenue: { x: 0, y: 2, w: 5, h: 3 },
+    units: { x: 0, y: 5, w: 5, h: 3 },
+    target: { x: 0, y: 8, w: 5, h: 3 },
+    chart: { x: 5, y: 2, w: 7, h: 9 },
+  },
+  phone: {
+    region: { x: 0, y: 0, w: 12, h: 2 },
+    revenue: { x: 0, y: 2, w: 12, h: 3 },
+    units: { x: 0, y: 5, w: 6, h: 3 },
+    target: { x: 6, y: 5, w: 6, h: 3 },
+    chart: { x: 0, y: 8, w: 12, h: 6 },
+  },
 };
 
-function phoneLayout(sheet: SheetSnapshot): SheetSnapshot {
+function narrowLayout(sheet: SheetSnapshot, layout: "tablet" | "phone"): SheetSnapshot {
+  const boxes = NARROW_BOXES[layout];
   const items = (sheet.dashboard?.items ?? []).flatMap((item) => {
-    const box = PHONE_BOXES[item.id];
+    const box = boxes[item.id];
     return box === undefined ? [] : [{ ...item, box }];
   });
   return { ...sheet, dashboard: { items } };
@@ -346,7 +364,7 @@ export function figureWorkbook(
     sheets: [
       ordersSheet(),
       regionsSheet(),
-      layout === "phone" ? phoneLayout(dashboardSheet()) : dashboardSheet(),
+      layout === "wide" ? dashboardSheet() : narrowLayout(dashboardSheet(), layout),
     ],
   };
 }

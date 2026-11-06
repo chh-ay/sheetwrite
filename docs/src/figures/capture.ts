@@ -67,6 +67,14 @@ const SHOTS: readonly Shot[] = [
   // Panel size: shown at about its own width in the docs column, so its labels stay
   // at their 12 px and up.
   { name: "dashboard", size: "panel", query: { sheet: "dashboard", ribbon: "compact" } },
+  // The tablet version of the dashboard hero: the KPI cards beside the chart,
+  // cropped to the items.
+  {
+    name: "dashboard-tablet",
+    size: "tablet",
+    query: { sheet: "dashboard", ribbon: "compact", layout: "tablet" },
+    crop: "items",
+  },
   // The phone version of the dashboard hero: the KPI cards above the chart,
   // laid out for a phone and cropped to the items.
   {

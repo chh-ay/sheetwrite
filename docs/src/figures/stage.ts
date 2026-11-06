@@ -6,7 +6,7 @@ import type { HistoryArchive } from "@sheetwrite/core/history";
 import { createSpreadsheetShell } from "@sheetwrite/core/shell";
 
 import { siteGridTheme } from "../showcases/site-grid-theme.js";
-import { FIGURE_SHEETS, figureWorkbook } from "./workbook.js";
+import { type DashboardLayout, FIGURE_SHEETS, figureWorkbook } from "./workbook.js";
 
 declare global {
   interface Window {
@@ -40,7 +40,7 @@ const PLACEHOLDER_WORKBOOK: Workbook = {
  * dark), `sheet` (orders,
  * regions or dashboard), `ribbon` (full or compact), `width` and `height` of
  * the stage in CSS pixels, `links=1` to give the workbook a linked
- * workbook, `layout=phone` for the phone dashboard layout, and `history=1` to start its version history with a named version. Marks the document `data-figure-ready`
+ * workbook, `layout=tablet` or `layout=phone` for a narrow dashboard layout, and `history=1` to start its version history with a named version. Marks the document `data-figure-ready`
  * once the first frame is drawn.
  */
 async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<void> {
@@ -83,9 +83,7 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
       },
     },
   });
-  await shell.grid.importWorkbook(
-    figureWorkbook(sheet, params.get("layout") === "phone" ? "phone" : "wide"),
-  );
+  await shell.grid.importWorkbook(figureWorkbook(sheet, dashboardLayout(params.get("layout"))));
   if (params.get("links") === "1") linkBudget(shell.grid);
 
   if (params.get("history") === "1") await saveDraft(archive, figureWorkbook(sheet));
@@ -94,6 +92,11 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
   await document.fonts.ready;
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   document.documentElement.dataset.figureReady = "true";
+}
+
+/** The dashboard layout a `layout` parameter names; anything else is the full layout. */
+function dashboardLayout(name: string | null): DashboardLayout {
+  return name === "tablet" || name === "phone" ? name : "wide";
 }
 
 /** The document ID of the stage's version history. */
