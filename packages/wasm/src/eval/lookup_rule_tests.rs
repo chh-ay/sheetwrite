@@ -53,6 +53,11 @@ fn store() -> (CellStore, usize) {
     for (row, value) in [9.0, 7.0, 7.0, 4.0, 2.0, 1.0].into_iter().enumerate() {
         store.set_number(sheet, row, 6, value, 0);
     }
+
+    // H: 1, an infinity (read as `#NUM!`), 2.
+    store.set_number(sheet, 0, 7, 1.0, 0);
+    store.set_number(sheet, 1, 7, f64::INFINITY, 0);
+    store.set_number(sheet, 2, 7, 2.0, 0);
     (store, sheet)
 }
 
@@ -149,6 +154,11 @@ const CASES: &[(&str, &str)] = &[
     ("=HLOOKUP(2,B1:E1,2,FALSE)", "#N/A"),
     ("=HLOOKUP(10,B1:E1,2,FALSE)", "#REF!"),
     ("=HLOOKUP(\"apple\",C1:E2,2,FALSE)", "Banana"),
+    // A non-finite number fails a scan that reaches it, in either direction.
+    ("=MATCH(1,H1:H3,0)", "1"),
+    ("=MATCH(2,H1:H3,0)", "#NUM!"),
+    ("=XMATCH(2,H1:H3,0,-1)", "3"),
+    ("=XMATCH(1,H1:H3,0,-1)", "#NUM!"),
     ("=XLOOKUP(3,B1:B6,E1:E5)", "#VALUE!"),
     ("=MATCH(3,B1:C6,0)", "#N/A"),
     ("=XLOOKUP(99,B1:B6,E1:E6)", "#N/A"),
