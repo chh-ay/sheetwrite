@@ -14,6 +14,7 @@ import {
   nearestNavigationItem,
 } from "../lib/navigation.js";
 import type { OutlineItem } from "../lib/outline.js";
+import { editUrl, reportProblemUrl } from "../lib/page-links.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { Icon } from "./Icon.js";
@@ -40,6 +41,8 @@ interface DocsShellProps {
   /** The page's outline from the build, shown before the article is read. */
   outline?: readonly OutlineItem[];
   reserveOutline?: boolean;
+  /** The page's source file in the repository, for Edit on GitHub; generated pages have none. */
+  sourcePath?: string;
   title: string;
 }
 
@@ -320,6 +323,7 @@ export function DocsShell({
   kind,
   outline: buildOutline,
   reserveOutline,
+  sourcePath,
   title,
 }: Readonly<DocsShellProps>) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
@@ -405,6 +409,20 @@ export function DocsShell({
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
           {titlePackage === undefined ? <span>{description}</span> : null}
+          {activeHref ? (
+            <p className="sw-page-actions" data-pagefind-ignore>
+              {sourcePath === undefined ? null : (
+                <a className="sw-button" data-size="sm" href={editUrl(sourcePath)}>
+                  <Icon name="edit" />
+                  Edit on GitHub
+                </a>
+              )}
+              <a className="sw-button" data-size="sm" href={reportProblemUrl(title, activeHref)}>
+                <Icon name="flag" />
+                Report a problem
+              </a>
+            </p>
+          ) : null}
         </header>
         <ApiSymbolFilter />
         {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}

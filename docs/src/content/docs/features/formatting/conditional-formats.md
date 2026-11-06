@@ -34,7 +34,7 @@ grid.setConditionalFormats([
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="Conditional formats"
+```ts compile runnable title="Conditional formats"
 import {
   createGrid,
   initSheetwrite,

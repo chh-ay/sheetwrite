@@ -2,6 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import {
+  GENERATED_CONTENT_DIRECTORIES,
+  GENERATED_CONTENT_PAGES,
+} from "../docs/src/lib/generated-content.js";
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
   documentationLinkRoutes,
@@ -20,7 +24,6 @@ import {
   splitPerformancePages,
   validateDataArtifact,
 } from "./docs-performance.js";
-import { GENERATED_CONTENT_DIRECTORIES, GENERATED_CONTENT_PAGES } from "./docs-shared.js";
 import { ADAPTER_DOC_CONTRACT, adapterContractIssues } from "./docs.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import { extractFigureAssets, perfFigure } from "./perf-figures.js";
