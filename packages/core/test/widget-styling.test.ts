@@ -120,6 +120,23 @@ describe("built-in widget styling", () => {
     expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
   });
 
+  // Contract: every widget token the stylesheets read is seeded, so no widget
+  // paints a light fallback under a dark theme.
+  it("seeds every widget custom property that styles.css and shell.css read", async () => {
+    const { host } = await makeGrid();
+    const read = new Set<string>();
+    for (const sheet of ["../styles.css", "../shell.css"]) {
+      const css = readFileSync(new URL(sheet, import.meta.url), "utf8");
+      for (const match of css.matchAll(/var\((--sheetwrite-(?:widget|toolbar|menu)-[a-z-]+)/g)) {
+        read.add(match[1] ?? "");
+      }
+    }
+    const unseeded = [...read].filter((name) => host.style.getPropertyValue(name) === "");
+
+    expect(read.size).toBeGreaterThan(0);
+    expect(unseeded).toEqual([]);
+  });
+
   // ── Computed-style parity + host override (the core restyling proof) ───────
   // Contract: with the real stylesheet loaded the seeded tokens flow through
   // var() to the exact themed colors, AND a host rule setting the token on the
