@@ -30,6 +30,7 @@ use crate::types::{
 };
 use crate::window::ConditionalRules;
 
+mod external_links;
 mod hidden_rows;
 #[cfg(all(test, feature = "analysis"))]
 mod measure_tests;
@@ -42,6 +43,8 @@ pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+#[cfg(all(test, feature = "analysis"))]
+mod related_measure_tests;
 #[cfg(feature = "analysis")]
 mod relationships;
 #[cfg(all(test, feature = "analysis"))]
@@ -3650,20 +3653,50 @@ impl CellStore {
         }
 
         if features.table_refs {
-            ast = resolve_structured_refs(
-                ast,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                &|reference, sheet, row, col| {
-                    self.resolve_structured_reference(reference, sheet, row, col)
-                },
-            );
+            ast = self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col);
         }
 
         #[cfg(feature = "analysis")]
         let ast = self.bind_regex_patterns(source, ast);
         Ok(ast)
+    }
+
+    /// Resolves a parsed formula as if it were in the cell at
+    /// (`formula_row`, `formula_col`) of `formula_sheet`: sheet names, defined
+    /// names, then structured references. Measures resolve their inlined
+    /// expression this way.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn resolve_parsed_formula(
+        &self,
+        ast: Ast,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Result<Ast, FormulaError> {
+        let ast = self.resolve_sheets(ast)?;
+        let placement = names::NamePlacement::new(formula_row, formula_col);
+        let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
+        Ok(self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col))
+    }
+
+    /// Resolves the table references of a formula in the cell at
+    /// (`formula_row`, `formula_col`) of `formula_sheet`.
+    fn resolve_table_refs(
+        &self,
+        ast: Ast,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Ast {
+        resolve_structured_refs(
+            ast,
+            formula_sheet,
+            formula_row,
+            formula_col,
+            &|reference, sheet, row, col| {
+                self.resolve_structured_reference(reference, sheet, row, col)
+            },
+        )
     }
 
     /// Points the literal REGEX patterns of a new formula at the patterns the

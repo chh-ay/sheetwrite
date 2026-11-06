@@ -203,9 +203,10 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
         return Err(FormulaError::Num);
     }
 
-    Ok(format_date_serial(*number, format)
-        .or_else(|| format_number(*number, format))
-        .unwrap_or_else(|| general_text(*number)))
+    if let Some(text) = format_date_serial(*number, format) {
+        return Ok(text);
+    }
+    Ok(format_number(*number, format)?.unwrap_or_else(|| general_text(*number)))
 }
 
 #[cfg(test)]

@@ -22,11 +22,14 @@ import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
 import { parseRangeText } from "./range-text.js";
 import { relationshipPanel } from "./relationship-panel.js";
+import { slicerPanel } from "./slicer-panel.js";
 
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
-  | { readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" | "history" };
+  | {
+      readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" | "history" | "slicer";
+    };
 
 interface PanelState {
   icons: IconOverrides | undefined;
@@ -109,6 +112,14 @@ export function openDataModelPanel(grid: Grid): void {
     ...panel,
     render: (body) => trackOpen(state, open, panel.render(body)),
   });
+}
+
+/** Insert › Filters › Slicer: the Insert Slicers list for the active dashboard. */
+export function openSlicerPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "slicer" };
+  const panel = slicerPanel(grid, grid.getActiveSheet());
+  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
 }
 
 /** Show the Sort panel for the selection or the current region. */

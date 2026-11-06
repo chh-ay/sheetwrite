@@ -31,6 +31,7 @@ import {
   validateMeasureAdmission,
   withMeasure,
   withoutMeasure,
+  cloneRelationships,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -177,6 +178,7 @@ import {
   tableSortState,
   tableWithBody,
 } from "./permute-rows.js";
+import { type PivotStatusRecord, pivotStatusAt } from "./pivot-status.js";
 import {
   cellRange,
   deleteRemap,
@@ -231,9 +233,6 @@ const PIVOT_FIELD_TYPES: readonly PivotFieldType[] = [
   "mixed",
 ];
 
-/** `pivotStatus` values per pivot: error, row, col, rows, cols, headerRows, labelCols. */
-const PIVOT_STATUS_STRIDE = 7;
-
 /** Error sentinels by engine `FormulaError` slot; `pivotStatus` sends slot + 1. */
 export const PIVOT_ERRORS: readonly string[] = [
   "#CYCLE!",
@@ -248,32 +247,6 @@ export const PIVOT_ERRORS: readonly string[] = [
   "#LOADING!",
   "#NULL!",
 ];
-
-interface PivotStatusRecord {
-  /** 0 when the output rendered; otherwise the anchor shows an error. */
-  readonly error: number;
-  readonly row: number;
-  readonly col: number;
-  readonly rows: number;
-  readonly cols: number;
-  readonly headerRows: number;
-  readonly labelCols: number;
-}
-
-function pivotStatusAt(status: Uint32Array, index: number): PivotStatusRecord | null {
-  const base = index * PIVOT_STATUS_STRIDE;
-  if (base + PIVOT_STATUS_STRIDE > status.length) return null;
-  const at = (offset: number): number => status[base + offset] ?? 0;
-  return {
-    error: at(0),
-    row: at(1),
-    col: at(2),
-    rows: at(3),
-    cols: at(4),
-    headerRows: at(5),
-    labelCols: at(6),
-  };
-}
 
 /** Values in a `relationshipStatus` record: code, firstRow, secondRow, unmatched. */
 const RELATIONSHIP_STATUS_STRIDE = 4;
@@ -721,6 +694,12 @@ export class StoreDataEngine {
   private readonly spillBlockersDirty = new Set<SheetId>();
   /** Sheets whose pivots must be sent to the engine before the mutation commits. */
   private readonly pivotSheetsDirty = new Set<SheetId>();
+  /**
+   * The definitions the engine computes for a sheet's pivots, when they
+   * differ from the saved ones. The dashboard chunk sets it to add slicer
+   * filters, so first paint carries only this slot.
+   */
+  private pivotView: ((sheet: Sheet) => PivotDefinition[] | undefined) | null = null;
 
   private readonly rangeHistory = new Map<
     CompactRangeHistory,
@@ -1107,7 +1086,9 @@ export class StoreDataEngine {
       return;
     }
 
-    const payload = encodePivotPayload(pivots, (id) => this.sheets.handles.get(id));
+    const payload = encodePivotPayload(this.pivotView?.(sheet) ?? pivots, (id) =>
+      this.sheets.handles.get(id),
+    );
     this.boundaryAccounting.record(
       this.resourceOperation ?? "edit",
       "js-to-wasm",
@@ -1118,6 +1099,25 @@ export class StoreDataEngine {
       throw storeFailure("resource-limit", `pivot payload rejected for sheet: ${sheet.id}`, {
         sheet: sheet.id,
       });
+    }
+  }
+
+  /**
+   * Compute pivots from `view` instead of the saved definitions, and send
+   * `sheets` again. A view changes inputs that are not in the document, such
+   * as a read-only viewer's slicer selection, so it needs no transaction.
+   */
+  setPivotView(
+    view: (sheet: Sheet) => PivotDefinition[] | undefined,
+    sheets: readonly SheetId[],
+  ): void {
+    this.pivotView = view;
+    this.wasm.beginMutation();
+    try {
+      for (const id of sheets) this.pivotSheetsDirty.add(id);
+      this.flushPivots();
+    } finally {
+      this.wasm.commitSources();
     }
   }
 
@@ -1186,6 +1186,29 @@ export class StoreDataEngine {
       strings.push(measure.id, measure.table, measure.formula, "", measure.name);
     }
     return wasm.setRelationships(strings);
+  }
+
+  /**
+   * `model` with each `[table, column, to]` rename applied to every measure
+   * formula, as Excel updates the formulas that name a renamed table,
+   * column or measure; see `renameStructuredReference`. A rename to the same
+   * name is skipped. Returns `model` itself when no formula changes.
+   */
+  private withRenames(
+    model: DataModel | undefined,
+    renames: [table: string, column: string, to: string][],
+  ): DataModel | undefined {
+    let changed = false;
+    const measures = (model?.measures ?? []).map((measure) => {
+      let formula = measure.formula;
+      for (const [table, column, to] of renames) {
+        if ((column || table) === to) continue;
+        formula = getEngine().renameStructuredReference(formula, table, column, to);
+      }
+      changed ||= formula !== measure.formula;
+      return { ...measure, formula };
+    });
+    return changed ? { relationships: cloneRelationships(model), measures } : model;
   }
 
   private syncTable(table: WorkbookTable): boolean {
@@ -1860,14 +1883,11 @@ export class StoreDataEngine {
   }
 
   /**
-   * The engine output of a pivot on a dashboard, which places none in cells;
-   * the caller frees it. Null on the default engine or for an unknown pivot.
+   * The engine output of the pivot at `index` in a dashboard's payload,
+   * which places none in cells; the caller frees it. Null on the default
+   * engine. Indices past the sheet's pivots read hidden pivots of a pivot view.
    */
-  dashboardPivotOutput(sheet: SheetId, id: string): PivotOutputCells | null {
-    const index =
-      this.workbook.sheets
-        .find((candidate) => candidate.id === sheet)
-        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+  dashboardPivotOutput(sheet: SheetId, index: number): PivotOutputCells | null {
     if (index < 0 || !this.wasm.pivotOutput) return null;
     return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
@@ -3602,6 +3622,16 @@ export class StoreDataEngine {
         const nextTables = [...tables];
         nextTables[index] = next;
         sheet.tables = nextTables;
+
+        const renames: [string, string, string][] = [[current.name, "", next.name]];
+        for (const column of next.columns) {
+          const previous = current.columns.find((candidate) => candidate.id === column.id);
+          if (previous) renames.push([next.name, previous.name, column.name]);
+        }
+        const model = this.withRenames(this.workbook.dataModel, renames);
+        if (model === this.workbook.dataModel) return true;
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 
@@ -3771,9 +3801,12 @@ export class StoreDataEngine {
           return false;
         }
 
+        const previous = findMeasure(current, patch.op === "setMeasure" ? patch.measure.id : "");
         const model =
           patch.op === "setMeasure"
-            ? withMeasure(current, patch.measure)
+            ? this.withRenames(withMeasure(current, patch.measure), [
+                ["", previous?.name ?? "", patch.measure.name],
+              ])
             : withoutMeasure(current, patch.id);
         if (!this.syncRelationships(model)) return false;
         this.workbook.dataModel = model;
@@ -3787,6 +3820,8 @@ export class StoreDataEngine {
         validateDashboardItemAdmission(patch.item, sheet, issues);
         if (issues.length > 0) return false;
         sheet.dashboard = withDashboardItem(sheet.dashboard, patch.item);
+        // A slicer filters the dashboard's pivots.
+        this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
 
@@ -3794,6 +3829,7 @@ export class StoreDataEngine {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet || !findDashboardItem(sheet, patch.id)) return false;
         sheet.dashboard = withoutDashboardItem(sheet.dashboard, patch.id);
+        this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
 

@@ -84,6 +84,51 @@ impl Criterion {
         }
     }
 
+    /// The operator and number a finite number cell is compared with, or
+    /// `None` when the criterion is text, a boolean or a pattern: then every
+    /// finite number gets the same answer, [`Self::matches_number`]'s.
+    pub(super) fn number_comparison(&self) -> Option<(CmpOp, f64)> {
+        match self.operand {
+            Value::Number(operand) if self.wildcard.is_none() => Some((self.op, operand)),
+            _ => None,
+        }
+    }
+
+    /// [`Self::matches`] for a finite number cell, without building a `Value`.
+    pub(super) fn matches_number(&self, number: f64) -> bool {
+        // A pattern never matches a number.
+        if self.wildcard.is_some() {
+            return self.op == CmpOp::Ne;
+        }
+
+        match self.operand {
+            Value::Number(operand) => number
+                .partial_cmp(&operand)
+                .map_or(self.op == CmpOp::Ne, |ordering| {
+                    ordering_matches(ordering, self.op)
+                }),
+            _ => self.op == CmpOp::Ne,
+        }
+    }
+
+    /// [`Self::matches`] for a text cell, read in place from the string pool.
+    pub(super) fn matches_text(&self, text: &str) -> bool {
+        if let Some(pattern) = &self.wildcard {
+            return pattern.matches(text) != (self.op == CmpOp::Ne);
+        }
+
+        let ordering = match &self.operand {
+            Value::Text(operand) => Some(compare_text_case_insensitive(text, operand)),
+            Value::Blank if text.is_empty() => Some(Ordering::Equal),
+            _ => None,
+        };
+
+        match ordering {
+            Some(ordering) => ordering_matches(ordering, self.op),
+            None => self.op == CmpOp::Ne,
+        }
+    }
+
     /// Counts the matches among numbers given as their `f64` bits, with the
     /// result of [`Self::matches`] on each number. `None` when the criterion
     /// is not a plain number: text and wildcard criteria need each cell's
