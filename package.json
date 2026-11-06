@@ -76,6 +76,7 @@
     "test:browser:portability": "playwright test --config test/browser/playwright.config.ts --grep @portability",
     "test:tooling": "bun scripts/workspace-tooling.ts test-tooling",
     "test:unit": "bun scripts/workspace-tooling.ts test-unit",
+    "test:unit:uncovered": "bun scripts/workspace-tooling.ts test-unit-uncovered",
     "test:coverage:ts": "bun scripts/coverage.ts ts",
     "test:coverage:rust": "bun scripts/coverage.ts rust",
     "test:coverage": "bun run test:coverage:ts && bun run test:coverage:rust",

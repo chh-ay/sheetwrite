@@ -123,6 +123,11 @@ a script nobody will run.
   `docs:check` requires examples for the starter entry points in
   `REQUIRED_API_EXAMPLES` in `docs.ts`. Add to this list when the starter
   surface grows.
+- **CI runs each unit suite once.** `test:unit` runs every unit suite.
+  CI's unit job runs `test:unit:uncovered` instead, which leaves out the
+  package directories in `COVERED_PACKAGE_TEST_ROOTS`, and then
+  `test:coverage`, which runs those directories and the Rust tests under
+  coverage.
 - **`docs:prepare-deployment` packages an existing docs build** as
   `.vercel/output`. It does not build packages or install tools. CI tests and
   deploys this output; Vercel does not rebuild it. See

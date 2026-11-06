@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const BUN_VERSION = "1.4.4";
@@ -120,8 +120,9 @@ export const TYPECHECK_NODES: readonly CommandNode[] = [
 
 /**
  * The test lists below own every repository test path. `test:tooling` (CI
- * preflight), `test:unit` (CI unit job) and `verify-ci` all run these nodes, so
- * a suite added here runs everywhere. Tooling suites run before any package is
+ * preflight), `test:unit` and `verify-ci` run these nodes, so a suite added
+ * here runs everywhere. CI's unit job runs `test:unit:uncovered` and then the
+ * coverage run, which together run every unit suite once. Tooling suites run before any package is
  * built; unit suites run against built package outputs and generated files, so
  * a suite that loads the engine or generated docs data (directly or through
  * `docs/src/lib`) belongs there.
@@ -171,6 +172,20 @@ export const UNIT_TEST_PATHS = [
   "docs/test",
 ] as const;
 
+/**
+ * Package test directories that `test:coverage:ts` runs under coverage. CI
+ * runs them only there, so its unit job does not run them twice.
+ */
+export const COVERED_PACKAGE_TEST_ROOTS = [
+  "packages/core/test",
+  "packages/react/test",
+  "packages/vue/test",
+  "packages/svelte/test",
+  "packages/xlsx/test",
+  "packages/charts/test",
+  "packages/queries/test",
+] as const;
+
 const TOOLING_TESTS: CommandNode = {
   id: "test:tooling-contracts",
   command: ["bun", "test", ...TOOLING_TEST_PATHS],
@@ -184,6 +199,31 @@ const UNIT_TEST_NODES: readonly CommandNode[] = [
     command: ["bun", "test", ...UNIT_TEST_PATHS],
   },
 ];
+
+/**
+ * The unit suites outside the coverage run: `UNIT_TEST_PATHS` with `packages`
+ * narrowed to the package test directories that coverage does not run.
+ */
+function uncoveredUnitTestNodes(root: string): readonly CommandNode[] {
+  const packagesRoot = resolve(root, "packages");
+  const uncoveredPackageTests = readdirSync(packagesRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/test`)
+    .filter((path) => existsSync(resolve(root, path)))
+    .filter((path) => !(COVERED_PACKAGE_TEST_ROOTS as readonly string[]).includes(path))
+    .sort();
+  const paths = UNIT_TEST_PATHS.flatMap((path) =>
+    path === "packages" ? uncoveredPackageTests : [path],
+  );
+
+  return [
+    ...GENERATED_SOURCE_NODES,
+    {
+      id: "test:unit:uncovered",
+      command: ["bun", "test", ...paths],
+    },
+  ];
+}
 
 const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
   TOOLING_TESTS,
@@ -389,7 +429,7 @@ export async function runNodes(root: string, nodes: readonly CommandNode[]): Pro
   for (const node of nodes) await executeNode(root, node);
 }
 
-function nodesForMode(mode: string): readonly CommandNode[] {
+function nodesForMode(mode: string, root: string): readonly CommandNode[] {
   switch (mode) {
     case "build":
       return PACKAGE_BUILD_NODES;
@@ -399,6 +439,8 @@ function nodesForMode(mode: string): readonly CommandNode[] {
       return [TOOLING_TESTS];
     case "test-unit":
       return UNIT_TEST_NODES;
+    case "test-unit-uncovered":
+      return uncoveredUnitTestNodes(root);
     case "typecheck-packages":
       return PACKAGE_TYPECHECK_NODES;
     case "typecheck-examples":
@@ -423,7 +465,7 @@ export async function main(
   const mode = args.find((argument) => !argument.startsWith("--"));
   if (!mode) throw new Error("A workspace tooling mode is required");
   validateWorkspaceGraph(root);
-  const nodes = nodesForMode(mode);
+  const nodes = nodesForMode(mode, root);
   if (args.includes("--dry-run")) {
     for (const node of nodes) {
       console.log(

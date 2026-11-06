@@ -11,6 +11,7 @@ import {
   validateReleasePackageVersions,
 } from "./changeset-ci.js";
 import {
+  COVERED_PACKAGE_TEST_ROOTS,
   PUBLISHABLE_PACKAGE_ORDER,
   TOOLING_TEST_PATHS,
   TYPECHECK_NODES,
@@ -146,6 +147,40 @@ describe("canonical workspace graph", () => {
     expect(listed.filter((path, index) => listed.indexOf(path) !== index)).toEqual([]);
     expect(suites.filter((suite) => !listed.includes(suite)).sort()).toEqual([]);
     expect(listed.filter((path) => !existsSync(join(root, path)))).toEqual([]);
+  });
+
+  it("runs every package test directory once between the uncovered unit run and coverage", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const result = Bun.spawnSync(
+      ["bun", "scripts/workspace-tooling.ts", "test-unit-uncovered", "--dry-run"],
+      { cwd: root, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(result.exitCode, result.stderr.toString()).toBe(0);
+
+    const [, command] =
+      result.stdout
+        .toString()
+        .split("\n")
+        .map((line) => line.split("\t"))
+        .find(([id]) => id === "test:unit:uncovered") ?? [];
+    if (command === undefined) throw new Error("test-unit-uncovered has no test:unit:uncovered node");
+    const paths = command
+      .split(" ")
+      .slice(2)
+      .map((argument) => JSON.parse(argument) as string);
+    const packageTestDirectories: string[] = [];
+    for await (const path of new Bun.Glob("packages/*/test").scan({ cwd: root, onlyFiles: false })) {
+      packageTestDirectories.push(path);
+    }
+
+    const packageRuns = [
+      ...paths.filter((path) => path.startsWith("packages/")),
+      ...COVERED_PACKAGE_TEST_ROOTS,
+    ];
+    expect(packageRuns.sort()).toEqual(packageTestDirectories.sort());
+    expect(paths).toEqual(
+      expect.arrayContaining(UNIT_TEST_PATHS.filter((path) => path !== "packages")),
+    );
   });
 });
 
