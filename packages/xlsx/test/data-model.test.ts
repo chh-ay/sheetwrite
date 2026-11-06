@@ -12,7 +12,7 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { registerXlsxBackends, sheetwriteWorkbookBackend } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -144,6 +144,120 @@ it("round-trips measures without relationships through Sheetwrite metadata", asy
   const reopened = await fromXlsxWorkbook(await toXlsxWorkbook(input));
 
   expect(reopened.workbook.dataModel).toEqual({ relationships: [], measures: [measure] });
+});
+
+it("writes a model pivot's current output as cells, and reopens it as the pivot", async () => {
+  const pivot: PivotDefinition = {
+    id: "by-region",
+    name: "By region",
+    source: {
+      model: {
+        table: "orders",
+        fields: [
+          { table: "customers", column: "region" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    },
+    anchor: { row: 4, col: 0 },
+    rows: [0],
+    columns: [],
+    values: [{ field: 1, aggregation: "SUM", numberFormat: "0.00" }, { measure: "share" }],
+  };
+  const input = authored([ordersToCustomers], [pivot]);
+  input.workbook.dataModel = {
+    relationships: [ordersToCustomers],
+    measures: [{ id: "share", name: "Share", table: "orders", formula: "=SUM(Orders[Amount])" }],
+  };
+  // What core computes for the pivot: a header row, one region and the total.
+  const pivotOutputs = [
+    {
+      sheet: "data",
+      items: [
+        {
+          id: "by-region",
+          cells: [
+            ["Region", "Sum of Amount", "Share"],
+            ["North", 7, 7],
+            ["Total", 7, 7],
+          ],
+          numberFormats: [
+            [null, null, null],
+            [null, "0.00", null],
+            [null, "0.00", null],
+          ],
+        },
+      ],
+    },
+  ];
+  const { warnings, onWarning } = collect();
+
+  const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(input, { onWarning }, { pivotOutputs });
+
+  const sheet = strFromU8(unzipSync(saved)["xl/worksheets/sheet1.xml"] ?? new Uint8Array());
+  expect(sheet).toMatch(/<c r="A5"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Region<\/t>/u);
+  expect(sheet).toMatch(/<c r="B6" s="(\d+)"><v>7<\/v><\/c>/u);
+  expect(sheet).toMatch(/<c r="A7"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Total<\/t>/u);
+  // The Sum value keeps its field's number format; the measure is General.
+  const styles = strFromU8(unzipSync(saved)["xl/styles.xml"] ?? new Uint8Array());
+  expect(styles).toContain('formatCode="0.00"');
+  expect(sheet).toMatch(/<c r="C6"><v>7<\/v><\/c>/u);
+  expect(warnings.map((warning) => warning.message)).toEqual([
+    "Pivot table By region was not written as a native pivot because a model pivot needs an Excel data-model binary; its current values were written as cells and it remains in Sheetwrite metadata",
+  ]);
+
+  // Sheetwrite reopens the live pivot; its output cells are not user values.
+  const reopened = await sheetwriteWorkbookBackend.fromXlsxWorkbook(saved);
+  const data = reopened.sheets[0];
+  expect(data?.pivots).toEqual([
+    {
+      ...pivot,
+      savedOutput: {
+        rows: 3,
+        cols: 3,
+        cells: ["Region", "Sum of Amount", "Share", "North", 7, 7, "Total", 7, 7],
+      },
+    },
+  ]);
+  const inOutput = (data?.cells ?? []).flatMap((block) =>
+    block.cells.filter((cell) => block.startRow + cell.rowOffset >= 4),
+  );
+  expect(inOutput).toEqual([]);
+});
+
+it("keeps a cell another application changed inside a kept pivot's output", async () => {
+  const pivot: PivotDefinition = {
+    id: "by-region",
+    name: "By region",
+    source: { model: { table: "orders", fields: [{ table: "orders", column: "amount" }] } },
+    anchor: { row: 4, col: 0 },
+    rows: [],
+    columns: [],
+    values: [{ field: 0, aggregation: "SUM" }],
+  };
+  const pivotOutputs = [
+    {
+      sheet: "data",
+      items: [{ id: "by-region", cells: [["Sum of Amount"], [7]], numberFormats: [[null], [null]] }],
+    },
+  ];
+  const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(
+    authored([], [pivot]),
+    {},
+    { pivotOutputs },
+  );
+  // Excel saves 9 over the value 7.
+  const files = unzipSync(saved);
+  const sheet = strFromU8(files["xl/worksheets/sheet1.xml"] ?? new Uint8Array());
+  files["xl/worksheets/sheet1.xml"] = strToU8(sheet.replace(/(<c r="A6"[^>]*><v>)7(<\/v>)/u, "$19$2"));
+
+  const reopened = await sheetwriteWorkbookBackend.fromXlsxWorkbook(zipSync(files));
+  const kept = (reopened.sheets[0]?.cells ?? []).flatMap((block) =>
+    block.cells
+      .filter((cell) => block.startRow + cell.rowOffset >= 4)
+      .map((cell) => [block.startRow + cell.rowOffset, cell.value]),
+  );
+  expect(kept).toEqual([[5, { kind: "literal", value: 9 }]]);
 });
 
 const DATA_MODEL_EXTENSION = `<extLst><ext uri="{FCE2AD5D-F65C-4FA6-A056-5C36A1767C68}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:dataModel><x15:modelTables><x15:modelTable id="Orders-1" name="Orders" connection="WorksheetConnection_Orders"/><x15:modelTable id="Clients-2" name="Clients" connection="WorksheetConnection_Customers"/><x15:modelTable id="Calendar-3" name="Calendar" connection="ThisWorkbookDataModel"/></x15:modelTables><x15:modelRelationships><x15:modelRelationship fromTable="Orders" fromColumn="Customer" toTable="Clients" toColumn="ID"/><x15:modelRelationship fromTable="Orders" fromColumn="Amount" toTable="Clients" toColumn="Region"/><x15:modelRelationship fromTable="Orders" fromColumn="Customer" toTable="Calendar" toColumn="Date"/></x15:modelRelationships></x15:dataModel></ext></extLst>`;

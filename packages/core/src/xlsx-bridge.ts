@@ -322,6 +322,13 @@ interface XlsxWorkbookExportContext {
   readonly sourceTracked?: boolean;
   /** Static content of each dashboard sheet, which only core can compute. */
   readonly dashboards?: readonly DashboardExport[];
+  /**
+   * Current output of each worksheet pivot, by sheet: each item's `id` is a
+   * pivot ID and its cells start at the pivot's anchor. The export writes
+   * them for pivots it keeps in Sheetwrite metadata, as Excel files carry a
+   * pivot's output as cell values.
+   */
+  readonly pivotOutputs?: readonly DashboardExport[];
 }
 
 /** Optional backend contract for complete workbook XLSX interchange. */
@@ -397,18 +404,26 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
 }
 
 /**
- * The export context with the static content of the dashboards, which only
- * the store's engine can compute. The module loads only for a workbook with a
- * dashboard.
+ * The export context with what only the store's engine can compute: the
+ * current output of worksheet pivots and the static content of dashboards.
+ * Each module loads only for a workbook that needs it.
  */
-async function withDashboards(
+async function withEngineContent(
   source: ReturnType<typeof workbookSnapshotOf>,
 ): Promise<XlsxWorkbookExportContext> {
-  if (source.store === undefined || !source.snapshot.sheets.some(isDashboard)) {
-    return source.context;
+  const store = source.store;
+  if (store === undefined) return source.context;
+  let context = source.context;
+  const sheets = source.snapshot.sheets;
+  if (sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0)) {
+    const { worksheetPivotExports } = await import("./pivot-export.js");
+    context = { ...context, pivotOutputs: worksheetPivotExports(store) };
   }
-  const { dashboardExports } = await import("./dashboard/dashboard-export.js");
-  return { ...source.context, dashboards: dashboardExports(source.store) };
+  if (sheets.some(isDashboard)) {
+    const { dashboardExports } = await import("./dashboard/dashboard-export.js");
+    context = { ...context, dashboards: dashboardExports(store) };
+  }
+  return context;
 }
 
 /**
@@ -437,7 +452,7 @@ export async function toXlsxWorkbook(
     // Checked before the snapshot is built, which is the largest step on this side.
     options?.signal?.throwIfAborted();
     const source = workbookSnapshotOf(input);
-    return await backend.toXlsxWorkbook(source.snapshot, options, await withDashboards(source));
+    return await backend.toXlsxWorkbook(source.snapshot, options, await withEngineContent(source));
   } catch (error) {
     throw xlsxCallFailure(error, options?.signal, {
       operation: "xlsx-export",
@@ -458,7 +473,7 @@ export function toXlsxWorkbookStream(
   const source = workbookSnapshotOf(input);
   const stream = backend.toXlsxWorkbookStream.bind(backend);
   async function* chunks(): AsyncGenerator<Uint8Array> {
-    yield* stream(source.snapshot, options, await withDashboards(source));
+    yield* stream(source.snapshot, options, await withEngineContent(source));
   }
   return readableBytes(chunks(), (error) =>
     xlsxCallFailure(error, options?.signal, {

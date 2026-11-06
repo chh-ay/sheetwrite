@@ -4,6 +4,7 @@ import type {
   ConditionalFormatRule,
   DashboardExport,
   DataValidationRule,
+  PivotDefinition,
   SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
@@ -182,9 +183,13 @@ function hasExactBorderWidth(style: CellStyle | undefined): boolean {
  * Workbook metadata for the hidden sheet. The saved output of a native pivot
  * is left out: the worksheet holds it as the pivot's rendered cells.
  */
+/** The output written as cells for each pivot kept in metadata, by pivot ID. */
+type KeptOutputs = ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
+
 function metadataSnapshot(
   snapshot: WorkbookSnapshot,
   nativePivots: ReadonlySet<string>,
+  keptOutputs: KeptOutputs,
 ): WorkbookSnapshot {
   const { xlsxSource: _source, ...workbook } = snapshot.workbook;
   return {
@@ -196,6 +201,10 @@ function metadataSnapshot(
       ...(sheet.pivots
         ? {
             pivots: sheet.pivots.map((pivot) => {
+              // The cells written for a kept pivot are its saved output, so
+              // the reader can tell them from user values.
+              const kept = keptOutputs.get(pivot.id);
+              if (kept) return { ...pivot, savedOutput: kept };
               if (!pivot.savedOutput || !nativePivots.has(pivot.id)) return pivot;
               const { savedOutput: _saved, ...definition } = pivot;
               return definition;
@@ -1063,9 +1072,12 @@ function* writeSheet(
 function metadataSheetXml(
   snapshot: WorkbookSnapshot,
   nativePivots: ReadonlySet<string>,
+  keptOutputs: KeptOutputs,
   context: XlsxCodecContext,
 ): Uint8Array {
-  const json = JSON.stringify(canonicalJsonValue(metadataSnapshot(snapshot, nativePivots)));
+  const json = JSON.stringify(
+    canonicalJsonValue(metadataSnapshot(snapshot, nativePivots, keptOutputs)),
+  );
   const chunks = [META_MARKER];
   let chunkParts: string[] = [];
   let chunkBytes = 0;
@@ -1203,13 +1215,22 @@ function iterationAttributes(snapshot: WorkbookSnapshot): string {
   return `${calculation.iterate ? ' iterate="1"' : ""} iterateCount="${calculation.maxIterations}" iterateDelta="${calculation.maxChange}"`;
 }
 
+/** What only core's engine computes for an export: values that Excel shows as cells. */
+export interface EngineContent {
+  /** Static content of each dashboard sheet. */
+  readonly dashboards?: readonly DashboardExport[];
+  /** Current output of each worksheet pivot, by sheet; item IDs are pivot IDs. */
+  readonly pivotOutputs?: readonly DashboardExport[];
+}
+
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
 function* writeWorkbookParts(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   resolveHook?: WorkbookWriteHookResolver,
-  dashboards: readonly DashboardExport[] = [],
+  content: EngineContent = {},
 ): Generator<ZipPart> {
+  const dashboards = content.dashboards ?? [];
   preflightSnapshot(snapshot, context);
   if (snapshot.sheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
@@ -1232,7 +1253,7 @@ function* writeWorkbookParts(
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
   if (ordered.some((sheet) => sheet.kind === "dashboard")) warnStaticDashboards(context);
   const styles = new StylesRegistry(context);
-  const pivots = preparePivots(snapshot, ordered, styles, context);
+  const pivots = preparePivots(snapshot, ordered, styles, context, content.pivotOutputs);
   const metadataName = metadataSheetName(snapshot);
   const overrides: ContentTypeOverride[] = [
     { part: "xl/workbook.xml", contentType: WORKBOOK_CONTENT },
@@ -1306,7 +1327,12 @@ function* writeWorkbookParts(
   const metadataPart = `xl/worksheets/sheet${metadataNumber}.xml`;
   yield {
     name: metadataPart,
-    data: metadataSheetXml(snapshot, pivots?.nativeIds ?? new Set(), context),
+    data: metadataSheetXml(
+      snapshot,
+      pivots?.nativeIds ?? new Set(),
+      pivots?.keptOutputs ?? new Map(),
+      context,
+    ),
   };
   overrides.push({ part: metadataPart, contentType: WORKSHEET_CONTENT });
   workbookRelationships.push({
@@ -1386,11 +1412,11 @@ export async function writeWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
-  dashboards?: readonly DashboardExport[],
+  content?: EngineContent,
 ): Promise<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
   return writeZip(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook, dashboards),
+    writeWorkbookParts(snapshot, { ...context, formulas }, hook, content),
     context,
   );
 }
@@ -1399,11 +1425,11 @@ export async function* streamWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
-  dashboards?: readonly DashboardExport[],
+  content?: EngineContent,
 ): AsyncGenerator<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
   yield* zipChunks(
-    writeWorkbookParts(snapshot, { ...context, formulas }, hook, dashboards),
+    writeWorkbookParts(snapshot, { ...context, formulas }, hook, content),
     context,
   );
 }

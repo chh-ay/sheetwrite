@@ -17,6 +17,7 @@ import {
   slicerOverridesOf,
   slicerValuesOf,
 } from "./dashboard-engine.js";
+import { pivotOutputContent } from "../pivot-export.js";
 import { slicerSelection } from "./dashboard-payload.js";
 
 /** A caption row over value rows that use General. */
@@ -38,19 +39,13 @@ function pivotExport(store: Store, sheet: SheetId, item: DashboardItem & { kind:
   const index = owner?.pivots?.findIndex((pivot) => pivot.id === item.pivot) ?? -1;
   const formats = owner?.pivots?.[index]?.values.map((value) => value.numberFormat ?? null) ?? [];
   const output = dashboardPivotOutputOf(store, sheet, index);
-  const rows: CellScalar[][] = [];
-  const rowFormats: (string | null)[][] = [];
-  for (let row = 0; output !== null && row < output.rows; row++) {
-    rows.push(output.cells.slice(row * output.cols, (row + 1) * output.cols));
-    rowFormats.push(
-      Array.from({ length: output.cols }, (_, col) => {
-        const value = row >= output.headerRows && col >= output.labelCols;
-        return value ? (formats[(col - output.labelCols) % formats.length] ?? null) : null;
-      }),
-    );
-  }
+  const content =
+    output === null ? { cells: [], numberFormats: [] } : pivotOutputContent(output, formats);
   const caption = dashboardItemTitle(store, sheet, item);
-  return { cells: captioned(caption, rows), numberFormats: [[null], ...rowFormats] };
+  return {
+    cells: captioned(caption, content.cells),
+    numberFormats: [[null], ...content.numberFormats],
+  };
 }
 
 /** The static content of one item. */
