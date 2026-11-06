@@ -163,13 +163,19 @@ describe("canonical workspace graph", () => {
         .split("\n")
         .map((line) => line.split("\t"))
         .find(([id]) => id === "test:unit:uncovered") ?? [];
-    if (command === undefined) throw new Error("test-unit-uncovered has no test:unit:uncovered node");
+    if (command === undefined) {
+      throw new Error("test-unit-uncovered has no test:unit:uncovered node");
+    }
+
     const paths = command
       .split(" ")
       .slice(2)
       .map((argument) => JSON.parse(argument) as string);
     const packageTestDirectories: string[] = [];
-    for await (const path of new Bun.Glob("packages/*/test").scan({ cwd: root, onlyFiles: false })) {
+    for await (const path of new Bun.Glob("packages/*/test").scan({
+      cwd: root,
+      onlyFiles: false,
+    })) {
       packageTestDirectories.push(path);
     }
 
