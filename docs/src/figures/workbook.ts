@@ -217,7 +217,7 @@ function dashboardSheet(): SheetSnapshot {
       items: [
         {
           id: "revenue",
-          box: { x: 0, y: 0, w: 3, h: 3 },
+          box: { x: 0, y: 0, w: 4, h: 3 },
           kind: "kpi",
           measure: "revenue",
           title: "Revenue",
@@ -225,7 +225,7 @@ function dashboardSheet(): SheetSnapshot {
         },
         {
           id: "units",
-          box: { x: 3, y: 0, w: 3, h: 3 },
+          box: { x: 4, y: 0, w: 3, h: 3 },
           kind: "kpi",
           measure: "units",
           title: "Units sold",
@@ -233,10 +233,10 @@ function dashboardSheet(): SheetSnapshot {
         },
         {
           id: "target",
-          box: { x: 6, y: 0, w: 3, h: 3 },
+          box: { x: 7, y: 0, w: 2, h: 3 },
           kind: "kpi",
           measure: "attainment",
-          title: "Target attainment",
+          title: "Attainment",
           numberFormat: "0%",
         },
         {

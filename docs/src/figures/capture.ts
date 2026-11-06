@@ -61,7 +61,9 @@ async function selectRows(page: Page, rows: number) {
 }
 
 const SHOTS: readonly Shot[] = [
-  { name: "dashboard", size: "app", query: { sheet: "dashboard" } },
+  // Panel size: shown at about its own width in the docs column, so its labels stay
+  // at their 12 px and up.
+  { name: "dashboard", size: "panel", query: { sheet: "dashboard", ribbon: "compact" } },
   {
     name: "data-model",
     size: "app",

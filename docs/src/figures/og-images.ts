@@ -17,6 +17,7 @@ import { renderAsync } from "@resvg/resvg-js";
 
 import { themeTokens, tokenColour } from "../lib/design-tokens.ts";
 import { DOCS_NAVIGATION, type NavigationItem } from "../lib/navigation.ts";
+import { RELEASES, releaseHref } from "../lib/releases.ts";
 import { ogImagePath } from "../lib/seo.ts";
 
 const DOCS = join(import.meta.dir, "../..");
@@ -179,8 +180,16 @@ function docsPages(): Page[] {
   return pages;
 }
 
-/** The sidebar section that lists `href`, or the section its path names. */
+/** The posts of releases that are not published yet. */
+const NEXT_RELEASE_HREFS = new Set(
+  RELEASES.filter((release) => release.unreleased === true).map((release) =>
+    releaseHref(release.version),
+  ),
+);
+
+/** The sidebar section that lists `href`, or the section its path names; an unpublished release post is the next release. */
 function sectionOf(href: string): string {
+  if (NEXT_RELEASE_HREFS.has(href)) return "Next release";
   const lists = (items: readonly NavigationItem[]): boolean =>
     items.some((item) => item.href === href || lists(item.items ?? []));
   const section = DOCS_NAVIGATION.find((entry) => entry.href === href || lists(entry.items));
