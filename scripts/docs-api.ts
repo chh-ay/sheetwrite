@@ -46,7 +46,6 @@ function packageSourcePath(packageName: string, source: string): string {
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
 }
 
-
 interface DeclarationMember {
   name: string;
   signature: string;
