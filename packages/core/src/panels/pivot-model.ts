@@ -208,6 +208,37 @@ export function shiftField(
   return placeField(pivot, field, placement.area, facts, placement, target);
 }
 
+/**
+ * Number formats the field list offers, as Excel's Format Cells
+ * categories: General (no format), then a code for each category. Custom
+ * codes are typed.
+ */
+export const VALUE_NUMBER_FORMATS: readonly (readonly [string, string])[] = [
+  ["", "General"],
+  ["#,##0.00", "Number"],
+  ["$#,##0.00", "Currency"],
+  ["0.00%", "Percentage"],
+  ["0.00E+00", "Scientific"],
+];
+
+/** `pivot` with value field `index` shown in `format`; undefined shows it as General. */
+export function setNumberFormat(
+  pivot: PivotDefinition,
+  index: number,
+  format: string | undefined,
+): PivotDefinition {
+  return {
+    ...pivot,
+    values: pivot.values.map((value, position) => {
+      if (position !== index) return value;
+      const next = { ...value };
+      if (format === undefined) delete next.numberFormat;
+      else next.numberFormat = format;
+      return next;
+    }),
+  };
+}
+
 export function setAggregation(
   pivot: PivotDefinition,
   index: number,

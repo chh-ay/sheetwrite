@@ -36,10 +36,15 @@ export type PivotSource =
   | { table: WorkbookTableId; invalid?: true }
   | { model: { table: WorkbookTableId; fields: TableColumnRef[] }; invalid?: true };
 
-/** One implicit aggregation or saved measure; `name` overrides its caption. */
+/**
+ * One implicit aggregation or saved measure; `name` overrides its caption.
+ * `numberFormat` is the Excel number-format code of its value cells, as
+ * Excel's Value Field Settings › Number Format sets it; absent shows them as
+ * General, as Excel does for a new value field.
+ */
 export type PivotValueField =
-  | { field: number; aggregation: PivotAggregation; name?: string }
-  | { measure: string; name?: string };
+  | { field: number; aggregation: PivotAggregation; name?: string; numberFormat?: string }
+  | { measure: string; name?: string; numberFormat?: string };
 
 /** Keep-list filter: only source rows whose `field` value is in `values` contribute. */
 export interface PivotFilter {
