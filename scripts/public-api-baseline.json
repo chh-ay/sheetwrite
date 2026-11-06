@@ -281,7 +281,7 @@
     "@sheetwrite/core#.#SheetVisibility": "4461e8e55bdd",
     "@sheetwrite/core#.#SheetwriteAddon": "eadb4f4583fd",
     "@sheetwrite/core#.#SheetwriteAddonContext": "d8f27fdcf17b",
-    "@sheetwrite/core#.#SheetwriteAddonGridContext": "3a3c93178488",
+    "@sheetwrite/core#.#SheetwriteAddonGridContext": "2c25f5b7dec8",
     "@sheetwrite/core#.#SheetwriteAddonSettings": "9f5e6d20a4df",
     "@sheetwrite/core#.#SheetwriteChartParts": "871dacbfbef2",
     "@sheetwrite/core#.#SheetwriteEngine": "e7bf8f84396f",
