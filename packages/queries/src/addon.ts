@@ -6,16 +6,16 @@ import type { QueryEngine, QueryLimits } from "./types.js";
 
 /** Hosts can provide the compiled artifact instead of using browser artifact loading. */
 export interface QueryEngineOptions {
- /** Compiled module or artifact bytes, as accepted by the generated bindings. */
+  /** Compiled module or artifact bytes, as accepted by the generated bindings. */
   readonly wasm?: SyncInitInput;
 }
 
 /** Options of the queries add-on, at init or for one grid. */
 export interface QueriesAddonOptions extends QueryEngineOptions {
- /** Loads the bytes or rows of a saved query's source; a grid without it has no query commands. */
- readonly fetchSource?: QueryFetchSource;
- /** Engine limits for each refresh. */
- readonly limits?: Partial<QueryLimits>;
+  /** Loads the bytes or rows of a saved query's source; a grid without it has no query commands. */
+  readonly fetchSource?: QueryFetchSource;
+  /** Engine limits for each refresh. */
+  readonly limits?: Partial<QueryLimits>;
 }
 
 /** The session of each grid the queries add-on applies to, while it loads and after. */
@@ -26,42 +26,42 @@ const SESSIONS = new WeakMap<Grid, Promise<QuerySession>>();
  * entry points differ only in that.
  */
 export function createQueriesAddon(
- loadEngine: (options: QueryEngineOptions) => Promise<QueryEngine>,
- options: QueriesAddonOptions,
+  loadEngine: (options: QueryEngineOptions) => Promise<QueryEngine>,
+  options: QueriesAddonOptions,
 ): SheetwriteAddon<QueriesAddonOptions> {
- return {
-  name: "queries",
-  grid({ grid, settings, queryCommands }) {
-   const merged: QueriesAddonOptions = { ...options, ...settings };
-   const fetchSource = merged.fetchSource;
-   if (fetchSource === undefined) return;
+  return {
+    name: "queries",
+    grid({ grid, settings, queryCommands }) {
+      const merged: QueriesAddonOptions = { ...options, ...settings };
+      const fetchSource = merged.fetchSource;
+      if (fetchSource === undefined) return;
 
-   let session: QuerySession | undefined;
-   let isDestroyed = false;
+      let session: QuerySession | undefined;
+      let isDestroyed = false;
 
-   // The session module loads with the engine, never with the package entry.
-   const pending = Promise.all([loadEngine(merged), import("./session.js")]).then(
-    ([engine, { createSessionWithEngine }]) => {
-     session = createSessionWithEngine(
-      grid,
-      engine,
-      { fetchSource, limits: merged.limits },
-      queryCommands,
-     );
-     if (isDestroyed) session.dispose();
+      // The session module loads with the engine, never with the package entry.
+      const pending = Promise.all([loadEngine(merged), import("./session.js")]).then(
+        ([engine, { createSessionWithEngine }]) => {
+          session = createSessionWithEngine(
+            grid,
+            engine,
+            { fetchSource, limits: merged.limits },
+            queryCommands,
+          );
+          if (isDestroyed) session.dispose();
 
-     return session;
+          return session;
+        },
+      );
+      SESSIONS.set(grid, pending);
+
+      return () => {
+        isDestroyed = true;
+        session?.dispose();
+        SESSIONS.delete(grid);
+      };
     },
-   );
-   SESSIONS.set(grid, pending);
-
-   return () => {
-    isDestroyed = true;
-    session?.dispose();
-    SESSIONS.delete(grid);
-   };
-  },
- };
+  };
 }
 
 /**
@@ -83,15 +83,15 @@ export function createQueriesAddon(
  * ```
  */
 export function querySession(grid: Grid): Promise<QuerySession> {
- const pending = SESSIONS.get(grid);
- if (pending !== undefined) return pending;
+  const pending = SESSIONS.get(grid);
+  if (pending !== undefined) return pending;
 
- return Promise.reject(
-  new SheetwriteError(
-   "optional-backend-unavailable",
-   "query",
-   "Sheetwrite: this grid has no query session. Install queriesAddon({ fetchSource }) through initSheetwrite before creating the grid.",
-   { context: { backend: "queries" }, retryable: false },
-  ),
- );
+  return Promise.reject(
+    new SheetwriteError(
+      "optional-backend-unavailable",
+      "query",
+      "Sheetwrite: this grid has no query session. Install queriesAddon({ fetchSource }) through initSheetwrite before creating the grid.",
+      { context: { backend: "queries" }, retryable: false },
+    ),
+  );
 }

@@ -204,7 +204,6 @@ export async function fromXlsxTable(
   }
 }
 
-
 /** Whether workbook import can be offered without loading an optional backend. */
 export function hasXlsxWorkbookBackend(): boolean {
   return xlsxWorkbookBackend() !== null;

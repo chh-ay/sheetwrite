@@ -3,10 +3,10 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { registerQueryCommands } from "../src/query-commands.js";
-import type { QueryCommands } from "../src/types.js";
 import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import type { QueryCommands } from "../src/types.js";
 import type { SavedQuery, Workbook } from "../src/types.js";
 
 let restore: () => void;

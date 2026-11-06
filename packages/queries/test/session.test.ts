@@ -97,7 +97,10 @@ function mount(initial: Workbook = workbook()): Grid {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const fixture: SourceFixture = { sources: {}, requests: [] };
-  const grid = createGrid(host, { workbook: initial, addons: { queries: sourceSettings(fixture) } });
+  const grid = createGrid(host, {
+    workbook: initial,
+    addons: { queries: sourceSettings(fixture) },
+  });
   fixtures.set(grid, fixture);
   grids.push(grid);
   return grid;

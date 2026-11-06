@@ -32,6 +32,8 @@ export async function loadPowerQueryCodec(
 }
 
 /** Node variant of `queriesAddon`; it reads the artifact from this package. */
-export function queriesAddon(options: QueriesAddonOptions = {}): SheetwriteAddon<QueriesAddonOptions> {
+export function queriesAddon(
+  options: QueriesAddonOptions = {},
+): SheetwriteAddon<QueriesAddonOptions> {
   return createQueriesAddon(loadQueryEngine, options);
 }

@@ -1,10 +1,6 @@
 import type { PowerQueryCodec, SheetwriteAddon } from "@sheetwrite/core";
 
-import {
-  createQueriesAddon,
-  type QueriesAddonOptions,
-  type QueryEngineOptions,
-} from "./addon.js";
+import { createQueriesAddon, type QueriesAddonOptions, type QueryEngineOptions } from "./addon.js";
 import type { QueryEngine } from "./types.js";
 
 export { type QueriesAddonOptions, type QueryEngineOptions, querySession } from "./addon.js";

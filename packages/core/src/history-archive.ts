@@ -79,10 +79,7 @@ export type {
 } from "./version-history/diff.js";
 export type { HistoryRestoreOptions, HistoryRestoreScope } from "./version-history/restore.js";
 export { historyAddon } from "./version-history/history-ui.js";
-export type {
-  HistoryAddonOptions,
-  HistoryPanelArchive,
-} from "./version-history/panel-contract.js";
+export type { HistoryAddonOptions, HistoryPanelArchive } from "./version-history/panel-contract.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,

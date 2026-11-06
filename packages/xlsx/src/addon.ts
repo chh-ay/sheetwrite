@@ -1,9 +1,9 @@
 import type {
- SheetwriteAddon,
- SheetwriteAddonContext,
- XlsxTableExportBackend,
- XlsxTableImportBackend,
- XlsxWorkbookBackend,
+  SheetwriteAddon,
+  SheetwriteAddonContext,
+  XlsxTableExportBackend,
+  XlsxTableImportBackend,
+  XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
 import type * as CodecModule from "./codec.js";
@@ -16,67 +16,67 @@ type Codec = typeof CodecModule;
  * parts when a store loads a snapshot.
  */
 function lazyBackends(context: SheetwriteAddonContext): {
- workbook: XlsxWorkbookBackend;
- tableImport: XlsxTableImportBackend;
- tableExport: XlsxTableExportBackend;
+  workbook: XlsxWorkbookBackend;
+  tableImport: XlsxTableImportBackend;
+  tableExport: XlsxTableExportBackend;
 } {
- let pending: Promise<Codec> | undefined;
+  let pending: Promise<Codec> | undefined;
 
- const codec = (): Promise<Codec> => {
-  pending ??= import("./codec.js").then((loaded) => {
-   context.xlsx({
-    workbook: loaded.sheetwriteWorkbookBackend,
-    tableImport: loaded.sheetwriteTableImportBackend,
-    tableExport: loaded.sheetwriteTableExportBackend,
-   });
-   return loaded;
-  });
-  return pending;
- };
+  const codec = (): Promise<Codec> => {
+    pending ??= import("./codec.js").then((loaded) => {
+      context.xlsx({
+        workbook: loaded.sheetwriteWorkbookBackend,
+        tableImport: loaded.sheetwriteTableImportBackend,
+        tableExport: loaded.sheetwriteTableExportBackend,
+      });
+      return loaded;
+    });
+    return pending;
+  };
 
- return {
-  workbook: {
-   name: "sheetwrite-ooxml",
-   async toXlsxWorkbook(snapshot, options, exportContext) {
-    const loaded = await codec();
-    return loaded.sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot, options, exportContext);
-   },
-   async *toXlsxWorkbookStream(snapshot, options, exportContext) {
-    const loaded = await codec();
-    yield* loaded.sheetwriteWorkbookBackend.toXlsxWorkbookStream(
-     snapshot,
-     options,
-     exportContext,
-    );
-   },
-   async fromXlsxWorkbook(data, options) {
-    const loaded = await codec();
-    return loaded.sheetwriteWorkbookBackend.fromXlsxWorkbook(data, options);
-   },
-   async fromXlsxWorkbookFile(file, options) {
-    const loaded = await codec();
-    return loaded.sheetwriteWorkbookBackend.fromXlsxWorkbookFile(file, options);
-   },
-  },
-  tableImport: {
-   name: "sheetwrite-ooxml-table",
-   async fromXlsxTable(data, options) {
-    const loaded = await codec();
-    return loaded.sheetwriteTableImportBackend.fromXlsxTable(data, options);
-   },
-  },
-  tableExport: {
-   name: "sheetwrite-ooxml-table",
-   async toXlsxTable(workbook, store, options) {
-    const loaded = await codec();
-    return loaded.sheetwriteTableExportBackend.toXlsxTable(workbook, store, options);
-   },
-   async *toXlsxTableStream(workbook, store, options) {
-    const loaded = await codec();
-    yield* loaded.sheetwriteTableExportBackend.toXlsxTableStream(workbook, store, options);
-   },
-  },
- };
+  return {
+    workbook: {
+      name: "sheetwrite-ooxml",
+      async toXlsxWorkbook(snapshot, options, exportContext) {
+        const loaded = await codec();
+        return loaded.sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot, options, exportContext);
+      },
+      async *toXlsxWorkbookStream(snapshot, options, exportContext) {
+        const loaded = await codec();
+        yield* loaded.sheetwriteWorkbookBackend.toXlsxWorkbookStream(
+          snapshot,
+          options,
+          exportContext,
+        );
+      },
+      async fromXlsxWorkbook(data, options) {
+        const loaded = await codec();
+        return loaded.sheetwriteWorkbookBackend.fromXlsxWorkbook(data, options);
+      },
+      async fromXlsxWorkbookFile(file, options) {
+        const loaded = await codec();
+        return loaded.sheetwriteWorkbookBackend.fromXlsxWorkbookFile(file, options);
+      },
+    },
+    tableImport: {
+      name: "sheetwrite-ooxml-table",
+      async fromXlsxTable(data, options) {
+        const loaded = await codec();
+        return loaded.sheetwriteTableImportBackend.fromXlsxTable(data, options);
+      },
+    },
+    tableExport: {
+      name: "sheetwrite-ooxml-table",
+      async toXlsxTable(workbook, store, options) {
+        const loaded = await codec();
+        return loaded.sheetwriteTableExportBackend.toXlsxTable(workbook, store, options);
+      },
+      async *toXlsxTableStream(workbook, store, options) {
+        const loaded = await codec();
+        yield* loaded.sheetwriteTableExportBackend.toXlsxTableStream(workbook, store, options);
+      },
+    },
+  };
 }
 
 /**
@@ -98,10 +98,10 @@ function lazyBackends(context: SheetwriteAddonContext): {
  * @see /docs/import-export/xlsx-export/
  */
 export function xlsxAddon(): SheetwriteAddon {
- return {
-  name: "xlsx",
-  setup(context) {
-   context.xlsx(lazyBackends(context));
-  },
- };
+  return {
+    name: "xlsx",
+    setup(context) {
+      context.xlsx(lazyBackends(context));
+    },
+  };
 }

@@ -7,44 +7,44 @@ import { createChartViewCache } from "./view-cache.js";
  * creates it; a chart mounted before then draws as soon as it loads.
  */
 function createLazyChartRenderer(store: Store): ChartRenderer {
- let renderer: ChartRenderer | undefined;
- let isDisposed = false;
+  let renderer: ChartRenderer | undefined;
+  let isDisposed = false;
 
- const loaded = import("./chart-renderer.js").then(({ createChartRenderer }) => {
-  if (!isDisposed) renderer = createChartRenderer(store);
-  return renderer;
- });
+  const loaded = import("./chart-renderer.js").then(({ createChartRenderer }) => {
+    if (!isDisposed) renderer = createChartRenderer(store);
+    return renderer;
+  });
 
- return {
-  mount(host, chart, size) {
-   if (renderer) return renderer.mount(host, chart, size);
+  return {
+    mount(host, chart, size) {
+      if (renderer) return renderer.mount(host, chart, size);
 
-   let width = size.width;
-   let height = size.height;
-   let mounted: MountedChart | undefined;
-   let isUnmounted = false;
+      let width = size.width;
+      let height = size.height;
+      let mounted: MountedChart | undefined;
+      let isUnmounted = false;
 
-   void loaded.then((ready) => {
-    if (ready && !isUnmounted) mounted = ready.mount(host, chart, { width, height });
-   });
+      void loaded.then((ready) => {
+        if (ready && !isUnmounted) mounted = ready.mount(host, chart, { width, height });
+      });
 
-   return {
-    resize(nextWidth, nextHeight) {
-     width = nextWidth;
-     height = nextHeight;
-     mounted?.resize(nextWidth, nextHeight);
+      return {
+        resize(nextWidth, nextHeight) {
+          width = nextWidth;
+          height = nextHeight;
+          mounted?.resize(nextWidth, nextHeight);
+        },
+        dispose() {
+          isUnmounted = true;
+          mounted?.dispose();
+        },
+      };
     },
     dispose() {
-     isUnmounted = true;
-     mounted?.dispose();
+      isDisposed = true;
+      renderer?.dispose();
     },
-   };
-  },
-  dispose() {
-   isDisposed = true;
-   renderer?.dispose();
-  },
- };
+  };
 }
 
 /**
@@ -71,10 +71,10 @@ function createLazyChartRenderer(store: Store): ChartRenderer {
  * ```
  */
 export function chartsAddon(): SheetwriteAddon {
- return {
-  name: "charts",
-  setup(context) {
-   context.charts({ views: createChartViewCache, renderer: createLazyChartRenderer });
-  },
- };
+  return {
+    name: "charts",
+    setup(context) {
+      context.charts({ views: createChartViewCache, renderer: createLazyChartRenderer });
+    },
+  };
 }

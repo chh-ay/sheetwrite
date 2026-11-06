@@ -274,15 +274,15 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
         },
       },
     });
-      const result = shell.grid.applyTransaction({ patches: salesOperations() });
-      if (result.status === "rejected") {
-        throw new Error(
-          `The sales workbook did not load: ${result.issues[0]?.message ?? "rejected"}`,
-        );
-      }
-      if (result.status !== "applied")
-        throw new Error(`The sales workbook did not load: ${result.status}`);
-      shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
+    const result = shell.grid.applyTransaction({ patches: salesOperations() });
+    if (result.status === "rejected") {
+      throw new Error(
+        `The sales workbook did not load: ${result.issues[0]?.message ?? "rejected"}`,
+      );
+    }
+    if (result.status !== "applied")
+      throw new Error(`The sales workbook did not load: ${result.status}`);
+    shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
     await loadTargets(await querySession(shell.grid));
   })();
 
