@@ -868,7 +868,6 @@ impl CellStore {
             return;
         }
 
-
         let found_cycle = self.graph.index().is_some_and(|index| {
             seed_dependency_depth_errors(
                 &self.sheets,
@@ -1457,7 +1456,12 @@ impl CellStore {
     /// out-of-line copy serves every writer; the call is small next to the
     /// evaluation it follows.
     #[inline(never)]
-    pub(super) fn settle_result(&mut self, id: FormulaId, result: EvalResult, results: &mut FormulaResults) {
+    pub(super) fn settle_result(
+        &mut self,
+        id: FormulaId,
+        result: EvalResult,
+        results: &mut FormulaResults,
+    ) {
         self.store_formula_result(id, result);
         results.settle(id);
     }
@@ -1552,6 +1556,15 @@ impl CellStore {
                     if self.iteration.is_some() {
                         iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
                     }
+                    // This pass wrote the whole result, errors included, to
+                    // the calculated slot, so no source-error lookup is needed.
+                    return match s.cells.calculated_cell_at(i) {
+                        Some((KIND_FORMULA, payload)) => Value::Error(
+                            FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref),
+                        ),
+                        Some((kind, payload)) => literal_cell_value(&self.strings, kind, payload),
+                        None => Value::number(s.cells.num_at(i)),
+                    };
                 }
 
                 return cached_formula_value(

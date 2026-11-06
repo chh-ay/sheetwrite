@@ -1884,11 +1884,13 @@ mod tests {
             &mut memo,
         );
         assert!(matches!(
-            memo.seeded_result(store.formula_id(left).expect("left formula")).as_ref(),
+            memo.seeded_result(store.formula_id(left).expect("left formula"))
+                .as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
         assert!(matches!(
-            memo.seeded_result(store.formula_id(right).expect("right formula")).as_ref(),
+            memo.seeded_result(store.formula_id(right).expect("right formula"))
+                .as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
     }
@@ -2193,7 +2195,8 @@ mod tests {
                 store
                     .formula_id(AbsCellKey::new(sheet, 0, 0))
                     .expect("formula")
-            ).as_ref(),
+            )
+            .as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
         for row in 0..ROWS {
@@ -2202,7 +2205,8 @@ mod tests {
                     store
                         .formula_id(AbsCellKey::new(sheet, row as u32, 1))
                         .expect("formula")
-                ).as_ref(),
+                )
+                .as_ref(),
                 Some(Value::Error(FormulaError::Cycle))
             ));
         }
@@ -2251,7 +2255,8 @@ mod tests {
                                 .is_none());
                         } else {
                             assert!(matches!(
-                                memo.seeded_result(store.formula_id(key).expect("formula")).as_ref(),
+                                memo.seeded_result(store.formula_id(key).expect("formula"))
+                                    .as_ref(),
                                 Some(Value::Error(FormulaError::Num))
                             ));
                         }
@@ -2269,7 +2274,8 @@ mod tests {
                     );
                     assert_eq!(memo.seeded.len(), CHAIN_ROWS);
                     assert!(affected.keys(&store.formula_slots).all(|key| matches!(
-                        memo.seeded_result(store.formula_id(key).expect("formula")).as_ref(),
+                        memo.seeded_result(store.formula_id(key).expect("formula"))
+                            .as_ref(),
                         Some(Value::Error(FormulaError::Cycle))
                     )));
                 }
