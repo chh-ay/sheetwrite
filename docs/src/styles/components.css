@@ -6,6 +6,15 @@
    Stroke and colour are inherited into each <use>d symbol; the accent marks
    the selected part of an icon. A filled control (primary button, active
    badge) sets --sw-icon-accent to its ink so the accent never vanishes. */
+/* The page's inline symbol sheet (IconSprite): takes no space and is never
+   painted itself. */
+.sw-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .sw-icon {
   flex: none;
   width: var(--sw-icon-sm);
@@ -60,6 +69,16 @@ a:not([class]) > .sw-icon:last-child {
   mask: var(--sw-icon-mask) center / contain no-repeat;
 }
 
+/* ── Body text: the body face's word space ────────────────────────────── */
+body {
+  word-spacing: var(--sw-word-spacing-body);
+}
+
+/* Code keeps one character per column, so its spaces stay the font's own. */
+:where(code, pre, kbd, samp, .expressive-code) {
+  word-spacing: normal;
+}
+
 /* ── Headings: every heading is in the display face ──────────────────────
    Zero specificity, so a component's own heading style still applies; an
    unstyled heading never falls back to the body face. Eyebrow-styled panel
@@ -67,10 +86,11 @@ a:not([class]) > .sw-icon:last-child {
 :where(h1, h2, h3, h4, h5, h6) {
   font-family: var(--sw-font-display);
   letter-spacing: var(--sw-tracking-heading);
+  word-spacing: normal;
 }
 
-/* Numbers in tables line up: tabular figures in every table on the site. */
-:where(table) {
+/* Numbers line up: tabular figures in every table and fact list. */
+:where(table, dd) {
   font-variant-numeric: tabular-nums;
 }
 
@@ -474,9 +494,10 @@ samp,
     "liga" 0;
 }
 
-/* Wrapped code lines continue under a two-character hanging indent. */
+/* Wrapped code lines continue under a two-character hanging indent, inside
+   Expressive Code's own inline padding. */
 :root .expressive-code .ec-line .code {
-  padding-inline-start: 2ch;
+  padding-inline-start: calc(var(--ec-codePadInl) - var(--ecGtrBrdWd, 0px) + 2ch);
   text-indent: -2ch;
 }
 
