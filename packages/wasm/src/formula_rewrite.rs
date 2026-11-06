@@ -219,7 +219,8 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
 ///
 /// The references of the tree and of the text are paired in source order.
 /// When the counts differ, they cannot be paired, and the whole formula is
-/// written from the tree.
+/// written from the tree. Out of line: every reader of formula text calls it.
+#[inline(never)]
 pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
     let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
     let mut out = String::with_capacity(source.len());
