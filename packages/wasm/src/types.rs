@@ -602,7 +602,8 @@ impl FormulaEntry {
     /// read metadata follows the new tree, and the source text is marked so
     /// that its references are written from the tree when it is read; the
     /// rest stays as the user wrote it, as in Excel. Returns whether anything
-    /// changed.
+    /// changed. Out of line, so the edits that call it share one copy.
+    #[inline(never)]
     fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
