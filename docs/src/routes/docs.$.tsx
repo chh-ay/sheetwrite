@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
-import { Suspense, use, useEffect } from "react";
+import { lazy, Suspense, use, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
@@ -25,11 +25,15 @@ function FormulaReference(props: Readonly<{ family: string }>) {
   return <Reference {...props} />;
 }
 
+/** Figures appear on Performance pages only, so their component loads with them. */
+const PerfFigure = lazy(() => import("../components/PerfFigure.js"));
+
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
   a: ContentLink,
   FormulaReference,
   PackageCommand,
+  PerfFigure,
 };
 
 export const Route = createFileRoute("/docs/$")({
@@ -45,6 +49,7 @@ export const Route = createFileRoute("/docs/$")({
         kind: undefined,
         outline: [],
         symbols: undefined,
+        sourcePath: undefined,
         stylesheets: [],
         moved: href,
         movedTo: moved.to,
@@ -62,6 +67,7 @@ export const Route = createFileRoute("/docs/$")({
       kind: document.kind,
       outline: document.outline ?? [],
       symbols: document.symbols,
+      sourcePath: document.sourcePath,
       stylesheets: document.stylesheets,
       moved: undefined,
       movedTo: undefined,
@@ -177,6 +183,7 @@ function DocumentRoute() {
       outline={metadata.outline}
       reserveOutline
       symbolCount={metadata.symbols}
+      sourcePath={metadata.sourcePath}
       title={metadata.title}
     >
       {/* The loader has loaded the article, so the server renders it in full;

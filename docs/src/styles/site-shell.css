@@ -307,13 +307,6 @@ details[open] > summary > .sw-disclosure-icon {
   color: var(--sw-accent-strong);
   font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
 }
-.sw-page-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sw-space-2);
-  margin-top: var(--sw-space-5);
-}
 .sw-document__header h1 {
   display: flex;
   flex-wrap: wrap;

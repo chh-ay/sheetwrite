@@ -11,6 +11,8 @@ export interface DocumentFrontmatter {
   outline?: readonly OutlineItem[];
   /** An API entry point's exported symbol count, for its symbol filter. */
   symbols?: number;
+  /** Set on pages the docs generator writes; see `markGeneratedPages` in lib/generated-content.ts. */
+  generated?: boolean;
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -20,6 +22,8 @@ export interface DocumentComponents {
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
   /** A formula family's table and filter; see FormulaReference.tsx. */
   FormulaReference?: ComponentType<{ family: string }>;
+  /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
+  PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
 }
 
 type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;
@@ -34,9 +38,15 @@ export interface DocumentModule {
 interface DocumentSource {
   fallbackTitle: string;
   load: () => Promise<DocumentModule>;
+  /** The glob key, `../content/docs/<page>.md`, relative to `docs/src/lib`. */
+  key: string;
 }
 
-export type DocumentRecord = DocumentFrontmatter & { stylesheets: readonly string[] };
+export type DocumentRecord = DocumentFrontmatter & {
+  stylesheets: readonly string[];
+  /** The page's source file in the repository; generated pages have none. */
+  sourcePath: string | undefined;
+};
 
 const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
@@ -53,7 +63,7 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     const href = hrefFromSource(source);
     const fallbackTitle =
       href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite";
-    return [href, { fallbackTitle, load }];
+    return [href, { fallbackTitle, key: source, load }];
   }),
 );
 
@@ -92,6 +102,7 @@ export async function documentForSplat(
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
     symbols: module.frontmatter?.symbols,
+    sourcePath: module.frontmatter?.generated ? undefined : source.key.replace("..", "docs/src"),
     stylesheets: module.stylesheets ?? [],
   };
 }
