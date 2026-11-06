@@ -313,9 +313,11 @@ function markShortInlineCode() {
 
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   // One frame style for every fence: shell commands use the same code frame as
-  // other languages. Long lines wrap under their own indent, so no line is cut
-  // at the frame edge on any width.
-  defaultProps: { wrap: true, preserveIndent: true, frame: "code" },
+  // other languages. Long lines wrap, so no line is cut at the frame edge on
+  // any width. The hanging indent is one CSS rule (components.css): Expressive
+  // Code's per-line indent styles would add markup to every highlighted line
+  // that ships in page JavaScript.
+  defaultProps: { wrap: true, preserveIndent: false, frame: "code" },
   themes: siteCodeThemes(),
   // The token colours are measured against AA in tokens.css; keep them exact.
   minSyntaxHighlightingColorContrast: 0,

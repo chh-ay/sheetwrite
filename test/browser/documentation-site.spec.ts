@@ -54,6 +54,10 @@ for (const [width, hasDesktopOutline] of [
     }
     await page.getByRole("link", { name: "Sheetwrite home", exact: true }).click();
     await expect(page).toHaveURL(siteUrl("/"));
+    // Phones keep the site links in the header's menu.
+    if (width < 1024) {
+      await page.getByRole("button", { name: "Site menu", exact: true }).click();
+    }
     await page
       .getByRole("navigation", { name: "Site", exact: true })
       .getByRole("link", { name: "Docs", exact: true })

@@ -6,6 +6,15 @@
    Stroke and colour are inherited into each <use>d symbol; the accent marks
    the selected part of an icon. A filled control (primary button, active
    badge) sets --sw-icon-accent to its ink so the accent never vanishes. */
+/* The page's inline symbol sheet (IconSprite): takes no space and is never
+   painted itself. */
+.sw-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .sw-icon {
   flex: none;
   width: var(--sw-icon-sm);
@@ -60,6 +69,16 @@ a:not([class]) > .sw-icon:last-child {
   mask: var(--sw-icon-mask) center / contain no-repeat;
 }
 
+/* ── Body text: the body face's word space ────────────────────────────── */
+body {
+  word-spacing: var(--sw-word-spacing-body);
+}
+
+/* Code keeps one character per column, so its spaces stay the font's own. */
+:where(code, pre, kbd, samp, .expressive-code) {
+  word-spacing: normal;
+}
+
 /* ── Headings: every heading is in the display face ──────────────────────
    Zero specificity, so a component's own heading style still applies; an
    unstyled heading never falls back to the body face. Eyebrow-styled panel
@@ -67,10 +86,11 @@ a:not([class]) > .sw-icon:last-child {
 :where(h1, h2, h3, h4, h5, h6) {
   font-family: var(--sw-font-display);
   letter-spacing: var(--sw-tracking-heading);
+  word-spacing: normal;
 }
 
-/* Numbers in tables line up: tabular figures in every table on the site. */
-:where(table) {
+/* Numbers line up: tabular figures in every table and fact list. */
+:where(table, dd) {
   font-variant-numeric: tabular-nums;
 }
 
@@ -185,6 +205,18 @@ a:not([class]) > .sw-icon:last-child {
 .sw-icon-button .sw-icon {
   width: var(--sw-icon-md);
   height: var(--sw-icon-md);
+}
+
+/* An icon button that draws its own path (no sprite class) takes the same
+   size and stroke as a sprite icon. */
+.sw-icon-button > svg:not(.sw-icon) {
+  width: var(--sw-icon-md);
+  height: var(--sw-icon-md);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--sw-icon-stroke);
 }
 
 /* ── Links ──────────────────────────────────────────────────────────────── */
@@ -462,7 +494,14 @@ samp,
     "liga" 0;
 }
 
-/* Phones: code steps down a size; long lines wrap (Expressive Code `wrap`). */
+/* Wrapped code lines continue under a two-character hanging indent, inside
+   Expressive Code's own inline padding. */
+:root .expressive-code .ec-line .code {
+  padding-inline-start: calc(var(--ec-codePadInl) - var(--ecGtrBrdWd, 0px) + 2ch);
+  text-indent: -2ch;
+}
+
+/* Phones: code steps down a size. */
 @media (max-width: 30rem) {
   :root .expressive-code pre {
     font-size: var(--sw-text-caption);
@@ -510,11 +549,22 @@ samp,
   text-decoration: none;
 }
 
+/* The nav is a popover (the phone menu); on wide screens it sits in the bar,
+   so the browser's popover box styles are reset here. */
 .sw-header__nav {
+  position: static;
   display: flex;
+  width: auto;
+  height: auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
   gap: var(--sw-space-1);
   align-items: center;
+  overflow: visible;
+  border: 0;
+  background: none;
+  color: inherit;
 }
 
 .sw-header__nav a,
@@ -575,8 +625,8 @@ samp,
 }
 
 /* Phones: one row (brand, search or menu, theme). The site links open from
-   the menu button as a panel under the bar; documentation pages hold the same
-   links in their own menu drawer. */
+   the menu button as a popover panel under the bar; documentation pages hold
+   the same links in their own menu drawer. */
 @media (max-width: 54rem) {
   .sw-header,
   .sw-header[data-has-search="true"] {
@@ -598,8 +648,9 @@ samp,
   }
 
   .sw-header__nav {
-    position: absolute;
-    top: 100%;
+    position: fixed;
+    top: var(--sw-header-height-compact);
+    bottom: auto;
     right: 0;
     left: 0;
     display: none;
@@ -611,7 +662,7 @@ samp,
     box-shadow: var(--sw-shadow-md);
   }
 
-  .sw-header[data-menu-open="true"]:not([data-has-search="true"]) .sw-header__nav {
+  .sw-header__nav:popover-open {
     display: flex;
   }
 

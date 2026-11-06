@@ -1,16 +1,4 @@
 /* Local to the four framework workbenches, not the other showcase routes. */
-.sw-showcase-page[data-framework="vanilla"] {
-  --sw-workbench-accent: var(--sw-accent);
-}
-.sw-showcase-page[data-framework="react"] {
-  --sw-workbench-accent: var(--sw-fw-react);
-}
-.sw-showcase-page[data-framework="vue"] {
-  --sw-workbench-accent: var(--sw-fw-vue);
-}
-.sw-showcase-page[data-framework="svelte"] {
-  --sw-workbench-accent: var(--sw-fw-svelte);
-}
 .sw-workbench-stage {
   --sw-stage-bg: var(--sw-surface-1);
   --sw-stage-raised: var(--sw-surface-2);
@@ -47,6 +35,8 @@
   gap: var(--sw-space-2) var(--sw-space-3);
   min-width: 0;
 }
+/* The primary action is brand green on every workbench; the framework colour
+   marks the framework only. */
 .sw-workbench-stage .sw-workbench-primary {
   display: inline-flex;
   align-items: center;
@@ -54,21 +44,21 @@
   gap: var(--sw-space-1-5);
   height: 2rem;
   padding: 0 var(--sw-space-3);
-  border: 1px solid var(--sw-workbench-accent);
+  border: 1px solid var(--sw-accent);
   border-radius: var(--sw-radius-md);
-  background: var(--sw-workbench-accent);
+  background: var(--sw-accent);
   color: var(--sw-accent-ink);
   font: var(--sw-weight-semibold) var(--sw-text-small) var(--sw-font-body);
   white-space: nowrap;
   cursor: pointer;
 }
+.sw-workbench-stage .sw-workbench-primary:hover:not(:disabled) {
+  border-color: var(--sw-accent-strong);
+  background: var(--sw-accent-strong);
+}
 .sw-workbench-stage .sw-workbench-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.sw-workbench-stage .sw-workbench-primary:focus-visible {
-  outline: 2px solid var(--sw-workbench-accent);
-  outline-offset: 3px;
 }
 .sw-workbench-readout {
   display: grid;
