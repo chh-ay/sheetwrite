@@ -206,24 +206,24 @@ import "@sheetwrite/core/styles.css";
 
 ### Widget and context-menu styling
 
-The built-in widgets (toolbar, find bar, menus, panels and the dashboard) read widget variables. The grid sets each one on its host element from the resolved theme, so the widgets follow the light and dark themes:
+The built-in widgets (toolbar, find bar, menus, panels and the dashboard) read widget variables. The grid sets the theme ones on its host element from the resolved theme; when unset, the others derive in the stylesheet from those, so the widgets follow the light and dark themes:
 
-| CSS custom property | Widget use | Set from |
+| CSS custom property | Widget use | Default |
 | --- | --- | --- |
-| `--sheetwrite-widget-font` | Widget text | `font` |
-| `--sheetwrite-widget-bg` | Widget and dashboard card background | `bg` |
-| `--sheetwrite-widget-fg` | Widget text color | `fg` |
-| `--sheetwrite-widget-border` | Borders and separators for toolbar, find and menu chrome | `gridLine` |
-| `--sheetwrite-widget-accent` | Accented labels | `headerFg` |
-| `--sheetwrite-widget-selection` | Selected rows and values | `selection` |
-| `--sheetwrite-widget-muted` | Secondary text | `fg` mixed 62% with `bg` |
-| `--sheetwrite-widget-muted-bg` | Dashboard background under its cards | `fg` mixed 4% with `bg` |
-| `--sheetwrite-widget-error` | Error text and outlines | red mixed 80% with `fg` |
-| `--sheetwrite-toolbar-bg` | Toolbar background | `headerBg` |
-| `--sheetwrite-toolbar-fg` | Toolbar text | `headerFg` |
-| `--sheetwrite-menu-hover` | Context-menu item hover background | `gridLine` |
-| `--sheetwrite-menu-shadow` | Menu and popup shadow | `0 6px 20px rgb(0 0 0 / 18%)` |
-| `--sheetwrite-menu-disabled-opacity` | Disabled context-menu row opacity | `0.45` |
+| `--sheetwrite-widget-font` | Widget text | theme `font` |
+| `--sheetwrite-widget-bg` | Widget and dashboard card background | theme `bg` |
+| `--sheetwrite-widget-fg` | Widget text color | theme `fg` |
+| `--sheetwrite-widget-border` | Borders and separators for toolbar, find and menu chrome | theme `gridLine` |
+| `--sheetwrite-widget-accent` | Accented labels | theme `headerFg` |
+| `--sheetwrite-widget-selection` | Selected rows and values | theme `selection` |
+| `--sheetwrite-toolbar-bg` | Toolbar background | theme `headerBg` |
+| `--sheetwrite-toolbar-fg` | Toolbar text | theme `headerFg` |
+| `--sheetwrite-menu-hover` | Context-menu item hover background | theme `gridLine` |
+| `--sheetwrite-widget-muted` | Secondary text | `--sheetwrite-widget-fg` mixed 62% with `--sheetwrite-widget-bg` |
+| `--sheetwrite-widget-muted-bg` | Dashboard background under its cards | `--sheetwrite-widget-fg` mixed 4% with `--sheetwrite-widget-bg` |
+| `--sheetwrite-widget-error` | Error text and outlines | red mixed 80% with `--sheetwrite-widget-fg` |
+| `--sheetwrite-menu-shadow` | Menu and popup shadow | a soft dark shadow |
+| `--sheetwrite-menu-disabled-opacity` | Disabled context-menu rows; disabled and mixed ribbon buttons | `0.5` on menu rows, `0.45` on ribbon buttons |
 
 The bundled menu uses these public classes:
 

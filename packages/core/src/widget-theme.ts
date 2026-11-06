@@ -1,11 +1,11 @@
 import type { Theme } from "./types/render.js";
 
 /**
- * Custom properties the built-in widgets (find bar, toolbar, menus, panels,
- * dashboard) read for their cosmetic styling. They are declared in
- * `styles.css` and `shell.css` via `var(...)` and seeded here from the
- * resolved {@link Theme}, so every widget follows the theme, light or dark,
- * and stays restylable by host CSS.
+ * Custom properties the built-in widgets (find bar, toolbar, context menu) read
+ * for their cosmetic styling. They are declared in `styles.css` via `var(...)`
+ * and seeded here from the resolved {@link Theme} so the default look is
+ * identical to the old hardcoded inline styles while remaining fully
+ * restylable by host CSS.
  */
 const WIDGET_THEME_VARS = {
   "--sheetwrite-widget-font": (t: Theme) => t.font,
@@ -14,20 +14,9 @@ const WIDGET_THEME_VARS = {
   "--sheetwrite-widget-border": (t: Theme) => t.gridLine,
   "--sheetwrite-widget-accent": (t: Theme) => t.headerFg,
   "--sheetwrite-widget-selection": (t: Theme) => t.selection,
-  // Secondary text: the foreground faded toward the background, 4.5:1 or more
-  // on the background in the light and dark themes.
-  "--sheetwrite-widget-muted": (t: Theme) => `color-mix(in srgb, ${t.fg} 62%, ${t.bg})`,
-  // The surface under the dashboard's cards: one step from the background
-  // toward the foreground, as a canvas sits behind its cards.
-  "--sheetwrite-widget-muted-bg": (t: Theme) => `color-mix(in srgb, ${t.fg} 4%, ${t.bg})`,
-  // Error text and outlines: red pulled toward the foreground, so it is
-  // darker on a light background and lighter on a dark one.
-  "--sheetwrite-widget-error": (t: Theme) => `color-mix(in srgb, #d92d20 80%, ${t.fg})`,
   "--sheetwrite-toolbar-bg": (t: Theme) => t.headerBg,
   "--sheetwrite-toolbar-fg": (t: Theme) => t.headerFg,
   "--sheetwrite-menu-hover": (t: Theme) => t.gridLine,
-  "--sheetwrite-menu-shadow": () => "0 6px 20px rgb(0 0 0 / 18%)",
-  "--sheetwrite-menu-disabled-opacity": () => "0.45",
 } as const;
 
 /**
