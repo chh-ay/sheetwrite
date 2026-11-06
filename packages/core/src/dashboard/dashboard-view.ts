@@ -5,6 +5,7 @@
 // is one undo step. This module loads as its own chunk (#231).
 
 import { cellScalarToText } from "../cell-input.js";
+import { formatNumber } from "../number-format.js";
 import { pivotsAvailable } from "../panels/panel-loader.js";
 import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
 import { compareScalars, scalarLabel, sourceDataRange } from "../panels/pivot-model.js";
@@ -336,7 +337,11 @@ function renderPivot(
     body.appendChild(note(result?.error ?? "#REF!"));
     return;
   }
-  body.appendChild(pivotTable(result));
+  const formats = grid
+    .getPivots(sheet)
+    .find((pivot) => pivot.id === item.pivot)
+    ?.values.map((value) => value.numberFormat);
+  body.appendChild(pivotTable(result, formats ?? []));
 }
 
 /**
@@ -370,7 +375,14 @@ export function dashboardPivotResult(
   }
 }
 
-function pivotTable(result: PivotResultView): HTMLTableElement {
+/**
+ * The result as a table. A value cell shows its value field's number
+ * format; value fields repeat across each column group, as on a sheet.
+ */
+function pivotTable(
+  result: PivotResultView,
+  formats: readonly (string | undefined)[],
+): HTMLTableElement {
   const table = document.createElement("table");
   table.className = "sheetwrite-dashboard-pivot";
   for (let row = 0; row < result.rows; row++) {
@@ -379,7 +391,12 @@ function pivotTable(result: PivotResultView): HTMLTableElement {
       const header = row < result.headerRows || col < result.labelCols;
       const cell = document.createElement(header ? "th" : "td");
       if (header) cell.scope = row < result.headerRows ? "col" : "row";
-      cell.textContent = cellScalarToText(result.cells[row * result.cols + col] ?? null);
+      const value = result.cells[row * result.cols + col] ?? null;
+      const format = header ? undefined : formats[(col - result.labelCols) % formats.length];
+      cell.textContent =
+        format !== undefined && typeof value === "number"
+          ? formatNumber(value, format)
+          : cellScalarToText(value);
       tr.appendChild(cell);
     }
     table.appendChild(tr);
