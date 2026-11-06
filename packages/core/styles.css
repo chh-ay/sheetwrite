@@ -2578,3 +2578,9 @@ textarea.sheetwrite-ribbon-field {
   flex: 1;
   min-width: 0;
 }
+
+/* A slicer value that no row has under the other slicers, as Excel dims it. */
+.sheetwrite-dashboard-slicer-value[data-no-data] {
+  color: var(--sheetwrite-widget-muted, #98a2b3);
+  border-style: dashed;
+}

@@ -92,7 +92,9 @@ function isItemBody(item: PlainRecord): boolean {
 
   const title = ownValue(item, "title");
   const selected = ownValue(item, "selected");
+  const noData = ownValue(item, "itemsWithNoData");
   return (
+    (noData === undefined || noData === "dim" || noData === "hide" || noData === "show") &&
     isColumnRef(ownValue(item, "field")) &&
     (title === undefined || isText(title)) &&
     (selected === undefined ||
