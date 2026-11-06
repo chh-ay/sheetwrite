@@ -1615,11 +1615,11 @@ describe("transactional document metadata", () => {
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
 
     grid.renameSheet("source", "Sales Data");
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
     grid.undo();
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(Sales!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Sales!A1+1");
     grid.redo();
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
 
     grid.moveSheet("source", 1);
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "source", "notes"]);
@@ -1628,11 +1628,11 @@ describe("transactional document metadata", () => {
 
     grid.removeSheet("source");
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(#REF!+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
     grid.undo();
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
     grid.redo();
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);

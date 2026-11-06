@@ -2707,7 +2707,10 @@ export async function readWorkbook(
       activeSheet,
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
       ...(calculation ? { calculation } : {}),
-      ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
+      // A model with only measures is still a model.
+      ...(dataModel?.relationships.length || dataModel?.measures?.length
+        ? { dataModel: structuredClone(dataModel) }
+        : {}),
       ...(externalLinks.links.length ? { externalLinks: externalLinks.links } : {}),
     },
     sheets,

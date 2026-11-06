@@ -2,6 +2,8 @@ import type {
   CellBlock,
   CellScalar,
   CellValue,
+  DashboardExport,
+  DashboardItemExport,
   PivotAggregation,
   PivotDefinition,
   PivotFilter,
@@ -14,6 +16,7 @@ import type {
 import { cellA1, sheetNameKey } from "@sheetwrite/core";
 
 import { type CellRect, parseCellRect, rectA1 } from "./cell-reference.js";
+import { staticCell } from "./dashboard.js";
 import { isoDateSerial, MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
 import {
   type ContentTypeOverride,
@@ -635,6 +638,7 @@ export async function readPivots(
       const restored = structuredClone(meta);
       if (!sourceExists(snapshot, restored))
         restored.source = { ...restored.source, invalid: true };
+      dropSavedOutputCells(sheet, restored);
       pivots.push(restored);
     }
 
@@ -1014,6 +1018,50 @@ function savedOutputRect(sheet: SheetSnapshot, pivot: PivotDefinition): CellRect
   return rect;
 }
 
+/**
+ * The current output of a pivot kept in metadata as one cell block at its
+ * anchor, each value with its number format; blank cells write nothing.
+ */
+function outputBlock(pivot: PivotDefinition, output: DashboardItemExport): CellBlock {
+  const cells: SnapshotCell[] = [];
+  let cols = 0;
+  for (const [row, values] of output.cells.entries()) {
+    cols = Math.max(cols, values.length);
+    for (const [col, value] of values.entries()) {
+      const format = output.numberFormats[row]?.[col] ?? null;
+      if (value === null && format === null) continue;
+      cells.push(staticCell(row, col, value, format, false));
+    }
+  }
+  return {
+    startRow: pivot.anchor.row,
+    startCol: pivot.anchor.col,
+    rowCount: output.cells.length,
+    colCount: cols,
+    cells,
+  };
+}
+
+/**
+ * Remove the cells of `sheet` that hold `pivot`'s saved output: the values
+ * the writer wrote for a pivot it kept in metadata. A cell another
+ * application changed stays, as user data that blocks the pivot.
+ */
+function dropSavedOutputCells(sheet: SheetSnapshot, pivot: PivotDefinition): void {
+  const saved = pivot.savedOutput;
+  if (!saved) return;
+  for (const block of sheet.cells) {
+    block.cells = block.cells.filter((cell) => {
+      const row = block.startRow + cell.rowOffset - pivot.anchor.row;
+      const col = block.startCol + cell.colOffset - pivot.anchor.col;
+      if (row < 0 || row >= saved.rows || col < 0 || col >= saved.cols) return true;
+      return (
+        cell.value.kind !== "literal" || cell.value.value !== saved.cells[row * saved.cols + col]
+      );
+    });
+  }
+}
+
 /** The saved output as one cell block; blank values write no cell. */
 function savedOutputBlock(
   saved: NonNullable<PivotDefinition["savedOutput"]>,
@@ -1158,6 +1206,12 @@ export interface PivotWrite {
   readonly workbookRelationships: readonly Relationship[];
   /** `<pivotCache>` elements for the workbook relationship ids of `workbookRelationships`. */
   pivotCaches(ids: readonly string[]): string[];
+  /**
+   * The output written as cells for each pivot kept in Sheetwrite metadata,
+   * by pivot ID. Metadata keeps it as the pivot's saved output, so the reader
+   * knows which cells are the pivot's and not user values.
+   */
+  readonly keptOutputs: ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
   readonly overrides: readonly ContentTypeOverride[];
   readonly parts: readonly ZipPart[];
   /**
@@ -1184,16 +1238,40 @@ export function preparePivots(
   ordered: readonly SheetSnapshot[],
   styles: StylesRegistry,
   context: XlsxCodecContext,
+  outputs: readonly DashboardExport[] = [],
 ): PivotWrite | undefined {
   if (!ordered.some((sheet) => (sheet.pivots?.length ?? 0) > 0)) return undefined;
 
   const plans: WritePlan[] = [];
+  const savedBlocks = new Map<string, CellBlock[]>();
+  const keptOutputs = new Map<string, NonNullable<PivotDefinition["savedOutput"]>>();
+  // A pivot kept in metadata writes its current output as cells, as Excel
+  // files carry every pivot's output, so Excel shows the values.
   const keepInMetadata = (sheet: SheetSnapshot, pivot: PivotDefinition, reason: string) => {
+    const output = outputs
+      .find((entry) => entry.sheet === sheet.id)
+      ?.items.find((item) => item.id === pivot.id);
     emitWarning(context, {
       code: "unsupported-feature",
-      message: `Pivot table ${pivot.name} was not written as a native pivot because ${reason}; it remains in Sheetwrite metadata`,
+      message: `Pivot table ${pivot.name} was not written as a native pivot because ${reason}; ${output ? "its current values were written as cells and " : ""}it remains in Sheetwrite metadata`,
       sheet: sheet.name,
     });
+    if (output === undefined) return;
+    const block = outputBlock(pivot, output);
+    const blocks = savedBlocks.get(sheet.id) ?? [];
+    blocks.push(block);
+    savedBlocks.set(sheet.id, blocks);
+    if (block.rowCount * block.colCount <= MAX_SAVED_OUTPUT_CELLS) {
+      keptOutputs.set(pivot.id, {
+        rows: block.rowCount,
+        cols: block.colCount,
+        cells: Array.from({ length: block.rowCount * block.colCount }, (_, offset) => {
+          return (
+            output.cells[Math.floor(offset / block.colCount)]?.[offset % block.colCount] ?? null
+          );
+        }),
+      });
+    }
   };
   for (const sheet of ordered) {
     // A dashboard's pivots stay in Sheetwrite metadata; its worksheet holds their values.
@@ -1225,7 +1303,6 @@ export function preparePivots(
   const cacheIds: number[] = [];
   const overrides: ContentTypeOverride[] = [];
   const parts: ZipPart[] = [];
-  const savedBlocks = new Map<string, CellBlock[]>();
   const nativeIds = new Set<string>();
   for (const plan of plans) {
     checkAbort(context);
@@ -1299,7 +1376,7 @@ export function preparePivots(
     cacheIds.push(cacheId);
     cacheId += 1;
   }
-  if (parts.length === 0) return undefined;
+  if (parts.length === 0 && savedBlocks.size === 0) return undefined;
 
   return {
     sheetRelationships: (sheetId) => sheetRelationships.get(sheetId) ?? [],
@@ -1308,6 +1385,7 @@ export function preparePivots(
       cacheIds.map(
         (id, index) => `<pivotCache cacheId="${id}" r:id="${escapeXml(ids[index] ?? "")}"/>`,
       ),
+    keptOutputs,
     overrides,
     parts,
     withSavedOutput: (sheet) => {
