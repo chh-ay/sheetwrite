@@ -12,6 +12,7 @@ import {
 } from "./layout/ShowcaseLayout.js";
 import {
   createDataModelScenario,
+  PENDING_SNAPSHOT,
   PIVOT_ROWS_USED,
   ORDER_ROWS,
   RELATIONSHIPS,
@@ -164,7 +165,7 @@ export default function DataModelShowcase() {
   return (
     <ShowcaseLayout
       code={{ title: "The code behind it", Snippet: DataModelSnippet }}
-      controls={<DataModelControls scenario={scenario} snapshot={snapshot} />}
+      controls={<DataModelControls scenario={scenario} snapshot={snapshot ?? PENDING_SNAPSHOT} />}
       demo={
         <>
           <DemoGrid

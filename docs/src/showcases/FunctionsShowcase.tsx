@@ -103,8 +103,11 @@ function FunctionsControls({
         title="Live results"
         description="Read from the engine after each change."
       >
+        {/* Before the engine is ready, each row holds its place with "…". */}
         <ShowcaseReadout
-          items={(snapshot?.results ?? []).map((result) => ({
+          items={(
+            snapshot?.results ?? family.formulas.map((entry) => ({ name: entry.name, value: "…" }))
+          ).map((result) => ({
             label: result.name,
             value: <span data-testid={`function-result-${result.name}`}>{result.value}</span>,
           }))}

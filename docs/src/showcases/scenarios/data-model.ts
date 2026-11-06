@@ -298,6 +298,23 @@ export interface DataModelSnapshot {
   readonly reads: readonly { label: string; src: string; value: string }[];
 }
 
+/** The pivot rows field the scenario starts with. */
+const FIRST_ROW_FIELD: RowFieldId = "category";
+
+/**
+ * The panel before the grid is ready: every relationship and read, nothing
+ * checked yet, so the panel has its final rows from the first paint.
+ */
+export const PENDING_SNAPSHOT: DataModelSnapshot = {
+  rowField: FIRST_ROW_FIELD,
+  relationships: RELATIONSHIPS.map(({ id, label }) => ({
+    id,
+    label,
+    status: { status: "unavailable" },
+  })),
+  reads: PIVOT_READS.map(({ label, src }) => ({ label, src, value: "…" })),
+};
+
 export interface DataModelScenario extends LiveScenario<DataModelSnapshot> {
   setRowField(id: RowFieldId): void;
   /** Give a second product the first product's ID, so the lookup key repeats. */
@@ -316,7 +333,7 @@ export function createDataModelScenario(host: HTMLElement): DataModelScenario {
   let grid: Grid | null = null;
   let shellElement: HTMLElement | null = null;
   let dispose = () => {};
-  let rowField: RowFieldId = "category";
+  let rowField = FIRST_ROW_FIELD;
 
   const ready = (async () => {
     // Letter headers without filler columns: the grid ends with each sheet's columns.

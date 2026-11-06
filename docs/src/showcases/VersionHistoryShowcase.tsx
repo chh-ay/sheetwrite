@@ -89,8 +89,9 @@ function HistoryControls({
         title="Versions"
         description="Newest first, with who saved or changed each."
       >
+        {/* Before the archive opens, the row its baseline version fills waits with "…". */}
         <ShowcaseReadout
-          items={(snapshot?.versions ?? []).map((version) => ({
+          items={(snapshot?.versions ?? [{ label: BASELINE_NAME, author: "…" }]).map((version) => ({
             label: version.label,
             value: version.author,
           }))}
