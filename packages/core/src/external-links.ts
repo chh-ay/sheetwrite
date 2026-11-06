@@ -1,5 +1,6 @@
 import { SheetwriteError } from "./errors.js";
 import { externalSheetText, rewriteExternalSheets } from "./external-link-formula.js";
+import { connectExternalLinkResolver } from "./external-link-session.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { ExternalLink, ExternalLinkSheet } from "./types/external-link.js";
@@ -51,6 +52,16 @@ export interface ExternalLinkUpdate {
 
 function sameBook(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
+}
+
+/**
+ * Give the Edit Links panel of `grid` a resolver, so its Update Values
+ * button can ask the host for current values. Without one, the panel lists
+ * the links and offers Change Source and Break Link only. Returns a function
+ * that disconnects the resolver.
+ */
+export function connectExternalLinks(grid: Grid, resolve: ExternalLinkResolver): () => void {
+  return connectExternalLinkResolver(grid, resolve);
 }
 
 /** The workbook's links; an absent list is empty. */

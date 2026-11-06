@@ -849,6 +849,16 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             ),
             available: queriesConnected,
           },
+          {
+            ...button(
+              "Edit Links",
+              "editLinks",
+              (grid) => void loadPanels(grid).then((panels) => panels.openEditLinksPanel(grid)),
+              "view",
+            ),
+            // As in Excel, the command shows only for a workbook with links.
+            available: (grid) => (grid.store.getWorkbook().externalLinks?.length ?? 0) > 0,
+          },
         ],
       },
       {
