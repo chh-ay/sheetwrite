@@ -15,38 +15,45 @@ queries refresh tables from your sources, and version history saves, compares an
 versions. Every add-on now installs through one call. Read the [breaking changes](#breaking-changes)
 before you upgrade.
 
+<Frame caption="A dashboard over the data model: KPI cards, a region slicer, a PivotChart and a pivot with a share-of-total measure.">
+  <Screenshot
+    name="dashboard"
+    alt="A dashboard sheet with three KPI cards for revenue, units sold and target attainment, a Region slicer with Americas and EMEA selected, a column chart of revenue by month and a pivot of revenue and share by product."
+  />
+</Frame>
+
 ## Highlights
 
 <CardGroup cols={2}>
-  <Card title="Dashboards" icon="dashboard" href="/docs/features/analysis/dashboards/">
+  <Card title="Dashboards" screenshot="dashboard" alt="A dashboard with KPI cards, a slicer, a chart and a pivot." href="/docs/features/analysis/dashboards/">
     Pivots, slicers, PivotCharts and KPI cards on a 12-column dashboard sheet. Slicers filter
     every pivot they reach through relationships.
   </Card>
-  <Card title="Data model and measures" icon="chart" href="/docs/features/analysis/data-model/">
+  <Card title="Data model and measures" screenshot="data-model" alt="The Data Model panel lists the Orders and Regions tables and their relationship." href="/docs/features/analysis/data-model/">
     Relate tables one-to-many, pivot over related tables, and write measures with `CALCULATE`
     and `ALL`.
   </Card>
-  <Card title="Sort in place" icon="table" href="/docs/features/data/data-operations/#sort-cells-in-place">
+  <Card title="Sort in place" screenshot="sort" alt="The Sort panel with a sort level, a header row option and Sort view only." href="/docs/features/data/data-operations/#sort-cells-in-place">
     Sort commands move the cells in Excel's sort order, as one undoable, synced change. The
     display-only sort is now the view sort.
   </Card>
-  <Card title="Linked workbooks" icon="file" href="/docs/features/formulas/">
+  <Card title="Linked workbooks" screenshot="edit-links" alt="The Edit Links panel lists a linked workbook with Update Values, Change Source and Break Link." href="/docs/features/formulas/">
     Formulas such as `[Budget.xlsx]Annual!C10` read the values a link saved. Update, change or
     break links from Edit Links.
   </Card>
-  <Card title="Saved queries" icon="download" href="/docs/features/data/">
+  <Card title="Saved queries" screenshot="queries" alt="The Queries and Connections panel lists the saved queries of the workbook." href="/docs/features/data/">
     The optional `@sheetwrite/queries` engine refreshes tables from CSV, JSON or host data, and
     XLSX keeps queries as Power Query M.
   </Card>
-  <Card title="Version history" icon="history" href="/docs/features/data/persistence/#opt-in-version-archives">
+  <Card title="Version history" screenshot="version-history" alt="The Version History panel lists saved versions with their authors." href="/docs/features/data/persistence/#opt-in-version-archives">
     Save named versions, compare two versions cell by cell with authors, and restore a
     workbook, sheet or range.
   </Card>
-  <Card title="Formula help" icon="formula" href="/docs/features/formulas/">
+  <Card title="Formula help" screenshot="formula-help" alt="The cell editor shows the SUMIFS argument guide while a formula is typed." href="/docs/features/formulas/">
     Autocomplete, an argument guide, live syntax errors, reference colours and Explain Formula
     in the cell editor and the formula bar.
   </Card>
-  <Card title="Compact ribbon" icon="ribbon" href="/docs/features/grid/">
+  <Card title="Compact ribbon" screenshot="compact-ribbon" alt="The compact ribbon folds its groups into menus at a narrow width." href="/docs/features/grid/">
     One command model drives the toolbar, the full ribbon and a new compact ribbon for narrow
     layouts.
   </Card>

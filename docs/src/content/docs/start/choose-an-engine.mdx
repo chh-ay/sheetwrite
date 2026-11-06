@@ -4,21 +4,39 @@ description: Use the default engine for standard formulas or select the full eng
 added: "0.6.0"
 ---
 
+Sheetwrite ships its formula engine in two builds. Both run the same Rust calculation engine; the
+full build adds the analysis functions and costs a larger download. Pick one before the first grid
+is created.
+
+<Diagram
+  name="engines"
+  alt="The default engine has math, lookup, text, logic, date, dynamic array and LET functions. The full engine has every default function plus statistics, finance, regex, database, matrix, LAMBDA helpers, GROUPBY and PIVOTBY. Both share one calculation engine."
+  width="640"
+  height="292"
+  caption="Both builds share storage, recalculation and limits; the full build adds function families."
+/>
+
 ## Compare the builds
 
-| Build | Package | Choose it for |
-| --- | --- | --- |
-| Default | `@sheetwrite/wasm` | Standard math, lookup, text, logic, dates, dynamic arrays, and `LET`; the smallest download. |
-| Full | `@sheetwrite/formulas` | Analysis families, `LAMBDA` helpers, `GROUPBY`, and `PIVOTBY`. |
+<CardGroup cols={2}>
+  <Card title="Default engine" icon="package">
+    `@sheetwrite/wasm`. Standard math, lookup, text, logic, dates, dynamic arrays and `LET`, in
+    the smallest download.
+  </Card>
+  <Card title="Full engine" icon="tab-formulas">
+    `@sheetwrite/formulas`. Adds statistics, distributions, regression, finance, regex, database,
+    matrix and reshaping functions, the `LAMBDA` helpers, `GROUPBY` and `PIVOTBY`.
+  </Card>
+</CardGroup>
 
-Both builds use the same Rust calculation engine, storage model, and resource
-limits. The full build adds statistics, distributions, regression, finance,
-regex, database, matrix, and reshaping functions. Check the
-[function catalog](/docs/reference/formula-functions/) for the build that
-provides each function. Compare download sizes in the
-[engine measurements](/docs/performance/formula-engine/).
+The [function catalog](/docs/reference/formula-functions/) names the build that provides each
+function, and the [engine measurements](/docs/performance/formula-engine/) compare download
+sizes.
 
-## Keep the default
+## Initialize the engine
+
+<Tabs label="Engine">
+<Tab title="Default engine">
 
 ```ts compile title="Initialize the default engine"
 import { initSheetwrite } from "@sheetwrite/core";
@@ -29,7 +47,8 @@ await initSheetwrite();
 Framework adapters make this call on mount. No explicit engine selection is
 needed for the default build.
 
-## Select the full engine
+</Tab>
+<Tab title="Full engine">
 
 ```sh verify title="Install the full engine"
 npm install @sheetwrite/core @sheetwrite/formulas
@@ -46,6 +65,9 @@ Run this before creating any grid or store and before mounting a framework
 adapter. Later zero-argument calls keep the selected engine. Importing the
 package alone does not select it.
 
+</Tab>
+</Tabs>
+
 ## Selection rules
 
 - An app uses one engine. Once initialization starts, selecting another engine rejects.
@@ -55,6 +77,14 @@ package alone does not select it.
 
 ## See also
 
-- [Installation](/docs/start/installation/) for explicit WASM sources and framework setup.
-- [Calculation engine](/docs/concepts/calculation-engine/) for recalculation, spills, and limits.
-- [Analysis formulas](/docs/features/formulas/analysis-formulas/) for full-engine examples.
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/docs/start/installation/">
+    WASM sources and framework setup.
+  </Card>
+  <Card title="Calculation engine" icon="memory" href="/docs/concepts/calculation-engine/">
+    Recalculation, spills and limits.
+  </Card>
+  <Card title="Analysis formulas" icon="chart" href="/docs/features/formulas/analysis-formulas/">
+    Full-engine examples.
+  </Card>
+</CardGroup>

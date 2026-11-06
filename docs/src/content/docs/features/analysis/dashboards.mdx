@@ -3,12 +3,34 @@ title: Dashboards
 description: "Arrange pivots, slicers, PivotCharts and KPI cards on a dashboard sheet with a grid layout that is saved, undone and synchronized."
 ---
 
-A dashboard is a sheet of the workbook with `kind: "dashboard"`. It has a tab, a name, an order and a visibility like a worksheet, but it has no cells, rows or columns. It holds items on a grid of 12 columns:
+A dashboard is a sheet of the workbook with `kind: "dashboard"`. It has a tab, a name, an order and a visibility like a worksheet, but it has no cells, rows or columns. It holds items on a grid of 12 columns.
 
-- a **pivot** item shows a pivot of the same sheet,
-- a **slicer** item lists the values of one table column and holds the values that pass,
-- a **chart** item shows a chart of the same sheet over one of its pivots, as an Excel PivotChart does,
-- a **KPI card** shows the value of one data model measure.
+<Frame caption="A dashboard over the data model: KPI cards, a slicer, a PivotChart and a pivot.">
+  <Screenshot
+    name="dashboard"
+    alt="A dashboard sheet with KPI cards for revenue, units sold and target attainment, a Region slicer with Americas and EMEA selected, a column chart of revenue by month and a pivot of revenue and share by product."
+  />
+</Frame>
+
+<CardGroup cols={2}>
+  <Card title="Pivot" icon="table" href="#items">
+    Shows a pivot of the same sheet, with each value field's number format.
+  </Card>
+  <Card title="Slicer" icon="filter" href="#slicers">
+    Lists the values of one table column and holds the values that pass.
+  </Card>
+  <Card title="Chart" icon="chart" href="#pivotcharts">
+    Shows a chart over one of the sheet's pivots, as an Excel PivotChart does.
+  </Card>
+  <Card title="KPI card" icon="gauge" href="#kpi-cards">
+    Shows the value of one data model measure in the slicers' filter context.
+  </Card>
+</CardGroup>
+
+<Info>
+  Pivot items, charts and KPI cards compute in the [full engine](/docs/start/choose-an-engine/).
+  With the default engine, each item says that it needs the full engine.
+</Info>
 
 ## Add a dashboard
 
