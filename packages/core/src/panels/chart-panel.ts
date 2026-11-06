@@ -5,7 +5,6 @@
 // keeps its draft.
 
 import { CHART_KINDS } from "../chart-kinds.js";
-import { categoryLevelLayout } from "../charts-live.js";
 import { findMeasure } from "../data-model.js";
 import { iconNode } from "../icons/resolve.js";
 import type {
@@ -253,11 +252,22 @@ function renderChartPanel(
   levelsLabel.append(levelsBox, document.createTextNode("Multi-level category labels"));
   axisSection.appendChild(levelsLabel);
 
-  /** Whether the categories of `chart` have levels: several pivot row fields or a 2-D category range. */
+  /**
+   * Whether the categories of `chart` have levels: several pivot row fields,
+   * or a category range of several rows and several columns, as charts-live
+   * reads them. The panel chunk does not load charts-live for it.
+   */
   const hasCategoryLevels = (chart: ChartDefinition): boolean => {
-    if (chart.kind === "pie" || chart.kind === "doughnut") return false;
+    const { kind } = chart;
+    if (kind === "pie" || kind === "doughnut" || kind === "scatter") return false;
     if (chart.pivot === undefined) {
-      return chart.series.some((series) => categoryLevelLayout(chart.kind, series) !== null);
+      return chart.series.some(
+        ({ categories }) =>
+          categories !== undefined &&
+          categories !== "#REF!" &&
+          categories.start.row !== categories.end.row &&
+          categories.start.col !== categories.end.col,
+      );
     }
     const pivot = grid.getPivots(ref.sheet).find((candidate) => candidate.id === chart.pivot);
     return (pivot?.rows.length ?? 0) > 1;

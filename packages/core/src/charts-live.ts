@@ -53,7 +53,7 @@ const EMPTY_READ: RangeRead = Object.freeze({
 });
 
 /** How a category range holds its levels: one per column or one per row. */
-export type CategoryLevelLayout = "columns" | "rows";
+type CategoryLevelLayout = "columns" | "rows";
 
 /**
  * How the categories of `series` hold levels, or null when they have one
@@ -62,10 +62,7 @@ export type CategoryLevelLayout = "columns" | "rows";
  * level per row when the values run along a row. Scatter charts read X
  * values, which have no levels.
  */
-export function categoryLevelLayout(
-  kind: ChartKind,
-  series: ChartSeries,
-): CategoryLevelLayout | null {
+function categoryLevelLayout(kind: ChartKind, series: ChartSeries): CategoryLevelLayout | null {
   const { categories, values } = series;
   if (kind === "scatter" || categories === undefined || categories === "#REF!") return null;
   if (categories.start.row === categories.end.row || categories.start.col === categories.end.col) {
