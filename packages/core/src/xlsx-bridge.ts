@@ -3,9 +3,7 @@ import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import type { CellScalar } from "./types/cell.js";
-import type { ChartView } from "./types/chart.js";
-import type { SheetId } from "./types/coordinates.js";
+import type { DashboardExport } from "./types/dashboard.js";
 import type { ColumnarData } from "./types/data.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -317,27 +315,6 @@ export interface XlsxWorkbookOptions {
    * unchanged since import.
    */
   powerQuery?: PowerQueryCodec;
-}
-
-/**
- * The static content of one dashboard item, as core computes it for an XLSX
- * export: Excel has no dashboard sheet, so the export writes these values.
- */
-export interface DashboardItemExport {
-  /** The item's ID. */
-  readonly id: string;
-  /** Rows of values from the top-left corner of the box; the first row is the caption. */
-  readonly cells: readonly (readonly CellScalar[])[];
-  /** Excel number format of each cell in `cells`, in the same shape; null shows it as General. */
-  readonly numberFormats: readonly (readonly (string | null)[])[];
-  /** A chart item's resolved view; the export writes it as a chart with literal data. */
-  readonly chart?: ChartView;
-}
-
-/** The static content of the items of one dashboard sheet. */
-export interface DashboardExport {
-  readonly sheet: SheetId;
-  readonly items: readonly DashboardItemExport[];
 }
 
 /** @internal Core-owned provenance for snapshots it materialized during this call. */

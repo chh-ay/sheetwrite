@@ -6,9 +6,8 @@
 import { resolveChartView } from "../charts-live.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
-import type { DashboardItem } from "../types/dashboard.js";
+import type { DashboardExport, DashboardItem, DashboardItemExport } from "../types/dashboard.js";
 import type { Store } from "../types/store.js";
-import type { DashboardExport, DashboardItemExport } from "../xlsx-bridge.js";
 import {
   applyDashboardPayload,
   dashboardItemTitle,

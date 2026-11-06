@@ -115,12 +115,14 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
-    dependencies: ["cell", "data-model"],
+    dependencies: ["cell", "chart", "coordinates", "data-model"],
     exports: [
       "Dashboard",
       "DashboardBox",
       "DashboardChartItem",
+      "DashboardExport",
       "DashboardItem",
+      "DashboardItemExport",
       "DashboardKpiItem",
       "DashboardPivotItem",
       "DashboardSlicerItem",
