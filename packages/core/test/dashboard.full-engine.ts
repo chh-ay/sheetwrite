@@ -15,8 +15,8 @@ import {
   type PivotDefinition,
   type WorkbookSnapshot,
 } from "../src/index.js";
-import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 
 beforeAll(async () => {
   await initSheetwrite({ engine: formulas });

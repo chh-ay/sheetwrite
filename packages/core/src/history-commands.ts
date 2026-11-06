@@ -5,7 +5,7 @@
 import type { Grid } from "./types/grid.js";
 
 /** Opens the history panel of one grid, or its Save Version form. */
-export type HistoryCommand = (action: "open" | "save") => void;
+type HistoryCommand = (action: "open" | "save") => void;
 
 const COMMANDS = new WeakMap<Grid, HistoryCommand>();
 

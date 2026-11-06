@@ -74,15 +74,15 @@ export function createQueriesAddon(
  * @example
  * ```ts
  * import type { Grid } from "@sheetwrite/core";
- * import { querySession } from "@sheetwrite/queries";
+ * import { querySessionOf } from "@sheetwrite/queries";
  *
  * async function refreshSales(grid: Grid) {
- *   const session = await querySession(grid);
+ *   const session = await querySessionOf(grid);
  *   return session.refreshAll();
  * }
  * ```
  */
-export function querySession(grid: Grid): Promise<QuerySession> {
+export function querySessionOf(grid: Grid): Promise<QuerySession> {
   const pending = SESSIONS.get(grid);
   if (pending !== undefined) return pending;
 

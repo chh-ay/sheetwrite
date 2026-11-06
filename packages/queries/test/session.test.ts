@@ -19,7 +19,7 @@ import {
   type QueryFetchRequest,
   type QueryFetchResult,
   type QuerySession,
-  querySession,
+  querySessionOf,
 } from "../src/node.js";
 
 beforeAll(async () => {
@@ -115,7 +115,7 @@ async function connect(
   if (fixture === undefined) throw new Error("the grid was not mounted with query settings");
   fixture.sources = sources;
   fixture.requests = requests;
-  return querySession(grid);
+  return querySessionOf(grid);
 }
 
 const cell = (grid: Grid, row: number, col: number) =>
@@ -445,7 +445,7 @@ describe("query sources and definitions", () => {
 
     grid.destroy();
 
-    await expect(querySession(grid)).rejects.toMatchObject({
+    await expect(querySessionOf(grid)).rejects.toMatchObject({
       code: "optional-backend-unavailable",
     });
   });
@@ -512,7 +512,7 @@ describe("query sources and definitions", () => {
       expect(peer.store.getCell({ sheet: "data", row: 1, col: 0 }).resolved).toBe("North");
       expect(peer.store.getWorkbook().queries?.map((query) => query.id)).toEqual(["sales"]);
       // The peer has no fetchSource, so it has no session and never fetches.
-      await expect(querySession(peer)).rejects.toMatchObject({
+      await expect(querySessionOf(peer)).rejects.toMatchObject({
         code: "optional-backend-unavailable",
       });
     } finally {

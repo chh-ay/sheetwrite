@@ -3,7 +3,7 @@ import type { PowerQueryCodec, SheetwriteAddon } from "@sheetwrite/core";
 import { createQueriesAddon, type QueriesAddonOptions, type QueryEngineOptions } from "./addon.js";
 import type { QueryEngine } from "./types.js";
 
-export { type QueriesAddonOptions, type QueryEngineOptions, querySession } from "./addon.js";
+export { type QueriesAddonOptions, type QueryEngineOptions, querySessionOf } from "./addon.js";
 
 export { QueryError } from "./errors.js";
 export type {
@@ -72,7 +72,7 @@ export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise
  * its Get Data, Refresh All and Queries & Connections commands, bound to the
  * host's `fetchSource`. The engine and its WASM load in the background when
  * such a grid is created; pages without the add-on load no query code. Get
- * the session with `querySession(grid)`.
+ * the session with `querySessionOf(grid)`.
  *
  * @example
  * ```ts

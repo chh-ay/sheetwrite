@@ -14,7 +14,7 @@ import {
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import * as formulas from "@sheetwrite/formulas";
 
-import { queriesAddon, querySession } from "../src/node.js";
+import { queriesAddon, querySessionOf } from "../src/node.js";
 
 beforeAll(async () => {
   await initSheetwrite({ engine: formulas, addons: [queriesAddon()] });
@@ -145,7 +145,7 @@ it("keeps a query output table's relationship through a refresh that updates the
       },
     },
   });
-  const session = await querySession(grid);
+  const session = await querySessionOf(grid);
   try {
     session.define(sales);
     expect((await session.refresh("sales")).status).toBe("applied");

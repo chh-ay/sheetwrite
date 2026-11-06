@@ -255,7 +255,7 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
     // The query package is a separate chunk; its engine and WASM load once
     // this page's grid exists. Only this grid gets a source, so other pages'
     // grids have no query session.
-    const { queriesAddon, querySession } = await import("@sheetwrite/queries");
+    const { queriesAddon, querySessionOf } = await import("@sheetwrite/queries");
     await initSheetwrite({ addons: [queriesAddon()] });
     if (disposed) return;
     shell = createSpreadsheetShell(host, {
@@ -283,7 +283,7 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
     if (result.status !== "applied")
       throw new Error(`The sales workbook did not load: ${result.status}`);
     shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
-    await loadTargets(await querySession(shell.grid));
+    await loadTargets(await querySessionOf(shell.grid));
   })();
 
   const stopTheme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));

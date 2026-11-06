@@ -238,12 +238,12 @@ its steps, and an optional output table. The queries add-on binds the saved
 queries of each grid to the host's `fetchSource` callback: install
 `queriesAddon({ fetchSource })` through `initSheetwrite`, or give one grid its
 own with `createGrid(host, { addons: { queries: { fetchSource } } })`. The query
-engine loads in the background when such a grid is created; `querySession(grid)`
+engine loads in the background when such a grid is created; `querySessionOf(grid)`
 resolves to the grid's session.
 
 ```ts compile title="Refresh saved queries through host fetch"
 import { type Grid, initSheetwrite } from "@sheetwrite/core";
-import { queriesAddon, querySession } from "@sheetwrite/queries";
+import { queriesAddon, querySessionOf } from "@sheetwrite/queries";
 
 await initSheetwrite({
   addons: [
@@ -258,7 +258,7 @@ await initSheetwrite({
 });
 
 async function refreshSales(grid: Grid) {
-  const session = await querySession(grid);
+  const session = await querySessionOf(grid);
 
   session.define({
     id: "sales",

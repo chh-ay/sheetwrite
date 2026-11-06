@@ -11,7 +11,6 @@ import {
   SheetwriteStore,
   toXlsxWorkbook,
 } from "../src/index.js";
-import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 import type {
   DashboardExport,
   DocumentOp,
@@ -21,6 +20,7 @@ import type {
 } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-backends.js";
 
 beforeAll(async () => {
   await initSheetwrite({ engine: formulas });
