@@ -17,7 +17,7 @@ export const RIBBON_PANEL_HEIGHT = 92;
 export const RIBBON_COMPACT_PANEL_HEIGHT = 36;
 
 /** Automatic layout switches below this width in CSS pixels. */
-export const RIBBON_COMPACT_WIDTH = 768;
+const RIBBON_COMPACT_WIDTH = 768;
 
 /**
  * Whether a ribbon `width` CSS pixels wide is compact in `mode`. The ribbon
