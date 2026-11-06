@@ -2,6 +2,7 @@ import { createGridFromSnapshot, initSheetwrite, type Grid, type Theme } from "@
 import { createFormulaBar, createNameBox, type ShellPiece } from "@sheetwrite/core/shell";
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { errorText } from "../lib/errors.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
@@ -251,6 +252,7 @@ export default function FormattingShowcase() {
               }
               variant="primary"
             >
+              <Icon name="refresh" />
               Export, then re-import XLSX
             </DemoButton>
             <output

@@ -1,6 +1,7 @@
 import type { Grid } from "@sheetwrite/core";
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { errorText } from "../lib/errors.js";
 import { ActionError } from "../lib/use-action.js";
 import {
@@ -129,6 +130,7 @@ export default function SpreadsheetShowcase() {
                   disabled={!ready}
                   onClick={() => setWidth(width === "narrow" ? "wide" : "narrow")}
                 >
+                  <Icon name={width === "narrow" ? "monitor" : "laptop"} />
                   {width === "narrow" ? "Unfold the ribbon" : "Fold the ribbon"}
                 </DemoButton>,
               )}

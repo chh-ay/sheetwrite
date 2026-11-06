@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { ActionError, useAction } from "../lib/use-action.js";
 import {
   ShowcaseControlGroup,
@@ -93,6 +94,7 @@ function FilterControls({
         ]}
       />
       <DemoButton disabled={disabled} onClick={onClear} variant="quiet">
+        <Icon name="close" />
         Clear view
       </DemoButton>
     </ShowcaseControlGroup>
@@ -116,12 +118,15 @@ function OrganizeControls({
     >
       <div className="sw-data-actions">
         <DemoButton disabled={disabled} onClick={() => run("group")}>
+          <Icon name="layers" />
           {snapshot?.collapsed ? "Expand batch" : "Collapse batch"}
         </DemoButton>
         <DemoButton disabled={disabled} onClick={() => run("rows")}>
+          <Icon name={snapshot?.hiddenRows ? "eye" : "eye-off"} />
           {snapshot?.hiddenRows ? "Unhide rows" : "Hide rows 25–27"}
         </DemoButton>
         <DemoButton disabled={disabled} onClick={() => run("columns")}>
+          <Icon name={snapshot?.hiddenColumns ? "eye" : "eye-off"} />
           {snapshot?.hiddenColumns ? "Unhide columns" : "Hide freight & owner"}
         </DemoButton>
       </div>
@@ -157,6 +162,7 @@ function RuleControls({
               <strong>{rule.column.header}</strong>
               <span>{rule.rule}</span>
               <DemoButton disabled={disabled} onClick={() => probe(rule.key)}>
+                <Icon name="shield" />
                 {rule.key === "order"
                   ? "Try a new order ID"
                   : `Try ${rule.key} ${probeValue(rule.key)}`}

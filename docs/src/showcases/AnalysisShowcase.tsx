@@ -1,6 +1,7 @@
 import type { Grid } from "@sheetwrite/core";
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { errorText } from "../lib/errors.js";
 import { ActionError } from "../lib/use-action.js";
 import {
@@ -144,6 +145,7 @@ export default function AnalysisShowcase() {
             <ShowcaseSteps
               steps={analysisSteps(
                 <DemoButton disabled={!ready} onClick={goToDipOrder}>
+                  <Icon name="search" />
                   Go to the order
                 </DemoButton>,
               )}

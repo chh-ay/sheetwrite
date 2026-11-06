@@ -2,6 +2,7 @@ import { cellA1, createGrid, type DocumentOp, type Grid } from "@sheetwrite/core
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { HighlightedCode } from "../components/HighlightedCode.js";
+import { Icon } from "../components/Icon.js";
 import { functionCount } from "../generated/formula-summary.json";
 import { errorText } from "../lib/errors.js";
 import { initFullEngine, whenStylesReady } from "../lib/full-engine.js";
@@ -258,6 +259,7 @@ export default function FormulasShowcase() {
               onClick={togglePromotion}
               variant="primary"
             >
+              <Icon name={promotionRestore ? "undo" : "bolt"} />
               {promotionRestore ? "Undo the APAC promotion" : "Run an APAC promotion: +20% units"}
             </DemoButton>
             <output aria-live="polite" className="sw-fx-recalc" data-testid="formulas-recalc">
@@ -326,6 +328,7 @@ export default function FormulasShowcase() {
                 value={draft}
               />
               <DemoButton data-testid="formulas-run" disabled={!ready} type="submit">
+                <Icon name="function" />
                 Calculate
               </DemoButton>
               <output aria-live="polite" data-testid="formulas-draft-result">
