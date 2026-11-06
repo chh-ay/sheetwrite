@@ -41,94 +41,118 @@
   font-size: var(--sw-text-eyebrow);
   font-weight: var(--sw-weight-semibold);
 }
-/* The newest release opens the sidebar, above the section groups. */
-.sw-sidebar__nav a.sw-release-card {
+/* Layout: a full-height sidebar beside one column that holds the top bar and
+   the page. Below 64rem the sidebar moves into the menu drawer. */
+.sw-docs {
   display: grid;
-  gap: var(--sw-space-1);
-  margin: 0 0 var(--sw-space-4);
-  padding: var(--sw-space-3) var(--sw-space-4);
-  border: var(--sw-border-width) solid color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
-  border-radius: var(--sw-radius-lg);
-  color: var(--sw-fg-muted);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--sw-accent) 12%, transparent), transparent 70%),
-    var(--sw-surface-1);
-  text-decoration: none;
-  transition: border-color var(--sw-motion-fast) var(--sw-motion-standard);
-}
-.sw-sidebar__nav a.sw-release-card:hover {
-  border-color: var(--sw-accent);
-  color: var(--sw-fg-muted);
-}
-.sw-sidebar__nav a.sw-release-card[aria-current="page"] {
-  border-color: var(--sw-accent);
-  font-weight: inherit;
-}
-.sw-release-card__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-  font-size: var(--sw-text-eyebrow);
-}
-.sw-release-card__badge {
-  border-radius: var(--sw-radius-pill);
-  padding: 0 var(--sw-space-1-5);
-  background: var(--sw-accent-soft);
-  color: var(--sw-accent-strong);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
-}
-.sw-release-card strong {
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-heading)
-    var(--sw-font-display);
-}
-.sw-release-card__summary {
-  font-size: var(--sw-text-caption);
-  line-height: var(--sw-leading-ui);
-}
-.sw-release-card__more {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sw-space-1);
-  margin-top: var(--sw-space-0-5);
-  color: var(--sw-accent-strong);
-  font-size: var(--sw-text-caption);
-  font-weight: var(--sw-weight-semibold);
-}
-.sw-nav-toggle {
-  display: none;
+  grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
 }
 
 .sw-sidebar {
-  position: fixed;
-  z-index: 10;
-  inset: var(--sw-header-height) auto 0 0;
-  width: var(--sw-sidebar-width);
-  /* The gutter is reserved even before the list overflows, so expanding a
-     group never narrows the column and reflows its text. The right padding
-     is trimmed by the thin scrollbar's width to keep the same text column. */
-  padding: var(--sw-space-8) var(--sw-space-2) var(--sw-space-8) var(--sw-space-5);
-  border-right: 1px solid var(--sw-border);
+  position: sticky;
+  top: 0;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border-right: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-0);
   overflow-y: auto;
+  /* The gutter is reserved even before the list overflows, so opening a
+     group never narrows the column and reflows its text. */
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
+/* The brand row lines up with the top bar beside it. */
+.sw-sidebar__brand {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+  min-height: var(--sw-header-height);
+  padding: 0 var(--sw-space-5);
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-0);
+  font: var(--sw-weight-bold) var(--sw-text-body) / 1 var(--sw-font-display);
+  text-decoration: none;
+}
+.sw-sidebar > .sw-sidebar__nav {
+  padding: var(--sw-space-4) var(--sw-space-3) var(--sw-space-10);
+}
 .sw-sidebar__nav {
+  display: grid;
+  gap: var(--sw-space-6);
+}
+/* A section: a small label over its pages. */
+.sw-nav-section {
   display: grid;
   gap: var(--sw-space-0-5);
 }
-/* Disclosure rows (sidebar groups, the inline outline): no native marker; a
+.sw-nav-section > h2 {
+  margin: 0 0 var(--sw-space-1);
+  padding-inline: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui)
+    var(--sw-font-display);
+}
+/* Page rows and group rows: icon, label, then a badge or chevron. */
+.sw-sidebar__nav a,
+.sw-nav-subgroup > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-1-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+  text-decoration: none;
+  transition:
+    color var(--sw-motion-fast) var(--sw-motion-standard),
+    background-color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+.sw-sidebar__nav a > .sw-icon,
+.sw-nav-subgroup > summary > .sw-icon:first-child {
+  flex: none;
+  color: var(--sw-fg-muted);
+}
+.sw-sidebar__nav a > span:first-of-type,
+.sw-nav-subgroup > summary > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sw-sidebar__nav a:hover,
+.sw-nav-subgroup > summary:hover {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-2);
+}
+/* The current page: a rounded accent highlight, icon included. */
+.sw-sidebar__nav a[aria-current="page"] {
+  color: var(--sw-accent-strong);
+  background: var(--sw-accent-soft);
+  font-weight: var(--sw-weight-semibold);
+}
+.sw-sidebar__nav a[aria-current="page"] > .sw-icon {
+  color: var(--sw-accent-strong);
+}
+/* Disclosure rows (nested groups, the inline outline): no native marker; a
    chevron from the sprite turns down when the row is open. */
-.sw-nav-group > summary,
 .sw-nav-subgroup > summary,
+.sw-toc-inline > summary {
+  cursor: pointer;
+  list-style: none;
+}
 .sw-toc-inline > summary {
   display: flex;
   align-items: center;
   gap: var(--sw-space-2);
-  cursor: pointer;
-  list-style: none;
 }
-.sw-nav-group > summary::-webkit-details-marker,
 .sw-nav-subgroup > summary::-webkit-details-marker,
 .sw-toc-inline > summary::-webkit-details-marker {
   display: none;
@@ -140,77 +164,15 @@
 details[open] > summary > .sw-disclosure-icon {
   transform: rotate(90deg);
 }
-.sw-nav-group > summary {
-  min-height: var(--sw-control-height);
-  padding: var(--sw-space-1-5) var(--sw-space-2);
-  border-radius: var(--sw-radius-sm);
-  color: var(--sw-fg-strong);
-  font-family: var(--sw-font-display);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-semibold);
-  transition: background-color var(--sw-motion-fast) var(--sw-motion-standard);
-}
-.sw-nav-group > summary:hover,
-.sw-nav-subgroup > summary:hover {
-  background: var(--sw-surface-2);
-}
-/* A tree line ties the pages to their group; the current page owns a short
-   accent segment of that line. */
-.sw-nav-group > div {
-  margin: var(--sw-space-1) 0 var(--sw-space-3) var(--sw-space-2);
-  border-left: var(--sw-border-width) solid var(--sw-border);
-}
-.sw-sidebar__nav a {
-  display: block;
-  margin-left: calc(var(--sw-border-width) * -1);
-  padding: var(--sw-space-1-5) var(--sw-space-3) var(--sw-space-1-5) var(--sw-space-4);
-  border-left: var(--sw-focus-ring-width) solid transparent;
-  border-radius: 0 var(--sw-radius-sm) var(--sw-radius-sm) 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-  line-height: var(--sw-leading-ui);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-  transition:
-    color var(--sw-motion-fast) var(--sw-motion-standard),
-    border-color var(--sw-motion-fast) var(--sw-motion-standard),
-    background-color var(--sw-motion-fast) var(--sw-motion-standard);
-}
-.sw-sidebar__nav a:hover {
-  border-left-color: var(--sw-border-strong);
-  color: var(--sw-fg-strong);
-}
-.sw-sidebar__nav a[aria-current="page"] {
-  border-left-color: var(--sw-accent);
-  color: var(--sw-fg-strong);
-  background: var(--sw-accent-soft);
-  font-weight: var(--sw-weight-semibold);
-}
-/* Page links carry an optional badge on the right edge. */
-.sw-sidebar__nav .sw-nav-group a {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-}
-.sw-sidebar__nav .sw-nav-group a > span:first-child,
-.sw-nav-group summary > span:first-child {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-/* A nested group reads as a quieter folder inside its section: same tree line,
-   one step in, label in the page-link weight. */
-.sw-nav-subgroup > summary {
-  padding: var(--sw-space-1-5) var(--sw-space-2) var(--sw-space-1-5) var(--sw-space-4);
-  border-radius: 0 var(--sw-radius-sm) var(--sw-radius-sm) 0;
-  color: var(--sw-fg);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-medium);
-}
+/* A group's pages sit one step in, on a quiet tree line. */
 .sw-nav-subgroup > div {
-  margin: var(--sw-space-0-5) 0 var(--sw-space-1) var(--sw-space-4);
+  display: grid;
+  gap: var(--sw-space-0-5);
+  margin: var(--sw-space-0-5) 0 var(--sw-space-1) calc(var(--sw-space-2) + var(--sw-icon-sm) / 2);
+  padding-left: var(--sw-space-2);
   border-left: var(--sw-border-width) solid var(--sw-border);
 }
-/* One quiet badge for pages changed in the latest release: tinted, never a
+/* One quiet badge for pages new in the current release: tinted, never a
    solid fill, so it never outweighs the current page's highlight. */
 .sw-nav-badge {
   flex: 0 0 auto;
@@ -220,75 +182,120 @@ details[open] > summary > .sw-disclosure-icon {
   color: var(--sw-accent-strong);
   font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
 }
-.sw-sidebar__nav section {
-  border-top: 1px solid var(--sw-border);
-  margin-top: var(--sw-space-4);
-  padding-top: var(--sw-space-4);
+
+/* The top bar over the reading column: tabs left; search, GitHub, theme and
+   (narrow screens) the menu right. */
+.sw-docs-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  grid-column: 2;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--sw-space-6);
+  min-height: var(--sw-header-height);
+  padding: 0 var(--sw-page-gutter);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+  backdrop-filter: blur(12px);
 }
-.sw-sidebar__nav section a {
-  margin-left: 0;
-  border-left: 0;
-  border-radius: var(--sw-radius-sm);
-  padding-left: var(--sw-space-2);
+.sw-docs-bar__brand {
+  display: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-body) / 1 var(--sw-font-display);
+  text-decoration: none;
 }
-.sw-sidebar__nav section a:hover {
+.sw-docs-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sw-space-1);
+  min-width: 0;
+}
+.sw-docs-tabs a {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+  padding: 0 var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1 var(--sw-font-body);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+.sw-docs-tabs a:hover {
+  color: var(--sw-fg-strong);
+}
+/* The active tab: strong text over an accent underline on the bar's edge. */
+.sw-docs-tabs a[aria-current] {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+.sw-docs-tabs a[aria-current]::after {
+  content: "";
+  position: absolute;
+  right: var(--sw-space-3);
+  bottom: calc(var(--sw-border-width) * -1);
+  left: var(--sw-space-3);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--sw-accent);
+}
+.sw-docs-tabs a[aria-current] > .sw-icon {
+  color: var(--sw-accent-strong);
+}
+.sw-docs-bar__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+}
+.sw-docs-bar__link {
+  padding: var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1 var(--sw-font-body);
+  text-decoration: none;
+}
+.sw-docs-bar__link:hover {
+  color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
 }
-.sw-sidebar__nav h2 {
-  margin: 0 0 var(--sw-space-1-5);
-  padding-inline: var(--sw-space-2);
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-display);
+.sw-nav-toggle {
+  display: none;
 }
 
 /* The reading column keeps the content width and centers in the space right
    of the sidebar; wide screens add the outline as a second column. */
 .sw-document {
+  grid-column: 2;
   display: grid;
   grid-template-columns: minmax(0, var(--sw-content-width));
   justify-content: center;
   align-content: start;
   min-width: 0;
-  margin-left: var(--sw-sidebar-width);
-  padding: var(--sw-space-12) var(--sw-page-gutter) var(--sw-space-16);
+  padding: var(--sw-space-10) var(--sw-page-gutter) var(--sw-space-16);
 }
 .sw-document__header {
   margin-bottom: var(--sw-space-10);
-  padding-bottom: var(--sw-space-8);
-  border-bottom: 1px solid var(--sw-border);
 }
-.sw-breadcrumb ol {
+/* The page's group, in the accent colour above the title. */
+.sw-document__eyebrow {
+  margin: 0 0 var(--sw-space-2);
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui)
+    var(--sw-font-body);
+}
+.sw-document__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sw-space-2);
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--sw-space-6);
-}
-.sw-breadcrumb li {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-  min-width: 0;
-}
-.sw-breadcrumb li + li::before {
-  content: "/";
-  color: var(--sw-fg-muted);
-}
-.sw-breadcrumb a,
-.sw-breadcrumb span {
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-.sw-breadcrumb a:hover {
-  color: var(--sw-accent-strong);
-  text-decoration: underline;
-}
-.sw-breadcrumb span[aria-current="page"] {
-  color: var(--sw-fg-strong);
+  margin-top: var(--sw-space-5);
 }
 .sw-document__header h1 {
   display: flex;
@@ -305,22 +312,12 @@ details[open] > summary > .sw-disclosure-icon {
   min-width: 0;
 }
 /* The page's one-sentence summary: the lead under the title. */
-.sw-document__header > span {
-  display: block;
+.sw-document__lead {
   max-width: var(--sw-measure-lead);
-  margin-top: var(--sw-space-4);
+  margin: var(--sw-space-3) 0 0;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-lead);
   line-height: var(--sw-leading-body);
-}
-.sw-title-package {
-  border: var(--sw-border-width) solid var(--sw-border);
-  border-radius: var(--sw-radius-sm);
-  padding: var(--sw-space-1) var(--sw-space-2);
-  color: var(--sw-fg-muted);
-  background: var(--sw-surface-2);
-  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: 0;
 }
 /* Reading hierarchy, every level in the display face: h2 sections with room
    above, h3 subsections, h4 labels. */
@@ -916,14 +913,45 @@ html:has(.sw-nav-dialog[open]) {
   }
 }
 @media (max-width: 63.999rem) {
+  /* Anchors land below the two-row bar: the brand row and the tab row. */
+  html:has(.sw-docs) {
+    --sw-header-height: calc(var(--sw-header-height-compact) + var(--sw-docs-tab-row-height));
+  }
+  .sw-docs {
+    --sw-docs-tab-row-height: 2.75rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
   .sw-sidebar {
+    display: none;
+  }
+  .sw-docs-bar {
+    grid-column: 1;
+    flex-wrap: wrap;
+    gap: 0 var(--sw-space-4);
+    min-height: 0;
+  }
+  .sw-docs-bar__brand {
+    display: flex;
+    min-height: var(--sw-header-height-compact);
+  }
+  /* The tabs take their own row under the brand and scroll sideways. */
+  .sw-docs-tabs {
+    order: 3;
+    flex: 1 0 100%;
+    height: var(--sw-docs-tab-row-height);
+    margin-inline: calc(var(--sw-page-gutter) * -1);
+    padding-inline: calc(var(--sw-page-gutter) - var(--sw-space-3));
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sw-docs-tabs::-webkit-scrollbar {
     display: none;
   }
   .sw-nav-toggle {
     display: inline-grid;
   }
   .sw-document {
-    margin-left: 0;
+    grid-column: 1;
     padding: var(--sw-space-8) var(--sw-page-gutter) var(--sw-space-12);
   }
 }
@@ -950,8 +978,8 @@ html:has(.sw-nav-dialog[open]) {
   .sw-document {
     padding-top: var(--sw-space-6);
   }
-  .sw-breadcrumb ol {
-    margin-bottom: var(--sw-space-4);
+  .sw-docs-bar__link {
+    display: none;
   }
   .sw-doc-home .sw-doc-start {
     grid-template-columns: 1fr;

@@ -1,10 +1,13 @@
 import apiNav from "../generated/api-nav.json" with { type: "json" };
 // Formula family pages; formula-nav.json is emitted by docs:generate.
 import formulaNav from "../generated/formula-nav.json" with { type: "json" };
+import type { IconName } from "../icons/icon-names.js";
 import { RELEASES, RELEASES_HREF, minorVersion, releaseDate, releaseHref } from "./releases.js";
 
 interface NavigationEntry {
   label: string;
+  /** The entry's sidebar icon, from the Sheetwrite sprite. */
+  icon?: IconName;
   /** Release that added the page; it shows "New" for each patch of that minor release. */
   added?: string;
   /** Release that changed the page substantially; it shows "Updated" likewise. */
@@ -29,8 +32,30 @@ interface NavigationGroup extends NavigationEntry {
  */
 export type NavigationItem = NavigationPage | NavigationGroup;
 
+/** The parts of the documentation, one tab each in the top bar. */
+export type DocsTabId = "guides" | "api" | "formulas" | "changelog" | "showcases";
+
+/** One top-bar tab: its landing page and icon. */
+export interface DocsTab {
+  readonly id: DocsTabId;
+  readonly label: string;
+  readonly href: string;
+  readonly icon: IconName;
+}
+
+/** The top-bar tabs, in order. Showcases leaves the documentation. */
+export const DOCS_TABS: readonly DocsTab[] = [
+  { id: "guides", label: "Guides", href: "/docs/", icon: "book" },
+  { id: "api", label: "API Reference", href: "/docs/api/", icon: "code" },
+  { id: "formulas", label: "Formulas", href: "/docs/reference/formula-functions/", icon: "formula" },
+  { id: "changelog", label: "Changelog", href: RELEASES_HREF, icon: "history" },
+  { id: "showcases", label: "Showcases", href: "/showcases/", icon: "play" },
+];
+
 export interface NavigationSection {
   label: string;
+  /** The tab whose sidebar lists this section. */
+  tab: DocsTabId;
   /** The section's overview page, which lists its pages as cards. */
   href?: string;
   items: readonly NavigationItem[];
@@ -50,264 +75,409 @@ const RELEASE = "0.6.0";
 export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Overview",
-    items: [{ label: "Overview", href: "/docs/" }],
+    tab: "guides",
+    items: [{ label: "Introduction", href: "/docs/", icon: "book" }],
   },
   {
     label: "Getting started",
+    tab: "guides",
     href: "/docs/start/",
     items: [
-      { label: "Installation", href: "/docs/start/installation/" },
-      { label: "First grid", href: "/docs/start/first-grid/" },
-      { label: "Choose an engine", href: "/docs/start/choose-an-engine/", added: RELEASE },
-      { label: "Upgrade to 0.6.0", href: "/docs/start/upgrade-to-0-6-0/", added: RELEASE },
+      { label: "Installation", href: "/docs/start/installation/", icon: "download" },
+      { label: "First grid", href: "/docs/start/first-grid/", icon: "table" },
+      {
+        label: "Choose an engine",
+        href: "/docs/start/choose-an-engine/",
+        icon: "bolt",
+        added: RELEASE,
+      },
+      {
+        label: "Upgrade to 0.6.0",
+        href: "/docs/start/upgrade-to-0-6-0/",
+        icon: "arrow-up",
+        added: RELEASE,
+      },
       // Not released yet; the label says so beside the 0.6.x version in the header.
-      { label: "Upgrade to 0.7.0 (next)", href: "/docs/start/upgrade-to-0-7-0/" },
+      { label: "Upgrade to 0.7.0 (next)", href: "/docs/start/upgrade-to-0-7-0/", icon: "arrow-up" },
     ],
   },
   {
     label: "Frameworks",
+    tab: "guides",
     items: [
-      { label: "Vanilla", href: "/docs/frameworks/vanilla/" },
-      { label: "React", href: "/docs/frameworks/react/" },
-      { label: "Vue", href: "/docs/frameworks/vue/" },
-      { label: "Svelte", href: "/docs/frameworks/svelte/" },
-      { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/" },
+      { label: "Vanilla", href: "/docs/frameworks/vanilla/", icon: "code" },
+      { label: "React", href: "/docs/frameworks/react/", icon: "code" },
+      { label: "Vue", href: "/docs/frameworks/vue/", icon: "code" },
+      { label: "Svelte", href: "/docs/frameworks/svelte/", icon: "code" },
+      { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/", icon: "refresh" },
     ],
   },
   {
     label: "Concepts",
+    tab: "guides",
     href: "/docs/concepts/",
     items: [
-      { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/" },
+      { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/", icon: "key" },
       {
         label: "Calculation engine",
         href: "/docs/concepts/calculation-engine/",
+        icon: "function",
         updated: RELEASE,
       },
-      { label: "Documents and operations", href: "/docs/concepts/documents-and-operations/" },
-      { label: "Error handling", href: "/docs/concepts/error-handling/" },
+      {
+        label: "Documents and operations",
+        href: "/docs/concepts/documents-and-operations/",
+        icon: "file",
+      },
+      { label: "Error handling", href: "/docs/concepts/error-handling/", icon: "warning" },
     ],
   },
   {
     label: "Features",
+    tab: "guides",
     items: [
       {
         label: "Grid",
         href: "/docs/features/grid/",
+        icon: "sheet",
         items: [
           {
             label: "Options and presentation",
             href: "/docs/features/grid/options-and-presentation/",
+            icon: "sliders",
           },
           {
             label: "Toolbar and ribbon",
             href: "/docs/features/grid/toolbar-and-ribbon/",
+            icon: "layers",
             added: RELEASE,
           },
-          { label: "Selection and keyboard", href: "/docs/features/grid/selection-and-keyboard/" },
+          {
+            label: "Selection and keyboard",
+            href: "/docs/features/grid/selection-and-keyboard/",
+            icon: "check",
+          },
           {
             label: "Editing and clipboard",
             href: "/docs/features/grid/editing-and-clipboard/",
+            icon: "copy",
             updated: RELEASE,
           },
-          { label: "Custom editors", href: "/docs/features/grid/custom-editors/" },
-          { label: "Resize, merge and fill", href: "/docs/features/grid/resize-merge-and-fill/" },
-          { label: "Context menu", href: "/docs/features/grid/context-menu/" },
-          { label: "Search", href: "/docs/features/grid/search/" },
-          { label: "Status bar", href: "/docs/features/grid/status-bar/", added: RELEASE },
-          { label: "Touch", href: "/docs/features/grid/touch/" },
-          { label: "Grid methods", href: "/docs/features/grid/grid-methods/" },
+          { label: "Custom editors", href: "/docs/features/grid/custom-editors/", icon: "code" },
+          {
+            label: "Resize, merge and fill",
+            href: "/docs/features/grid/resize-merge-and-fill/",
+            icon: "merge",
+          },
+          { label: "Context menu", href: "/docs/features/grid/context-menu/", icon: "menu" },
+          { label: "Search", href: "/docs/features/grid/search/", icon: "search" },
+          {
+            label: "Status bar",
+            href: "/docs/features/grid/status-bar/",
+            icon: "gauge",
+            added: RELEASE,
+          },
+          { label: "Touch", href: "/docs/features/grid/touch/", icon: "monitor" },
+          { label: "Grid methods", href: "/docs/features/grid/grid-methods/", icon: "code" },
         ],
       },
       {
         label: "Formatting",
         href: "/docs/features/formatting/",
+        icon: "sparkle",
         items: [
-          { label: "Styles and themes", href: "/docs/features/formatting/styles/" },
+          { label: "Styles and themes", href: "/docs/features/formatting/styles/", icon: "sun" },
           {
             label: "Fonts and alignment",
             href: "/docs/features/formatting/fonts-and-alignment/",
+            icon: "sliders",
             updated: RELEASE,
           },
-          { label: "Number formats", href: "/docs/features/formatting/number-formats/" },
-          { label: "Conditional formats", href: "/docs/features/formatting/conditional-formats/" },
+          {
+            label: "Number formats",
+            href: "/docs/features/formatting/number-formats/",
+            icon: "function",
+          },
+          {
+            label: "Conditional formats",
+            href: "/docs/features/formatting/conditional-formats/",
+            icon: "filter",
+          },
         ],
       },
       {
         label: "Data",
         href: "/docs/features/data/",
+        icon: "database",
         items: [
-          { label: "Data operations", href: "/docs/features/data/data-operations/" },
-          { label: "Datasources", href: "/docs/features/data/datasources/" },
-          { label: "Host-owned rows", href: "/docs/features/data/host-owned-rows/" },
+          { label: "Data operations", href: "/docs/features/data/data-operations/", icon: "sort" },
+          { label: "Datasources", href: "/docs/features/data/datasources/", icon: "server" },
+          { label: "Host-owned rows", href: "/docs/features/data/host-owned-rows/", icon: "link" },
           {
             label: "Validation, protection and notes",
             href: "/docs/features/data/validation-protection-and-notes/",
+            icon: "shield",
           },
-          { label: "Persistence", href: "/docs/features/data/persistence/" },
+          { label: "Persistence", href: "/docs/features/data/persistence/", icon: "save" },
         ],
       },
       {
         label: "Formulas",
         href: "/docs/features/formulas/",
+        icon: "formula",
         items: [
           {
             label: "Authoring and references",
             href: "/docs/features/formulas/authoring-and-references/",
+            icon: "link",
           },
           {
             label: "Operators and reference operators",
             href: "/docs/features/formulas/operators/",
+            icon: "plus",
             added: RELEASE,
           },
           {
             label: "Dynamic arrays and spills",
             href: "/docs/features/formulas/dynamic-arrays-and-spills/",
+            icon: "spill",
           },
           {
             label: "OFFSET and INDIRECT",
             href: "/docs/features/formulas/offset-and-indirect/",
+            icon: "arrow-right",
             added: RELEASE,
           },
           {
             label: "Volatile functions",
             href: "/docs/features/formulas/volatile-functions/",
+            icon: "refresh",
             added: RELEASE,
           },
           {
             label: "Iterative calculation",
             href: "/docs/features/formulas/iterative-calculation/",
+            icon: "redo",
             added: RELEASE,
           },
           {
             label: "Lookup, criteria and financial rules",
             href: "/docs/features/formulas/lookup-criteria-and-financial/",
+            icon: "filter",
           },
           {
             label: "Analysis formulas (full engine)",
             href: "/docs/features/formulas/analysis-formulas/",
+            icon: "chart",
           },
           {
             label: "Custom functions",
             href: "/docs/features/formulas/custom-functions/",
+            icon: "function",
           },
           {
             label: "Formula help",
             href: "/docs/features/formulas/formula-help/",
+            icon: "info",
           },
         ],
       },
       {
         label: "Analysis",
         href: "/docs/features/analysis/",
+        icon: "chart",
         items: [
-          { label: "Pivot tables", href: "/docs/features/analysis/pivot-tables/", added: RELEASE },
-          { label: "Charts", href: "/docs/features/analysis/charts/", added: RELEASE },
+          {
+            label: "Pivot tables",
+            href: "/docs/features/analysis/pivot-tables/",
+            icon: "pivot",
+            added: RELEASE,
+          },
+          {
+            label: "Charts",
+            href: "/docs/features/analysis/charts/",
+            icon: "chart",
+            added: RELEASE,
+          },
+          { label: "Dashboards", href: "/docs/features/analysis/dashboards/", icon: "dashboard" },
+          { label: "Data model", href: "/docs/features/analysis/data-model/", icon: "layers" },
         ],
       },
-      { label: "Collaboration", href: "/docs/features/collaboration/" },
-      { label: "Worker rendering", href: "/docs/features/worker-rendering/" },
-      { label: "Accessibility", href: "/docs/features/accessibility/" },
+      { label: "Collaboration", href: "/docs/features/collaboration/", icon: "users" },
+      { label: "Worker rendering", href: "/docs/features/worker-rendering/", icon: "monitor" },
+      { label: "Accessibility", href: "/docs/features/accessibility/", icon: "eye" },
     ],
   },
   {
     label: "Import and export",
+    tab: "guides",
     href: "/docs/import-export/",
     items: [
-      { label: "XLSX import", href: "/docs/import-export/xlsx-import/" },
-      { label: "XLSX export", href: "/docs/import-export/xlsx-export/" },
-      { label: "CSV and TSV", href: "/docs/import-export/csv-and-tsv/" },
+      { label: "XLSX import", href: "/docs/import-export/xlsx-import/", icon: "upload" },
+      { label: "XLSX export", href: "/docs/import-export/xlsx-export/", icon: "download" },
+      { label: "CSV and TSV", href: "/docs/import-export/csv-and-tsv/", icon: "file" },
       {
         label: "Kept parts and round trips",
         href: "/docs/import-export/kept-parts-and-round-trips/",
+        icon: "restore",
         added: RELEASE,
       },
       {
         label: "Large files and streaming",
         href: "/docs/import-export/large-files-and-streaming/",
+        icon: "live",
         updated: RELEASE,
       },
       {
         label: "LibreOffice compatibility",
         href: "/docs/import-export/libreoffice-compatibility/",
+        icon: "compare",
         added: RELEASE,
       },
     ],
   },
   {
     label: "Tutorials",
+    tab: "guides",
     href: "/docs/tutorials/",
     items: [
       {
         label: "Excel in JavaScript",
         href: "/docs/tutorials/excel-in-javascript/",
+        icon: "code",
         added: RELEASE,
       },
-      { label: "Excel in React", href: "/docs/tutorials/excel-in-react/", added: RELEASE },
-      { label: "Excel in Vue", href: "/docs/tutorials/excel-in-vue/", added: RELEASE },
-      { label: "Excel in Svelte", href: "/docs/tutorials/excel-in-svelte/", added: RELEASE },
-      { label: "Excel in Node.js", href: "/docs/tutorials/excel-in-nodejs/", added: RELEASE },
+      {
+        label: "Excel in React",
+        href: "/docs/tutorials/excel-in-react/",
+        icon: "code",
+        added: RELEASE,
+      },
+      { label: "Excel in Vue", href: "/docs/tutorials/excel-in-vue/", icon: "code", added: RELEASE },
+      {
+        label: "Excel in Svelte",
+        href: "/docs/tutorials/excel-in-svelte/",
+        icon: "code",
+        added: RELEASE,
+      },
+      {
+        label: "Excel in Node.js",
+        href: "/docs/tutorials/excel-in-nodejs/",
+        icon: "server",
+        added: RELEASE,
+      },
       {
         label: "Spreadsheet app with the ribbon",
         href: "/docs/tutorials/spreadsheet-app-with-ribbon/",
+        icon: "layers",
         added: RELEASE,
       },
     ],
   },
   {
     label: "Performance",
+    tab: "guides",
+    href: "/docs/performance/",
     items: [
+      { label: "Render", href: "/docs/performance/render/", icon: "monitor" },
+      { label: "Data engine", href: "/docs/performance/data-engine/", icon: "database" },
+      { label: "Core write path", href: "/docs/performance/core-write-path/", icon: "bolt" },
+      { label: "Formula engine", href: "/docs/performance/formula-engine/", icon: "function" },
+      { label: "XLSX codec", href: "/docs/performance/xlsx-codec/", icon: "file" },
+      { label: "Delivery size", href: "/docs/performance/delivery-size/", icon: "download" },
+      { label: "Memory", href: "/docs/performance/memory/", icon: "gauge" },
       {
-        label: "Overview",
-        href: "/docs/performance/",
-        items: [
-          { label: "Render", href: "/docs/performance/render/" },
-          { label: "Data engine", href: "/docs/performance/data-engine/" },
-          { label: "Core write path", href: "/docs/performance/core-write-path/" },
-          { label: "Formula engine", href: "/docs/performance/formula-engine/" },
-          { label: "XLSX codec", href: "/docs/performance/xlsx-codec/" },
-          { label: "Delivery size", href: "/docs/performance/delivery-size/" },
-          { label: "Memory", href: "/docs/performance/memory/" },
-          { label: "Release comparison", href: "/docs/performance/release-comparison/" },
-          { label: "Benchmark protocol", href: "/docs/performance/benchmark-protocol/" },
-        ],
+        label: "Release comparison",
+        href: "/docs/performance/release-comparison/",
+        icon: "compare",
+      },
+      {
+        label: "Benchmark protocol",
+        href: "/docs/performance/benchmark-protocol/",
+        icon: "clock",
       },
     ],
   },
   {
     label: "Reference",
+    tab: "api",
     items: [
-      { label: "API contract", href: "/docs/reference/api-contract/" },
+      { label: "API contract", href: "/docs/reference/api-contract/", icon: "book" },
+      { label: "Document operations", href: "/docs/reference/document-operations/", icon: "file" },
+      { label: "Events", href: "/docs/reference/events/", icon: "live" },
       {
-        label: "Formula functions",
-        href: "/docs/reference/formula-functions/",
-        items: formulaNav,
+        label: "Compatibility limits",
+        href: "/docs/reference/compatibility-limits/",
+        icon: "warning",
       },
-      { label: "Excel function coverage", href: "/docs/reference/excel-function-coverage/" },
-      { label: "Document operations", href: "/docs/reference/document-operations/" },
-      { label: "Events", href: "/docs/reference/events/" },
-      { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
-      { label: "Compatibility results", href: "/docs/reference/compatibility-results/" },
-      { label: "Package entry points", href: "/docs/reference/package-entry-points/" },
-      { label: "Moved pages", href: "/docs/reference/moved-guides/" },
+      {
+        label: "Compatibility results",
+        href: "/docs/reference/compatibility-results/",
+        icon: "check",
+      },
+      {
+        label: "Package entry points",
+        href: "/docs/reference/package-entry-points/",
+        icon: "layers",
+      },
+      { label: "Moved pages", href: "/docs/reference/moved-guides/", icon: "arrow-right" },
     ],
   },
   {
     // Generated from package exports; api-nav.json is emitted by docs:generate.
     label: API_PACKAGES_LABEL,
-    items: [{ label: "All entry points", href: "/docs/api/" }, ...apiNav],
+    tab: "api",
+    items: [
+      { label: "All entry points", href: "/docs/api/", icon: "layers" },
+      ...apiNav.map((entry) => ({ ...entry, icon: "code" as const })),
+    ],
+  },
+  {
+    label: "Formula functions",
+    tab: "formulas",
+    items: [
+      { label: "Overview", href: "/docs/reference/formula-functions/", icon: "formula" },
+      ...formulaNav.map((entry) => ({ ...entry, icon: "function" as const })),
+      {
+        label: "Excel function coverage",
+        href: "/docs/reference/excel-function-coverage/",
+        icon: "check",
+      },
+    ],
   },
   {
     label: "Release notes",
+    tab: "changelog",
     items: [
-      { label: "All releases", href: RELEASES_HREF },
+      { label: "All releases", href: RELEASES_HREF, icon: "history" },
       ...RELEASES.map((release) => ({
         label: `${release.version} · ${releaseDate(release)}`,
         href: releaseHref(release.version),
+        icon: "clock" as const,
       })),
     ],
   },
 ];
+
+/** The sections a tab's sidebar lists. */
+export function tabSections(tab: DocsTabId): readonly NavigationSection[] {
+  return DOCS_NAVIGATION.filter((section) => section.tab === tab);
+}
+
+/**
+ * The tab a documentation page belongs to: the tab of its navigation section,
+ * or, for pages outside the navigation (generated API symbols, moved pages),
+ * the tab whose landing path prefixes it.
+ */
+export function tabForHref(activeHref: string | undefined): DocsTabId {
+  const section = nearestNavigationItem(activeHref)?.section;
+  const tab = DOCS_NAVIGATION.find((entry) => entry.label === section)?.tab;
+  if (tab !== undefined) return tab;
+  if (activeHref?.startsWith("/docs/api/")) return "api";
+  if (activeHref?.startsWith("/docs/reference/formula-functions/")) return "formulas";
+  if (activeHref?.startsWith(RELEASES_HREF)) return "changelog";
+  return "guides";
+}
 
 /** Depth-first pages of a tree, in the order a reader sees them in the sidebar. */
 export function navigationPages(items: readonly NavigationItem[]): NavigationPage[] {

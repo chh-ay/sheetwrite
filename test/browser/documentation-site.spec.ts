@@ -66,18 +66,11 @@ for (const [width, hasDesktopOutline] of [
     await expect(page.getByRole("navigation", { name: "On this page", exact: true })).toHaveCount(
       0,
     );
-    if (width < 1024) {
-      await page.getByRole("button", { name: "Documentation menu", exact: true }).click();
-      await page
-        .getByRole("dialog", { name: "Documentation", exact: true })
-        .getByRole("link", { name: "Showcases", exact: true })
-        .click();
-    } else {
-      await page
-        .getByRole("navigation", { name: "Site", exact: true })
-        .getByRole("link", { name: "Showcases", exact: true })
-        .click();
-    }
+    // Showcases is a tab of the documentation bar at every width.
+    await page
+      .getByRole("navigation", { name: "Documentation sections", exact: true })
+      .getByRole("link", { name: "Showcases", exact: true })
+      .click();
     await expect(page).toHaveURL(siteUrl("/showcases/"));
   });
 }
