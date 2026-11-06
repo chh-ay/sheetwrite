@@ -1,10 +1,11 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, serialize,
-    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    invalidate_sheet_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, shift_cols,
+    shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
+use crate::formula_rewrite::rewrite_parsed_references;
 use crate::memory::MemoryOwnerStats;
 use std::rc::Rc;
 
@@ -578,17 +579,33 @@ impl FormulaEntry {
         entry
     }
 
-    /// Applies `rewrite` to the entry's tree. When it reports a change, the
-    /// source text and read metadata follow the new tree; otherwise the text
-    /// stays as the user wrote it. Returns whether anything changed.
-    fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+    /// Applies `rewrite` to each reference of the entry's tree; it returns
+    /// whether it changed the reference it is given. When a reference
+    /// changes, the read metadata follows the new tree, and the source text
+    /// changes only where a reference changed, as Excel keeps the rest of
+    /// what the user wrote. Returns whether anything changed.
+    fn rewrite_ast(
+        &mut self,
+        formula_sheet: u32,
+        mut rewrite: impl FnMut(&mut Ast) -> bool,
+    ) -> bool {
+        let is_reference = self.is_reference();
         let Some(ast) = &mut self.ast else {
             return false;
         };
-        if !rewrite(ast) {
-            return false;
+
+        // A plain reference has no source text: its tree is the target.
+        if is_reference {
+            if !rewrite(ast) {
+                return false;
+            }
+        } else {
+            let Some(source) = rewrite_parsed_references(&self.source, ast, &mut rewrite) else {
+                return false;
+            };
+            self.source = source;
         }
-        self.source = serialize(ast);
+
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
         self.set_volatile(volatile);

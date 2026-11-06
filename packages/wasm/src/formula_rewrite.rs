@@ -1,16 +1,20 @@
-//! Reference rewrites of formula text that the store does not hold: pasted
-//! and filled cells, and conditional-format rules. Each reference follows
-//! the rules of formulas in the store (whole columns and rows, the
-//! `XFD1048576` sheet edge, `#REF!` for a reference that leaves the sheet).
-//! Only the text of a reference that changes is replaced, so the formula
-//! keeps the spacing, case and parentheses that its author wrote.
+//! Reference rewrites that replace only the text of the references that
+//! change, so a formula keeps the spacing, case and parentheses that its
+//! author wrote, as Excel keeps them. Pasted and filled cells and
+//! conditional-format rules are rewritten from their text alone; formulas
+//! and defined names in the store are rewritten through their parse tree,
+//! and their text follows the references that the tree changed. Each
+//! reference follows the rules of formulas in the store (whole columns and
+//! rows, the `XFD1048576` sheet edge, `#REF!` for a reference that leaves the
+//! sheet).
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::calc::{
-    area, lex_token, rewrite_own_sheet_axis, translate_relative_refs, write_ast, AreaEnd, Ast,
-    Axis, AxisChange, Func, Tok,
+    area, lex_token, rewrite_own_sheet_axis, serialize, translate_relative_refs, write_ast,
+    AreaEnd, Ast, Axis, AxisChange, Func, Tok,
 };
+use crate::types::FormulaError;
 
 /// Move the relative references of a copied formula by the distance from
 /// its source cell to its target cell. Absolute parts stay; a reference
@@ -131,17 +135,37 @@ struct Lexeme<'a> {
     end: usize,
 }
 
-/// One cell or range reference in the source text.
+/// One reference in the source text, as the parser reads it: a cell, range
+/// or 3-D reference, a table reference, or `#REF!`.
 struct Reference {
-    /// The reference with its coordinates, without a sheet qualifier.
-    ast: Ast,
+    /// The cell or range of a cell, range or 3-D reference, without its sheet
+    /// qualifier. A table reference and `#REF!` have none.
+    ast: Option<Ast>,
     /// Whether a sheet name qualifies the reference.
     qualified: bool,
-    /// Byte offset of the sheet qualifier, or of the coordinates without one.
+    /// Byte offset of the reference, with its sheet or workbook qualifier.
     start: usize,
     /// Byte offset of the coordinates.
     coordinates_start: usize,
     end: usize,
+}
+
+impl Reference {
+    /// A table reference or `#REF!` from lexeme `first` to lexeme `last`.
+    fn whole(lexemes: &[Lexeme<'_>], first: usize, last: usize) -> Self {
+        Self {
+            ast: None,
+            qualified: false,
+            start: lexemes[first].start,
+            coordinates_start: lexemes[first].start,
+            end: lexemes[last].end,
+        }
+    }
+
+    /// Whether the text ends with the spill suffix `#`.
+    fn spills(&self) -> bool {
+        matches!(self.ast, Some(Ast::Func(Func::AnchorArray, _)))
+    }
 }
 
 /// Rewrite each reference through `rewrite` and replace the text of the
@@ -155,9 +179,12 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
     let mut out = String::with_capacity(source.len());
     let mut copied = 0;
     for reference in references(&lexemes) {
-        let mut rewritten = reference.ast.clone();
+        let Some(original) = &reference.ast else {
+            continue;
+        };
+        let mut rewritten = original.clone();
         rewrite(&mut rewritten, reference.qualified);
-        if rewritten == reference.ast {
+        if rewritten == *original {
             continue;
         }
 
@@ -176,6 +203,87 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
 
     out.push_str(&source[copied..]);
     out
+}
+
+/// Apply `rewrite` to each reference of `ast`, the parse of `source`, and
+/// return `source` with the text of each reference that changed replaced by
+/// its new text, or `None` when no reference changed. A reference is a cell,
+/// range, 3-D or table reference, or `#REF!`; `rewrite` returns whether it
+/// changed the one it is given.
+///
+/// The references of the tree and of the text are paired in source order.
+/// When the counts differ, the text cannot be paired and is written again
+/// from the tree.
+#[inline(never)]
+pub(crate) fn rewrite_parsed_references(
+    source: &str,
+    ast: &mut Ast,
+    rewrite: &mut dyn FnMut(&mut Ast) -> bool,
+) -> Option<String> {
+    // The new text of the changed references, one after the other, and for
+    // each one its index in source order and its end in `texts`.
+    let mut texts = String::new();
+    let mut changed: Vec<(usize, usize)> = Vec::new();
+    let mut count = 0;
+    for_each_reference(ast, &mut |reference| {
+        if rewrite(reference) {
+            write_ast(reference, &mut texts);
+            changed.push((count, texts.len()));
+        }
+        count += 1;
+    });
+    if changed.is_empty() {
+        return None;
+    }
+
+    let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
+    debug_assert_eq!(spans.len(), count, "references of {source}");
+    if spans.len() != count {
+        return Some(serialize(ast));
+    }
+
+    let mut out = String::with_capacity(source.len() + texts.len());
+    let mut copied = 0;
+    let mut text_start = 0;
+    for (index, text_end) in changed {
+        let span = &spans[index];
+        let text = &texts[text_start..text_end];
+        out.push_str(&source[copied..span.start]);
+        out.push_str(text);
+
+        // A deleted spill anchor writes as `#REF!`, without the suffix.
+        if span.spills() && text != "#REF!" {
+            out.push('#');
+        }
+        copied = span.end;
+        text_start = text_end;
+    }
+
+    out.push_str(&source[copied..]);
+    Some(out)
+}
+
+/// Visit each reference of `ast` in source order: the nodes that
+/// [`references`] finds in the text.
+fn for_each_reference(ast: &mut Ast, visit: &mut dyn FnMut(&mut Ast)) {
+    match ast {
+        Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::InvalidRef => visit(ast),
+        _ => {
+            ast.fold_children_mut(&mut |child| {
+                for_each_reference(child, visit);
+                false
+            });
+        }
+    }
 }
 
 fn is_deleted(reference: &Ast) -> bool {
@@ -205,15 +313,52 @@ fn lex(source: &str) -> Option<Vec<Lexeme<'_>>> {
 
 /// The references in source order. The shapes follow the parser: a name
 /// before `(` is a function, before `[` a table, and before `!` (or as
-/// `First:Last!`) a sheet qualifier of the reference after it.
+/// `First:Last!`) a sheet qualifier of the reference after it; a `[...]`
+/// before `Sheet!` names another workbook, and any other one is a table
+/// reference. An array constant holds values only.
 fn references(lexemes: &[Lexeme<'_>]) -> Vec<Reference> {
     let tok = |index: usize| lexemes.get(index).map(|lexeme| &lexeme.tok);
     let mut found = Vec::new();
+    let mut open_arrays = 0usize;
     let mut index = 0;
     while index < lexemes.len() {
         let start = lexemes[index].start;
         let (coordinates, qualified) = match (tok(index), tok(index + 1)) {
-            (Some(Tok::Ident(..)), Some(Tok::Structured(_) | Tok::LParen)) => {
+            (Some(Tok::LBrace), _) => {
+                open_arrays += 1;
+                index += 1;
+                continue;
+            }
+            (Some(Tok::RBrace), _) => {
+                open_arrays = open_arrays.saturating_sub(1);
+                index += 1;
+                continue;
+            }
+            _ if open_arrays > 0 => {
+                index += 1;
+                continue;
+            }
+            (Some(Tok::Error(FormulaError::Ref)), _) => {
+                found.push(Reference::whole(lexemes, index, index));
+                index += 1;
+                continue;
+            }
+            (Some(Tok::Ident(..)), Some(Tok::Structured(_))) => {
+                found.push(Reference::whole(lexemes, index, index + 1));
+                index += 2;
+                continue;
+            }
+            (Some(Tok::Structured(_)), Some(Tok::Ident(_, false)))
+                if tok(index + 2) == Some(&Tok::Bang) =>
+            {
+                (index + 3, true)
+            }
+            (Some(Tok::Structured(_)), _) => {
+                found.push(Reference::whole(lexemes, index, index));
+                index += 1;
+                continue;
+            }
+            (Some(Tok::Ident(..)), Some(Tok::LParen)) => {
                 index += 2;
                 continue;
             }
@@ -236,7 +381,7 @@ fn references(lexemes: &[Lexeme<'_>]) -> Vec<Reference> {
         match reference_at(lexemes, coordinates) {
             Some((ast, next)) => {
                 found.push(Reference {
-                    ast,
+                    ast: Some(ast),
                     qualified,
                     start,
                     coordinates_start: lexemes[coordinates].start,
