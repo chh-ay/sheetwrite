@@ -550,7 +550,10 @@ export function renderFormulaFunctionPages(
       "",
       "## Functions",
       "",
-      `<FormulaReference family="${slug}"></FormulaReference>`,
+      // The open tag alone on its line starts an HTML block, so the filter is
+      // not wrapped in a paragraph.
+      `<FormulaReference family="${slug}">`,
+      "</FormulaReference>",
       "",
       "## Signature profiles",
       "",

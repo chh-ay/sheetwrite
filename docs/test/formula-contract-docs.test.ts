@@ -49,7 +49,7 @@ describe("generated formula documentation contract", () => {
     }
     for (const page of families) {
       // The page holds the profiles; its separate table links to them.
-      expect(page.content).toContain(`<FormulaReference family="${page.table?.family}">`);
+      expect(page.content).toContain(`\n<FormulaReference family="${page.table?.family}">\n`);
       const ids = new Set([...page.content.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]));
       for (const [, target] of `${page.content}${page.table?.html}`.matchAll(/ href="#([^"]+)"/g)) {
         expect(ids.has(target)).toBeTrue();
