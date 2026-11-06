@@ -133,24 +133,21 @@ test("sidebar marks only the nearest documentation route as current", async ({ p
 
 test("site root serves the product landing", async ({ page }) => {
   const errors = collectErrors(page);
+  const wasmRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
+  });
   const response = await page.goto(siteUrl("/"));
   expect(response?.ok()).toBe(true);
   // Semantic contract: exactly one H1, and the hero grid is a static preview
-  // until the page has loaded: the engine never competes with the first paint.
+  // until the reader reaches for it: the engine adds nothing to the page load.
   await expect(page.locator("main h1")).toHaveCount(1);
   const liveGrid = page.getByTestId("landing-live-grid");
   await expect(liveGrid).toBeVisible();
-  const engineAfterLoad = await page.evaluate(() => {
-    const [navigation] = performance.getEntriesByType(
-      "navigation",
-    ) as PerformanceNavigationTiming[];
-    const loadEnd = navigation?.loadEventEnd ?? 0;
-    return performance
-      .getEntriesByType("resource")
-      .filter((entry) => /\.wasm(?:$|\?)/.test(entry.name))
-      .every((entry) => entry.startTime >= loadEnd);
-  });
-  expect(engineAfterLoad).toBe(true);
+  await page.waitForLoadState("networkidle");
+  await expect(liveGrid).toHaveAttribute("data-state", "preview");
+  await expect(page.locator("main canvas")).toHaveCount(0);
+  expect(wasmRequests).toEqual([]);
   await expect(page).toHaveTitle(SITE_TITLE);
   for (const selector of [
     'meta[name="description"]',

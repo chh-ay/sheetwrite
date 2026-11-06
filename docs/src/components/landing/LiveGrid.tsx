@@ -6,14 +6,12 @@ import { LANDING_HEADERS, landingPreviewRows } from "./live-grid/landing-workboo
 
 type LiveGridState = "preview" | "loading" | "live" | "failed";
 
-/** How long after the page's load event the grid starts when nobody reaches for it. */
-const IDLE_START_TIMEOUT_MS = 2500;
 const COLUMN_LETTERS = LANDING_HEADERS.map((_, index) => String.fromCharCode(65 + index));
 /** Empty rows the preview paints under the totals, as the live sheet does. */
 const PREVIEW_SPARE_ROWS = 3;
 
 const STATUS_TEXT: Readonly<Record<LiveGridState, string>> = {
-  preview: "Preview",
+  preview: "Point at it to go live",
   loading: "Starting the engine",
   live: "Live",
   failed: "Preview",
@@ -21,9 +19,10 @@ const STATUS_TEXT: Readonly<Record<LiveGridState, string>> = {
 
 /**
  * The hero's spreadsheet: a server-rendered preview of the workbook that
- * becomes the real engine and Grid as soon as the reader reaches for it, or
- * when the page goes idle. The preview and the live grid show the same cells,
- * so the swap does not move the page.
+ * becomes the real engine and Grid the moment the reader reaches for it
+ * (pointer, focus or touch). Nothing loads before that, so the engine never
+ * adds to the page's load or blocking time. The preview and the live grid
+ * show the same cells, so the swap does not move the page.
  */
 export function LiveGrid() {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -40,12 +39,12 @@ export function LiveGrid() {
     let dispose: (() => void) | undefined;
     let cancelled = false;
     let started = false;
-    let idleHandle: number | undefined;
 
     const start = () => {
       if (started) return;
       started = true;
       setState("loading");
+      // A separate chunk: the engine and Grid download only once the reader reaches for them.
       import("./live-grid/mount-live-grid.js")
         .then(({ mountLiveGrid }) => mountLiveGrid({ formulaBar, grid }))
         .then((disposer) => {
@@ -61,27 +60,14 @@ export function LiveGrid() {
           setState("failed");
         });
     };
-    // Safari has no idle callback; a short timer after load serves the same purpose.
-    const hasIdleCallback = typeof window.requestIdleCallback === "function";
-    const startWhenIdle = () => {
-      idleHandle = hasIdleCallback
-        ? window.requestIdleCallback(start, { timeout: IDLE_START_TIMEOUT_MS })
-        : window.setTimeout(start, IDLE_START_TIMEOUT_MS);
-    };
     const intents = ["pointerenter", "focusin", "touchstart"] as const;
     for (const intent of intents)
       frame.addEventListener(intent, start, { once: true, passive: true });
-    if (document.readyState === "complete") startWhenIdle();
-    else window.addEventListener("load", startWhenIdle, { once: true });
 
     return () => {
       cancelled = true;
       for (const intent of intents) frame.removeEventListener(intent, start);
-      window.removeEventListener("load", startWhenIdle);
-      if (idleHandle !== undefined) {
-        if (hasIdleCallback) window.cancelIdleCallback(idleHandle);
-        else window.clearTimeout(idleHandle);
-      }
+      dispose?.();
     };
   }, []);
 
