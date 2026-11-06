@@ -228,8 +228,10 @@
   --sw-weight-semibold: 600;
   --sw-weight-bold: 700;
 
-  --sw-tracking-display: -0.025em;
-  --sw-tracking-heading: -0.015em;
+  /* Bricolage Grotesque's display optical size is already tight; headings
+     take only a trace of negative tracking. */
+  --sw-tracking-display: -0.01em;
+  --sw-tracking-heading: -0.005em;
   --sw-tracking-eyebrow: 0.08em;
 
   /* Line lengths: prose stays near 70 characters, leads a little shorter. */
