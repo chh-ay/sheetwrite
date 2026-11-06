@@ -1,7 +1,7 @@
 import apiNav from "../generated/api-nav.json" with { type: "json" };
 // Formula family pages; formula-nav.json is emitted by docs:generate.
 import formulaNav from "../generated/formula-nav.json" with { type: "json" };
-import { RELEASES, RELEASES_HREF, minorVersion, releaseDate, releaseHref } from "./releases.js";
+import { RELEASES, RELEASES_HREF, minorVersion, releaseHref, releaseLabel } from "./releases.js";
 
 interface NavigationEntry {
   label: string;
@@ -302,7 +302,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     items: [
       { label: "All releases", href: RELEASES_HREF },
       ...RELEASES.map((release) => ({
-        label: `${release.version} · ${releaseDate(release)}`,
+        label: releaseLabel(release),
         href: releaseHref(release.version),
       })),
     ],

@@ -1,11 +1,15 @@
 /**
- * Published releases with a release post, newest first. The release pull
- * request adds one entry together with its `releases/<version>.md` post; the
- * header version link, the sidebar and the version strip on each post read
- * this list, so a new version shows everywhere at once.
+ * Releases with a release post, newest first. The release pull request adds
+ * one entry together with its `releases/<version>.md` post; the header
+ * version link, the sidebar and the version strip on each post read this
+ * list, so a new version shows everywhere at once. The next release may be
+ * listed ahead of its publication with `unreleased: true`: its post and the
+ * release list show it as "(next)", while the header, the latest-release card
+ * and the landing keep the newest published release.
  */
-interface Release {
+interface PublishedRelease {
   readonly version: string;
+  readonly unreleased?: false;
   /** Publication date on npm, `YYYY-MM-DD`. */
   readonly date: string;
   /** One line for the sidebar card and the release list. */
@@ -14,7 +18,23 @@ interface Release {
   readonly highlights?: readonly string[];
 }
 
-const RELEASES: readonly [Release, ...Release[]] = [
+/** The next release, before the release pull request dates it. */
+interface UnreleasedRelease {
+  readonly version: string;
+  readonly unreleased: true;
+  readonly summary: string;
+  readonly highlights?: readonly string[];
+}
+
+type Release = PublishedRelease | UnreleasedRelease;
+
+const RELEASES: readonly Release[] = [
+  {
+    version: "0.7.0",
+    unreleased: true,
+    summary:
+      "Dashboards, a data model with measures, in-place sort, linked workbooks and version history.",
+  },
   {
     version: "0.6.1",
     date: "2026-10-30",
@@ -66,7 +86,7 @@ const RELEASES: readonly [Release, ...Release[]] = [
 ];
 
 /** Dates read as "Oct 18, 2026"; the registry keeps ISO dates for `<time>`. */
-function releaseDate(release: Release): string {
+function releaseDate(release: PublishedRelease): string {
   return new Date(`${release.date}T00:00:00Z`).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -75,14 +95,26 @@ function releaseDate(release: Release): string {
   });
 }
 
-const LATEST_RELEASE = RELEASES[0];
+/** A release's name in lists: its date when published, "(next)" before. */
+function releaseLabel(release: Release): string {
+  return release.unreleased === true
+    ? `${release.version} (next)`
+    : `${release.version} · ${releaseDate(release)}`;
+}
+
+const PUBLISHED_RELEASES = RELEASES.filter(
+  (release): release is PublishedRelease => release.unreleased !== true,
+);
+
+/** The newest published release: the header, the release card and the landing name it. */
+const LATEST_RELEASE = PUBLISHED_RELEASES[0] as PublishedRelease;
 
 /**
- * The newest release that lists highlights. Patch releases have none, so the
- * landing keeps naming the minor release until the next one ships.
+ * The newest published release that lists highlights. Patch releases have
+ * none, so the landing keeps naming the minor release until the next one ships.
  */
-const LATEST_HIGHLIGHTED_RELEASE = RELEASES.find(
-  (release): release is Release & { highlights: readonly string[] } =>
+const LATEST_HIGHLIGHTED_RELEASE = PUBLISHED_RELEASES.find(
+  (release): release is PublishedRelease & { highlights: readonly string[] } =>
     release.highlights !== undefined,
 );
 
@@ -123,6 +155,8 @@ export {
   releaseContext,
   releaseDate,
   releaseHref,
+  releaseLabel,
+  type PublishedRelease,
   type Release,
   type ReleaseContext,
 };

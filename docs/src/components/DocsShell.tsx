@@ -325,9 +325,13 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
 function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
   return (
     <nav aria-label="Release versions" className="sw-release-strip" data-pagefind-ignore>
-      <span>
-        Released <time dateTime={release.date}>{releaseDate(release)}</time>
-      </span>
+      {release.unreleased === true ? (
+        <span>Next release, not published yet</span>
+      ) : (
+        <span>
+          Released <time dateTime={release.date}>{releaseDate(release)}</time>
+        </span>
+      )}
       {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
       {older === undefined ? null : (
         <Link rel="prev" to={releaseHref(older.version)}>
