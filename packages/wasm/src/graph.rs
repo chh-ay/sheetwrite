@@ -1067,7 +1067,31 @@ impl FormulaGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::DirtyCells;
+    use super::{DirtyCells, DirtyRect, SheetFormulas};
+
+    /// A two-column block written row by row stays one rectangle.
+    #[test]
+    fn row_by_row_block_stays_one_rectangle() {
+        let mut ranges = Vec::new();
+        for row in 0..1_000 {
+            for col in 2..4 {
+                SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((row, col)));
+            }
+        }
+
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].area(), 2_000);
+    }
+
+    /// Cells a row apart are not adjacent: the gap row is not marked.
+    #[test]
+    fn gapped_cells_stay_separate() {
+        let mut ranges = Vec::new();
+        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((0, 1)));
+        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((2, 1)));
+
+        assert_eq!(ranges.len(), 2);
+    }
 
     /// The distinct cells a list holds, in address order.
     fn distinct(cells: &DirtyCells) -> Vec<(u32, u32)> {
