@@ -1,6 +1,3 @@
-import headingFont from "@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2?url";
-// The latin heading and body faces, preloaded so text paints in them on the
-// first frame; tokens.css declares the same files.
 import bodyFont from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
 import {
   createRootRoute,
@@ -13,10 +10,13 @@ import {
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { type ReactNode, useEffect, useLayoutEffect } from "react";
+import { preload } from "react-dom";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
+import headingFont from "../fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
+import spriteUrl from "../icons/sprite.svg?url";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
@@ -77,20 +77,6 @@ export const Route = createRootRoute({
     const showcaseChrome = !canonicalPath.startsWith("/docs/");
     return {
       links: [
-        {
-          rel: "preload",
-          href: headingFont,
-          as: "font",
-          type: "font/woff2",
-          crossOrigin: "anonymous",
-        },
-        {
-          rel: "preload",
-          href: bodyFont,
-          as: "font",
-          type: "font/woff2",
-          crossOrigin: "anonymous",
-        },
         // Explicit head links are render-blocking in dev and production. Plain
         // CSS imports are injected by Vite only after hydration in dev, which
         // exposed a half-styled SSR frame on full-page route navigation.
@@ -176,8 +162,21 @@ function RootComponent() {
   return <Outlet />;
 }
 
+const FONT_PRELOAD = {
+  as: "font",
+  type: "font/woff2",
+  crossOrigin: "anonymous",
+  fetchPriority: "high",
+} as const;
+
 /** The `<html>` document: always rendered on the server, around every page, error, and 404. */
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
+  // React writes these preloads first in the head, ahead of the module
+  // preloads, so the heading and body fonts and the icon sprite load with the
+  // stylesheets and are ready for the first paint on slow links.
+  preload(headingFont, FONT_PRELOAD);
+  preload(bodyFont, FONT_PRELOAD);
+  preload(spriteUrl, { as: "image", type: "image/svg+xml", fetchPriority: "high" });
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
