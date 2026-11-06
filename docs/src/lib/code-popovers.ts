@@ -232,19 +232,22 @@ export function openCodePopover(trigger: HTMLElement): void {
   const panel = panelId === undefined ? null : panelFor(panelId);
   if (panelId === undefined || panel === null) return;
 
+  // Every layout read before the first write: reading line boxes after the
+  // writes below would force a second style and layout pass in this event.
+  const related = relatedTriggers(trigger, panelId);
+  const anchor = lineAnchor(trigger);
+  const placement = preferredPlacement(trigger, related);
+
   closePopover();
   // Fixed before it enters the document, so the panel never joins the page flow.
   panel.style.position = "fixed";
   document.body.append(panel);
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
-  const related = relatedTriggers(trigger, panelId);
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
   const detachWatcher = new MutationObserver(() => {
     if (!trigger.isConnected) closePopover();
   });
   detachWatcher.observe(document.body, { childList: true, subtree: true });
-  const anchor = lineAnchor(trigger);
-  const placement = preferredPlacement(trigger, related);
   // Positions synchronously in microtasks, so the first painted frame is placed.
   const stopPositioning = autoUpdate(
     anchor,
