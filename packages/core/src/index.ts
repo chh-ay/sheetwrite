@@ -317,6 +317,7 @@ export type {
   ContextMenuItems,
   Dashboard,
   DashboardBox,
+  DashboardChartItem,
   DashboardItem,
   DashboardPivotItem,
   DashboardSlicerItem,

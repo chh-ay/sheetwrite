@@ -834,6 +834,13 @@ impl CellStore {
         let (Some(layout), Some(cache)) = (pivot.layout.as_ref(), pivot.cache.as_ref()) else {
             return output;
         };
+        output.layout = [
+            layout.rows,
+            layout.cols,
+            layout.header_rows,
+            layout.label_cols,
+        ]
+        .map(|count| u32::try_from(count).unwrap_or(u32::MAX));
         let mut cells: Vec<Value> = (0..layout.rows * layout.cols)
             .map(|offset| cache.cell(layout, offset))
             .collect();
@@ -860,6 +867,7 @@ pub struct PivotOutput {
     kinds: Vec<u8>,
     numbers: Vec<f64>,
     texts: Vec<String>,
+    layout: [u32; 4],
 }
 
 impl PivotOutput {
@@ -894,6 +902,11 @@ impl PivotOutput {
     /// The text cells, in order.
     pub fn texts(&self) -> Vec<String> {
         self.texts.clone()
+    }
+
+    /// `[rows, cols, headerRows, labelCols]` of the output; zeros without a layout.
+    pub fn layout(&self) -> Vec<u32> {
+        self.layout.to_vec()
     }
 }
 
