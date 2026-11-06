@@ -71,11 +71,7 @@ import {
 } from "./resource-accounting.js";
 import { registerGridDocument } from "./restore-commit.js";
 import type { CommandToolbar } from "./ribbon/command-toolbar.js";
-import {
-  assertRibbonConfig,
-  RIBBON_EXPANDED_HEIGHT,
-  TOOLBAR_HEIGHT,
-} from "./ribbon/ribbon-metrics.js";
+import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
@@ -2579,7 +2575,9 @@ export class GridImpl implements Grid {
       return;
     }
 
-    this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
+    // The ribbon spans the host, so the host's width decides its layout now.
+    const layout = typeof config.ribbon === "object" ? config.ribbon : {};
+    this.toolbarHeight = ribbonHeight(layout, this.host.clientWidth);
     void import("./ribbon/ribbon.js").then(({ Ribbon: RibbonClass }) => {
       if (!build.closed) this.mountRibbon(build, RibbonClass, config);
     }, failed);
