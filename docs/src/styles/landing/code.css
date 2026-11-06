@@ -187,11 +187,16 @@
   line-height: 1.6;
 }
 
-/* The setup snippet, highlighted at build time, sits at the card's foot. */
-.sw-lp-engines__choices article .expressive-code {
-  margin-top: auto;
-  padding-top: var(--sw-space-1-5);
-  font-size: var(--sw-text-small);
+/* The setup call sits at the card's foot, in the code theme's roles. */
+.sw-lp-engines__code {
+  margin: auto 0 0;
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-code-bg);
+  color: var(--sw-code-fg);
+  font: var(--sw-text-small) / var(--sw-leading-code) var(--sw-font-mono);
+  white-space: pre-wrap;
 }
 
 .sw-lp-engines__choices .sw-lp-engines__size {

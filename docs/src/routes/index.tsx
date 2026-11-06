@@ -4,7 +4,6 @@ import corePackage from "../../../packages/core/package.json" with { type: "json
 import { Icon } from "../components/Icon.js";
 import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
-import { EngineDefaultSnippet, EngineFullSnippet } from "../components/landing/EngineSnippets.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
 import { GridGlow } from "../components/landing/GridGlow.js";
 import { HeroApp } from "../components/landing/HeroApp.js";
@@ -431,7 +430,12 @@ function Landing() {
                   <b>{kib(downloads.defaultEngineBrotliBytes)}</b> WASM, Brotli
                 </p>
               ) : null}
-              <EngineDefaultSnippet />
+              <pre className="sw-lp-engines__code">
+                <code>
+                  <span className="sw-code-keyword">await</span>{" "}
+                  <span className="sw-code-function">initSheetwrite</span>();
+                </code>
+              </pre>
             </article>
             <article data-variant="full">
               <span>Full</span>
@@ -445,7 +449,13 @@ function Landing() {
                   <b>{kib(downloads.fullEngineBrotliBytes)}</b> WASM, Brotli
                 </p>
               ) : null}
-              <EngineFullSnippet />
+              <pre className="sw-lp-engines__code">
+                <code>
+                  <span className="sw-code-keyword">await</span>{" "}
+                  <span className="sw-code-function">initSheetwrite</span>(
+                  <span className="sw-code-number">undefined</span>, formulas);
+                </code>
+              </pre>
             </article>
           </div>
           {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
