@@ -415,8 +415,9 @@ export async function initSheetwrite(options: InitSheetwriteOptions = {}): Promi
  }
 
  if (options.addons?.length) {
-  addons = (await import("./addons.js")).addonRegistry;
-  addons.install(options.addons);
+  const registry = await import("./addons.js");
+  addons = registry.addonRegistry;
+  await addons.install(options.addons);
  }
 }
 

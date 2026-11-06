@@ -3,14 +3,15 @@
 
 import { setChartRendererFactory, setChartViewProviderFactory } from "./chart-backend.js";
 import { SheetwriteError } from "./errors.js";
-import { registerQueryCommands } from "./query-commands.js";
 import type { SheetwriteAddon, SheetwriteAddonContext } from "./types/addon.js";
 import type { Grid, SheetwriteAddonSettings } from "./types/grid.js";
-import {
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
-} from "./xlsx-backends.js";
+
+// The XLSX slots and the query command seam load on their first use, so the
+// grid's import of this module preloads nothing else: every module it names
+// adds bytes to the first chunk.
+
+/** XLSX parts given during setup that are still being written to their slots. */
+const pendingXlsx: Promise<void>[] = [];
 
 /** Core's page-wide registration methods, which write the chart and XLSX backends. */
 const setupContext: SheetwriteAddonContext = {
@@ -19,11 +20,14 @@ const setupContext: SheetwriteAddonContext = {
     setChartRendererFactory(parts.renderer);
   },
   xlsx(parts) {
-    if (parts.workbook) setXlsxWorkbookBackend(parts.workbook);
+    const written = import("./xlsx-backends.js").then((slots) => {
+      if (parts.workbook) slots.setXlsxWorkbookBackend(parts.workbook);
 
-    if (parts.tableImport) setXlsxTableImportBackend(parts.tableImport);
+      if (parts.tableImport) slots.setXlsxTableImportBackend(parts.tableImport);
 
-    if (parts.tableExport) setXlsxTableExportBackend(parts.tableExport);
+      if (parts.tableExport) slots.setXlsxTableExportBackend(parts.tableExport);
+    });
+    pendingXlsx.push(written);
   },
 };
 
@@ -48,7 +52,7 @@ export class AddonRegistry {
    * rejected before any setup runs. A name installed by an earlier call is
    * kept, so repeated `initSheetwrite` calls are no-ops for it.
    */
-  install(addons: readonly SheetwriteAddon[]): void {
+  async install(addons: readonly SheetwriteAddon[]): Promise<void> {
     const listedNames = new Set<string>();
 
     for (const addon of addons) {
@@ -70,6 +74,9 @@ export class AddonRegistry {
       addon.setup?.(setupContext);
       this.installed.set(addon.name, addon);
     }
+
+    // `initSheetwrite` resolves once every XLSX part is in its slot.
+    await Promise.all(pendingXlsx.splice(0));
   }
 
   /** Whether an add-on with this name is installed. */
@@ -89,7 +96,12 @@ export class AddonRegistry {
           grid,
           settings: settings?.[addon.name],
           queryCommands(commands) {
-            const remove = registerQueryCommands(grid, commands);
+            const registered = import("./query-commands.js").then((seam) =>
+              seam.registerQueryCommands(grid, commands),
+            );
+            const remove = (): void => {
+              void registered.then((unregister) => unregister());
+            };
             grid.addCleanup(remove);
             return remove;
           },
