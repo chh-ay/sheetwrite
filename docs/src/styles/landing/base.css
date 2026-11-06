@@ -128,6 +128,7 @@
 
 /* Arrow icons at the end of link text sit on the text's baseline. */
 .sw-landing :is(a, .sw-features__cta) > .sw-icon {
+  display: inline-block;
   margin-left: var(--sw-space-1);
   vertical-align: -0.2em;
   transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
