@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import {
   breadcrumbsFor,
   type Crumb,
@@ -13,18 +14,9 @@ import {
   nearestNavigationItem,
 } from "../lib/navigation.js";
 import type { OutlineItem } from "../lib/outline.js";
-import {
-  LATEST_RELEASE,
-  RELEASES_HREF,
-  type ReleaseContext,
-  releaseContext,
-  releaseDate,
-  releaseHref,
-} from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { Icon } from "./Icon.js";
-import { PackageCommand } from "./PackageCommand.js";
 import { SiteTopbar } from "./SiteTopbar.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
 
@@ -81,7 +73,7 @@ function LatestReleaseCard({
   activeHref,
   onNavigate,
 }: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
-  const href = releaseHref(LATEST_RELEASE.version);
+  const { href, date, dateLabel, version, summary } = releaseFacts.latest;
 
   return (
     <Link
@@ -92,10 +84,10 @@ function LatestReleaseCard({
     >
       <span className="sw-release-card__meta">
         <span className="sw-release-card__badge">New</span>
-        <time dateTime={LATEST_RELEASE.date}>{releaseDate(LATEST_RELEASE)}</time>
+        <time dateTime={date}>{dateLabel}</time>
       </span>
-      <strong>Sheetwrite {LATEST_RELEASE.version}</strong>
-      <span className="sw-release-card__summary">{LATEST_RELEASE.summary}</span>
+      <strong>Sheetwrite {version}</strong>
+      <span className="sw-release-card__summary">{summary}</span>
       <span className="sw-release-card__more">
         Read the release notes <Icon name="arrow-right" />
       </span>
@@ -111,7 +103,7 @@ const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
  * repeat its pages' markers on a collapsed row.
  */
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
-  const badge = navigationBadge(item, LATEST_RELEASE.version);
+  const badge = navigationBadge(item, releaseFacts.latest.version);
   if (badge === undefined) return null;
 
   return (
@@ -321,29 +313,6 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   );
 }
 
-/** On a release post: its date and a step to the newer and older posts. */
-function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
-  return (
-    <nav aria-label="Release versions" className="sw-release-strip" data-pagefind-ignore>
-      <span>
-        Released <time dateTime={release.date}>{releaseDate(release)}</time>
-      </span>
-      {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
-      {older === undefined ? null : (
-        <Link rel="prev" to={releaseHref(older.version)}>
-          <Icon name="arrow-left" /> {older.version}
-        </Link>
-      )}
-      {newer === undefined ? null : (
-        <Link rel="next" to={releaseHref(newer.version)}>
-          {newer.version} <Icon name="arrow-right" />
-        </Link>
-      )}
-      <Link to={RELEASES_HREF}>All releases</Link>
-    </nav>
-  );
-}
-
 export function DocsShell({
   activeHref,
   children,
@@ -360,7 +329,6 @@ export function DocsShell({
   const outline = useDocumentOutline(buildOutline);
   const neighbours = documentNeighbours(activeHref);
 
-  const release = releaseContext(activeHref);
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -437,15 +405,6 @@ export function DocsShell({
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
           {titlePackage === undefined ? <span>{description}</span> : null}
-          {release === undefined ? null : (
-            <>
-              <ReleaseStrip {...release} />
-              <PackageCommand
-                note={`Update each adapter and add-on you use to ${release.release.version} too: all packages release together.`}
-                packages={`@sheetwrite/core@${release.release.version}`}
-              />
-            </>
-          )}
         </header>
         <ApiSymbolFilter />
         {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}
