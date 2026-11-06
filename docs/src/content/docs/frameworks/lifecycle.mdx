@@ -3,8 +3,6 @@ title: Adapter lifecycle
 description: Initialization, readiness, resets, and transaction ownership across every Sheetwrite framework adapter.
 ---
 
-import { TabItem, Tabs } from "../../../components/Tabs";
-
 Every adapter follows one lifecycle:
 
 1. mount the framework component;
@@ -22,8 +20,8 @@ Use **`Sheetwrite`** for a data-first, uncontrolled grid: pass columns plus init
 
 Use **`SheetwriteGrid`** for an advanced `Workbook` plus eager data or a datasource. It exposes the imperative `Grid` after readiness and keeps structural configuration under the host's control.
 
-<Tabs syncKey="sheetwrite-framework">
-  <TabItem label="Vanilla">
+<Tabs sync="framework" label="Framework">
+  <Tab title="Vanilla">
 
 The imperative core has one ownership mode: the host supplies the workbook and data, awaits runtime initialization, and destroys the returned grid.
 
@@ -37,8 +35,8 @@ const grid = createGrid(host, { workbook, data });
 grid.destroy();
 ```
 
-  </TabItem>
-  <TabItem label="React">
+  </Tab>
+  <Tab title="React">
 
 ```tsx prelude="react" partial="requires component-owned columns and rows" title="React ownership"
 <Sheetwrite
@@ -60,8 +58,8 @@ grid.destroy();
 
 `defaultRows` is seed data. Changing it after mount does not replace committed edits; a new `columns`, `defaultRows`, or `sheetName` identity derives a new document and creates a new generation.
 
-  </TabItem>
-  <TabItem label="Vue">
+  </Tab>
+  <Tab title="Vue">
 
 ```vue prelude="vue" partial="requires component-owned columns and rows" title="Vue ownership"
 <Sheetwrite
@@ -83,8 +81,8 @@ grid.destroy();
 
 The template ref exposes `{ grid }` after readiness. `defaultRows` seeds the document once; a new `columns`, `defaultRows`, or `sheetName` identity creates a new generation.
 
-  </TabItem>
-  <TabItem label="Svelte">
+  </Tab>
+  <Tab title="Svelte">
 
 ```svelte prelude="svelte" partial="requires component-owned columns and rows" title="Svelte ownership"
 <script lang="ts">
@@ -109,7 +107,7 @@ The template ref exposes `{ grid }` after readiness. `defaultRows` seeds the doc
 
 `bind:grid` publishes the live handle and clears it on reset or unmount. `defaultRows` seeds the document once; a new `columns`, `defaultRows`, or `sheetName` identity creates a new generation.
 
-  </TabItem>
+  </Tab>
 </Tabs>
 
 ## Readiness is generation-scoped

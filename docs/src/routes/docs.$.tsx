@@ -14,7 +14,7 @@ import { forwardedHeading } from "../lib/moved-headings.js";
 import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
-import { documentStructuredData, pageMeta, pageTitle } from "../lib/seo.js";
+import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
@@ -34,6 +34,7 @@ export const Route = createFileRoute("/docs/$")({
         kind: undefined,
         outline: [],
         sourcePath: undefined,
+        stylesheets: [],
         moved: href,
         href,
       };
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/docs/$")({
       kind: document.kind,
       outline: document.outline ?? [],
       sourcePath: document.sourcePath,
+      stylesheets: document.stylesheets,
       moved: undefined,
       href,
     };
@@ -76,7 +78,9 @@ export const Route = createFileRoute("/docs/$")({
       meta: [
         ...pageMeta(pageTitle(title), description),
         { property: "og:type", content: "article" },
+        ...pageImageMeta(loaderData.href, title),
       ],
+      links: loaderData.stylesheets.map((href) => ({ rel: "stylesheet", href })),
       scripts: [{ type: "application/ld+json", children: structuredData }],
     };
   },

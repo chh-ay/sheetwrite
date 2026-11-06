@@ -490,7 +490,15 @@ function convertDocumentBody(body: string): string {
       continue;
     }
 
-    const prose = convertProseLine(formatTokens(lines[index] ?? ""));
+    // A component tag can span lines; read it whole.
+    let line = lines[index] ?? "";
+    if (/^\s*<[A-Z][A-Za-z]*\b/.test(line) && !/>\s*$/.test(line)) {
+      while (index + 1 < lines.length && !/>\s*$/.test(line)) {
+        index += 1;
+        line += ` ${(lines[index] ?? "").trim()}`;
+      }
+    }
+    const prose = convertProseLine(formatTokens(line));
     const blank = prose.trim() === "";
     if (!(blank && previousProseBlank)) output.push(blank ? "" : prose);
     previousProseBlank = blank;
@@ -499,13 +507,56 @@ function convertDocumentBody(body: string): string {
   return output.join("\n");
 }
 
+/** Callout components and the label each gets in plain text. */
+const CALLOUT_LABELS: Readonly<Record<string, string>> = {
+  Note: "Note",
+  Info: "Note",
+  Tip: "Tip",
+  Check: "Done",
+  Warning: "Warning",
+  Danger: "Caution",
+};
+
+/** An attribute of a component tag, as written. */
+function tagAttribute(tag: string, name: string): string | undefined {
+  return new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+}
+
+/**
+ * One content component tag as plain text: a titled block keeps its title in
+ * bold, a figure keeps its alt text, a callout its label, and the rest of the
+ * chrome is dropped.
+ */
+function componentText(tag: string): string {
+  const name = /^<\/?([A-Z][A-Za-z0-9]*)/.exec(tag.trim())?.[1] ?? "";
+  if (tag.trim().startsWith("</")) return "";
+  const title = tagAttribute(tag, "title");
+  if (name === "Update") return `### ${tagAttribute(tag, "version") ?? ""}`;
+  if (name in CALLOUT_LABELS)
+    return title === undefined ? `${CALLOUT_LABELS[name]}:` : `**${title}**`;
+  if (name === "Card") {
+    const href = tagAttribute(tag, "href");
+    return title === undefined
+      ? ""
+      : href === undefined
+        ? `**${title}**`
+        : `**[${title}](${href})**`;
+  }
+  if (title !== undefined) return `**${title}**`;
+  const alt = tagAttribute(tag, "alt") ?? tagAttribute(tag, "label");
+  return alt === undefined ? "" : `(Figure: ${alt})`;
+}
+
 function convertProseLine(line: string): string {
   if (isMdxImport(line)) return "";
-  const tabItem = /^\s*<TabItem\s+label="([^"]*)">\s*$/.exec(line);
-  if (tabItem !== null) return `**${tabItem[1]}**`;
-  if (/^\s*<\/?Tabs\b[^>]*>\s*$/.test(line)) return "";
-  if (/^\s*<\/?TabItem\b[^>]*>\s*$/.test(line)) return "";
-  if (/^\s*<\/?[A-Z][A-Za-z0-9]*(\s[^>]*)?\/?>\s*$/.test(line)) return "";
+  if (/^\s*<\/?[A-Z][A-Za-z0-9]*(\s[^>]*)?\/?>\s*$/.test(line)) {
+    return plainText(absolutizeMarkdownLinks(componentText(line)));
+  }
+  // A one-line callout: `<Note>text</Note>`.
+  const callout = /^\s*<(Note|Info|Tip|Check|Warning|Danger)>(.*)<\/\1>\s*$/.exec(line);
+  if (callout !== null) {
+    return `${CALLOUT_LABELS[callout[1] ?? ""]}: ${plainText(absolutizeMarkdownLinks(convertInlineHtml(callout[2] ?? "")))}`;
+  }
   return plainText(absolutizeMarkdownLinks(convertInlineHtml(line)));
 }
 

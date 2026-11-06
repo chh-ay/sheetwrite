@@ -32,6 +32,8 @@ type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;
 export interface DocumentModule {
   default: DocumentComponent;
   frontmatter?: DocumentFrontmatter;
+  /** Stylesheets of the components the page uses that most pages do not (lib/content-components.ts). */
+  stylesheets?: readonly string[];
 }
 
 interface DocumentSource {
@@ -42,10 +44,11 @@ interface DocumentSource {
   key: string;
 }
 
-export interface DocumentRecord extends DocumentFrontmatter {
+export type DocumentRecord = DocumentFrontmatter & {
+  stylesheets: readonly string[];
   /** The page's source file in the repository; generated pages have none. */
   sourcePath: string | undefined;
-}
+};
 
 const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
@@ -83,6 +86,7 @@ export async function documentForSplat(
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
     sourcePath: module.frontmatter?.generated ? undefined : source.key.replace("..", "docs/src"),
+    stylesheets: module.stylesheets ?? [],
   };
 }
 

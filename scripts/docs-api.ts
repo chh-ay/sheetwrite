@@ -1048,7 +1048,7 @@ export function renderMovedGuides(): string {
     "",
     "Each guide that was a file in the repository has a page in the docs site.",
     "",
-    '<div class="sw-next-links sw-moved-guides">',
+    '<div class="sw-card-group sw-moved-guides" data-cols="2">',
   ];
   const guides = new Map<string, string[]>();
   for (const [oldPath, route] of Object.entries(MIGRATION_ROUTES)) {
@@ -1057,7 +1057,7 @@ export function renderMovedGuides(): string {
   for (const [route, oldPaths] of guides) {
     const title = readableId(route.split("/").filter(Boolean).at(-1) ?? route);
     lines.push(
-      `<a href="${html(route)}"><strong>${html(title)}</strong>${oldPaths.map((path) => `<code>${html(path)}</code>`).join("")}</a>`,
+      `<a class="sw-doc-card" href="${html(route)}"><span class="sw-card__title">${html(title)}</span><span class="sw-card__body">${oldPaths.map((path) => `<code>${html(path)}</code>`).join(" ")}</span></a>`,
     );
   }
   lines.push("</div>");
