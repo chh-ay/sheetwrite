@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type KeyboardEvent,
   type RefObject,
   useEffect,
@@ -10,6 +9,8 @@ import {
 } from "react";
 
 import { HighlightedCode } from "../components/HighlightedCode.js";
+import { type CodeToken, tokenizeCode } from "../lib/code-tokens.js";
+import { EDITOR_HINT, expectedResultHeight } from "./layout.js";
 import {
   type ConsoleEntry,
   type ExampleError,
@@ -44,9 +45,6 @@ type RunState =
   | { readonly kind: "running" }
   | { readonly kind: "done"; readonly milliseconds: number }
   | { readonly kind: "failed" };
-
-/** The frame's height before the example sizes it: one small grid. */
-const INITIAL_FRAME_HEIGHT = 320;
 
 /** The status line for a run. */
 function statusText(state: RunState, entries: number): string {
@@ -117,7 +115,7 @@ export function Playground({ source, title }: PlaygroundProps) {
         value={code}
       />
       <p className="sw-playground__hint" id={hintId}>
-        Edit the code, then press Run or Ctrl+Enter. Press Escape, then Tab, to leave the editor.
+        {EDITOR_HINT}
       </p>
       {error === undefined ? null : (
         <div className="sw-playground__error" role="alert">
@@ -186,9 +184,26 @@ interface CodeEditorProps {
   onRun(): void;
 }
 
+/** The highlighted code, one list of tokens per source line. */
+function highlightedLines(code: string): CodeToken[][] {
+  const lines: CodeToken[][] = [[]];
+  for (const token of tokenizeCode(code, "typescript")) {
+    const parts = token.text.split("\n");
+    for (const [index, text] of parts.entries()) {
+      if (index > 0) lines.push([]);
+      if (text.length > 0) lines.at(-1)?.push({ text, role: token.role });
+    }
+  }
+  return lines;
+}
+
 /**
  * A text area over the highlighted code, so the code keeps the site's colours
- * while it is edited. Tab indents; Escape, then Tab, leaves the editor.
+ * while it is edited. Both layers wrap long lines at the same place, as the
+ * page's code block does on a phone. The highlighted layer draws each source
+ * line as its own block, so the line an error points at is marked whole,
+ * however many rows it wraps to. Tab indents; Escape, then Tab, leaves the
+ * editor.
  */
 function CodeEditor({
   value,
@@ -225,21 +240,31 @@ function CodeEditor({
     }
     leaving.current = false;
   };
-  const marker = useMemo(
-    () =>
-      errorLine === undefined
-        ? undefined
-        : ({ "--playground-error-line": errorLine } as CSSProperties),
-    [errorLine],
-  );
+  const lines = useMemo(() => highlightedLines(value), [value]);
   return (
     <div className="sw-playground__editor">
-      {marker === undefined ? null : (
-        <span aria-hidden="true" className="sw-playground__error-line" style={marker} />
-      )}
       <pre aria-hidden="true">
-        {/* The trailing line break keeps a final empty line as tall as the text area's. */}
-        <HighlightedCode code={`${value}\n`} language="typescript" />
+        <code>
+          {lines.map((tokens, line) => (
+            <span
+              className="sw-playground__line"
+              data-error={line + 1 === errorLine ? "" : undefined}
+              // oxlint-disable-next-line react/no-array-index-key -- lines repeat; their position is their identity.
+              key={line}
+            >
+              {tokens.map((token, index) =>
+                token.role === undefined ? (
+                  token.text
+                ) : (
+                  // oxlint-disable-next-line react/no-array-index-key -- tokens repeat; their position is their identity.
+                  <span className={`sw-code-${token.role}`} key={index}>
+                    {token.text}
+                  </span>
+                ),
+              )}
+            </span>
+          ))}
+        </code>
       </pre>
       <textarea
         aria-describedby={describedBy}
@@ -252,7 +277,6 @@ function CodeEditor({
         ref={textarea}
         spellCheck={false}
         value={value}
-        wrap="off"
       />
     </div>
   );
@@ -269,7 +293,8 @@ interface ExampleFrameProps {
 /** The frame one run of the example runs in, as tall as what the example draws. */
 function ExampleFrame({ code, onConsole, onError, onFinish }: ExampleFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(INITIAL_FRAME_HEIGHT);
+  // Until the example draws, the frame takes the height the example gives its grid.
+  const [height, setHeight] = useState(() => expectedResultHeight(code));
   const frameSource = useMemo(() => frameDocument(), []);
 
   useEffect(() => {
@@ -299,7 +324,7 @@ function ExampleFrame({ code, onConsole, onError, onFinish }: ExampleFrameProps)
       // Scripts run so the example can; the frame cannot navigate the page or open windows.
       sandbox="allow-scripts allow-same-origin"
       srcDoc={frameSource}
-      style={{ height }}
+      style={height === undefined ? undefined : { height }}
       title="Example result"
     />
   );

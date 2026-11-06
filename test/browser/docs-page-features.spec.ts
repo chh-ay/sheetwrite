@@ -86,8 +86,11 @@ for (const path of RUNNABLE_FEATURE_PAGES) {
   test(`the runnable example on ${path} runs without an error`, async ({ page }) => {
     await page.goto(siteUrl(path));
     await waitForHydration(page);
-    await page.locator("details:has(.sw-runnable) > summary").first().click();
-    await page.getByRole("button", { name: "Try it" }).first().click();
+    // The button shows under the closed "Full setup" disclosure, and runs it without opening it.
+    await expect(page.locator(".sw-runnable details").first()).not.toHaveAttribute("open");
+    const tryIt = page.getByRole("button", { name: "Try it" }).first();
+    await expect(tryIt).toBeVisible();
+    await tryIt.click();
     const playground = page.locator(".sw-playground");
     await expect(playground.getByRole("status")).toHaveText(/^Ran in \d+ ms/, {
       timeout: RUN_TIMEOUT_MS,
@@ -96,6 +99,33 @@ for (const path of RUNNABLE_FEATURE_PAGES) {
     await expect(playground.frameLocator("iframe").locator("#grid canvas").first()).toBeAttached();
   });
 }
+
+test("on a phone the editor wraps long lines in both layers, like the page's code block", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(FIRST_GRID_URL);
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Try it" }).first().click();
+  const editor = page.locator(".sw-playground__editor").first();
+  await expect(page.locator(".sw-playground").getByRole("status")).toHaveText(/^Ran in/, {
+    timeout: RUN_TIMEOUT_MS,
+  });
+  const layout = await editor.evaluate((element) => {
+    const pre = element.querySelector("pre");
+    const textarea = element.querySelector("textarea");
+    if (pre === null || textarea === null) throw new Error("The editor has no layers");
+    return {
+      fits:
+        element.scrollWidth <= element.clientWidth && textarea.scrollWidth <= textarea.clientWidth,
+      preHeight: pre.getBoundingClientRect().height,
+      textHeight: textarea.scrollHeight,
+    };
+  });
+  expect(layout.fits).toBe(true);
+  // Both layers wrap to the same rows, so the coloured text stays under the caret.
+  expect(Math.abs(layout.preHeight - layout.textHeight)).toBeLessThanOrEqual(1);
+});
 
 test("a page without a runnable example loads none of the playground", async ({ page }) => {
   const scripts = scriptRequests(page);

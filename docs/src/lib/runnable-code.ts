@@ -71,24 +71,84 @@ function componentImport(): RunnableHastNode {
   };
 }
 
+/** Whether a node is a raw HTML block that opens or closes a `<details>` disclosure. */
+function detailsTag(node: RunnableHastNode): "open" | "close" | "both" | undefined {
+  if (node.type !== "raw") return undefined;
+  const value = node.value ?? "";
+  const opens = /<details[\s>]/.test(value);
+  const closes = value.includes("</details>");
+  if (opens && closes) return "both";
+  if (opens) return /^<details[\s>]/.test(value.trim()) ? "open" : "both";
+  return closes ? (value.trim() === "</details>" ? "close" : "both") : undefined;
+}
+
 /**
- * Wraps each runnable fence in `<RunnableCode>`. Runs before Expressive Code,
- * which still renders the fence inside the wrapper.
+ * The sibling range of a runnable fence in a `<details>` disclosure ("Full
+ * setup") that holds no other code block. Markdown keeps the disclosure's
+ * tags as raw HTML blocks among its content until a later step parses them.
+ */
+function disclosureAround(
+  siblings: readonly RunnableHastNode[],
+  index: number,
+): [number, number] | undefined {
+  const find = (step: -1 | 1, wanted: "open" | "close"): number | undefined => {
+    for (let at = index + step; at >= 0 && at < siblings.length; at += step) {
+      const sibling = siblings[at] as RunnableHastNode;
+      if (sibling.tagName === "pre") return undefined;
+      const tag = detailsTag(sibling);
+      if (tag !== undefined) return tag === wanted ? at : undefined;
+    }
+    return undefined;
+  };
+  const open = find(-1, "open");
+  const close = find(1, "close");
+  return open === undefined || close === undefined ? undefined : [open, close];
+}
+
+/**
+ * Wraps each runnable fence in `<RunnableCode>`. A fence alone in a
+ * collapsed disclosure is wrapped with its disclosure, so the Try it button
+ * shows under the closed disclosure, not inside it. Runs before Expressive
+ * Code, which still renders the fence inside the wrapper.
  */
 export function runnableCodeBlocks() {
   return (tree: RunnableHastNode): void => {
     let found = false;
     const visit = (node: RunnableHastNode): void => {
-      if (node.children === undefined) return;
-      node.children = node.children.map((child) => {
+      const children = node.children;
+      if (children === undefined) return;
+      const output: RunnableHastNode[] = [];
+      for (let index = 0; index < children.length; index += 1) {
+        const child = children[index] as RunnableHastNode;
         const code = child.tagName === "pre" ? child.children?.[0] : undefined;
         if (code?.tagName !== "code" || !isRunnableMeta(code.data?.meta)) {
           visit(child);
-          return child;
+          output.push(child);
+          continue;
         }
         found = true;
-        return { type: "mdxJsxFlowElement", name: COMPONENT, attributes: [], children: [child] };
-      });
+        const disclosure = disclosureAround(children, index);
+        if (disclosure === undefined) {
+          output.push({
+            type: "mdxJsxFlowElement",
+            name: COMPONENT,
+            attributes: [],
+            children: [child],
+          });
+          continue;
+        }
+        const [open, close] = disclosure;
+        // The opener and the content before the fence are already in the output.
+        output.splice(output.length - (index - open));
+        output.push({
+          type: "mdxJsxFlowElement",
+          name: COMPONENT,
+          attributes: [{ type: "mdxJsxAttribute", name: "disclosed", value: null }],
+          children: children.slice(open, close + 1),
+        });
+        index = close;
+      }
+      node.children = output;
     };
     visit(tree);
     if (found) tree.children?.unshift(componentImport());

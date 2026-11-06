@@ -22,8 +22,14 @@
   background: var(--sw-surface-1);
 }
 
+/* The bar is as tall with or without its buttons, so the loading placeholder
+   and the playground line up. */
 .sw-playground__bar {
   display: flex;
+  min-height: calc(
+    var(--sw-control-height) - var(--sw-space-2) + 2 * var(--sw-space-2) + var(--sw-border-width)
+  );
+  box-sizing: border-box;
   align-items: center;
   gap: var(--sw-space-2);
   padding: var(--sw-space-2) var(--sw-space-3) var(--sw-space-2) var(--sw-space-5);
@@ -42,12 +48,12 @@
 }
 
 /* The text area lies over the highlighted code in one grid cell; both use the
-   same font, padding and line height, so the caret sits on the coloured text. */
+   same font, padding, line height and wrapping rules, so long lines break at
+   the same place in both layers and the caret sits on the coloured text. */
 .sw-playground__editor {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(100%, max-content);
-  overflow-x: auto;
+  grid-template-columns: minmax(0, 1fr);
   background: var(--sw-code-bg);
   font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
 }
@@ -58,8 +64,6 @@
 
 .sw-playground__editor > pre,
 .sw-playground__editor > textarea {
-  /* Positioned, so the text paints over the error line marker. */
-  position: relative;
   grid-area: 1 / 1;
   box-sizing: border-box;
   margin: 0;
@@ -68,12 +72,38 @@
   font: inherit;
   letter-spacing: normal;
   tab-size: 2;
-  white-space: pre;
+  /* No hanging indent: a text area cannot indent the rows of each line it
+     wraps, so both layers wrap rows at the left edge to stay aligned. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .sw-playground__editor > pre {
+  overflow: hidden;
+  background: none;
   color: var(--sw-code-fg);
   pointer-events: none;
+}
+
+.sw-playground__editor > pre > code {
+  display: block;
+  padding: 0;
+  background: none;
+  font: inherit;
+}
+
+/* One source line; an empty line keeps the text area's line height. */
+.sw-playground__line {
+  display: block;
+  min-height: 1lh;
+}
+
+/* The line an error points at, across the editor's padding, on every row it wraps to. */
+.sw-playground__line[data-error] {
+  margin-inline: calc(-1 * var(--sw-space-5));
+  padding-inline: var(--sw-space-5);
+  background: var(--sw-danger-soft);
 }
 
 .sw-playground__editor > textarea {
@@ -93,16 +123,9 @@
   color: transparent;
 }
 
-/* The line an error points at; the editor's line height is one `lh`. */
-.sw-playground__error-line {
-  position: absolute;
-  inset-inline: 0;
-  top: calc(var(--sw-space-4) + (var(--playground-error-line) - 1) * 1lh);
-  height: 1lh;
-  background: var(--sw-danger-soft);
-}
-
+/* Prose caps paragraph width; the hint's top border is the editor's bottom edge and spans the panel. */
 .sw-playground .sw-playground__hint {
+  max-width: none;
   margin: 0;
   padding: var(--sw-space-2) var(--sw-space-5);
   border-top: var(--sw-border-width) solid var(--sw-border);
@@ -128,6 +151,7 @@
 
 .sw-playground .sw-playground__error > p {
   flex: 1;
+  max-width: none;
   min-width: 0;
   margin: 0;
   font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
@@ -139,11 +163,13 @@
   border-top: var(--sw-border-width) solid var(--sw-border);
 }
 
+/* The status has a fixed box beside the label, so its text can change from
+   "Running…" to the result without moving anything. */
 .sw-playground .sw-playground__label {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--sw-space-1) var(--sw-space-4);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-4);
+  max-width: none;
   margin: 0 0 var(--sw-space-3);
   color: var(--sw-fg-muted);
   font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
@@ -154,9 +180,23 @@
   font-weight: var(--sw-weight-semibold);
 }
 
+/* Start-aligned, so the text does not move as it changes. */
+.sw-playground__label > [role="status"] {
+  text-align: start;
+}
+
+/* On a phone the longest status takes two rows; the box keeps both from the start. */
+@media (max-width: 40rem) {
+  .sw-playground__label > [role="status"] {
+    min-height: 2lh;
+  }
+}
+
+/* The frame's height when the example sets no host height (see playground/layout.ts). */
 .sw-playground__frame {
   display: block;
   width: 100%;
+  height: 20rem;
   border: 0;
   background: transparent;
 }
@@ -198,4 +238,31 @@
   background: none;
   color: inherit;
   font: inherit;
+}
+
+/* While the editor loads, the page's code block stands in for it, without its
+   own frame and title, so the panel opens at its final size. A code block in
+   a closed "Full setup" disclosure shows without the disclosure. */
+.sw-playground__pending .expressive-code,
+.sw-prose .sw-playground__pending .expressive-code {
+  margin: 0;
+}
+
+.sw-prose .sw-playground__pending .expressive-code figure.frame {
+  border: 0;
+  border-radius: 0;
+}
+
+.sw-prose .sw-playground__pending .expressive-code figure.frame > figcaption.header,
+.sw-prose .sw-playground__pending .expressive-code .copy,
+.sw-playground__pending details > :not(.expressive-code) {
+  display: none;
+}
+
+.sw-playground__pending details::details-content {
+  content-visibility: visible;
+}
+
+.sw-prose .sw-playground__pending .expressive-code pre {
+  background: var(--sw-code-bg);
 }
