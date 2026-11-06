@@ -129,6 +129,7 @@ function PreviewTable() {
     <table aria-hidden="true" className="sw-live-grid__preview">
       <thead>
         <tr>
+          {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- the corner cell of a hidden, decorative preview. */}
           <th />
           {COLUMN_LETTERS.map((letter) => (
             <th key={letter}>{letter}</th>
@@ -155,6 +156,7 @@ function PreviewTable() {
           <tr key={`spare-${rows.length + index + 1}`}>
             <th>{rows.length + index + 1}</th>
             {COLUMN_LETTERS.map((letter) => (
+              // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- empty cells of a hidden, decorative preview.
               <td key={letter} />
             ))}
           </tr>

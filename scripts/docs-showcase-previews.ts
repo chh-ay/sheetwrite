@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 
 import { chromium, type Page } from "@playwright/test";
 
-import { CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.ts";
+import { CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
 
 const ROOT = resolve(import.meta.dir, "..");
 const OUTPUT_DIR = join(ROOT, "docs/public/showcase-previews");
