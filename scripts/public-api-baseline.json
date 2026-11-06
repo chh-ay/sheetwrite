@@ -501,6 +501,7 @@
     "@sheetwrite/core#./external-links#ExternalSheetName": "510641da414c",
     "@sheetwrite/core#./external-links#breakExternalLinks": "579eb458afaa",
     "@sheetwrite/core#./external-links#changeExternalLinkSource": "b017eb47449e",
+    "@sheetwrite/core#./external-links#connectExternalLinks": "32f71f33d595",
     "@sheetwrite/core#./external-links#externalSheetText": "b8848913dc08",
     "@sheetwrite/core#./external-links#formulaCallsExternalData": "db1eed4e79e9",
     "@sheetwrite/core#./external-links#formulaContainsExternalReference": "db1eed4e79e9",
