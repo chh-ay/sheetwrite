@@ -1165,12 +1165,12 @@ impl CellStore {
             Ok(layout) => layout,
             Err(error) => return self.show_pivot_error(owner, pivot, error, None),
         };
-        // A pivot anchored below the last row of its sheet has no cells to
-        // hold output: a dashboard has no rows, and core anchors a chart's
-        // copy of a worksheet pivot below the last row. The pivot keeps its
-        // layout and `pivotOutput` reads the cells from the cache. No cell
-        // changes, so no sheet is dirty.
-        if anchor.0 as usize >= self.sheets[owner].cells.row_count() {
+        // A pivot anchored right of the last column of its sheet has no cells
+        // to hold output: a dashboard has no columns, and core anchors a
+        // chart's copy of a worksheet pivot right of the last column. The
+        // pivot keeps its layout and `pivotOutput` reads the cells from the
+        // cache. No cell changes, so no sheet is dirty.
+        if anchor.1 as usize >= self.sheets[owner].cells.n_cols() {
             footprints[index].attempt = None;
             pivot.attempt = None;
             pivot.error = None;

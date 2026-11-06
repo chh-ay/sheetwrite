@@ -753,8 +753,8 @@ fn pivot_structural_clamp_preserves_both_colliding_anchors_and_recovers() {
     assert_eq!(store.get_cell(output, 8, 1).num(), 18.0);
 }
 
-/// Row of a chart copy's anchor, as core sends it: below the last row of every sheet.
-const UNPLACED_ROW: u32 = 1 << 30;
+/// Column of a chart copy's anchor, as core sends it: right of the last column of every sheet.
+const UNPLACED_COL: u32 = 1 << 30;
 
 /// Checks that the copy (pivot 1 on `output`) computes without placing:
 /// both pivots show no error, and each value of the copy, which has no total
@@ -785,12 +785,12 @@ fn assert_copy_matches_placed(store: &CellStore, output: usize) {
 }
 
 #[test]
-fn pivot_anchored_below_its_sheet_computes_without_placing() {
+fn pivot_anchored_right_of_its_sheet_computes_without_placing() {
     let (mut store, source, output) = fixture(12);
     let placed = fixture_pivot(source, 12, &[SUM]);
     let copy = PivotPayload {
         id: 1,
-        anchor: (UNPLACED_ROW, 0),
+        anchor: (0, UNPLACED_COL),
         flags: 0,
         ..fixture_pivot(source, 12, &[SUM])
     };
@@ -805,8 +805,8 @@ fn pivot_anchored_below_its_sheet_computes_without_placing() {
     store.recompute(source);
     assert_copy_matches_placed(&store, output);
 
-    // Deleting rows above the copy leaves it below the sheet.
-    store.remove_rows(output, 0, 1);
+    // Deleting a column left of the copy leaves it right of the sheet.
+    store.remove_cols(output, 10, 1);
     store.recompute(output);
     assert_copy_matches_placed(&store, output);
 }

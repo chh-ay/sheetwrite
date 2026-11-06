@@ -117,13 +117,13 @@ function dataPivot(
 }
 
 /**
- * Row of the anchor of the first chart copy of a worksheet pivot; each next
- * copy takes the next row. The rows are below the last row of every sheet,
- * and deleting rows above them never brings them inside, so the engine
- * computes the copies without placing them in cells. Row and column edits
- * move every copy alike, so their anchors never meet.
+ * Column of the anchor of the first chart copy of a worksheet pivot; each
+ * next copy takes the next column. The columns are right of the last column
+ * of every sheet, and deleting columns never brings them inside, so the
+ * engine computes the copies without placing them in cells. Row and column
+ * edits move every copy alike, so their anchors never meet.
  */
-const UNPLACED_ROW = 2 ** 30;
+const UNPLACED_COL = 2 ** 30;
 
 /**
  * The copy of `pivot` that a chart reads: without subtotals or totals and
@@ -259,7 +259,7 @@ export function worksheetPayload(sheet: Sheet): PivotViewPayload | undefined {
     if (index === undefined) {
       index = all.length;
       const copy = chartCopy(pivot, `chart-data-${pivot.id}`);
-      all.push({ ...copy, anchor: { row: UNPLACED_ROW + copies.size, col: 0 } });
+      all.push({ ...copy, anchor: { row: 0, col: UNPLACED_COL + copies.size } });
       copies.set(pivot.id, index);
     }
     hidden.set(chart.id, index);
