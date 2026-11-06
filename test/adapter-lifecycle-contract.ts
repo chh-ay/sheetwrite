@@ -1,7 +1,5 @@
 import { describe, expect, it, spyOn } from "bun:test";
 
-// The adapters load core's built entry, so the test swaps the table exporter in that same module.
-import { setXlsxTableExportBackend } from "../packages/core/dist/xlsx-backends.js";
 import type {
   GridAdapterEventHandlers,
   GridReadyEvent,
@@ -19,6 +17,12 @@ import type {
   Selection,
   Workbook,
 } from "../packages/core/src/index.js";
+import type * as XlsxBackends from "../packages/core/src/xlsx-backends.js";
+
+// The adapters load core's built entry, and the built package keeps no declarations for this
+// internal module, so the test loads its runtime from dist with the source module's types.
+const BUILT_XLSX_BACKENDS: string = "../packages/core/dist/xlsx-backends.js";
+const { setXlsxTableExportBackend } = (await import(BUILT_XLSX_BACKENDS)) as typeof XlsxBackends;
 
 export interface AdapterLifecycleCase {
   id:

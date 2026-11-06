@@ -321,6 +321,19 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "Viewport",
     ],
   },
+  xlsx: {
+    source: "packages/core/src/types/xlsx.ts",
+    dependencies: ["data", "document", "query", "store"],
+    exports: [
+      "XlsxResourceLimits",
+      "XlsxTableExportBackend",
+      "XlsxTableImportBackend",
+      "XlsxWorkbookBackend",
+      "XlsxWorkbookExportContext",
+      "XlsxWorkbookOptions",
+      "XlsxWorkbookWarning",
+    ],
+  },
   grid: {
     source: "packages/core/src/types/grid.ts",
     dependencies: [
@@ -369,6 +382,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "SheetLifecycleResult",
       "SearchResult",
       "SelectionSummary",
+      "SheetwriteAddonSettings",
       "ToolbarActionName",
       "ToolbarIcon",
       "ToolbarItem",
