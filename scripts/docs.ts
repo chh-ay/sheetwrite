@@ -115,6 +115,7 @@ export const ADAPTER_DOC_CONTRACT = {
     "mutationPolicy",
     "transactionResourceLimits",
     "hyperlinkActivation",
+    "addons",
     "theme",
     "readOnly",
     "config",
