@@ -56,6 +56,9 @@ const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 const DASHBOARD_SHARED_MARKERS = ["chart-data-", '["SUM","Sum"]'];
 // The add-on registry loads only when a page installs an add-on; its error text survives minifiers.
 const ADDON_REGISTRY_MARKER = "is listed more than once.";
+// The registry loads the XLSX slots and the query command seam on first use; webpack keeps the
+// names of exports that a dynamic import reads.
+const ADDON_SEAM_MARKERS = ["setXlsxWorkbookBackend", "registerQueryCommands"];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
@@ -69,6 +72,7 @@ const findChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
+const addonSeamChunks = [];
 const documentChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
@@ -76,6 +80,7 @@ for (const file of lazyChunks) {
   if (code.includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(file);
   else if (code.includes(EDIT_LINKS_PANEL_MARKER)) editLinksPanelChunks.push(file);
   else if (code.includes(ADDON_REGISTRY_MARKER)) addonRegistryChunks.push(file);
+  else if (ADDON_SEAM_MARKERS.some((marker) => code.includes(marker))) addonSeamChunks.push(file);
   else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
   // Before the function table: the shared dashboard code also lists the pivot aggregations.
@@ -184,6 +189,7 @@ const assets = publicFiles.map((file) => {
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,
+      addonSeamChunks,
     ].some((chunks) => chunks.includes(file))
   ) {
     // The function table loads from the panels and formula help, and the add-on registry from
