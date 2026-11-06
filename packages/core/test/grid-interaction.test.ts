@@ -14,7 +14,7 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
+import { elementAdded, makeColumnarData, makeWorkbook, mountGridWithData, mountHost, scrollerOf } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -68,10 +68,7 @@ function requestColumnIndices(request: DataSourceRequest): number[] {
 
 describe("find-bar keystroke isolation", () => {
   it("does not clear the selected cell when Backspace is pressed in the find input", async () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, host, grid } = mountGridWithData(10);
     const addr = { sheet: "s1", row: 3, col: 0 };
 
     grid.setSelection({ kind: "cell", addr });
@@ -124,10 +121,7 @@ describe("row-resize repaint invalidation", () => {
   // so the paint signature's window/scroll/store components are all invariant
   // across the resize. The only way a repaint can fire is the row-height epoch.
   it("repaints with the new row height after a row-header drag", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { host, grid } = mountGridWithData(5);
 
     const recorder = makePaintRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);

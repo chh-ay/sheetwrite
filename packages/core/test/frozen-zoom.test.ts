@@ -15,7 +15,7 @@ import type {
   VisibleWindowView,
   Workbook,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountGridWithData, mountHost, scrollerOf } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
@@ -274,10 +274,7 @@ describe("zoom", () => {
   // Contract: setZoom clamps finite arguments into [0.5, 2], leaves in-range
   // factors untouched, and ignores values that cannot produce valid geometry.
   it("clamps finite zoom factors to [0.5, 2]", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { grid } = mountGridWithData(10);
 
     const cases: Array<{ input: number; expected: number }> = [
       { input: 0.25, expected: 0.5 },
@@ -336,10 +333,7 @@ describe("zoom", () => {
 describe("view composition", () => {
   // The Grid interface owns displayed-row geometry for every commit path.
   it("composes filter, hide, and sort into a shrunken painted view", () => {
-    const workbook = makeWorkbook(50);
-    const store = new SheetwriteStore(workbook, makeColumnarData(50));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, grid } = mountGridWithData(50);
 
     const recorder = makeRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
@@ -363,10 +357,7 @@ describe("view composition", () => {
 
   for (const source of ["transaction", "remote", "history"] as const) {
     it(`reconciles filtered rows before change listeners for ${source} commits`, () => {
-      const workbook = makeWorkbook(50);
-      const store = new SheetwriteStore(workbook, makeColumnarData(50));
-      const host = mountHost();
-      const grid = new GridImpl(host, { workbook }, store);
+      const { store, host, grid } = mountGridWithData(50);
       const recorder = makeRecorder();
       expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
@@ -425,10 +416,7 @@ describe("view composition", () => {
   });
 
   it("reconciles the row view before listeners when column structure clears a filter", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, grid } = mountGridWithData(10);
     grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     const recorder = makeRecorder();
@@ -485,10 +473,7 @@ describe("row heights under views", () => {
   // by the underlying DATA row, so that after the view is cleared the height
   // reappears on that data row's natural position — not on the old view slot.
   it("keys overrides by data row and repaints them on the natural row after clearView", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { workbook, store, grid } = mountGridWithData(5);
 
     // Sort amount descending → view order [4,3,2,1,0]; view row 1 is data row 3.
     grid.setViewSort([{ col: 1, ascending: false }]);
