@@ -1,6 +1,6 @@
 # Excel checks
 
-Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433), external links (#226), measures (#230) and dashboards (#231) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 10 to 14 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
+Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433), external links (#226), measures (#230) and dashboards (#231) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 7 and 10 to 14 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
 
 For each check, save the result file under the name given and attach it to the issue in a comment. A test then compares the file with Sheetwrite's result. When a result differs from the expected one, also write down what Excel showed.
 
@@ -99,17 +99,18 @@ Expected: Excel shows the relationship in **Data › Relationships** as active. 
 
 ## 7. A Sheetwrite workbook with a model pivot (#229)
 
-Sheetwrite related the same tables and added a model pivot at A8 (`Region` by sum of `Amount`). Sheetwrite cannot write Excel's data model, which is a known difference for 0.7.0.
+Sheetwrite related the same tables and added a model pivot at A8 (`Region` by sum of `Amount`). Sheetwrite cannot write Excel's data model, which is a known difference for 0.7.0. The export writes the pivot's current output as cells and keeps the pivot in Sheetwrite metadata (#495).
 
 1. Open the file.
-2. Open **Data › Relationships**.
+2. Write down A8:B12.
+3. Open **Data › Relationships**.
 
 Expected:
 
 - Excel opens the file without a repair message.
 - The tables and their values are as in the input file.
+- A8:B12 hold `Region`, `Sum of Amount`; North 15; South 20; West 7; `Total` 42, as plain values: Excel shows no PivotTable there.
 - Data › Relationships lists no relationship.
-- A8 and the cells below are empty, because the model pivot is not a native pivot in Excel.
 
 ## 8. A saved query refreshes in Excel (#227)
 
@@ -172,7 +173,7 @@ Expected: the formula still names `Prices.xlsx` and sheet `List`; Excel may show
 
 ## 12. A model pivot with measures (#230)
 
-Sheet `Data` has the table `Orders` (`Region`, `Amount`) and, at D1, the model pivot `Revenue by region`: `Region` by sum of `Amount`, the measure `Revenue` (`=SUM(Orders[Amount])`) and the measure `Share` (`=[Revenue]/CALCULATE([Revenue], ALL(Orders[Region]))`). Excel keeps measures in its data model part, which Sheetwrite does not write, so the export warned "Pivot table Revenue by region was not written as a native pivot because a model pivot needs an Excel data-model binary; it remains in Sheetwrite metadata".
+Sheet `Data` has the table `Orders` (`Region`, `Amount`) and, at D1, the model pivot `Revenue by region`: `Region` by sum of `Amount`, the measure `Revenue` (`=SUM(Orders[Amount])`) and the measure `Share` (`=[Revenue]/CALCULATE([Revenue], ALL(Orders[Region]))`). Excel keeps measures in its data model part, which Sheetwrite does not write, so the export warned "Pivot table Revenue by region was not written as a native pivot because a model pivot needs an Excel data-model binary; its current values were written as cells and it remains in Sheetwrite metadata".
 
 1. Open the file.
 2. Write down what D1:G6 show.
@@ -182,7 +183,7 @@ Expected:
 
 - Excel opens the file without a repair message.
 - The table `Orders` and its values are as in the input file.
-- D1 and the cells next to and below it are empty: the pivot is not a native pivot in Excel, as in check 7.
+- D1:G6 hold the pivot's values as plain cells: `Region`, `Sum of Amount`, `Revenue`, `Share`; East 180, 180, 27%; North 190, 190, 29%; South 95, 95, 15%; West 190, 190, 29%; `Total` 655, 655, 100%. The share cells use the `0%` format. Excel shows no PivotTable there, as in check 7.
 - No relationship or measure is listed in Excel.
 
 ## 13. Measures with no relationships through Excel (#230)
