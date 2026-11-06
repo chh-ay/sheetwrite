@@ -138,6 +138,15 @@
   transform: translateX(-50%);
 }
 
+/* The end labels stay inside the lane; the others centre on their gridline. */
+.change__ticks span:first-child {
+  transform: none;
+}
+
+.change__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
 .change__ticks span[data-centre] {
   color: var(--sw-fg-strong);
   font-weight: 600;
@@ -168,7 +177,7 @@
   position: relative;
   height: 1.125rem;
   background:
-    linear-gradient(var(--sw-fg-muted), var(--sw-fg-muted)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--sw-fg-muted), var(--sw-fg-muted)) var(--change-origin, 50%) 0 / 1px 100% no-repeat,
     repeating-linear-gradient(
       to right,
       var(--sw-border) 0 1px,
@@ -349,10 +358,6 @@
     grid-column: 1 / -1;
   }
 
-  .change__ticks span:not([data-centre]):not(:first-child):not(:last-child) {
-    visibility: hidden;
-  }
-
   .change__label {
     grid-column: 1 / -1;
     padding-top: var(--sw-space-1);
@@ -368,15 +373,5 @@
   .change {
     margin-inline: calc(var(--sw-space-2) * -1);
     padding: var(--sw-space-4);
-  }
-}
-
-@container change (max-width: 40rem) {
-  .change__ticks span:first-child {
-    transform: none;
-  }
-
-  .change__ticks span:last-child {
-    transform: translateX(-100%);
   }
 }

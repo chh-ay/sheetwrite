@@ -1054,6 +1054,21 @@ function formulaFigure(machines: readonly MachineEvidence<FormulaEvidence>[]): s
   });
 }
 
+/**
+ * "countif-100k" at 100,000 cells reads "Countif · 100,000 cells": a size the
+ * ID repeats is dropped from the name, so the label states it once.
+ */
+function workloadLabel(id: string, size: number): string {
+  const scalar = /^scalar-edit-affects-(\d+)$/u.exec(id);
+  if (scalar?.[1] !== undefined) {
+    return `Scalar edit read by ${formatCount(Number(scalar[1]))} formulas`;
+  }
+  const name = id.replace(/-(\d+)(k?)$/u, (suffix, digits: string, thousands: string) =>
+    Number(digits) * (thousands ? 1000 : 1) === size ? "" : suffix,
+  );
+  return `${readableId(name)} · ${formatCount(size)} ${size === 1 ? "cell" : "cells"}`;
+}
+
 /** Where `bench:engine-comparison` writes each machine's captures, by platform. */
 const ENGINE_COMPARISON_DIRECTORIES: ReadonlyArray<{
   readonly machine: "linux" | "mac";
@@ -1115,7 +1130,7 @@ async function renderEngineChange(): Promise<string[]> {
         : [
             {
               id: `${measured.id}/${measured.size}`,
-              label: `${readableId(measured.id)} · ${formatCount(measured.size)} ${measured.size === 1 ? "cell" : "cells"}`,
+              label: workloadLabel(measured.id, measured.size),
               base: fastestToP95(before.stat),
               measured: fastestToP95(measured.stat),
             },
