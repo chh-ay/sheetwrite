@@ -72,13 +72,11 @@ const MEASURES: readonly Measure[] = [
   { id: "orders", name: "Orders", table: "orders", formula: "=COUNTA(Orders[Order])" },
 ];
 
-/**
- * A PivotChart: its categories and series come from the pivot, so it lists no
- * series. The item's header names it, so the chart draws no title.
- */
+/** A PivotChart: its categories and series come from the pivot, so it lists no series. */
 const REGION_CHART: ChartDefinition = {
   id: "region-chart",
   kind: "column",
+  title: "Revenue by region",
   legend: "none",
   pivot: "by-region",
   anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 280 },
@@ -227,7 +225,7 @@ function itemLabel(item: DashboardItem): string {
     case "kpi":
       return `${item.title ?? item.measure} card`;
     case "chart":
-      return `${PIVOT_NAMES.get(REGION_CHART.pivot ?? "") ?? item.chart} chart`;
+      return `${REGION_CHART.title ?? item.chart} chart`;
   }
 }
 
