@@ -1105,7 +1105,7 @@ async function renderEngineChange(): Promise<string[]> {
       continue;
     }
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as EngineComparisonManifest;
-    if (manifest.protocol !== "sheetwrite-engine-comparison-v1") {
+    if (manifest.protocol !== "sheetwrite-engine-comparison-v2") {
       throw new Error(`${directory}/capture.json is not an engine comparison manifest`);
     }
     const base = await loadEvidence(

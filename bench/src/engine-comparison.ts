@@ -3,18 +3,23 @@
  * one machine, so the Formula engine page can show what the coming engine
  * changes, before its release capture exists.
  *
- *   bench-run --slot <cpu> bun src/engine-comparison.ts --base 0.6.0 \
+ *   bun src/engine-comparison.ts --base 0.6.0 \
  *     --base-checkout <clean checkout of v0.6.0, packages built> \
  *     --candidate-checkout <clean checkout of develop, packages built>
  *
+ * Run it on an otherwise idle machine, holding every benchmark and build slot,
+ * with every CPU available: as in the release capture, the JavaScript engine
+ * compiles the WASM engine on other cores, and a capture pinned to one core
+ * measures that compilation as well. The script refuses a restricted CPU set.
+ *
  * Both captures run the candidate's own formula benchmark, one after the
- * other in one process tree, so both sides share the harness, the core and
- * the CPU. The base side loads the release's engine through
+ * other in one process tree, so both sides share the harness and the CPUs.
+ * The base side loads the release's engine through
  * `SHEETWRITE_BENCH_ENGINE_ROOT`, which records the engine's provenance in the
  * capture. The captures, and `capture.json` with both commits, the order, the
  * command and the machine, go to `results/engine-comparison/<platform>/`.
  */
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { arch, cpus, platform, release as kernelRelease, totalmem } from "node:os";
 import { resolve } from "node:path";
 
@@ -22,7 +27,7 @@ import { optionValue, requiredOption } from "./cli-options.js";
 
 const BENCH_ROOT = resolve(import.meta.dir, "..");
 
-export const ENGINE_COMPARISON_PROTOCOL = "sheetwrite-engine-comparison-v1";
+export const ENGINE_COMPARISON_PROTOCOL = "sheetwrite-engine-comparison-v2";
 
 /** Artifact names, inside the candidate checkout's results and the output directory. */
 export const ENGINE_COMPARISON_ARTIFACTS = {
@@ -66,6 +71,18 @@ function capture(
   }
 }
 
+/**
+ * The CPUs this process may run on, as Linux lists them ("0-19"); other
+ * systems schedule on every CPU.
+ */
+async function cpuAffinity(): Promise<string> {
+  if (platform() !== "linux") return `0-${cpus().length - 1}`;
+  const status = await readFile("/proc/self/status", "utf8");
+  const allowed = /^Cpus_allowed_list:\s*(\S+)$/mu.exec(status)?.[1];
+  if (allowed === undefined) throw new Error("cannot read this process's CPU affinity");
+  return allowed;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const baseVersion = requiredOption(args, "--base");
@@ -83,6 +100,14 @@ async function main(): Promise<void> {
     BENCH_ROOT,
     optionValue(args, "--output-dir") ?? `results/engine-comparison/${platform()}`,
   );
+
+  const affinity = await cpuAffinity();
+  const everyCpu = `0-${cpus().length - 1}`;
+  if (affinity !== everyCpu) {
+    throw new Error(
+      `this process may run only on CPUs ${affinity}; a formula capture needs every CPU (${everyCpu}), so background compilation does not share the measured core`,
+    );
+  }
 
   const startedAt = new Date().toISOString();
   capture("base", candidateCheckout, {
@@ -110,12 +135,13 @@ async function main(): Promise<void> {
       arch: arch(),
       cpu: processors[0]?.model ?? "unknown",
       logicalCores: processors.length,
+      cpuAffinity: affinity,
       memoryBytes: totalmem(),
       bun: Bun.version,
     },
     startedAt,
     finishedAt,
-    command: `bench-run --slot <cpu> bun src/engine-comparison.ts --base ${baseVersion} --base-checkout <clean checkout of v${baseVersion}, packages built> --candidate-checkout <clean checkout of the candidate, packages built>`,
+    command: `bun src/engine-comparison.ts --base ${baseVersion} --base-checkout <clean checkout of v${baseVersion}, packages built> --candidate-checkout <clean checkout of the candidate, packages built>`,
     artifacts: ENGINE_COMPARISON_ARTIFACTS,
   };
   await writeFile(resolve(outputDir, "capture.json"), `${JSON.stringify(manifest, null, 2)}\n`);
