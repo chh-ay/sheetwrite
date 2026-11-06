@@ -81,9 +81,11 @@ const API_PACKAGE_ICONS: Readonly<Record<string, IconName>> = {
   "@sheetwrite/xlsx": "file",
 };
 
-/** An API package's icon; a package without its own reads as code. */
+/** An API package's icon. Every package has its own; a new one must add it here. */
 function apiPackageIcon(name: string): IconName {
-  return API_PACKAGE_ICONS[name] ?? "code";
+  const icon = API_PACKAGE_ICONS[name];
+  if (icon === undefined) throw new Error(`No sidebar icon for API package ${name}`);
+  return icon;
 }
 
 /** Each formula family page's icon, by the family's route slug. */
@@ -101,10 +103,12 @@ const FORMULA_FAMILY_ICONS: Readonly<Record<string, IconName>> = {
   text: "type",
 };
 
-/** A formula family page's icon; a family without its own reads as a function. */
+/** A formula family page's icon. Every family has its own; a new one must add it here. */
 function formulaFamilyIcon(href: string): IconName {
   const slug = /\/formula-functions\/([^/]+)\/$/.exec(href)?.[1] ?? "";
-  return FORMULA_FAMILY_ICONS[slug] ?? "function";
+  const icon = FORMULA_FAMILY_ICONS[slug];
+  if (icon === undefined) throw new Error(`No sidebar icon for formula family ${slug}`);
+  return icon;
 }
 
 /** Narrows a linkable entry without copying its authored metadata. */
