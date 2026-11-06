@@ -4,22 +4,6 @@
   gap: var(--sw-space-8);
   min-width: 0;
 }
-.host-row-stage {
-  overflow: hidden;
-  border: 1px solid var(--sw-border-strong);
-  border-radius: var(--sw-radius-lg);
-  background: var(--sw-surface-1);
-  color: var(--sw-fg);
-}
-.host-row-stage__bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sw-space-4);
-  align-items: center;
-  padding: var(--sw-space-5) var(--sw-space-6);
-  background: var(--sw-surface-1);
-}
-.host-row-stage__bar p,
 .host-row-panel header p {
   margin: 0 0 var(--sw-space-1-5);
   font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
@@ -27,119 +11,15 @@
   text-transform: uppercase;
   color: var(--sw-accent-strong);
 }
-.host-row-stage__bar h2 {
-  margin: 0;
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-h2) / 1.2 var(--sw-font-display);
-}
-.host-row-stage__bar output {
-  display: grid;
-  gap: var(--sw-space-2);
-  align-content: start;
-  padding: var(--sw-space-4);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-  background: var(--sw-surface-0);
-}
-.host-row-stage__bar output strong {
-  font: var(--sw-weight-semibold) var(--sw-text-h1) / 1.2 var(--sw-font-mono);
-  color: var(--sw-fg-strong);
-}
-.host-row-stage__bar output span,
-.host-row-stage__note {
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-}
-.host-row-stage :is(.host-row-primary, .host-row-actions button) {
-  height: 2rem;
-  max-width: 100%;
-  padding: 0 var(--sw-space-3);
-  border: 1px solid var(--sw-border-strong);
-  border-radius: var(--sw-radius-md);
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
-  cursor: pointer;
-}
-.host-row-stage button.host-row-primary {
-  color: var(--sw-accent-ink);
-  background: var(--sw-accent);
-  border-color: var(--sw-accent);
-}
-.host-row-stage button:hover:not(:disabled) {
-  border-color: var(--sw-accent);
-}
-.host-row-stage button:focus-visible {
-  outline: 2px solid var(--sw-accent-strong);
-  outline-offset: 3px;
-}
-.host-row-stage button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 /* Three labelled groups share the strip: what the host changes, what only the
    view changes, and the host's write policy. */
-.host-row-actions {
-  display: grid;
-  grid-template-columns: 3fr 3fr 2fr;
-  gap: var(--sw-space-4);
-  padding: var(--sw-space-3) var(--sw-space-6);
-  margin: 0;
-  border-block: 1px solid var(--sw-border);
-}
-
-.host-row-actions__group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sw-space-1-5);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
 
 /* A floated legend is not the fieldset's border legend, so it lays out as an
    ordinary first row of the flex group. */
-.host-row-actions__group legend {
-  float: left;
-  width: 100%;
-  padding: 0;
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
-}
-
-.host-row-stage .host-row-actions button {
-  flex: 1 1 auto;
-  min-height: 2.25rem;
-  height: auto;
-  padding: var(--sw-space-1) var(--sw-space-3);
-  line-height: 1.25;
-}
-.host-row-stage__note {
-  margin: 0;
-  padding: var(--sw-space-3) var(--sw-space-6);
-}
 /* Core declares its canvas palette on the grid root (.sheetwrite) and overrides
    it again for [data-theme="dark"], so the stage palette only takes effect when
    it is declared on that same element with higher specificity. This also drives
    the sheet-tab tokens, which core derives from the resolved canvas theme. */
-.host-rows-showcase .host-row-stage .sheetwrite {
-  --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
-  --sheetwrite-bg: var(--sw-surface-1);
-  --sheetwrite-fg: var(--sw-fg);
-  --sheetwrite-grid-line: var(--sw-border);
-  --sheetwrite-header-bg: var(--sw-surface-2);
-  --sheetwrite-header-fg: var(--sw-fg-strong);
-  --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 15%, transparent);
-  --sheetwrite-selection-border: var(--sw-accent);
-  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
-  --sheetwrite-search-active: var(--sw-warning);
-  --sheetwrite-widget-bg: var(--sw-surface-2);
-  --sheetwrite-widget-fg: var(--sw-fg);
-  --sheetwrite-widget-border: var(--sw-border);
-}
 /* Both panels share one height: the delta log fills the column beside the
    account store instead of stopping short of it. */
 .host-row-proof {
@@ -285,20 +165,6 @@
   .host-row-proof {
     grid-template-columns: minmax(0, 1fr);
   }
-  .host-row-stage__bar {
-    grid-template-columns: minmax(0, 1fr);
-    padding: var(--sw-space-4);
-  }
-  .host-row-stage__bar output {
-    display: grid;
-    gap: var(--sw-space-1);
-  }
-  .host-row-actions {
-    padding: var(--sw-space-3) var(--sw-space-4);
-  }
-  .host-row-stage__bar button {
-    justify-self: start;
-  }
   .host-row-panel th,
   .host-row-panel td {
     padding: var(--sw-space-2);
@@ -309,69 +175,13 @@
     display: none;
   }
 }
-
-.host-row-stage__bar {
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr);
-}
-.host-row-stage__bar > button {
-  justify-self: end;
-}
-.host-row-stage .sheetwrite-tabbar {
-  padding: var(--sw-space-0-5) var(--sw-space-2);
-  border-top: 1px solid var(--sw-border);
-}
-.host-row-stage .sheetwrite-tab {
-  padding: 0 var(--sw-space-3);
-  border-radius: var(--sw-radius-xs);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-body);
-}
-.host-row-stage .sheetwrite-tab-icon {
-  width: 1rem;
-  height: 1rem;
-}
 /* The add-sheet control sits inside the 28px tab bar: keep it on the bar's own
    height and give it the same chip treatment as the tab beside it. */
-.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add) {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 100%;
-  padding: 0;
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-xs);
-  background: transparent;
-  color: var(--sw-fg-muted);
-}
-.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):hover,
-.host-row-stage .sheetwrite-tab-options-button[aria-expanded="true"] {
-  border-color: var(--sw-accent);
-  background: var(--sw-surface-2);
-  color: var(--sw-accent-strong);
-}
-.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
-  outline: 2px solid var(--sw-accent);
-  outline-offset: 1px;
-}
 .host-row-panel header > span {
   text-align: right;
   line-height: 1.5;
 }
 @media (max-width: 48rem) {
-  .host-row-stage__bar {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .host-row-stage__bar > button {
-    justify-self: stretch;
-    min-height: 2.5rem;
-  }
-  .host-row-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .host-row-actions button {
-    min-height: 2.5rem;
-    height: auto;
-    line-height: 1.3;
-  }
   .host-row-stage-pill {
     white-space: normal;
   }

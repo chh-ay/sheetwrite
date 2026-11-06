@@ -86,6 +86,8 @@ export const Route = createFileRoute("/showcases/performance")({
   component: PerformanceRoute,
 });
 
+/** Jumps to shares of the sheet's height, from the first row to the last. */
+const LANDMARKS = [0, 0.25, 0.5, 0.75, 1] as const;
 const SCALE_OVERSCAN = 4;
 const COMPARISON_LOG_MAX_EXPONENT = COMPARISON_EVIDENCE.available
   ? Math.max(
@@ -915,25 +917,22 @@ function JumpControls({ workbench }: Readonly<{ workbench: PerformanceWorkbench 
           Jump to cell
         </DemoButton>
       </form>
-      <fieldset aria-label="Jump to a row" className="sw-sp-quick-jumps">
-        {[
-          { label: "Start", row: 0 },
-          { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
-          { label: "End", row: SCALE_ROWS - 1 },
-        ].map(({ label, row }) => (
+      <fieldset aria-label="Jump to a share of the rows" className="sw-sp-quick-jumps">
+        {LANDMARKS.map((ratio) => (
           <DemoButton
+            data-testid={`scale-landmark-${ratio * 100}`}
             disabled={!ready}
-            key={label}
-            onClick={() => jumpTo(row, firstColumn, "landmark")}
+            key={ratio}
+            onClick={() => jumpTo(Math.round((SCALE_ROWS - 1) * ratio), firstColumn, "landmark")}
           >
-            {label}
+            {ratio * 100}%
           </DemoButton>
         ))}
         <DemoButton
           disabled={!ready}
           onClick={() => jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")}
         >
-          Random row
+          Random
         </DemoButton>
       </fieldset>
     </>

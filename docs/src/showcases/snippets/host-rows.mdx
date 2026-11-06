@@ -1,0 +1,25 @@
+```tsx prelude="react" title="host-rows.tsx"
+import { createRowBridge } from "@sheetwrite/core";
+import { createSimpleGridInput } from "@sheetwrite/core/adapter";
+
+declare function saveDelta(delta: unknown): void;
+
+// Your app owns the rows; the bridge gives each one a stable ID
+const input = createSimpleGridInput({ columns, defaultRows: rows, sheetName: "Accounts" });
+const bridge = createRowBridge({
+  columns,
+  defaultRows: rows,
+  getRowId: (row) => String(row.id),
+  createRowId: () => crypto.randomUUID(),
+});
+
+// Every edit, insert and delete arrives as deltas that name row IDs, whatever
+// the view's sort or filter
+export const Accounts = () => (
+  <SheetwriteGrid
+    {...input}
+    rowBridge={bridge}
+    onRowDelta={(projection) => projection.deltas.forEach(saveDelta)}
+  />
+);
+```
