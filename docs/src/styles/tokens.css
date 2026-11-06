@@ -187,6 +187,34 @@
   line-gap-override: 0%;
 }
 
+/* Code: a monospace fallback scaled to JetBrains Mono's 0.6 em advance and
+   line metrics, so a code line that fits in the web font also fits before it
+   loads, and wrapped lines keep their count. Courier New and Liberation Mono
+   advance 0.6001 em; the scale keeps the fallback a hair narrower. */
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  font-weight: 100 549;
+  src:
+    local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
+    local("LiberationMono"), local("Cousine");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  font-weight: 550 900;
+  src:
+    local("Courier New Bold"), local("CourierNewPS-BoldMT"), local("Liberation Mono Bold"),
+    local("LiberationMono-Bold"), local("Cousine Bold");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* ── Type ─────────────────────────────────────────────────────────────
      Three families: Bricolage Grotesque for display and headings, Instrument
@@ -198,7 +226,7 @@
   --sw-font-display:
     "Bricolage Grotesque Variable", "Bricolage Grotesque", "Bricolage Grotesque Fallback",
     system-ui, sans-serif;
-  --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --sw-font-mono: "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);
