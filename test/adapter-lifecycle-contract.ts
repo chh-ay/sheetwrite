@@ -1,6 +1,5 @@
 import { describe, expect, it, spyOn } from "bun:test";
 
-import { setXlsxTableExportBackend } from "../packages/core/dist/index.js";
 import type {
   GridAdapterEventHandlers,
   GridReadyEvent,
@@ -18,6 +17,14 @@ import type {
   Selection,
   Workbook,
 } from "../packages/core/src/index.js";
+import type * as XlsxSlots from "../packages/core/src/xlsx-slots.js";
+
+// The adapters load core's built entry, and the built package keeps no declarations for this
+// internal module, so the test loads its runtime from dist with the source module's types.
+const BUILT_XLSX_SLOTS: string = "../packages/core/dist/xlsx-slots.js";
+const { setXlsxTableExportBackend, xlsxTableExportBackend } = (await import(
+  BUILT_XLSX_SLOTS
+)) as typeof XlsxSlots;
 
 export interface AdapterLifecycleCase {
   id:
@@ -103,6 +110,7 @@ export const GRID_OPTION_CONFORMANCE = {
   mutationPolicy: { policy: "reset", reason: "input-reset" },
   transactionResourceLimits: { policy: "reset", reason: "input-reset" },
   hyperlinkActivation: { policy: "reset", reason: "input-reset" },
+  addons: { policy: "reset", reason: "input-reset" },
   renderers: { policy: "reset", reason: "renderer-reset" },
   editors: { policy: "reset", reason: "input-reset" },
   overscan: { policy: "live", reason: null },
@@ -313,6 +321,8 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         configurable: true,
         value: { readText: () => clipboardRead.promise },
       });
+      // The test's exporter stands in for any installed one, which it puts back.
+      const installedTableExport = xlsxTableExportBackend();
       setXlsxTableExportBackend({
         name: "pending-unmount-save",
         toXlsxTable(_workbook, _store, options) {
@@ -361,7 +371,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         expect(warnings).toHaveBeenCalledTimes(0);
       } finally {
         await mounted?.unmount();
-        setXlsxTableExportBackend(null as never);
+        setXlsxTableExportBackend(installedTableExport);
         if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
         else Reflect.deleteProperty(navigator, "clipboard");
         errors.mockRestore();
@@ -622,6 +632,8 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const grid = mounted.getPublishedGrid()!;
 
       rejectProtectedEdit(grid);
+      // The test's exporter stands in for any installed one, which it puts back.
+      const installedTableExport = xlsxTableExportBackend();
       setXlsxTableExportBackend({
         name: "adapter-rejecting-export",
         async toXlsxTable() {
@@ -631,7 +643,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       grid.actions.exportXlsx();
       await waitFor(() => fallbackEvents.length === 1 && datasourceEvents.length === 1);
       const exportEvent = await waitForDelivery(exportDelivery.promise, "export error event");
-      setXlsxTableExportBackend(null as never);
+      setXlsxTableExportBackend(installedTableExport);
 
       expect(mutationEvents).toHaveLength(1);
       expect(mutationEvents[0]!.issues.map((issue) => issue.kind)).toEqual(["protection"]);

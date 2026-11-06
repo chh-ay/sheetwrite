@@ -183,7 +183,7 @@ function measureDepth(depth: number): Omit<DepthResult, "maxRssMiB"> {
 }
 
 async function runWorker(depth: number): Promise<DepthResult> {
-  await initSheetwrite(readFileSync(WASM_PATH));
+  await initSheetwrite({ source: readFileSync(WASM_PATH) });
   const restoreCanvas = installCanvasTestStubs();
   try {
     // The first Grid and coordinator in a process run cold code; discard them so

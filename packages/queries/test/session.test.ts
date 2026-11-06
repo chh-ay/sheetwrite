@@ -14,15 +14,22 @@ import {
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 
 import {
-  createQuerySession,
+  type QueriesAddonOptions,
+  queriesAddon,
   type QueryFetchRequest,
   type QueryFetchResult,
   type QuerySession,
+  querySessionOf,
 } from "../src/node.js";
 
 beforeAll(async () => {
   await initSheetwrite();
 });
+
+// Add-ons install once per process, and another copy of this package may have
+// installed "queries" first. These checks call this copy's grid hook directly,
+// as `createGrid` does for an installed add-on.
+const addon = queriesAddon();
 
 let restoreStubs: () => void;
 beforeEach(() => {
@@ -62,35 +69,70 @@ const unfiltered: SavedQuery = {
 };
 
 const grids: Grid[] = [];
-const sessions: QuerySession[] = [];
+const cleanups: (() => void)[] = [];
 afterEach(() => {
-  for (const session of sessions.splice(0)) session.dispose();
+  for (const cleanup of cleanups.splice(0)) cleanup();
   for (const grid of grids.splice(0)) grid.destroy();
 });
 
-function mount(initial: Workbook = workbook()): Grid {
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const grid = createGrid(host, { workbook: initial });
-  grids.push(grid);
-  return grid;
+/** Apply the queries add-on to `grid`, as grid creation does; returns its cleanup. */
+function applyQueries(grid: Grid, settings: QueriesAddonOptions | undefined): () => void {
+  const cleanup =
+    addon.grid?.({
+      grid,
+      settings,
+      queryCommands: () => () => {},
+      historyCommand: () => {},
+    }) ?? (() => {});
+  cleanups.push(cleanup);
+  return cleanup;
 }
 
 type Sources = Record<string, string | (() => Promise<QueryFetchResult>)>;
 
-async function connect(grid: Grid, sources: Sources, requests: QueryFetchRequest[] = []) {
-  const session = await createQuerySession(grid, {
+/** The fixture sources and the recorded requests of one grid; `connect` fills them in. */
+interface SourceFixture {
+  sources: Sources;
+  requests: QueryFetchRequest[];
+}
+
+const fixtures = new WeakMap<Grid, SourceFixture>();
+
+/** Grid settings whose `fetchSource` serves `fixture`. */
+function sourceSettings(fixture: SourceFixture): QueriesAddonOptions {
+  return {
     fetchSource: async (request) => {
-      requests.push(request);
-      const source = sources[request.sourceId];
+      fixture.requests.push(request);
+      const source = fixture.sources[request.sourceId];
       if (typeof source === "function") return source();
       if (source === undefined) throw new Error(`No fixture for ${request.sourceId}`);
 
       return { kind: "bytes", bytes: encoder.encode(source) };
     },
-  });
-  sessions.push(session);
-  return session;
+  };
+}
+
+function mount(initial: Workbook = workbook()): Grid {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const fixture: SourceFixture = { sources: {}, requests: [] };
+  const grid = createGrid(host, { workbook: initial });
+  grids.push(grid);
+  applyQueries(grid, sourceSettings(fixture));
+  fixtures.set(grid, fixture);
+  return grid;
+}
+
+async function connect(
+  grid: Grid,
+  sources: Sources,
+  requests: QueryFetchRequest[] = [],
+): Promise<QuerySession> {
+  const fixture = fixtures.get(grid);
+  if (fixture === undefined) throw new Error("the grid was not mounted with query settings");
+  fixture.sources = sources;
+  fixture.requests = requests;
+  return querySessionOf(grid);
 }
 
 const cell = (grid: Grid, row: number, col: number) =>
@@ -413,6 +455,23 @@ describe("query sources and definitions", () => {
     expect([cell(grid, 1, 0), cell(grid, 2, 0)]).toEqual(["South", null]);
   });
 
+  it("ends a grid's session with the add-on's cleanup", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = createGrid(host, { workbook: workbook() });
+    grids.push(grid);
+    const fixture: SourceFixture = { sources: {}, requests: [] };
+    const cleanup = applyQueries(grid, sourceSettings(fixture));
+    const session = await querySessionOf(grid);
+    expect(session.define(unfiltered).status).toBe("applied");
+
+    cleanup();
+
+    await expect(querySessionOf(grid)).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+    });
+  });
+
   it("rejects a plan the engine cannot run before saving it", async () => {
     const grid = mount();
     const session = await connect(grid, {});
@@ -440,8 +499,13 @@ describe("query sources and definitions", () => {
     const senderHost = document.createElement("div");
     const peerHost = document.createElement("div");
     document.body.append(senderHost, peerHost);
+    const senderFixture: SourceFixture = { sources: {}, requests: [] };
     const sender = createGridFromSnapshot(senderHost, structuredClone(base));
+    applyQueries(sender, sourceSettings(senderFixture));
+    fixtures.set(sender, senderFixture);
     const peer = createGridFromSnapshot(peerHost, structuredClone(base));
+    // The peer gets the add-on without a fetchSource, so it has no session.
+    applyQueries(peer, undefined);
     grids.push(sender, peer);
     const options = { documentId: "query-sync", serverVersion: 0 };
     const senderSync = new SyncCoordinator(sender, adapter, options);
@@ -470,6 +534,10 @@ describe("query sources and definitions", () => {
 
       expect(peer.store.getCell({ sheet: "data", row: 1, col: 0 }).resolved).toBe("North");
       expect(peer.store.getWorkbook().queries?.map((query) => query.id)).toEqual(["sales"]);
+      // The peer has no fetchSource, so it has no session and never fetches.
+      await expect(querySessionOf(peer)).rejects.toMatchObject({
+        code: "optional-backend-unavailable",
+      });
     } finally {
       senderSync.destroy();
       peerSync.destroy();

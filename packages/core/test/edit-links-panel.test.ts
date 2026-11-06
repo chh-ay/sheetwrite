@@ -1,14 +1,13 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
-import { connectExternalLinks } from "../src/external-links.js";
-import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { type ExternalLinkResolver, externalLinksAddon } from "../src/external-links.js";
+import { createGrid, initSheetwrite } from "../src/grid.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
-import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { ExternalLink, Workbook } from "../src/types.js";
+import type { ExternalLink, Grid, Workbook } from "../src/types.js";
 
 let restore: () => void;
-const grids: GridImpl[] = [];
+const grids: Grid[] = [];
 
 // The ribbon and the panel load as their own chunks in a grid, so the tests
 // load them the same way.
@@ -16,7 +15,7 @@ const RIBBON_MODULE = "../src/ribbon/ribbon.js";
 const PANEL_MODULE = "../src/panels/edit-links-panel.js";
 
 beforeAll(async () => {
-  await initSheetwrite();
+  await initSheetwrite({ addons: [externalLinksAddon()] });
   await import(RIBBON_MODULE);
 });
 beforeEach(() => {
@@ -35,7 +34,7 @@ const budget: ExternalLink = {
 };
 const A1 = { sheet: "s1", row: 0, col: 0 };
 
-async function setup(externalLinks?: ExternalLink[]) {
+async function setup(externalLinks?: ExternalLink[], resolve?: ExternalLinkResolver) {
   const workbook: Workbook = {
     ...(externalLinks === undefined ? {} : { externalLinks }),
     activeSheet: "s1",
@@ -53,11 +52,15 @@ async function setup(externalLinks?: ExternalLink[]) {
       },
     ],
   };
-  const store = new SheetwriteStore(workbook);
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 1400 }, clientHeight: { value: 500 } });
   document.body.appendChild(host);
-  const grid = new GridImpl(host, { workbook, readOnly: false, config: { ribbon: true } }, store);
+  const grid = createGrid(host, {
+    workbook,
+    readOnly: false,
+    config: { ribbon: true },
+    addons: { externalLinks: { resolve } },
+  });
   grids.push(grid);
   await import(RIBBON_MODULE);
   grid.applyTransaction({
@@ -108,16 +111,16 @@ it("shows Edit Links only for a workbook with links", async () => {
   expect(commandButton("editLinks")).not.toBeNull();
 });
 
-it("lists the links and updates their values through the connected resolver", async () => {
-  const { grid, openPanel, control, panelText } = await setup([budget]);
-  await openPanel();
-  expect(panelText()).toContain("Budget.xlsx");
-  expect(panelText()).toContain("Location: https://files.example/Budget.xlsx");
-  expect(panelText()).toContain("Status: Saved values");
-  expect(control<HTMLButtonElement>("update-all").disabled).toBe(true);
+it("lists the links and updates their values through the grid's resolver", async () => {
+  const withoutResolver = await setup([budget]);
+  await withoutResolver.openPanel();
+  expect(withoutResolver.panelText()).toContain("Budget.xlsx");
+  expect(withoutResolver.panelText()).toContain("Location: https://files.example/Budget.xlsx");
+  expect(withoutResolver.panelText()).toContain("Status: Saved values");
+  expect(withoutResolver.control<HTMLButtonElement>("update-all").disabled).toBe(true);
 
   const requests: string[] = [];
-  connectExternalLinks(grid, async ({ book }) => {
+  const { grid, openPanel, control, panelText } = await setup([budget], async ({ book }) => {
     requests.push(book);
     return [{ name: "Annual", cells: [{ row: 0, col: 0, value: 9 }] }];
   });
