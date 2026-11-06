@@ -30,6 +30,11 @@ export interface PlacementInput {
   readonly viewport: Box;
   /** Space between the panel and the line. */
   readonly gap: number;
+  /**
+   * The shortest a panel may become: a panel taller than the room on its side
+   * shrinks to that room (and scrolls), down to this height.
+   */
+  readonly minHeight: number;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -43,7 +48,10 @@ export interface PanelPlacement {
   readonly shift: number;
 }
 
-/** The panel's box for `placement`, as Floating UI would place it before shifting. */
+/**
+ * The panel's box for `placement`, as Floating UI would place it before
+ * shifting: below and above, a panel taller than the room shrinks to it.
+ */
 export function panelBox(placement: PanelPlacement, input: PlacementInput): Box {
   const { trigger, line, lineEnd, panel, viewport, gap } = input;
   const distance = gap + placement.shift;
@@ -53,17 +61,23 @@ export function panelBox(placement: PanelPlacement, input: PlacementInput): Box 
     return { left, top, right: left + panel.width, bottom: top + panel.height };
   }
   const left = clamp(trigger.left, viewport.left, viewport.right - panel.width);
-  const top =
-    placement.side === "below" ? line.bottom + distance : line.top - distance - panel.height;
-  return { left, top, right: left + panel.width, bottom: top + panel.height };
+  const right = left + panel.width;
+  if (placement.side === "below") {
+    const top = line.bottom + distance;
+    return { left, top, right, bottom: top + Math.min(panel.height, viewport.bottom - top) };
+  }
+  const bottom = line.top - distance;
+  return { left, top: bottom - Math.min(panel.height, bottom - viewport.top), right, bottom };
 }
 
-function fitsViewport(box: Box, viewport: Box): boolean {
+function fitsViewport(box: Box, input: PlacementInput): boolean {
+  const { viewport, minHeight } = input;
   return (
     box.left >= viewport.left &&
     box.top >= viewport.top &&
     box.right <= viewport.right &&
-    box.bottom <= viewport.bottom
+    box.bottom <= viewport.bottom &&
+    box.bottom - box.top >= Math.min(minHeight, input.panel.height)
   );
 }
 
@@ -114,7 +128,7 @@ export function choosePanelPlacement(input: PlacementInput): PanelPlacement {
   let best: { placement: PanelPlacement; covered: number } | undefined;
   for (const placement of candidates) {
     const box = panelBox(placement, input);
-    if (!fitsViewport(box, input.viewport)) continue;
+    if (!fitsViewport(box, input)) continue;
     const covered = input.mentions.filter((mention) => overlaps(box, mention)).length;
     if (covered === 0) return placement;
     if (best === undefined || covered < best.covered) best = { placement, covered };

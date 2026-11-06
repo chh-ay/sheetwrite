@@ -18,7 +18,6 @@
 import {
   autoUpdate,
   computePosition,
-  flip,
   offset,
   type Placement,
   shift,
@@ -53,6 +52,8 @@ const VIEWPORT_PADDING_PX = 12;
 /** The 34rem design cap; the inline style wins over the CSS max-width. */
 const PANEL_MAX_WIDTH_PX = 544;
 const PANEL_MAX_HEIGHT_PX = 480;
+/** A panel taller than the room beside its line shrinks and scrolls, down to this. */
+const PANEL_MIN_HEIGHT_PX = 160;
 /** Code blocks this close to the viewport get their panels prepared. */
 const PREPARE_MARGIN = "50% 0px";
 /** The latest an idle preparation waits when the browser never goes idle. */
@@ -253,15 +254,14 @@ async function positionPopover(
     bottom: VIEWPORT_PADDING_PX,
     left: VIEWPORT_PADDING_PX,
   };
-  const opposite: Placement = side === "above" ? "bottom-start" : "top-start";
   const result = await computePosition(anchor, panel, {
     strategy: "fixed",
     placement: FLOATING_PLACEMENT[side],
     middleware: [
+      // The side was chosen on open; it holds while the page scrolls, and a
+      // panel without room on its side shrinks and scrolls instead of moving
+      // onto the mentions it was placed to keep clear.
       offset(PANEL_OFFSET_PX + extra),
-      // Beside the line the panel only shifts; above or below it may flip
-      // when scrolling leaves no room on its side.
-      ...(side === "beside" ? [] : [flip({ padding, fallbackPlacements: [opposite] })]),
       shift({ padding }),
       size({
         padding,
@@ -303,6 +303,7 @@ export function openCodePopover(trigger: HTMLElement): void {
     mentions: related.map(boxOf),
     viewport: panelArea(),
     gap: PANEL_OFFSET_PX,
+    minHeight: PANEL_MIN_HEIGHT_PX,
   });
 
   closePopover();

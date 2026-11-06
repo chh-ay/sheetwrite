@@ -20,6 +20,7 @@ function input(mentions: readonly Box[], viewportWidth = 1440): PlacementInput {
     mentions,
     viewport: box(12, 76, viewportWidth - 24, 812),
     gap: 8,
+    minHeight: 120,
   };
 }
 
