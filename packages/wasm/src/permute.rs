@@ -1,6 +1,8 @@
-//! In-place row sort: the rows of a rectangle move by a permutation, as
-//! Excel's Sort moves them. Each cell keeps its value, style and source; a
-//! formula is adjusted for the move of its own row (`sort_formula`).
+//! Rows or columns that move by a permutation. Excel's Sort moves the rows
+//! of a rectangle: each cell keeps its value, style and source, and a
+//! formula is adjusted for the move of its own row (`sort_formula`). Excel's
+//! Cut and Insert Cut Cells moves whole rows or columns: every reference in
+//! the workbook follows the cells it names (`moved_index`, `moved_span`).
 //! Formulas are read as source text and written back through the same
 //! source-replacement path that packed block writes use, so this module does
 //! not depend on how the store keeps formulas.
@@ -9,11 +11,18 @@ use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
 
+use crate::calc::{move_refs, moved_index};
 use crate::formula_rewrite::sort_formula;
 use crate::graph::DirtyRect;
 use crate::row_order::order_targets;
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK, BLOCK_RESOURCE_LIMIT};
 use crate::types::{cell_key, AbsCellKey, FormulaEntry, KIND_EMPTY, KIND_FORMULA};
+
+/// The storage of moved cells: kind, payload and style.
+type MovedSlots = Vec<(u8, u64, u32)>;
+
+/// The sources of moved formula and reference cells, keyed by target cell.
+type MovedSources = HashMap<(u32, u32), FormulaEntry>;
 
 /// Status of a permutation that moves part of a spill range, which Excel
 /// rejects with "You can't change part of an array."
@@ -75,24 +84,76 @@ impl CellStore {
             return BLOCK_RESOURCE_LIMIT;
         }
 
-        let mut slots = Vec::with_capacity(block.rows);
-        for col in start_col..start_col + cols {
-            slots.clear();
-            let sources = self.read_moved_column(block, col, order, &mut slots);
-            let written = self.replace_range_sources(
-                sheet,
-                (start_row, col),
-                (block.rows, 1),
-                revision,
-                sources,
-                |row, _| slots[row],
-            );
-            if !written {
-                return BLOCK_RESOURCE_LIMIT;
+        if self.permute_block_rows(block, order, revision, true) {
+            BLOCK_OK
+        } else {
+            BLOCK_RESOURCE_LIMIT
+        }
+    }
+
+    /// Move `count` whole rows from row `from`, so that the first of them is
+    /// row `to` after the move, as Excel's Cut and Insert Cut Cells moves
+    /// rows. Each cell keeps its value, style and formula, and every
+    /// reference in the workbook follows the cells it names. Status: `0`
+    /// success, `1` invalid rows, `3` dirty-capacity rejection.
+    #[wasm_bindgen(js_name = moveRows)]
+    pub fn move_rows(&mut self, sheet: usize, from: usize, count: usize, to: usize) -> u32 {
+        self.move_block(sheet, false, (from, count, to))
+    }
+
+    /// Column counterpart of [`CellStore::move_rows`].
+    #[wasm_bindgen(js_name = moveCols)]
+    pub fn move_cols(&mut self, sheet: usize, from: usize, count: usize, to: usize) -> u32 {
+        self.move_block(sheet, true, (from, count, to))
+    }
+
+    /// Cells, as `[sheet, row, col]` triples at their address before the
+    /// move, whose formula a move back cannot restore: a range that loses a
+    /// moved row or column at its edge does not get it back. Undo restores
+    /// these cells from a capture. Pass `columns` for a column move.
+    #[wasm_bindgen(js_name = moveLosses)]
+    pub fn move_losses(
+        &self,
+        sheet: usize,
+        columns: bool,
+        from: u32,
+        count: u32,
+        to: u32,
+    ) -> Vec<u32> {
+        let edited = sheet as u32;
+        let mut losses = Vec::new();
+        for (formula_sheet, data) in self.sheets.iter().enumerate() {
+            if !self.sheet_alive[formula_sheet] {
+                continue;
+            }
+            let formula_sheet = formula_sheet as u32;
+            for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
+                let Some(ast) = entry.ast.as_ref().filter(|_| entry.is_formula()) else {
+                    continue;
+                };
+                let mut moved = ast.clone();
+                if !move_refs(
+                    &mut moved,
+                    edited,
+                    formula_sheet,
+                    columns,
+                    (from, count, to),
+                ) {
+                    continue;
+                }
+                move_refs(
+                    &mut moved,
+                    edited,
+                    formula_sheet,
+                    columns,
+                    (to, count, from),
+                );
+                if moved != *ast {
+                    losses.extend_from_slice(&[formula_sheet, row, col]);
+                }
             }
         }
-
-        BLOCK_OK
+        losses
     }
 
     /// Offsets, row-major in the rectangle before the move, of the formula
@@ -237,42 +298,115 @@ impl CellStore {
         whole
     }
 
-    /// Read the cells that move into column `col`, in target order. Slots
-    /// receive the storage of each target cell; the returned map holds the
-    /// adjusted source of each formula or reference cell, keyed by target.
-    fn read_moved_column(
-        &self,
+    /// Move the rows of `block` by `order`, column by column. With `adjust`,
+    /// a moved formula is adjusted for the move of its own row, as a sort
+    /// does; without it, its text is kept. Returns false when the store
+    /// cannot take a write.
+    fn permute_block_rows(
+        &mut self,
         block: PermutedBlock,
-        col: usize,
         order: &[u32],
-        slots: &mut Vec<(u8, u64, u32)>,
-    ) -> HashMap<(u32, u32), FormulaEntry> {
-        let data = &self.sheets[block.sheet];
-        let mut sources = HashMap::new();
-
-        for (target, &source) in order.iter().enumerate() {
-            let source_row = block.start_row + source as usize;
-            let target_row = block.start_row + target;
-            let index = data.cells.idx(source_row, col);
-            let kind = data.cells.source_kind_at(index);
-            let style = data.cells.style_at(index);
-
-            if kind != KIND_FORMULA {
-                slots.push((kind, data.cells.source_payload_at(index), style));
-                continue;
+        revision: Option<u64>,
+        adjust: bool,
+    ) -> bool {
+        let mut slots = Vec::with_capacity(block.rows);
+        for col in block.start_col..block.start_col + block.cols {
+            slots.clear();
+            let mut sources = HashMap::new();
+            for (target, &source) in order.iter().enumerate() {
+                let row_delta = if adjust {
+                    target as i32 - source as i32
+                } else {
+                    0
+                };
+                self.read_moved_cell(
+                    block.sheet,
+                    [
+                        (block.start_row + source as usize, col),
+                        (block.start_row + target, col),
+                    ],
+                    row_delta,
+                    &mut slots,
+                    &mut sources,
+                );
             }
+            let written = self.replace_range_sources(
+                block.sheet,
+                (block.start_row, col),
+                (block.rows, 1),
+                revision,
+                sources,
+                |row, _| slots[row],
+            );
+            if !written {
+                return false;
+            }
+        }
+        true
+    }
 
-            let row_delta = target as i32 - source as i32;
-            let moved = self.moved_source(block.sheet, source_row, col, row_delta);
-            let (Some(moved), Some(key)) = (moved, cell_key(target_row, col)) else {
-                slots.push((KIND_EMPTY, 0, style));
-                continue;
-            };
-            slots.push((KIND_FORMULA, 0, style));
-            sources.insert(key, self.source_entry(block.sheet, key, moved));
+    /// Move whole columns from `start`: target column offset `i` gets the
+    /// cells of source column offset `order[i]`. Every moved column is read
+    /// before any is written, since a column can be the target of another.
+    fn permute_columns(
+        &mut self,
+        sheet: usize,
+        start: usize,
+        order: &[u32],
+        revision: Option<u64>,
+    ) -> bool {
+        let rows = self.sheets[sheet].cells.row_count();
+        let mut slots = Vec::with_capacity(rows * order.len());
+        let mut sources = HashMap::new();
+        for (target, &source) in order.iter().enumerate() {
+            for row in 0..rows {
+                self.read_moved_cell(
+                    sheet,
+                    [(row, start + source as usize), (row, start + target)],
+                    0,
+                    &mut slots,
+                    &mut sources,
+                );
+            }
+        }
+        self.replace_range_sources(
+            sheet,
+            (0, start),
+            (rows, order.len()),
+            revision,
+            sources,
+            |row, col| slots[col * rows + row],
+        )
+    }
+
+    /// Read the cell at the first address that moves to the second: its
+    /// storage goes to `slots`, and the source of a formula or reference
+    /// cell, adjusted for a sort that moves its row by `row_delta`, to
+    /// `sources`.
+    fn read_moved_cell(
+        &self,
+        sheet: usize,
+        [(source_row, source_col), (target_row, target_col)]: [(usize, usize); 2],
+        row_delta: i32,
+        slots: &mut MovedSlots,
+        sources: &mut MovedSources,
+    ) {
+        let data = &self.sheets[sheet];
+        let index = data.cells.idx(source_row, source_col);
+        let kind = data.cells.source_kind_at(index);
+        let style = data.cells.style_at(index);
+        if kind != KIND_FORMULA {
+            slots.push((kind, data.cells.source_payload_at(index), style));
+            return;
         }
 
-        sources
+        let moved = self.moved_source(sheet, source_row, source_col, row_delta);
+        let (Some(moved), Some(key)) = (moved, cell_key(target_row, target_col)) else {
+            slots.push((KIND_EMPTY, 0, style));
+            return;
+        };
+        slots.push((KIND_FORMULA, 0, style));
+        sources.insert(key, self.source_entry(sheet, key, moved));
     }
 
     fn moved_source(
@@ -283,7 +417,12 @@ impl CellStore {
         row_delta: i32,
     ) -> Option<MovedSource> {
         if let Some(text) = self.formula_source(sheet, row, col) {
-            return Some(MovedSource::Formula(sort_formula(&text, row_delta)));
+            let text = if row_delta == 0 {
+                text
+            } else {
+                sort_formula(&text, row_delta)
+            };
+            return Some(MovedSource::Formula(text));
         }
 
         let target = self.reference_target(sheet, row, col)?;
@@ -292,6 +431,75 @@ impl CellStore {
             row: target[1],
             col: target[2],
         }))
+    }
+
+    /// Move `count` rows or, with `columns`, columns from `from` to `to`:
+    /// the references first, then the cells, which read the text of each
+    /// moved formula with its references already moved.
+    fn move_block(
+        &mut self,
+        sheet: usize,
+        columns: bool,
+        (from, count, to): (usize, usize, usize),
+    ) -> u32 {
+        let Some(data) = self.sheets.get(sheet).filter(|_| self.sheet_alive[sheet]) else {
+            return BLOCK_INVALID;
+        };
+        let (rows, cols) = (data.cells.row_count(), data.cells.n_cols());
+        let length = if columns { cols } else { rows };
+        let fits = count > 0
+            && u32::try_from(length).is_ok()
+            && from.checked_add(count).is_some_and(|end| end <= length)
+            && to.checked_add(count).is_some_and(|end| end <= length);
+        if !fits {
+            return BLOCK_INVALID;
+        }
+        if from == to {
+            return BLOCK_OK;
+        }
+
+        let start = from.min(to);
+        let span = from.max(to) + count - start;
+        let block = (from as u32, count as u32, to as u32);
+        let (rect_start, rect_size) = if columns {
+            ((0, start), (rows, span))
+        } else {
+            ((start, 0), (span, cols))
+        };
+        let revision = self.local_dirty_revision();
+        if revision.is_some()
+            && !self.sheets[sheet].cells.can_dirty_rect(
+                rect_start.0,
+                rect_start.1,
+                rect_size.0,
+                rect_size.1,
+            )
+        {
+            return BLOCK_RESOURCE_LIMIT;
+        }
+
+        self.move_references(sheet as u32, columns, block);
+        let order = moved_order(start, span, block);
+        let written = rect_size.0 == 0
+            || rect_size.1 == 0
+            || if columns {
+                self.permute_columns(sheet, start, &order, revision)
+            } else {
+                let rows = PermutedBlock {
+                    sheet,
+                    start_row: start,
+                    start_col: 0,
+                    rows: span,
+                    cols,
+                };
+                self.permute_block_rows(rows, &order, revision, false)
+            };
+        self.graph.invalidate();
+        if written {
+            BLOCK_OK
+        } else {
+            BLOCK_RESOURCE_LIMIT
+        }
     }
 
     fn source_entry(&self, sheet: usize, key: (u32, u32), moved: MovedSource) -> FormulaEntry {
@@ -306,6 +514,17 @@ impl CellStore {
             ),
         }
     }
+}
+
+/// The order that moves `block` (`from`, `count`, `to`) within the `span`
+/// indices from `start`: entry `i` is the source offset of target offset `i`.
+fn moved_order(start: usize, span: usize, (from, count, to): (u32, u32, u32)) -> Vec<u32> {
+    let mut order = vec![0; span];
+    for source in 0..span {
+        let target = moved_index((start + source) as u32, from, count, to) as usize - start;
+        order[target] = source as u32;
+    }
+    order
 }
 
 /// A rectangle of cells, inclusive on every edge.

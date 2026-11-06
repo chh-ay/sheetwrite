@@ -8,9 +8,9 @@ use rustc_hash::FxHashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, parse, parse_with_features, place_span, resolve_sheet_refs,
-    resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef,
-    TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, moved_index, moved_span, parse, parse_with_features, place_span,
+    resolve_sheet_refs, resolve_structured_refs, sheet_name_key, shift_range, Ast, NamedRangeRef,
+    StructuredRef, TableSection, UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -3425,6 +3425,63 @@ impl CellStore {
         if self.shift_named_formulas(edited_sheet, at, delta, true) || ranges_changed {
             self.refresh_named_formula_entries();
         }
+    }
+
+    /// Follow `block` (`from`, `count`, `to`) rows or, with `columns`,
+    /// columns of `edited_sheet` that move, in every formula, defined name
+    /// and table of the workbook. The cells themselves move afterwards.
+    pub(crate) fn move_references(
+        &mut self,
+        edited_sheet: u32,
+        columns: bool,
+        block: (u32, u32, u32),
+    ) {
+        for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
+            sheet
+                .formulas
+                .rewrite_entries(&mut self.formula_slots, |entry| {
+                    entry.move_axis(edited_sheet, formula_sheet as u32, columns, block);
+                });
+            sheet.formulas.mark_all_dirty();
+        }
+
+        let (from, count, to) = block;
+        for table in self
+            .tables
+            .values_mut()
+            .filter(|table| table.sheet == edited_sheet)
+        {
+            let span = if columns {
+                (&mut table.col_start, &mut table.col_end)
+            } else {
+                (&mut table.row_start, &mut table.row_end)
+            };
+            if let Some(moved) = moved_span(*span.0, *span.1, from, count, to) {
+                (*span.0, *span.1) = moved;
+            }
+            if columns {
+                for column in &mut table.columns {
+                    column.col = moved_index(column.col, from, count, to);
+                }
+                table.columns.sort_by_key(|column| column.col);
+            }
+        }
+
+        // Saved pivot output and pivot sources move as a delete where the
+        // block was and an insert where it lands; core sends the moved
+        // definitions again.
+        let axis = if columns {
+            pivot_output::ShiftAxis::Cols
+        } else {
+            pivot_output::ShiftAxis::Rows
+        };
+        self.shift_pivots(edited_sheet as usize, axis, from, -i64::from(count));
+        self.shift_pivots(edited_sheet as usize, axis, to, i64::from(count));
+
+        if self.move_named_references(edited_sheet, columns, block) {
+            self.refresh_named_formula_entries();
+        }
+        self.graph.invalidate();
     }
 
     fn drop_invalid_references(&mut self) {
