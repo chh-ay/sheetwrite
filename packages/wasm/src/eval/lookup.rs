@@ -10,8 +10,7 @@ use std::cmp::Ordering;
 
 use crate::cells::payload_num;
 use crate::types::{
-    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER,
-    KIND_STRING,
+    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER, KIND_STRING,
 };
 
 use super::criteria::WildcardPattern;
