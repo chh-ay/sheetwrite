@@ -59,6 +59,7 @@ async function setup(externalLinks?: ExternalLink[]) {
   document.body.appendChild(host);
   const grid = new GridImpl(host, { workbook, readOnly: false, config: { ribbon: true } }, store);
   grids.push(grid);
+  await import(RIBBON_MODULE);
   grid.applyTransaction({
     patches: [{ op: "set", addr: A1, value: { kind: "formula", src: "=[Budget.xlsx]Annual!A1" } }],
   });
