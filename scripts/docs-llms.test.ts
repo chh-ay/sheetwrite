@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expectedLlmsFiles, inNavigationOrder, LLMS_FULL_PATH } from "./docs-llms.js";
+import {
+  expectedLlmsFiles,
+  inNavigationOrder,
+  LLMS_FULL_PATH,
+  LLMS_SITE_BASE,
+} from "./docs-llms.js";
 
 describe("llms reading order", () => {
   it("orders pages depth-first by the sidebar, then unlisted pages by route", () => {
@@ -100,6 +105,52 @@ describe("llms document text", () => {
       expect(links).toHaveLength(2);
       expect(new Set(links).size).toBe(2);
       for (const anchor of links) expect(full.content).toContain(`<a id="${anchor}"></a>`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reads content components as titled text, figures as their alt text", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
+    const contentRoot = join(root, "docs/src/content/docs");
+    try {
+      await mkdir(contentRoot, { recursive: true });
+      await writeFile(
+        join(contentRoot, "index.mdx"),
+        [
+          "---",
+          "title: Components",
+          "---",
+          "<Note>Read this first.</Note>",
+          "",
+          "<Steps>",
+          '<Step title="Install the packages">',
+          "Add the core package.",
+          "</Step>",
+          "</Steps>",
+          "",
+          "<Screenshot",
+          '  name="dashboard"',
+          '  alt="A dashboard with a slicer."',
+          "/>",
+          "",
+          '<Card title="Dashboards" href="/docs/features/analysis/dashboards/">',
+          "Pivots and slicers.",
+          "</Card>",
+        ].join("\n"),
+      );
+
+      const files = await expectedLlmsFiles({ formatVersion: 2, packages: [] }, root, []);
+      const full = files.find((file) => file.path === join(root, LLMS_FULL_PATH));
+      if (full === undefined) throw new Error("Full-text endpoint is missing");
+
+      expect(full.content).toContain("Note: Read this first.");
+      expect(full.content).toContain("**Install the packages**\nAdd the core package.");
+      expect(full.content).toContain("(Figure: A dashboard with a slicer.)");
+      expect(full.content).not.toContain('name="dashboard"');
+      expect(full.content).toContain(
+        `**[Dashboards](${LLMS_SITE_BASE}/docs/features/analysis/dashboards/)**`,
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }

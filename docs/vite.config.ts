@@ -18,10 +18,10 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
-import type { IconName } from "./src/icons/icon-names.ts";
 import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { codeHangingIndent } from "./src/lib/code-indent.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
+import { CALLOUTS, callout, contentComponents } from "./src/lib/content-components.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
 import { formulaTables } from "./src/lib/formula-tables.ts";
@@ -68,7 +68,8 @@ function installCommandsAsTerminals() {
             ? INSTALL_COMMAND.exec(textOf(code).trim())
             : null;
         if (match?.[1] === undefined) {
-          visit(child);
+          // A CodeGroup already spells out each package manager.
+          if (!isCodeGroup(child)) visit(child);
           return child;
         }
         return {
@@ -83,37 +84,39 @@ function installCommandsAsTerminals() {
   };
 }
 
-/** A callout tone: its title and its icon in the Sheetwrite sprite. */
-interface CalloutTone {
-  readonly tone: string;
-  readonly title: string;
-  readonly icon: IconName;
+/** A `<CodeGroup>`, which contentComponents has already turned into code tabs. */
+function isCodeGroup(node: HastNode): boolean {
+  return (
+    node.name === "Tabs" &&
+    node.attributes?.some(
+      (attribute) => attribute.name === "variant" && attribute.value === "code",
+    ) === true
+  );
 }
 
-/** GitHub alert markers and the callout each becomes. */
-const ALERT_CALLOUTS: Readonly<Record<string, CalloutTone>> = {
-  NOTE: { tone: "note", title: "Note", icon: "info" },
-  IMPORTANT: { tone: "note", title: "Important", icon: "info" },
-  TIP: { tone: "tip", title: "Tip", icon: "tip" },
-  WARNING: { tone: "warning", title: "Warning", icon: "warning" },
-  CAUTION: { tone: "danger", title: "Caution", icon: "danger" },
-};
+/** GitHub alert markers and the callout component each becomes. */
+const ALERT_CALLOUTS = {
+  NOTE: CALLOUTS.Note,
+  IMPORTANT: CALLOUTS.Info,
+  TIP: CALLOUTS.Tip,
+  WARNING: CALLOUTS.Warning,
+  CAUTION: CALLOUTS.Danger,
+} as const;
 const ALERT_MARKER = /^\s*\[!(NOTE|IMPORTANT|TIP|WARNING|CAUTION)\]\s*/;
 
 /**
  * A Markdown alert (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, `> [!CAUTION]`)
- * becomes a static callout with the site's icon and tone, so callouts are
- * written in plain Markdown and add no JavaScript to the page. The icon markup
- * is parsed by rehype-raw later in the pipeline.
+ * becomes the same static callout as `<Note>`, `<Tip>`, `<Warning>` and
+ * `<Danger>`, so `.md` pages have callouts too and add no JavaScript.
  */
 function markdownAlertsAsCallouts() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.children === undefined) return;
       node.children = node.children.map((child) => {
-        const callout = child.tagName === "blockquote" ? alertCallout(child) : undefined;
-        visit(callout ?? child);
-        return callout ?? child;
+        const found = child.tagName === "blockquote" ? alertCallout(child) : undefined;
+        visit(found ?? child);
+        return found ?? child;
       });
     };
     visit(tree);
@@ -125,36 +128,19 @@ function alertCallout(blockquote: HastNode): HastNode | undefined {
   const firstParagraph = children.find((child) => child.type === "element");
   const firstText = firstParagraph?.tagName === "p" ? firstParagraph.children?.[0] : undefined;
   const marker = firstText?.type === "text" ? ALERT_MARKER.exec(firstText.value ?? "") : null;
-  const callout = marker?.[1] === undefined ? undefined : ALERT_CALLOUTS[marker[1]];
-  if (firstParagraph === undefined || firstText === undefined || marker === null || !callout) {
+  const tone =
+    marker?.[1] === undefined
+      ? undefined
+      : ALERT_CALLOUTS[marker[1] as keyof typeof ALERT_CALLOUTS];
+  if (firstParagraph === undefined || firstText === undefined || tone === undefined) {
     return undefined;
   }
-  firstText.value = (firstText.value ?? "").slice(marker[0].length);
+  firstText.value = (firstText.value ?? "").slice(marker?.[0].length ?? 0);
   const body =
     textOf(firstParagraph).trim().length === 0
       ? children.filter((child) => child !== firstParagraph)
       : children;
-  const icon = inlineIcon(callout.icon, "md");
-  return {
-    type: "element",
-    tagName: "aside",
-    properties: { className: ["sw-callout"], dataTone: callout.tone, ariaLabel: callout.title },
-    children: [
-      { type: "raw", value: icon },
-      {
-        type: "element",
-        tagName: "p",
-        properties: { className: ["sw-callout__title"] },
-        children: [{ type: "text", value: callout.title }],
-      },
-      {
-        type: "element",
-        tagName: "div",
-        properties: { className: ["sw-callout__body"] },
-        children: body,
-      },
-    ],
-  };
+  return callout(tone, body);
 }
 
 /**
@@ -468,6 +454,9 @@ export default defineConfig({
       ...mdx({
         remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm],
         rehypePlugins: [
+          // First: Steps, Cards, callouts and the figures become static HTML, and
+          // CodeGroup becomes Tabs, before fences are highlighted.
+          contentComponents,
           installCommandsAsTerminals,
           markdownAlertsAsCallouts,
           [

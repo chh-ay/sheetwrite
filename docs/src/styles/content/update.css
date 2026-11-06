@@ -1,0 +1,75 @@
+/* Update: the dated entries of the releases page (lib/content-components.ts). Loaded only by pages that use it. */
+
+/* ── Update: a dated changelog entry; the date column stays in view ───── */
+.sw-update {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: var(--sw-space-8);
+  padding: var(--sw-space-8) 0;
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-update__meta {
+  position: sticky;
+  top: calc(var(--sw-header-height) + var(--sw-space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sw-space-2);
+  align-self: start;
+  align-items: flex-start;
+}
+
+.sw-update__date {
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1.3 var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The version leads each entry: the heading that "On this page" lists. */
+.sw-docs .sw-prose .sw-update__version {
+  margin: 0;
+  padding: 0;
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / var(--sw-leading-heading)
+    var(--sw-font-display);
+}
+
+.sw-docs .sw-prose .sw-update__version a {
+  color: var(--sw-fg-strong);
+  text-decoration: none;
+}
+
+.sw-docs .sw-prose .sw-update__version a:hover {
+  color: var(--sw-accent-strong);
+  text-decoration: underline;
+}
+
+.sw-update__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1);
+}
+
+.sw-docs .sw-prose .sw-update__title {
+  margin: 0 0 var(--sw-space-3);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-heading)
+    var(--sw-font-display);
+}
+
+.sw-update__body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 48rem) {
+  .sw-update {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sw-space-3);
+  }
+
+  .sw-update__meta {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}

@@ -32,6 +32,8 @@ type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;
 export interface DocumentModule {
   default: DocumentComponent;
   frontmatter?: DocumentFrontmatter;
+  /** Stylesheets of the components the page uses that most pages do not (lib/content-components.ts). */
+  stylesheets?: readonly string[];
 }
 
 interface DocumentSource {
@@ -40,7 +42,7 @@ interface DocumentSource {
   load: () => Promise<DocumentModule>;
 }
 
-export type DocumentRecord = DocumentFrontmatter;
+export type DocumentRecord = DocumentFrontmatter & { stylesheets: readonly string[] };
 
 const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
@@ -77,6 +79,7 @@ export async function documentForSplat(
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
+    stylesheets: module.stylesheets ?? [],
   };
 }
 
