@@ -25,6 +25,9 @@ def band(report, key):
         for pair in report["pairs"]
         if key in pair["candidate"]["timings"] and key in pair["base"]["timings"]
     ]
+    # A row the A/A report lacks (added since it ran) gets no band.
+    if not ratios:
+        return None
     return min(ratios), max(ratios)
 
 
@@ -38,7 +41,12 @@ def name(key):
 
 def main():
     label = sys.argv[1]
-    engines = {"default": (load(sys.argv[2]), load(sys.argv[4])), "full": (load(sys.argv[3]), load(sys.argv[5]))}
+    # `-` in place of an engine's A/B report leaves that engine out.
+    engines = {
+        engine: (load(ab), load(aa))
+        for engine, ab, aa in (("default", sys.argv[2], sys.argv[4]), ("full", sys.argv[3], sys.argv[5]))
+        if ab != "-"
+    }
 
     summary = ["| Engine | Result | Pairs | Geomean (A/A) | Faster beyond A/A | Slower beyond A/A |", "| --- | --- | ---: | ---: | ---: | ---: |"]
     changed = ["| Engine | Row | Base ms | Candidate ms | Change | Paired ratio | A/A band |", "| --- | --- | ---: | ---: | --- | ---: | ---: |"]
@@ -48,11 +56,15 @@ def main():
         rows = ab["verdict"]["timings"]
         faster = slower = 0
         for row in rows:
-            low, high = band(aa, row["key"])
+            limits = band(aa, row["key"])
             ratio = row["pairedRatio"]
+            shown = "n/a" if limits is None else f"{limits[0]:.3f}–{limits[1]:.3f}"
             full.append(
-                f"| {engine} | {name(row['key'])} | {row['baseMs']:.4f} | {row['candidateMs']:.4f} | {ratio:.3f} | {low:.3f}–{high:.3f} | {row['ratioLimit']} |"
+                f"| {engine} | {name(row['key'])} | {row['baseMs']:.4f} | {row['candidateMs']:.4f} | {ratio:.3f} | {shown} | {row['ratioLimit']} |"
             )
+            if limits is None:
+                continue
+            low, high = limits
             if low <= ratio <= high:
                 continue
             if ratio < low:
