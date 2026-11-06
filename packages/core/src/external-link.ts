@@ -83,7 +83,7 @@ export function validateExternalLinksShape(
     issues.push({
       path,
       code: "invalid-value",
-      message: `externalLinks must be an array of at most ${MAX_EXTERNAL_LINKS} links`,
+      message: "externalLinks must be an array of links",
     });
     return;
   }
@@ -106,7 +106,7 @@ export function validateExternalLinksShape(
       issues.push({
         path: `${path}[${index}]`,
         code: "invalid-value",
-        message: `An external link needs a unique book name without brackets, a target, and sheets of valid cells within ${MAX_EXTERNAL_CELLS} cells and an area of ${MAX_EXTERNAL_SHEET_AREA}`,
+        message: "invalid external link",
       });
       return;
     }
