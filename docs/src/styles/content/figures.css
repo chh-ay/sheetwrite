@@ -142,3 +142,16 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* On phones a diagram keeps a readable size and scrolls sideways, as the
+   collaboration diagram does, instead of shrinking its labels. */
+@media (max-width: 40rem) {
+  .sw-frame--diagram .sw-frame__media {
+    overflow-x: auto;
+  }
+
+  .sw-frame--diagram .sw-frame__media > .sw-diagram {
+    width: 36rem;
+    max-width: none;
+  }
+}
