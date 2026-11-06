@@ -71,8 +71,14 @@ lists which inputs update in place and which reset.
 Rendering the component on the server does not initialize WASM. In frameworks
 that render on the server, mount it in a client component.
 
-<div class="sw-next-links">
-<a href="/react/"><span>Example</span><strong>Run the React example</strong></a>
-<a href="/docs/frameworks/lifecycle/"><span>Lifecycle</span><strong>Updates and resets</strong></a>
-<a href="/docs/api/react/"><span>Reference</span><strong><code>@sheetwrite/react</code> API</strong></a>
-</div>
+<CardGroup cols={3}>
+  <Card title="Run the React example" icon="framework-react" href="/react/">
+    The React setup in a running app.
+  </Card>
+  <Card title="Updates and resets" icon="lifecycle" href="/docs/frameworks/lifecycle/">
+    When the adapter creates, updates and destroys the grid.
+  </Card>
+  <Card title="@sheetwrite/react API" icon="tab-api" href="/docs/api/react/">
+    Every export of `@sheetwrite/react`.
+  </Card>
+</CardGroup>

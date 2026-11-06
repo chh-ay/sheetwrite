@@ -1,18 +1,30 @@
 import { describe, expect, it } from "bun:test";
 
-import { evaluate } from "@mdx-js/mdx";
+import { compile, evaluate } from "@mdx-js/mdx";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as runtime from "react/jsx-runtime";
 
 import { contentComponents } from "../src/lib/content-components.ts";
 
+/** Drops the page's imports and exports, which only the docs build can resolve. */
+function withoutModuleCode() {
+  return (tree: { children: Array<{ type: string }> }) => {
+    tree.children = tree.children.filter((child) => child.type !== "mdxjsEsm");
+  };
+}
+
 /** An MDX page rendered to HTML with only the content-components plugin. */
 async function render(source: string): Promise<string> {
   const { default: Page } = await evaluate(source, {
     ...runtime,
-    rehypePlugins: [contentComponents],
+    rehypePlugins: [contentComponents, withoutModuleCode],
   });
   return renderToStaticMarkup(runtime.jsx(Page, {}));
+}
+
+/** The compiled page module, with the imports and exports the plugin adds. */
+async function moduleCode(source: string): Promise<string> {
+  return String(await compile(source, { rehypePlugins: [contentComponents] }));
 }
 
 describe("content components", () => {
@@ -120,5 +132,14 @@ grid.setViewSort([{ col: 2, ascending: true }]);
       '<Card> needs a "title" attribute',
     );
     await expect(render(`<Badge color="pink">x</Badge>`)).rejects.toThrow("<Badge color>");
+  });
+
+  it("links the stylesheets of the components a page uses that most pages do not", async () => {
+    const code = await moduleCode(
+      `<Accordion title="Why">Because.</Accordion>\n\n<Note>Plain.</Note>`,
+    );
+    expect(code).toContain('import stylesheet0 from "/src/styles/content/accordion.css?url";');
+    expect(code).toContain("export const stylesheets = [stylesheet0];");
+    expect(await moduleCode("<Note>Only shared styles.</Note>")).not.toContain("stylesheets");
   });
 });

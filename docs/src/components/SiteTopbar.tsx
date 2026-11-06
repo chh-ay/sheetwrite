@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { LATEST_RELEASE, RELEASES_HREF } from "../lib/releases.js";
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { BrandMark } from "./BrandMark.js";
 import { Icon } from "./Icon.js";
@@ -36,7 +36,7 @@ interface SiteTopbarProps {
 type Section = "docs" | "showcases" | "releases" | undefined;
 
 function currentSection(pathname: string, active: SiteTopbarProps["active"]): Section {
-  if (pathname.startsWith(RELEASES_HREF)) return "releases";
+  if (pathname.startsWith(releaseFacts.releasesHref)) return "releases";
   if (pathname.startsWith("/docs/")) return "docs";
   if (pathname.startsWith("/showcases/") || active !== undefined) return "showcases";
   return undefined;
@@ -81,11 +81,11 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
         </Link>
         <Link
           activeOptions={EXACT}
-          aria-current={marker("releases", RELEASES_HREF)}
-          to={RELEASES_HREF}
+          aria-current={marker("releases", releaseFacts.releasesHref)}
+          to={releaseFacts.releasesHref}
         >
           Releases
-          <span className="sw-header__version">v{LATEST_RELEASE.version}</span>
+          <span className="sw-header__version">v{releaseFacts.latest.version}</span>
         </Link>
         <a className="sw-header__nav-github" href={REPOSITORY_URL}>
           GitHub

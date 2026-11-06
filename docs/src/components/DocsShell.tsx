@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import {
   type DocsTabId,
   type DocumentNeighbours,
@@ -13,20 +14,11 @@ import {
   tabSections,
 } from "../lib/navigation.js";
 import type { OutlineItem } from "../lib/outline.js";
-import {
-  LATEST_RELEASE,
-  RELEASES_HREF,
-  type ReleaseContext,
-  releaseContext,
-  releaseDate,
-  releaseHref,
-} from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { BrandMark } from "./BrandMark.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { DocsTopbar } from "./DocsTopbar.js";
 import { Icon } from "./Icon.js";
-import { PackageCommand } from "./PackageCommand.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
 
 /**
@@ -62,7 +54,7 @@ interface DocsShellProps {
  * would repeat its pages' markers on a collapsed row.
  */
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
-  if (item.items !== undefined || navigationBadge(item, LATEST_RELEASE.version) !== "new") {
+  if (item.items !== undefined || navigationBadge(item, releaseFacts.latest.version) !== "new") {
     return null;
   }
   return <span className="sw-nav-badge">New</span>;
@@ -245,33 +237,6 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   );
 }
 
-/** On a release post: its date and a step to the newer and older posts. */
-function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
-  return (
-    <nav aria-label="Release versions" className="sw-release-strip" data-pagefind-ignore>
-      {release.unreleased === true ? (
-        <span>Next release, not published yet</span>
-      ) : (
-        <span>
-          Released <time dateTime={release.date}>{releaseDate(release)}</time>
-        </span>
-      )}
-      {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
-      {older === undefined ? null : (
-        <Link rel="prev" to={releaseHref(older.version)}>
-          <Icon name="arrow-left" /> {older.version}
-        </Link>
-      )}
-      {newer === undefined ? null : (
-        <Link rel="next" to={releaseHref(newer.version)}>
-          {newer.version} <Icon name="arrow-right" />
-        </Link>
-      )}
-      <Link to={RELEASES_HREF}>All releases</Link>
-    </nav>
-  );
-}
-
 /**
  * The page's eyebrow: the group it sits in (the nearest group, else its
  * section), or the package of a generated symbol page.
@@ -305,7 +270,6 @@ export function DocsShell({
   const outline = useDocumentOutline(buildOutline);
   const neighbours = documentNeighbours(activeHref);
 
-  const release = releaseContext(activeHref);
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -400,18 +364,6 @@ export function DocsShell({
                 </a>
               )}
             </p>
-          )}
-          {release === undefined ? null : (
-            <>
-              <ReleaseStrip {...release} />
-              {/* An unreleased version has no package to install yet. */}
-              {release.release.unreleased === true ? null : (
-                <PackageCommand
-                  note={`Update each adapter and add-on you use to ${release.release.version} too: all packages release together.`}
-                  packages={`@sheetwrite/core@${release.release.version}`}
-                />
-              )}
-            </>
           )}
         </header>
         <ApiSymbolFilter />

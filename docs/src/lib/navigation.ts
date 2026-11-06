@@ -1,8 +1,8 @@
 import apiNav from "../generated/api-nav.json" with { type: "json" };
 // Formula family pages; formula-nav.json is emitted by docs:generate.
 import formulaNav from "../generated/formula-nav.json" with { type: "json" };
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import type { IconName } from "../icons/icon-names.js";
-import { RELEASES, RELEASES_HREF, minorVersion, releaseHref, releaseLabel } from "./releases.js";
 
 interface NavigationEntry {
   label: string;
@@ -53,7 +53,7 @@ export const DOCS_TABS: readonly DocsTab[] = [
     href: "/docs/reference/formula-functions/",
     icon: "tab-formulas",
   },
-  { id: "changelog", label: "Changelog", href: RELEASES_HREF, icon: "tab-changelog" },
+  { id: "changelog", label: "Changelog", href: releaseFacts.releasesHref, icon: "tab-changelog" },
   { id: "showcases", label: "Showcases", href: "/showcases/", icon: "tab-showcases" },
 ];
 
@@ -528,14 +528,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Release notes",
     tab: "changelog",
-    items: [
-      { label: "All releases", href: RELEASES_HREF, icon: "history" },
-      ...RELEASES.map((release) => ({
-        label: releaseLabel(release),
-        href: releaseHref(release.version),
-        icon: "release" as const,
-      })),
-    ],
+    // "All releases" leads; each release has the release glyph.
+    items: releaseFacts.links.map((link, index) => ({
+      ...link,
+      icon: index === 0 ? ("history" as const) : ("release" as const),
+    })),
   },
 ];
 
@@ -555,7 +552,7 @@ export function tabForHref(activeHref: string | undefined): DocsTabId {
   if (tab !== undefined) return tab;
   if (activeHref?.startsWith("/docs/api/")) return "api";
   if (activeHref?.startsWith("/docs/reference/formula-functions/")) return "formulas";
-  if (activeHref?.startsWith(RELEASES_HREF)) return "changelog";
+  if (activeHref?.startsWith(releaseFacts.releasesHref)) return "changelog";
   return "guides";
 }
 
@@ -592,6 +589,11 @@ const READING_ORDER: readonly NavigationPage[] = navigationPages(
 );
 
 export type NavigationBadge = "new" | "updated";
+
+/** The major and minor version; patch releases share the same feature set. */
+function minorVersion(version: string): string {
+  return version.replace(/\.\d+$/, "");
+}
 
 /**
  * Badge for an entry in the given release. A group shows the strongest badge

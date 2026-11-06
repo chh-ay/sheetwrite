@@ -1,7 +1,14 @@
 import { ICON_ID_PREFIX } from "../icons/icon-href.js";
 import type { IconName } from "../icons/icon-names.js";
 import { element, type HastNode } from "./build-hast.js";
-import { RELEASES, releaseDate, releaseHref } from "./releases.js";
+import {
+  LATEST_RELEASE,
+  RELEASES,
+  RELEASES_HREF,
+  releaseContext,
+  releaseDate,
+  releaseHref,
+} from "./releases.js";
 
 /**
  * Content components for MDX pages: Steps,
@@ -684,6 +691,133 @@ function runtimeImport({ module, names }: (typeof RUNTIME_MODULES)[RuntimeCompon
   };
 }
 
+/**
+ * Components whose styles most pages never need, each with its stylesheet
+ * (from the docs root). A page that uses one exports the stylesheet's URL in
+ * `stylesheets`, and the docs route links it in the page head.
+ */
+const PAGE_STYLESHEETS: Partial<Record<ComponentName, string>> = {
+  Accordion: "/src/styles/content/accordion.css",
+  AccordionGroup: "/src/styles/content/accordion.css",
+  Frame: "/src/styles/content/figures.css",
+  Screenshot: "/src/styles/content/figures.css",
+  Diagram: "/src/styles/content/figures.css",
+  Annotated: "/src/styles/content/figures.css",
+  Compare: "/src/styles/content/figures.css",
+  Update: "/src/styles/content/update.css",
+  LiveGrid: "/src/styles/content/live-grid.css",
+};
+
+/**
+ * `import s0 from "<sheet>?url"; … export const stylesheets = [s0, …]`, as one
+ * MDX ESM node: the URLs of the page's stylesheets after the build.
+ */
+function stylesheetsExport(sheets: readonly string[]): ContentNode {
+  const local = (index: number) => ({ type: "Identifier", name: `stylesheet${index}` });
+  return {
+    type: "mdxjsEsm",
+    value: "",
+    data: {
+      estree: {
+        type: "Program",
+        sourceType: "module",
+        body: [
+          ...sheets.map((sheet, index) => ({
+            type: "ImportDeclaration",
+            specifiers: [{ type: "ImportDefaultSpecifier", local: local(index) }],
+            source: { type: "Literal", value: `${sheet}?url`, raw: JSON.stringify(`${sheet}?url`) },
+          })),
+          {
+            type: "ExportNamedDeclaration",
+            specifiers: [],
+            source: null,
+            declaration: {
+              type: "VariableDeclaration",
+              kind: "const",
+              declarations: [
+                {
+                  type: "VariableDeclarator",
+                  id: { type: "Identifier", name: "stylesheets" },
+                  init: {
+                    type: "ArrayExpression",
+                    elements: sheets.map((_, index) => local(index)),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+/** A release post's version, from its source path: `…/releases/0.6.1.md`. */
+const RELEASE_POST = /\/content\/docs\/releases\/(\d+\.\d+\.\d+)\.mdx?$/;
+
+/**
+ * The strip that opens a release post: its date (or that it is the next
+ * release), steps to the older and newer posts, and, once published, the
+ * install command for that version. Static, so only release posts carry it.
+ */
+function releaseStrip(href: string): ContentNode[] {
+  const context = releaseContext(href);
+  if (context === undefined) throw new Error(`${href} is not in lib/releases.ts`);
+  const { release, newer, older } = context;
+  const link = (to: string, children: ContentNode[], rel?: string) =>
+    element("a", children, { href: to, ...(rel === undefined ? {} : { rel }) });
+  const strip = element(
+    "nav",
+    [
+      release.unreleased === true
+        ? element("span", [text("Next release, not published yet")])
+        : element("span", [
+            text("Released "),
+            element("time", [text(releaseDate(release))], { dateTime: release.date }),
+          ]),
+      ...(release === LATEST_RELEASE
+        ? [element("span", [text("Latest")], { className: ["sw-release-strip__latest"] })]
+        : []),
+      ...(older === undefined
+        ? []
+        : [
+            link(
+              releaseHref(older.version),
+              [spriteIcon("arrow-left"), text(` ${older.version}`)],
+              "prev",
+            ),
+          ]),
+      ...(newer === undefined
+        ? []
+        : [
+            link(
+              releaseHref(newer.version),
+              [text(`${newer.version} `), spriteIcon("arrow-right")],
+              "next",
+            ),
+          ]),
+      link(RELEASES_HREF, [text("All releases")]),
+    ],
+    { ariaLabel: "Release versions", className: ["sw-release-strip"], dataPagefindIgnore: "" },
+  );
+  if (release.unreleased === true) return [strip];
+  return [
+    strip,
+    {
+      type: "mdxJsxFlowElement",
+      name: "PackageCommand",
+      attributes: [
+        jsxAttribute(
+          "note",
+          `Update each adapter and add-on you use to ${release.version} too: all packages release together.`,
+        ),
+        jsxAttribute("packages", `@sheetwrite/core@${release.version}`),
+      ],
+      children: [],
+    },
+  ];
+}
+
 function isComponent(node: ContentNode): node is ContentNode & { name: ComponentName } {
   return (
     (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
@@ -698,11 +832,18 @@ function isComponent(node: ContentNode): node is ContentNode & { name: Component
  * anchors and appear in "On this page".
  */
 export function contentComponents() {
-  return (tree: ContentNode): void => {
+  return (tree: ContentNode, file: { path?: string }): void => {
     const used = new Set<RuntimeComponent>();
+    const sheets = new Set<string>();
     const visit = (node: ContentNode): ContentNode => {
       if (node.children !== undefined) node.children = node.children.map(visit);
       if (!isComponent(node)) return node;
+      const sheet = PAGE_STYLESHEETS[node.name];
+      if (sheet !== undefined) sheets.add(sheet);
+      // A card's screenshot swaps with the theme, as figure screenshots do.
+      if (node.name === "Card" && attribute(node, "screenshot") !== undefined) {
+        sheets.add("/src/styles/content/figures.css");
+      }
       if (node.name === "Tabs" || node.name === "Tab") {
         used.add("Tabs");
         return node;
@@ -723,6 +864,9 @@ export function contentComponents() {
     };
     visit(tree);
     const imports = [...used].map((name) => runtimeImport(RUNTIME_MODULES[name]));
-    tree.children = [...imports, ...(tree.children ?? [])];
+    const styles = sheets.size === 0 ? [] : [stylesheetsExport([...sheets])];
+    const version = RELEASE_POST.exec(file.path ?? "")?.[1];
+    const strip = version === undefined ? [] : releaseStrip(releaseHref(version));
+    tree.children = [...imports, ...styles, ...strip, ...(tree.children ?? [])];
   };
 }

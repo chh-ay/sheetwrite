@@ -26,44 +26,6 @@
   font-size: var(--sw-text-small);
 }
 
-/* Next steps close a page as cards, not as a bare bullet list. */
-.sw-prose .sw-next-links {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--sw-space-3);
-  margin: var(--sw-space-8) 0 0;
-}
-.sw-prose .sw-next-links a {
-  display: grid;
-  gap: var(--sw-space-1);
-  padding: var(--sw-space-4) var(--sw-space-4);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-lg);
-  background: var(--sw-surface-1);
-  text-decoration: none;
-  transition:
-    border-color 140ms ease,
-    transform 140ms ease;
-}
-.sw-prose .sw-next-links a:hover {
-  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
-  transform: translateY(-1px);
-}
-.sw-prose .sw-next-links span {
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
-}
-.sw-prose .sw-next-links strong {
-  color: var(--sw-fg-strong);
-  font-weight: var(--sw-weight-semibold);
-}
-.sw-prose .sw-next-links strong::after {
-  content: " →";
-  color: var(--sw-accent);
-}
-
 /* Collaboration sequence diagram. Colours come from the theme tokens, so the
    SVG follows the light and dark themes; on phones the frame scrolls sideways
    instead of shrinking the labels below a readable size. */
@@ -294,10 +256,6 @@
   }
 }
 
-.sw-prose .sw-next-links.sw-moved-guides {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
-}
 .sw-prose .sw-moved-guides code {
-  justify-self: start;
   font-size: var(--sw-text-eyebrow);
 }
