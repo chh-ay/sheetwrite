@@ -3,7 +3,6 @@
 // The output records each result so two runs can be compared for equality.
 
 import "./dom-setup.js";
-
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { cpus, hostname } from "node:os";

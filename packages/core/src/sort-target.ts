@@ -25,7 +25,5 @@ export function looksLikeHeader(store: Store, range: Range): boolean {
   if (firstRow.some((value) => value !== null && typeof value !== "string")) return false;
 
   const secondRow = readRowValues(store, { ...columns, row: range.start.row + 1 });
-  return firstRow.some(
-    (value, offset) => value !== null && typeof secondRow[offset] !== "string",
-  );
+  return firstRow.some((value, offset) => value !== null && typeof secondRow[offset] !== "string");
 }
