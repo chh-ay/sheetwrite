@@ -679,8 +679,11 @@ impl SettledCells {
 
         if word < window.first_word {
             // Grow toward lower cells by at least the current length, so a
-            // run written upward moves the words a logarithmic number of times.
-            let grown = (window.first_word - word).max(window.words.len());
+            // run written upward moves the words a logarithmic number of
+            // times, but never below the sheet's first word.
+            let grown = (window.first_word - word)
+                .max(window.words.len())
+                .min(window.first_word);
             if window.words.len() + grown > limit {
                 return;
             }
