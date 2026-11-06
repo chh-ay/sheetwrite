@@ -282,22 +282,16 @@ function scriptSamples(
 }
 
 describe("cold-route long-task attribution", () => {
-  test("charges a long task that mostly runs package frames to Sheetwrite", () => {
+  test.each([
+    ["mostly runs package frames, so it is charged to Sheetwrite", 50, 5, { ownedMs: 60, unattributedMs: 0 }],
+    ["mostly runs other code, so it is unattributed", 20, 40, { ownedMs: 0, unattributedMs: 60 }],
+  ] as const)("a long task that %s", (_case, packageSamples, shellSamples, expected) => {
     const events = [
       task(0, 60),
-      scriptSamples(1_000, PACKAGE_URL, 50),
-      scriptSamples(51_000, SHELL_URL, 5),
+      scriptSamples(1_000, PACKAGE_URL, packageSamples),
+      scriptSamples(1_000 + packageSamples * 1_000, SHELL_URL, shellSamples),
     ];
-    expect(coldTaskDurations(events)).toEqual({ ownedMs: 60, unattributedMs: 0 });
-  });
-
-  test("reports a long task that mostly runs other code as unattributed", () => {
-    const events = [
-      task(0, 60),
-      scriptSamples(1_000, PACKAGE_URL, 20),
-      scriptSamples(21_000, SHELL_URL, 40),
-    ];
-    expect(coldTaskDurations(events)).toEqual({ ownedMs: 0, unattributedMs: 60 });
+    expect(coldTaskDurations(events)).toEqual(expected);
   });
 
   test("reports a long task the profile does not cover as unattributed", () => {
