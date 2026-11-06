@@ -44,8 +44,10 @@ const VERTICAL_TICK_SPACING = 32;
 const HORIZONTAL_TICK_SPACING = 64;
 /** Below this plot size in pixels, axes and marks cannot be read, so they are not drawn. */
 const MIN_PLOT_SIZE = 8;
-/** Category labels of a bar chart take at most this share of the width. */
+/** Category labels of a bar chart take at most this share of the width; rotated labels, of the height. */
 const CATEGORY_LABEL_MAX_SHARE = 0.3;
+/** Lines an outer category label wraps onto before it ends with an ellipsis. */
+const MAX_GROUP_LABEL_LINES = 3;
 
 /** Share of each category band that the column or bar group fills; the rest is the gap between groups. */
 const BAR_GROUP_SHARE = 0.7;
@@ -147,20 +149,30 @@ function pointCount(series: readonly ChartSeriesView[]): number {
   return series.reduce((count, entry) => Math.max(count, entry.values.length), 0);
 }
 
-/** Labels for the category axis, from the first series that has categories; 1, 2, 3… otherwise, as in Excel. */
+/**
+ * One label for each category, from the first series that has categories;
+ * 1, 2, 3… otherwise, as in Excel. With category levels, each label is the
+ * text of its levels from the outside in, joined by spaces: an outer label
+ * shows at the first category of its group, as Excel's one-row labels do.
+ */
 function categoryLabels(series: readonly ChartSeriesView[], count: number): string[] {
   const source = series.find((entry) => entry.categories.length > 0);
   const labels: string[] = [];
 
   for (let index = 0; index < count; index += 1) {
+    if (!source || index >= source.categories.length) {
+      labels.push(String(index + 1));
+      continue;
+    }
+
+    const locale = source.numberLocale;
+    let label = "";
+    for (const level of source.categoryLevels) {
+      const text = categoryText(level.labels[index], level.formats[index] ?? null, locale);
+      if (text !== "") label += `${text} `;
+    }
     labels.push(
-      source && index < source.categories.length
-        ? categoryText(
-            source.categories[index],
-            source.categoryFormats[index] ?? null,
-            source.numberLocale,
-          )
-        : String(index + 1),
+      label + categoryText(source.categories[index], source.categoryFormats[index] ?? null, locale),
     );
   }
 
@@ -549,6 +561,238 @@ function drawCategoryLabels(
   }
 }
 
+/** One group of an outer category level: the categories `start` to `end - 1`. */
+interface CategoryGroup {
+  start: number;
+  end: number;
+  label: string;
+}
+
+/**
+ * Multi-level category labels. Rows run from the axis outward: the inner
+ * labels first, then each outer level from the innermost to the outermost.
+ */
+interface CategoryTiers {
+  /** The label of each category. */
+  inner: string[];
+  /** The groups of each outer level, from the axis outward. */
+  outer: CategoryGroup[][];
+  /** For each boundary between categories, 0 to the count, the label rows its divider crosses. */
+  depths: Int32Array;
+}
+
+/**
+ * The tiers of the first `count` categories of `source`, grouped as Excel
+ * groups multi-level labels: a group starts at a label on its level or where
+ * a group of an outer level starts, and a blank label continues it.
+ */
+function categoryTiers(source: ChartSeriesView, count: number): CategoryTiers {
+  const locale = source.numberLocale;
+  const inner: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    inner.push(
+      categoryText(source.categories[index], source.categoryFormats[index] ?? null, locale),
+    );
+  }
+
+  const starts = new Uint8Array(count + 1);
+  starts[0] = 1;
+  starts[count] = 1;
+  const depths = new Int32Array(count + 1).fill(1);
+  const outer: CategoryGroup[][] = [];
+
+  // From the outermost level in, so each level knows where the outer groups start.
+  for (const level of source.categoryLevels) {
+    for (let index = 0; index < count; index += 1) {
+      if ((level.labels[index] ?? null) !== null) starts[index] = 1;
+    }
+
+    const groups: CategoryGroup[] = [];
+    let start = 0;
+    for (let index = 1; index <= count; index += 1) {
+      if (starts[index] === 0) continue;
+      const label = categoryText(level.labels[start], level.formats[start] ?? null, locale);
+      groups.push({ start, end: index, label });
+      start = index;
+    }
+
+    for (let index = 0; index <= count; index += 1) {
+      depths[index] = (depths[index] ?? 1) + (starts[index] ?? 0);
+    }
+    outer.unshift(groups);
+  }
+
+  return { inner, outer, depths };
+}
+
+/**
+ * `text` wrapped at spaces onto lines of at most `maxWidth`, as Excel wraps
+ * the labels of outer category levels. The last line ends with an ellipsis
+ * when text is left over.
+ */
+function wrapText(text: string, maxWidth: number): string[] {
+  const characters = Math.floor(maxWidth / (FONT_SIZE * GLYPH_WIDTH_RATIO));
+  const lines: string[] = [];
+  let rest = text;
+
+  while (lines.length < MAX_GROUP_LABEL_LINES - 1 && rest.length > characters) {
+    const space = rest.lastIndexOf(" ", characters);
+    if (space <= 0) break;
+    lines.push(rest.slice(0, space));
+    rest = rest.slice(space + 1);
+  }
+
+  lines.push(fitText(rest, maxWidth));
+  return lines;
+}
+
+/** How the rows of multi-level category labels are drawn. */
+interface TierLayout {
+  /** The inner labels turn to read upward, as Excel turns labels that do not fit their band. */
+  rotated: boolean;
+  /** Every `stride`-th inner label is drawn, so drawn labels do not overlap. */
+  stride: number;
+  /** The extent of each row across the axis, from the axis outward. */
+  sizes: number[];
+  /** The text lines of each outer group, by row. */
+  lines: string[][][];
+}
+
+/**
+ * The layout of `tiers` over category bands of `band` pixels. On a vertical
+ * axis the inner labels take `innerSize` and each outer label reads upward,
+ * because Excel has no horizontal outer labels in bar charts. On a horizontal
+ * axis inner labels that do not fit turn upward and take at most
+ * `innerSize`, and outer labels wrap within their group.
+ */
+function tierLayout(
+  tiers: CategoryTiers,
+  band: number,
+  vertical: boolean,
+  innerSize: number,
+): TierLayout {
+  const widest = Math.max(0, ...tiers.inner.map((label) => textWidth(label)));
+  const rotated = !vertical && widest + AXIS_LABEL_GAP > band;
+  const stride = vertical || rotated ? Math.max(1, Math.ceil(LINE_HEIGHT / band)) : 1;
+  const sizes = [vertical ? innerSize : rotated ? Math.min(widest, innerSize) : LINE_HEIGHT];
+
+  const lines = tiers.outer.map((groups) => {
+    const row = groups.map((group) => {
+      const span = (group.end - group.start) * band - AXIS_LABEL_GAP;
+      return vertical ? [fitText(group.label, span)] : wrapText(group.label, span);
+    });
+    sizes.push(Math.max(1, ...row.map((groupLines) => groupLines.length)) * LINE_HEIGHT);
+    return row;
+  });
+
+  return { rotated, stride, sizes, lines };
+}
+
+/** The distance from the axis to the far edge of all label rows. */
+function tierExtent(layout: TierLayout): number {
+  return layout.sizes.reduce((total, size) => total + AXIS_LABEL_GAP + size, 0);
+}
+
+/**
+ * Multi-level category labels with dividers, as Excel draws them: a row of
+ * labels per level, each outer label once and centered on its group. A
+ * divider between two categories crosses the inner row and every outer row
+ * where a group ends there.
+ */
+function drawCategoryTiers(
+  context: DrawContext,
+  tiers: CategoryTiers,
+  layout: TierLayout,
+  plot: Box,
+  vertical: boolean,
+): void {
+  const count = tiers.inner.length;
+  const start = vertical ? plot.top : plot.left;
+  const band = ((vertical ? plot.bottom : plot.right) - start) / count;
+  const edges: number[] = [];
+  let edge = 0;
+  for (const size of layout.sizes) {
+    edge += AXIS_LABEL_GAP + size;
+    edges.push(edge);
+  }
+
+  // With skipped inner labels, only the dividers between groups are drawn.
+  const dividers = context.svg.element(
+    "g",
+    { class: "sheetwrite-chart-category-dividers", stroke: GRID_LINE_COLOR },
+    context.root,
+  );
+  for (let index = 0; index <= count; index += 1) {
+    const depth = tiers.depths[index] ?? 1;
+    if (depth === 1 && layout.stride > 1) continue;
+
+    const along = start + index * band;
+    const across = edges[depth - 1] ?? edge;
+    const ends = vertical
+      ? { x1: plot.left, x2: plot.left - across, y1: along, y2: along }
+      : { x1: along, x2: along, y1: plot.bottom, y2: plot.bottom + across };
+    context.svg.element("line", ends, dividers);
+  }
+
+  const group = context.svg.element(
+    "g",
+    { class: "sheetwrite-chart-category-axis", "font-size": FONT_SIZE },
+    context.root,
+  );
+  const innerSize = layout.sizes[0] ?? 0;
+  for (let index = 0; index < count; index += layout.stride) {
+    const label = tiers.inner[index] ?? "";
+    const center = start + (index + 0.5) * band;
+    const y = plot.bottom + AXIS_LABEL_GAP;
+    const attributes: Record<string, string | number> = vertical
+      ? {
+          x: plot.left - AXIS_LABEL_GAP,
+          y: center,
+          "text-anchor": "end",
+          "dominant-baseline": "central",
+        }
+      : layout.rotated
+        ? {
+            x: center,
+            y,
+            "text-anchor": "end",
+            "dominant-baseline": "central",
+            transform: `rotate(-90 ${center} ${y})`,
+          }
+        : { x: center, y: y + FONT_SIZE, "text-anchor": "middle" };
+    const fitted = fitText(label, vertical || layout.rotated ? innerSize : band - AXIS_LABEL_GAP);
+    context.svg.text(fitted, { ...attributes, "data-level": 0 }, group);
+  }
+
+  layout.lines.forEach((row, rowIndex) => {
+    const near = (edges[rowIndex] ?? 0) + AXIS_LABEL_GAP;
+    const groups = tiers.outer[rowIndex] ?? [];
+
+    groups.forEach((entry, groupIndex) => {
+      const center = start + ((entry.start + entry.end) / 2) * band;
+      (row[groupIndex] ?? []).forEach((line, lineIndex) => {
+        if (line === "") return;
+
+        const x = plot.left - near - LINE_HEIGHT / 2;
+        const attributes: Record<string, string | number> = vertical
+          ? {
+              x,
+              y: center,
+              "text-anchor": "middle",
+              "dominant-baseline": "central",
+              transform: `rotate(-90 ${x} ${center})`,
+            }
+          : {
+              x: center,
+              y: plot.bottom + near + FONT_SIZE + lineIndex * LINE_HEIGHT,
+              "text-anchor": "middle",
+            };
+        context.svg.text(line, { ...attributes, "data-level": rowIndex + 1 }, group);
+      });
+    });
+  });
+}
+
 /** The pixel of value zero, or of the nearest axis end when zero is outside the axis. */
 function baselinePixel(axis: Axis): number {
   const zero = Math.min(Math.max(0, axis.scale.min), axis.scale.max);
@@ -757,14 +1001,23 @@ function drawCartesian(context: DrawContext, box: Box): void {
 
   const count = pointCount(series);
   const labels = kind === "scatter" ? [] : categoryLabels(series, count);
+  const levelSource = series.find((entry) => entry.categories.length > 0);
+  const hasTiers =
+    kind !== "scatter" &&
+    count > 0 &&
+    levelSource !== undefined &&
+    levelSource.categoryLevels.length > 0 &&
+    chart.axes?.multiLevelLabels !== false;
+  const tiers = hasTiers ? categoryTiers(levelSource, count) : null;
 
   if (horizontal) {
     const categoryWidth = Math.min(
-      Math.max(0, ...labels.map((label) => textWidth(label))),
+      Math.max(0, ...(tiers?.inner ?? labels).map((label) => textWidth(label))),
       (region.right - region.left) * CATEGORY_LABEL_MAX_SHARE,
     );
+    const outerWidth = (tiers?.outer.length ?? 0) * (LINE_HEIGHT + AXIS_LABEL_GAP);
     const plot = {
-      left: region.left + categoryWidth + AXIS_LABEL_GAP,
+      left: region.left + outerWidth + categoryWidth + AXIS_LABEL_GAP,
       right: region.right - widestValueLabel / 2,
       top: region.top,
       bottom: region.bottom - LINE_HEIGHT - AXIS_LABEL_GAP,
@@ -775,15 +1028,24 @@ function drawCartesian(context: DrawContext, box: Box): void {
     drawValueAxis(context, axis, plot, false, valueLabels);
     drawBars(context, axis, plot, true);
     drawBaseline(context, plot, baselinePixel(axis), true);
-    drawCategoryLabels(context, labels, plot, true, categoryWidth);
+    if (tiers) {
+      const layout = tierLayout(tiers, (plot.bottom - plot.top) / count, true, categoryWidth);
+      drawCategoryTiers(context, tiers, layout, plot, true);
+    } else {
+      drawCategoryLabels(context, labels, plot, true, categoryWidth);
+    }
     return;
   }
 
+  const left = region.left + widestValueLabel + AXIS_LABEL_GAP;
+  const right = region.right - (kind === "scatter" ? HORIZONTAL_TICK_SPACING / 2 : 0);
+  const maxRotated = (region.bottom - region.top) * CATEGORY_LABEL_MAX_SHARE;
+  const layout = tiers ? tierLayout(tiers, (right - left) / count, false, maxRotated) : null;
   const plot = {
-    left: region.left + widestValueLabel + AXIS_LABEL_GAP,
-    right: region.right - (kind === "scatter" ? HORIZONTAL_TICK_SPACING / 2 : 0),
+    left,
+    right,
     top: region.top + FONT_SIZE / 2,
-    bottom: region.bottom - LINE_HEIGHT - AXIS_LABEL_GAP,
+    bottom: region.bottom - (layout ? tierExtent(layout) : LINE_HEIGHT + AXIS_LABEL_GAP),
   };
   if (plot.right - plot.left < MIN_PLOT_SIZE || plot.bottom - plot.top < MIN_PLOT_SIZE) return;
 
@@ -804,7 +1066,8 @@ function drawCartesian(context: DrawContext, box: Box): void {
   }
 
   drawBaseline(context, plot, baselinePixel(axis), false);
-  drawCategoryLabels(context, labels, plot, false, 0);
+  if (tiers && layout) drawCategoryTiers(context, tiers, layout, plot, false);
+  else drawCategoryLabels(context, labels, plot, false, 0);
 }
 
 function drawScatter(context: DrawContext, axis: Axis, plot: Box): void {

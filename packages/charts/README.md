@@ -67,6 +67,7 @@ host.replaceChildren(renderChartSvg(view, { width: 320, height: 200 }));
 - The chart shows a note when a source was truncated or refers to a deleted range (`#REF!`).
 - Pie and doughnut charts use the first series only.
 - Scatter charts use the categories as x values when they are numbers.
+- Categories with levels (`categoryLevels`) draw one row of labels per level: each outer label once, centered under its group, with lines between categories and groups, as Excel's multi-level category labels. Crowded inner labels turn to read upward. `axes.multiLevelLabels: false` draws one row of labels, each the text of its levels from the outside in.
 - Line, area and scatter series with more points than the plot has pixels keep only the lowest and highest point of each pixel column.
 - The element has `role="img"`, a `<title>` with the chart title and kind, and a `<desc>` with the series names and point counts.
 

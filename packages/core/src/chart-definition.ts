@@ -54,7 +54,7 @@ const CHART_KEYS = new Set([
   "pivot",
   "pivotValues",
 ]);
-const AXES_KEYS = new Set(["xTitle", "yTitle"]);
+const AXES_KEYS = new Set(["xTitle", "yTitle", "multiLevelLabels"]);
 const ANCHOR_KEYS = new Set(["row", "col", "offsetX", "offsetY", "width", "height"]);
 const SERIES_KEYS = new Set(["name", "nameRange", "values", "categories"]);
 
@@ -163,7 +163,8 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
   if (
     !axes ||
     (axes.xTitle !== undefined && !validChartText(axes.xTitle)) ||
-    (axes.yTitle !== undefined && !validChartText(axes.yTitle))
+    (axes.yTitle !== undefined && !validChartText(axes.yTitle)) ||
+    (axes.multiLevelLabels !== undefined && typeof axes.multiLevelLabels !== "boolean")
   ) {
     return null;
   }
@@ -171,6 +172,7 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
   return {
     ...(axes.xTitle !== undefined ? { xTitle: axes.xTitle } : {}),
     ...(axes.yTitle !== undefined ? { yTitle: axes.yTitle } : {}),
+    ...(axes.multiLevelLabels !== undefined ? { multiLevelLabels: axes.multiLevelLabels } : {}),
   };
 }
 

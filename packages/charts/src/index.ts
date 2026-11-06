@@ -1,5 +1,6 @@
 export type {
   ChartAnchor,
+  ChartCategoryLevel,
   ChartChangeEvent,
   ChartDefinition,
   ChartKind,

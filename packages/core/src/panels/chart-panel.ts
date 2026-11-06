@@ -1,7 +1,8 @@
-// The Chart panel: kind, series ranges, titles and legend of one chart. Each
-// committed change is ONE `grid.setChart`, so it is one undo step and the
-// chart redraws at once. The controls follow changes from elsewhere (undo,
-// a collaborator) in place, so a field the user is typing in keeps its draft.
+// The Chart panel: kind, series ranges, titles, category labels and legend of
+// one chart. Each committed change is ONE `grid.setChart`, so it is one undo
+// step and the chart redraws at once. The controls follow changes from
+// elsewhere (undo, a collaborator) in place, so a field the user is typing in
+// keeps its draft.
 
 import { CHART_KINDS } from "../chart-kinds.js";
 import { findMeasure } from "../data-model.js";
@@ -61,14 +62,17 @@ function withOptional<K extends "title" | "legend" | "axes">(
   return next;
 }
 
-function withAxisTitle(
+type AxisSettings = NonNullable<ChartDefinition["axes"]>;
+
+/** Copy `chart` with axis setting `key` set to `value`, or without it when `value` is undefined. */
+function withAxisSetting<K extends keyof AxisSettings>(
   chart: ChartDefinition,
-  axis: "xTitle" | "yTitle",
-  text: string,
+  key: K,
+  value: AxisSettings[K] | undefined,
 ): ChartDefinition {
   const axes = { ...chart.axes };
-  if (text === "") delete axes[axis];
-  else axes[axis] = text;
+  if (value === undefined) delete axes[key];
+  else axes[key] = value;
   return withOptional(chart, "axes", Object.keys(axes).length === 0 ? undefined : axes);
 }
 
@@ -225,12 +229,49 @@ function renderChartPanel(
     commit((chart) => withOptional(chart, "title", text === "" ? undefined : text)),
   );
   const xField = textField("Horizontal axis title", "x-title", (text) =>
-    commit((chart) => withAxisTitle(chart, "xTitle", text)),
+    commit((chart) => withAxisSetting(chart, "xTitle", text === "" ? undefined : text)),
   );
   const yField = textField("Vertical axis title", "y-title", (text) =>
-    commit((chart) => withAxisTitle(chart, "yTitle", text)),
+    commit((chart) => withAxisSetting(chart, "yTitle", text === "" ? undefined : text)),
   );
   textSection.append(titleField.field.element, xField.field.element, yField.field.element);
+
+  // Format Axis › Multi-level Category Labels in Excel; it shows only when the categories have levels.
+  const axisSection = panelSection("Category axis");
+  const levelsLabel = document.createElement("label");
+  levelsLabel.className = "sheetwrite-panel-check";
+  const levelsBox = document.createElement("input");
+  levelsBox.type = "checkbox";
+  levelsBox.dataset.focusKey = "multi-level-labels";
+  levelsBox.addEventListener("change", () => {
+    const on = levelsBox.checked;
+    if (commit((chart) => withAxisSetting(chart, "multiLevelLabels", on ? undefined : false))) {
+      levelsBox.checked = !on;
+    }
+  });
+  levelsLabel.append(levelsBox, document.createTextNode("Multi-level category labels"));
+  axisSection.appendChild(levelsLabel);
+
+  /**
+   * Whether the categories of `chart` have levels: several pivot row fields,
+   * or a category range of several rows and several columns, as charts-live
+   * reads them. The panel chunk does not load charts-live for it.
+   */
+  const hasCategoryLevels = (chart: ChartDefinition): boolean => {
+    const { kind } = chart;
+    if (kind === "pie" || kind === "doughnut" || kind === "scatter") return false;
+    if (chart.pivot === undefined) {
+      return chart.series.some(
+        ({ categories }) =>
+          categories !== undefined &&
+          categories !== "#REF!" &&
+          categories.start.row !== categories.end.row &&
+          categories.start.col !== categories.end.col,
+      );
+    }
+    const pivot = grid.getPivots(ref.sheet).find((candidate) => candidate.id === chart.pivot);
+    return (pivot?.rows.length ?? 0) > 1;
+  };
 
   const legendSection = panelSection("Legend");
   const legend = panelField("Legend position", selectOf(LEGEND_OPTIONS, ""), "legend");
@@ -247,7 +288,15 @@ function renderChartPanel(
   missing.textContent = MISSING_CHART;
   missing.hidden = true;
 
-  body.append(missing, kindSection, seriesSection, valueSection, textSection, legendSection);
+  body.append(
+    missing,
+    kindSection,
+    seriesSection,
+    valueSection,
+    textSection,
+    axisSection,
+    legendSection,
+  );
 
   const show = (): void => {
     const chart = read();
@@ -257,6 +306,7 @@ function renderChartPanel(
     }
     if (chart === null) {
       valueSection.hidden = true;
+      axisSection.hidden = true;
       return;
     }
 
@@ -271,6 +321,8 @@ function renderChartPanel(
     xField.input.show(chart.axes?.xTitle ?? "");
     yField.input.show(chart.axes?.yTitle ?? "");
     legend.control.value = chart.legend ?? "";
+    axisSection.hidden = !hasCategoryLevels(chart);
+    levelsBox.checked = chart.axes?.multiLevelLabels !== false;
   };
 
   show();
