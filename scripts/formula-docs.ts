@@ -136,12 +136,14 @@ function excelSyntaxHtml(name: string, syntax: string): string {
   const open = syntax.indexOf("(");
   const close = syntax.lastIndexOf(")");
   const argumentsText = open < 0 || close < open ? "" : syntax.slice(open + 1, close);
-  const tokens = [...argumentsText.matchAll(SYNTAX_TOKEN)].map(([token]) => {
-    const role =
-      /^[\w '-]+$/.test(token.trim()) && token.trim() !== "" ? "property" : "punctuation";
-    return `<span class="sw-code-${role}">${html(token)}</span>`;
-  });
-  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span><span class="sw-code-punctuation">(</span>${tokens.join("")}<span class="sw-code-punctuation">)</span></code>`;
+  // Punctuation stays bare text in the code element's punctuation colour; only
+  // the function name and argument names carry a token class.
+  const tokens = [...argumentsText.matchAll(SYNTAX_TOKEN)].map(([token]) =>
+    /^[\w '-]+$/.test(token.trim()) && token.trim() !== ""
+      ? `<span class="sw-code-property">${html(token)}</span>`
+      : html(token),
+  );
+  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span>(${tokens.join("")})</code>`;
 }
 
 function parseFunctions(value: unknown): FormulaRecord[] {

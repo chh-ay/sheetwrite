@@ -80,14 +80,14 @@
   vertical-align: top;
   overflow-wrap: anywhere;
 }
-/* The call syntax, coloured with the code roles; it is the row's name. */
-/* Long syntax wraps after an argument instead of running into the next
-   column. */
+/* The call syntax, the row's name: the function and argument names carry the
+   code roles, the bare punctuation takes the punctuation colour. Long syntax
+   wraps after an argument instead of running into the next column. */
 .sw-prose .sw-formula-table .sw-formula-syntax {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--sw-code-fg);
+  color: var(--sw-code-punctuation);
   font-size: var(--sw-text-small);
   white-space: normal;
   overflow-wrap: anywhere;
