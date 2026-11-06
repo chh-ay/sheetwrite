@@ -4,6 +4,7 @@ import type {
   ConditionalFormatRule,
   DashboardExport,
   DataValidationRule,
+  SheetId,
   PivotDefinition,
   SheetSnapshot,
   SnapshotCell,
@@ -1215,12 +1216,14 @@ function iterationAttributes(snapshot: WorkbookSnapshot): string {
   return `${calculation.iterate ? ' iterate="1"' : ""} iterateCount="${calculation.maxIterations}" iterateDelta="${calculation.maxChange}"`;
 }
 
-/** What only core's engine computes for an export: values that Excel shows as cells. */
+/** What only core's engine computes for an export: values that Excel shows as cells and charts. */
 export interface EngineContent {
   /** Static content of each dashboard sheet. */
   readonly dashboards?: readonly DashboardExport[];
   /** Current output of each worksheet pivot, by sheet; item IDs are pivot IDs. */
   readonly pivotOutputs?: readonly DashboardExport[];
+  /** The resolved view of each worksheet chart over a pivot, by sheet and chart ID. */
+  readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
 }
 
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
@@ -1286,7 +1289,7 @@ function* writeWorkbookParts(
         sheetTableId,
         hook,
         pivots?.sheetRelationships(exportSheet.id),
-        dashboard?.charts,
+        dashboard?.charts ?? content.pivotCharts?.get(sheet.id),
       );
     }
     const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);

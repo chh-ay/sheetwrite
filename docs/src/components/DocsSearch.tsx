@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "./Icon.js";
+
 interface PagefindSubResult {
   url: string;
   title: string;
@@ -171,10 +173,7 @@ export function DocsSearch() {
         }}
         type="button"
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="6" />
-          <path d="m16 16 5 5" />
-        </svg>
+        <Icon name="search" />
         <span>Search docs</span>
         <kbd>Ctrl K</kbd>
       </button>
@@ -195,10 +194,7 @@ export function DocsSearch() {
         <form method="dialog">
           <label>
             <span className="sw-visually-hidden">Search documentation</span>
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="6" />
-              <path d="m16 16 5 5" />
-            </svg>
+            <Icon name="search" size="md" />
             <input
               autoComplete="off"
               onChange={(event) => setQuery(event.currentTarget.value)}

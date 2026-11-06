@@ -17,7 +17,7 @@ import corePackage from "../../../packages/core/package.json" with { type: "json
 import { IconSprite } from "../components/IconSprite.js";
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import headingFont from "../fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
-import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
+import { initializeCodeEnhancements } from "../lib/code-enhancements.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import { SITE_URL } from "../lib/seo.js";

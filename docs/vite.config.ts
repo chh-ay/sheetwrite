@@ -23,9 +23,14 @@ import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { codeHangingIndent } from "./src/lib/code-indent.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
+import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
+import { formulaTables } from "./src/lib/formula-tables.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
+import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
+import { exportOutline } from "./src/lib/outline.ts";
 import { renderPerfBars } from "./src/lib/perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
+import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
@@ -150,14 +155,19 @@ function alertCallout(blockquote: HastNode): HastNode | undefined {
   };
 }
 
-/** Generated Markdown keeps its content static; only the filter needs hydration. */
+/**
+ * A family page's `<FormulaReference family>` becomes the filter component;
+ * the family's table is static HTML outside the page (see formula-tables.ts).
+ */
 function hydrateFormulaReference() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.tagName === "formulareference") {
         node.type = "mdxJsxFlowElement";
         node.name = "FormulaReference";
-        node.attributes = [];
+        node.attributes = [
+          { type: "mdxJsxAttribute", name: "family", value: String(node.properties?.family ?? "") },
+        ];
         delete node.tagName;
         delete node.properties;
       }
@@ -273,12 +283,6 @@ function wrapProseTables() {
   };
 }
 
-/**
- * Inline code shorter than this fits a phone line, so it never needs to break
- * at a hyphen or quote; longer code keeps wrapping to avoid sideways scroll.
- */
-const SHORT_CODE_LENGTH = 32;
-
 /** Gives short inline code a class, so an identifier reads as one token. */
 function markShortInlineCode() {
   return (tree: HastNode): void => {
@@ -287,7 +291,7 @@ function markShortInlineCode() {
         if (child.tagName === "pre") continue;
         if (child.tagName === "code" && textOf(child).length <= SHORT_CODE_LENGTH) {
           const className = [child.properties?.className ?? []].flat().map(String);
-          child.properties = { ...child.properties, className: [...className, "sw-code-token"] };
+          child.properties = { ...child.properties, className: [...className, SHORT_CODE_CLASS] };
         }
         visit(child);
       }
@@ -375,7 +379,8 @@ const OWNED_BY_SITE_MODULE = "tabindex-js-module";
  * of every page, in its HTML and its hydration chunk. Pages render code
  * without them; the root loads them once instead:
  *
- * - The stylesheet, so it is downloaded once and cached across the site.
+ * - The stylesheet, so it is downloaded once and cached across the site,
+ *   with the copy button's state rules scoped to the button.
  * - The scripts (the copy button), as a function the root runs after
  *   hydration. A `<script>` in page content is inert when React renders it
  *   on a client-side navigation, and React reports it as an error. The
@@ -392,7 +397,7 @@ function expressiveCodeAssets(): Plugin {
     async load(id) {
       if (id === RESOLVED_EXPRESSIVE_CODE_STYLES_ID) {
         const { baseStyles, themeStyles } = await sharedExpressiveCodeRenderer();
-        return `${baseStyles}\n${themeStyles}`;
+        return `${scopeCopyButtonStates(baseStyles)}\n${themeStyles}`;
       }
       if (id !== RESOLVED_EXPRESSIVE_CODE_SCRIPTS_ID) return undefined;
       const { jsModules } = await sharedExpressiveCodeRenderer();
@@ -445,8 +450,11 @@ export default defineConfig({
           ],
           hydrateFormulaReference,
           dedupeCodePopovers,
+          rovingCodeFocus,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,
+          // After the ids exist: the server render shows the outline from these.
+          exportOutline,
           markResponsiveCodeBlocks,
           wrapProseTables,
           markShortInlineCode,
@@ -455,6 +463,7 @@ export default defineConfig({
       enforce: "pre",
     },
     expressiveCodeAssets(),
+    formulaTables(),
     tailwindcss(),
     tanstackStart({
       pages: [

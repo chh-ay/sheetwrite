@@ -1,8 +1,7 @@
-// The link between a store's dashboards and its engine (#231). The view and
-// the XLSX export both read dashboard results through it, so both see the
-// same slicer filters, hidden pivots and charts.
+// The link between a store's pivot views and its engine (#231, #487). The
+// dashboard view, the charts over pivots and the XLSX export all read pivot
+// results through it, so they see the same slicer filters and hidden pivots.
 
-import { setPivotChartViews } from "../charts-live.js";
 import { isDashboard } from "../dashboard.js";
 import { compareScalars, sourceDataRange } from "../panels/pivot-model.js";
 import { PIVOT_ERRORS } from "../store/data-engine.js";
@@ -11,9 +10,10 @@ import type { CellScalar } from "../types/cell.js";
 import type { ChartDefinition, ChartView } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { DashboardItem, DashboardSlicerItem } from "../types/dashboard.js";
+import type { Sheet } from "../types/document.js";
 import type { Store } from "../types/store.js";
 import { type PivotOutputRead, pivotChartView } from "./dashboard-chart.js";
-import { dashboardPayload } from "./dashboard-payload.js";
+import { dashboardPayload, type PivotViewPayload, worksheetPayload } from "./dashboard-payload.js";
 
 /** Most values one slicer lists; more would not fit a box and would read every row. */
 const MAX_SLICER_VALUES = 1_000;
@@ -34,27 +34,26 @@ export function slicerOverridesOf(store: Store): Map<string, CellScalar[] | null
   return overrides;
 }
 
-/** The payload index of the hidden pivot of item `itemId` on `owner`; -1 when it has none. */
-export function hiddenPivotIndex(store: Store, owner: SheetId, itemId: string): number {
+/** What the engine computes for `sheet`: a dashboard's slicers and items, or a worksheet's chart copies. */
+function payloadOf(store: Store, sheet: Sheet): PivotViewPayload | undefined {
+  if (!isDashboard(sheet)) return worksheetPayload(sheet);
   const workbook = store.getWorkbook();
-  const sheet = workbook.sheets.find((candidate) => candidate.id === owner);
-  if (sheet === undefined) return -1;
-  const payload = dashboardPayload(
-    sheet,
-    workbook.sheets,
-    workbook.dataModel,
-    slicerOverridesOf(store),
-  );
-  return payload?.hidden.get(itemId) ?? -1;
+  return dashboardPayload(sheet, workbook.sheets, workbook.dataModel, slicerOverridesOf(store));
 }
 
-/** The output of the pivot at `index` in a dashboard's payload, or null without one. */
-export function dashboardPivotOutputOf(
-  store: Store,
-  sheet: SheetId,
-  index: number,
-): PivotOutputRead | null {
-  const output = storeEngine(store)?.dashboardPivotOutput(sheet, index) ?? null;
+/**
+ * The payload index of the hidden pivot that `id` reads on `owner`: a
+ * dashboard item, or a worksheet chart. -1 when it reads none.
+ */
+export function hiddenPivotIndex(store: Store, owner: SheetId, id: string): number {
+  const sheet = store.getWorkbook().sheets.find((candidate) => candidate.id === owner);
+  if (sheet === undefined) return -1;
+  return payloadOf(store, sheet)?.hidden.get(id) ?? -1;
+}
+
+/** The output of the pivot at `index` in a sheet's payload, or null without one. */
+export function pivotOutputOf(store: Store, sheet: SheetId, index: number): PivotOutputRead | null {
+  const output = storeEngine(store)?.pivotOutputCells(sheet, index) ?? null;
   if (output === null) return null;
   try {
     const kinds = output.kinds();
@@ -76,33 +75,35 @@ export function dashboardPivotOutputOf(
   }
 }
 
-/** The view of a chart over a dashboard pivot: its chart item's hidden pivot. */
-function dashboardChartView(store: Store, owner: SheetId, chart: ChartDefinition): ChartView {
+/**
+ * The view of a chart over a pivot. On a dashboard it reads the hidden pivot
+ * of its chart item; on a worksheet, the chart's copy of the pivot. Callers
+ * pass it to `setPivotChartViews` after `applyPivotViews`.
+ */
+export function pivotChartViewOf(store: Store, owner: SheetId, chart: ChartDefinition): ChartView {
   const sheet = store.getWorkbook().sheets.find((candidate) => candidate.id === owner);
-  const item = sheet?.dashboard?.items.find(
-    (candidate) => candidate.kind === "chart" && candidate.chart === chart.id,
-  );
+  const reader = isDashboard(sheet)
+    ? sheet?.dashboard?.items.find((item) => item.kind === "chart" && item.chart === chart.id)?.id
+    : chart.id;
   const output =
-    item === undefined
+    reader === undefined
       ? null
-      : dashboardPivotOutputOf(store, owner, hiddenPivotIndex(store, owner, item.id));
+      : pivotOutputOf(store, owner, hiddenPivotIndex(store, owner, reader));
   const pivot = sheet?.pivots?.find((candidate) => candidate.id === chart.pivot);
   return pivotChartView(chart, output, pivot?.values.map((value) => value.numberFormat) ?? []);
 }
 
 /**
- * Let the engine compute the dashboards `dashboards` of `store` with their
- * slicer filters and hidden pivots, and let charts over their pivots resolve.
- * Call it again after a read-only slicer selection changes.
+ * Let the engine of `store` compute the pivot views of `dashboards`, with
+ * their slicer filters and hidden pivots, and of every sheet whose charts
+ * read a pivot. Call it again after a read-only slicer selection changes.
  */
-export function applyDashboardPayload(store: Store, dashboards: readonly SheetId[]): void {
-  setPivotChartViews(dashboardChartView);
-  storeEngine(store)?.setPivotView((owner) => {
-    if (!isDashboard(owner)) return undefined;
-    const workbook = store.getWorkbook();
-    return dashboardPayload(owner, workbook.sheets, workbook.dataModel, slicerOverridesOf(store))
-      ?.pivots;
-  }, dashboards);
+export function applyPivotViews(store: Store, dashboards: readonly SheetId[]): void {
+  const sheets = new Set(dashboards);
+  for (const sheet of store.getWorkbook().sheets) {
+    if (sheet.charts?.some((chart) => chart.pivot !== undefined)) sheets.add(sheet.id);
+  }
+  storeEngine(store)?.setPivotView((owner) => payloadOf(store, owner)?.pivots, [...sheets]);
 }
 
 /** The IDs of the dashboard sheets of `store`. */

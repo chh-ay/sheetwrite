@@ -96,7 +96,7 @@
 .sw-landing-footer__title {
   margin: 0 0 var(--sw-space-1);
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.2 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
