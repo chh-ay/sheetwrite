@@ -285,6 +285,10 @@ export class CommandToolbar {
     this.lifetime.add(
       onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
     );
+    // Some commands depend on the document, such as Edit Links on its links.
+    this.lifetime.add(
+      grid.on("change", () => this.refresh((command) => grid.getCommandState(command))),
+    );
     // Absent in some test environments; every command then stays on the row.
     if (typeof ResizeObserver === "function") {
       const resizeObserver = new ResizeObserver(() => this.scheduleFit());
