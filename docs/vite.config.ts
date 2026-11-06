@@ -18,6 +18,7 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
+import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { codeHangingIndent } from "./src/lib/code-indent.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { CALLOUTS, callout, contentComponents } from "./src/lib/content-components.ts";
