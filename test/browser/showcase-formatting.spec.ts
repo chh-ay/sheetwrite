@@ -49,7 +49,7 @@ test("formatting controls change the live budget and XLSX preserves the edited s
       REVENUE,
     ),
   ).toBe("General");
-  await page.getByRole("button", { name: "Export → re-import XLSX", exact: true }).click();
+  await page.getByRole("button", { name: "Export, then re-import XLSX", exact: true }).click();
   await expect(page.getByTestId("formatting-roundtrip")).toContainText("Verified");
   await expect(page.getByTestId("formatting-roundtrip")).toContainText("0 differences");
   await expect(page.locator(".sw-formatting-imported canvas")).toBeAttached();

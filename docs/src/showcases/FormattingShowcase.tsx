@@ -251,7 +251,7 @@ export default function FormattingShowcase() {
               }
               variant="primary"
             >
-              Export → re-import XLSX
+              Export, then re-import XLSX
             </DemoButton>
             <output
               aria-live="polite"

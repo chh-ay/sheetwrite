@@ -2,14 +2,8 @@
    Route-scoped selectors and shared demo tokens keep this page independent. */
 
 @layer components {
-  .sw-si-frame {
-    display: flex;
-    min-height: 100dvh;
-    flex-direction: column;
-    background: var(--sw-surface-0);
-    color: var(--sw-fg);
-  }
-
+  /* The page's wrappers inside the shared showcase layout: the exchange
+     workbench in the demo, then the section rail and the evidence sections. */
   .sw-si-page {
     --sw-si-grid-block-size: clamp(30rem, 60dvh, 36rem);
     --sw-si-split-block-size: clamp(27rem, calc(100dvh - (var(--sw-header-height) * 2)), 46rem);
@@ -17,46 +11,8 @@
        strong foreground. */
     --sw-si-danger: color-mix(in srgb, var(--sw-danger) 68%, var(--sw-fg-strong));
     display: flex;
-    width: calc(100% - 2 * var(--sw-page-inset));
+    min-width: 0;
     flex-direction: column;
-    margin: 0 auto;
-    padding: var(--sw-space-3) 0 var(--sw-space-16);
-  }
-
-  .sw-si-page > .sw-capability-hero {
-    order: 1;
-  }
-
-  .sw-si-page > #xlsx {
-    order: 3;
-  }
-
-  .sw-si-page > .sw-si-sectionnav {
-    order: 4;
-  }
-
-  .sw-si-page > #contract {
-    order: 5;
-  }
-
-  .sw-si-page > #fixtures {
-    order: 6;
-  }
-
-  .sw-si-page > #warnings {
-    order: 7;
-  }
-
-  .sw-si-page > #delimited {
-    order: 8;
-  }
-
-  .sw-si-page > #limits {
-    order: 9;
-  }
-
-  .sw-si-page > #isolation {
-    order: 10;
   }
 
   /* ── Persistent section rail ──

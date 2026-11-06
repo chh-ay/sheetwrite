@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { pageMeta } from "../lib/seo.js";
 import CollaborationShowcase from "../showcases/CollaborationShowcase.js";
+import { COLLABORATION_ACTORS } from "../showcases/collaboration-protocol.js";
 import { ProofPage } from "../showcases/ProofPage.js";
 
 import collaborationStylesheet from "../styles/showcase-collaboration.css?url";
@@ -59,11 +60,13 @@ function CollaborationProofRoute() {
       boundaryContract="PersistenceAdapter + RemoteOperationSource"
       boundaryLede="Everything moving on this page is the real collaboration flow running in your browser tab. The server is deliberately illustrative: the responsibilities below never move into Sheetwrite."
       description={description}
-      eyebrow="CAPABILITY / LIVE COLLABORATION"
+      eyebrow="Collaboration"
       facts={[
-        { label: "Clients", value: "Two, fully isolated" },
+        {
+          label: "Clients",
+          value: COLLABORATION_ACTORS.map((actor) => actor.displayName).join(" and "),
+        },
         { label: "Ordering", value: "Server-sequenced versions" },
-        { label: "Durability", value: "IndexedDB pending queues" },
         { label: "Conflicts", value: "Conservative rebase" },
       ]}
       guideHref="/docs/features/collaboration/"

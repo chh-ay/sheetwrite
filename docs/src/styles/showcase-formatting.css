@@ -1,210 +1,36 @@
-@layer components {
-  .sw-formatting-frame {
-    min-height: 100dvh;
-    background: var(--sw-surface-0);
-    color: var(--sw-fg);
-  }
-
-  /* Same page inset as every other capability showcase. */
-  .sw-formatting {
-    width: calc(100% - 2 * var(--sw-page-inset));
-    margin-inline: auto;
-    padding-block: var(--sw-space-8) var(--sw-space-16);
-  }
-
-  .sw-formatting-workspace {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 19rem;
-    overflow: hidden;
-    border: 1px solid var(--sw-border-strong);
-    border-radius: var(--sw-radius-lg);
-    background: var(--sw-surface-1);
-    box-shadow: var(--sw-shadow-lg);
-  }
-
-  .sw-formatting-ledger {
-    min-width: 0;
-  }
-  .sw-formatting-toolbar,
-  .sw-formatting-caption {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--sw-space-3);
-    padding: var(--sw-space-3) var(--sw-space-4);
-    border-bottom: 1px solid var(--sw-border);
-    background: var(--sw-surface-2);
-  }
-  .sw-formatting-toolbar strong {
-    margin-right: auto;
-    color: var(--sw-fg-strong);
-  }
-  .sw-formatting-toolbar span,
-  .sw-formatting-caption {
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-text-caption);
-  }
-  .sw-formatting-formula {
-    --sheetwrite-widget-bg: var(--sw-surface-2);
-    --sheetwrite-widget-fg: var(--sw-fg);
-    --sheetwrite-widget-border: var(--sw-border);
-    display: flex;
-    min-height: 2.5rem;
-    border-bottom: 1px solid var(--sw-border);
-  }
-  .sw-formatting-grid {
-    height: 45rem;
-  }
-  .sw-formatting-imported {
-    height: 25rem;
-  }
-  .sw-formatting-controls {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sw-space-5);
-    padding: var(--sw-space-5);
-    border-left: 1px solid var(--sw-border);
-    background: var(--sw-surface-1);
-  }
-  .sw-formatting-controls h2 {
-    margin: 0;
-    font-size: var(--sw-text-lead);
-    color: var(--sw-fg-strong);
-  }
-  .sw-formatting-controls p {
-    margin: 0;
-    font-size: var(--sw-text-small);
-    color: var(--sw-fg-muted);
-    line-height: 1.65;
-  }
-  .sw-formatting-controls fieldset {
-    min-width: 0;
-    padding: 0;
-    margin: 0;
-    border: 0;
-  }
-  .sw-formatting-controls legend {
-    margin-bottom: var(--sw-space-2);
-    font-size: var(--sw-text-eyebrow);
-    font-weight: var(--sw-weight-semibold);
-    text-transform: uppercase;
-    letter-spacing: var(--sw-tracking-eyebrow);
-    color: var(--sw-fg-muted);
-  }
-  .sw-formatting-buttons {
-    display: flex;
-    gap: var(--sw-space-1-5);
-    flex-wrap: wrap;
-  }
-  .sw-formatting button {
-    border: 1px solid var(--sw-border-strong);
-    border-radius: var(--sw-radius-xs);
-    padding: var(--sw-space-2) var(--sw-space-3);
-    background: var(--sw-surface-2);
-    color: var(--sw-fg);
-    font: inherit;
-    font-size: var(--sw-text-caption);
-    cursor: pointer;
-  }
-  .sw-formatting button:hover {
-    border-color: var(--sw-accent);
-    color: var(--sw-accent-strong);
-  }
-  .sw-formatting button:focus-visible {
-    outline: 2px solid var(--sw-accent);
-    outline-offset: 3px;
-  }
-  .sw-formatting button:disabled {
-    cursor: wait;
-    opacity: 0.6;
-  }
-  .sw-formatting button[aria-pressed="true"] {
-    border-color: var(--sw-accent);
-    color: var(--sw-accent-strong);
-  }
-  .sw-formatting-proof {
-    margin-top: var(--sw-space-8);
-    border: 1px solid var(--sw-border);
-    border-radius: var(--sw-radius-lg);
-    overflow: hidden;
-    background: var(--sw-surface-1);
-  }
-  .sw-formatting-proof > header {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--sw-space-4);
-    padding: var(--sw-space-5);
-    background: var(--sw-surface-1);
-  }
-  .sw-formatting-proof h2 {
-    margin: 0 0 var(--sw-space-1-5);
-    color: var(--sw-fg-strong);
-    font-size: var(--sw-text-h3);
-  }
-  .sw-formatting-proof p {
-    margin: 0;
-    color: var(--sw-fg-muted);
-    max-width: 65ch;
-    line-height: 1.6;
-    font-size: var(--sw-text-small);
-  }
-  .sw-formatting-proof output {
-    display: block;
-    padding: var(--sw-space-4) var(--sw-space-5);
-    border-top: 1px solid var(--sw-border);
-    color: var(--sw-accent-strong);
-  }
-  .sw-formatting-notes {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sw-space-8);
-    margin-top: var(--sw-space-8);
-  }
-  .sw-formatting-notes h2 {
-    font-size: var(--sw-text-body);
-    color: var(--sw-fg-strong);
-  }
-  .sw-formatting-notes p {
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-text-small);
-    line-height: 1.75;
-  }
-  .sw-formatting-notes a {
-    color: var(--sw-accent-strong);
-  }
-  .sw-formatting .sw-action-error {
-    color: var(--sw-danger);
-  }
-
-  @media (max-width: 1000px) {
-    .sw-formatting-workspace {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .sw-formatting-controls {
-      border-left: 0;
-      border-top: 1px solid var(--sw-border);
-    }
-    .sw-formatting-notes {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sw-space-2);
-    }
-  }
-  @media (max-width: 600px) {
-    .sw-formatting-grid {
-      height: 30rem;
-    }
-  }
+/* The formatting showcase: its formula bar and budget grid in the demo, the
+   control rows and round-trip report in the panel, and the re-imported grid. */
+.sw-formatting-formula {
+  --sheetwrite-widget-bg: var(--sw-surface-2);
+  --sheetwrite-widget-fg: var(--sw-fg);
+  --sheetwrite-widget-border: var(--sw-border);
+  display: flex;
+  min-height: var(--sw-control-height);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
 }
 
-/* The caption under the budget, the status in the window bar and the round-trip report. */
-.sw-showcase__demo .sw-formatting-caption {
+.sw-formatting-grid {
+  height: clamp(22rem, 72vh, 40rem);
+}
+
+.sw-formatting-imported {
+  height: 25rem;
+}
+
+.sw-formatting-caption {
   margin: 0;
   padding: var(--sw-space-2) var(--sw-space-4);
   border-top: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-2);
 }
 
+.sw-formatting-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1-5);
+}
+
+.sw-formatting-caption,
 .sw-formatting-status,
 .sw-formatting-report {
   color: var(--sw-fg-muted);

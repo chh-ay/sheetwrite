@@ -55,11 +55,10 @@ function DatabaseProofRoute() {
       boundaryContract="PersistenceAdapter"
       boundaryLede="This showcase runs the full save-and-reload flow against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours."
       description={description}
-      eyebrow="CAPABILITY / DATABASE & DOCUMENT LIFECYCLE"
+      eyebrow="Data"
       facts={[
         { label: "Storage", value: "Browser IndexedDB" },
-        { label: "Commits", value: "Append-only DocumentOp[]" },
-        { label: "Versioning", value: "Atomic base-version compare" },
+        { label: "Commits", value: "Append-only operations" },
         { label: "Durability", value: "Pending queue survives reload" },
       ]}
       guideHref="/docs/features/data/persistence/"
