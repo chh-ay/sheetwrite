@@ -1,5 +1,5 @@
 ```ts prelude="core" title="dashboards.ts"
-// A dashboard sheet holds pivots and slicers on a twelve-column grid
+// A dashboard sheet lays out pivots, charts, KPI cards and slicers on twelve columns
 grid.addSheet({ id: "dashboard", name: "Sales dashboard", kind: "dashboard" });
 grid.setPivot(
   {
@@ -14,13 +14,19 @@ grid.setPivot(
   "dashboard",
 );
 
-// Each item change is one undo step, saved and synced with the workbook
+// Each item change is one undo step, saved and synced with the workbook.
+// The slicer filters the KPI card and the pivot together.
 grid.applyTransaction({
   patches: [
     {
       op: "setDashboardItem",
       sheet: "dashboard",
-      item: { id: "region-pivot", kind: "pivot", pivot: "by-region", box: { x: 0, y: 0, w: 6, h: 6 } },
+      item: { id: "revenue-kpi", kind: "kpi", measure: "revenue", box: { x: 0, y: 0, w: 3, h: 3 } },
+    },
+    {
+      op: "setDashboardItem",
+      sheet: "dashboard",
+      item: { id: "region-pivot", kind: "pivot", pivot: "by-region", box: { x: 0, y: 3, w: 6, h: 6 } },
     },
     {
       op: "setDashboardItem",
@@ -30,7 +36,7 @@ grid.applyTransaction({
         kind: "slicer",
         field: { table: "orders", column: "region" },
         selected: ["EMEA"],
-        box: { x: 0, y: 6, w: 4, h: 5 },
+        box: { x: 6, y: 0, w: 3, h: 6 },
       },
     },
   ],

@@ -1,3 +1,5 @@
+import { formatNumber } from "@sheetwrite/core";
+
 import { ActionError } from "../lib/use-action.js";
 import { ControlActions, ControlButton, DemoGrid } from "./feature-controls.js";
 import {
@@ -9,6 +11,7 @@ import {
 import {
   createDashboardScenario,
   ORDER_ROWS,
+  REGIONS,
   type DashboardScenario,
   type DashboardSnapshot,
 } from "./scenarios/dashboards.js";
@@ -30,6 +33,35 @@ function DashboardControls({
   return (
     <>
       <ShowcaseControlGroup
+        title="Filter with a slicer"
+        description="The slicers filter the pivot, the chart and the KPI cards together."
+      >
+        <ControlActions>
+          <ControlButton
+            disabled={disabled}
+            icon="filter"
+            onClick={() => void run("The slicer", (current) => current.keepFirstRegion())}
+            variant="primary"
+          >
+            Keep {REGIONS[0]} in the Region slicer
+          </ControlButton>
+        </ControlActions>
+        <ShowcaseReadout
+          items={[
+            {
+              label: "Revenue by channel, total",
+              value: (
+                <span data-testid="dashboard-filtered-revenue">
+                  {typeof snapshot?.filteredRevenue === "number"
+                    ? formatNumber(snapshot.filteredRevenue, "$#,##0")
+                    : "…"}
+                </span>
+              ),
+            },
+          ]}
+        />
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup
         title="Arrange the items"
         description="Drag a header to move an item and its corner to resize it, or use the item's actions menu and the arrow keys."
       >
@@ -38,23 +70,15 @@ function DashboardControls({
             disabled={disabled || (snapshot?.hasProductPivot ?? true)}
             icon="plus"
             onClick={() => void run("The new pivot", (current) => current.addProductPivot())}
-            variant="primary"
           >
             Add a product pivot
           </ControlButton>
           <ControlButton
             disabled={disabled}
             icon="layers"
-            onClick={() => void run("The swap", (current) => current.swapPivots())}
+            onClick={() => void run("The swap", (current) => current.swapChartAndPivot())}
           >
-            Swap the two pivots
-          </ControlButton>
-          <ControlButton
-            disabled={disabled}
-            icon="filter"
-            onClick={() => void run("The slicer", (current) => current.keepFirstRegion())}
-          >
-            Keep one region in the slicer
+            Swap the chart and the pivot
           </ControlButton>
           <ControlButton
             disabled={disabled}
@@ -109,25 +133,25 @@ export default function DashboardsShowcase() {
       id="dashboards"
       task={
         <>
-          Arrange pivots and slicers on a dashboard sheet: move and resize them, add a pivot, and
-          pick slicer values. Undo takes back each change.
+          Filter a dashboard of KPI cards, a PivotChart and a pivot with its slicers, then move,
+          resize and add items. Undo takes back each change.
         </>
       }
-      title="A dashboard of pivots and slicers"
+      title="A dashboard that filters together"
     >
-      <ShowcaseSection id="dashboards-rules" title="How a dashboard is kept">
+      <ShowcaseSection id="dashboards-rules" title="How a dashboard works">
         <ul>
           <li>
             A dashboard is a sheet with <code>kind: "dashboard"</code>. Its pivots compute from the
             Orders table without writing output cells.
           </li>
           <li>
-            Items never overlap: a move or resize into another item's place is refused, and the view
-            says so.
+            A slicer filters every pivot, PivotChart and KPI card whose table reaches its column, as
+            an Excel slicer filters its connected PivotTables. Its selection is saved and undone.
           </li>
           <li>
-            A slicer saves the values it keeps, as Excel saves slicer state. It does not filter the
-            pivots yet.
+            A KPI card shows a data model measure in the slicers' filter context. Items never
+            overlap: a move or resize into another item's place is refused, and the view says so.
           </li>
         </ul>
       </ShowcaseSection>

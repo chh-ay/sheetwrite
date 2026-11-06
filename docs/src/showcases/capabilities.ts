@@ -10,269 +10,269 @@
  */
 
 export type CapabilityOwnerId =
-  | "vanilla"
-  | "react"
-  | "vue"
-  | "svelte"
-  | "database"
-  | "interoperability"
-  | "formatting"
-  | "formulas"
-  | "performance"
-  | "collaboration"
-  | "data-tools"
-  | "host-rows"
-  | "spreadsheet"
-  | "analysis"
-  | "sort"
-  | "queries"
-  | "data-model"
-  | "version-history"
-  | "functions"
-  | "recalculation"
-  | "dashboards";
+ | "vanilla"
+ | "react"
+ | "vue"
+ | "svelte"
+ | "database"
+ | "interoperability"
+ | "formatting"
+ | "formulas"
+ | "performance"
+ | "collaboration"
+ | "data-tools"
+ | "host-rows"
+ | "spreadsheet"
+ | "analysis"
+ | "sort"
+ | "queries"
+ | "data-model"
+ | "version-history"
+ | "functions"
+ | "recalculation"
+ | "dashboards";
 
 export type CapabilityArea =
-  | "editing"
-  | "modeling"
-  | "workflow"
-  | "scale"
-  | "interop"
-  | "persistence"
-  | "collaboration"
-  | "lifecycle";
+ | "editing"
+ | "modeling"
+ | "workflow"
+ | "scale"
+ | "interop"
+ | "persistence"
+ | "collaboration"
+ | "lifecycle";
 
 export type CapabilityScope = "browser" | "browser+worker" | "runtime";
 
 export interface CapabilityOwner {
-  id: CapabilityOwnerId;
-  label: string;
-  /** Route URL, trailing slash — every URL here must stay resolvable. */
-  href: string;
-  /** Repo-relative TanStack route file backing `href`. */
-  routeFile: string;
-  /** One-line bounded responsibility; owners must not duplicate each other. */
-  responsibility: string;
-  kind: "framework" | "capability";
+ id: CapabilityOwnerId;
+ label: string;
+ /** Route URL, trailing slash — every URL here must stay resolvable. */
+ href: string;
+ /** Repo-relative TanStack route file backing `href`. */
+ routeFile: string;
+ /** One-line bounded responsibility; owners must not duplicate each other. */
+ responsibility: string;
+ kind: "framework" | "capability";
 }
 
 export interface CapabilitySecondary {
-  owner: CapabilityOwnerId;
-  /** Declared intent — undeclared duplicate ownership fails validation. */
-  reason: string;
+ owner: CapabilityOwnerId;
+ /** Declared intent — undeclared duplicate ownership fails validation. */
+ reason: string;
 }
 
 export interface Capability {
-  /** Stable `area.name` identifier. */
-  id: string;
-  title: string;
-  area: CapabilityArea;
-  /** Exactly one primary showcase owner. */
-  primary: CapabilityOwnerId;
-  secondary?: readonly CapabilitySecondary[];
-  /** The user interaction that proves the capability on the owner route. */
-  interaction: string;
-  scope: CapabilityScope;
-  /** What assistive-technology users can rely on while exercising it. */
-  accessibility: string;
-  /** Repo-relative executable contract; browser-scoped paths live in test/. */
-  testPath: string;
-  /** Repo-relative shared scenario/protocol modules this proof binds to. */
-  sharedModules: readonly string[];
-  /** Explicit host-owned or unsupported boundary shown on the hub. */
-  boundary: string;
+ /** Stable `area.name` identifier. */
+ id: string;
+ title: string;
+ area: CapabilityArea;
+ /** Exactly one primary showcase owner. */
+ primary: CapabilityOwnerId;
+ secondary?: readonly CapabilitySecondary[];
+ /** The user interaction that proves the capability on the owner route. */
+ interaction: string;
+ scope: CapabilityScope;
+ /** What assistive-technology users can rely on while exercising it. */
+ accessibility: string;
+ /** Repo-relative executable contract; browser-scoped paths live in test/. */
+ testPath: string;
+ /** Repo-relative shared scenario/protocol modules this proof binds to. */
+ sharedModules: readonly string[];
+ /** Explicit host-owned or unsupported boundary shown on the hub. */
+ boundary: string;
 }
 
 export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
-  {
-    id: "vanilla",
-    label: "Vanilla workbench",
-    href: "/vanilla/",
-    routeFile: "docs/src/routes/vanilla.tsx",
-    responsibility:
-      "Lowest-level engine and host boundary: explicit lifecycle, renderer selection, Worker fallback, workbook operations, framework-free integration.",
-    kind: "framework",
-  },
-  {
-    id: "react",
-    label: "React workbench",
-    href: "/react/",
-    routeFile: "docs/src/routes/react.tsx",
-    responsibility:
-      "Controlled analytics product: query and filter controls, formulas and aggregates, derived summaries, import/export workflow, React reset semantics.",
-    kind: "framework",
-  },
-  {
-    id: "vue",
-    label: "Vue workbench",
-    href: "/vue/",
-    routeFile: "docs/src/routes/vue.tsx",
-    responsibility:
-      "Composed business workflow: validation, protection, notes and metadata, workbook and sheet operations, host persistence state, explicit props and events.",
-    kind: "framework",
-  },
-  {
-    id: "svelte",
-    label: "Svelte workbench",
-    href: "/svelte/",
-    routeFile: "docs/src/routes/svelte.tsx",
-    responsibility:
-      "Offline and collaborative product: durable pending work, connectivity and activity state, reconnect drain, persistence across remount.",
-    kind: "framework",
-  },
-  {
-    id: "database",
-    label: "Database & document lifecycle",
-    href: "/showcases/database/",
-    routeFile: "docs/src/routes/showcases.database.tsx",
-    responsibility:
-      "Real browser IndexedDB persistence: snapshot load, append-only commits, retries, conflict tails, compaction, reload recovery, live counters.",
-    kind: "capability",
-  },
-  {
-    id: "interoperability",
-    label: "Spreadsheet interoperability",
-    href: "/showcases/interoperability/",
-    routeFile: "docs/src/routes/showcases.interoperability.tsx",
-    responsibility:
-      "XLSX/Excel and CSV/TSV exchange against independent fixtures: fidelity, intentional loss, warnings, resource limits, optional package boundary.",
-    kind: "capability",
-  },
-  {
-    id: "formatting",
-    label: "Formatting & number formats",
-    href: "/showcases/formatting/",
-    routeFile: "docs/src/routes/showcases.formatting.tsx",
-    responsibility:
-      "Live budget typography, alignment, borders, fills, mixed per-cell number formats, conditional formatting, and XLSX style fidelity.",
-    kind: "capability",
-  },
-  {
-    id: "formulas",
-    label: "Formula analysis",
-    href: "/showcases/formulas/",
-    routeFile: "docs/src/routes/showcases.formulas.tsx",
-    responsibility:
-      "Full formula engine: GROUPBY and PIVOTBY grouping, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
-    kind: "capability",
-  },
-  {
-    id: "performance",
-    label: "Performance & scale",
-    href: "/showcases/performance/",
-    routeFile: "docs/src/routes/showcases.performance.tsx",
-    responsibility:
-      "Million-row paging, wide pages, cache churn, Worker and main-thread rendering, WASM crossings, measured benchmark evidence.",
-    kind: "capability",
-  },
-  {
-    id: "collaboration",
-    label: "Collaboration protocol",
-    href: "/showcases/collaboration/",
-    routeFile: "docs/src/routes/showcases.collaboration.tsx",
-    responsibility:
-      "Two-client protocol proof: sequencing, duplicate acknowledgements, presence, offline reconnect, version gaps, conflicts, recovery.",
-    kind: "capability",
-  },
-  {
-    id: "host-rows",
-    label: "Host-owned rows",
-    href: "/showcases/host-rows/",
-    routeFile: "docs/src/routes/showcases.host-rows.tsx",
-    responsibility:
-      "Host entity store as the source of truth: stable row IDs across sort, filter, insert and delete, edit deltas per record, host write policy, bulk lead import.",
-    kind: "capability",
-  },
-  {
-    id: "data-tools",
-    label: "Data tools",
-    href: "/showcases/data-tools/",
-    routeFile: "docs/src/routes/showcases.data-tools.tsx",
-    responsibility:
-      "Dispatch operations: multi-key sort, composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
-    kind: "capability",
-  },
-  {
-    id: "spreadsheet",
-    label: "Spreadsheet app",
-    href: "/showcases/spreadsheet/",
-    routeFile: "docs/src/routes/showcases.spreadsheet.tsx",
-    responsibility:
-      "The composable shell as a complete app: Excel-style ribbon, name box, formula bar, sheet tabs and status around one grid, with ribbon folding at narrow widths.",
-    kind: "capability",
-  },
-  {
-    id: "analysis",
-    label: "Analysis",
-    href: "/showcases/analysis/",
-    routeFile: "docs/src/routes/showcases.analysis.tsx",
-    responsibility:
-      "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
-    kind: "capability",
-  },
-  {
-    id: "sort",
-    label: "Sort in place",
-    href: "/showcases/sort/",
-    routeFile: "docs/src/routes/showcases.sort.tsx",
-    responsibility:
-      "Excel's in-place sort of a range by several keys, the Sort panel, and the view-only sort, with formulas that read the sorted cells.",
-    kind: "capability",
-  },
-  {
-    id: "queries",
-    label: "Saved queries",
-    href: "/showcases/queries/",
-    routeFile: "docs/src/routes/showcases.queries.tsx",
-    responsibility:
-      "Power Query-style saved queries over host-loaded CSV and JSON sources: steps, merge, group, refresh into tables, and Queries & Connections.",
-    kind: "capability",
-  },
-  {
-    id: "data-model",
-    label: "Data model",
-    href: "/showcases/data-model/",
-    routeFile: "docs/src/routes/showcases.data-model.tsx",
-    responsibility:
-      "Relationships between workbook tables, key checks, pivots over fields of related tables, measures, GETPIVOTDATA over a model pivot, and the Relationships panel.",
-    kind: "capability",
-  },
-  {
-    id: "version-history",
-    label: "Version history",
-    href: "/showcases/version-history/",
-    routeFile: "docs/src/routes/showcases.version-history.tsx",
-    responsibility:
-      "History archives journaled by the document authority: named versions, authors, compare with the current document, restore of a range or a sheet, and the Version History panel.",
-    kind: "capability",
-  },
-  {
-    id: "functions",
-    label: "Excel functions",
-    href: "/showcases/functions/",
-    routeFile: "docs/src/routes/showcases.functions.tsx",
-    responsibility:
-      "The function families 0.7.0 adds: engineering, financial, statistics, information, math and text, LOOKUP and TRIMRANGE, GETPIVOTDATA, regex, and references to other workbooks.",
-    kind: "capability",
-  },
-  {
-    id: "recalculation",
-    label: "Live recalculation",
-    href: "/showcases/recalculation/",
-    routeFile: "docs/src/routes/showcases.recalculation.tsx",
-    responsibility:
-      "Recalculation timed in the browser: one edit under 100,000 formulas, 1,000 lookups over 100,000 rows, and the order of edit, results and paint.",
-    kind: "capability",
-  },
-  {
-    id: "dashboards",
-    label: "Dashboards",
-    href: "/showcases/dashboards/",
-    routeFile: "docs/src/routes/showcases.dashboards.tsx",
-    responsibility:
-      "Dashboard sheets of pivot and slicer items on a twelve-column grid: move, resize, add items and keep slicer values, each one undo step.",
-    kind: "capability",
-  },
+ {
+  id: "vanilla",
+  label: "Vanilla workbench",
+  href: "/vanilla/",
+  routeFile: "docs/src/routes/vanilla.tsx",
+  responsibility:
+   "Lowest-level engine and host boundary: explicit lifecycle, renderer selection, Worker fallback, workbook operations, framework-free integration.",
+  kind: "framework",
+ },
+ {
+  id: "react",
+  label: "React workbench",
+  href: "/react/",
+  routeFile: "docs/src/routes/react.tsx",
+  responsibility:
+   "Controlled analytics product: query and filter controls, formulas and aggregates, derived summaries, import/export workflow, React reset semantics.",
+  kind: "framework",
+ },
+ {
+  id: "vue",
+  label: "Vue workbench",
+  href: "/vue/",
+  routeFile: "docs/src/routes/vue.tsx",
+  responsibility:
+   "Composed business workflow: validation, protection, notes and metadata, workbook and sheet operations, host persistence state, explicit props and events.",
+  kind: "framework",
+ },
+ {
+  id: "svelte",
+  label: "Svelte workbench",
+  href: "/svelte/",
+  routeFile: "docs/src/routes/svelte.tsx",
+  responsibility:
+   "Offline and collaborative product: durable pending work, connectivity and activity state, reconnect drain, persistence across remount.",
+  kind: "framework",
+ },
+ {
+  id: "database",
+  label: "Database & document lifecycle",
+  href: "/showcases/database/",
+  routeFile: "docs/src/routes/showcases.database.tsx",
+  responsibility:
+   "Real browser IndexedDB persistence: snapshot load, append-only commits, retries, conflict tails, compaction, reload recovery, live counters.",
+  kind: "capability",
+ },
+ {
+  id: "interoperability",
+  label: "Spreadsheet interoperability",
+  href: "/showcases/interoperability/",
+  routeFile: "docs/src/routes/showcases.interoperability.tsx",
+  responsibility:
+   "XLSX/Excel and CSV/TSV exchange against independent fixtures: fidelity, intentional loss, warnings, resource limits, optional package boundary.",
+  kind: "capability",
+ },
+ {
+  id: "formatting",
+  label: "Formatting & number formats",
+  href: "/showcases/formatting/",
+  routeFile: "docs/src/routes/showcases.formatting.tsx",
+  responsibility:
+   "Live budget typography, alignment, borders, fills, mixed per-cell number formats, conditional formatting, and XLSX style fidelity.",
+  kind: "capability",
+ },
+ {
+  id: "formulas",
+  label: "Formula analysis",
+  href: "/showcases/formulas/",
+  routeFile: "docs/src/routes/showcases.formulas.tsx",
+  responsibility:
+   "Full formula engine: GROUPBY and PIVOTBY grouping, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
+  kind: "capability",
+ },
+ {
+  id: "performance",
+  label: "Performance & scale",
+  href: "/showcases/performance/",
+  routeFile: "docs/src/routes/showcases.performance.tsx",
+  responsibility:
+   "Million-row paging, wide pages, cache churn, Worker and main-thread rendering, WASM crossings, measured benchmark evidence.",
+  kind: "capability",
+ },
+ {
+  id: "collaboration",
+  label: "Collaboration protocol",
+  href: "/showcases/collaboration/",
+  routeFile: "docs/src/routes/showcases.collaboration.tsx",
+  responsibility:
+   "Two-client protocol proof: sequencing, duplicate acknowledgements, presence, offline reconnect, version gaps, conflicts, recovery.",
+  kind: "capability",
+ },
+ {
+  id: "host-rows",
+  label: "Host-owned rows",
+  href: "/showcases/host-rows/",
+  routeFile: "docs/src/routes/showcases.host-rows.tsx",
+  responsibility:
+   "Host entity store as the source of truth: stable row IDs across sort, filter, insert and delete, edit deltas per record, host write policy, bulk lead import.",
+  kind: "capability",
+ },
+ {
+  id: "data-tools",
+  label: "Data tools",
+  href: "/showcases/data-tools/",
+  routeFile: "docs/src/routes/showcases.data-tools.tsx",
+  responsibility:
+   "Dispatch operations: multi-key sort, composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
+  kind: "capability",
+ },
+ {
+  id: "spreadsheet",
+  label: "Spreadsheet app",
+  href: "/showcases/spreadsheet/",
+  routeFile: "docs/src/routes/showcases.spreadsheet.tsx",
+  responsibility:
+   "The composable shell as a complete app: Excel-style ribbon, name box, formula bar, sheet tabs and status around one grid, with ribbon folding at narrow widths.",
+  kind: "capability",
+ },
+ {
+  id: "analysis",
+  label: "Analysis",
+  href: "/showcases/analysis/",
+  routeFile: "docs/src/routes/showcases.analysis.tsx",
+  responsibility:
+   "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
+  kind: "capability",
+ },
+ {
+  id: "sort",
+  label: "Sort in place",
+  href: "/showcases/sort/",
+  routeFile: "docs/src/routes/showcases.sort.tsx",
+  responsibility:
+   "Excel's in-place sort of a range by several keys, the Sort panel, and the view-only sort, with formulas that read the sorted cells.",
+  kind: "capability",
+ },
+ {
+  id: "queries",
+  label: "Saved queries",
+  href: "/showcases/queries/",
+  routeFile: "docs/src/routes/showcases.queries.tsx",
+  responsibility:
+   "Power Query-style saved queries over host-loaded CSV and JSON sources: steps, merge, group, refresh into tables, and Queries & Connections.",
+  kind: "capability",
+ },
+ {
+  id: "data-model",
+  label: "Data model",
+  href: "/showcases/data-model/",
+  routeFile: "docs/src/routes/showcases.data-model.tsx",
+  responsibility:
+   "Relationships between workbook tables, key checks, pivots over fields of related tables, measures, GETPIVOTDATA over a model pivot, and the Relationships panel.",
+  kind: "capability",
+ },
+ {
+  id: "version-history",
+  label: "Version history",
+  href: "/showcases/version-history/",
+  routeFile: "docs/src/routes/showcases.version-history.tsx",
+  responsibility:
+   "History archives journaled by the document authority: named versions, authors, compare with the current document, restore of a range or a sheet, and the Version History panel.",
+  kind: "capability",
+ },
+ {
+  id: "functions",
+  label: "Excel functions",
+  href: "/showcases/functions/",
+  routeFile: "docs/src/routes/showcases.functions.tsx",
+  responsibility:
+   "The function families 0.7.0 adds: engineering, financial, statistics, information, math and text, LOOKUP and TRIMRANGE, GETPIVOTDATA, regex, and references to other workbooks.",
+  kind: "capability",
+ },
+ {
+  id: "recalculation",
+  label: "Live recalculation",
+  href: "/showcases/recalculation/",
+  routeFile: "docs/src/routes/showcases.recalculation.tsx",
+  responsibility:
+   "Recalculation timed in the browser: one edit under 100,000 formulas, 1,000 lookups over 100,000 rows, and the order of edit, results and paint.",
+  kind: "capability",
+ },
+ {
+  id: "dashboards",
+  label: "Dashboards",
+  href: "/showcases/dashboards/",
+  routeFile: "docs/src/routes/showcases.dashboards.tsx",
+  responsibility:
+   "Dashboard sheets of KPI cards, slicers, PivotCharts and pivots on a twelve-column grid: slicers filter them together; move, resize and add items, each one undo step.",
+  kind: "capability",
+ },
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
@@ -300,1006 +300,1006 @@ const HOST_ROWS_SPEC = "test/browser/host-owned-rows.spec.ts";
 const ANALYSIS_SPEC = "test/browser/showcase-analysis.spec.ts";
 
 const HOST_CHROME_BOUNDARY =
-  "Product chrome beyond the shell pieces (menus, dialogs, app framing) is host-owned.";
+ "Product chrome beyond the shell pieces (menus, dialogs, app framing) is host-owned.";
 const HOST_PERSISTENCE_BOUNDARY =
-  "Authentication, authorization, transport, server database transactions, and deployment are host-owned.";
+ "Authentication, authorization, transport, server database transactions, and deployment are host-owned.";
 
 export const CAPABILITY_INVENTORY: readonly Capability[] = [
-  {
-    id: "editing.cell-edit",
-    title: "Cell editing",
-    area: "editing",
-    primary: "vanilla",
-    secondary: [
-      { owner: "react", reason: "Controlled reconciliation keeps the analytics grid editable." },
-      { owner: "vue", reason: "Business workflow edits run through validation and protection." },
-      { owner: "svelte", reason: "Offline edits queue durably before they sync." },
-    ],
-    interaction:
-      "Double-click or press F2, type a value or formula, Enter commits, Escape cancels.",
-    scope: "browser",
-    accessibility:
-      "Formula bar and name box are labeled inputs; the full edit path works keyboard-only.",
-    testPath: VANILLA_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: HOST_CHROME_BOUNDARY,
-  },
-  {
-    id: "editing.selection",
-    title: "Selection & navigation",
-    area: "editing",
-    primary: "vanilla",
-    interaction:
-      "Arrow and Shift+Arrow keyboard range selection, pointer drag, and name-box address jumps.",
-    scope: "browser",
-    accessibility: "Name box reflects the active address and is keyboard reachable at all times.",
-    testPath: VANILLA_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: HOST_CHROME_BOUNDARY,
-  },
-  {
-    id: "editing.clipboard",
-    title: "Clipboard copy, cut & paste",
-    area: "editing",
-    primary: "react",
-    interaction: "Copy or cut a selected range, paste it elsewhere, values and styles arrive.",
-    scope: "browser",
-    accessibility: "Standard platform shortcuts (Ctrl/Cmd+C, X, V) work on the focused grid.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: "System-clipboard permission prompts and non-grid paste targets are browser-owned.",
-  },
-  {
-    id: "editing.fill",
-    title: "Fill & series",
-    area: "editing",
-    primary: "react",
-    interaction: "Drag the fill handle (or fill down) to extend values and formula series.",
-    scope: "browser",
-    accessibility: "Fill results land in the document and are re-readable through the formula bar.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: HOST_CHROME_BOUNDARY,
-  },
-  {
-    id: "editing.undo-redo",
-    title: "Undo & redo",
-    area: "editing",
-    primary: "react",
-    interaction: "Ctrl/Cmd+Z reverses committed transactions; Ctrl/Cmd+Y replays them.",
-    scope: "browser",
-    accessibility: "History shortcuts operate on the focused grid without pointer involvement.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: "Undo history is per-grid and in-memory; durable history is host-owned.",
-  },
-  {
-    id: "editing.search-replace",
-    title: "Search & replace",
-    area: "editing",
-    primary: "react",
-    interaction: "Open the find bar, search across 100k rows, replace an occurrence.",
-    scope: "browser",
-    accessibility: "Find bar is a labeled input; match navigation works from the keyboard.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: HOST_CHROME_BOUNDARY,
-  },
-  {
-    id: "workbook.sheet-operations",
-    title: "Workbook & sheet operations",
-    area: "editing",
-    primary: "vue",
-    interaction: "Add, rename, and switch sheets from the tab strip; cross-sheet state survives.",
-    scope: "browser",
-    accessibility: "Sheet tabs are focusable controls with accessible names.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: HOST_CHROME_BOUNDARY,
-  },
-  {
-    id: "workbook.host-operations",
-    title: "Programmatic workbook operations",
-    area: "editing",
-    primary: "vanilla",
-    interaction:
-      "Host buttons drive core-API document operations (insert rows/columns, structural edits).",
-    scope: "browser",
-    accessibility: "Host controls are real buttons with accessible names, not canvas hotspots.",
-    testPath: VANILLA_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: "The host owns when and why operations fire; the engine owns applying them.",
-  },
+ {
+  id: "editing.cell-edit",
+  title: "Cell editing",
+  area: "editing",
+  primary: "vanilla",
+  secondary: [
+   { owner: "react", reason: "Controlled reconciliation keeps the analytics grid editable." },
+   { owner: "vue", reason: "Business workflow edits run through validation and protection." },
+   { owner: "svelte", reason: "Offline edits queue durably before they sync." },
+  ],
+  interaction:
+   "Double-click or press F2, type a value or formula, Enter commits, Escape cancels.",
+  scope: "browser",
+  accessibility:
+   "Formula bar and name box are labeled inputs; the full edit path works keyboard-only.",
+  testPath: VANILLA_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: HOST_CHROME_BOUNDARY,
+ },
+ {
+  id: "editing.selection",
+  title: "Selection & navigation",
+  area: "editing",
+  primary: "vanilla",
+  interaction:
+   "Arrow and Shift+Arrow keyboard range selection, pointer drag, and name-box address jumps.",
+  scope: "browser",
+  accessibility: "Name box reflects the active address and is keyboard reachable at all times.",
+  testPath: VANILLA_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: HOST_CHROME_BOUNDARY,
+ },
+ {
+  id: "editing.clipboard",
+  title: "Clipboard copy, cut & paste",
+  area: "editing",
+  primary: "react",
+  interaction: "Copy or cut a selected range, paste it elsewhere, values and styles arrive.",
+  scope: "browser",
+  accessibility: "Standard platform shortcuts (Ctrl/Cmd+C, X, V) work on the focused grid.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: "System-clipboard permission prompts and non-grid paste targets are browser-owned.",
+ },
+ {
+  id: "editing.fill",
+  title: "Fill & series",
+  area: "editing",
+  primary: "react",
+  interaction: "Drag the fill handle (or fill down) to extend values and formula series.",
+  scope: "browser",
+  accessibility: "Fill results land in the document and are re-readable through the formula bar.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: HOST_CHROME_BOUNDARY,
+ },
+ {
+  id: "editing.undo-redo",
+  title: "Undo & redo",
+  area: "editing",
+  primary: "react",
+  interaction: "Ctrl/Cmd+Z reverses committed transactions; Ctrl/Cmd+Y replays them.",
+  scope: "browser",
+  accessibility: "History shortcuts operate on the focused grid without pointer involvement.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: "Undo history is per-grid and in-memory; durable history is host-owned.",
+ },
+ {
+  id: "editing.search-replace",
+  title: "Search & replace",
+  area: "editing",
+  primary: "react",
+  interaction: "Open the find bar, search across 100k rows, replace an occurrence.",
+  scope: "browser",
+  accessibility: "Find bar is a labeled input; match navigation works from the keyboard.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: HOST_CHROME_BOUNDARY,
+ },
+ {
+  id: "workbook.sheet-operations",
+  title: "Workbook & sheet operations",
+  area: "editing",
+  primary: "vue",
+  interaction: "Add, rename, and switch sheets from the tab strip; cross-sheet state survives.",
+  scope: "browser",
+  accessibility: "Sheet tabs are focusable controls with accessible names.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: HOST_CHROME_BOUNDARY,
+ },
+ {
+  id: "workbook.host-operations",
+  title: "Programmatic workbook operations",
+  area: "editing",
+  primary: "vanilla",
+  interaction:
+   "Host buttons drive core-API document operations (insert rows/columns, structural edits).",
+  scope: "browser",
+  accessibility: "Host controls are real buttons with accessible names, not canvas hotspots.",
+  testPath: VANILLA_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: "The host owns when and why operations fire; the engine owns applying them.",
+ },
 
-  {
-    id: "formulas.entry-recalc",
-    title: "Formula entry & recalculation",
-    area: "modeling",
-    primary: "react",
-    interaction: "Type =SUM(...) into a cell; dependent KPI cells recalculate in the Rust engine.",
-    scope: "browser",
-    accessibility: "Formulas are entered through the labeled formula bar, keyboard-only.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary:
-      "Function coverage is the documented engine set; volatile recalc scheduling is engine-owned.",
-  },
-  {
-    id: "formulas.references-names",
-    title: "Cross-sheet references & named ranges",
-    area: "modeling",
-    primary: "react",
-    interaction:
-      "Summary KPIs reference Pipeline!F ranges and the ANNUAL_ARR named range; edits propagate across sheets.",
-    scope: "browser",
-    accessibility: "Reference sources remain inspectable through the formula bar.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: "External-workbook references are unsupported; names live inside one document.",
-  },
-  {
-    id: "formulas.full-engine",
-    title: "Full formula engine",
-    area: "modeling",
-    primary: "formulas",
-    interaction:
-      "The page selects @sheetwrite/formulas before it creates the Grid; thirteen panels calculate from that engine.",
-    scope: "browser",
-    accessibility:
-      "Every panel has a labeled recipe button that selects its anchor cell; results are Grid cells.",
-    testPath: FORMULAS_SPEC,
-    sharedModules: [FORMULAS_SCENARIO],
-    boundary:
-      "Each app selects one engine before its first Grid. Function vectors such as HSTACK(SUM,AVERAGE) are not supported.",
-  },
-  {
-    id: "formulas.dynamic-arrays",
-    title: "Grouping formulas & dynamic arrays",
-    area: "modeling",
-    primary: "formulas",
-    interaction:
-      "GROUPBY, PIVOTBY, FILTER, SORTBY and TAKE spill live; the APAC promotion changes them in one transaction.",
-    scope: "browser",
-    accessibility: "The recalculation time and description are announced in a polite live region.",
-    testPath: FORMULAS_SPEC,
-    sharedModules: [FORMULAS_SCENARIO],
-    boundary: "Spills stop at the sheet edge and at occupied cells, which show #SPILL!.",
-  },
-  {
-    id: "modeling.pivot-tables",
-    title: "Pivot tables",
-    area: "modeling",
-    primary: "analysis",
-    interaction:
-      "Edit an order and the pivot's month and region totals update in place; move fields between Rows, Columns, Values and Filters in the field list.",
-    scope: "browser",
-    accessibility:
-      "Every field can be moved with its actions menu from the keyboard; areas and fields have names that say where each field is.",
-    testPath: ANALYSIS_SPEC,
-    sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
-    boundary:
-      "Pivot tables need the full engine (@sheetwrite/formulas); filters keep the values they list.",
-  },
-  {
-    id: "modeling.charts",
-    title: "Live charts",
-    area: "modeling",
-    primary: "analysis",
-    interaction:
-      "A line chart reads the pivot output and redraws after an edit; select it to move, resize or delete it, or insert a chart from a selection.",
-    scope: "browser",
-    accessibility:
-      "A chart is an image named by its title and kind, with its series listed; selected charts move with the arrow keys.",
-    testPath: ANALYSIS_SPEC,
-    sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
-    boundary:
-      "Charts draw through the optional @sheetwrite/charts package; without it, a frame shows the title.",
-  },
-  {
-    id: "formulas.lambda",
-    title: "LAMBDA helpers",
-    area: "modeling",
-    primary: "formulas",
-    interaction: "LET, SCAN and MAP with LAMBDA build a running total and parse order codes.",
-    scope: "browser",
-    accessibility:
-      "The formula text of the selected panel is shown as readable code beside the Grid.",
-    testPath: FORMULAS_SPEC,
-    sharedModules: [FORMULAS_SCENARIO],
-    boundary: "LAMBDA call depth and work are bounded; a violation returns #NUM!.",
-  },
-  {
-    id: "formulas.spill-references",
-    title: "Spill references",
-    area: "modeling",
-    primary: "formulas",
-    interaction:
-      "G11 reads the Top 5 spill through A11#; after the promotion it follows the new ranking.",
-    scope: "browser",
-    accessibility: "The selected panel's first value is shown as text beside the Grid.",
-    testPath: FORMULAS_SPEC,
-    sharedModules: [FORMULAS_SCENARIO],
-    boundary: "A spill reference returns #REF! when its anchor holds no spill.",
-  },
-  {
-    id: "data.aggregation",
-    title: "Aggregation",
-    area: "modeling",
-    primary: "react",
-    interaction:
-      "SUM/AVG/MAX/MIN and per-market SUMIF aggregates over 100k rows update live after an edit.",
-    scope: "browser",
-    accessibility: "Aggregate outcomes are readable as text cells, not canvas-only artifacts.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: "Derived dashboards beyond the grid are host-owned product surface.",
-  },
-  {
-    id: "data.sort-filter",
-    title: "Sort & filter",
-    area: "modeling",
-    primary: "react",
-    interaction: "Apply column sort keys and filters from controls; the view narrows live.",
-    scope: "browser",
-    accessibility: "Sort and filter controls are native form elements with labels.",
-    testPath: REACT_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary: "Server-side query pushdown is host-owned; the engine filters its own store.",
-  },
-  {
-    id: "scale.query-behavior",
-    title: "Query behavior on paged data",
-    area: "modeling",
-    primary: "performance",
-    interaction: "Run filtered scans against the paged million-row datasource and observe timing.",
-    scope: "browser",
-    accessibility: "Query results and timings render as accessible text, not canvas-only.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary:
-      "Datasource backends (databases, APIs) are host-owned; paging contracts are engine-owned.",
-  },
+ {
+  id: "formulas.entry-recalc",
+  title: "Formula entry & recalculation",
+  area: "modeling",
+  primary: "react",
+  interaction: "Type =SUM(...) into a cell; dependent KPI cells recalculate in the Rust engine.",
+  scope: "browser",
+  accessibility: "Formulas are entered through the labeled formula bar, keyboard-only.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary:
+   "Function coverage is the documented engine set; volatile recalc scheduling is engine-owned.",
+ },
+ {
+  id: "formulas.references-names",
+  title: "Cross-sheet references & named ranges",
+  area: "modeling",
+  primary: "react",
+  interaction:
+   "Summary KPIs reference Pipeline!F ranges and the ANNUAL_ARR named range; edits propagate across sheets.",
+  scope: "browser",
+  accessibility: "Reference sources remain inspectable through the formula bar.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: "External-workbook references are unsupported; names live inside one document.",
+ },
+ {
+  id: "formulas.full-engine",
+  title: "Full formula engine",
+  area: "modeling",
+  primary: "formulas",
+  interaction:
+   "The page selects @sheetwrite/formulas before it creates the Grid; thirteen panels calculate from that engine.",
+  scope: "browser",
+  accessibility:
+   "Every panel has a labeled recipe button that selects its anchor cell; results are Grid cells.",
+  testPath: FORMULAS_SPEC,
+  sharedModules: [FORMULAS_SCENARIO],
+  boundary:
+   "Each app selects one engine before its first Grid. Function vectors such as HSTACK(SUM,AVERAGE) are not supported.",
+ },
+ {
+  id: "formulas.dynamic-arrays",
+  title: "Grouping formulas & dynamic arrays",
+  area: "modeling",
+  primary: "formulas",
+  interaction:
+   "GROUPBY, PIVOTBY, FILTER, SORTBY and TAKE spill live; the APAC promotion changes them in one transaction.",
+  scope: "browser",
+  accessibility: "The recalculation time and description are announced in a polite live region.",
+  testPath: FORMULAS_SPEC,
+  sharedModules: [FORMULAS_SCENARIO],
+  boundary: "Spills stop at the sheet edge and at occupied cells, which show #SPILL!.",
+ },
+ {
+  id: "modeling.pivot-tables",
+  title: "Pivot tables",
+  area: "modeling",
+  primary: "analysis",
+  interaction:
+   "Edit an order and the pivot's month and region totals update in place; move fields between Rows, Columns, Values and Filters in the field list.",
+  scope: "browser",
+  accessibility:
+   "Every field can be moved with its actions menu from the keyboard; areas and fields have names that say where each field is.",
+  testPath: ANALYSIS_SPEC,
+  sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
+  boundary:
+   "Pivot tables need the full engine (@sheetwrite/formulas); filters keep the values they list.",
+ },
+ {
+  id: "modeling.charts",
+  title: "Live charts",
+  area: "modeling",
+  primary: "analysis",
+  interaction:
+   "A line chart reads the pivot output and redraws after an edit; select it to move, resize or delete it, or insert a chart from a selection.",
+  scope: "browser",
+  accessibility:
+   "A chart is an image named by its title and kind, with its series listed; selected charts move with the arrow keys.",
+  testPath: ANALYSIS_SPEC,
+  sharedModules: [ANALYSIS_SCENARIO, ORDERS_STORY],
+  boundary:
+   "Charts draw through the optional @sheetwrite/charts package; without it, a frame shows the title.",
+ },
+ {
+  id: "formulas.lambda",
+  title: "LAMBDA helpers",
+  area: "modeling",
+  primary: "formulas",
+  interaction: "LET, SCAN and MAP with LAMBDA build a running total and parse order codes.",
+  scope: "browser",
+  accessibility:
+   "The formula text of the selected panel is shown as readable code beside the Grid.",
+  testPath: FORMULAS_SPEC,
+  sharedModules: [FORMULAS_SCENARIO],
+  boundary: "LAMBDA call depth and work are bounded; a violation returns #NUM!.",
+ },
+ {
+  id: "formulas.spill-references",
+  title: "Spill references",
+  area: "modeling",
+  primary: "formulas",
+  interaction:
+   "G11 reads the Top 5 spill through A11#; after the promotion it follows the new ranking.",
+  scope: "browser",
+  accessibility: "The selected panel's first value is shown as text beside the Grid.",
+  testPath: FORMULAS_SPEC,
+  sharedModules: [FORMULAS_SCENARIO],
+  boundary: "A spill reference returns #REF! when its anchor holds no spill.",
+ },
+ {
+  id: "data.aggregation",
+  title: "Aggregation",
+  area: "modeling",
+  primary: "react",
+  interaction:
+   "SUM/AVG/MAX/MIN and per-market SUMIF aggregates over 100k rows update live after an edit.",
+  scope: "browser",
+  accessibility: "Aggregate outcomes are readable as text cells, not canvas-only artifacts.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: "Derived dashboards beyond the grid are host-owned product surface.",
+ },
+ {
+  id: "data.sort-filter",
+  title: "Sort & filter",
+  area: "modeling",
+  primary: "react",
+  interaction: "Apply column sort keys and filters from controls; the view narrows live.",
+  scope: "browser",
+  accessibility: "Sort and filter controls are native form elements with labels.",
+  testPath: REACT_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary: "Server-side query pushdown is host-owned; the engine filters its own store.",
+ },
+ {
+  id: "scale.query-behavior",
+  title: "Query behavior on paged data",
+  area: "modeling",
+  primary: "performance",
+  interaction: "Run filtered scans against the paged million-row datasource and observe timing.",
+  scope: "browser",
+  accessibility: "Query results and timings render as accessible text, not canvas-only.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary:
+   "Datasource backends (databases, APIs) are host-owned; paging contracts are engine-owned.",
+ },
 
-  {
-    id: "data.validation-rules",
-    title: "Data validation",
-    area: "workflow",
-    primary: "vue",
-    interaction:
-      "Enter an off-list status (rejected) and an out-of-bounds quantity (warned) at the mutation barrier.",
-    scope: "browser",
-    accessibility: "Validation outcomes surface as visible, readable text near the edit.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Rules are client UX policy. Server-side enforcement is host-owned.",
-  },
-  {
-    id: "data.protection",
-    title: "Protected ranges",
-    area: "workflow",
-    primary: "vue",
-    interaction: "Edit a computed total; the host protection resolver denies the local mutation.",
-    scope: "browser",
-    accessibility: "Denied edits produce visible feedback rather than silent failure.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Protection is client UX policy, never server authorization. That is host-owned.",
-  },
-  {
-    id: "data.operations-workflow",
-    title: "Composed dispatch data tools",
-    area: "modeling",
-    primary: "data-tools",
-    interaction:
-      "Compose multi-key sort and two column filters; collapse groups, hide/unhide rows and columns, then inspect mutation receipts for reject, warn and role-gated edits.",
-    scope: "browser",
-    accessibility:
-      "Native labeled controls, visible row counts, stored-value receipts and an accessible event log.",
-    testPath: "test/browser/showcase-data-tools.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
-    boundary:
-      "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
-  },
-  {
-    id: "data.sort-in-place",
-    title: "Sort in place",
-    area: "modeling",
-    primary: "sort",
-    interaction:
-      "Sort 40 orders in place by one or two keys, then sort the view only; formulas that read row 1 follow the in-place sort and keep their value under the view sort.",
-    scope: "browser",
-    accessibility:
-      "Labeled buttons, a polite status of moved rows, and the formula results as text in the side panel.",
-    testPath: "test/browser/showcase-sort.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/sort.ts"],
-    boundary:
-      "Sorting runs on the client document; servers that validate operations must accept `permuteRows` and the `sort` commit reason.",
-  },
-  {
-    id: "data.saved-queries",
-    title: "Saved queries and refresh",
-    area: "modeling",
-    primary: "queries",
-    interaction:
-      "Refresh two saved queries into tables, add orders to the host feed, change a filter step and refresh again; formulas over the output tables follow, and undo fetches nothing.",
-    scope: "browser",
-    accessibility:
-      "Labeled buttons and radio group, a polite refresh status, and the formula results as text.",
-    testPath: "test/browser/showcase-queries.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/queries.ts"],
-    boundary:
-      "Source fetching, credentials and network policy are host-owned; the session never calls fetch itself.",
-  },
-  {
-    id: "modeling.dashboards",
-    title: "Dashboards",
-    area: "modeling",
-    primary: "dashboards",
-    interaction:
-      "Add a pivot item, swap two pivots, keep one slicer value and undo; drag or use the item's actions menu with the arrow keys to move and resize items.",
-    scope: "browser",
-    accessibility:
-      "Items have keyboard Move and Resize from their actions menu; the saved layout is text in the side panel.",
-    testPath: "test/browser/showcase-dashboards.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/dashboards.ts"],
-    boundary:
-      "Slicers save their selection but do not filter pivots yet; dashboard pivots need the full engine.",
-  },
-  {
-    id: "modeling.data-model",
-    title: "Data model and measures",
-    area: "modeling",
-    primary: "data-model",
-    secondary: [
-      { owner: "analysis", reason: "Single-table pivots and their charts stay on Analysis." },
-    ],
-    interaction:
-      "Switch the model pivot's rows between fields of two related tables, repeat a lookup key and orphan an order, and read the key status and the GETPIVOTDATA totals.",
-    scope: "browser",
-    accessibility:
-      "Each relationship's key status is a polite status badge; the pivot totals are text in the side panel.",
-    testPath: "test/browser/showcase-data-model.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/data-model.ts"],
-    boundary:
-      "Key checks and model pivots run in the full engine; Excel's data model binary is not written, so Excel opens an exported file without relationships.",
-  },
-  {
-    id: "persistence.version-history",
-    title: "Version history",
-    area: "persistence",
-    primary: "version-history",
-    secondary: [
-      {
-        owner: "collaboration",
-        reason: "Collaboration shows the sync protocol whose commits the archive records.",
-      },
-    ],
-    interaction:
-      "Edit as yourself and as a second author, save a version, compare the approved version with the current document by author, then restore a range and the sheet.",
-    scope: "browser",
-    accessibility:
-      "Labeled buttons; versions and changed cells are text lists with the author of each.",
-    testPath: "test/browser/showcase-version-history.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/version-history.ts"],
-    boundary:
-      "The page's authority and archive live in memory; a real host keeps commits and the journal in one database transaction.",
-  },
-  {
-    id: "formulas.excel-function-families",
-    title: "Excel function families",
-    area: "modeling",
-    primary: "functions",
-    secondary: [
-      {
-        owner: "formulas",
-        reason: "Formula analysis keeps grouping, dynamic arrays and LAMBDA over a ledger.",
-      },
-    ],
-    interaction:
-      "Pick a function family, change its first input, and read each live result; references to other workbooks keep their text and show #REF!.",
-    scope: "browser",
-    accessibility:
-      "The family is a labeled select, the input a labeled field, and every result is text in the side panel.",
-    testPath: "test/browser/showcase-functions.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/functions.ts"],
-    boundary:
-      "Most families run only in the full engine; values for links to other workbooks are not loaded yet.",
-  },
-  {
-    id: "workflow.ribbon",
-    title: "Excel-style ribbon",
-    area: "workflow",
-    primary: "spreadsheet",
-    interaction:
-      "Format and edit a two-sheet workbook from the ribbon's Home, Insert, Data and View tabs; narrow the window to watch groups shrink and fold into dropdowns.",
-    scope: "browser",
-    accessibility:
-      "Tab list with arrow-key navigation, labeled groups, aria-pressed toggles, keyboard menus and lists, and Escape back to the grid.",
-    testPath: "test/browser/showcase-spreadsheet.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/spreadsheet.ts"],
-    boundary:
-      "Commands act through grid.actions; a host that wants different chrome builds its own on the same API.",
-  },
-  {
-    id: "annotations.notes",
-    title: "Cell notes",
-    area: "workflow",
-    primary: "vue",
-    interaction: "Open, read, and edit plain-text notes anchored to cells.",
-    scope: "browser",
-    accessibility: "Notes render as text content reachable from the anchored cell.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Discussion threads and mentions live outside the document model (host-owned).",
-  },
-  {
-    id: "annotations.metadata",
-    title: "Row & column metadata",
-    area: "workflow",
-    primary: "vue",
-    interaction: "Row height and visibility metadata applied through document operations persists.",
-    scope: "browser",
-    accessibility: "Metadata changes never remove content from the accessible document.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Arbitrary host metadata belongs in host storage keyed by document position.",
-  },
-  {
-    id: "formatting.cell-styles",
-    title: "Cell styles & number formats",
-    area: "workflow",
-    primary: "formatting",
-    secondary: [
-      { owner: "vue", reason: "Supplier workflow uses currency and conditional styles." },
-    ],
-    interaction:
-      "Change live budget styles and mixed number formats, then export and re-import XLSX to compare their fidelity.",
-    scope: "browser",
-    accessibility: "Style never encodes the only copy of information; values stay readable.",
-    testPath: "test/browser/showcase-formatting.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/formatting.ts"],
-    boundary: "Theming beyond the documented Theme contract is host-owned CSS.",
-  },
-  {
-    id: "formatting.merges",
-    title: "Merged cells",
-    area: "workflow",
-    primary: "vue",
-    interaction:
-      "The Suppliers banner renders one merged region; covered cells defer to the anchor.",
-    scope: "browser",
-    accessibility: "Merged content reads from its anchor cell through the name box.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Merges are rectangular regions; L-shaped or overlapping merges are unsupported.",
-  },
-  {
-    id: "formatting.frozen-panes",
-    title: "Frozen panes",
-    area: "workflow",
-    primary: "vue",
-    interaction: "Leading columns/rows stay pinned while the body scrolls.",
-    scope: "browser",
-    accessibility: "Frozen regions remain part of the same keyboard navigation space.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Only leading rows/columns freeze; arbitrary interior panes are unsupported.",
-  },
+ {
+  id: "data.validation-rules",
+  title: "Data validation",
+  area: "workflow",
+  primary: "vue",
+  interaction:
+   "Enter an off-list status (rejected) and an out-of-bounds quantity (warned) at the mutation barrier.",
+  scope: "browser",
+  accessibility: "Validation outcomes surface as visible, readable text near the edit.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: "Rules are client UX policy. Server-side enforcement is host-owned.",
+ },
+ {
+  id: "data.protection",
+  title: "Protected ranges",
+  area: "workflow",
+  primary: "vue",
+  interaction: "Edit a computed total; the host protection resolver denies the local mutation.",
+  scope: "browser",
+  accessibility: "Denied edits produce visible feedback rather than silent failure.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: "Protection is client UX policy, never server authorization. That is host-owned.",
+ },
+ {
+  id: "data.operations-workflow",
+  title: "Composed dispatch data tools",
+  area: "modeling",
+  primary: "data-tools",
+  interaction:
+   "Compose multi-key sort and two column filters; collapse groups, hide/unhide rows and columns, then inspect mutation receipts for reject, warn and role-gated edits.",
+  scope: "browser",
+  accessibility:
+   "Native labeled controls, visible row counts, stored-value receipts and an accessible event log.",
+  testPath: "test/browser/showcase-data-tools.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
+  boundary:
+   "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
+ },
+ {
+  id: "data.sort-in-place",
+  title: "Sort in place",
+  area: "modeling",
+  primary: "sort",
+  interaction:
+   "Sort 40 orders in place by one or two keys, then sort the view only; formulas that read row 1 follow the in-place sort and keep their value under the view sort.",
+  scope: "browser",
+  accessibility:
+   "Labeled buttons, a polite status of moved rows, and the formula results as text in the side panel.",
+  testPath: "test/browser/showcase-sort.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/sort.ts"],
+  boundary:
+   "Sorting runs on the client document; servers that validate operations must accept `permuteRows` and the `sort` commit reason.",
+ },
+ {
+  id: "data.saved-queries",
+  title: "Saved queries and refresh",
+  area: "modeling",
+  primary: "queries",
+  interaction:
+   "Refresh two saved queries into tables, add orders to the host feed, change a filter step and refresh again; formulas over the output tables follow, and undo fetches nothing.",
+  scope: "browser",
+  accessibility:
+   "Labeled buttons and radio group, a polite refresh status, and the formula results as text.",
+  testPath: "test/browser/showcase-queries.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/queries.ts"],
+  boundary:
+   "Source fetching, credentials and network policy are host-owned; the session never calls fetch itself.",
+ },
+ {
+  id: "modeling.dashboards",
+  title: "Dashboards",
+  area: "modeling",
+  primary: "dashboards",
+  interaction:
+   "Keep one region in the Region slicer and read the filtered pivot total, swap the chart and the pivot, add a pivot item and undo; drag or use the item's actions menu with the arrow keys to move and resize items.",
+  scope: "browser",
+  accessibility:
+   "Items have keyboard Move and Resize from their actions menu; the saved layout is text in the side panel.",
+  testPath: "test/browser/showcase-dashboards.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/dashboards.ts"],
+  boundary:
+   "Dashboard pivots, charts and KPI cards need the full engine and the charts package; Excel receives a static worksheet.",
+ },
+ {
+  id: "modeling.data-model",
+  title: "Data model and measures",
+  area: "modeling",
+  primary: "data-model",
+  secondary: [
+   { owner: "analysis", reason: "Single-table pivots and their charts stay on Analysis." },
+  ],
+  interaction:
+   "Switch the model pivot's rows between fields of two related tables, repeat a lookup key and orphan an order, and read the key status and the GETPIVOTDATA totals.",
+  scope: "browser",
+  accessibility:
+   "Each relationship's key status is a polite status badge; the pivot totals are text in the side panel.",
+  testPath: "test/browser/showcase-data-model.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/data-model.ts"],
+  boundary:
+   "Key checks and model pivots run in the full engine; Excel's data model binary is not written, so Excel opens an exported file without relationships.",
+ },
+ {
+  id: "persistence.version-history",
+  title: "Version history",
+  area: "persistence",
+  primary: "version-history",
+  secondary: [
+   {
+    owner: "collaboration",
+    reason: "Collaboration shows the sync protocol whose commits the archive records.",
+   },
+  ],
+  interaction:
+   "Edit as yourself and as a second author, save a version, compare the approved version with the current document by author, then restore a range and the sheet.",
+  scope: "browser",
+  accessibility:
+   "Labeled buttons; versions and changed cells are text lists with the author of each.",
+  testPath: "test/browser/showcase-version-history.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/version-history.ts"],
+  boundary:
+   "The page's authority and archive live in memory; a real host keeps commits and the journal in one database transaction.",
+ },
+ {
+  id: "formulas.excel-function-families",
+  title: "Excel function families",
+  area: "modeling",
+  primary: "functions",
+  secondary: [
+   {
+    owner: "formulas",
+    reason: "Formula analysis keeps grouping, dynamic arrays and LAMBDA over a ledger.",
+   },
+  ],
+  interaction:
+   "Pick a function family, change its first input, and read each live result; references to other workbooks keep their text and show #REF!.",
+  scope: "browser",
+  accessibility:
+   "The family is a labeled select, the input a labeled field, and every result is text in the side panel.",
+  testPath: "test/browser/showcase-functions.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/functions.ts"],
+  boundary:
+   "Most families run only in the full engine; values for links to other workbooks are not loaded yet.",
+ },
+ {
+  id: "workflow.ribbon",
+  title: "Excel-style ribbon",
+  area: "workflow",
+  primary: "spreadsheet",
+  interaction:
+   "Format and edit a two-sheet workbook from the ribbon's Home, Insert, Data and View tabs; narrow the window to watch groups shrink and fold into dropdowns.",
+  scope: "browser",
+  accessibility:
+   "Tab list with arrow-key navigation, labeled groups, aria-pressed toggles, keyboard menus and lists, and Escape back to the grid.",
+  testPath: "test/browser/showcase-spreadsheet.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/spreadsheet.ts"],
+  boundary:
+   "Commands act through grid.actions; a host that wants different chrome builds its own on the same API.",
+ },
+ {
+  id: "annotations.notes",
+  title: "Cell notes",
+  area: "workflow",
+  primary: "vue",
+  interaction: "Open, read, and edit plain-text notes anchored to cells.",
+  scope: "browser",
+  accessibility: "Notes render as text content reachable from the anchored cell.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: "Discussion threads and mentions live outside the document model (host-owned).",
+ },
+ {
+  id: "annotations.metadata",
+  title: "Row & column metadata",
+  area: "workflow",
+  primary: "vue",
+  interaction: "Row height and visibility metadata applied through document operations persists.",
+  scope: "browser",
+  accessibility: "Metadata changes never remove content from the accessible document.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: "Arbitrary host metadata belongs in host storage keyed by document position.",
+ },
+ {
+  id: "formatting.cell-styles",
+  title: "Cell styles & number formats",
+  area: "workflow",
+  primary: "formatting",
+  secondary: [
+   { owner: "vue", reason: "Supplier workflow uses currency and conditional styles." },
+  ],
+  interaction:
+   "Change live budget styles and mixed number formats, then export and re-import XLSX to compare their fidelity.",
+  scope: "browser",
+  accessibility: "Style never encodes the only copy of information; values stay readable.",
+  testPath: "test/browser/showcase-formatting.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/formatting.ts"],
+  boundary: "Theming beyond the documented Theme contract is host-owned CSS.",
+ },
+ {
+  id: "formatting.merges",
+  title: "Merged cells",
+  area: "workflow",
+  primary: "vue",
+  interaction:
+   "The Suppliers banner renders one merged region; covered cells defer to the anchor.",
+  scope: "browser",
+  accessibility: "Merged content reads from its anchor cell through the name box.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: "Merges are rectangular regions; L-shaped or overlapping merges are unsupported.",
+ },
+ {
+  id: "formatting.frozen-panes",
+  title: "Frozen panes",
+  area: "workflow",
+  primary: "vue",
+  interaction: "Leading columns/rows stay pinned while the body scrolls.",
+  scope: "browser",
+  accessibility: "Frozen regions remain part of the same keyboard navigation space.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary: "Only leading rows/columns freeze; arbitrary interior panes are unsupported.",
+ },
 
-  {
-    id: "scale.dense-datasource",
-    title: "Dense in-memory datasource",
-    area: "scale",
-    primary: "vanilla",
-    interaction: "Scroll and edit a 100k-row dense columnar ingest with instant paint.",
-    scope: "browser",
-    accessibility: "Scroll position and selection stay recoverable via the name box.",
-    testPath: VANILLA_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: "Dense sheets obey documented snapshot resource limits before allocation.",
-  },
-  {
-    id: "scale.paged-million-rows",
-    title: "Million-row paged datasource",
-    area: "scale",
-    primary: "performance",
-    secondary: [
-      {
-        owner: "vanilla",
-        reason: "Engine-boundary paged datasource ownership stays demonstrable.",
-      },
-    ],
-    interaction: "Scroll a 1,000,000-row paged datasource; pages stream in without blocking paint.",
-    scope: "browser",
-    accessibility: "Loading states are communicated in text, not spinner-only.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary:
-      "The page provider (network, database) is host-owned; caching and eviction are engine-owned.",
-  },
-  {
-    id: "scale.wide-pages",
-    title: "Wide pages",
-    area: "scale",
-    primary: "performance",
-    interaction: "Navigate a wide-column page layout; horizontal virtualization keeps paint flat.",
-    scope: "browser",
-    accessibility: "Column addressing stays stable and reachable through the name box.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary: "Column-count ceilings follow documented resource limits.",
-  },
-  {
-    id: "scale.cache-churn",
-    title: "Cache churn",
-    area: "scale",
-    primary: "performance",
-    interaction:
-      "Jump-scroll across distant regions to force page eviction and refetch; observe counters.",
-    scope: "browser",
-    accessibility: "Churn evidence renders as readable counters.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary: "Eviction policy is engine-owned and not host-configurable beyond documented limits.",
-  },
-  {
-    id: "rendering.renderer-selection",
-    title: "Renderer selection",
-    area: "scale",
-    primary: "vanilla",
-    interaction: "Choose main-thread or Worker rendering at creation and observe the active mode.",
-    scope: "browser+worker",
-    accessibility: "The active renderer mode is reported as text in the host UI.",
-    testPath: VANILLA_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: "OffscreenCanvas availability is browser-owned; selection is honest about fallback.",
-  },
-  {
-    id: "rendering.worker-fallback",
-    title: "Worker failure & fallback",
-    area: "scale",
-    primary: "vanilla",
-    interaction:
-      "Force a Worker boot failure; rendering falls back to the main thread without data loss.",
-    scope: "browser+worker",
-    accessibility: "Fallback is announced in host UI text, never silent.",
-    testPath: VANILLA_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: "Worker CSP and cross-origin isolation constraints are host-deployment-owned.",
-  },
-  {
-    id: "rendering.worker-offscreen",
-    title: "Worker rendering evidence",
-    area: "scale",
-    primary: "performance",
-    interaction: "Compare main-thread vs Worker rendering under load with visible frame evidence.",
-    scope: "browser+worker",
-    accessibility: "Measurements are presented as text and tables, not color-only charts.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary: "Absolute numbers are hardware-dependent; the page shows measured, labeled captures.",
-  },
-  {
-    id: "perf.wasm-crossings",
-    title: "WASM boundary crossings",
-    area: "scale",
-    primary: "performance",
-    interaction: "Inspect crossing counts per interaction: bulk windows, not per-cell chatter.",
-    scope: "browser",
-    accessibility: "Instrumentation renders as accessible text counters.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary: "Crossing budgets are engine internals; the proof shows behavior, not a host API.",
-  },
-  {
-    id: "perf.benchmark-evidence",
-    title: "Measured benchmark evidence",
-    area: "scale",
-    primary: "performance",
-    interaction: "Read checked-in protocol results: median speedups, heap, capture metadata.",
-    scope: "browser",
-    accessibility: "Benchmark bars carry text equivalents; log-scale is explained in prose.",
-    testPath: PERFORMANCE_SPEC,
-    sharedModules: [SCALE_SCENARIO],
-    boundary: "Numbers come from the checked-in benchmark protocol only: measured, never promised.",
-  },
+ {
+  id: "scale.dense-datasource",
+  title: "Dense in-memory datasource",
+  area: "scale",
+  primary: "vanilla",
+  interaction: "Scroll and edit a 100k-row dense columnar ingest with instant paint.",
+  scope: "browser",
+  accessibility: "Scroll position and selection stay recoverable via the name box.",
+  testPath: VANILLA_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: "Dense sheets obey documented snapshot resource limits before allocation.",
+ },
+ {
+  id: "scale.paged-million-rows",
+  title: "Million-row paged datasource",
+  area: "scale",
+  primary: "performance",
+  secondary: [
+   {
+    owner: "vanilla",
+    reason: "Engine-boundary paged datasource ownership stays demonstrable.",
+   },
+  ],
+  interaction: "Scroll a 1,000,000-row paged datasource; pages stream in without blocking paint.",
+  scope: "browser",
+  accessibility: "Loading states are communicated in text, not spinner-only.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary:
+   "The page provider (network, database) is host-owned; caching and eviction are engine-owned.",
+ },
+ {
+  id: "scale.wide-pages",
+  title: "Wide pages",
+  area: "scale",
+  primary: "performance",
+  interaction: "Navigate a wide-column page layout; horizontal virtualization keeps paint flat.",
+  scope: "browser",
+  accessibility: "Column addressing stays stable and reachable through the name box.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary: "Column-count ceilings follow documented resource limits.",
+ },
+ {
+  id: "scale.cache-churn",
+  title: "Cache churn",
+  area: "scale",
+  primary: "performance",
+  interaction:
+   "Jump-scroll across distant regions to force page eviction and refetch; observe counters.",
+  scope: "browser",
+  accessibility: "Churn evidence renders as readable counters.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary: "Eviction policy is engine-owned and not host-configurable beyond documented limits.",
+ },
+ {
+  id: "rendering.renderer-selection",
+  title: "Renderer selection",
+  area: "scale",
+  primary: "vanilla",
+  interaction: "Choose main-thread or Worker rendering at creation and observe the active mode.",
+  scope: "browser+worker",
+  accessibility: "The active renderer mode is reported as text in the host UI.",
+  testPath: VANILLA_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: "OffscreenCanvas availability is browser-owned; selection is honest about fallback.",
+ },
+ {
+  id: "rendering.worker-fallback",
+  title: "Worker failure & fallback",
+  area: "scale",
+  primary: "vanilla",
+  interaction:
+   "Force a Worker boot failure; rendering falls back to the main thread without data loss.",
+  scope: "browser+worker",
+  accessibility: "Fallback is announced in host UI text, never silent.",
+  testPath: VANILLA_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: "Worker CSP and cross-origin isolation constraints are host-deployment-owned.",
+ },
+ {
+  id: "rendering.worker-offscreen",
+  title: "Worker rendering evidence",
+  area: "scale",
+  primary: "performance",
+  interaction: "Compare main-thread vs Worker rendering under load with visible frame evidence.",
+  scope: "browser+worker",
+  accessibility: "Measurements are presented as text and tables, not color-only charts.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary: "Absolute numbers are hardware-dependent; the page shows measured, labeled captures.",
+ },
+ {
+  id: "perf.wasm-crossings",
+  title: "WASM boundary crossings",
+  area: "scale",
+  primary: "performance",
+  interaction: "Inspect crossing counts per interaction: bulk windows, not per-cell chatter.",
+  scope: "browser",
+  accessibility: "Instrumentation renders as accessible text counters.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary: "Crossing budgets are engine internals; the proof shows behavior, not a host API.",
+ },
+ {
+  id: "perf.benchmark-evidence",
+  title: "Measured benchmark evidence",
+  area: "scale",
+  primary: "performance",
+  interaction: "Read checked-in protocol results: median speedups, heap, capture metadata.",
+  scope: "browser",
+  accessibility: "Benchmark bars carry text equivalents; log-scale is explained in prose.",
+  testPath: PERFORMANCE_SPEC,
+  sharedModules: [SCALE_SCENARIO],
+  boundary: "Numbers come from the checked-in benchmark protocol only: measured, never promised.",
+ },
 
-  {
-    id: "io.xlsx-import",
-    title: "XLSX import",
-    area: "interop",
-    primary: "interoperability",
-    interaction: "Import independent .xlsx fixtures; supported features arrive intact.",
-    scope: "browser",
-    accessibility: "Import status and warnings render as readable text lists.",
-    testPath: INTEROP_SPEC,
-    sharedModules: [INTEROP_SCENARIO],
-    boundary: "Producer compatibility is claimed only where genuine producer bytes are tested.",
-  },
-  {
-    id: "io.xlsx-export",
-    title: "XLSX export",
-    area: "interop",
-    primary: "interoperability",
-    secondary: [
-      { owner: "react", reason: "The analytics workbench keeps an export workflow entry point." },
-    ],
-    interaction: "Export the working document to .xlsx and verify preserved features.",
-    scope: "browser",
-    accessibility: "Export triggers are labeled buttons; completion is announced in text.",
-    testPath: INTEROP_SPEC,
-    sharedModules: [INTEROP_SCENARIO],
-    boundary: "Table-format export intentionally reduces scope/fidelity and stays in-memory.",
-  },
-  {
-    id: "io.csv-tsv",
-    title: "CSV/TSV exchange",
-    area: "interop",
-    primary: "interoperability",
-    interaction: "Round-trip delimited text with quoting, delimiters, and line-ending fidelity.",
-    scope: "browser",
-    accessibility: "Parsed previews are real tables, readable row by row.",
-    testPath: INTEROP_SPEC,
-    sharedModules: [INTEROP_SCENARIO],
-    boundary:
-      "Delimited text carries values only. Styles, formulas-as-formulas, and merges do not survive.",
-  },
-  {
-    id: "io.fidelity-loss-warnings",
-    title: "Fidelity boundaries & structured warnings",
-    area: "interop",
-    primary: "interoperability",
-    interaction: "Trigger intentional-loss paths; each loss surfaces as a structured warning.",
-    scope: "browser",
-    accessibility: "Warnings are enumerable text items, not toast-only flashes.",
-    testPath: INTEROP_SPEC,
-    sharedModules: [INTEROP_SCENARIO],
-    boundary: "Unsupported OOXML features are named, warned about, and dropped deterministically.",
-  },
-  {
-    id: "io.hostile-input-limits",
-    title: "Hostile input & resource limits",
-    area: "interop",
-    primary: "interoperability",
-    interaction: "Feed oversized/hostile archives; imports abort at documented resource limits.",
-    scope: "browser",
-    accessibility: "Rejections explain the violated limit in plain text.",
-    testPath: INTEROP_SPEC,
-    sharedModules: [INTEROP_SCENARIO],
-    boundary: "Limits reject before allocation; raising them is an explicit host decision.",
-  },
-  {
-    id: "io.package-isolation",
-    title: "Optional package boundary",
-    area: "interop",
-    primary: "interoperability",
-    interaction: "Observe that XLSX support loads from @sheetwrite/xlsx only when registered.",
-    scope: "browser",
-    accessibility: "The boundary is documented on-page in readable prose.",
-    testPath: INTEROP_SPEC,
-    sharedModules: [INTEROP_SCENARIO],
-    boundary: "Core never bundles the codec; hosts opt in per entry point.",
-  },
+ {
+  id: "io.xlsx-import",
+  title: "XLSX import",
+  area: "interop",
+  primary: "interoperability",
+  interaction: "Import independent .xlsx fixtures; supported features arrive intact.",
+  scope: "browser",
+  accessibility: "Import status and warnings render as readable text lists.",
+  testPath: INTEROP_SPEC,
+  sharedModules: [INTEROP_SCENARIO],
+  boundary: "Producer compatibility is claimed only where genuine producer bytes are tested.",
+ },
+ {
+  id: "io.xlsx-export",
+  title: "XLSX export",
+  area: "interop",
+  primary: "interoperability",
+  secondary: [
+   { owner: "react", reason: "The analytics workbench keeps an export workflow entry point." },
+  ],
+  interaction: "Export the working document to .xlsx and verify preserved features.",
+  scope: "browser",
+  accessibility: "Export triggers are labeled buttons; completion is announced in text.",
+  testPath: INTEROP_SPEC,
+  sharedModules: [INTEROP_SCENARIO],
+  boundary: "Table-format export intentionally reduces scope/fidelity and stays in-memory.",
+ },
+ {
+  id: "io.csv-tsv",
+  title: "CSV/TSV exchange",
+  area: "interop",
+  primary: "interoperability",
+  interaction: "Round-trip delimited text with quoting, delimiters, and line-ending fidelity.",
+  scope: "browser",
+  accessibility: "Parsed previews are real tables, readable row by row.",
+  testPath: INTEROP_SPEC,
+  sharedModules: [INTEROP_SCENARIO],
+  boundary:
+   "Delimited text carries values only. Styles, formulas-as-formulas, and merges do not survive.",
+ },
+ {
+  id: "io.fidelity-loss-warnings",
+  title: "Fidelity boundaries & structured warnings",
+  area: "interop",
+  primary: "interoperability",
+  interaction: "Trigger intentional-loss paths; each loss surfaces as a structured warning.",
+  scope: "browser",
+  accessibility: "Warnings are enumerable text items, not toast-only flashes.",
+  testPath: INTEROP_SPEC,
+  sharedModules: [INTEROP_SCENARIO],
+  boundary: "Unsupported OOXML features are named, warned about, and dropped deterministically.",
+ },
+ {
+  id: "io.hostile-input-limits",
+  title: "Hostile input & resource limits",
+  area: "interop",
+  primary: "interoperability",
+  interaction: "Feed oversized/hostile archives; imports abort at documented resource limits.",
+  scope: "browser",
+  accessibility: "Rejections explain the violated limit in plain text.",
+  testPath: INTEROP_SPEC,
+  sharedModules: [INTEROP_SCENARIO],
+  boundary: "Limits reject before allocation; raising them is an explicit host decision.",
+ },
+ {
+  id: "io.package-isolation",
+  title: "Optional package boundary",
+  area: "interop",
+  primary: "interoperability",
+  interaction: "Observe that XLSX support loads from @sheetwrite/xlsx only when registered.",
+  scope: "browser",
+  accessibility: "The boundary is documented on-page in readable prose.",
+  testPath: INTEROP_SPEC,
+  sharedModules: [INTEROP_SCENARIO],
+  boundary: "Core never bundles the codec; hosts opt in per entry point.",
+ },
 
-  {
-    id: "persistence.snapshot-load",
-    title: "Snapshot load",
-    area: "persistence",
-    primary: "database",
-    interaction: "Boot the document from a validated IndexedDB snapshot instead of raw ingest.",
-    scope: "browser",
-    accessibility: "Load state is announced in text; the grid is usable after load completes.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.append-only-commits",
-    title: "Append-only operation commits",
-    area: "persistence",
-    primary: "database",
-    interaction:
-      "Each committed transaction appends DocumentOp[] records atomically against its base version.",
-    scope: "browser",
-    accessibility: "Commit progression is visible through live text counters.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.idempotent-retry",
-    title: "Idempotent duplicate retry",
-    area: "persistence",
-    primary: "database",
-    interaction: "Replay a committed mutation; the adapter acknowledges without double-applying.",
-    scope: "browser",
-    accessibility: "Retry outcomes are shown as text, distinguishing ack from apply.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.conflict-tail-fallback",
-    title: "Bounded conflict tails & snapshot fallback",
-    area: "persistence",
-    primary: "database",
-    interaction:
-      "Force a stale base version; recovery replays a bounded tail or falls back to snapshot.",
-    scope: "browser",
-    accessibility: "The recovery path taken is stated in text.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.compaction",
-    title: "Count/byte-triggered compaction",
-    area: "persistence",
-    primary: "database",
-    interaction: "Cross the record or byte bound; the tail folds into a new snapshot.",
-    scope: "browser",
-    accessibility: "Compaction events appear in the live counter text.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.reload-recovery",
-    title: "Reload recovery",
-    area: "persistence",
-    primary: "database",
-    interaction: "Reload the page; the document and pending work recover from IndexedDB.",
-    scope: "browser",
-    accessibility: "Recovery status is announced in text after reload.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.live-counters",
-    title: "Live persistence counters",
-    area: "persistence",
-    primary: "database",
-    interaction:
-      "Watch record/byte/current-version/snapshot-version/tail/pending gauges move with each commit.",
-    scope: "browser",
-    accessibility: "Every gauge is a labeled text value, not a canvas drawing.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [DATABASE_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "persistence.host-state",
-    title: "Host persistence state",
-    area: "persistence",
-    primary: "vue",
-    interaction: "The host UI surfaces adapter pending/committed state as the user edits.",
-    scope: "browser",
-    accessibility: "Persistence state is mirrored into visible, labeled text.",
-    testPath: VUE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary:
-      "The durable browser-database proof lives on /showcases/database/; production storage is host-owned.",
-  },
+ {
+  id: "persistence.snapshot-load",
+  title: "Snapshot load",
+  area: "persistence",
+  primary: "database",
+  interaction: "Boot the document from a validated IndexedDB snapshot instead of raw ingest.",
+  scope: "browser",
+  accessibility: "Load state is announced in text; the grid is usable after load completes.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.append-only-commits",
+  title: "Append-only operation commits",
+  area: "persistence",
+  primary: "database",
+  interaction:
+   "Each committed transaction appends DocumentOp[] records atomically against its base version.",
+  scope: "browser",
+  accessibility: "Commit progression is visible through live text counters.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.idempotent-retry",
+  title: "Idempotent duplicate retry",
+  area: "persistence",
+  primary: "database",
+  interaction: "Replay a committed mutation; the adapter acknowledges without double-applying.",
+  scope: "browser",
+  accessibility: "Retry outcomes are shown as text, distinguishing ack from apply.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.conflict-tail-fallback",
+  title: "Bounded conflict tails & snapshot fallback",
+  area: "persistence",
+  primary: "database",
+  interaction:
+   "Force a stale base version; recovery replays a bounded tail or falls back to snapshot.",
+  scope: "browser",
+  accessibility: "The recovery path taken is stated in text.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.compaction",
+  title: "Count/byte-triggered compaction",
+  area: "persistence",
+  primary: "database",
+  interaction: "Cross the record or byte bound; the tail folds into a new snapshot.",
+  scope: "browser",
+  accessibility: "Compaction events appear in the live counter text.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.reload-recovery",
+  title: "Reload recovery",
+  area: "persistence",
+  primary: "database",
+  interaction: "Reload the page; the document and pending work recover from IndexedDB.",
+  scope: "browser",
+  accessibility: "Recovery status is announced in text after reload.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.live-counters",
+  title: "Live persistence counters",
+  area: "persistence",
+  primary: "database",
+  interaction:
+   "Watch record/byte/current-version/snapshot-version/tail/pending gauges move with each commit.",
+  scope: "browser",
+  accessibility: "Every gauge is a labeled text value, not a canvas drawing.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [DATABASE_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "persistence.host-state",
+  title: "Host persistence state",
+  area: "persistence",
+  primary: "vue",
+  interaction: "The host UI surfaces adapter pending/committed state as the user edits.",
+  scope: "browser",
+  accessibility: "Persistence state is mirrored into visible, labeled text.",
+  testPath: VUE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary:
+   "The durable browser-database proof lives on /showcases/database/; production storage is host-owned.",
+ },
 
-  {
-    id: "offline.durable-pending",
-    title: "Durable pending work",
-    area: "collaboration",
-    primary: "svelte",
-    secondary: [
-      {
-        owner: "collaboration",
-        reason: "The protocol route proves pending durability at the protocol level.",
-      },
-    ],
-    interaction: "Edit while offline; pending commits persist durably and survive remount.",
-    scope: "browser",
-    accessibility: "Pending counts render as labeled text that updates as work drains.",
-    testPath: SVELTE_SPEC,
-    sharedModules: [OFFLINE_SCENARIO, COLLABORATION_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "offline.connectivity-activity",
-    title: "Connectivity & activity state",
-    area: "collaboration",
-    primary: "svelte",
-    interaction: "Toggle offline/online; connection and activity states track the transition.",
-    scope: "browser",
-    accessibility: "Connectivity state is communicated in text, not color alone.",
-    testPath: SVELTE_SPEC,
-    sharedModules: [OFFLINE_SCENARIO, COLLABORATION_PROTOCOL],
-    boundary: "Real network detection and transport reconnection policy are host-owned.",
-  },
-  {
-    id: "sync.reconnect-drain",
-    title: "Reconnect drain",
-    area: "collaboration",
-    primary: "svelte",
-    interaction: "Come back online; queued local commits drain in order and converge.",
-    scope: "browser",
-    accessibility: "Drain progress is visible as text counts.",
-    testPath: SVELTE_SPEC,
-    sharedModules: [OFFLINE_SCENARIO, COLLABORATION_PROTOCOL],
-    boundary: HOST_PERSISTENCE_BOUNDARY,
-  },
-  {
-    id: "collab.two-client-convergence",
-    title: "Two-client convergence",
-    area: "collaboration",
-    primary: "collaboration",
-    interaction: "Edit from two live clients; both converge on identical document state.",
-    scope: "browser",
-    accessibility: "Both clients are operable grids with the standard keyboard contract.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [COLLABORATION_PROTOCOL],
-    boundary:
-      "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
-  },
-  {
-    id: "collab.sequencing-acks",
-    title: "Operation sequencing & duplicate acknowledgements",
-    area: "collaboration",
-    primary: "collaboration",
-    interaction:
-      "Commits sequence through version numbers; duplicate submissions acknowledge idempotently.",
-    scope: "browser",
-    accessibility: "Sequence numbers are visible text in the protocol log.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [COLLABORATION_PROTOCOL],
-    boundary:
-      "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
-  },
-  {
-    id: "collab.version-gaps",
-    title: "Version gap recovery",
-    area: "collaboration",
-    primary: "collaboration",
-    interaction:
-      "Drop operations to create a gap; the client requests and replays the missing range.",
-    scope: "browser",
-    accessibility: "Gap detection and recovery are narrated in the protocol log text.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [COLLABORATION_PROTOCOL],
-    boundary:
-      "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
-  },
-  {
-    id: "collab.presence",
-    title: "Presence",
-    area: "collaboration",
-    primary: "collaboration",
-    secondary: [
-      {
-        owner: "svelte",
-        reason: "The offline product shows collaborator presence in a real workbench.",
-      },
-    ],
-    interaction:
-      "Collaborator selections and identities overlay live without entering the document.",
-    scope: "browser",
-    accessibility: "Collaborator identity is available as text, not color-only cursors.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [COLLABORATION_PROTOCOL],
-    boundary: "Presence is ephemeral and never persisted into snapshots or history.",
-  },
-  {
-    id: "collab.conflicts",
-    title: "Conflicting edits",
-    area: "collaboration",
-    primary: "collaboration",
-    secondary: [
-      {
-        owner: "svelte",
-        reason: "The offline product rebases conflicting field edits on reconnect.",
-      },
-    ],
-    interaction: "Commit conflicting edits from both clients; rebase resolves deterministically.",
-    scope: "browser",
-    accessibility: "Conflict outcomes are explained in the protocol log text.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [COLLABORATION_PROTOCOL],
-    boundary: "Semantic merge policy beyond deterministic rebase is host-owned product behavior.",
-  },
-  {
-    id: "collab.recovery",
-    title: "Collaboration recovery",
-    area: "collaboration",
-    primary: "collaboration",
-    interaction: "Kill and restore a client mid-session; it recovers state and rejoins cleanly.",
-    scope: "browser",
-    accessibility: "Recovery steps are narrated as text in the protocol log.",
-    testPath: DATABASE_COLLAB_SPEC,
-    sharedModules: [COLLABORATION_PROTOCOL],
-    boundary:
-      "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
-  },
+ {
+  id: "offline.durable-pending",
+  title: "Durable pending work",
+  area: "collaboration",
+  primary: "svelte",
+  secondary: [
+   {
+    owner: "collaboration",
+    reason: "The protocol route proves pending durability at the protocol level.",
+   },
+  ],
+  interaction: "Edit while offline; pending commits persist durably and survive remount.",
+  scope: "browser",
+  accessibility: "Pending counts render as labeled text that updates as work drains.",
+  testPath: SVELTE_SPEC,
+  sharedModules: [OFFLINE_SCENARIO, COLLABORATION_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "offline.connectivity-activity",
+  title: "Connectivity & activity state",
+  area: "collaboration",
+  primary: "svelte",
+  interaction: "Toggle offline/online; connection and activity states track the transition.",
+  scope: "browser",
+  accessibility: "Connectivity state is communicated in text, not color alone.",
+  testPath: SVELTE_SPEC,
+  sharedModules: [OFFLINE_SCENARIO, COLLABORATION_PROTOCOL],
+  boundary: "Real network detection and transport reconnection policy are host-owned.",
+ },
+ {
+  id: "sync.reconnect-drain",
+  title: "Reconnect drain",
+  area: "collaboration",
+  primary: "svelte",
+  interaction: "Come back online; queued local commits drain in order and converge.",
+  scope: "browser",
+  accessibility: "Drain progress is visible as text counts.",
+  testPath: SVELTE_SPEC,
+  sharedModules: [OFFLINE_SCENARIO, COLLABORATION_PROTOCOL],
+  boundary: HOST_PERSISTENCE_BOUNDARY,
+ },
+ {
+  id: "collab.two-client-convergence",
+  title: "Two-client convergence",
+  area: "collaboration",
+  primary: "collaboration",
+  interaction: "Edit from two live clients; both converge on identical document state.",
+  scope: "browser",
+  accessibility: "Both clients are operable grids with the standard keyboard contract.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [COLLABORATION_PROTOCOL],
+  boundary:
+   "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
+ },
+ {
+  id: "collab.sequencing-acks",
+  title: "Operation sequencing & duplicate acknowledgements",
+  area: "collaboration",
+  primary: "collaboration",
+  interaction:
+   "Commits sequence through version numbers; duplicate submissions acknowledge idempotently.",
+  scope: "browser",
+  accessibility: "Sequence numbers are visible text in the protocol log.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [COLLABORATION_PROTOCOL],
+  boundary:
+   "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
+ },
+ {
+  id: "collab.version-gaps",
+  title: "Version gap recovery",
+  area: "collaboration",
+  primary: "collaboration",
+  interaction:
+   "Drop operations to create a gap; the client requests and replays the missing range.",
+  scope: "browser",
+  accessibility: "Gap detection and recovery are narrated in the protocol log text.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [COLLABORATION_PROTOCOL],
+  boundary:
+   "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
+ },
+ {
+  id: "collab.presence",
+  title: "Presence",
+  area: "collaboration",
+  primary: "collaboration",
+  secondary: [
+   {
+    owner: "svelte",
+    reason: "The offline product shows collaborator presence in a real workbench.",
+   },
+  ],
+  interaction:
+   "Collaborator selections and identities overlay live without entering the document.",
+  scope: "browser",
+  accessibility: "Collaborator identity is available as text, not color-only cursors.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [COLLABORATION_PROTOCOL],
+  boundary: "Presence is ephemeral and never persisted into snapshots or history.",
+ },
+ {
+  id: "collab.conflicts",
+  title: "Conflicting edits",
+  area: "collaboration",
+  primary: "collaboration",
+  secondary: [
+   {
+    owner: "svelte",
+    reason: "The offline product rebases conflicting field edits on reconnect.",
+   },
+  ],
+  interaction: "Commit conflicting edits from both clients; rebase resolves deterministically.",
+  scope: "browser",
+  accessibility: "Conflict outcomes are explained in the protocol log text.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [COLLABORATION_PROTOCOL],
+  boundary: "Semantic merge policy beyond deterministic rebase is host-owned product behavior.",
+ },
+ {
+  id: "collab.recovery",
+  title: "Collaboration recovery",
+  area: "collaboration",
+  primary: "collaboration",
+  interaction: "Kill and restore a client mid-session; it recovers state and rejoins cleanly.",
+  scope: "browser",
+  accessibility: "Recovery steps are narrated as text in the protocol log.",
+  testPath: DATABASE_COLLAB_SPEC,
+  sharedModules: [COLLABORATION_PROTOCOL],
+  boundary:
+   "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
+ },
 
-  {
-    id: "lifecycle.engine-events",
-    title: "Recalculation, results and paint in order",
-    area: "lifecycle",
-    primary: "recalculation",
-    interaction:
-      "Change the cell that 100,000 formulas read, or move 1,000 lookups; the side panel lists when the edit was applied, its results were readable and the next frame was painted.",
-    scope: "browser",
-    accessibility:
-      "Every timing and the event order are text in the side panel; the bars are decorative.",
-    testPath: "test/browser/showcase-recalculation.spec.ts",
-    sharedModules: ["docs/src/showcases/scenarios/recalculation.ts"],
-    boundary:
-      "Timings depend on the reader's device and browser; the release benchmarks measure fixed machines.",
-  },
-  {
-    id: "workflow.host-owned-rows",
-    title: "Host-owned rows",
-    area: "workflow",
-    primary: "host-rows",
-    interaction:
-      "Sort, filter, insert, delete, and edit rows; every delta names the same account ID, and the host can reject or transform a write. Import 10,000 leads with unique IDs.",
-    scope: "browser",
-    accessibility:
-      "The account store and the delta log are text tables beside the Grid; every row action is a labelled button.",
-    testPath: HOST_ROWS_SPEC,
-    sharedModules: ["docs/src/showcases/HostRowsShowcase.tsx"],
-    boundary:
-      "The entity store, its persistence, and the write policy are host-owned; Sheetwrite keeps row identity and reports deltas.",
-  },
+ {
+  id: "lifecycle.engine-events",
+  title: "Recalculation, results and paint in order",
+  area: "lifecycle",
+  primary: "recalculation",
+  interaction:
+   "Change the cell that 100,000 formulas read, or move 1,000 lookups; the side panel lists when the edit was applied, its results were readable and the next frame was painted.",
+  scope: "browser",
+  accessibility:
+   "Every timing and the event order are text in the side panel; the bars are decorative.",
+  testPath: "test/browser/showcase-recalculation.spec.ts",
+  sharedModules: ["docs/src/showcases/scenarios/recalculation.ts"],
+  boundary:
+   "Timings depend on the reader's device and browser; the release benchmarks measure fixed machines.",
+ },
+ {
+  id: "workflow.host-owned-rows",
+  title: "Host-owned rows",
+  area: "workflow",
+  primary: "host-rows",
+  interaction:
+   "Sort, filter, insert, delete, and edit rows; every delta names the same account ID, and the host can reject or transform a write. Import 10,000 leads with unique IDs.",
+  scope: "browser",
+  accessibility:
+   "The account store and the delta log are text tables beside the Grid; every row action is a labelled button.",
+  testPath: HOST_ROWS_SPEC,
+  sharedModules: ["docs/src/showcases/HostRowsShowcase.tsx"],
+  boundary:
+   "The entity store, its persistence, and the write policy are host-owned; Sheetwrite keeps row identity and reports deltas.",
+ },
 
-  {
-    id: "lifecycle.vanilla",
-    title: "Vanilla lifecycle",
-    area: "lifecycle",
-    primary: "vanilla",
-    interaction:
-      "Explicit create, live-option replacement, input-driven reset, readiness/error events, destroy.",
-    scope: "browser",
-    accessibility: "Lifecycle controls are labeled buttons; state changes render as text.",
-    testPath: LIFECYCLE_SPEC,
-    sharedModules: [ENGINE_SCENARIO],
-    boundary: "Host code owns when lifecycle transitions happen; the adapter owns applying them.",
-  },
-  {
-    id: "lifecycle.react",
-    title: "React lifecycle",
-    area: "lifecycle",
-    primary: "react",
-    interaction:
-      "StrictMode double-mount, controlled state reconciliation, live option replacement, reset reasons, destroy.",
-    scope: "browser",
-    accessibility: "Reset state is observable through visible text, not console output.",
-    testPath: LIFECYCLE_SPEC,
-    sharedModules: [ANALYTICS_SCENARIO],
-    boundary:
-      "Only initial | input-reset | renderer-reset reasons exist; host renders around them.",
-  },
-  {
-    id: "lifecycle.vue",
-    title: "Vue lifecycle",
-    area: "lifecycle",
-    primary: "vue",
-    interaction:
-      "Reactive prop updates, explicit props/events contract, reset on reset-bound inputs, destroy on unmount.",
-    scope: "browser",
-    accessibility: "Emitted lifecycle events surface as visible text state.",
-    testPath: LIFECYCLE_SPEC,
-    sharedModules: [BUSINESS_SCENARIO],
-    boundary:
-      "Only initial | input-reset | renderer-reset reasons exist; host renders around them.",
-  },
-  {
-    id: "lifecycle.svelte",
-    title: "Svelte lifecycle",
-    area: "lifecycle",
-    primary: "svelte",
-    interaction:
-      "Rune-driven binding, remount with persisted state, live option replacement, destroy on unmount.",
-    scope: "browser",
-    accessibility: "Remount persistence is verifiable through visible document state.",
-    testPath: LIFECYCLE_SPEC,
-    sharedModules: [OFFLINE_SCENARIO],
-    boundary:
-      "Only initial | input-reset | renderer-reset reasons exist; host renders around them.",
-  },
+ {
+  id: "lifecycle.vanilla",
+  title: "Vanilla lifecycle",
+  area: "lifecycle",
+  primary: "vanilla",
+  interaction:
+   "Explicit create, live-option replacement, input-driven reset, readiness/error events, destroy.",
+  scope: "browser",
+  accessibility: "Lifecycle controls are labeled buttons; state changes render as text.",
+  testPath: LIFECYCLE_SPEC,
+  sharedModules: [ENGINE_SCENARIO],
+  boundary: "Host code owns when lifecycle transitions happen; the adapter owns applying them.",
+ },
+ {
+  id: "lifecycle.react",
+  title: "React lifecycle",
+  area: "lifecycle",
+  primary: "react",
+  interaction:
+   "StrictMode double-mount, controlled state reconciliation, live option replacement, reset reasons, destroy.",
+  scope: "browser",
+  accessibility: "Reset state is observable through visible text, not console output.",
+  testPath: LIFECYCLE_SPEC,
+  sharedModules: [ANALYTICS_SCENARIO],
+  boundary:
+   "Only initial | input-reset | renderer-reset reasons exist; host renders around them.",
+ },
+ {
+  id: "lifecycle.vue",
+  title: "Vue lifecycle",
+  area: "lifecycle",
+  primary: "vue",
+  interaction:
+   "Reactive prop updates, explicit props/events contract, reset on reset-bound inputs, destroy on unmount.",
+  scope: "browser",
+  accessibility: "Emitted lifecycle events surface as visible text state.",
+  testPath: LIFECYCLE_SPEC,
+  sharedModules: [BUSINESS_SCENARIO],
+  boundary:
+   "Only initial | input-reset | renderer-reset reasons exist; host renders around them.",
+ },
+ {
+  id: "lifecycle.svelte",
+  title: "Svelte lifecycle",
+  area: "lifecycle",
+  primary: "svelte",
+  interaction:
+   "Rune-driven binding, remount with persisted state, live option replacement, destroy on unmount.",
+  scope: "browser",
+  accessibility: "Remount persistence is verifiable through visible document state.",
+  testPath: LIFECYCLE_SPEC,
+  sharedModules: [OFFLINE_SCENARIO],
+  boundary:
+   "Only initial | input-reset | renderer-reset reasons exist; host renders around them.",
+ },
 ];
