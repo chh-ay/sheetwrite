@@ -132,7 +132,9 @@ impl<'c> CellTest<'c> {
     /// writes every word; later ones clear the bits of rows they reject and
     /// skip words with no row left. A finite number against a finite operand
     /// is below, equal to or above it, so its answer is one select of three,
-    /// without a branch per comparison operator.
+    /// without a branch per comparison operator. A text cell's answer depends
+    /// only on its pool id, and a column usually repeats a few values, so the
+    /// answers for the last two ids seen are reused for this column only.
     fn mask_column(
         &self,
         strings: &StringStorage,
@@ -141,6 +143,8 @@ impl<'c> CellTest<'c> {
         first: bool,
     ) {
         let (operand, [below, equal, above]) = self.number_answers();
+        let mut texts: [Option<(u32, bool)>; 2] = [None; 2];
+        let mut next_text = 0;
         let chunks = kinds.chunks(MASK_ROWS).zip(payloads.chunks(MASK_ROWS));
         for (word, (kinds, payloads)) in mask.iter_mut().zip(chunks) {
             if !first && *word == 0 {
@@ -154,6 +158,17 @@ impl<'c> CellTest<'c> {
                     (number < operand && below)
                         | (number == operand && equal)
                         | (number > operand && above)
+                } else if kind == KIND_STRING {
+                    let id = payload_str_id(payload);
+                    let known = texts.iter().flatten().find(|&&(text, _)| text == id);
+                    if let Some(&(_, answer)) = known {
+                        answer
+                    } else {
+                        let answer = self.matches(strings, kind, payload);
+                        texts[next_text] = Some((id, answer));
+                        next_text ^= 1;
+                        answer
+                    }
                 } else {
                     self.matches(strings, kind, payload)
                 };
