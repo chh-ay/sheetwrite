@@ -42,7 +42,7 @@ export const CONTENT_COMPONENTS = {
   Steps: [],
   Step: ["title", "id", "titleSize"],
   CardGroup: ["cols"],
-  Card: ["title", "href", "icon", "illustration", "screenshot", "alt", "cta"],
+  Card: ["title", "href", "icon", "illustration", "screenshot", "alt", "size", "cta"],
   Note: ["title"],
   Tip: ["title"],
   Warning: ["title"],
@@ -223,7 +223,11 @@ function card(node: ContentNode): ContentNode {
     screenshot:
       attribute(node, "screenshot") === undefined
         ? undefined
-        : { name: required(node, "screenshot"), alt: required(node, "alt") },
+        : {
+            name: required(node, "screenshot"),
+            alt: required(node, "alt"),
+            size: (attribute(node, "size") ?? "app") as ShotSize,
+          },
     cta: attribute(node, "cta"),
     body: node.children ?? [],
   });
@@ -239,7 +243,7 @@ export interface DocCard {
   /** An illustration in public/figures/illustrations, across the top; replaces the icon. */
   illustration?: string;
   /** A capture from the screenshot script, across the top; replaces the icon. */
-  screenshot?: { name: string; alt: string };
+  screenshot?: { name: string; alt: string; size: ShotSize };
   /** The link text at the foot of a linked card. */
   cta?: string;
   /** A label beside the title, such as a New badge. */
@@ -253,7 +257,7 @@ function cardArt(
   screenshot: DocCard["screenshot"],
 ): HastNode[] {
   if (screenshot !== undefined) {
-    const shots = themedShots(screenshot.name, screenshot.alt, "app", CARD_SHOT_SIZES);
+    const shots = themedShots(screenshot.name, screenshot.alt, screenshot.size, CARD_SHOT_SIZES);
     return [{ ...shots, properties: { className: ["sw-shots", "sw-card__shot"] } }];
   }
   if (illustration !== undefined) {
@@ -555,11 +559,17 @@ function update(node: ContentNode): ContentNode {
   const meta = element(
     "div",
     [
+      // The version is the entry's heading, so "On this page" lists versions.
+      element(
+        "h2",
+        [
+          element("a", [text(release.unreleased === true ? `${version} (next)` : version)], {
+            href: releaseHref(version),
+          }),
+        ],
+        { className: ["sw-update__version"], id },
+      ),
       when,
-      element("a", [text(release.unreleased === true ? `${version} (next)` : version)], {
-        className: ["sw-update__version"],
-        href: releaseHref(version),
-      }),
       ...(tags.length === 0
         ? []
         : [
@@ -585,7 +595,7 @@ function update(node: ContentNode): ContentNode {
       element(
         "div",
         [
-          element("h2", [text(release.summary)], { className: ["sw-update__title"], id }),
+          element("p", [text(release.summary)], { className: ["sw-update__title"] }),
           ...(node.children ?? []),
         ],
         { className: ["sw-update__body"] },
