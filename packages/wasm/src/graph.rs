@@ -89,50 +89,55 @@ impl DirtyRect {
     }
 }
 
-/// Exact dirty source cells in one flat list. Writes in address order (a load
-/// or a fill) keep it sorted and unique as they append. Other orders append
-/// too, and the list is sorted and deduplicated in place before it grows, so
-/// repeated edits of a few cells stay bounded without hashing.
+/// Exact dirty source cells in one flat list: a sorted, unique prefix and an
+/// unsorted tail. Writes in address order (a load or a fill) extend the
+/// prefix. A write already in the prefix is found by binary search and adds
+/// nothing. Others append to the tail, which is sorted into the prefix and
+/// deduplicated in place before the list grows, so repeated edits of a few
+/// cells stay bounded without hashing.
+#[derive(Default)]
 struct DirtyCells {
     cells: Vec<CellKey>,
-    sorted: bool,
-}
-
-impl Default for DirtyCells {
-    fn default() -> Self {
-        Self {
-            cells: Vec::new(),
-            sorted: true,
-        }
-    }
+    sorted_len: usize,
 }
 
 impl DirtyCells {
     fn insert(&mut self, key: CellKey) {
+        let len = self.cells.len();
         match self.cells.last() {
-            None => {}
-            Some(&last) if last < key => {}
             Some(&last) if last == key => return,
-            Some(_) => {
-                if self.sorted && self.cells.binary_search(&key).is_ok() {
-                    return;
-                }
-                self.sorted = false;
+            Some(&last) if self.sorted_len == len && last < key => {
+                self.cells.push(key);
+                self.sorted_len += 1;
+                return;
             }
+            None => {
+                self.cells.push(key);
+                self.sorted_len = 1;
+                return;
+            }
+            Some(_) => {}
         }
 
-        // Fold duplicates before growing; a sorted list has none. Room for as
-        // many cells again as survive the fold keeps each fold amortized.
-        if !self.sorted && self.cells.len() == self.cells.capacity() {
+        let prefix = self.cells.get(..self.sorted_len).unwrap_or_default();
+        if prefix.binary_search(&key).is_ok() {
+            return;
+        }
+
+        // Fold the tail before growing. Room for as many cells again as
+        // survive the fold keeps each fold amortized.
+        if len == self.cells.capacity() {
             self.cells.sort_unstable();
             self.cells.dedup();
-            self.sorted = true;
+            self.sorted_len = self.cells.len();
             if self.cells.binary_search(&key).is_ok() {
                 return;
             }
 
             self.cells.reserve(self.cells.len());
-            self.sorted = self.cells.last().is_none_or(|&last| last < key);
+            if self.cells.last().is_none_or(|&last| last < key) {
+                self.sorted_len += 1;
+            }
         }
 
         self.cells.push(key);
@@ -757,7 +762,7 @@ impl SheetFormulas {
         if let DirtyState::Cells(cells) = &mut self.dirty {
             if cells.cells.capacity() <= RETAINED_DIRTY_CAPACITY {
                 cells.cells.clear();
-                cells.sorted = true;
+                cells.sorted_len = 0;
                 return;
             }
         }
@@ -1008,7 +1013,7 @@ mod tests {
             cells.insert((row, 1));
         }
 
-        assert!(cells.sorted);
+        assert_eq!(cells.sorted_len, 1_000);
         assert_eq!(cells.cells.len(), 1_000);
     }
 
@@ -1023,7 +1028,7 @@ mod tests {
             cells.insert((row, 0));
         }
 
-        assert!(cells.sorted);
+        assert_eq!(cells.sorted_len, 100);
         assert_eq!(cells.cells.len(), 100);
     }
 
