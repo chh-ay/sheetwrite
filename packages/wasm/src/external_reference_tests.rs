@@ -31,6 +31,11 @@ fn external_references_parse_and_write_back_as_written() {
         "='[Budget 2024.xlsx]Annual Plan'!C10",
         "=SUM('C:\\Reports\\[Budget.xlsx]Annual'!C10:C25)",
         "=SUM([Budget.xlsx]Annual!A1,[Sales.xlsm]Q1!B2)",
+        "=Budget.xlsx!Total",
+        "=SUM('Budget 2024.xlsx'!Total)",
+        "=[Budget.xlsx]!Total",
+        "='C:\\Reports\\[Budget.xlsx]'!Total",
+        "=[Budget.xlsx]Annual!Local",
     ] {
         assert_eq!(round_trip(source), source);
     }
@@ -193,4 +198,80 @@ fn formulas_follow_a_link_that_is_added_removed_and_added_again() {
     store.recompute(annual);
     assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
     assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(formula));
+}
+
+/// `linked_store` with the names of `Budget.xlsx` that its link part saves:
+/// `Total` (C10) and `Rows` (C10:C11) for the workbook, and `Local` (C11)
+/// for the sheet `Annual`.
+fn store_with_names() -> (CellStore, usize, usize) {
+    let (mut store, report, annual) = linked_store();
+    assert!(store.add_external_name("Budget.xlsx", "", "Total", "=Annual!$C$10"));
+    assert!(store.add_external_name("Budget.xlsx", "", "Rows", "=Annual!$C$10:$C$11"));
+    assert!(store.add_external_name("Budget.xlsx", "Annual", "Local", "=Annual!$C$11"));
+    (store, report, annual)
+}
+
+/// Excel writes a name of another workbook as `Budget.xlsx!Total`, with the
+/// path when the workbook is closed (Microsoft, "Create workbook links":
+/// `=SUM(Budget.xlsx!Sales)`), and keeps the saved values of the cells the
+/// name refers to.
+#[test]
+fn defined_names_of_a_link_read_its_saved_values() {
+    let (mut store, report, _) = store_with_names();
+    let cases = [
+        ("=Budget.xlsx!Total", "7"),
+        ("=SUM(budget.xlsx!ROWS) * 2", "24"),
+        ("='C:\\Reports\\Budget.xlsx'!Total", "7"),
+        ("=[Budget.xlsx]!Total+1", "8"),
+        ("='C:\\Reports\\[Budget.xlsx]'!Total", "7"),
+        ("=[Budget.xlsx]Annual!Local", "5"),
+        // A name the link does not hold, or a link without values.
+        ("=Budget.xlsx!Missing", "#REF!"),
+        ("=Sales.xlsx!Total", "#REF!"),
+    ];
+    for (row, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(report, row, 0, formula, 0);
+    }
+    store.recompute(report);
+
+    for (row, (formula, expected)) in cases.iter().enumerate() {
+        let cell = store.get_cell(report, row, 0);
+        let shown = cell.string().unwrap_or_else(|| cell.num().to_string());
+        assert_eq!(shown, *expected, "{formula}");
+        assert_eq!(
+            store.formula_source(report, row, 0).as_deref(),
+            Some(*formula)
+        );
+    }
+}
+
+#[test]
+fn a_link_name_follows_its_values_and_its_removal() {
+    let (mut store, report, annual) = store_with_names();
+    store.set_formula(report, 0, 0, "=Budget.xlsx!Total", 0);
+    store.recompute(report);
+
+    store.set_number(annual, 9, 2, 10.0, 0);
+    store.recompute(annual);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 10.0);
+
+    store.remove_external_names("budget.xlsx");
+    assert_eq!(
+        store.get_cell(report, 0, 0).string().as_deref(),
+        Some("#REF!")
+    );
+
+    assert!(store.add_external_name("Budget.xlsx", "", "Total", "=Annual!$C$11"));
+    assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
+    assert_eq!(
+        store.formula_source(report, 0, 0).as_deref(),
+        Some("=Budget.xlsx!Total")
+    );
+}
+
+#[test]
+fn a_name_needs_a_sheet_the_link_holds() {
+    let (mut store, _, _) = linked_store();
+    assert!(!store.add_external_name("Budget.xlsx", "", "Other", "=Other!$A$1"));
+    assert!(!store.add_external_name("Budget.xlsx", "", "Broken", "=#REF!"));
 }
