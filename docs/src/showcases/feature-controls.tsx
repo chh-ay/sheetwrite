@@ -30,8 +30,8 @@ const GRID_SPARE_ROWS = 2;
 
 /**
  * The live grid of a showcase. Without `rows` it takes the shared stage height;
- * with `rows`, it fits that many sheet rows plus a small margin, so short data
- * does not sit above a band of empty rows.
+ * with `rows`, where the panel follows the demo it fits that many sheet rows
+ * plus a small margin, so short data does not sit above a band of empty rows.
  */
 export function DemoGrid({
   hostRef,

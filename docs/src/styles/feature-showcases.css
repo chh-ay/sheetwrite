@@ -150,15 +150,18 @@
   background: var(--sw-accent);
 }
 
-/* A grid sized to its data: the shell chrome (ribbon, formula bar, column
-   headers and sheet tabs) plus `--sw-feature-grid-rows` rows of the grid's
-   default row height. */
-.sw-feature-grid[data-sized="true"] {
-  --sw-feature-grid-chrome: 14rem;
-  --sw-feature-grid-row: 1.75rem;
-  height: calc(
-    var(--sw-feature-grid-chrome) + var(--sw-feature-grid-rows) * var(--sw-feature-grid-row)
-  );
+/* Below the desktop layout the panel follows the demo, so a grid of short data
+   is sized to it: the shell chrome (ribbon, formula bar, column headers and
+   sheet tabs) plus `--sw-feature-grid-rows` rows of the grid's default row
+   height. Beside the panel on desktop it keeps the shared stage height. */
+@media (max-width: 71.99rem) {
+  .sw-feature-grid[data-sized="true"] {
+    --sw-feature-grid-chrome: 10.5rem;
+    --sw-feature-grid-row: 1.75rem;
+    height: calc(
+      var(--sw-feature-grid-chrome) + var(--sw-feature-grid-rows) * var(--sw-feature-grid-row)
+    );
+  }
 }
 
 /* Rows of the side-panel lists answer the pointer like the readout rows. */
