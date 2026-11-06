@@ -1,7 +1,6 @@
 // Grid configuration, events, actions, search, and imperative API contracts.
 // No runtime values live here.
 
-import type { SheetwriteAddonSettings } from "../addons.js";
 import type { SheetwriteError } from "../errors.js";
 import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
@@ -598,6 +597,9 @@ export interface GridConfig {
    */
   keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
+
+/** Per-grid add-on settings, keyed by add-on name. */
+export type SheetwriteAddonSettings = Readonly<Record<string, unknown>>;
 
 /**
  * Workbook, data, rendering, policy, and built-in UI options used to create a Grid.

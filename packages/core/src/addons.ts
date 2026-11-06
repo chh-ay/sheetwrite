@@ -1,15 +1,17 @@
 import { setChartRendererFactory, setChartViewProviderFactory } from "./chart-backend.js";
 import { SheetwriteError } from "./errors.js";
-import type { Grid } from "./types/grid.js";
+import type { Grid, SheetwriteAddonSettings } from "./types/grid.js";
 import type { ChartRendererFactory, ChartViewProviderFactory } from "./types/store.js";
+import type {
+  XlsxTableExportBackend,
+  XlsxTableImportBackend,
+  XlsxWorkbookBackend,
+} from "./types/xlsx.js";
 import {
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
-  type XlsxTableExportBackend,
-  type XlsxTableImportBackend,
-  type XlsxWorkbookBackend,
-} from "./xlsx-bridge.js";
+} from "./xlsx-backends.js";
 
 /** Chart parts an add-on gives to core. */
 export interface SheetwriteChartParts {
@@ -60,9 +62,6 @@ export interface SheetwriteAddon<Settings = unknown> {
   /** Applies per-grid settings to one new grid. */
   grid?(context: SheetwriteAddonGridContext<Settings>): (() => void) | void;
 }
-
-/** Per-grid add-on settings, keyed by add-on name. */
-export type SheetwriteAddonSettings = Readonly<Record<string, unknown>>;
 
 /** Core's registration methods, which write the chart and XLSX backends. */
 const setupContext: SheetwriteAddonContext = {

@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from "bun:test";
 
 // The adapters load core's built entry, so the test swaps the table exporter in that same module.
-import { setXlsxTableExportBackend } from "../packages/core/dist/xlsx-bridge.js";
+import { setXlsxTableExportBackend } from "../packages/core/dist/xlsx-backends.js";
 import type {
   GridAdapterEventHandlers,
   GridReadyEvent,

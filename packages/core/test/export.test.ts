@@ -19,11 +19,13 @@ import { initSheetwrite } from "../src/grid.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
 import {
-  fromXlsxTable,
-  fromXlsxWorkbook,
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
+} from "../src/xlsx-backends.js";
+import {
+  fromXlsxTable,
+  fromXlsxWorkbook,
   toXlsxTable,
   toXlsxWorkbook,
   XlsxResourceError,

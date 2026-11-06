@@ -122,12 +122,22 @@ async function worker(): Promise<StreamingMemoryResult> {
   const xlsx = (await import(
     pathToFileURL(resolve(root, "packages/xlsx/src/workbook.ts")).href
   )) as { sheetwriteWorkbookBackend: XlsxWorkbookBackend };
-  // The core bridge module, not the public add-on API, so both checkouts install the same backend the same way.
-  const bridge = (await import(
-    pathToFileURL(resolve(root, "packages/core/src/xlsx-bridge.ts")).href
-  )) as { setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): void };
-  await core.initSheetwrite();
-  bridge.setXlsxWorkbookBackend(xlsx.sheetwriteWorkbookBackend);
+  // A baseline checkout from before the add-on API takes no options object and has the setter instead.
+  const legacySetter = Reflect.get(core, "setXlsxWorkbookBackend");
+  if (typeof legacySetter === "function") {
+    await core.initSheetwrite();
+    legacySetter(xlsx.sheetwriteWorkbookBackend);
+  } else {
+    await core.initSheetwrite({
+      addons: [
+        {
+          name: "streaming-memory-bench",
+          setup: (context) => context.xlsx({ workbook: xlsx.sheetwriteWorkbookBackend }),
+        },
+      ],
+    });
+  }
+
   const options = {
     maxCells: rows * COLUMNS,
     resourceLimits: {

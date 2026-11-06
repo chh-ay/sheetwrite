@@ -5,49 +5,18 @@ import { storeEngine } from "./store/engine-registry.js";
 import type { ColumnarData } from "./types/data.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
-import type { PowerQueryCodec } from "./types/query.js";
 import type { Store } from "./types/store.js";
-import { hasAdmittedXlsxSource, setXlsxSourceVerifier } from "./xlsx-source.js";
-
-/** Resource dimensions bounded by every XLSX import and export path. */
-export interface XlsxResourceLimits {
-  /** Compressed workbook input bytes; defaults to 32 MiB. */
-  maxInputBytes: number;
-  /** Encoded workbook output bytes; defaults to 128 MiB. */
-  maxOutputBytes: number;
-  /** ZIP archive entries; defaults to 1,024. */
-  maxArchiveEntries: number;
-  /** Uncompressed bytes in any one ZIP entry; defaults to 64 MiB. */
-  maxEntryUncompressedBytes: number;
-  /** Aggregate uncompressed ZIP entry bytes; defaults to 256 MiB. */
-  maxTotalUncompressedBytes: number;
-  /** Retained opaque compressed payload bytes; defaults to 64 MiB. */
-  maxPreservedBytes: number;
-  /** Uncompressed-to-compressed ratio for one ZIP entry; defaults to 100. */
-  maxCompressionRatio: number;
-  /** Workbook worksheets; defaults to 256. */
-  maxSheets: number;
-  /** Rows in any worksheet; defaults to 1,048,576. */
-  maxRowsPerSheet: number;
-  /** Columns in any worksheet; defaults to 16,384. */
-  maxColumnsPerSheet: number;
-  /** Cells accounted by the active conversion path; defaults to 1,000,000. */
-  maxCells: number;
-  /** Aggregate merged ranges; defaults to 100,000. */
-  maxMerges: number;
-  /** Shared-string table entries; defaults to 1,000,000. */
-  maxSharedStrings: number;
-  /** Style-related records; defaults to 65,536. */
-  maxStyles: number;
-  /** Elements in any one XML part; defaults to 2,000,000. */
-  maxXmlElements: number;
-  /** Element nesting depth in any one XML part; defaults to 64. */
-  maxXmlDepth: number;
-  /** Attributes on any one XML element; defaults to 128. */
-  maxXmlAttributesPerElement: number;
-  /** UTF-8 text bytes in one XML element or attribute; defaults to 16 MiB. */
-  maxXmlTextBytes: number;
-}
+import type {
+  XlsxResourceLimits,
+  XlsxWorkbookExportContext,
+  XlsxWorkbookOptions,
+} from "./types/xlsx.js";
+import {
+  xlsxTableExportBackend,
+  xlsxTableImportBackend,
+  xlsxWorkbookBackend,
+} from "./xlsx-backends.js";
+import { hasAdmittedXlsxSource } from "./xlsx-source.js";
 
 /**
  * Codec defaults combine SpreadsheetML worksheet dimensions with independent
@@ -97,26 +66,6 @@ export class XlsxResourceError extends SheetwriteError {
       { context: { format: "xlsx", resource, limit, actual } },
     );
   }
-}
-
-/**
- * Pluggable first-row-header, first-sheet table export backend.
- */
-export interface XlsxTableExportBackend {
-  name: string;
-  toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
-  toXlsxTableStream?(
-    workbook: Workbook,
-    store: Store,
-    options?: XlsxWorkbookOptions,
-  ): AsyncIterable<Uint8Array>;
-}
-
-let tableExportBackend: XlsxTableExportBackend | null = null;
-
-/** Sets the table XLSX export implementation that the XLSX add-on installs. */
-export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
-  tableExportBackend = next;
 }
 
 function missingXlsxBackend(
@@ -186,7 +135,7 @@ export async function toXlsxTable(
   store: Store,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  const backend = tableExportBackend;
+  const backend = xlsxTableExportBackend();
   if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
   try {
     options?.signal?.throwIfAborted();
@@ -206,7 +155,7 @@ export function toXlsxTableStream(
   store: Store,
   options?: XlsxWorkbookOptions,
 ): ReadableStream<Uint8Array> {
-  const backend = tableExportBackend;
+  const backend = xlsxTableExportBackend();
   if (!backend?.toXlsxTableStream) throw missingXlsxBackend("toXlsxTableStream", "xlsx-export");
   return readableBytes(backend.toXlsxTableStream(workbook, store, options), (error) =>
     xlsxCallFailure(error, options?.signal, {
@@ -215,26 +164,6 @@ export function toXlsxTableStream(
       functionName: "toXlsxTableStream",
     }),
   );
-}
-
-/**
- * Pluggable table import backend. Parses raw `.xlsx` bytes into the same
- * `ColumnarData` shape `fromCsv` returns, so host ingestion code can stay
- * format-agnostic.
- */
-export interface XlsxTableImportBackend {
-  name: string;
-  fromXlsxTable(
-    data: ArrayBuffer | Uint8Array,
-    options?: XlsxWorkbookOptions,
-  ): Promise<ColumnarData>;
-}
-
-let tableImportBackend: XlsxTableImportBackend | null = null;
-
-/** Sets the table XLSX import implementation that the XLSX add-on installs. */
-export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
-  tableImportBackend = next;
 }
 
 /**
@@ -259,7 +188,7 @@ export async function fromXlsxTable(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<ColumnarData> {
-  const backend = tableImportBackend;
+  const backend = xlsxTableImportBackend();
   if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
   try {
     options?.signal?.throwIfAborted();
@@ -273,86 +202,9 @@ export async function fromXlsxTable(
   }
 }
 
-/** Structured fidelity warning emitted during XLSX conversion. */
-export interface XlsxWorkbookWarning {
-  code:
-    | "boolean-literal"
-    | "rich-text"
-    | "hyperlink"
-    | "unsupported-cell-value"
-    | "unsupported-feature"
-    | "external-relationship"
-    | "external-formula"
-    | "format-loss"
-    | "validation-loss"
-    | "invalid-metadata"
-    | "query-loss";
-  message: string;
-  sheet?: string;
-  cell?: string;
-  part?: string;
-}
-
-/** Shared options passed to every registered table and workbook XLSX backend. */
-export interface XlsxWorkbookOptions {
-  /**
-   * Checked before the work and once per ZIP entry, worksheet and chunk of
-   * cells. After it fires, the call rejects (or the stream errors) with
-   * `signal.reason`, not with a `SheetwriteError`.
-   */
-  signal?: AbortSignal;
-  /** Cells accounted by the active conversion path; defaults to 1,000,000. */
-  maxCells?: number;
-  /** Positive overrides for every XLSX resource dimension except `maxCells`. */
-  resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
-  onWarning?: (warning: XlsxWorkbookWarning) => void;
-  /**
-   * Power Query translation for saved queries, such as `loadPowerQueryCodec()`
-   * from `@sheetwrite/queries`. Without it, import keeps query parts as opaque
-   * parts, and export writes them back only while `workbook.queries` is
-   * unchanged since import.
-   */
-  powerQuery?: PowerQueryCodec;
-}
-
-/** @internal Core-owned provenance for snapshots it materialized during this call. */
-interface XlsxWorkbookExportContext {
-  readonly sourceTracked?: boolean;
-}
-
-/** Optional backend contract for complete workbook XLSX interchange. */
-export interface XlsxWorkbookBackend {
-  name: string;
-  toXlsxWorkbook(
-    snapshot: WorkbookSnapshot,
-    options?: XlsxWorkbookOptions,
-    context?: XlsxWorkbookExportContext,
-  ): Promise<Uint8Array>;
-  fromXlsxWorkbook(
-    data: ArrayBuffer | Uint8Array,
-    options?: XlsxWorkbookOptions,
-  ): Promise<WorkbookSnapshot>;
-  toXlsxWorkbookStream?(
-    snapshot: WorkbookSnapshot,
-    options?: XlsxWorkbookOptions,
-    context?: XlsxWorkbookExportContext,
-  ): AsyncIterable<Uint8Array>;
-  fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
-  /** @internal Verify opaque payloads at store ingress, without retaining inflated bytes. */
-  verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot["workbook"]["xlsxSource"];
-}
-
-let workbookBackend: XlsxWorkbookBackend | null = null;
-
-/** Sets the workbook XLSX implementation that the XLSX add-on installs; `null` clears it. */
-export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend | null): void {
-  workbookBackend = next;
-  setXlsxSourceVerifier(next?.verifySource?.bind(next));
-}
-
 /** Whether workbook import can be offered without loading an optional backend. */
 export function hasXlsxWorkbookBackend(): boolean {
-  return workbookBackend !== null;
+  return xlsxWorkbookBackend() !== null;
 }
 
 /**
@@ -409,7 +261,7 @@ export async function toXlsxWorkbook(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  const backend = workbookBackend;
+  const backend = xlsxWorkbookBackend();
   if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
   try {
     // Checked before the snapshot is built, which is the largest step on this side.
@@ -430,7 +282,7 @@ export function toXlsxWorkbookStream(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
 ): ReadableStream<Uint8Array> {
-  const backend = workbookBackend;
+  const backend = xlsxWorkbookBackend();
   if (!backend?.toXlsxWorkbookStream)
     throw missingXlsxBackend("toXlsxWorkbookStream", "xlsx-export");
   const source = workbookSnapshotOf(input);
@@ -450,7 +302,7 @@ export async function fromXlsxWorkbookFile(
   file: Blob,
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  const backend = workbookBackend;
+  const backend = xlsxWorkbookBackend();
   if (!backend) throw missingXlsxBackend("fromXlsxWorkbookFile", "xlsx-import");
   try {
     options?.signal?.throwIfAborted();
@@ -489,7 +341,7 @@ export async function fromXlsxWorkbook(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  const backend = workbookBackend;
+  const backend = xlsxWorkbookBackend();
   if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
   try {
     options?.signal?.throwIfAborted();

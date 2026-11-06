@@ -2,7 +2,6 @@ export {
   type SheetwriteAddon,
   type SheetwriteAddonContext,
   type SheetwriteAddonGridContext,
-  type SheetwriteAddonSettings,
   type SheetwriteChartParts,
   type SheetwriteXlsxParts,
 } from "./addons.js";
@@ -120,12 +119,6 @@ export {
   toXlsxWorkbook,
   toXlsxWorkbookStream,
   XlsxResourceError,
-  type XlsxResourceLimits,
-  type XlsxTableExportBackend,
-  type XlsxTableImportBackend,
-  type XlsxWorkbookBackend,
-  type XlsxWorkbookOptions,
-  type XlsxWorkbookWarning,
 } from "./xlsx-bridge.js";
 
 export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.js";
@@ -450,6 +443,13 @@ export type {
   XlsxSourcePart,
   XlsxSourceSnapshot,
   XlsxUnsupportedQuery,
+  SheetwriteAddonSettings,
+  XlsxResourceLimits,
+  XlsxTableExportBackend,
+  XlsxTableImportBackend,
+  XlsxWorkbookBackend,
+  XlsxWorkbookOptions,
+  XlsxWorkbookWarning,
 } from "./types.js";
 
 export {
