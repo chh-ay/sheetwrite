@@ -80,9 +80,10 @@
   vertical-align: top;
   overflow-wrap: anywhere;
 }
-/* The call syntax, the row's name: the function and argument names carry the
-   code roles, the bare punctuation takes the punctuation colour. Long syntax
-   wraps after an argument instead of running into the next column. */
+/* The call syntax, the row's name: the function name and the argument
+   names (`var`) take the code roles, the bare punctuation the punctuation
+   colour. Long syntax wraps after an argument instead of running into the
+   next column. */
 .sw-prose .sw-formula-table .sw-formula-syntax {
   padding: 0;
   border: 0;
@@ -91,6 +92,10 @@
   font-size: var(--sw-text-small);
   white-space: normal;
   overflow-wrap: anywhere;
+}
+.sw-prose .sw-formula-table .sw-formula-syntax var {
+  color: var(--sw-code-property);
+  font-style: normal;
 }
 .sw-prose .sw-formula-table small {
   display: block;
