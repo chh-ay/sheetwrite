@@ -290,7 +290,7 @@ function details(
 }
 
 function legend(baseName: string): string {
-  return `<p class="lane-legend"><span>${legendMark("circle", "accent")}Sheetwrite median</span><span><i class="lane-legend__range" aria-hidden="true"></i>Lowest–highest round</span><span>${legendMark("diamond", "muted")}${escapeHtml(baseName)} median</span><span class="lane-legend__hint">Hover or focus a row for every value</span></p>`;
+  return `<p class="lane-legend"><span>${legendMark("circle", "accent")}Sheetwrite median</span><span><i class="lane-legend__range" aria-hidden="true"></i>Lowest–highest round</span><span>${legendMark("diamond", "muted")}${escapeHtml(baseName)} median</span><span class="lane-legend__hint">Hover, focus or tap a name for every value</span></p>`;
 }
 
 /** Every machine's speedups side by side, and every machine's numbers. */

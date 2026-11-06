@@ -1,4 +1,3 @@
-import type { FigureShape, FigureTone } from "../components/figures/scale.js";
 /**
  * Every machine at once, honestly: one row per workload with one mark per
  * machine on a shared ratio axis. Absolute times differ between machines, so
@@ -8,6 +7,7 @@ import type { FigureShape, FigureTone } from "../components/figures/scale.js";
  * slowdown. The bars, the speed story and the engine change all use it for
  * their "All" view.
  */
+import { type FigureShape, type FigureTone, scalePosition } from "../components/figures/scale.js";
 import { laneHtml, legendMark } from "../components/figures/static.js";
 import { escapeHtml, formatTimes, type PerfIconMarkup, type PerfMachine } from "./perf-bars.js";
 
@@ -55,8 +55,14 @@ export const MACHINE_MARKS: Readonly<
   mac: { shape: "diamond", tone: "violet" },
 };
 
-/** An axis shows at most this many labels; a long one labels every other or third power of two. */
-const MAX_TICKS = 6;
+/** Up to this many doublings, the axis steps in powers of two; a wider one steps in powers of ten. */
+const MAX_DOUBLINGS = 6;
+
+/** A ratio axis: its ends and the values its gridlines and labels sit on. */
+interface RatioAxis {
+  readonly domain: readonly [low: number, high: number];
+  readonly ticks: readonly number[];
+}
 
 function measured(result: MachineResult | undefined): result is {
   ratio: number;
@@ -75,39 +81,35 @@ function resultText(
   return "pending" in result ? result.pending : describe(result);
 }
 
-/** Powers of two from the slowest mark (or 1×) to the fastest. */
-function axisOf(rows: readonly MachineRow[]): { low: number; high: number } {
-  const exponents = rows.flatMap((row) =>
-    Object.values(row.results).flatMap((result) =>
-      measured(result) ? [Math.log2(result.ratio)] : [],
-    ),
+/** From the slowest mark (or 1×) to the fastest, in powers of two or, when that spans many doublings, of ten. */
+function axisOf(rows: readonly MachineRow[]): RatioAxis {
+  const ratios = rows.flatMap((row) =>
+    Object.values(row.results).flatMap((result) => (measured(result) ? [result.ratio] : [])),
   );
+  const wide = Math.log2(Math.max(1, ...ratios)) > MAX_DOUBLINGS;
+  const base = wide ? 10 : 2;
+  const log = (value: number) => Math.log(value) / Math.log(base);
+  const low = Math.min(0, Math.floor(Math.min(0, ...ratios.map(log))));
+  const high = Math.max(1, Math.ceil(Math.max(0, ...ratios.map(log))));
   return {
-    low: Math.min(0, Math.floor(Math.min(0, ...exponents))),
-    high: Math.max(1, Math.ceil(Math.max(0, ...exponents))),
+    domain: [base ** low, base ** high],
+    ticks: Array.from({ length: high - low + 1 }, (_, index) => base ** (low + index)),
   };
 }
 
-function at(ratio: number, axis: { low: number; high: number }): string {
-  const exponent = Math.max(axis.low, Math.min(axis.high, Math.log2(ratio)));
-  return `${(((exponent - axis.low) / (axis.high - axis.low)) * 100).toFixed(2)}%`;
+/** "1/2×", "1×", "1,000×". */
+function ratioLabel(ratio: number): string {
+  return ratio >= 1 ? `${ratio.toLocaleString("en-US")}×` : `1/${Math.round(1 / ratio)}×`;
 }
 
-function ratioLabel(exponent: number): string {
-  return exponent >= 0 ? `${(2 ** exponent).toLocaleString("en-US")}×` : `1/${2 ** -exponent}×`;
-}
-
-function ticks(axis: { low: number; high: number }): string {
-  const step = Math.ceil((axis.high - axis.low + 1) / MAX_TICKS);
-  const labels: string[] = [];
-  for (let exponent = axis.low; exponent <= axis.high; exponent += 1) {
-    // 1× is always labelled; the others keep an even rhythm from it.
-    if (exponent !== 0 && exponent % step !== 0) continue;
-    labels.push(
-      `<span style="left:${at(2 ** exponent, axis)}"${exponent === 0 ? " data-parity" : ""}>${ratioLabel(exponent)}</span>`,
-    );
-  }
-  return labels.join("");
+function ticks(axis: RatioAxis): string {
+  const scale = { kind: "log", domain: axis.domain } as const;
+  return axis.ticks
+    .map(
+      (ratio) =>
+        `<span style="left:${scalePosition(scale, ratio).toFixed(2)}%"${ratio === 1 ? " data-parity" : ""}>${ratioLabel(ratio)}</span>`,
+    )
+    .join("");
 }
 
 function legend(comparison: MachineComparison, icon: PerfIconMarkup): string {
@@ -119,19 +121,12 @@ function legend(comparison: MachineComparison, icon: PerfIconMarkup): string {
     .join("")}</ul>`;
 }
 
-function row(
-  entry: MachineRow,
-  comparison: MachineComparison,
-  axis: { low: number; high: number },
-): string {
+function row(entry: MachineRow, comparison: MachineComparison, axis: RatioAxis): string {
   const lane = laneHtml({
     label: entry.label,
-    scale: { kind: "log", domain: [2 ** axis.low, 2 ** axis.high] },
+    scale: { kind: "log", domain: axis.domain },
     origin: 1,
-    gridlines: Array.from(
-      { length: axis.high - axis.low + 1 },
-      (_, index) => 2 ** (axis.low + index),
-    ),
+    gridlines: axis.ticks,
     series: comparison.machines.map((key) => {
       const result = entry.results[key.machine];
       return {
@@ -212,7 +207,7 @@ export function renderMachineComparison(
 ): string {
   const axis = axisOf(comparison.rows);
   return [
-    `<div class="machines" style="--machines-steps:${axis.high - axis.low}">`,
+    `<div class="machines">`,
     legend(comparison, icon),
     `<p class="machines__axis-title">${escapeHtml(comparison.measure)} on each machine, against its own baseline; log scale, 1× is ${escapeHtml(comparison.parity)}. Machines are never compared with each other.</p>`,
     `<div class="machines__axis" aria-hidden="true"><span class="machines__ticks">${ticks(axis)}</span></div>`,

@@ -336,7 +336,7 @@
 
 .speed-story__numbers {
   position: relative;
-  margin-top: var(--sw-space-3);
+  margin-top: var(--sw-space-2);
 }
 
 .speed-story__toggle {
@@ -411,8 +411,9 @@
   background: color-mix(in srgb, var(--sw-icon-accent) 45%, transparent);
 }
 
+/* The hint has its own line, under the keys it explains. */
 .lane-legend__hint {
-  margin-left: auto;
+  flex-basis: 100%;
 }
 
 .lane-table {
@@ -513,6 +514,11 @@
     font-size: var(--sw-text-caption);
   }
 
+  /* A phone lane labels every other decade, so labels never touch. */
+  .lane-group__ticks span:nth-child(even):not(:last-child) {
+    visibility: hidden;
+  }
+
   /* The group's ticks sit over the lane column, which spans the row on phones. */
   .lane-group__head {
     grid-template-columns: minmax(0, 1fr) 7.5rem;
@@ -521,10 +527,6 @@
 
   .lane-group__head b {
     grid-column: 1 / -1;
-  }
-
-  .lane-legend__hint {
-    margin-left: 0;
   }
 }
 

@@ -189,7 +189,7 @@
 /* Phones: the lane and chip stack under the name. */
 @container (max-width: 40rem) {
   .fig-range-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: var(--fig-row-columns-phone, minmax(0, 1fr) 7.5rem);
     row-gap: var(--sw-space-1);
     padding-block: var(--sw-space-1-5);
   }
@@ -199,7 +199,7 @@
   }
 
   .fig-chip {
-    min-width: 7.5rem;
+    min-width: 0;
   }
 
   .fig-tip {

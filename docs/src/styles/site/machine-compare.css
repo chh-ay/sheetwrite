@@ -238,6 +238,11 @@
     font-size: var(--sw-text-caption);
   }
 
+  /* A phone axis labels every other step, so labels never touch. */
+  .machines__ticks span:nth-child(even):not(:last-child) {
+    visibility: hidden;
+  }
+
   .machines__values b {
     margin-left: var(--sw-space-1);
   }
