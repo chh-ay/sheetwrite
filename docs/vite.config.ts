@@ -20,6 +20,7 @@ import { defineConfig, type Plugin } from "vite";
 
 import type { IconName } from "./src/icons/icon-names.ts";
 import { inlineIcon } from "./src/icons/inline-icon.ts";
+import { codeHangingIndent } from "./src/lib/code-indent.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
@@ -316,9 +317,9 @@ function markShortInlineCode() {
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   // One frame style for every fence: shell commands use the same code frame as
   // other languages. Long lines wrap, so no line is cut at the frame edge on
-  // any width. The hanging indent is one CSS rule (components.css): Expressive
-  // Code's per-line indent styles would add markup to every highlighted line
-  // that ships in page JavaScript.
+  // any width; codeHangingIndent hangs each continuation under its own line's
+  // indent with a class, where `preserveIndent` would add an inline style to
+  // every line of the page JavaScript.
   defaultProps: { wrap: true, preserveIndent: false, frame: "code" },
   themes: siteCodeThemes(),
   // The token colours are measured against AA in tokens.css; keep them exact.
@@ -366,6 +367,7 @@ const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   useDarkModeMediaQuery: false,
   themeCssSelector: (theme: ExpressiveCodeTheme) => `[data-theme='${theme.type}']`,
   plugins: [
+    codeHangingIndent(),
     sheetwriteCodeHovers({
       cwd: new URL(".", import.meta.url).pathname,
       shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
