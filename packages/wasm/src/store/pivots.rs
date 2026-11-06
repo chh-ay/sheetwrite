@@ -834,8 +834,13 @@ impl CellStore {
         let (Some(layout), Some(cache)) = (pivot.layout.as_ref(), pivot.cache.as_ref()) else {
             return output;
         };
-        output.layout = [layout.rows, layout.cols, layout.header_rows, layout.label_cols]
-            .map(|count| u32::try_from(count).unwrap_or(u32::MAX));
+        output.layout = [
+            layout.rows,
+            layout.cols,
+            layout.header_rows,
+            layout.label_cols,
+        ]
+        .map(|count| u32::try_from(count).unwrap_or(u32::MAX));
         let mut cells: Vec<Value> = (0..layout.rows * layout.cols)
             .map(|offset| cache.cell(layout, offset))
             .collect();
