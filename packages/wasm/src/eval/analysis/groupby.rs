@@ -40,6 +40,7 @@ struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
     pass: &'a mut EvalPass<'p>,
+    /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
     work: usize,
     sums: HashMap<(usize, usize, usize), Value>,

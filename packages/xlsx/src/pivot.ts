@@ -11,8 +11,10 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { colToA1, dateToSerial, labelToCol, sheetNameKey } from "@sheetwrite/core";
+import { cellA1, sheetNameKey } from "@sheetwrite/core";
 
+import { type CellRect, parseCellRect, rectA1 } from "./cell-reference.js";
+import { isoDateSerial, MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
 import {
   type ContentTypeOverride,
   type OpcPackage,
@@ -20,6 +22,7 @@ import {
   relationshipTypeMatches,
 } from "./opc.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
+import type { StylesRegistry } from "./styles.js";
 import {
   decodeXstring,
   encodeXstring,
@@ -47,10 +50,8 @@ import type { ZipPart } from "./zip.js";
  *   file. Pivots that OOXML cannot express stay only in Sheetwrite metadata.
  */
 
-const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const PIVOT_TABLE_REL = `${REL_NS}/pivotTable`;
-const PIVOT_CACHE_REL = `${REL_NS}/pivotCacheDefinition`;
+const PIVOT_TABLE_REL = `${RELATIONSHIPS_NS}/pivotTable`;
+const PIVOT_CACHE_REL = `${RELATIONSHIPS_NS}/pivotCacheDefinition`;
 const PIVOT_TABLE_CONTENT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml";
 const PIVOT_CACHE_CONTENT =
@@ -97,42 +98,6 @@ const CUSTOM_SUBTOTAL_FLAGS = [
   "varPSubtotal",
 ] as const;
 
-interface CellRect {
-  readonly r0: number;
-  readonly c0: number;
-  readonly r1: number;
-  readonly c1: number;
-}
-
-function parseCellReference(text: string): { row: number; col: number } | undefined {
-  const match = /^\$?([A-Z]{1,3})\$?([1-9]\d{0,6})$/i.exec(text);
-  const label = match?.[1];
-  const row = match?.[2];
-  if (label === undefined || row === undefined) return undefined;
-  return { row: Number(row) - 1, col: labelToCol(label.toUpperCase()) };
-}
-
-function parseRect(text: string | undefined): CellRect | undefined {
-  const [first, last = first, extra] = (text ?? "").split(":");
-  if (first === undefined || last === undefined || extra !== undefined) return undefined;
-  const start = parseCellReference(first);
-  const end = parseCellReference(last);
-  if (!start || !end) return undefined;
-  return {
-    r0: Math.min(start.row, end.row),
-    c0: Math.min(start.col, end.col),
-    r1: Math.max(start.row, end.row),
-    c1: Math.max(start.col, end.col),
-  };
-}
-
-function rectA1(rect: CellRect): string {
-  const start = `${colToA1(rect.c0)}${rect.r0 + 1}`;
-  return rect.r0 === rect.r1 && rect.c0 === rect.c1
-    ? start
-    : `${start}:${colToA1(rect.c1)}${rect.r1 + 1}`;
-}
-
 /** Defined and table names compare case-insensitively after NFC normalization. */
 function nameKey(name: string): string {
   return name.normalize("NFC").toUpperCase();
@@ -175,12 +140,9 @@ function sharedItemValue(item: XmlElement): CellScalar | undefined {
       return xmlBoolean(text);
     case "m":
       return null;
-    case "d": {
+    case "d":
       // Cells hold 1900-system serials (the reader shifts 1904 dates), and so do filters.
-      const hasZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(text ?? "");
-      const date = new Date(hasZone ? (text ?? "") : `${text ?? ""}Z`);
-      return Number.isFinite(date.getTime()) ? dateToSerial(date) : undefined;
-    }
+      return isoDateSerial(text ?? "");
     default:
       return undefined;
   }
@@ -216,7 +178,7 @@ function readSource(cache: XmlElement, snapshot: WorkbookSnapshot): ResolvedRead
     };
   }
 
-  const rect = parseRect(xmlAttribute(worksheet, "ref"));
+  const rect = parseCellRect(xmlAttribute(worksheet, "ref") ?? "");
   const sheetName = xmlAttribute(worksheet, "sheet");
   if (!rect || sheetName === undefined) return "its source range is incomplete";
   const key = sheetNameKey(decodeXstring(sheetName));
@@ -262,6 +224,7 @@ function pivotFromXml(
   table: XmlElement,
   cache: XmlElement,
   snapshot: WorkbookSnapshot,
+  numberFormat: (numFmtId: number) => string | undefined,
 ): ReadPivot | string {
   const name = decodeXstring(xmlAttribute(table, "name") ?? "");
   if (!name) return "it has no name";
@@ -316,10 +279,13 @@ function pivotFromXml(
     const aggregation = AGGREGATION_BY_SUBTOTAL.get(subtotal);
     if (!aggregation) return `it uses the ${subtotal} summary`;
     const caption = xmlAttribute(data, "name");
+    const formatId = xmlAttribute(data, "numFmtId");
+    const format = formatId === undefined ? undefined : numberFormat(Number(formatId));
     values.push({
       field: valueFields[index] ?? 0,
       aggregation,
       ...(caption !== undefined ? { name: decodeXstring(caption) } : {}),
+      ...(format !== undefined ? { numberFormat: format } : {}),
     });
   }
 
@@ -437,7 +403,7 @@ function pivotFromXml(
   if (tabularRows > 0 && tabularRows < rows.length) return "it mixes row layouts";
 
   const location = xmlChild(table, "location");
-  const body = parseRect(location ? xmlAttribute(location, "ref") : undefined);
+  const body = location ? parseCellRect(xmlAttribute(location, "ref") ?? "") : undefined;
   if (!location || !body) return "its location is missing";
   const output: CellRect[] = [body];
   // Sheetwrite writes a one-cell location and no page filter cells; only a
@@ -565,6 +531,8 @@ export interface PivotReadInput {
   readonly metadata: WorkbookSnapshot | null;
   /** Grows a sheet so a reference past its last cell stays inside it. */
   extendSheet(sheet: SheetSnapshot, row: number, col: number): void;
+  /** The format code of a `numFmtId` in `styles.xml`, or undefined for General. */
+  numberFormat(numFmtId: number): string | undefined;
 }
 
 /**
@@ -574,7 +542,7 @@ export interface PivotReadInput {
  */
 export async function readPivots(
   packageFile: OpcPackage,
-  { snapshot, sheetParts, metadata, extendSheet }: PivotReadInput,
+  { snapshot, sheetParts, metadata, extendSheet, numberFormat }: PivotReadInput,
   context: XlsxCodecContext,
 ): Promise<ReadonlySet<string>> {
   const modelled = new Set<string>();
@@ -616,7 +584,10 @@ export async function readPivots(
         }
         const cache = caches.get(cachePart);
         const table = await readPivotXml(packageFile, tablePart, "pivotTableDefinition", context);
-        read = table && cache ? pivotFromXml(table, cache, snapshot) : "its XML could not be read";
+        read =
+          table && cache
+            ? pivotFromXml(table, cache, snapshot, numberFormat)
+            : "its XML could not be read";
         if (typeof read !== "string") users.modelled += 1;
       }
       if (typeof read === "string") {
@@ -756,10 +727,11 @@ function resolveWriteSource(
 
 /** Why the definition alone has no OOXML form, or undefined. */
 function definitionBlocker(pivot: PivotDefinition, width: number): string | undefined {
+  const values = implicitValues(pivot);
   const fields = [
     ...pivot.rows,
     ...pivot.columns,
-    ...pivot.values.map((value) => value.field),
+    ...values.map((value) => value.field),
     ...(pivot.filters ?? []).map((filter) => filter.field),
     ...(pivot.sort ?? []).map((sort) => sort.field),
   ];
@@ -770,13 +742,18 @@ function definitionBlocker(pivot: PivotDefinition, width: number): string | unde
   if (new Set(axisFields).size !== axisFields.length) {
     return "it uses one field more than once on its axes";
   }
-  if (pivot.values.some((value) => !SUBTOTAL_BY_AGGREGATION.has(value.aggregation))) {
+  if (values.some((value) => !SUBTOTAL_BY_AGGREGATION.has(value.aggregation))) {
     return "Excel pivot caches have no distinct count";
   }
   if (pivot.filters?.some((filter) => filter.values.length === 0)) {
     return "it filters out every value";
   }
   return undefined;
+}
+
+/** Value fields that aggregate a source field; measures have no pivot-cache form. */
+function implicitValues(pivot: PivotDefinition) {
+  return pivot.values.filter((value) => "field" in value);
 }
 
 /** Type and item statistics of one source field's data cells. */
@@ -1062,6 +1039,7 @@ function pivotTableXml(
   plan: WritePlan,
   cacheId: number,
   savedRect: CellRect | undefined,
+  styles: StylesRegistry,
   context: XlsxCodecContext,
 ): Uint8Array {
   const { pivot } = plan;
@@ -1069,7 +1047,8 @@ function pivotTableXml(
   const subtotals = pivot.subtotals !== false;
   const rows = new Set(pivot.rows);
   const columns = new Set(pivot.columns);
-  const values = new Set(pivot.values.map((value) => value.field));
+  const dataFields = implicitValues(pivot);
+  const values = new Set(dataFields.map((value) => value.field));
   const filters = new Map((pivot.filters ?? []).map((filter) => [filter.field, filter]));
   const pages = [...filters.keys()].filter((field) => !rows.has(field) && !columns.has(field));
   const pageSet = new Set(pages);
@@ -1087,9 +1066,7 @@ function pivotTableXml(
   // Saved output is written as the rendered cells, so the location covers
   // them; otherwise a one-cell location, and the reading application lays the
   // output out on refresh.
-  const anchor = savedRect
-    ? rectA1(savedRect)
-    : `${colToA1(pivot.anchor.col)}${pivot.anchor.row + 1}`;
+  const anchor = savedRect ? rectA1(savedRect) : cellA1(pivot.anchor.row, pivot.anchor.col);
   xml.append(
     `<location ref="${anchor}" firstHeaderRow="1" firstDataRow="1" firstDataCol="1"${pages.length > 0 ? ` rowPageCount="${pages.length}" colPageCount="1"` : ""}/>`,
   );
@@ -1150,12 +1127,12 @@ function pivotTableXml(
     for (const field of pages) xml.append(`<pageField fld="${field}" hier="-1"/>`);
     xml.append("</pageFields>");
   }
-  if (pivot.values.length > 0) {
-    xml.append(`<dataFields count="${pivot.values.length}">`);
-    for (const value of pivot.values) {
+  if (dataFields.length > 0) {
+    xml.append(`<dataFields count="${dataFields.length}">`);
+    for (const value of dataFields) {
       const subtotal = SUBTOTAL_BY_AGGREGATION.get(value.aggregation) ?? "sum";
       xml.append(
-        `<dataField${value.name !== undefined ? ` name="${escapeXml(encodeXstring(value.name))}"` : ""} fld="${value.field}"${subtotal === "sum" ? "" : ` subtotal="${subtotal}"`} baseField="0" baseItem="0"/>`,
+        `<dataField${value.name !== undefined ? ` name="${escapeXml(encodeXstring(value.name))}"` : ""} fld="${value.field}"${subtotal === "sum" ? "" : ` subtotal="${subtotal}"`} baseField="0" baseItem="0"${value.numberFormat ? ` numFmtId="${styles.numberFormatId(value.numberFormat)}"` : ""}/>`,
       );
     }
     xml.append("</dataFields>");
@@ -1203,6 +1180,7 @@ export interface PivotWrite {
 export function preparePivots(
   snapshot: WorkbookSnapshot,
   ordered: readonly SheetSnapshot[],
+  styles: StylesRegistry,
   context: XlsxCodecContext,
 ): PivotWrite | undefined {
   if (!ordered.some((sheet) => (sheet.pivots?.length ?? 0) > 0)) return undefined;
@@ -1288,7 +1266,7 @@ export function preparePivots(
     if (!saved || savedRect) nativeIds.add(plan.pivot.id);
     parts.push(
       { name: cachePart, data: cacheDefinitionXml(plan, names, context) },
-      { name: tablePart, data: pivotTableXml(plan, cacheId, savedRect, context) },
+      { name: tablePart, data: pivotTableXml(plan, cacheId, savedRect, styles, context) },
       {
         name: `xl/pivotTables/_rels/pivotTable${tableNumber}.xml.rels`,
         data: relationshipsXml(

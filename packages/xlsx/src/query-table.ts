@@ -1,13 +1,11 @@
 import type { WorkbookTable } from "@sheetwrite/core";
 
+import { MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
 import { escapeXml } from "./xml.js";
 
 // The writer emits queryTable parts for every table binding, so these stay
 // outside the lazily loaded Power Query module.
-const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const OFFICE_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-
-export const QUERY_TABLE_REL = `${OFFICE_REL}/queryTable`;
+export const QUERY_TABLE_REL = `${RELATIONSHIPS_NS}/queryTable`;
 export const QUERY_TABLE_CONTENT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml";
 

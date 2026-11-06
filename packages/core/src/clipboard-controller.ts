@@ -1,6 +1,6 @@
 import { cellA1, shiftA1Refs } from "./a1.js";
 import { parseCellInput } from "./cell-input.js";
-import { isCellFontFamily, isCellNumberFormat, isCellVerticalAlign } from "./cell-style-fields.js";
+import { isCellFontFamily, isCellVerticalAlign, sanitizeCellStyle } from "./cell-style-fields.js";
 import {
   type ClipboardCell,
   type ClipboardSnapshot,
@@ -69,6 +69,26 @@ function parseExternalInput(source: string, type: Sheet["columns"][number]["type
   const parsed = parseCellInput(source, type);
 
   return parsed.kind === "formula" ? { kind: "literal", value: `'${parsed.src}` } : parsed;
+}
+
+/**
+ * The write of one cell pasted from another workbook or application. Its
+ * formula, reference or text is re-read as typed input for the target column,
+ * so an external formula lands as inert text; other values keep their kind.
+ */
+function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type"]): CellWrite {
+  const value = cell.value;
+  let source: string;
+  if (value.kind === "formula") source = value.src;
+  else if (value.kind === "ref") {
+    source = `=${value.target.sheet}!${cellA1(value.target.row, value.target.col)}`;
+  } else if (typeof value.value === "string") {
+    source = value.value;
+  } else {
+    return { value, style: cell.style };
+  }
+
+  return { value: parseExternalInput(source, type), style: cell.style };
 }
 
 function clipboardHtml(snapshot: ClipboardSnapshot): string {
@@ -185,7 +205,7 @@ function parseClipboardJson(text: string): TrustedClipboard | null {
         row.push({
           value: cellValue,
           resolved,
-          style: safeClipboardStyle(cell.style),
+          style: sanitizeCellStyle(cell.style) ?? {},
         });
       }
 
@@ -254,76 +274,6 @@ function parseClipboardValue(value: unknown): CellValue | null {
   }
 
   return null;
-}
-
-function safeClipboardStyle(value: unknown): CellStyle {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  const input = value as Record<string, unknown>;
-  const style: CellStyle = {};
-  for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"] as const) {
-    if (typeof input[key] === "boolean") style[key] = input[key];
-  }
-
-  if (
-    typeof input.fontSize === "number" &&
-    Number.isFinite(input.fontSize) &&
-    input.fontSize > 0 &&
-    input.fontSize <= 512
-  ) {
-    style.fontSize = input.fontSize;
-  }
-
-  if (typeof input.color === "string") style.color = safeCssColor(input.color);
-  if (typeof input.backgroundColor === "string") {
-    style.backgroundColor = safeCssColor(input.backgroundColor);
-  }
-
-  if (input.align === "left" || input.align === "center" || input.align === "right") {
-    style.align = input.align;
-  }
-
-  if (isCellVerticalAlign(input.verticalAlign)) style.verticalAlign = input.verticalAlign;
-  if (typeof input.fontFamily === "string" && isCellFontFamily(input.fontFamily)) {
-    style.fontFamily = input.fontFamily;
-  }
-
-  if (typeof input.numberFormat === "string" && isCellNumberFormat(input.numberFormat)) {
-    style.numberFormat = input.numberFormat;
-  }
-
-  if (input.border && typeof input.border === "object" && !Array.isArray(input.border)) {
-    const borders: NonNullable<CellStyle["border"]> = {};
-    const borderInput = input.border as Record<string, unknown>;
-    for (const side of ["all", "top", "right", "bottom", "left"] as const) {
-      const candidate = borderInput[side];
-      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
-      const borderValue = candidate as Record<string, unknown>;
-      const border: NonNullable<NonNullable<CellStyle["border"]>[typeof side]> = {};
-      if (typeof borderValue.color === "string") border.color = safeCssColor(borderValue.color);
-      if (
-        typeof borderValue.width === "number" &&
-        Number.isFinite(borderValue.width) &&
-        borderValue.width >= 0 &&
-        borderValue.width <= 64
-      ) {
-        border.width = borderValue.width;
-      }
-
-      if (
-        borderValue.style === "solid" ||
-        borderValue.style === "dashed" ||
-        borderValue.style === "dotted"
-      ) {
-        border.style = borderValue.style;
-      }
-
-      if (Object.keys(border).length > 0) borders[side] = border;
-    }
-
-    if (Object.keys(borders).length > 0) style.border = borders;
-  }
-
-  return style;
 }
 
 function createClipboardToken(): string {
@@ -706,20 +656,7 @@ export class ClipboardController {
       (row, col, targetCol): CellWrite => {
         const cell = snapshot.cells[row]![col]!;
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
-        const value = cell.value;
-        let source: string;
-        if (value.kind === "formula") source = value.src;
-        else if (value.kind === "ref") {
-          source = `=${value.target.sheet}!${cellA1(value.target.row, value.target.col)}`;
-        } else if (typeof value.value === "string") {
-          source = value.value;
-        } else {
-          return { value, style: cell.style };
-        }
-        return {
-          value: parseExternalInput(source, sheet.columns[targetCol]?.type ?? "text"),
-          style: cell.style,
-        };
+        return externalCellWrite(cell, sheet.columns[targetCol]?.type ?? "text");
       },
     );
   }
@@ -730,23 +667,8 @@ export class ClipboardController {
       focus,
       grid.length,
       (row) => grid[row]!.length,
-      (row, col, targetCol): CellWrite => {
-        const cell = grid[row]![col]!;
-        const value = cell.value;
-        let source: string;
-        if (value.kind === "formula") source = value.src;
-        else if (value.kind === "ref") {
-          source = `=${value.target.sheet}!${cellA1(value.target.row, value.target.col)}`;
-        } else if (typeof value.value === "string") {
-          source = value.value;
-        } else {
-          return cell;
-        }
-        return {
-          value: parseExternalInput(source, sheet.columns[targetCol]?.type ?? "text"),
-          style: cell.style,
-        };
-      },
+      (row, col, targetCol): CellWrite =>
+        externalCellWrite(grid[row]![col]!, sheet.columns[targetCol]?.type ?? "text"),
     );
   }
 

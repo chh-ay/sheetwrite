@@ -23,7 +23,7 @@
 
 use std::cell::RefCell;
 
-use crate::calc::{sheet_name_key, Ast, Func, RangeFlags, RefFlags, SheetRef};
+use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value};
 
@@ -480,17 +480,7 @@ fn r1c1_to_a1(text: &str, origin: (u32, u32)) -> Result<String, FormulaError> {
         let separator = remainder.find('C').ok_or(FormulaError::Ref)?;
         let row = r1c1_axis(&remainder[..separator], origin.0, SPILL_MAX_ROWS)?;
         let col = r1c1_axis(&remainder[separator + 1..], origin.1, SPILL_MAX_COLS)?;
-        let mut column = col + 1;
-        let mut letters = [0u8; 3];
-        let mut start = letters.len();
-        while column > 0 {
-            start -= 1;
-            letters[start] = b'A' + ((column - 1) % 26) as u8;
-            column = (column - 1) / 26;
-        }
-        for &letter in &letters[start..] {
-            output.push(char::from(letter));
-        }
+        write_col(col, &mut output);
         output.push_str(&(row + 1).to_string());
     }
     Ok(output)

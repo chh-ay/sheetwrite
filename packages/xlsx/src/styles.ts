@@ -1,6 +1,7 @@
 import type { CellBorder, CellStyle, CellVerticalAlign } from "@sheetwrite/core";
 import { isCellFontFamily } from "@sheetwrite/core";
 
+import { DRAWINGML_NAMESPACES, MAIN_NAMESPACES, MAIN_NS } from "./format.js";
 import {
   assertResource,
   boundedErrorText,
@@ -49,14 +50,6 @@ const BUILTIN_NUMBER_FORMATS: Readonly<Record<number, string>> = {
   49: "@",
 };
 
-const MAIN_NAMESPACES = [
-  "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-  "http://purl.oclc.org/ooxml/spreadsheetml/main",
-] as const;
-const DRAWING_NAMESPACES = [
-  "http://schemas.openxmlformats.org/drawingml/2006/main",
-  "http://purl.oclc.org/ooxml/drawingml/main",
-] as const;
 const INDEXED_COLORS = [
   "000000",
   "FFFFFF",
@@ -233,7 +226,7 @@ function parsedThemeColors(
 ): ReadonlyMap<number, string> {
   const colors = new Map<number, string>();
   if (!root) return colors;
-  assertXmlRoot(root, "theme", DRAWING_NAMESPACES, part);
+  assertXmlRoot(root, "theme", DRAWINGML_NAMESPACES, part);
   const scheme = xmlChild(xmlChild(root, "themeElements") ?? root, "clrScheme");
   if (!scheme) return colors;
   const names = [
@@ -496,9 +489,27 @@ export class StylesRegistry {
   readonly #styleIds = new Map<string, number>([[styleKey(undefined, undefined), 0]]);
   readonly #differentials: CellStyle[] = [];
   readonly #differentialIds = new Map<string, number>();
+  readonly #customFormats: string[] = [];
+  readonly #customFormatIds = new Map<string, number>();
 
   constructor(context: XlsxCodecContext) {
     this.#context = context;
+  }
+
+  /**
+   * The `numFmtId` of `format`: a built-in id, or a custom id from 164 that
+   * `styles.xml` lists. Cell styles and pivot value fields share the ids.
+   */
+  numberFormatId(format: string): number {
+    const builtin = Object.entries(BUILTIN_NUMBER_FORMATS).find(([, value]) => value === format);
+    if (builtin) return Number(builtin[0]);
+    let custom = this.#customFormatIds.get(format);
+    if (custom === undefined) {
+      custom = 164 + this.#customFormats.length;
+      this.#customFormats.push(format);
+      this.#customFormatIds.set(format, custom);
+    }
+    return custom;
   }
 
   register(style: CellStyle | undefined, numberFormat: string | undefined): number {
@@ -551,8 +562,6 @@ export class StylesRegistry {
     const fontIds = new Map<string, number>([["{}", 0]]);
     const fillIds = new Map<string, number>([["{}", 0]]);
     const borderIds = new Map<string, number>([["{}", 0]]);
-    const customFormats: string[] = [];
-    const customFormatIds = new Map<string, number>();
     const xfs: {
       fontId: number;
       fillId: number;
@@ -589,28 +598,14 @@ export class StylesRegistry {
         borders.push(border);
         borderIds.set(borderKey, borderId);
       }
-      let numFmtId = 0;
-      if (record.numberFormat) {
-        const builtin = Object.entries(BUILTIN_NUMBER_FORMATS).find(
-          ([, value]) => value === record.numberFormat,
-        );
-        if (builtin) numFmtId = Number(builtin[0]);
-        else {
-          let custom = customFormatIds.get(record.numberFormat);
-          if (custom === undefined) {
-            custom = 164 + customFormats.length;
-            customFormats.push(record.numberFormat);
-            customFormatIds.set(record.numberFormat, custom);
-          }
-          numFmtId = custom;
-        }
-      }
+      const numFmtId = record.numberFormat ? this.numberFormatId(record.numberFormat) : 0;
       xfs.push({ fontId, fillId, borderId, numFmtId, alignment: style });
     }
 
     const xml = new XmlBuffer(this.#context);
     xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-    xml.append('<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
+    xml.append(`<styleSheet xmlns="${MAIN_NS}">`);
+    const customFormats = this.#customFormats;
     if (customFormats.length > 0) {
       xml.append(`<numFmts count="${customFormats.length}">`);
       for (let index = 0; index < customFormats.length; index++) {
@@ -764,6 +759,13 @@ function parsedDifferentialStyle(
 export class ParsedStyles {
   readonly #styles: ParsedCellStyle[];
   readonly #differentials: CellStyle[];
+  readonly #formats = new Map<number, string>();
+
+  /** The format code of `numFmtId`, or undefined for an unknown id or General. */
+  numberFormat(numFmtId: number): string | undefined {
+    const format = this.#formats.get(numFmtId);
+    return format === "General" ? undefined : format;
+  }
 
   constructor(
     root: XmlElement | undefined,
@@ -779,7 +781,7 @@ export class ParsedStyles {
     }
     assertXmlRoot(root, "styleSheet", MAIN_NAMESPACES, part);
     const theme = parsedThemeColors(themeRoot, themePart);
-    const formats = new Map<number, string>();
+    const formats = this.#formats;
     for (const [id, value] of Object.entries(BUILTIN_NUMBER_FORMATS)) {
       formats.set(Number(id), value);
     }

@@ -569,6 +569,7 @@ pub(crate) struct FormulaResults {
     /// Active calls are separate from results so back edges do not recurse.
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
+    lookups: crate::eval::LookupStates,
     /// Boxed, so the pass workspace the store keeps between passes grows by
     /// one pointer, not by the whole table.
     #[cfg(feature = "analysis")]
@@ -746,6 +747,11 @@ impl FormulaResults {
         self.range_sums.last = Some((range, sum));
     }
 
+    /// The search states of lookup ranges in this pass.
+    pub(crate) fn lookup_states(&mut self) -> &mut crate::eval::LookupStates {
+        &mut self.lookups
+    }
+
     /// The program this pass compiled for exactly `pattern` in this case mode.
     #[cfg(feature = "analysis")]
     pub(crate) fn pass_regex(
@@ -799,6 +805,7 @@ impl FormulaResults {
         self.values.clear();
         self.range_sums.sums.clear();
         self.range_sums.last = None;
+        self.lookups.clear();
         #[cfg(feature = "analysis")]
         {
             self.regexes = None;
@@ -821,6 +828,7 @@ impl FormulaResults {
         if self.range_sums.sums.capacity() > SLOT_PAGE_LEN {
             self.range_sums.sums = Vec::new();
         }
+        self.lookups.release();
 
         // Reuse primary pass storage, never formula values or selected ids.
         work.clear();
@@ -835,6 +843,7 @@ impl FormulaResults {
         formulas.add_vec::<FormulaId>(self.used.len(), self.used.capacity());
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
+        self.lookups.add_memory_stats(formulas);
         formulas.add_vec::<u32>(
             self.range_sums.slots.len(),
             self.range_sums.slots.capacity(),

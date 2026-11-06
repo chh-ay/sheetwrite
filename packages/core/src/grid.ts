@@ -10,7 +10,9 @@ import {
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
+import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
+import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
@@ -73,7 +75,7 @@ import {
   TOOLBAR_HEIGHT,
 } from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
-import { Scope, ScopeSlot } from "./scope.js";
+import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { validateSheetName } from "./sheet-name.js";
@@ -232,6 +234,7 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "importXlsx",
   "versionHistory",
   "saveVersion",
+  "newDashboard",
   "undo",
   "redo",
 ];
@@ -569,6 +572,8 @@ export class GridImpl implements Grid {
   private activeSheet: SheetId;
   /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
   private activeSheetCache: Sheet | null = null;
+  /** Shows the dashboard view while a dashboard sheet is active; spreadsheet grids only. */
+  private dashboardView: DashboardViewHook | null = null;
   /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
   private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
   private readonly virtualColumnTargets = new Map<SheetId, number>();
@@ -587,6 +592,7 @@ export class GridImpl implements Grid {
   private sheetHasSources = true;
   /** The running auto-fit job; a new job or an edit closes it. */
   private readonly autoFits = new ScopeSlot(this.lifetime);
+  private measureContext: CanvasRenderingContext2D | null = null;
   private imports: ScopeSlot | null = null;
   private documentOperations: ScopeSlot | null = null;
   private readonly hasDatasource: boolean;
@@ -913,7 +919,7 @@ export class GridImpl implements Grid {
       colLeftOf: (col) => this.colLeftOf(col),
       rowTop: (row) => this.geometry.rowOffset(row),
       rowHeight: (row) => this.geometry.rowHeight(row),
-      visibleRowWindow: () => this.readWindows.sampleRows(),
+      autoFitColumns: (cols) => this.autoFitColumns(cols),
       previewColumnWidth: (col, width) => {
         this.geometry.previewColumnWidth(col, width);
         this.applyLayout();
@@ -1160,6 +1166,9 @@ export class GridImpl implements Grid {
   private attachPanels(): void {
     if (this.presentation !== "spreadsheet") return;
     this.lifetime.add(attachPanelTriggers(this, this.config?.icons));
+    const dashboard = attachDashboardView(this, this.viewportEl, () => this.readOnly);
+    this.dashboardView = dashboard;
+    this.lifetime.add(() => dashboard.dispose());
   }
 
   private refreshSourcePresence(): void {
@@ -1931,9 +1940,10 @@ export class GridImpl implements Grid {
     return this.loadable.dataEdge(this.activeSheet, row, col, dRow, dCol);
   }
 
+  /** The one detached 2D context that auto-fit measures text with; `trimMemory` drops it. */
   private measurementContext(): CanvasRenderingContext2D | null {
-    const canvas = document.createElement("canvas");
-    return canvas.getContext("2d");
+    this.measureContext ??= document.createElement("canvas").getContext("2d");
+    return this.measureContext;
   }
 
   private requireAutoFitRangeLoaded(range: Range): void {
@@ -1969,20 +1979,16 @@ export class GridImpl implements Grid {
   /** Run `step` in the next frame, unless the job closes first. */
   private scheduleAutoFitChunk(job: AutoFitJob, step: () => void): void {
     this.autoFitStats.scheduledChunks += 1;
-    if (globalThis.requestAnimationFrame === undefined) {
-      job.scope.setTimeout(step, 0);
-      return;
-    }
 
     // Some hosts run the callback synchronously; then no frame is left to cancel.
     let ran = false;
     let removeCancel: (() => void) | undefined;
-    const frame = requestAnimationFrame(() => {
+    const cancel = scheduleFrame(() => {
       ran = true;
       removeCancel?.();
       step();
     });
-    if (!ran) removeCancel = job.scope.add(() => cancelAnimationFrame(frame));
+    if (!ran) removeCancel = job.scope.add(cancel);
   }
 
   private cancelAutoFit(): void {
@@ -2005,12 +2011,9 @@ export class GridImpl implements Grid {
       let required = requiredHeights[requiredIndex] ?? this.baseTheme.rowHeight;
       for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
         const col = columns[columnIndex]!;
-        const valueIndex = (row - view.rows.start) * columns.length + columnIndex;
-        const value = view.values[valueIndex];
-        if (value === null || value === undefined || value === "") continue;
-        const column = sheet.columns[col]!;
-        const cellStyle = view.styles[view.styleIds[valueIndex]!] ?? {};
-        const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
+        const cell = autoFitCell(sheet, view, row, columnIndex, col);
+        if (!cell) continue;
+        const { value, style } = cell;
         const text = cellScalarToText(value);
         if (!style.wrap && !text.includes("\n")) continue;
         const width =
@@ -2039,12 +2042,9 @@ export class GridImpl implements Grid {
     for (let row = view.rows.start; row < view.rows.end; row++) {
       for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
         const col = columns[columnIndex]!;
-        const valueIndex = (row - view.rows.start) * columns.length + columnIndex;
-        const value = view.values[valueIndex];
-        if (value === null || value === undefined || value === "") continue;
-        const column = sheet.columns[col]!;
-        const cellStyle = view.styles[view.styleIds[valueIndex]!] ?? {};
-        const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
+        const cell = autoFitCell(sheet, view, row, columnIndex, col);
+        if (!cell) continue;
+        const { value, style, column } = cell;
         context.font = fontFor(this.baseTheme, style);
         let width = widths[targetOffset + columnIndex]!;
         const text = cellDisplayText(
@@ -2053,7 +2053,7 @@ export class GridImpl implements Grid {
           column.numberLocale,
         );
         for (const line of text.split("\n")) {
-          width = Math.max(width, context.measureText(line).width + 12);
+          width = Math.max(width, context.measureText(line).width + CELL_TEXT_HORIZONTAL_PADDING);
         }
         widths[targetOffset + columnIndex] = width;
       }
@@ -2204,7 +2204,7 @@ export class GridImpl implements Grid {
         bold: column.headerStyle?.bold ?? true,
       });
 
-      widths[index] = context.measureText(column.header).width + 12;
+      widths[index] = context.measureText(column.header).width + CELL_TEXT_HORIZONTAL_PADDING;
     }
 
     const patches: DocumentOp[] = [];
@@ -2657,6 +2657,7 @@ export class GridImpl implements Grid {
   /** Bring editors, tabs, the find bar and command state in line with `readOnly`. */
   private syncReadOnlyChrome(readOnly: boolean): void {
     this.sheetTabs?.setReadOnly(readOnly);
+    this.dashboardView?.sync();
     if (readOnly) {
       this.cancelAutoFit();
       this.interactions.reconcile("read-only");
@@ -3436,6 +3437,9 @@ export class GridImpl implements Grid {
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
       versionHistory: () => this.config?.history?.(this, "open"),
+      // The dashboard chunk names and adds the sheet; first paint carries only this call.
+      newDashboard: () =>
+        void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
       saveVersion: () => {
         if (!this.readOnly) this.config?.history?.(this, "save");
       },
@@ -4002,18 +4006,8 @@ export class GridImpl implements Grid {
   destroy(): void {
     if (this.lifetime.closed) return;
     this.removeEngineFailureListener();
-    let failure: unknown;
-    let failed = false;
-    const cleanup = (operation: () => void): void => {
-      try {
-        operation();
-      } catch (error) {
-        if (!failed) {
-          failure = error;
-          failed = true;
-        }
-      }
-    };
+    const failures = new FirstFailure();
+    const cleanup = (operation: () => void): void => failures.run(operation);
 
     cleanup(() => this.lifetime.close());
     cleanup(() => this.datasourceController.destroy());
@@ -4044,7 +4038,7 @@ export class GridImpl implements Grid {
       for (const listeners of Object.values(this.listeners)) listeners.clear();
     });
 
-    if (failed) throw failure;
+    failures.rethrow();
   }
 
   trimMemory(): void {
@@ -4058,7 +4052,7 @@ export class GridImpl implements Grid {
       this.renderer.trimMemory?.();
     }
     trimNumberFormatCaches();
-    this.interactions.trimMemory();
+    this.measureContext = null;
     this.overlayPainter.trimMemory();
 
     // The next frame reads its window again, so a worker renderer gets every
@@ -4172,4 +4166,27 @@ function changesSheetStructure(patch: DocumentOp): boolean {
     default:
       return false;
   }
+}
+
+/**
+ * The non-empty cell an auto-fit measures at `row` of a window, with its
+ * column style under its own; null for an empty cell.
+ */
+function autoFitCell(
+  sheet: Sheet,
+  view: VisibleWindowView,
+  row: number,
+  columnIndex: number,
+  col: number,
+): { value: CellScalar; style: CellStyle; column: Column } | null {
+  const valueIndex = (row - view.rows.start) * view.cols.length + columnIndex;
+  const value = view.values[valueIndex];
+  if (value === null || value === undefined || value === "") return null;
+
+  const column = sheet.columns[col];
+  if (!column) return null;
+
+  const cellStyle = view.styles[view.styleIds[valueIndex] ?? 0] ?? EMPTY_STYLE;
+  const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
+  return { value, style, column };
 }

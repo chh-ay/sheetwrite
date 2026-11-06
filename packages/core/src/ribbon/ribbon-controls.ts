@@ -4,9 +4,11 @@
 // render through `renderControl`, so they share look, state and keyboard.
 
 import { errorDetail } from "../action-feedback.js";
+import { isDashboard } from "../dashboard.js";
 import type { IconName } from "../icons/icon-names.js";
 import { iconNode } from "../icons/resolve.js";
 import { isKeyboardAction } from "../keymap.js";
+import { selectionCell } from "../selection.js";
 import type { Grid, GridCommandName, GridCommandState, IconOverrides } from "../types/grid.js";
 import {
   EDIT_STATE_COMMAND,
@@ -22,7 +24,7 @@ import {
   type RibbonPlacementSpec,
 } from "./command-spec.js";
 import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
-import { focusAddress, steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
+import { steppedZoom, ZOOM_RESET, zoomLabel } from "./ribbon-model.js";
 import { focusInSurface, type RibbonPopup, showInSurface } from "./ribbon-popup.js";
 
 /**
@@ -483,7 +485,7 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   trigger.setAttribute("aria-haspopup", "dialog");
   trigger.setAttribute("aria-expanded", "false");
   trigger.addEventListener("click", () => {
-    const cell = focusAddress(context.grid);
+    const cell = selectionCell(context.grid.getSelection());
     if (cell === null) return;
 
     const form = document.createElement("form");
@@ -533,6 +535,66 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   };
 }
 
+/** Whether the active sheet is a dashboard, where a pivot reads a table and takes a free box. */
+function activeDashboard(grid: Grid): boolean {
+  const sheet = grid.getActiveSheet();
+  return isDashboard(grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet));
+}
+
+/**
+ * On a dashboard, "Choose the table to analyze" replaces the place form: a
+ * dashboard has no cells, and slicers filter tables, so its pivot reads a table.
+ */
+function openTablePicker(
+  spec: RibbonPlacementSpec,
+  context: RibbonContext,
+  trigger: HTMLButtonElement,
+): void {
+  const form = document.createElement("form");
+  form.className = "sheetwrite-ribbon-form";
+  const tables = context.grid.store.getWorkbook().sheets.flatMap((sheet) => sheet.tables ?? []);
+
+  const label = document.createElement("label");
+  label.textContent = "Choose the table to analyze";
+  const select = document.createElement("select");
+  select.className = "sheetwrite-ribbon-field";
+  for (const table of tables) select.add(new Option(table.name, table.id));
+  label.appendChild(select);
+
+  const error = document.createElement("p");
+  error.className = "sheetwrite-ribbon-form-error";
+  error.setAttribute("role", "alert");
+  error.hidden = tables.length > 0;
+  error.textContent = "Add a table first: a dashboard pivot reads a table.";
+  const save = document.createElement("button");
+  save.type = "submit";
+  save.className = "sheetwrite-ribbon-form-button";
+  save.textContent = "OK";
+  save.disabled = tables.length === 0;
+  form.append(label, error, save);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (save.disabled) return;
+    save.disabled = true;
+    let message: string | null;
+    try {
+      message = await spec.submit(context.grid, { kind: "dashboard", table: select.value });
+    } catch (cause) {
+      message = `${spec.label} could not run: ${errorDetail(cause)}`;
+    } finally {
+      save.disabled = false;
+    }
+    if (message !== null) {
+      error.textContent = message;
+      error.hidden = false;
+      return;
+    }
+    context.popup.closeAll(false);
+  });
+  context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
+}
+
 let placementSerial = 0;
 
 /**
@@ -545,6 +607,10 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
   trigger.setAttribute("aria-haspopup", "dialog");
   trigger.setAttribute("aria-expanded", "false");
   trigger.addEventListener("click", () => {
+    if (activeDashboard(context.grid)) {
+      openTablePicker(spec, context, trigger);
+      return;
+    }
     placementSerial += 1;
     const group = `sheetwrite-ribbon-placement-${placementSerial}`;
     const form = document.createElement("form");
@@ -628,7 +694,9 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     element: trigger,
     refresh({ state }) {
       const next = spec.unavailable(context.grid);
-      trigger.disabled = next !== null || isDisabled("edit", state);
+      // A dashboard has no selection; its table picker needs only an editable grid.
+      const availability = activeDashboard(context.grid) ? "newDashboard" : "edit";
+      trigger.disabled = next !== null || isDisabled(availability, state);
       if (next === reason) return;
       reason = next;
       trigger.title = next ?? spec.label;

@@ -144,8 +144,9 @@ impl WildcardPattern {
         })
     }
 
-    pub(super) fn matches(&self, candidate: &Value) -> bool {
-        criterion_text(candidate).is_some_and(|text| self.wildcard.matches(text))
+    /// Matches the text a lookup candidate shows a wildcard.
+    pub(super) fn matches_text(&self, text: &str) -> bool {
+        self.wildcard.matches(text)
     }
 }
 

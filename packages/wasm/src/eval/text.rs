@@ -692,30 +692,14 @@ mod tests {
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
 
-    use super::super::functions::FuncAccumulator;
-
-    fn accumulator(arguments: Vec<(bool, Vec<Value>)>) -> FuncAccumulator {
-        let mut values = FuncAccumulator::default();
-        for (from_range, argument) in arguments {
-            let cells = argument.len();
-            for value in argument {
-                if from_range {
-                    values.push_range(value).unwrap();
-                } else {
-                    values.push_scalar(value).unwrap();
-                }
-            }
-            values.finish_arg(cells, 1).unwrap();
-        }
-        values
-    }
+    use super::super::test_support::mixed_arguments;
 
     fn evaluate(func: Func, arguments: Vec<Value>) -> Value {
         let arguments = arguments
             .into_iter()
             .map(|value| (false, vec![value]))
             .collect();
-        apply(func, &accumulator(arguments)).unwrap()
+        apply(func, &mixed_arguments(arguments)).unwrap()
     }
 
     fn assert_number(value: Value, expected: f64) {
@@ -731,7 +715,7 @@ mod tests {
 
     #[test]
     fn text_join_flattens_values_with_shared_coercion() {
-        let values = accumulator(vec![
+        let values = mixed_arguments(vec![
             (false, vec![Value::text("|")]),
             (false, vec![Value::Bool(true)]),
             (
@@ -749,7 +733,7 @@ mod tests {
             Value::text("a|TRUE|2")
         );
 
-        let error = accumulator(vec![
+        let error = mixed_arguments(vec![
             (false, vec![Value::text(",")]),
             (false, vec![Value::Bool(false)]),
             (true, vec![Value::Error(FormulaError::Ref)]),

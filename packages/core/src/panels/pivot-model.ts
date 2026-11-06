@@ -50,7 +50,7 @@ export function areaFields(pivot: PivotDefinition, area: PivotArea): number[] {
     case "columns":
       return [...pivot.columns];
     case "values":
-      return pivot.values.map((value) => value.field);
+      return pivot.values.map((value) => ("field" in value ? value.field : -1));
     case "filters":
       return (pivot.filters ?? []).map((filter) => filter.field);
   }
@@ -105,6 +105,8 @@ function removePlacement(
     case "values": {
       const value = pivot.values[index];
       if (value === undefined) return [pivot, null];
+      if ("measure" in value)
+        return [{ ...pivot, values: withoutIndex(pivot.values, index) }, null];
       return [
         { ...pivot, values: withoutIndex(pivot.values, index) },
         { field: value.field, value },
@@ -181,6 +183,13 @@ export function placeField(
 
 /** Remove one entry from its area. */
 export function removeField(pivot: PivotDefinition, placement: PivotPlacement): PivotDefinition {
+  // A measure value has no source field to carry anywhere, so removing it
+  // is the one edit it takes.
+  const value = placement.area === "values" ? pivot.values[placement.index] : undefined;
+  if (value !== undefined && "measure" in value) {
+    return { ...pivot, values: withoutIndex(pivot.values, placement.index) };
+  }
+
   const [next, entry] = removePlacement(pivot, placement);
   return entry === null ? pivot : pruneSort(next);
 }
@@ -199,6 +208,37 @@ export function shiftField(
   return placeField(pivot, field, placement.area, facts, placement, target);
 }
 
+/**
+ * Number formats the field list offers, as Excel's Format Cells
+ * categories: General (no format), then a code for each category. Custom
+ * codes are typed.
+ */
+export const VALUE_NUMBER_FORMATS: readonly (readonly [string, string])[] = [
+  ["", "General"],
+  ["#,##0.00", "Number"],
+  ["$#,##0.00", "Currency"],
+  ["0.00%", "Percentage"],
+  ["0.00E+00", "Scientific"],
+];
+
+/** `pivot` with value field `index` shown in `format`; undefined shows it as General. */
+export function setNumberFormat(
+  pivot: PivotDefinition,
+  index: number,
+  format: string | undefined,
+): PivotDefinition {
+  return {
+    ...pivot,
+    values: pivot.values.map((value, position) => {
+      if (position !== index) return value;
+      const next = { ...value };
+      if (format === undefined) delete next.numberFormat;
+      else next.numberFormat = format;
+      return next;
+    }),
+  };
+}
+
 export function setAggregation(
   pivot: PivotDefinition,
   index: number,
@@ -207,7 +247,7 @@ export function setAggregation(
   return {
     ...pivot,
     values: pivot.values.map((value, position) =>
-      position === index ? { ...value, aggregation } : value,
+      position === index && "field" in value ? { ...value, aggregation } : value,
     ),
   };
 }
@@ -366,4 +406,26 @@ export function nextPivotIdentity(pivots: readonly PivotDefinition[]): {
   let number = pivots.length + 1;
   while (ids.has(`pivot-${number}`) || names.has(`PivotTable${number}`)) number += 1;
   return { id: `pivot-${number}`, name: `PivotTable${number}` };
+}
+
+/** Sort order of filter values: numbers, then text, then logicals, then blank. */
+export function compareScalars(a: CellScalar, b: CellScalar): number {
+  const rank = (value: CellScalar): number =>
+    typeof value === "number"
+      ? 0
+      : typeof value === "string"
+        ? 1
+        : typeof value === "boolean"
+          ? 2
+          : 3;
+  const byRank = rank(a) - rank(b);
+  if (byRank !== 0) return byRank;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
+  return Number(a) - Number(b);
+}
+
+/** The label of a filter or slicer value; a blank shows as "(blank)", as in Excel. */
+export function scalarLabel(value: CellScalar): string {
+  return value === null || value === "" ? "(blank)" : String(value);
 }
