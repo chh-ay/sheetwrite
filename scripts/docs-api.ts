@@ -822,13 +822,13 @@ function closingIndex(text: string, open: number): number {
 }
 
 /**
- * The parameters and return type of the first `function name(…)` signature in
- * a declaration, or undefined when the declaration is not a plain function.
+ * The parameters and return type of a function's first call signature, given
+ * as the manifest records it (`<T>(a: A, b?: B): R`) or as a declaration
+ * (`function name(…): R`); undefined when neither shape matches.
  */
 export function functionFields(signature: string, name: string): FunctionFields | undefined {
-  const start = signature.indexOf(`function ${name}`);
-  if (start === -1) return undefined;
-  let open = start + `function ${name}`.length;
+  const declared = signature.indexOf(`function ${name}`);
+  let open = declared === -1 ? 0 : declared + `function ${name}`.length;
   if (signature[open] === "<") open = closingIndex(signature, open) + 1;
   if (signature[open] !== "(") return undefined;
   const close = closingIndex(signature, open);

@@ -769,7 +769,7 @@
 
 /* The example aside: after the reference on narrow screens, beside it (and
    sticky) on wide ones. */
-.sw-prose .api-layout__aside > h2 {
+.sw-docs .sw-prose .api-layout__aside > h2 {
   margin-top: var(--sw-space-10);
 }
 @media (min-width: 88rem) {
@@ -789,7 +789,7 @@
     overflow-y: auto;
     scrollbar-width: thin;
   }
-  .sw-prose .api-layout__aside > h2 {
+  .sw-docs .sw-prose .api-layout__aside > h2 {
     margin-top: 0;
     color: var(--sw-fg-muted);
     font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);

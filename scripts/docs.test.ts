@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
   documentationLinkRoutes,
+  functionFields,
   movedPageIssues,
   renderEntryPage,
   renderSymbolPage,
@@ -793,5 +794,33 @@ describe("generated docs ownership", () => {
     for (const page of GENERATED_CONTENT_PAGES) {
       expect(ignored.has(`docs/src/content/docs/${page}`)).toBeTrue();
     }
+  });
+});
+
+describe("API function fields", () => {
+  it("reads parameters and the return type from a recorded signature", () => {
+    expect(functionFields("(host: HTMLElement, opts: GridOptions): Grid", "createGrid")).toEqual({
+      parameters: [
+        { name: "host", type: "HTMLElement", optional: false },
+        { name: "opts", type: "GridOptions", optional: false },
+      ],
+      returns: "Grid",
+    });
+  });
+
+  it("keeps generic, function and record types whole", () => {
+    expect(
+      functionFields(
+        "<T>(map: Map<string, T>, pick?: (value: T, key: string) => boolean, ...rest: T[]): Promise<T[]>",
+        "pickAll",
+      ),
+    ).toEqual({
+      parameters: [
+        { name: "map", type: "Map<string, T>", optional: false },
+        { name: "pick", type: "(value: T, key: string) => boolean", optional: true },
+        { name: "...rest", type: "T[]", optional: false },
+      ],
+      returns: "Promise<T[]>",
+    });
   });
 });
