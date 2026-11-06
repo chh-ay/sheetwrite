@@ -548,7 +548,7 @@ function sameScalar(left: CellScalar, right: CellScalar): boolean {
 
 /**
  * The values of `item` that some row has under the other slicers, from its
- * hidden pivot: one header row, then one label per row with data. Null when
+ * hidden pivot: one header cell, then one label per value with data. Null when
  * the item shows every value or the engine has no output for it.
  */
 function slicerValuesWithData(
@@ -562,8 +562,6 @@ function slicerValuesWithData(
   if (owner === undefined) return null;
   const cells = dashboardPivotCells(grid, sheet, dataPivotIndex(owner, item, workbook.sheets));
   if (cells === null || cells.length === 0) return null;
-  // A pivot with no value fields has a label column and one blank value column.
-  const labels: CellScalar[] = [];
-  for (let index = 2; index < cells.length; index += 2) labels.push(cells[index] ?? null);
-  return labels;
+  // A pivot with no value fields and no totals is one label column under its header.
+  return cells.slice(1);
 }
