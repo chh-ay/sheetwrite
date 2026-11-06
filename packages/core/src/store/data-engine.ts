@@ -1859,14 +1859,11 @@ export class StoreDataEngine {
   }
 
   /**
-   * The engine output of a pivot on a dashboard, which places none in cells;
-   * the caller frees it. Null on the default engine or for an unknown pivot.
+   * The engine output of the pivot at `index` in a dashboard's payload,
+   * which places none in cells; the caller frees it. Null on the default
+   * engine. Indices past the sheet's pivots read hidden pivots of a pivot view.
    */
-  dashboardPivotOutput(sheet: SheetId, id: string): PivotOutputCells | null {
-    const index =
-      this.workbook.sheets
-        .find((candidate) => candidate.id === sheet)
-        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+  dashboardPivotOutput(sheet: SheetId, index: number): PivotOutputCells | null {
     if (index < 0 || !this.wasm.pivotOutput) return null;
     return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
