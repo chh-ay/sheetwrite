@@ -1015,8 +1015,8 @@ function WindowNavigator({ workbench }: Readonly<{ workbench: PerformanceWorkben
           {
             label: "Window",
             value: (
-              <span data-testid="scale-window-a1">
-                {windowA1}
+              <>
+                <span data-testid="scale-window-a1">{windowA1}</span>
                 <span className="sw-sp-visually-hidden">
                   <span data-testid="scale-window-rows">
                     {firstRow + 1}–{lastRow + 1}
@@ -1025,7 +1025,7 @@ function WindowNavigator({ workbench }: Readonly<{ workbench: PerformanceWorkben
                     {colToA1(firstColumn)}–{colToA1(lastColumn)}
                   </span>
                 </span>
-              </span>
+              </>
             ),
           },
           {
