@@ -23,13 +23,26 @@
  * `test/design-tokens.test.ts` measures every text and icon pair below
  * against WCAG AA in both themes.
  */
+/* Arial (Liberation Sans on Linux) scaled to Space Grotesk's width and line
+   metrics, so headings keep their line breaks while the web font loads.
+   Values from both fonts' hhea and advance widths over a heading sample. */
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial"), local("Liberation Sans"), local("Helvetica");
+  size-adjust: 108.01%;
+  ascent-override: 91.1%;
+  descent-override: 27.03%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* ── Type ─────────────────────────────────────────────────────────────
      Three families: Space Grotesk for display and headings, Inter for body
      and interface text, JetBrains Mono for code and eyebrows. Roles, not raw
      sizes: a stylesheet picks the role that matches the text's job. */
   --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
-  --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --sw-font-display:
+    "Space Grotesk Variable", "Space Grotesk", "Space Grotesk Fallback", system-ui, sans-serif;
   --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
