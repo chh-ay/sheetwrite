@@ -120,7 +120,6 @@ function SortControls({
             disabled={disabled || snapshot?.viewSort === null}
             icon="eye-off"
             onClick={() => void run("Clear view sort", (current) => current.clearViewSort())}
-            variant="quiet"
           >
             Clear view sort
           </ControlButton>
@@ -136,7 +135,6 @@ function SortControls({
             disabled={disabled}
             icon="undo"
             onClick={() => void run("Undo", (current) => current.undo())}
-            variant="quiet"
           >
             Undo
           </ControlButton>

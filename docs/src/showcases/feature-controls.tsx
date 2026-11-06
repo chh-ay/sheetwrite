@@ -25,13 +25,13 @@ export function ControlActions({ children }: { readonly children: ReactNode }) {
   return <div className="sw-feature-actions">{children}</div>;
 }
 
-/** Empty rows a sized grid keeps under its data, so the last row never meets the tabs. */
-const GRID_SPARE_ROWS = 2;
+/** The empty row a sized grid keeps under its data, so the last row never meets the tabs. */
+const GRID_SPARE_ROWS = 1;
 
 /**
  * The live grid of a showcase. Without `rows` it takes the shared stage height;
- * with `rows`, where the panel follows the demo it fits that many sheet rows
- * plus a small margin, so short data does not sit above a band of empty rows.
+ * with `rows`, it fits that many sheet rows plus one, so short data does not
+ * sit above a band of empty rows.
  */
 export function DemoGrid({
   hostRef,

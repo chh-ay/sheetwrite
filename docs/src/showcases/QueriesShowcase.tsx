@@ -137,7 +137,6 @@ function QueriesControls({
             disabled={busy}
             icon="undo"
             onClick={() => void run("Undo", (current) => current.undo())}
-            variant="quiet"
           >
             Undo
           </ControlButton>

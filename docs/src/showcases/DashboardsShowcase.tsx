@@ -60,7 +60,6 @@ function DashboardControls({
             disabled={disabled}
             icon="undo"
             onClick={() => void run("Undo", (current) => current.undo())}
-            variant="quiet"
           >
             Undo
           </ControlButton>
