@@ -1,11 +1,11 @@
 /* Capability pages use site tokens for both the page and the live workbooks. */
 
-/* ---------- shared page shell ---------- */
+/* ---------- wrappers inside the shared showcase layout ---------- */
 
 .sw-proofs-page {
-  width: calc(100% - 2 * var(--sw-page-inset));
-  margin-inline: auto;
-  padding-block: var(--sw-space-3) clamp(var(--sw-space-12), 8vh, var(--sw-space-20));
+  display: grid;
+  gap: var(--sw-space-10);
+  min-width: 0;
   color: var(--sw-fg);
   font-family: var(--sw-font-body);
 }

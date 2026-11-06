@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
-import { CapabilityHero } from "./CapabilityHero.js";
+import { ShowcaseLayout, ShowcaseSection } from "./layout/ShowcaseLayout.js";
 
 export interface ProofFact {
   label: string;
@@ -63,19 +62,24 @@ export function ProofPage({
   const sheetwriteRows = boundary.filter((row) => row.owner === "sheetwrite");
   const hostRows = boundary.filter((row) => row.owner === "host");
   return (
-    <div className="sw-showcase-frame">
-      <SiteTopbar />
-      <main className="sw-proofs-page" data-proof={slug}>
-        <CapabilityHero description={description} eyebrow={eyebrow} facts={facts} title={title} />
-
-        <section aria-label={`${title} live scenario`} className="sw-proofs-page__stage">
+    <ShowcaseLayout
+      demo={
+        <div className="sw-proofs-page" data-proof={slug}>
           <div className="sw-proofs-page__viewport">{children}</div>
-          <footer className="sw-proofs-page__prompt">
-            <strong>Try it</strong>
-            <span>{prompt}</span>
-          </footer>
-        </section>
-
+        </div>
+      }
+      demoLabel={`${title} live scenario`}
+      eyebrow={eyebrow}
+      facts={facts}
+      guide={{ href: guideHref, label: guideLabel }}
+      id={slug}
+      task={description}
+      title={title}
+    >
+      <ShowcaseSection id={`${slug}-try`} title="Try it">
+        <p>{prompt}</p>
+      </ShowcaseSection>
+      <div className="sw-proofs-page" data-proof={slug}>
         <section aria-labelledby={`${slug}-proof-points`} className="sw-proofs-page__points">
           <header>
             <p className="sw-proofs-page__eyebrow">VERIFIED IN THIS SCENARIO</p>
@@ -159,7 +163,7 @@ export function ProofPage({
             </a>
           </nav>
         </footer>
-      </main>
-    </div>
+      </div>
+    </ShowcaseLayout>
   );
 }
