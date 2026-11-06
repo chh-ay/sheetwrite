@@ -89,45 +89,58 @@ impl DirtyRect {
     }
 }
 
-/// Exact dirty source cells in one flat list: a sorted, unique prefix and an
-/// unsorted tail. Writes in address order (a load or a fill) extend the
-/// prefix. A write already in the prefix is found by binary search and adds
-/// nothing. Others append to the tail, which is sorted into the prefix and
-/// deduplicated in place before the list grows, so repeated edits of a few
-/// cells stay bounded without hashing.
+/// Exact dirty source cells in one flat list: a sorted, unique prefix and a
+/// tail. Writes in address order (a load or a fill) extend the prefix. A
+/// write that restarts lower (the next column of a spill) starts the tail,
+/// which stays a sorted run while writes keep ascending. A write already in
+/// either sorted run is found by binary search and adds nothing. Once the
+/// tail is out of order it may hold repeats, so the whole list is sorted and
+/// deduplicated in place before it grows: repeated edits of a few cells stay
+/// bounded without hashing.
 #[derive(Default)]
 struct DirtyCells {
     cells: Vec<CellKey>,
     sorted_len: usize,
+    tail_sorted: bool,
 }
 
 impl DirtyCells {
     fn insert(&mut self, key: CellKey) {
         let len = self.cells.len();
-        match self.cells.last() {
-            Some(&last) if last == key => return,
-            Some(&last) if self.sorted_len == len && last < key => {
-                self.cells.push(key);
-                self.sorted_len += 1;
-                return;
-            }
-            None => {
-                self.cells.push(key);
-                self.sorted_len = 1;
-                return;
-            }
-            Some(_) => {}
+        let Some(&last) = self.cells.last() else {
+            self.cells.push(key);
+            self.sorted_len = 1;
+            return;
+        };
+        if last == key {
+            return;
         }
 
-        let prefix = self.cells.get(..self.sorted_len).unwrap_or_default();
+        let prefix_only = self.sorted_len == len;
+        if prefix_only && last < key {
+            self.cells.push(key);
+            self.sorted_len += 1;
+            return;
+        }
+
+        let (prefix, tail) = self.cells.split_at(self.sorted_len.min(len));
         if prefix.binary_search(&key).is_ok() {
             return;
         }
 
-        // Fold the tail before growing. Room for as many cells again as
-        // survive the fold keeps each fold amortized.
+        if prefix_only {
+            self.tail_sorted = true;
+        } else if self.tail_sorted && last > key {
+            if tail.binary_search(&key).is_ok() {
+                return;
+            }
+            self.tail_sorted = false;
+        }
+
+        // Fold before growing. Sorting two ascending runs is a linear merge,
+        // and room for as many cells again as survive keeps folds amortized.
         if len == self.cells.capacity() {
-            self.cells.sort_unstable();
+            self.cells.sort();
             self.cells.dedup();
             self.sorted_len = self.cells.len();
             if self.cells.binary_search(&key).is_ok() {
@@ -137,6 +150,8 @@ impl DirtyCells {
             self.cells.reserve(self.cells.len());
             if self.cells.last().is_none_or(|&last| last < key) {
                 self.sorted_len += 1;
+            } else {
+                self.tail_sorted = true;
             }
         }
 
