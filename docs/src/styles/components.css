@@ -474,7 +474,13 @@ samp,
     "liga" 0;
 }
 
-/* Phones: code steps down a size; long lines wrap (Expressive Code `wrap`). */
+/* Wrapped code lines continue under a two-character hanging indent. */
+:root .expressive-code .ec-line .code {
+  padding-inline-start: 2ch;
+  text-indent: -2ch;
+}
+
+/* Phones: code steps down a size. */
 @media (max-width: 30rem) {
   :root .expressive-code pre {
     font-size: var(--sw-text-caption);
