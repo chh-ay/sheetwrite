@@ -159,6 +159,8 @@ export class Ribbon {
     this.lifetime.add(
       onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
     );
+    // Some commands depend on the document, such as Edit Links on its links.
+    this.lifetime.add(grid.on("change", () => this.updateAvailability()));
     // Absent in some test environments; the ribbon then never shrinks groups.
     if (typeof ResizeObserver === "function") {
       const resizeObserver = new ResizeObserver(() => this.scheduleFit());

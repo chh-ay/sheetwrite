@@ -3,6 +3,7 @@ import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { HighlightedCode } from "../components/HighlightedCode.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { isRepeatClick } from "../lib/action-guard.js";
 import { ActionError, useAction } from "../lib/use-action.js";
@@ -522,7 +523,7 @@ export default function EngineShowcase() {
               <span className="sw-engine__eyebrow">SAME READS, NEW CONSTANT</span>
               <p>
                 Rewrite the forecast formula in {ENGINE_COLUMN_LETTER.forecast}
-                {rowLabel} from <code>=${offScreenRead}</code> to{" "}
+                {rowLabel} from <HighlightedCode code={`=${offScreenRead}`} language="formula" /> to{" "}
                 <code>
                   =${offScreenRead}*{ENGINE_FORECAST_UPSIDE}
                 </code>
@@ -594,7 +595,7 @@ export default function EngineShowcase() {
                           ? `${formatEngineValue(dependency.kind, dependency.before)} → ${formatEngineValue(dependency.kind, dependency.after)}`
                           : "Not loaded in this window"}
                       </strong>
-                      <code>{dependency.formula}</code>
+                      <HighlightedCode code={dependency.formula} language="formula" />
                     </li>
                   );
                 })}

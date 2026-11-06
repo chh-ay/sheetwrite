@@ -4,11 +4,16 @@ import {
   type LazyExoticComponent,
   lazy,
 } from "react";
-import type { ReactNode } from "react";
+
+import type { OutlineItem } from "./outline.js";
 
 export interface DocumentFrontmatter {
   title: string;
   description: string;
+  /** Declaration kind of a generated API symbol page (`interface`, `function`, …). */
+  kind?: string;
+  /** The page's outline, collected at build time; see lib/outline.ts. */
+  outline?: readonly OutlineItem[];
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -16,7 +21,8 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  FormulaReference?: ComponentType<{ children: ReactNode }>;
+  /** A formula family's table and filter; see FormulaReference.tsx. */
+  FormulaReference?: ComponentType<{ family: string }>;
 }
 
 type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;
@@ -67,6 +73,8 @@ export async function documentForSplat(
   return {
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
+    kind: module.frontmatter?.kind,
+    outline: module.frontmatter?.outline ?? [],
   };
 }
 

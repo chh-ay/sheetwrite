@@ -59,7 +59,10 @@ const FLIGHTS: Readonly<Record<FlightKind, FlightPlan>> = {
       // Move on a log scale, so every leg covers one order of magnitude evenly.
       const from = Math.log10((DEPTH_STOPS[leg] ?? 0) + 1);
       const to = Math.log10((DEPTH_STOPS[leg + 1] ?? LAST_ROW) + 1);
-      return { row: Math.min(LAST_ROW, Math.round(10 ** (from + (to - from) * move) - 1)), col: 0 };
+      return {
+        row: Math.min(LAST_ROW, Math.round(10 ** (from + (to - from) * move) - 1)),
+        col: 0,
+      };
     },
   },
   corner: {
@@ -72,7 +75,10 @@ const FLIGHTS: Readonly<Record<FlightKind, FlightPlan>> = {
       const { leg, move } = legAt(t, CORNER_STOPS.length - 1);
       const from = CORNER_STOPS[leg] ?? 0;
       const share = from + ((CORNER_STOPS[leg + 1] ?? 1) - from) * move;
-      return { row: Math.round(share * LAST_ROW), col: Math.round(share * LAST_COLUMN) };
+      return {
+        row: Math.round(share * LAST_ROW),
+        col: Math.round(share * LAST_COLUMN),
+      };
     },
   },
   teleport: {
@@ -138,7 +144,12 @@ interface ScaleFlightDeckProps {
   /** The latest paged-store sample from the page, shown when no flight is running. */
   resident: { bytes: number; cells: number };
   tiles: readonly (DatasourceTile & { residence: string })[];
-  window: { firstRow: number; lastRow: number; firstColumn: number; lastColumn: number };
+  window: {
+    firstRow: number;
+    lastRow: number;
+    firstColumn: number;
+    lastColumn: number;
+  };
   onJump(row: number, col: number): void;
   onStatus(message: string): void;
 }
@@ -195,7 +206,10 @@ export function ScaleFlightDeck({
       if (!stats) return { residentBytes: 0, loadedCells: 0 };
       peakResidentBytes = Math.max(peakResidentBytes, stats.allocatedBytes);
       peakLoadedCells = Math.max(peakLoadedCells, stats.loadedCells);
-      return { residentBytes: stats.allocatedBytes, loadedCells: stats.loadedCells };
+      return {
+        residentBytes: stats.allocatedBytes,
+        loadedCells: stats.loadedCells,
+      };
     };
 
     const finish = (now: number) => {
@@ -252,7 +266,11 @@ export function ScaleFlightDeck({
           last = next;
           visited.add(next.row * SCALE_COLUMNS + next.col);
           // Scrolling alone moves the view; the destination is selected once, at the end.
-          mounted.scrollToCell({ sheet: FEED_SHEET, row: next.row, col: next.col });
+          mounted.scrollToCell({
+            sheet: FEED_SHEET,
+            row: next.row,
+            col: next.col,
+          });
         }
       }
       const resident = sample();
@@ -394,7 +412,12 @@ const MAP_HEIGHT = 216;
 
 interface ScaleMinimapProps {
   tiles: readonly (DatasourceTile & { residence: string })[];
-  window: { firstRow: number; lastRow: number; firstColumn: number; lastColumn: number };
+  window: {
+    firstRow: number;
+    lastRow: number;
+    firstColumn: number;
+    lastColumn: number;
+  };
   onJump(row: number, col: number): void;
 }
 
@@ -433,7 +456,7 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
     const accent = color("--sw-accent", "#10b981");
     const muted = color("--sw-border", "#cbd5e1");
     const strong = color("--sw-fg-strong", "#0f172a");
-    const warn = color("--sw-demo-warn", "#f59e0b");
+    const warn = color("--sw-warning", "#f59e0b");
 
     context.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
     context.strokeStyle = muted;

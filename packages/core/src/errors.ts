@@ -159,7 +159,8 @@ export type SheetwriteErrorOperation =
   | "hyperlink-activate"
   | "keyboard-configure"
   | "chart-view"
-  | "host-function";
+  | "host-function"
+  | "external-link";
 
 /**
  * Every `SheetwriteErrorOperation`, for hosts that list the operations at run
@@ -196,6 +197,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "keyboard-configure",
   "chart-view",
   "host-function",
+  "external-link",
 ] as const satisfies readonly SheetwriteErrorOperation[];
 
 /** JSON-safe values accepted in a public failure context. */

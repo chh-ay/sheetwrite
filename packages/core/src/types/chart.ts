@@ -38,6 +38,20 @@ export interface ChartDefinition {
   legend?: "none" | "top" | "right" | "bottom" | "left";
   anchor: ChartAnchor;
   series: ChartSeries[];
+  /**
+   * The ID of a pivot on the same sheet whose result the chart shows, as an
+   * Excel PivotChart does: the leaf row items are the categories, with the
+   * outer items joined into each label, and each value field (for each
+   * column item) is a series. Subtotals and grand totals are never points.
+   * `series` is empty then.
+   */
+  pivot?: string;
+  /**
+   * The value fields of the pivot that the chart plots, by position in the
+   * pivot's `values`, as the Field List picks a PivotChart's values in
+   * Excel. Absent plots every value field. Only valid with `pivot`.
+   */
+  pivotValues?: number[];
 }
 
 /** Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order. */
@@ -78,7 +92,8 @@ export interface ChartRef {
 export interface ChartChangeEvent {
   /**
    * Store epoch after the commit. `undefined` when the store sent its change
-   * event without an epoch, which a custom `Store` can do.
+   * event without an epoch, which a custom `Store` can do, or when the pivot
+   * views that charts over pivots read were computed again without a commit.
    */
   readonly epoch: number | undefined;
   /** Charts to resolve again, in commit order of the edits that touched them. */

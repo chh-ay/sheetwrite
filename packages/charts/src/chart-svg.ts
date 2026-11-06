@@ -167,17 +167,20 @@ function categoryLabels(series: readonly ChartSeriesView[], count: number): stri
   return labels;
 }
 
-/** The first value format of the series, which the value axis uses, as Excel's "linked to source" does. */
+/**
+ * The value axis format: the first series' format, as Excel's "linked to
+ * source" axis uses the first series. A General first series keeps General
+ * ticks even when a later series has a format.
+ */
 function valueAxisFormat(series: readonly ChartSeriesView[]): {
   format: string | null;
   locale: string | null;
 } {
-  for (const entry of series) {
-    const format = entry.numberFormats.find((code) => code !== null);
-    if (format !== undefined) return { format, locale: entry.numberLocale };
-  }
-
-  return { format: null, locale: series[0]?.numberLocale ?? null };
+  const first = series[0];
+  return {
+    format: first?.numberFormats.find((code) => code !== null) ?? null,
+    locale: first?.numberLocale ?? null,
+  };
 }
 
 function valueRange(series: readonly ChartSeriesView[]): { min: number; max: number } {

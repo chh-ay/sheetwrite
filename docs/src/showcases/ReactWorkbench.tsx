@@ -9,10 +9,10 @@ import type { GridConfig } from "@sheetwrite/core";
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { Link } from "@tanstack/react-router";
-import { FileSpreadsheet, Monitor } from "lucide-react";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { Icon } from "../components/Icon.js";
 import { ActionError, pendingProps } from "../lib/use-action.js";
 import { money, useAnalyticsWorkbench } from "./react-analytics.js";
 import { ANALYTICS_MARKETS, ANALYTICS_SEGMENTS, ANALYTICS_THEME } from "./scenarios/analytics.js";
@@ -100,7 +100,7 @@ export default function ReactWorkbench() {
         <header className="sw-demo-controlbar sw-rwb-commandbar">
           <div className="sw-demo-controlbar__identity">
             <span className="sw-demo-product__mark" aria-hidden="true">
-              <FileSpreadsheet size={16} strokeWidth={1.8} />
+              <Icon name="sheet" />
             </span>
             <div>
               <h2>Pipeline analytics</h2>
@@ -148,7 +148,7 @@ export default function ReactWorkbench() {
             data-state={bench.generation === 0 ? "pending" : "resolved"}
             role="status"
           >
-            <Monitor aria-hidden="true" size={14} />
+            <Icon name="monitor" />
             {bench.generation === 0 ? "Connecting" : "React synced"}
           </span>
         </header>

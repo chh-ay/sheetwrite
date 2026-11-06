@@ -12,6 +12,7 @@ import {
   navigationBadge,
   nearestNavigationItem,
 } from "../lib/navigation.js";
+import type { OutlineItem } from "../lib/outline.js";
 import {
   LATEST_RELEASE,
   RELEASES_HREF,
@@ -22,9 +23,10 @@ import {
 } from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
+import { Icon } from "./Icon.js";
 import { PackageCommand } from "./PackageCommand.js";
+import { SiteTopbar } from "./SiteTopbar.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
-import { ThemeToggle } from "./ThemeToggle.js";
 
 /**
  * Keep the sidebar only when it fits beside the reading panel; smaller
@@ -37,24 +39,16 @@ interface DocsShellProps {
   activeHref?: string;
   children: ReactNode;
   description: string;
+  /** Declaration kind of an API symbol page, shown as a chip beside the title. */
+  kind?: string;
   /**
    * Include a collapsible outline above the article on narrow screens.
    * The task-oriented overview omits it.
    */
+  /** The page's outline from the build, shown before the article is read. */
+  outline?: readonly OutlineItem[];
   reserveOutline?: boolean;
   title: string;
-}
-
-function Brand() {
-  return (
-    <Link aria-label="Sheetwrite home" className="sw-brand" to="/">
-      <svg aria-hidden="true" viewBox="0 0 32 32">
-        <rect height="26" rx="5" width="26" x="3" y="3" />
-        <path d="M3 11h26M11 3v26M20 11v18M11 20h18" />
-      </svg>
-      <span>Sheetwrite</span>
-    </Link>
-  );
 }
 
 function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
@@ -103,7 +97,7 @@ function LatestReleaseCard({
       <strong>Sheetwrite {LATEST_RELEASE.version}</strong>
       <span className="sw-release-card__summary">{LATEST_RELEASE.summary}</span>
       <span className="sw-release-card__more">
-        Read the release notes <span aria-hidden="true">→</span>
+        Read the release notes <Icon name="arrow-right" />
       </span>
     </Link>
   );
@@ -111,7 +105,11 @@ function LatestReleaseCard({
 
 const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
 
-/** New/Updated marker for the latest release; text, so screen readers announce it. */
+/**
+ * New/Updated marker for a page changed in the latest release; text, so
+ * screen readers announce it. Only page links carry it: a group marker would
+ * repeat its pages' markers on a collapsed row.
+ */
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
   const badge = navigationBadge(item, LATEST_RELEASE.version);
   if (badge === undefined) return null;
@@ -170,7 +168,7 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
       <details className="sw-nav-subgroup" key={`${item.label}:${open}`} open={open}>
         <summary>
           <span>{item.label}</span>
-          <NavigationBadgeLabel item={item} />
+          <Icon className="sw-disclosure-icon" name="chevron-right" />
         </summary>
         <div>
           <NavigationEntries
@@ -206,7 +204,7 @@ function NavigationSections({
         >
           <summary>
             <span>{section.label}</span>
-            <NavigationBadgeLabel item={section} />
+            <Icon className="sw-disclosure-icon" name="chevron-right" />
           </summary>
           <div>
             <NavigationEntries
@@ -286,9 +284,7 @@ function NavigationDrawer({
           onClick={onDismiss}
           type="button"
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="m6 6 12 12M18 6 6 18" />
-          </svg>
+          <Icon name="close" size="md" />
         </button>
       </div>
       <NavigationSections activeHref={activeHref} onNavigate={onDismiss} />
@@ -325,19 +321,6 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   );
 }
 
-/** The current version is one click from every page: it opens its release post. */
-function VersionLink() {
-  return (
-    <Link
-      aria-label={`Release notes for Sheetwrite ${LATEST_RELEASE.version}`}
-      className="sw-version-link"
-      to={releaseHref(LATEST_RELEASE.version)}
-    >
-      v{LATEST_RELEASE.version}
-    </Link>
-  );
-}
-
 /** On a release post: its date and a step to the newer and older posts. */
 function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
   return (
@@ -348,12 +331,12 @@ function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
       {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
       {older === undefined ? null : (
         <Link rel="prev" to={releaseHref(older.version)}>
-          ← {older.version}
+          <Icon name="arrow-left" /> {older.version}
         </Link>
       )}
       {newer === undefined ? null : (
         <Link rel="next" to={releaseHref(newer.version)}>
-          {newer.version} →
+          {newer.version} <Icon name="arrow-right" />
         </Link>
       )}
       <Link to={RELEASES_HREF}>All releases</Link>
@@ -365,6 +348,8 @@ export function DocsShell({
   activeHref,
   children,
   description,
+  kind,
+  outline: buildOutline,
   reserveOutline,
   title,
 }: Readonly<DocsShellProps>) {
@@ -372,13 +357,10 @@ export function DocsShell({
   // better as a chip than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
 
-  const outline = useDocumentOutline();
+  const outline = useDocumentOutline(buildOutline);
   const neighbours = documentNeighbours(activeHref);
 
   const release = releaseContext(activeHref);
-  // Release notes are their own header section; every other page is Docs.
-  const inReleases = activeHref?.startsWith(RELEASES_HREF) ?? false;
-
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -411,44 +393,9 @@ export function DocsShell({
       <a className="sw-skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="sw-docs-header">
-        <div className="sw-docs-header__brand">
-          <Brand />
-          <VersionLink />
-        </div>
-        <DocsSearch />
-        <div className="sw-docs-header__actions">
-          <nav aria-label="Product links" className="sw-docs-header__links">
-            <Link className="sw-docs-header__home" to="/">
-              Home
-            </Link>
-            <Link
-              activeOptions={{ exact: true }}
-              aria-current={inReleases ? undefined : "page"}
-              className="sw-docs-header__docs"
-              to="/docs/"
-            >
-              Docs
-            </Link>
-            <Link
-              aria-current={inReleases ? "page" : undefined}
-              className="sw-docs-header__releases"
-              to={RELEASES_HREF}
-            >
-              Releases
-            </Link>
-            <Link className="sw-docs-header__showcases" to="/showcases/">
-              Showcases
-            </Link>
-            <a
-              className="sw-docs-header__ai"
-              href="/llms.txt"
-              title="Curated documentation index for AI agents"
-            >
-              llms.txt
-            </a>
-          </nav>
-          <ThemeToggle />
+      <SiteTopbar
+        search={<DocsSearch />}
+        trailing={
           <button
             aria-controls={NAVIGATION_DIALOG_ID}
             aria-expanded={navigationOpen}
@@ -457,13 +404,11 @@ export function DocsShell({
             onClick={openNavigation}
             type="button"
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
+            <Icon name="menu" size="md" />
             <span className="sw-visually-hidden">Documentation menu</span>
           </button>
-        </div>
-      </header>
+        }
+      />
       <aside className="sw-sidebar">
         <NavigationSections activeHref={activeHref} />
       </aside>
@@ -479,6 +424,11 @@ export function DocsShell({
           <Breadcrumbs trail={breadcrumbsFor(activeHref, titleMain ?? title)} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
+            {kind === undefined ? null : (
+              <span className="api-status" data-kind={kind} data-pagefind-ignore>
+                {kind}
+              </span>
+            )}
             {titlePackage ? (
               <code className="sw-title-package" data-pagefind-ignore>
                 {titlePackage}

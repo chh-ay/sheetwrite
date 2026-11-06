@@ -2,13 +2,14 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { readPreference, writePreference } from "../lib/preference-storage.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
+import { Icon } from "./Icon.js";
 import { onTabListKey } from "./tabKeys.js";
 
 const MANAGERS = [
-  { id: "npm", install: "npm install" },
-  { id: "pnpm", install: "pnpm add" },
-  { id: "yarn", install: "yarn add" },
-  { id: "bun", install: "bun add" },
+  { id: "npm", program: "npm", subcommand: "install" },
+  { id: "pnpm", program: "pnpm", subcommand: "add" },
+  { id: "yarn", program: "yarn", subcommand: "add" },
+  { id: "bun", program: "bun", subcommand: "add" },
 ] as const;
 const MANAGER_IDS = MANAGERS.map((manager) => manager.id);
 
@@ -43,7 +44,8 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
   const copiedTimer = useRef<number | undefined>(undefined);
   const copy = useAction();
   const id = useId();
-  const command = `${MANAGERS.find((entry) => entry.id === manager)?.install ?? "npm install"} ${packages}`;
+  const { program, subcommand } = MANAGERS.find((entry) => entry.id === manager) ?? MANAGERS[0];
+  const command = `${program} ${subcommand} ${packages}`;
   const copied = copiedCommand === command;
 
   useEffect(() => {
@@ -68,11 +70,7 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
   return (
     <figure className="sw-terminal" data-pagefind-ignore>
       <div className="sw-terminal__bar">
-        <span aria-hidden="true" className="sw-terminal__dots">
-          <i />
-          <i />
-          <i />
-        </span>
+        <Icon className="sw-terminal__icon" name="terminal" />
         <div aria-label="Package manager" className="sw-terminal__tabs" role="tablist">
           {MANAGERS.map((entry) => (
             <button
@@ -111,6 +109,7 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
           }
           type="button"
         >
+          {copied ? <Icon name="check" /> : <Icon name="copy" />}
           <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>
@@ -121,11 +120,15 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
         role="tabpanel"
         tabIndex={0}
       >
+        {/* Highlighted with the code theme's roles: the shell program, its
+            subcommand and the package specifiers. */}
         <code>
           <span aria-hidden="true" className="sw-terminal__prompt">
             ${" "}
           </span>
-          {command}
+          <span className="sw-code-function">{program}</span>{" "}
+          <span className="sw-code-keyword">{subcommand}</span>{" "}
+          <span className="sw-code-string">{packages}</span>
         </code>
       </pre>
       {note ? <figcaption className="sw-terminal__note">{note}</figcaption> : null}

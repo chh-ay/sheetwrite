@@ -5,6 +5,7 @@
 // (`openLazyPanel`). Everything goes through the public Grid API.
 
 import { colToA1 } from "../a1.js";
+import { isDashboard } from "../dashboard.js";
 import { firstFreeBox } from "../dashboard/dashboard-layout.js";
 import { sheetNameKey } from "../name-key.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
@@ -13,22 +14,41 @@ import type { DashboardItem } from "../types/dashboard.js";
 import type { SheetSnapshot } from "../types/document.js";
 import type { Grid, GridPanel, IconOverrides } from "../types/grid.js";
 import type { PivotDefinition } from "../types/pivot.js";
-import { chartFromRange, nextChartId, selectionRange } from "./chart-model.js";
+import {
+  chartFromRange,
+  DEFAULT_CHART_HEIGHT,
+  DEFAULT_CHART_WIDTH,
+  nextChartId,
+  selectionRange,
+} from "./chart-model.js";
 import { chartPanel } from "./chart-panel.js";
 import { explainPanel } from "./explain-panel.js";
+import { kpiPanel } from "./kpi-panel.js";
+import { measurePanel } from "./measure-panel.js";
 import { namePanel } from "./name-panel.js";
 import { rejectionMessage } from "./panel-dom.js";
 import { nextPivotIdentity, pivotSourceFor } from "./pivot-model.js";
 import { pivotPanel } from "./pivot-panel.js";
 import { parseRangeText } from "./range-text.js";
 import { relationshipPanel } from "./relationship-panel.js";
+import { selectedPivot } from "./selected-pivot.js";
 import { slicerPanel } from "./slicer-panel.js";
 
 /** What the open panel shows, so selection changes can switch or close it. */
 type OpenPanel =
   | { readonly kind: "chart" | "pivot"; readonly sheet: SheetId; readonly id: string }
   | {
-      readonly kind: "explain" | "names" | "queries" | "sort" | "dataModel" | "history" | "slicer";
+      readonly kind:
+        | "explain"
+        | "names"
+        | "queries"
+        | "links"
+        | "sort"
+        | "dataModel"
+        | "measures"
+        | "history"
+        | "slicer"
+        | "kpi";
     };
 
 interface PanelState {
@@ -103,6 +123,17 @@ export function openNamePanel(grid: Grid, define = false): void {
   });
 }
 
+/** Data › Measures opens the measures panel. */
+export function openMeasurePanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "measures" };
+  const panel = measurePanel(grid);
+  grid.openPanel({
+    ...panel,
+    render: (body) => trackOpen(state, open, panel.render(body)),
+  });
+}
+
 /** Data › Data Model and Data › Relationships open the data model panel. */
 export function openDataModelPanel(grid: Grid): void {
   const state = stateOf(grid);
@@ -122,6 +153,14 @@ export function openSlicerPanel(grid: Grid): void {
   grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
 }
 
+/** Insert › Dashboard › KPI Card: the measure picker for the active dashboard. */
+export function openKpiPanel(grid: Grid): void {
+  const state = stateOf(grid);
+  const open: OpenPanel = { kind: "kpi" };
+  const panel = kpiPanel(grid, grid.getActiveSheet());
+  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
+}
+
 /** Show the Sort panel for the selection or the current region. */
 export function openSortPanel(grid: Grid): void {
   // A dynamic import, so bundlers emit the Sort panel as its own chunk that
@@ -135,6 +174,14 @@ export function openQueryPanel(grid: Grid, create: boolean): void {
   openLazyPanel(grid, { kind: "queries" }, async () => {
     const { queryPanel } = await import("./query-panel.js");
     return (target) => queryPanel(target, create);
+  });
+}
+
+/** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
+export function openEditLinksPanel(grid: Grid): void {
+  openLazyPanel(grid, { kind: "links" }, async () => {
+    const { editLinksPanel } = await import("./edit-links-panel.js");
+    return editLinksPanel;
   });
 }
 
@@ -229,6 +276,84 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
 
   grid.selectChart(chart.id, range.sheet);
   openChartPanel(grid, { sheet: range.sheet, id: chart.id });
+  return true;
+}
+
+/** Width and height, in dashboard cells, of a new PivotChart. */
+const PIVOT_CHART_BOX = { w: 6, h: 8 } as const;
+
+/**
+ * Insert › Charts › PivotChart: a chart of `kind` over a pivot, as Excel
+ * inserts a PivotChart for the PivotTable that holds the active cell. On a
+ * worksheet the chart floats right of the pivot's output; it is selected and
+ * its panel opens. False when no pivot is in reach or the store refuses the
+ * change.
+ */
+export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolean {
+  const sheet = grid.getActiveSheet();
+  const owner = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
+  if (!isDashboard(owner)) return insertWorksheetPivotChart(grid, kind);
+
+  const items = owner?.dashboard?.items ?? [];
+  const pivots = items.filter((item) => item.kind === "pivot");
+  const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
+  const source = pivots.find((item) => item.id === focused) ?? pivots[0];
+  if (source === undefined || source.kind !== "pivot") return false;
+
+  const id = nextChartId(grid.getCharts(sheet));
+  const box = firstFreeBox(items, PIVOT_CHART_BOX.w, PIVOT_CHART_BOX.h);
+  const title = grid.getPivots(sheet).find((pivot) => pivot.id === source.pivot)?.name;
+  // A dashboard places the chart through its item box, so the anchor stays at the origin.
+  const anchor = { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 };
+  const result = grid.applyTransaction({
+    patches: [
+      {
+        op: "setChart",
+        sheet,
+        chart: {
+          id,
+          kind,
+          ...(title === undefined ? {} : { title }),
+          anchor,
+          series: [],
+          pivot: source.pivot,
+        },
+      },
+      { op: "setDashboardItem", sheet, item: { id: `chart-${id}`, box, kind: "chart", chart: id } },
+    ],
+  });
+  return result.status === "applied";
+}
+
+/** Insert › Charts › PivotChart on a worksheet: a chart over the pivot that holds the active cell. */
+function insertWorksheetPivotChart(grid: Grid, kind: ChartKind): boolean {
+  const hit = selectedPivot(grid);
+  const sheet = hit?.range.sheet;
+  const owner = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
+  if (hit === null || sheet === undefined || owner === undefined) return false;
+
+  const id = nextChartId(grid.getCharts(sheet));
+  const title = grid.getPivots(sheet).find((pivot) => pivot.id === hit.id)?.name;
+  const anchor = {
+    row: hit.range.start.row,
+    col: Math.min(hit.range.end.col + 1, owner.columns.length - 1),
+    offsetX: 0,
+    offsetY: 0,
+    width: DEFAULT_CHART_WIDTH,
+    height: DEFAULT_CHART_HEIGHT,
+  };
+  const chart = {
+    id,
+    kind,
+    ...(title === undefined ? {} : { title }),
+    anchor,
+    series: [],
+    pivot: hit.id,
+  };
+  if (grid.setChart(chart, sheet).status !== "applied") return false;
+
+  grid.selectChart(id, sheet);
+  openChartPanel(grid, { sheet, id });
   return true;
 }
 

@@ -1,0 +1,671 @@
+/* Core components shared by every page: icons, eyebrows, buttons, links,
+   badges, cards, callouts, tabs, tables and code tokens. Pages compose these
+   classes instead of restyling their own copies. */
+
+/* ── Icons: the Sheetwrite sprite, one stroke, sizes on a 4 px grid ──────
+   Stroke and colour are inherited into each <use>d symbol; the accent marks
+   the selected part of an icon. A filled control (primary button, active
+   badge) sets --sw-icon-accent to its ink so the accent never vanishes. */
+/* The page's inline symbol sheet (IconSprite): takes no space and is never
+   painted itself. */
+.sw-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.sw-icon {
+  flex: none;
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--sw-icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.sw-icon[data-size="md"] {
+  width: var(--sw-icon-md);
+  height: var(--sw-icon-md);
+}
+
+.sw-icon[data-size="lg"] {
+  width: var(--sw-icon-lg);
+  height: var(--sw-icon-lg);
+}
+
+/* An arrow after a plain link's label in running text sits on the text line
+   (styled links such as .sw-link-arrow lay out their own icon). */
+a:not([class]) > .sw-icon:last-child {
+  display: inline-block;
+  margin-inline-start: var(--sw-space-1);
+  vertical-align: -0.2em;
+}
+
+/* Sprite icons as CSS masks, for markers drawn by CSS in generated markup
+   (details summaries, link arrows). Each URL is the symbol's own path data;
+   test/icons.test.ts keeps them in step with the sprite. */
+:root {
+  /* The mask a .sw-mask-icon draws; each use sets it to one of the masks below. */
+  --sw-icon-mask: none;
+  --sw-icon-mask-chevron-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9.5 6 6 6-6 6'/%3E%3C/svg%3E");
+  --sw-icon-mask-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+  --sw-icon-mask-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12h15M13.5 6l6 6-6 6'/%3E%3C/svg%3E");
+  --sw-icon-mask-arrow-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.5 12h-15M10.5 6l-6 6 6 6'/%3E%3C/svg%3E");
+  --sw-icon-mask-external: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 3.5h7v7M20.5 3.5l-9 9M18 14v4.5a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2H10'/%3E%3C/svg%3E");
+}
+
+/* A mask icon in the current text colour: set --sw-icon-mask to one of the
+   --sw-icon-mask-* tokens. */
+.sw-mask-icon {
+  display: inline-block;
+  flex: none;
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentColor;
+  mask: var(--sw-icon-mask) center / contain no-repeat;
+}
+
+/* ── Body text: the body face's word space ────────────────────────────── */
+body {
+  word-spacing: var(--sw-word-spacing-body);
+}
+
+/* Code keeps one character per column, so its spaces stay the font's own. */
+:where(code, pre, kbd, samp, .expressive-code) {
+  word-spacing: normal;
+}
+
+/* ── Headings: every heading is in the display face ──────────────────────
+   Zero specificity, so a component's own heading style still applies; an
+   unstyled heading never falls back to the body face. Eyebrow-styled panel
+   titles set the mono eyebrow role themselves. */
+:where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-heading);
+  word-spacing: normal;
+}
+
+/* Numbers line up: tabular figures in every table and fact list. */
+:where(table, dd) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Eyebrow: the label above a title ───────────────────────────────────── */
+.sw-eyebrow {
+  margin: 0;
+  color: var(--sw-accent);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────
+   One shape: default (outlined), primary (brand fill) and quiet (no frame);
+   sizes sm, md (default) and lg. Pressed toggles use aria-pressed. */
+.sw-button {
+  display: inline-flex;
+  min-height: var(--sw-control-height);
+  gap: var(--sw-space-2);
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--sw-motion-fast) var(--sw-motion-standard),
+    background var(--sw-motion-fast) var(--sw-motion-standard),
+    color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.sw-button:hover:not(:disabled, [data-disabled]) {
+  border-color: var(--sw-accent);
+  color: var(--sw-accent);
+}
+
+.sw-button[data-variant="primary"] {
+  --sw-icon-accent: currentColor;
+  border-color: var(--sw-accent);
+  background: var(--sw-accent);
+  color: var(--sw-accent-ink);
+}
+
+.sw-button[data-variant="primary"]:hover:not(:disabled, [data-disabled]) {
+  border-color: var(--sw-accent-strong);
+  background: var(--sw-accent-strong);
+  color: var(--sw-accent-ink);
+}
+
+.sw-button[data-variant="quiet"] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sw-fg);
+}
+
+.sw-button[data-variant="quiet"]:hover:not(:disabled, [data-disabled]) {
+  border-color: transparent;
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+}
+
+.sw-button[aria-pressed="true"] {
+  border-color: var(--sw-accent);
+  background: var(--sw-accent-soft);
+  color: var(--sw-fg-strong);
+}
+
+.sw-button[data-size="sm"] {
+  min-height: calc(var(--sw-control-height) - var(--sw-space-2));
+  padding: 0 var(--sw-space-3);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-button[data-size="lg"] {
+  min-height: var(--sw-control-height-lg);
+  padding: 0 var(--sw-space-6);
+  font-size: var(--sw-text-body);
+}
+
+.sw-button:disabled,
+.sw-button[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sw-icon-button {
+  display: inline-grid;
+  width: var(--sw-control-height);
+  height: var(--sw-control-height);
+  place-items: center;
+  padding: 0;
+  border: var(--sw-border-width) solid transparent;
+  border-radius: var(--sw-radius-md);
+  background: transparent;
+  color: var(--sw-fg-muted);
+  cursor: pointer;
+  transition:
+    background var(--sw-motion-fast) var(--sw-motion-standard),
+    color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.sw-icon-button:hover {
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+}
+
+.sw-icon-button .sw-icon {
+  width: var(--sw-icon-md);
+  height: var(--sw-icon-md);
+}
+
+/* An icon button that draws its own path (no sprite class) takes the same
+   size and stroke as a sprite icon. */
+.sw-icon-button > svg:not(.sw-icon) {
+  width: var(--sw-icon-md);
+  height: var(--sw-icon-md);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--sw-icon-stroke);
+}
+
+/* ── Links ──────────────────────────────────────────────────────────────── */
+.sw-link-arrow {
+  display: inline-flex;
+  gap: var(--sw-space-1-5);
+  align-items: center;
+  color: var(--sw-accent);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+  text-decoration: none;
+}
+
+.sw-link-arrow:hover {
+  color: var(--sw-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.sw-link-arrow .sw-icon:last-child {
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-link-arrow:hover .sw-icon:last-child {
+  transform: translateX(var(--sw-space-0-5));
+}
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+.sw-badge {
+  display: inline-flex;
+  gap: var(--sw-space-1);
+  align-items: center;
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.sw-badge[data-tone="accent"] {
+  background: var(--sw-accent-soft);
+  color: var(--sw-accent-strong);
+}
+
+.sw-badge[data-tone="info"] {
+  background: var(--sw-info-soft);
+  color: var(--sw-info);
+}
+
+.sw-badge[data-tone="warning"] {
+  background: var(--sw-warning-soft);
+  color: var(--sw-warning);
+}
+
+.sw-badge[data-tone="danger"] {
+  background: var(--sw-danger-soft);
+  color: var(--sw-danger);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.sw-card {
+  display: grid;
+  gap: var(--sw-space-3);
+  align-content: start;
+  padding: var(--sw-space-5);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+}
+
+a.sw-card {
+  text-decoration: none;
+  transition:
+    border-color var(--sw-motion-fast) var(--sw-motion-standard),
+    box-shadow var(--sw-motion-fast) var(--sw-motion-standard),
+    transform var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+a.sw-card:hover {
+  border-color: var(--sw-accent);
+  box-shadow: var(--sw-shadow-md);
+  transform: translateY(calc(var(--sw-space-0-5) * -1));
+}
+
+.sw-card__title {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-heading)
+    var(--sw-font-display);
+}
+
+.sw-card__body {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-body);
+}
+
+/* ── Callouts: note, tip, warning, danger ───────────────────────────────── */
+.sw-callout {
+  --sw-callout-tone: var(--sw-info);
+  --sw-icon-accent: var(--sw-callout-tone);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-1) var(--sw-space-3);
+  align-items: center;
+  margin: var(--sw-space-6) 0;
+  padding: var(--sw-space-4) var(--sw-space-5);
+  border: var(--sw-border-width) solid
+    color-mix(in srgb, var(--sw-callout-tone) 30%, var(--sw-border));
+  border-left: var(--sw-space-1) solid var(--sw-callout-tone);
+  border-radius: var(--sw-radius-md);
+  background: color-mix(in srgb, var(--sw-callout-tone) 7%, var(--sw-surface-1));
+  color: var(--sw-fg);
+}
+
+.sw-callout[data-tone="tip"] {
+  --sw-callout-tone: var(--sw-accent);
+}
+
+.sw-callout[data-tone="warning"] {
+  --sw-callout-tone: var(--sw-warning);
+}
+
+.sw-callout[data-tone="danger"] {
+  --sw-callout-tone: var(--sw-danger);
+}
+
+.sw-callout > .sw-icon {
+  color: var(--sw-callout-tone);
+}
+
+.sw-callout .sw-callout__title {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-callout .sw-callout__body {
+  grid-column: 2;
+  font-size: var(--sw-text-body);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-callout .sw-callout__body > :first-child {
+  margin-top: 0;
+}
+
+.sw-callout .sw-callout__body > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── Tabs: a list of buttons over panels ────────────────────────────────── */
+.sw-tabs__list {
+  display: flex;
+  gap: var(--sw-space-1);
+  overflow-x: auto;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  scrollbar-width: none;
+}
+
+.sw-tabs__list [role="tab"] {
+  position: relative;
+  min-height: var(--sw-control-height);
+  padding: 0 var(--sw-space-3);
+  border: 0;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1 var(--sw-font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sw-tabs__list [role="tab"]:hover {
+  color: var(--sw-fg-strong);
+}
+
+.sw-tabs__list [role="tab"][aria-selected="true"] {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-tabs__list [role="tab"][aria-selected="true"]::after {
+  position: absolute;
+  right: var(--sw-space-2);
+  bottom: calc(var(--sw-border-width) * -1);
+  left: var(--sw-space-2);
+  height: var(--sw-space-0-5);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-accent);
+  content: "";
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.sw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-table th,
+.sw-table td {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sw-table th {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-semibold);
+  background: var(--sw-surface-2);
+}
+
+.sw-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ── Sheet tabs: every Sheetwrite shell on the site ──────────────────────
+   Core paints its sheet tabs from these variables. A grid's own tab bar sets
+   them inline from its theme; the shell's tab row reads them from here, so
+   the active sheet is brand text on a raised surface in both themes. */
+.sheetwrite-shell {
+  --sheetwrite-tab-font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-body);
+  --sheetwrite-tab-bg: var(--sw-surface-1);
+  --sheetwrite-tab-fg: var(--sw-fg-muted);
+  --sheetwrite-tab-border: var(--sw-border);
+  --sheetwrite-tab-hover-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-fg: var(--sw-accent-strong);
+}
+
+/* ── Code tokens: role classes for code rendered outside Expressive Code ── */
+.sw-code-comment {
+  color: var(--sw-code-comment);
+}
+.sw-code-keyword {
+  color: var(--sw-code-keyword);
+}
+.sw-code-function {
+  color: var(--sw-code-function);
+}
+.sw-code-string {
+  color: var(--sw-code-string);
+}
+.sw-code-number {
+  color: var(--sw-code-number);
+}
+.sw-code-type {
+  color: var(--sw-code-type);
+}
+.sw-code-property {
+  color: var(--sw-code-property);
+}
+.sw-code-punctuation {
+  color: var(--sw-code-punctuation);
+}
+
+/* JetBrains Mono ligatures turn `===` into one glyph; code shows what is typed.
+   Expressive Code reverts every property inside its frames, so its code and
+   token spans need a selector that outranks that reset. */
+code,
+pre,
+kbd,
+samp,
+:root .expressive-code pre,
+:root .expressive-code pre * {
+  font-feature-settings:
+    "calt" 0,
+    "liga" 0;
+}
+
+/* Phones: code steps down a size. */
+@media (max-width: 30rem) {
+  :root .expressive-code pre {
+    font-size: var(--sw-text-caption);
+  }
+}
+
+/* ── Brand mark ─────────────────────────────────────────────────────────── */
+.sw-brand-mark {
+  flex: none;
+  width: var(--sw-icon-lg);
+  height: var(--sw-icon-lg);
+  fill: var(--sw-accent-soft);
+  stroke: var(--sw-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+/* ── Site header: one header on every page ──────────────────────────────── */
+.sw-header {
+  position: sticky;
+  z-index: 50;
+  top: 0;
+  display: grid;
+  min-height: var(--sw-header-height);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sw-space-2) var(--sw-space-8);
+  align-items: center;
+  padding: var(--sw-space-2) var(--sw-page-inset);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: color-mix(in srgb, var(--sw-surface-0) 92%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.sw-header[data-has-search="true"] {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+.sw-header__brand {
+  display: inline-flex;
+  gap: var(--sw-space-2);
+  align-items: center;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-h4) / 1 var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-heading);
+  text-decoration: none;
+}
+
+/* The nav is a popover (the phone menu); on wide screens it sits in the bar,
+   so the browser's popover box styles are reset here. */
+.sw-header__nav {
+  position: static;
+  display: flex;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  gap: var(--sw-space-1);
+  align-items: center;
+  overflow: visible;
+  border: 0;
+  background: none;
+  color: inherit;
+}
+
+.sw-header__nav a,
+.sw-header__link {
+  display: inline-flex;
+  min-height: var(--sw-control-height);
+  gap: var(--sw-space-2);
+  align-items: center;
+  padding: 0 var(--sw-space-3);
+  border-radius: var(--sw-radius-md);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1 var(--sw-font-body);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--sw-motion-fast) var(--sw-motion-standard),
+    color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+/* Hover: a deeper tint and the strong text colour, visible on the bar in both
+   themes. */
+.sw-header__nav a:hover,
+.sw-header__link:hover {
+  background: var(--sw-surface-3);
+  color: var(--sw-fg-strong);
+}
+
+.sw-header__nav a[aria-current] {
+  background: var(--sw-accent-soft);
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-header__version {
+  padding: var(--sw-space-0-5) var(--sw-space-1-5);
+  border: var(--sw-border-width) solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-pill);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-mono);
+}
+
+.sw-header__search {
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.sw-header__actions {
+  display: flex;
+  gap: var(--sw-space-1);
+  align-items: center;
+  justify-self: end;
+}
+
+/* Wide screens: GitHub sits in the actions and the menu button is hidden. */
+.sw-header__nav .sw-header__nav-github,
+.sw-header__menu {
+  display: none;
+}
+
+/* Phones: one row (brand, search or menu, theme). The site links open from
+   the menu button as a popover panel under the bar; documentation pages hold
+   the same links in their own menu drawer. */
+@media (max-width: 54rem) {
+  .sw-header,
+  .sw-header[data-has-search="true"] {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: var(--sw-header-height-compact);
+    padding-block: var(--sw-space-1);
+  }
+
+  .sw-header[data-has-search="true"] {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .sw-header__link {
+    display: none;
+  }
+
+  .sw-header__menu {
+    display: inline-flex;
+  }
+
+  .sw-header__nav {
+    position: fixed;
+    top: var(--sw-header-height-compact);
+    bottom: auto;
+    right: 0;
+    left: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--sw-space-2) var(--sw-page-inset) var(--sw-space-4);
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+    background: var(--sw-surface-0);
+    box-shadow: var(--sw-shadow-md);
+  }
+
+  .sw-header__nav:popover-open {
+    display: flex;
+  }
+
+  .sw-header__nav a,
+  .sw-header__nav .sw-header__nav-github {
+    display: flex;
+    min-height: var(--sw-control-height-lg);
+  }
+
+  .sw-header__search {
+    justify-self: end;
+  }
+}

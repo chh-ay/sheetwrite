@@ -8,6 +8,7 @@
 //! scaled binary value, so ROUND, TEXT and `&` agree with what a cell shows.
 
 use crate::float_text::rounded_digits;
+use crate::types::FormulaError;
 
 /// Significant decimal digits that Excel keeps for a number.
 const SIGNIFICANT_DIGITS: u32 = 15;
@@ -53,12 +54,6 @@ impl Decimal {
             };
         }
 
-        // A percent or scale code can take a number past the largest double
-        // (#433); such a value has no digits.
-        assert!(
-            number.is_finite(),
-            "a number format scaled past the largest double"
-        );
         let rounded = rounded_digits(number.abs(), SIGNIFICANT_DIGITS);
         Self {
             negative,
@@ -386,8 +381,10 @@ fn resolve_commas(section: &mut Section<'_>) {
 }
 
 /// Formats a number with an Excel number format code, or `None` when the code
-/// is a date or time format or cannot be read.
-pub(super) fn format_number(number: f64, code: &str) -> Option<String> {
+/// is a date or time format or cannot be read. A percent code that takes the
+/// number past the largest double is `#NUM!`, the error Excel gives a numeric
+/// result too large to hold.
+pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, FormulaError> {
     let parts = sections(code);
     let (part, magnitude_only) = match (parts.len(), number) {
         (1, _) => (parts[0], false),
@@ -395,12 +392,14 @@ pub(super) fn format_number(number: f64, code: &str) -> Option<String> {
         (2.., value) if value == 0.0 && parts.len() >= 3 => (parts[2], false),
         _ => (parts[0], false),
     };
-    let section = parse_section(part)?;
+    let Some(section) = parse_section(part) else {
+        return Ok(None);
+    };
     let value = if magnitude_only { number.abs() } else { number };
-    Some(render(&section, value))
+    render(&section, value).map(Some)
 }
 
-fn render(section: &Section<'_>, value: f64) -> String {
+fn render(section: &Section<'_>, value: f64) -> Result<String, FormulaError> {
     if section.tokens.contains(&Token::General) {
         let mut text = String::new();
         for token in &section.tokens {
@@ -409,7 +408,7 @@ fn render(section: &Section<'_>, value: f64) -> String {
                 other => text.push_str(literal_text(other)),
             }
         }
-        return text;
+        return Ok(text);
     }
 
     let percents = section
@@ -419,6 +418,10 @@ fn render(section: &Section<'_>, value: f64) -> String {
         .count();
     let scaled =
         value * PERCENT_SCALE.powi(percents as i32) / THOUSANDS_SCALE.powi(section.thousands_scale);
+    if !scaled.is_finite() {
+        return Err(FormulaError::Num);
+    }
+
     let layout = Layout::of(&section.tokens);
     let (mantissa, exponent) = match layout.exponent_digits {
         Some(_) => scientific_parts(scaled, &layout),
@@ -447,7 +450,7 @@ fn render(section: &Section<'_>, value: f64) -> String {
         },
         &mut text,
     );
-    text
+    Ok(text)
 }
 
 fn literal_text<'a>(token: &Token<'a>) -> &'a str {
@@ -656,11 +659,13 @@ mod tests {
             (5.0, "[Red]0.0", "5.0"),
         ] {
             assert_eq!(
-                format_number(number, code).as_deref(),
-                Some(expected),
+                format_number(number, code),
+                Ok(Some(expected.to_string())),
                 "{code}"
             );
         }
-        assert_eq!(format_number(1.0, "yyyy"), None);
+        assert_eq!(format_number(1.0, "yyyy"), Ok(None));
+        assert_eq!(format_number(f64::MAX, "0%"), Err(FormulaError::Num));
+        assert_eq!(format_number(-f64::MAX, "0;(0%)"), Err(FormulaError::Num));
     }
 }

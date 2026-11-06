@@ -100,18 +100,19 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Data Model** and **Relationships** (Data › Data Tools) open the [data model](/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
 
-**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place. Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
+**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. On a worksheet, **PivotChart** shows while the active cell is in a pivot and [charts that pivot](/docs/features/analysis/charts/#charts-over-pivots). Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
 
 **Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
 
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships, New Dashboard, Slicer and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships, New Dashboard, KPI Card, PivotChart, Slicer and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
 | Tab | Group | Command | Glyph | Feature |
 | --- | --- | --- | --- | --- |
+| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="chart" aria-hidden="true"></span> `chart` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
 | Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
 | Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
 | Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
@@ -120,9 +121,9 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 | Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
 | Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) |
 | Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)); also refreshes external links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
+| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
 | Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
+| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)); shows only for a workbook with links |
 | Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
 | Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
 | Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures ([#230](https://github.com/chh-ay/sheetwrite/issues/230)) |

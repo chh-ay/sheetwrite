@@ -1,5 +1,6 @@
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown } from "lucide-react";
+
+import { Icon } from "../../components/Icon.js";
 
 export interface DemoSelectOption {
   label: string;
@@ -37,7 +38,7 @@ export function DemoSelect({
         <Select.Trigger className="sw-demo-select__trigger">
           <Select.Value />
           <Select.Icon className="sw-demo-select__icon">
-            <ChevronDown size={14} aria-hidden="true" />
+            <Icon name="chevron-down" />
           </Select.Icon>
         </Select.Trigger>
         <Select.Portal>
@@ -57,7 +58,7 @@ export function DemoSelect({
                     value={option.value}
                   >
                     <Select.ItemIndicator className="sw-demo-select__indicator">
-                      <Check size={14} aria-hidden="true" />
+                      <Icon name="check" />
                     </Select.ItemIndicator>
                     <Select.ItemText>{option.label}</Select.ItemText>
                   </Select.Item>

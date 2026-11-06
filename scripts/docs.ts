@@ -71,6 +71,7 @@ import {
 import { siteDataFiles } from "./docs-site-data.js";
 import {
   loadFormulaContractInventory,
+  loadFormulaReferenceEntries,
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
@@ -254,10 +255,12 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ...(await collectCompatibilityDigestIssues()),
   ];
   if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
-  const [formulaInventory, publishedCompatibilityResults] = await Promise.all([
-    loadFormulaContractInventory(repositoryRoot),
-    compatibilityResults(),
-  ]);
+  const [formulaInventory, formulaReferenceEntries, publishedCompatibilityResults] =
+    await Promise.all([
+      loadFormulaContractInventory(repositoryRoot),
+      loadFormulaReferenceEntries(repositoryRoot),
+      compatibilityResults(),
+    ]);
 
   // Link resolution and entry pages read declaration shapes synchronously, so every
   // manifest declaration is parsed up front, in one batch.
@@ -352,7 +355,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     }
   }
 
-  const formulaPages = renderFormulaFunctionPages(formulaInventory);
+  const formulaPages = renderFormulaFunctionPages(formulaInventory, formulaReferenceEntries);
   const excelCatalog: unknown = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
   );
@@ -372,6 +375,16 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       content: renderCompatibilityResults(),
     },
     ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
+    ...formulaPages.flatMap(({ table }) =>
+      table === undefined
+        ? []
+        : [
+            {
+              path: join(generatedDataRoot, `formula-tables/${table.family}.html`),
+              content: table.html,
+            },
+          ],
+    ),
     { path: join(contentRoot, excelCoverage.route), content: excelCoverage.content },
     ...siteDataFiles(manifest, formulaPages),
     {
@@ -392,6 +405,11 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     {
       path: join(generatedDataRoot, "compatibility-results.json"),
       content: stableJson(publishedCompatibilityResults),
+    },
+    // The landing shows the counts only; the full results ship with their own page.
+    {
+      path: join(generatedDataRoot, "compatibility-summary.json"),
+      content: stableJson(publishedCompatibilityResults.testSet),
     },
     ...splitPerformancePages(await renderEvidenceText()).map((page) => ({
       path: join(contentRoot, page.route),

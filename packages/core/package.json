@@ -53,6 +53,10 @@
       "types": "./dist/history-indexeddb.d.ts",
       "default": "./dist/history-indexeddb.js"
     },
+    "./external-links": {
+      "types": "./dist/external-links.d.ts",
+      "default": "./dist/external-links.js"
+    },
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./dist/shell.js"

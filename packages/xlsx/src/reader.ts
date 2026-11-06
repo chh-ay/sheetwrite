@@ -37,10 +37,12 @@ import {
   validWorkbookTableXmlElement,
   withXlsxFormulaEngine,
 } from "@sheetwrite/core";
+import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { readCharts } from "./chart-read.js";
 import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";
+import { linkedFormula, readExternalLinks } from "./external-links.js";
 import {
   columnWidthCharacters,
   columnWidthPixels,
@@ -49,11 +51,7 @@ import {
   META_MARKER,
   META_STEM,
 } from "./format.js";
-import {
-  convertFormulaSources,
-  formulaContainsExternalReference,
-  workbookFormulaSources,
-} from "./formula.js";
+import { convertFormulaSources, workbookFormulaSources } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";
@@ -1468,13 +1466,18 @@ async function parseSheet(
           });
           value = formulaText ? { kind: "literal", value: `=${formulaText}` } : null;
         } else if (formulaContainsExternalReference(formulaText)) {
-          emitWarning(rowContext, {
-            code: "external-formula",
-            message: "External-data formula was neutralized as inert text",
-            sheet: reference.name,
-            cell: addressText,
-          });
-          value = { kind: "literal", value: `=${formulaText}` };
+          const linked = linkedFormula(formulaText, context.externalBooks);
+          if (linked === undefined) {
+            emitWarning(rowContext, {
+              code: "external-formula",
+              message: "External-data formula was neutralized as inert text",
+              sheet: reference.name,
+              cell: addressText,
+            });
+            value = { kind: "literal", value: `=${formulaText}` };
+          } else {
+            value = { kind: "formula", src: `=${linked}` };
+          }
         } else {
           value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
         }
@@ -1862,6 +1865,33 @@ function hasCustomXml(packageFile: OpcPackage): boolean {
 }
 
 /** Restore sidecar cell fields from the sidecar sheet each worksheet claimed, by sheet order. */
+/**
+ * A dashboard sheet from its Sheetwrite metadata: its items, pivots and
+ * charts, with no cells. The worksheet's static values and charts are not
+ * read, because the export writes them again from the dashboard.
+ */
+function restoredDashboard(
+  meta: SheetSnapshot,
+  id: string,
+  name: string,
+  order: number,
+  state: string | undefined,
+): SheetSnapshot {
+  return {
+    id,
+    name,
+    order,
+    ...(state === "hidden" || state === "veryHidden" ? { visibility: state } : {}),
+    kind: "dashboard",
+    ...(meta.dashboard ? { dashboard: structuredClone(meta.dashboard) } : {}),
+    rowCount: 0,
+    columns: [],
+    ...(meta.pivots ? { pivots: structuredClone(meta.pivots) } : {}),
+    ...(meta.charts ? { charts: structuredClone(meta.charts) } : {}),
+    cells: [],
+  };
+}
+
 function restoreSidecarFields(
   snapshot: WorkbookSnapshot,
   claims: readonly (SheetSnapshot | undefined)[],
@@ -2192,17 +2222,27 @@ export async function readWorkbook(
   const themePart = workbookRelationships.find(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
+  // Before the sheets, whose formulas name the links by index.
+  const externalLinks = await readExternalLinks(
+    packageFile,
+    workbookRoot,
+    workbookRelationships,
+    context,
+  );
+  context.externalBooks = externalLinks.books;
+  const readLinkParts = new Set(externalLinks.parts.values());
   for (const relationship of workbookRelationships) {
+    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
     if (
       relationship.external ||
       ["worksheet", "styles", "sharedStrings", "theme"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
       ) ||
-      isRetainedRelationship("workbook", relationship.type)
+      (isRetainedRelationship("workbook", relationship.type) &&
+        (!externalLink || readLinkParts.has(relationship.target)))
     ) {
       continue;
     }
-    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
     emitWarning(context, {
       code: externalLink ? "external-relationship" : "unsupported-feature",
       message: externalLink
@@ -2338,6 +2378,11 @@ export async function readWorkbook(
     const source = sourceSheets[order]!;
     const meta = resolvedMetadata[order];
     const id = resolvedIds[order]!;
+    // A dashboard comes back from Sheetwrite metadata; its worksheet only holds static values.
+    if (meta?.kind === "dashboard") {
+      sheets.push(restoredDashboard(meta, id, source.name, order, source.state));
+      continue;
+    }
     const tableColumnCount = source.tables.reduce(
       (maximum, table) => Math.max(maximum, table.range.end.col + 1),
       0,
@@ -2662,7 +2707,11 @@ export async function readWorkbook(
       activeSheet,
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
       ...(calculation ? { calculation } : {}),
-      ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
+      // A model with only measures is still a model.
+      ...(dataModel?.relationships.length || dataModel?.measures?.length
+        ? { dataModel: structuredClone(dataModel) }
+        : {}),
+      ...(externalLinks.links.length ? { externalLinks: externalLinks.links } : {}),
     },
     sheets,
   };
@@ -2696,6 +2745,7 @@ export async function readWorkbook(
       context,
       new Set([...modelledPivotParts, ...chartParts.modelled]),
       chartParts.replacements,
+      externalLinks.parts,
     );
   // The Power Query module loads only for workbooks that can hold queries:
   // saved definitions in the hidden metadata, or a customXml item.

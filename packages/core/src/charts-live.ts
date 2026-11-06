@@ -4,7 +4,7 @@
 // Nothing here runs for a store until a caller resolves or subscribes, so
 // workbooks without charts pay nothing.
 
-import { chartSourceRanges } from "./chart-definition.js";
+import { chartSourceRanges, MAX_CHART_POINTS } from "./chart-definition.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
@@ -21,12 +21,6 @@ import type { Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet } from "./types/document.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
-
-/**
- * Most points resolved per series range. Cells are read in row-major order and
- * cells past this count are dropped; the series view reports `truncated`.
- */
-export const MAX_CHART_POINTS = 10_000;
 
 /** Inclusive rectangle actually read for one series range, after bounds and point limits. */
 interface ReadRect {
@@ -141,11 +135,56 @@ function seriesName(
   return `Series ${index + 1}`;
 }
 
+/** Builds the view of a chart over a pivot; set by the pivot view chunk when it loads. */
+let pivotCharts: ((store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView) | null =
+  null;
+
+/** Engines whose pivot views are computed or loading, so each asks for them once. */
+const pivotEngines = new WeakSet<StoreDataEngine>();
+
+/**
+ * Set how charts over pivots resolve, after the engine of `store` computed
+ * its pivot views. The listeners of `store` hear that its charts over pivots
+ * changed. The pivot view chunk calls it.
+ */
+export function setPivotChartViews(
+  store: Store,
+  views: (store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView,
+): void {
+  pivotCharts = views;
+  TRACKERS.get(store)?.pivotViewsChanged();
+}
+
+/**
+ * Load the pivot view chunk and let the engine of `store` compute the pivot
+ * views, once per engine. A failed load tries again at the next request.
+ */
+function requestPivotViews(store: Store): void {
+  const engine = storeEngine(store);
+  if (engine === null || pivotEngines.has(engine)) return;
+
+  pivotEngines.add(engine);
+  void import("./dashboard/dashboard-engine.js").then(
+    (module) => {
+      module.applyPivotViews(store, []);
+      setPivotChartViews(store, module.pivotChartViewOf);
+    },
+    (error: unknown) => {
+      pivotEngines.delete(engine);
+      throw error;
+    },
+  );
+}
+
 /**
  * Resolve one chart to plain data the renderer draws without reading cells.
  * Values that are not numbers (text, booleans, errors, empty cells) become
  * `null`. Each series range costs one bulk window read of at most
  * `MAX_CHART_POINTS` cells. Returns `null` when the chart does not exist.
+ *
+ * A chart over a pivot reads the pivot's leaf items from a pivot view. The
+ * first such chart loads the code for it; until then the chart has no
+ * series, and a change event names it when it loads.
  *
  * Call it after a {@link subscribeChartChanges} event names the chart, not per frame.
  */
@@ -153,6 +192,10 @@ export function resolveChartView(store: Store, sheet: SheetId, id: string): Char
   const sheets = sheetMap(store);
   const chart = sheets.get(sheet)?.charts?.find((candidate) => candidate.id === id);
   if (!chart) return null;
+  if (chart.pivot !== undefined) {
+    requestPivotViews(store);
+    return pivotCharts?.(store, sheet, chart) ?? { chart, series: [] };
+  }
 
   const series = chart.series.map((source, index) => {
     const values = readRange(store, sheets, source.values);
@@ -244,6 +287,8 @@ class ChartIndex {
   readonly owned = new Map<SheetId, number[]>();
   /** Charts that read a formula, reference, spill or pivot output; any value change may move them. */
   readonly computed: number[] = [];
+  /** Charts over pivots; they also change when the pivot views are computed again. */
+  readonly pivots: ChartRef[] = [];
 
   constructor(store: Store) {
     const sheets = sheetMap(store);
@@ -253,13 +298,20 @@ class ChartIndex {
     for (const sheet of sheets.values()) {
       for (const definition of sheet.charts ?? []) {
         const chart = this.charts.length;
-        this.charts.push({ sheet: sheet.id, id: definition.id });
+        const ref = { sheet: sheet.id, id: definition.id };
+        this.charts.push(ref);
 
         const owned = this.owned.get(sheet.id);
         if (owned) owned.push(chart);
         else this.owned.set(sheet.id, [chart]);
 
-        if (this.addSources(definition, chart, sheets, entries, engine)) this.computed.push(chart);
+        if (definition.pivot !== undefined) {
+          // A chart over a pivot reads the pivot's result.
+          this.pivots.push(ref);
+          this.computed.push(chart);
+        } else if (this.addSources(definition, chart, sheets, entries, engine)) {
+          this.computed.push(chart);
+        }
       }
     }
 
@@ -447,7 +499,8 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
-      // Formula results can depend on names, calculation settings and sheet identity/order.
+    case "setExternalLinks":
+      // Formula results can depend on names, calculation settings, linked values and sheet identity/order.
       context.valuesChanged = true;
       return;
 
@@ -504,6 +557,18 @@ class ChartTracker {
 
   dispose(): void {
     this.detach();
+  }
+
+  /**
+   * Name every chart over a pivot: the pivot views they read were computed
+   * again with no commit, so the event has no epoch.
+   */
+  pivotViewsChanged(): void {
+    const charts = this.index.pivots;
+    if (charts.length === 0) return;
+
+    const event: ChartChangeEvent = { epoch: undefined, charts: [...charts] };
+    for (const listener of this.listeners) listener(event);
   }
 
   private onChange(event: ChangeEvent): void {
