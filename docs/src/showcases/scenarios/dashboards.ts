@@ -244,7 +244,7 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
   const controller = new AbortController();
   const listeners = createListeners();
   let grid: Grid | null = null;
-  let dispose = () => {};
+  let dispose = () => { };
 
   const items = (): DashboardItem[] =>
     grid?.store.getWorkbook().sheets.find((sheet) => sheet.id === DASHBOARD_SHEET)?.dashboard
@@ -270,13 +270,13 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
   };
 
   const ready = (async () => {
-    // The PivotChart draws through the optional charts package.
-    const { registerChartsBackend } = await import("@sheetwrite/charts");
-    registerChartsBackend();
+    // The PivotChart draws through the optional charts package, loaded here.
+    const { chartsAddon } = await import("@sheetwrite/charts");
     const shell = await mountShowcaseShell(
       host,
       { workbook: dashboardWorkbook() },
       controller.signal,
+      [chartsAddon()],
     );
     if (!shell) return;
     grid = shell.grid;

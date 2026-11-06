@@ -1,6 +1,6 @@
 ```ts prelude="collaboration" title="version-history.ts"
 import { MemoryPersistenceAdapter } from "@sheetwrite/core";
-import { createHistoryCommands, HistoryArchive, MemoryHistoryStorage } from "@sheetwrite/core/history";
+import { historyAddon, HistoryArchive, MemoryHistoryStorage } from "@sheetwrite/core/history";
 
 // The authority journals every committed change, with its author, into the archive
 const archive = await HistoryArchive.open({ documentId, storage: new MemoryHistoryStorage() });
@@ -9,9 +9,10 @@ const authority = new MemoryPersistenceAdapter(snapshot);
 authority.recordHistory(documentId, archive);
 
 // Review › Version History and Save Version in the ribbon
+await initSheetwrite({ addons: [historyAddon()] });
 createGrid(host, {
   workbook,
-  config: { history: createHistoryCommands({ archive, authorId: "you", sync: () => sync }) },
+  addons: { history: { archive, authorId: "you", sync: () => sync } },
 });
 
 // Name the committed head, compare it with the current document, restore a range

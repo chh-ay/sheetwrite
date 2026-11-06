@@ -6,11 +6,7 @@ import {
   type SavedQuery,
   type Workbook,
 } from "@sheetwrite/core";
-import {
-  createQuerySession,
-  type QueryRefreshResult,
-  type QuerySession,
-} from "@sheetwrite/queries";
+import { queriesAddon, querySessionOf, type QueryRefreshResult, type QuerySession } from "@sheetwrite/queries";
 
 import type { LiveScenario } from "../use-live-scenario.js";
 import {
@@ -77,16 +73,16 @@ function regionTotalsQuery(statuses: StatusFilter): SavedQuery {
     steps: [
       ...(statuses === "shipped"
         ? [
-            {
-              kind: "filter" as const,
-              predicate: {
-                kind: "compare" as const,
-                column: "status",
-                op: "eq" as const,
-                value: "Shipped",
-              },
+          {
+            kind: "filter" as const,
+            predicate: {
+              kind: "compare" as const,
+              column: "status",
+              op: "eq" as const,
+              value: "Shipped",
             },
-          ]
+          },
+        ]
         : []),
       { kind: "join", input: "regions", keys: [["region", "code"]], join: "left" },
       {
@@ -254,7 +250,7 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
   let grid: Grid | null = null;
   let shellElement: HTMLElement | null = null;
   let session: QuerySession | null = null;
-  let dispose = () => {};
+  let dispose = () => { };
   let fetches = 0;
   let statuses: StatusFilter = "shipped";
   let definitionChanged = false;
@@ -291,20 +287,23 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
     const shell = await mountShowcaseShell(
       host,
       // Letter headers without filler columns: the grid ends with the report's columns.
-      { workbook: queriesWorkbook(), presentation: "data-grid" },
+      {
+        workbook: queriesWorkbook(),
+        presentation: "data-grid",
+        addons: { queries: { fetchSource } },
+      },
       controller.signal,
+      [queriesAddon()],
     );
     if (!shell) return;
     grid = shell.grid;
     shellElement = shell.element;
     requireApplied(grid.applyRemoteOperations(reportOperations()), "The report formulas");
-    // The query engine's WASM loads here, on the first session, never with the grid.
-    session = await createQuerySession(grid, { fetchSource });
+    // The query engine's WASM loads with this grid, the only one given a source.
+    session = await querySessionOf(grid);
     const stopChanges = grid.on("change", () => listeners.notify());
-    const connected = session;
     dispose = () => {
       stopChanges();
-      connected.dispose();
       shell.dispose();
     };
     if (controller.signal.aborted) return;
