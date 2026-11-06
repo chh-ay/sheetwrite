@@ -333,6 +333,12 @@ const insertChartOf =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
 
+/** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard pivot. */
+const insertPivotChartOf =
+  (kind: ChartKind) =>
+  async (grid: Grid): Promise<boolean> =>
+    (await loadPanels(grid)).insertPivotChart(grid, kind);
+
 /** Insert › Filters › Slicer opens the Insert Slicers list; the panel code loads on first use. */
 const insertSlicer = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openSlicerPanel(grid);
@@ -366,6 +372,23 @@ const chart: RibbonMenuSpec = {
   large: true,
   run: insertChartOf("column"),
   items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insertChartOf(kind) })),
+};
+
+/** Excel's PivotChart: on a dashboard with a pivot, a chart over that pivot. */
+const pivotChart: RibbonMenuSpec = {
+  kind: "menu",
+  id: "pivotChart",
+  label: "PivotChart",
+  icon: "chart",
+  availability: "newDashboard",
+  large: true,
+  run: insertPivotChartOf("column"),
+  items: CHART_KINDS.map(({ kind, label, icon }) => ({
+    label,
+    icon,
+    run: insertPivotChartOf(kind),
+  })),
+  available: (grid) => activeSheetIsDashboard(grid),
 };
 
 function outline(group: boolean): (grid: Grid) => void {
@@ -698,7 +721,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         label: "Charts",
         icon: "chart",
         layout: "flow",
-        controls: [chart],
+        controls: [chart, pivotChart],
       },
       {
         id: "dashboard",

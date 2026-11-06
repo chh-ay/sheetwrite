@@ -53,8 +53,18 @@ export interface DashboardSlicerItem {
   itemsWithNoData?: "dim" | "hide" | "show";
 }
 
+/** A chart of the dashboard sheet over one of its pivots, shown in a box. */
+export interface DashboardChartItem {
+  /** Stable ID, unique on the dashboard. */
+  id: string;
+  box: DashboardBox;
+  kind: "chart";
+  /** `ChartDefinition.id` of a chart on the same dashboard sheet; its `pivot` names the data. */
+  chart: string;
+}
+
 /** One item of a dashboard. */
-export type DashboardItem = DashboardPivotItem | DashboardSlicerItem;
+export type DashboardItem = DashboardPivotItem | DashboardSlicerItem | DashboardChartItem;
 
 /** The layout of a dashboard sheet. */
 export interface Dashboard {

@@ -5,6 +5,8 @@
 // is one undo step. This module loads as its own chunk (#231).
 
 import { cellScalarToText } from "../cell-input.js";
+import { createChartRenderer } from "../chart-backend.js";
+import { setPivotChartViews } from "../charts-live.js";
 import { isDashboard } from "../dashboard.js";
 import { formatNumber } from "../number-format.js";
 import { pivotsAvailable } from "../panels/panel-loader.js";
@@ -14,6 +16,7 @@ import { Scope } from "../scope.js";
 import { PIVOT_ERRORS } from "../store/data-engine.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { CellScalar } from "../types/cell.js";
+import type { ChartDefinition, ChartRenderer, MountedChart } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
 import type {
   DashboardBox,
@@ -21,8 +24,10 @@ import type {
   DashboardPivotItem,
   DashboardSlicerItem,
 } from "../types/dashboard.js";
+import type { DocumentOp } from "../types/document.js";
 import type { Grid } from "../types/grid.js";
 import type { PivotResultView } from "../types/pivot.js";
+import { type PivotOutputRead, pivotChartView } from "./dashboard-chart.js";
 import {
   boxIsFree,
   DASHBOARD_COLUMNS,
@@ -30,10 +35,12 @@ import {
   movedBox,
   resizedBox,
 } from "./dashboard-layout.js";
-import { dataPivotIndex, slicedPivots, slicerSelection } from "./slicer-filter.js";
+import { dashboardPayload, slicerSelection } from "./dashboard-payload.js";
 
 const NEEDS_FULL_ENGINE =
   "This item needs the full engine. Load @sheetwrite/formulas to compute it.";
+const NEEDS_CHARTS =
+  "Charts need @sheetwrite/charts. Import @sheetwrite/charts/register to draw them.";
 const TAKEN = "Another item is in that place.";
 const MOVE_HINT = "Arrow keys move the item. Enter or Escape ends.";
 const RESIZE_HINT = "Arrow keys resize the item. Enter or Escape ends.";
@@ -89,13 +96,64 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     engine?.setPivotView((owner) => {
       if (!isDashboard(owner)) return undefined;
       const workbook = grid.store.getWorkbook();
-      return slicedPivots(
+      return dashboardPayload(
         owner,
         workbook.sheets,
         workbook.dataModel?.relationships ?? [],
         overrides,
-      );
+      )?.pivots;
     }, dashboards);
+  };
+
+  /** The payload index of the hidden pivot of item `itemId` on `owner`; -1 when it has none. */
+  const hiddenIndex = (owner: SheetId, itemId: string): number => {
+    const workbook = grid.store.getWorkbook();
+    const ownerSheet = workbook.sheets.find((candidate) => candidate.id === owner);
+    if (ownerSheet === undefined) return -1;
+    const payload = dashboardPayload(
+      ownerSheet,
+      workbook.sheets,
+      workbook.dataModel?.relationships ?? [],
+      overrides,
+    );
+    return payload?.hidden.get(itemId) ?? -1;
+  };
+
+  // Charts over dashboard pivots draw their item's hidden pivot: no subtotals or totals.
+  setPivotChartViews((_store, owner, chart) => {
+    const item = items().find(
+      (candidate) => candidate.kind === "chart" && candidate.chart === chart.id,
+    );
+    const output =
+      item === undefined ? null : dashboardPivotOutputOf(grid, owner, hiddenIndex(owner, item.id));
+    const pivot = grid.getPivots(owner).find((candidate) => candidate.id === chart.pivot);
+    return pivotChartView(chart, output, pivot?.values.map((value) => value.numberFormat) ?? []);
+  });
+
+  // Charts mount after each build, when their boxes have a size; a rebuild mounts them again.
+  let mountedCharts: MountedChart[] = [];
+  let chartRenderer: ChartRenderer | null = null;
+  const unmountCharts = (): void => {
+    for (const mounted of mountedCharts) mounted.dispose();
+    mountedCharts = [];
+    chartRenderer?.dispose();
+    chartRenderer = null;
+  };
+  const mountCharts = (): void => {
+    unmountCharts();
+    if (sheet === null) return;
+    const hosts = root.querySelectorAll<HTMLElement>("[data-chart-id]");
+    if (hosts.length === 0) return;
+    chartRenderer = createChartRenderer(grid.store);
+    for (const host of hosts) {
+      const id = host.dataset.chartId ?? "";
+      if (chartRenderer === null) {
+        host.appendChild(note(NEEDS_CHARTS));
+        continue;
+      }
+      const size = { width: host.clientWidth, height: host.clientHeight };
+      mountedCharts.push(chartRenderer.mount(host, { sheet, id }, size));
+    }
   };
   filterPivots(
     grid.store
@@ -136,7 +194,10 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
 
   const remove = (item: DashboardItem): void => {
     if (sheet === null) return;
-    grid.applyTransaction({ patches: [{ op: "removeDashboardItem", sheet, id: item.id }] });
+    // A chart item owns its chart, as deleting an Excel PivotChart deletes the chart.
+    const patches: DocumentOp[] = [{ op: "removeDashboardItem", sheet, id: item.id }];
+    if (item.kind === "chart") patches.push({ op: "removeChart", sheet, id: item.chart });
+    grid.applyTransaction({ patches });
   };
 
   /** One arrow step of the keyboard mode on `item`. */
@@ -274,10 +335,18 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
 
     const body = document.createElement("div");
     body.className = "sheetwrite-dashboard-item-body";
-    if (item.kind === "pivot") renderPivot(body, grid, sheet ?? grid.getActiveSheet(), item);
-    else {
+    const owner = sheet ?? grid.getActiveSheet();
+    if (item.kind === "pivot") renderPivot(body, grid, owner, item);
+    else if (item.kind === "chart") {
+      // The chart renderer draws into this box once the build is in the page.
+      body.dataset.chartId = item.chart;
+      body.classList.add("sheetwrite-dashboard-chart");
+    } else {
       const kept = readOnly ? slicerSelection(item, overrides) : item.selected;
-      const withData = slicerValuesWithData(grid, sheet ?? grid.getActiveSheet(), item);
+      const withData = slicerValuesWithData(
+        item,
+        dashboardPivotOutputOf(grid, owner, hiddenIndex(owner, item.id)),
+      );
       renderSlicer(body, grid, item, kept, withData, (next) => chooseSlicer(item, next));
     }
     element.appendChild(body);
@@ -324,11 +393,12 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const owner = sheet;
     if (owner === null) return;
     const list = items();
-    const results = list.map((item) =>
-      item.kind === "pivot"
-        ? dashboardPivotResult(grid, owner, item.pivot)
-        : [slicerValues(grid, item), slicerValuesWithData(grid, owner, item)],
-    );
+    const results = list.map((item) => {
+      if (item.kind === "pivot") return dashboardPivotResult(grid, owner, item.pivot);
+      const output = dashboardPivotOutputOf(grid, owner, hiddenIndex(owner, item.id));
+      if (item.kind === "chart") return [chartOf(grid, owner, item.chart), output];
+      return [slicerValues(grid, item), output];
+    });
     const signature = JSON.stringify([list, results, readOnly, mode, message, [...overrides]]);
     if (!force && signature === rendered) return;
     rendered = signature;
@@ -336,6 +406,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     // Keep the focus on the same item through the rebuild.
     const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
     build();
+    mountCharts();
     if (focused !== undefined && root.contains(document.activeElement) === false)
       focusItem(focused);
   };
@@ -355,6 +426,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       if (next !== null) refresh();
     },
     dispose() {
+      unmountCharts();
       lifetime.close();
     },
   };
@@ -366,11 +438,19 @@ function placeBox(element: HTMLElement, box: DashboardBox): void {
   element.style.gridRow = `${box.y + 1} / span ${box.h}`;
 }
 
-/** The caption of an item: the pivot name, or the slicer title or column name. */
+/** The chart `id` of dashboard `sheet`, or undefined. */
+function chartOf(grid: Grid, sheet: SheetId, id: string): ChartDefinition | undefined {
+  const owner = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
+  return owner?.charts?.find((chart) => chart.id === id);
+}
+
+/** The caption of an item: the pivot name, the chart title, or the slicer title or column name. */
 function itemTitle(grid: Grid, item: DashboardItem): string {
   if (item.kind === "pivot") {
     return grid.getPivots().find((pivot) => pivot.id === item.pivot)?.name ?? item.pivot;
   }
+  if (item.kind === "chart")
+    return chartOf(grid, grid.getActiveSheet(), item.chart)?.title ?? "Chart";
   if (item.title !== undefined) return item.title;
   const table = grid.store
     .getWorkbook()
@@ -421,25 +501,26 @@ export function dashboardPivotResult(
 ): PivotResultView | null {
   const result = grid.getPivotResult(sheet, id);
   const index = grid.getPivots(sheet).findIndex((pivot) => pivot.id === id);
-  const cells = dashboardPivotCells(grid, sheet, index);
-  if (result === null || result.status !== "ok" || cells === null) return result;
-  return { ...result, cells };
+  const output = dashboardPivotOutputOf(grid, sheet, index);
+  if (result === null || result.status !== "ok" || output === null) return result;
+  return { ...result, cells: output.cells };
 }
 
-/** The output cells, row-major, of the pivot at `index` in a dashboard's payload. */
-export function dashboardPivotCells(
+/** The output of the pivot at `index` in a dashboard's payload, or null without one. */
+export function dashboardPivotOutputOf(
   grid: Grid,
   sheet: SheetId,
   index: number,
-): CellScalar[] | null {
+): PivotOutputRead | null {
   const output = storeEngine(grid.store)?.dashboardPivotOutput(sheet, index) ?? null;
   if (output === null) return null;
   try {
     const kinds = output.kinds();
     const numbers = output.numbers();
     const texts = output.texts();
+    const [rows = 0, cols = 0, headerRows = 0, labelCols = 0] = output.layout();
     let text = 0;
-    return Array.from(kinds, (kind, cell): CellScalar => {
+    const cells = Array.from(kinds, (kind, cell): CellScalar => {
       const number = numbers[cell] ?? 0;
       if (kind === 1) return number;
       if (kind === 2) return texts[text++] ?? "";
@@ -447,6 +528,7 @@ export function dashboardPivotCells(
       if (kind === 4) return PIVOT_ERRORS[number] ?? "#VALUE!";
       return null;
     });
+    return { cells, rows, cols, headerRows, labelCols };
   } finally {
     output.free();
   }
@@ -572,16 +654,10 @@ function sameScalar(left: CellScalar, right: CellScalar): boolean {
  * the item shows every value or the engine has no output for it.
  */
 function slicerValuesWithData(
-  grid: Grid,
-  sheet: SheetId,
   item: DashboardSlicerItem,
+  output: PivotOutputRead | null,
 ): CellScalar[] | null {
-  if (item.itemsWithNoData === "show") return null;
-  const workbook = grid.store.getWorkbook();
-  const owner = workbook.sheets.find((candidate) => candidate.id === sheet);
-  if (owner === undefined) return null;
-  const cells = dashboardPivotCells(grid, sheet, dataPivotIndex(owner, item, workbook.sheets));
-  if (cells === null || cells.length === 0) return null;
+  if (item.itemsWithNoData === "show" || output === null || output.cells.length === 0) return null;
   // A pivot with no value fields and no totals is one label column under its header.
-  return cells.slice(1);
+  return output.cells.slice(1);
 }

@@ -232,6 +232,50 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
   return true;
 }
 
+/** Width and height, in dashboard cells, of a new PivotChart. */
+const PIVOT_CHART_BOX = { w: 6, h: 8 } as const;
+
+/**
+ * Insert › Charts › PivotChart on a dashboard: a chart of `kind` over the
+ * focused pivot item, or else the first one, in the next free box. The chart
+ * and its item are one transaction, so one undo removes both. False when the
+ * dashboard has no pivot or the store refuses the change.
+ */
+export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolean {
+  const sheet = grid.getActiveSheet();
+  const items =
+    grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
+    [];
+  const pivots = items.filter((item) => item.kind === "pivot");
+  const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
+  const source = pivots.find((item) => item.id === focused) ?? pivots[0];
+  if (source === undefined || source.kind !== "pivot") return false;
+
+  const id = nextChartId(grid.getCharts(sheet));
+  const box = firstFreeBox(items, PIVOT_CHART_BOX.w, PIVOT_CHART_BOX.h);
+  const title = grid.getPivots(sheet).find((pivot) => pivot.id === source.pivot)?.name;
+  // A dashboard places the chart through its item box, so the anchor stays at the origin.
+  const anchor = { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 };
+  const result = grid.applyTransaction({
+    patches: [
+      {
+        op: "setChart",
+        sheet,
+        chart: {
+          id,
+          kind,
+          ...(title === undefined ? {} : { title }),
+          anchor,
+          series: [],
+          pivot: source.pivot,
+        },
+      },
+      { op: "setDashboardItem", sheet, item: { id: `chart-${id}`, box, kind: "chart", chart: id } },
+    ],
+  });
+  return result.status === "applied";
+}
+
 /** Where Insert › PivotTable puts the new pivot. */
 export type PivotDestination =
   | { readonly kind: "new-sheet" }
