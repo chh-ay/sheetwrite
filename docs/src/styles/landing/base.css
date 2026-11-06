@@ -23,39 +23,40 @@
   flex: 1;
   width: min(80rem, calc(100% - 2 * var(--sw-page-inset)));
   margin: 0 auto;
-  padding: clamp(2rem, 6vh, 3.5rem) 0 clamp(2.5rem, 7vh, 4rem);
+  padding: clamp(var(--sw-space-8), 6vh, var(--sw-space-16)) 0
+    clamp(var(--sw-space-10), 7vh, var(--sw-space-16));
 }
 
 /* ---- Shared type and controls ------------------------------------------- */
 
 .sw-lp-eyebrow {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--sw-space-4);
   color: var(--sw-accent-strong);
-  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
-  letter-spacing: 0.1em;
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .sw-lp-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--sw-space-3);
 }
 
 .sw-lp-button {
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
-  padding: 0 1.35rem;
+  padding: 0 var(--sw-space-5);
   border: 1px solid var(--sw-accent-strong);
-  border-radius: 0.6rem;
+  border-radius: var(--sw-radius-md);
   background: var(--sw-accent-strong);
   color: var(--sw-accent-ink);
-  font: 650 0.95rem / 1 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1 var(--sw-font-body);
   text-decoration: none;
   transition:
-    background var(--sw-demo-transition),
-    border-color var(--sw-demo-transition);
+    background var(--sw-motion-fast) var(--sw-motion-decelerate),
+    border-color var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
 .sw-lp-button:hover {
@@ -75,9 +76,9 @@
 
 .sw-lp-more {
   display: inline-block;
-  margin-top: 1.5rem;
+  margin-top: var(--sw-space-6);
   color: var(--sw-accent-strong);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
   text-decoration: none;
 }
 
@@ -87,15 +88,15 @@
 }
 
 .sw-lp-section {
-  padding-top: clamp(4.5rem, 10vh, 7rem);
+  padding-top: clamp(var(--sw-space-20), 10vh, var(--sw-space-section));
 }
 
 .sw-lp-head {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  column-gap: clamp(2rem, 6vw, 6rem);
+  column-gap: clamp(var(--sw-space-8), 6vw, var(--sw-space-section));
   align-items: end;
-  margin-bottom: 2.25rem;
+  margin-bottom: var(--sw-space-10);
 }
 
 .sw-lp-head .sw-lp-eyebrow {
@@ -105,20 +106,20 @@
 .sw-lp-head h2 {
   margin: 0;
   color: var(--sw-fg-strong);
-  font: 650 clamp(1.8rem, 3.2vw, 2.75rem) / 1.12 var(--sw-font-display);
-  letter-spacing: -0.03em;
+  font: var(--sw-weight-semibold) var(--sw-text-h1) / 1.12 var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-display);
 }
 
 .sw-lp-head > p:not(.sw-lp-eyebrow) {
   margin: 0;
   color: var(--sw-fg-muted);
-  font-size: 1.02rem;
+  font-size: var(--sw-text-body);
   line-height: 1.65;
 }
 
 .sw-lp-head a {
   color: var(--sw-accent-strong);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-lp-note {

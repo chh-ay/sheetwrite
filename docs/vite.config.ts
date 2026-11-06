@@ -18,6 +18,10 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
+import type { IconName } from "./src/icons/icon-names.ts";
+import { inlineIcon } from "./src/icons/inline-icon.ts";
+import { codeHangingIndent } from "./src/lib/code-indent.ts";
+import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
@@ -67,6 +71,80 @@ function installCommandsAsTerminals() {
       });
     };
     visit(tree);
+  };
+}
+
+/** A callout tone: its title and its icon in the Sheetwrite sprite. */
+interface CalloutTone {
+  readonly tone: string;
+  readonly title: string;
+  readonly icon: IconName;
+}
+
+/** GitHub alert markers and the callout each becomes. */
+const ALERT_CALLOUTS: Readonly<Record<string, CalloutTone>> = {
+  NOTE: { tone: "note", title: "Note", icon: "info" },
+  IMPORTANT: { tone: "note", title: "Important", icon: "info" },
+  TIP: { tone: "tip", title: "Tip", icon: "tip" },
+  WARNING: { tone: "warning", title: "Warning", icon: "warning" },
+  CAUTION: { tone: "danger", title: "Caution", icon: "danger" },
+};
+const ALERT_MARKER = /^\s*\[!(NOTE|IMPORTANT|TIP|WARNING|CAUTION)\]\s*/;
+
+/**
+ * A Markdown alert (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, `> [!CAUTION]`)
+ * becomes a static callout with the site's icon and tone, so callouts are
+ * written in plain Markdown and add no JavaScript to the page. The icon markup
+ * is parsed by rehype-raw later in the pipeline.
+ */
+function markdownAlertsAsCallouts() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (node.children === undefined) return;
+      node.children = node.children.map((child) => {
+        const callout = child.tagName === "blockquote" ? alertCallout(child) : undefined;
+        visit(callout ?? child);
+        return callout ?? child;
+      });
+    };
+    visit(tree);
+  };
+}
+
+function alertCallout(blockquote: HastNode): HastNode | undefined {
+  const children = blockquote.children ?? [];
+  const firstParagraph = children.find((child) => child.type === "element");
+  const firstText = firstParagraph?.tagName === "p" ? firstParagraph.children?.[0] : undefined;
+  const marker = firstText?.type === "text" ? ALERT_MARKER.exec(firstText.value ?? "") : null;
+  const callout = marker?.[1] === undefined ? undefined : ALERT_CALLOUTS[marker[1]];
+  if (firstParagraph === undefined || firstText === undefined || marker === null || !callout) {
+    return undefined;
+  }
+  firstText.value = (firstText.value ?? "").slice(marker[0].length);
+  const body =
+    textOf(firstParagraph).trim().length === 0
+      ? children.filter((child) => child !== firstParagraph)
+      : children;
+  const icon = inlineIcon(callout.icon, "md");
+  return {
+    type: "element",
+    tagName: "aside",
+    properties: { className: ["sw-callout"], dataTone: callout.tone, ariaLabel: callout.title },
+    children: [
+      { type: "raw", value: icon },
+      {
+        type: "element",
+        tagName: "p",
+        properties: { className: ["sw-callout__title"] },
+        children: [{ type: "text", value: callout.title }],
+      },
+      {
+        type: "element",
+        tagName: "div",
+        properties: { className: ["sw-callout__body"] },
+        children: body,
+      },
+    ],
   };
 }
 
@@ -233,14 +311,59 @@ function markShortInlineCode() {
 }
 
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
-  defaultProps: { wrap: false },
+  // One frame style for every fence: shell commands use the same code frame as
+  // other languages. Long lines wrap, so no line is cut at the frame edge on
+  // any width; codeHangingIndent hangs each continuation under its own line's
+  // indent with a class, where `preserveIndent` would add an inline style to
+  // every line of the page JavaScript.
+  defaultProps: { wrap: true, preserveIndent: false, frame: "code" },
+  themes: siteCodeThemes(),
+  // The token colours are measured against AA in tokens.css; keep them exact.
+  minSyntaxHighlightingColorContrast: 0,
+  shiki: { langs: [FORMULA_LANGUAGE, tsMemberLanguage()] },
   styleOverrides: {
     codeFontFamily: "var(--sw-font-mono)",
+    codeFontSize: "var(--sw-text-code)",
+    codeLineHeight: "var(--sw-leading-code)",
+    codePaddingBlock: "var(--sw-space-4)",
+    codePaddingInline: "var(--sw-space-5)",
     uiFontFamily: "var(--sw-font-body)",
+    uiFontSize: "var(--sw-text-caption)",
+    uiFontWeight: "var(--sw-weight-semibold)",
+    borderRadius: "var(--sw-radius-lg)",
+    borderColor: "var(--sw-border)",
+    focusBorder: "var(--sw-accent)",
+    scrollbarThumbColor: "var(--sw-border-strong)",
+    scrollbarThumbHoverColor: "var(--sw-field-edge)",
+    frames: {
+      shadowColor: "transparent",
+      editorActiveTabBackground: "var(--sw-code-bg)",
+      editorActiveTabForeground: "var(--sw-fg-strong)",
+      editorActiveTabIndicatorTopColor: "var(--sw-accent)",
+      editorActiveTabIndicatorBottomColor: "transparent",
+      editorTabBarBackground: "var(--sw-surface-2)",
+      editorTabBarBorderBottomColor: "var(--sw-border)",
+      terminalTitlebarBackground: "var(--sw-surface-2)",
+      terminalTitlebarForeground: "var(--sw-fg-muted)",
+      terminalTitlebarBorderBottomColor: "var(--sw-border)",
+      terminalTitlebarDotsForeground: "var(--sw-border-strong)",
+      terminalTitlebarDotsOpacity: "1",
+      terminalBackground: "var(--sw-code-bg)",
+      inlineButtonForeground: "var(--sw-fg-muted)",
+      inlineButtonBorder: "var(--sw-border-strong)",
+      inlineButtonBackground: "var(--sw-surface-1)",
+      tooltipSuccessBackground: "var(--sw-accent)",
+      tooltipSuccessForeground: "var(--sw-accent-ink)",
+    },
+    textMarkers: {
+      markBackground: "var(--sw-code-line-highlight)",
+      markBorderColor: "var(--sw-code-line-marker)",
+    },
   },
   useDarkModeMediaQuery: false,
   themeCssSelector: (theme: ExpressiveCodeTheme) => `[data-theme='${theme.type}']`,
   plugins: [
+    codeHangingIndent(),
     sheetwriteCodeHovers({
       cwd: new URL(".", import.meta.url).pathname,
       shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
@@ -313,6 +436,7 @@ export default defineConfig({
         remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm],
         rehypePlugins: [
           installCommandsAsTerminals,
+          markdownAlertsAsCallouts,
           [
             rehypeExpressiveCode,
             {

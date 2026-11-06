@@ -14,7 +14,6 @@ import { cellA1, MemoryPersistenceAdapter, SyncCoordinator } from "@sheetwrite/c
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 import type { GridReadyEvent } from "@sheetwrite/vue";
 import { SheetwriteGrid } from "@sheetwrite/vue";
-import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
 import {
   computed,
   defineComponent,
@@ -26,6 +25,8 @@ import {
   type FunctionalComponent,
 } from "vue";
 
+import { iconHref } from "../icons/icon-href.js";
+import type { IconName } from "../icons/icon-names.js";
 import { createActionGuard, type ActionState } from "../lib/action-guard.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import {
@@ -39,6 +40,13 @@ import {
 
 import "@sheetwrite/vue/styles.css";
 import type { RenderingMode } from "./ui/rendering-mode.js";
+
+/** A decorative icon from the Sheetwrite sprite; the text beside it carries the meaning. */
+function sheetwriteIcon(name: IconName) {
+  return h("svg", { class: "sw-icon", "aria-hidden": "true", focusable: "false" }, [
+    h("use", { href: iconHref(name) }),
+  ]);
+}
 
 // The scenario module owns the governed workbook (validation rules, protected
 // totals, notes, merges, frozen panes). This component owns what Vue is for:
@@ -983,7 +991,7 @@ const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wo
         h("h3", "Host persistence"),
         h("p", "Local document changes stay pending until acknowledged."),
       ]),
-      h("a", { href: "/showcases/database/" }, "Durable proof →"),
+      h("a", { href: "/showcases/database/" }, ["Durable proof", sheetwriteIcon("arrow-right")]),
     ]),
     h("div", { class: "sw-vuewb-persist" }, [
       h(
@@ -1169,7 +1177,7 @@ const App = defineComponent({
           h("header", { class: "sw-demo-controlbar sw-vuewb-controlbar" }, [
             h("div", { class: "sw-demo-controlbar__identity" }, [
               h("span", { class: "sw-demo-product__mark", "aria-hidden": "true" }, [
-                h(FileSpreadsheet, { size: 16 }),
+                sheetwriteIcon("sheet"),
               ]),
               h("div", [
                 h("h2", "Purchase order review"),
@@ -1209,7 +1217,7 @@ const App = defineComponent({
                 "aria-live": "polite",
               },
               [
-                h(ShieldCheck, { size: 14, "aria-hidden": "true" }),
+                sheetwriteIcon("shield"),
                 h("span", { class: "sw-vuewb-readout__label" }, "Challenge"),
                 h("strong", CHALLENGE_LABELS[challengeState.value]),
               ],

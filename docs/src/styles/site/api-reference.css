@@ -22,11 +22,11 @@
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--sw-border);
-  border-radius: 999px;
-  padding: 0.16rem 0.55rem;
+  border-radius: var(--sw-radius-pill);
+  padding: var(--sw-space-0-5) var(--sw-space-2);
   color: var(--sw-fg-muted);
   background: var(--sw-surface-2);
-  font: 600 0.67rem / 1.3 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.3 var(--sw-font-mono);
   letter-spacing: 0.02em;
 }
 
@@ -34,7 +34,7 @@
    the baseline. */
 .sw-prose h2 .api-count,
 .sw-prose h3 .api-count {
-  margin-left: 0.5rem;
+  margin-left: var(--sw-space-2);
   vertical-align: middle;
 }
 
@@ -44,7 +44,7 @@
 .api-status[data-kind="class"],
 .api-status[data-kind="enum"],
 .api-status[data-status="test-only"] {
-  --api-kind-color: var(--sw-type-number);
+  --api-kind-color: var(--sw-code-number);
 }
 
 .api-symbol-badge[data-kind="function"],
@@ -57,12 +57,12 @@
 .api-symbol-badge[data-kind="variable"],
 .api-status[data-kind="interface"],
 .api-status[data-kind="variable"] {
-  --api-kind-color: var(--sw-type-name);
+  --api-kind-color: var(--sw-code-function);
 }
 
 .api-symbol-badge[data-kind="type"],
 .api-status[data-kind="type"] {
-  --api-kind-color: var(--sw-type-keyword);
+  --api-kind-color: var(--sw-code-keyword);
 }
 
 .api-status[data-kind],
@@ -78,23 +78,23 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: var(--sw-space-3);
+  margin-bottom: var(--sw-space-6);
 }
 
 .sw-prose .api-backlink {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--sw-space-1-5);
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
-  font-weight: 550;
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-medium);
   text-decoration: none;
 }
 
 .sw-prose .api-backlink::before {
   content: "←";
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 
 .sw-prose .api-backlink:hover,
@@ -104,22 +104,22 @@
 
 .api-metadata {
   display: grid;
-  gap: 0.5rem;
-  margin: 1.5rem 0 2rem;
+  gap: var(--sw-space-2);
+  margin: var(--sw-space-6) 0 var(--sw-space-8);
 }
 
 .api-metadata div {
   display: grid;
   grid-template-columns: 8.5rem minmax(0, 1fr);
-  gap: 0.8rem;
+  gap: var(--sw-space-3);
   align-items: baseline;
 }
 
 .api-metadata dt {
-  color: var(--sw-fg-dim);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
+  font-weight: var(--sw-weight-semibold);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -137,14 +137,14 @@
 .api-member-index {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.85rem;
+  gap: var(--sw-space-1) var(--sw-space-3);
   align-items: baseline;
-  margin: 1.25rem 0 2rem;
-  padding: 0.7rem 0.9rem;
+  margin: var(--sw-space-5) 0 var(--sw-space-8);
+  padding: var(--sw-space-3) var(--sw-space-4);
   border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
+  border-radius: var(--sw-radius-md);
   background: var(--sw-surface-1);
-  font-size: 0.78rem;
+  font-size: var(--sw-text-caption);
 }
 
 .sw-prose .api-member-index a {
@@ -168,24 +168,24 @@
 /* Entry-point tables: editorial rules instead of a boxed grid; the numeric
    column right-aligns and rows light up on hover. */
 .sw-prose .api-entry-table {
-  margin: 1.25rem 0 2.5rem;
+  margin: var(--sw-space-5) 0 var(--sw-space-10);
   border: 0;
   border-radius: 0;
 }
 
 .sw-prose .api-entry-table th,
 .sw-prose .api-entry-table td {
-  padding: 0.55rem 0.75rem;
+  padding: var(--sw-space-2) var(--sw-space-3);
   vertical-align: middle;
 }
 
 .sw-prose .api-entry-table th {
   border-bottom-color: var(--sw-border-strong);
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   background: transparent;
-  font-size: 0.68rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  font-size: var(--sw-text-eyebrow);
+  font-weight: var(--sw-weight-semibold);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -196,18 +196,18 @@
 .sw-prose .api-entry-table th:first-child,
 .sw-prose .api-entry-table td:first-child {
   width: 52%;
-  padding-inline-start: 0.2rem;
+  padding-inline-start: var(--sw-space-1);
 }
 
 .sw-prose .api-entry-table th:last-child,
 .sw-prose .api-entry-table td:last-child {
-  padding-inline-end: 0.2rem;
+  padding-inline-end: var(--sw-space-1);
   text-align: right;
 }
 
 .sw-prose .api-entry-table td:last-child {
   color: var(--sw-fg-muted);
-  font: 500 0.8rem var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -224,8 +224,8 @@
   padding: 0;
   background: transparent;
   color: var(--sw-accent-strong);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-prose .api-entry-table a:hover > code {
@@ -239,17 +239,17 @@
 .api-symbol-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 0.8rem;
-  margin: 1.1rem 0 2.75rem;
+  gap: var(--sw-space-3);
+  margin: var(--sw-space-4) 0 var(--sw-space-12);
 }
 
 .api-symbol-card {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: var(--sw-space-2);
   border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
-  padding: 0.85rem 0.95rem;
+  border-radius: var(--sw-radius-md);
+  padding: var(--sw-space-3) var(--sw-space-4);
   background: var(--sw-surface-1);
   text-decoration: none;
   transition:
@@ -265,7 +265,7 @@
 .api-symbol-card__head {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: var(--sw-space-2);
   min-width: 0;
 }
 
@@ -276,10 +276,10 @@
   justify-content: center;
   width: 1.3rem;
   height: 1.3rem;
-  border-radius: 0.3rem;
+  border-radius: var(--sw-radius-xs);
   color: var(--api-kind-color, var(--sw-fg-muted));
   background: color-mix(in srgb, var(--api-kind-color, var(--sw-fg-muted)) 13%, transparent);
-  font: 650 0.7rem / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-mono);
 }
 
 .sw-prose .api-symbol-card code {
@@ -288,7 +288,7 @@
   padding: 0;
   background: transparent;
   color: var(--sw-fg-strong);
-  font: 600 0.86rem / 1.45 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.45 var(--sw-font-mono);
   overflow-wrap: anywhere;
   transition: color 120ms ease;
 }
@@ -303,7 +303,7 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
   color: var(--sw-fg-muted);
-  font-size: 0.79rem;
+  font-size: var(--sw-text-caption);
   line-height: 1.55;
 }
 
@@ -311,7 +311,7 @@
    Every row keeps a real top border and an opaque background (contract-
    checked); the background matches the page so the list reads flat. */
 .api-member-list {
-  margin: 1rem 0 2.25rem;
+  margin: var(--sw-space-4) 0 var(--sw-space-10);
   border-bottom: 1px solid var(--sw-border);
 }
 
@@ -326,9 +326,9 @@
 
 /* The declaration stays a single docked panel: summary header, flush fence. */
 .api-declaration {
-  margin: 1.1rem 0 2.2rem;
+  margin: var(--sw-space-4) 0 var(--sw-space-8);
   border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
+  border-radius: var(--sw-radius-md);
   background: var(--sw-surface-1);
   transition: border-color 120ms ease;
 }
@@ -340,11 +340,11 @@
 .api-member summary,
 .api-declaration summary {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   align-items: baseline;
-  border-radius: 0.35rem;
+  border-radius: var(--sw-radius-sm);
   /* Member rows are a scan list: the name, then the one-line meaning. */
-  padding: 0.42rem 0.35rem;
+  padding: var(--sw-space-1-5) var(--sw-space-1-5);
   color: var(--sw-fg-strong);
   cursor: pointer;
   list-style: none;
@@ -353,7 +353,7 @@
 
 .api-declaration summary {
   border-radius: calc(0.6rem - 1px);
-  padding: 0.7rem 0.95rem;
+  padding: var(--sw-space-3) var(--sw-space-4);
 }
 
 /* An open row keeps its name where the reader left it and tints its own
@@ -375,7 +375,7 @@
   height: 0.42rem;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   transform: rotate(-45deg);
   transition:
     transform 140ms ease,
@@ -428,7 +428,7 @@
   padding: 0;
   background: transparent;
   color: var(--sw-fg-strong);
-  font: 600 0.84rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.5 var(--sw-font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -439,7 +439,7 @@
 .api-member-summary {
   color: var(--sw-fg-muted);
   font-family: var(--sw-font-body);
-  font-size: 0.78rem;
+  font-size: var(--sw-text-caption);
   line-height: 1.45;
 }
 
@@ -448,7 +448,7 @@
   padding: 0;
   background: transparent;
   color: var(--sw-fg);
-  font-size: 0.72rem;
+  font-size: var(--sw-text-eyebrow);
 }
 
 /* An aliased union prints as the alias name beside the member name; the chip
@@ -462,12 +462,12 @@
 }
 
 .sw-prose .api-member-alias code {
-  border: 1px solid color-mix(in srgb, var(--sw-type-name) 30%, var(--sw-border));
-  padding: 0.04rem 0.3rem;
-  border-radius: 0.3rem;
-  background: color-mix(in srgb, var(--sw-type-name) 8%, var(--sw-surface-2));
-  color: color-mix(in srgb, var(--sw-type-name) 74%, var(--sw-fg));
-  font: 550 0.72rem / 1.5 var(--sw-font-mono);
+  border: 1px solid color-mix(in srgb, var(--sw-code-function) 30%, var(--sw-border));
+  padding: var(--sw-space-0-5) var(--sw-space-1);
+  border-radius: var(--sw-radius-xs);
+  background: color-mix(in srgb, var(--sw-code-function) 8%, var(--sw-surface-2));
+  color: color-mix(in srgb, var(--sw-code-function) 74%, var(--sw-fg));
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.5 var(--sw-font-mono);
 }
 
 .sw-prose .api-member-alias a:hover code {
@@ -478,18 +478,18 @@
 /* Referenced by: who depends on the owning package, and which documented
    exports name the symbol. Each chip carries the consumer and the relationship. */
 .api-consumers-label {
-  margin: 1.4rem 0 0.55rem;
-  color: var(--sw-fg-dim);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  margin: var(--sw-space-6) 0 var(--sw-space-2);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
+  font-weight: var(--sw-weight-semibold);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .api-consumer-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 0.5rem;
+  gap: var(--sw-space-1-5) var(--sw-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -497,14 +497,14 @@
 
 .sw-prose .api-consumer-list li {
   display: inline-flex;
-  gap: 0.4rem;
+  gap: var(--sw-space-1-5);
   align-items: baseline;
   margin: 0;
-  padding: 0.2rem 0.6rem;
+  padding: var(--sw-space-1) var(--sw-space-2);
   border: 1px solid var(--sw-border);
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   background: var(--sw-surface-1);
-  font-size: 0.76rem;
+  font-size: var(--sw-text-eyebrow);
 }
 
 .sw-prose .api-consumer-list a {
@@ -525,22 +525,22 @@
 }
 
 .api-consumer-kind {
-  color: var(--sw-fg-dim);
-  font: 600 0.63rem / 1.4 var(--sw-font-mono);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
   letter-spacing: 0.02em;
 }
 
 .sw-prose .api-consumer-list .api-consumer-more {
   border-color: transparent;
   background: transparent;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   font-style: italic;
 }
 
 .api-declaration > summary {
   color: var(--sw-fg-muted);
-  font-size: 0.84rem;
-  font-weight: 550;
+  font-size: var(--sw-text-caption);
+  font-weight: var(--sw-weight-medium);
 }
 
 .api-declaration > summary:hover,
@@ -561,39 +561,39 @@
 /* Member signatures sit as one compact framed line indented under the name;
    docs follow as plain prose, not another surface. */
 .sw-prose .api-member .expressive-code {
-  margin: 0.15rem 0 0.7rem 1.25rem;
+  margin: var(--sw-space-0-5) 0 var(--sw-space-3) var(--sw-space-5);
 }
 
 .sw-prose .api-member .expressive-code figure.frame {
   border: 1px solid var(--sw-border);
-  border-radius: 0.5rem;
+  border-radius: var(--sw-radius-md);
 }
 
 /* Short signatures must not float in a tall empty frame. */
 .sw-prose .api-member .expressive-code pre,
 .sw-prose .api-declaration .expressive-code pre {
-  font-size: 0.78rem;
+  font-size: var(--sw-text-caption);
 }
 
 .api-member .expressive-code pre > code,
 .api-declaration .expressive-code pre > code {
-  padding-block: 0.5rem;
+  padding-block: var(--sw-space-2);
 }
 
 .api-member .api-member-doc {
   max-width: 47rem;
-  margin: -0.3rem 0 0.8rem;
-  padding: 0 0.3rem 0 1.25rem;
+  margin: calc(var(--sw-space-1) * -1) 0 var(--sw-space-3);
+  padding: 0 var(--sw-space-1) 0 var(--sw-space-5);
   color: var(--sw-fg-muted);
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
 }
 
 /* Union variants: one surface with hairline dividers; each variant is a
    docked highlighted fence so identifiers hover and link like declarations. */
 .api-variant-list {
-  margin: 1.1rem 0 2.75rem;
+  margin: var(--sw-space-4) 0 var(--sw-space-12);
   border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
+  border-radius: var(--sw-radius-md);
   background: var(--sw-surface-1);
   overflow: hidden;
 }
@@ -616,11 +616,11 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  font-size: 0.78rem;
+  font-size: var(--sw-text-caption);
 }
 
 .api-variant .expressive-code pre > code {
-  padding-block: 0.55rem;
+  padding-block: var(--sw-space-2);
 }
 
 @media (max-width: 30rem) {
@@ -630,7 +630,7 @@
 
   .api-metadata div {
     grid-template-columns: 1fr;
-    gap: 0.1rem;
+    gap: var(--sw-space-0-5);
   }
 
   /* The summary line drops below the member name instead of squeezing into a
@@ -641,7 +641,7 @@
 
   .api-member-summary {
     flex: 1 0 100%;
-    padding-left: 0.95rem;
+    padding-left: var(--sw-space-4);
   }
 
   .sw-prose .api-member .expressive-code {
@@ -649,7 +649,7 @@
   }
 
   .api-member .api-member-doc {
-    padding-left: 0.3rem;
+    padding-left: var(--sw-space-1);
   }
 }
 
@@ -657,8 +657,8 @@
    plain type reveals stay fainter. A wavy line reads as a spelling error, so
    no tier uses it. */
 .sw-code-popover__trigger {
-  border-radius: 0.2rem;
-  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 40%, transparent);
+  border-radius: var(--sw-radius-xs);
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-muted) 40%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.25em;
   cursor: help;
@@ -699,12 +699,10 @@ body .sw-code-popover__panel {
   max-width: min(34rem, calc(100vw - 1.5rem));
   overflow: auto;
   border: 1px solid var(--sw-border-strong);
-  border-radius: 0.65rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
   color: var(--sw-fg);
-  box-shadow:
-    0 1.25rem 3rem rgb(15 23 42 / 22%),
-    0 2px 6px rgb(15 23 42 / 10%);
+  box-shadow: var(--sw-shadow-lg);
   overscroll-behavior: contain;
   scrollbar-color: var(--sw-border-strong) transparent;
 }
@@ -713,23 +711,17 @@ body .sw-code-popover__panel[hidden] {
   display: none;
 }
 
-:root[data-theme="dark"] body .sw-code-popover__panel {
-  box-shadow:
-    0 1.5rem 3.5rem rgb(0 0 0 / 56%),
-    0 2px 8px rgb(0 0 0 / 40%);
-}
-
 body .sw-code-popover__signature {
   display: block;
   box-sizing: border-box;
   width: 100%;
   margin: 0;
-  padding: 0.85rem 1rem 0.9rem 1.15rem;
+  padding: var(--sw-space-3) var(--sw-space-4) var(--sw-space-4) var(--sw-space-5);
   overflow: auto hidden;
   border-block-start: 2px solid color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
   background: var(--sw-surface-2);
   color: var(--sw-fg-strong);
-  font: 500 0.72rem / 1.54 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.54 var(--sw-font-mono);
   tab-size: 2;
   text-align: start;
   white-space: pre;
@@ -754,19 +746,19 @@ body .sw-code-popover__tags {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  padding: 0.75rem 1rem 0.82rem 1.15rem;
+  padding: var(--sw-space-3) var(--sw-space-4) var(--sw-space-3) var(--sw-space-5);
   border-top: 1px solid var(--sw-border);
   background: var(--sw-surface-1);
   color: var(--sw-fg);
-  font: 450 0.72rem / 1.52 var(--sw-font-body);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.52 var(--sw-font-body);
   text-align: start;
   white-space: normal;
 }
 
 body .sw-code-popover__tags {
   display: grid;
-  gap: 0.35rem;
-  padding-block-start: 0.65rem;
+  gap: var(--sw-space-1-5);
+  padding-block-start: var(--sw-space-3);
   color: var(--sw-fg-muted);
 }
 
@@ -777,34 +769,34 @@ body .sw-code-popover__tag-name {
 
 body .sw-code-popover__tag-name {
   color: var(--sw-accent-strong);
-  font: 600 0.68rem / 1.4 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
 }
 
 /* An example tag is a small code block under its label, not inline prose. */
 body .sw-code-popover__tag--example {
   display: grid;
-  gap: 0.3rem;
+  gap: var(--sw-space-1);
 }
 
 body .sw-code-popover__example {
   display: block;
   overflow-x: auto;
-  padding: 0.5rem 0.65rem;
+  padding: var(--sw-space-2) var(--sw-space-3);
   border: 1px solid var(--sw-border);
-  border-radius: 0.4rem;
+  border-radius: var(--sw-radius-sm);
   background: var(--sw-surface-2);
   color: var(--sw-fg);
-  font: 0.72rem / 1.55 var(--sw-font-mono);
+  font: var(--sw-text-eyebrow) / 1.55 var(--sw-font-mono);
   white-space: pre;
 }
 
 body .sw-code-popover__link {
   display: block;
-  padding: 0.55rem 1rem 0.6rem 1.15rem;
+  padding: var(--sw-space-2) var(--sw-space-4) var(--sw-space-2) var(--sw-space-5);
   border-top: 1px solid var(--sw-border);
   color: var(--sw-accent-strong);
   background: var(--sw-surface-1);
-  font: 650 0.7rem / 1.4 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-body);
   text-decoration: none;
 }
 
@@ -841,13 +833,13 @@ body .sw-code-popover__accessible-signature {
 
 .sw-test-fixture {
   min-height: 100vh;
-  padding: 1rem;
+  padding: var(--sw-space-4);
   background: var(--sw-surface-0);
 }
 
 .sw-test-fixture [data-framework-lifecycle] {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
 }
 
 .sw-test-fixture output {
@@ -890,18 +882,18 @@ body .sw-code-popover__accessible-signature {
   margin: 0;
   overflow: hidden;
   font-size: 0;
-  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+  scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-6));
 }
 
 /* ToC deep links target member rows; keep them clear of the fixed header. */
 .sw-prose .api-member[id] {
-  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+  scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-6));
 }
 
 /* Type identifiers in generated declaration fences link to their API pages. */
 .sw-prose .expressive-code a.sw-code-ref {
   color: inherit;
-  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 65%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-muted) 65%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
 }

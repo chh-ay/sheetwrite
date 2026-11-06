@@ -2,7 +2,7 @@
    what a docs snippet produces. Cell content keeps its own authored colors;
    the sheet chrome follows the site tokens in light and dark themes. */
 .sw-prose .sw-grid-result {
-  margin: 0.75rem 0 1.5rem;
+  margin: var(--sw-space-3) 0 var(--sw-space-6);
 }
 /* The sheet keeps grid-sized columns instead of stretching to the page: a
    two-column result is a small corner of a sheet. The edge column and row fade
@@ -51,22 +51,22 @@
   border-radius: 0;
   border-collapse: separate;
   border-spacing: 0;
-  font: 400 0.82rem / 1.4 var(--sw-font-body);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / 1.4 var(--sw-font-body);
   font-variant-numeric: tabular-nums;
 }
 .sw-prose .sw-grid-result__sheet th,
 .sw-prose .sw-grid-result__sheet td {
   border: 0 solid var(--sw-border);
   border-width: 0 1px 1px 0;
-  padding: 0.35rem 0.7rem;
+  padding: var(--sw-space-1-5) var(--sw-space-3);
   white-space: nowrap;
   vertical-align: middle;
 }
 .sw-prose .sw-grid-result__sheet thead th,
 .sw-prose .sw-grid-result__sheet tbody th {
   background: var(--sw-surface-2);
-  color: var(--sw-fg-dim);
-  font: 600 0.7rem / 1.4 var(--sw-font-mono);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
   text-align: center;
 }
 .sw-prose .sw-grid-result__sheet tbody th {
@@ -86,20 +86,21 @@
   min-width: 3.5rem;
 }
 .sw-prose .sw-grid-result__sheet :is(th, td).sw-grid-result__edge {
-  mask-image: linear-gradient(to right, #000, transparent);
+  mask-image: linear-gradient(to right, var(--sw-mask-opaque), transparent);
 }
 .sw-prose .sw-grid-result__sheet tr.sw-grid-result__edge > * {
-  mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, var(--sw-mask-opaque), transparent);
 }
 .sw-prose .sw-grid-result__sheet tr.sw-grid-result__edge > :last-child {
   mask-image:
-    linear-gradient(to right, #000, transparent), linear-gradient(to bottom, #000, transparent);
+    linear-gradient(to right, var(--sw-mask-opaque), transparent),
+    linear-gradient(to bottom, var(--sw-mask-opaque), transparent);
   mask-composite: intersect;
 }
 .sw-prose .sw-grid-result__row-id {
-  margin-left: 0.5rem;
+  margin-left: var(--sw-space-2);
   color: var(--sw-fg-muted);
-  font-weight: 500;
+  font-weight: var(--sw-weight-medium);
 }
 
 /* Markers match what the live grid paints: a tinted selection with an
@@ -118,12 +119,12 @@
   right: 0;
   width: 8px;
   height: 8px;
-  background: #f59e0b;
+  background: var(--sw-warning);
   clip-path: polygon(0 0, 100% 0, 100% 100%);
   content: "";
 }
 .sw-prose .sw-grid-result__sheet td[data-list="true"] {
-  padding-right: 1.6rem;
+  padding-right: var(--sw-space-6);
 }
 .sw-prose .sw-grid-result__sheet td[data-list="true"]::after {
   position: absolute;
@@ -140,22 +141,22 @@
 /* Authored blocks around the sheet: a find widget above it; a legend, a mini
    menu or a status bar under it. */
 .sw-prose .sw-grid-result > :not(:first-child, figcaption) {
-  margin-top: 0.5rem;
+  margin-top: var(--sw-space-2);
 }
 .sw-prose .sw-grid-result__legend {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 0.35rem 1rem;
+  gap: var(--sw-space-1-5) var(--sw-space-4);
   margin-bottom: 0;
-  padding: 0.65rem 0.8rem;
+  padding: var(--sw-space-3) var(--sw-space-3);
   border: 1px solid var(--sw-border);
-  border-radius: 0.5rem;
-  font-size: 0.82rem;
+  border-radius: var(--sw-radius-md);
+  font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-grid-result__legend dt {
   margin: 0;
   color: var(--sw-fg-strong);
-  font: 600 0.75rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.5 var(--sw-font-mono);
 }
 .sw-prose .sw-grid-result__legend dd {
   margin: 0;
@@ -163,9 +164,9 @@
   line-height: 1.5;
 }
 .sw-prose .sw-grid-result figcaption {
-  margin-top: 0.4rem;
+  margin-top: var(--sw-space-1-5);
   color: var(--sw-fg-muted);
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
 }
 
 /* Group overview pages: one card per page, with its New/Updated badge. */
@@ -176,13 +177,13 @@
 .sw-prose .sw-section-cards a p {
   margin: 0;
   color: var(--sw-fg-muted);
-  font-size: 0.85rem;
+  font-size: var(--sw-text-small);
 }
 /* The card's generic `span` rule would stretch the badge and dim its text. */
 .sw-prose .sw-section-cards .sw-nav-badge {
   justify-self: start;
-  font: 700 0.6rem / 1.6 var(--sw-font-mono);
-  letter-spacing: 0.05em;
+  font: var(--sw-weight-bold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
 }
 .sw-prose .sw-section-cards .sw-nav-badge[data-badge="new"] {
   color: var(--sw-accent-ink);
@@ -199,23 +200,23 @@
 
 /* These figures show chrome without pretending that static controls work. */
 .sw-prose .sw-chrome-result {
-  margin: 0.75rem 0 1.5rem;
-  padding: 0.75rem;
+  margin: var(--sw-space-3) 0 var(--sw-space-6);
+  padding: var(--sw-space-3);
   overflow-x: auto;
   border: 1px solid var(--sw-border);
-  border-radius: 0.5rem;
+  border-radius: var(--sw-radius-md);
   color: var(--sw-fg);
   background: var(--sw-surface-1);
 }
 .sw-prose .sw-chrome-result figcaption {
-  margin-top: 0.5rem;
+  margin-top: var(--sw-space-2);
   color: var(--sw-fg-muted);
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-mini-ribbon,
 .sw-mini-search,
 .sw-mini-status {
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-mini-ribbon [aria-selected="true"] {
   border-bottom: 2px solid var(--sw-accent);
@@ -226,20 +227,20 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
 }
 
 /* The find widget floats at the sheet's top right, as in the grid: a query
    field with its match count, then the replace row. */
 .sw-mini-search {
   display: grid;
-  gap: 0.4rem;
+  gap: var(--sw-space-1-5);
   width: max-content;
   max-width: 100%;
   margin-left: auto;
-  padding: 0.5rem;
+  padding: var(--sw-space-2);
   border: 1px solid var(--sw-border);
-  border-radius: 0.45rem;
+  border-radius: var(--sw-radius-md);
   background: var(--sw-surface-2);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
 }
@@ -247,12 +248,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--sw-space-1-5);
 }
 .sw-mini-search > div > span {
-  padding: 0.25rem 0.5rem;
+  padding: var(--sw-space-1) var(--sw-space-2);
   border: 1px solid var(--sw-border);
-  border-radius: 0.3rem;
+  border-radius: var(--sw-radius-xs);
   color: var(--sw-fg-muted);
   line-height: 1.3;
 }
@@ -263,7 +264,7 @@
   color: var(--sw-fg-strong);
 }
 .sw-mini-search > div:last-child > span:first-child {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 /* The match count is a label, not a control. */
 .sw-mini-search > div:first-child > span:nth-child(2) {
@@ -271,41 +272,41 @@
   font-variant-numeric: tabular-nums;
 }
 .sw-mini-ribbon section {
-  padding: 0.5rem;
+  padding: var(--sw-space-2);
   border-right: 1px solid var(--sw-border);
 }
 .sw-mini-menu {
   width: max-content;
   min-width: 12rem;
-  padding: 0.35rem;
+  padding: var(--sw-space-1-5);
   border: 1px solid var(--sw-border);
-  border-radius: 0.35rem;
+  border-radius: var(--sw-radius-sm);
   background: var(--sw-surface-2);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--sw-fg-strong) 12%, transparent);
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
 }
 /* Under a result sheet the menu opens from the clicked cell, past the row numbers. */
 .sw-grid-result > .sw-mini-menu {
-  margin-left: 3rem;
+  margin-left: var(--sw-space-12);
 }
 .sw-mini-menu > div {
   display: flex;
   justify-content: space-between;
-  gap: 2rem;
-  padding: 0.25rem 0.5rem;
+  gap: var(--sw-space-8);
+  padding: var(--sw-space-1) var(--sw-space-2);
 }
 .sw-mini-menu kbd {
   color: var(--sw-fg-muted);
-  font: 500 0.75rem / 1.4 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
 }
 .sw-mini-menu hr {
-  margin: 0.3rem;
+  margin: var(--sw-space-1);
   border: 0;
   border-top: 1px solid var(--sw-border);
 }
 .sw-mini-status {
   justify-content: flex-end;
-  padding: 0.4rem 0.65rem;
+  padding: var(--sw-space-1-5) var(--sw-space-3);
   background: var(--sw-surface-2);
   border-top: 1px solid var(--sw-border);
 }
@@ -313,7 +314,7 @@
 .sw-mini-status > span:first-child {
   margin-right: auto;
   color: var(--sw-fg-strong);
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 /* Under a result sheet the status bar closes the frame, as in the shell. */
 .sw-prose .sw-grid-result > .sw-mini-status {
@@ -322,11 +323,11 @@
   border-radius: 0 0 0.5rem 0.5rem;
 }
 .sw-mini-ribbon-tabs {
-  padding: 0.35rem 0.5rem;
+  padding: var(--sw-space-1-5) var(--sw-space-2);
   border-bottom: 1px solid var(--sw-border);
 }
 .sw-mini-ribbon-tabs > span {
-  padding: 0.25rem 0.65rem;
+  padding: var(--sw-space-1) var(--sw-space-3);
 }
 .sw-mini-ribbon-tabs [data-active="true"] {
   border-bottom: 2px solid var(--sw-accent);
@@ -335,16 +336,16 @@
 .sw-mini-ribbon-groups section > div {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: var(--sw-space-2);
 }
 .sw-mini-ribbon-groups small {
   display: block;
-  margin-top: 0.6rem;
+  margin-top: var(--sw-space-2);
   color: var(--sw-fg-muted);
   text-align: center;
 }
 .sw-chrome-result [aria-disabled="true"] {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   opacity: 0.65;
 }
 .sw-mini-search mark {
