@@ -2,7 +2,6 @@
 // the current region around a cell and whether its first row is a header.
 // The quick sort commands and the Sort panel share them.
 
-import { readRowValues } from "./data-window-reads.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { Store } from "./types/store.js";
@@ -20,10 +19,14 @@ export function currentRegion(store: Store, addr: CellAddress): Range | null {
 export function looksLikeHeader(store: Store, range: Range): boolean {
   if (range.end.row <= range.start.row) return false;
 
-  const columns = { sheet: range.sheet, startCol: range.start.col, endCol: range.end.col };
-  const firstRow = readRowValues(store, { ...columns, row: range.start.row });
-  if (firstRow.some((value) => value !== null && typeof value !== "string")) return false;
+  let differs = false;
+  for (let col = range.start.col; col <= range.end.col; col++) {
+    const first = store.getCell({ sheet: range.sheet, row: range.start.row, col }).resolved;
+    if (first !== null && typeof first !== "string") return false;
+    if (first === null) continue;
 
-  const secondRow = readRowValues(store, { ...columns, row: range.start.row + 1 });
-  return firstRow.some((value, offset) => value !== null && typeof secondRow[offset] !== "string");
+    const second = store.getCell({ sheet: range.sheet, row: range.start.row + 1, col }).resolved;
+    if (typeof second !== "string") differs = true;
+  }
+  return differs;
 }
