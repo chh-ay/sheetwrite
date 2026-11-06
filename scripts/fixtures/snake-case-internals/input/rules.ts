@@ -3,6 +3,7 @@ import { publicHelper } from "./shared.js";
 export function exportedEntry(inputValue: number): number {
   // `localTotal` is passed to `privateHelper`.
   const localTotal = inputValue + 1;
+  // A prose mention of localTotal may name an OOXML term, so it stays.
   return privateHelper(localTotal);
 }
 

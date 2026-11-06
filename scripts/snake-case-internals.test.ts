@@ -45,8 +45,12 @@ describe("snake-case-internals", () => {
     }
   });
 
-  test("reports a rename whose new name is already bound instead of shadowing it", async () => {
+  test("reports bound names and prose mentions instead of rewriting them", async () => {
     const plan = await planRenames(join(FIXTURES, "input/tsconfig.json"), []);
+
+    expect(plan.mentions.map((mention) => `${mention.line} ${mention.oldName}`)).toEqual([
+      "6 localTotal",
+    ]);
 
     expect(plan.conflicts.map((conflict) => `${conflict.oldName} -> ${conflict.newName}`)).toEqual([
       "scaledLine -> scaled_line",

@@ -74,9 +74,18 @@ export interface RenameConflict {
   readonly reason: string;
 }
 
+/** A bare comment mention of a renamed name, left unchanged for a reviewer to judge. */
+export interface CommentMention {
+  readonly file: string;
+  readonly line: number;
+  readonly oldName: string;
+  readonly newName: string;
+}
+
 export interface RenamePlan {
   readonly renames: readonly PlannedRename[];
   readonly conflicts: readonly RenameConflict[];
+  readonly mentions: readonly CommentMention[];
   readonly edits: ReadonlyMap<string, readonly TextEdit[]>;
 }
 
@@ -342,26 +351,41 @@ function trivia_in(
 }
 
 /**
- * Edits that rename mentions of the old name in comments within the symbol's scope,
- * including `@param` tags. Mentions after a `.` are property paths and stay.
+ * Rename mentions of the old name in comments within the symbol's scope. A mention
+ * written as code (in backticks or as a `@param` name) is rewritten. A bare mention
+ * may name an OOXML or DOM term with the same spelling, so it is only reported for
+ * review. Mentions after a `.` are property paths and stay.
  */
-function comment_edits(candidate: Candidate): TextEdit[] {
+function comment_edits(candidate: Candidate): { edits: TextEdit[]; mentions: CommentMention[] } {
   const text = candidate.file.text;
   const escaped = candidate.oldName.replaceAll("$", "\\$");
   const pattern = new RegExp(`(?<![\\w$#.])${escaped}(?![\\w$])`, "g");
+  const code_prefix = /(`|@param\s+(\{[^}]*\}\s+)?\[?)$/;
   const edits: TextEdit[] = [];
+  const mentions: CommentMention[] = [];
   for (const [start, end] of trivia_in(candidate.file, comment_scope(candidate))) {
-    for (const match of text.slice(start, end).matchAll(pattern)) {
+    const trivia = text.slice(start, end);
+    for (const match of trivia.matchAll(pattern)) {
       const name_start = start + match.index;
-      edits.push({
-        start: name_start,
-        end: name_start + candidate.oldName.length,
-        text: candidate.newName,
+      if (code_prefix.test(trivia.slice(0, match.index))) {
+        edits.push({
+          start: name_start,
+          end: name_start + candidate.oldName.length,
+          text: candidate.newName,
+        });
+        continue;
+      }
+
+      mentions.push({
+        file: candidate.file.fileName,
+        line: candidate.file.getLineAndCharacterOfPosition(name_start).line + 1,
+        oldName: candidate.oldName,
+        newName: candidate.newName,
       });
     }
   }
 
-  return edits;
+  return { edits, mentions };
 }
 
 async function find_conflict(
@@ -507,6 +531,7 @@ export async function planRenames(
 
     const renames: PlannedRename[] = [];
     const conflicts: RenameConflict[] = [];
+    const mentions = new Map<string, CommentMention>();
     const edits = new Map<string, TextEdit[]>();
     for (const candidate of candidates.values()) {
       const summary = {
@@ -532,22 +557,23 @@ export async function planRenames(
         edits.set(occurrence.file.fileName, file_edits);
       }
 
+      const comments = comment_edits(candidate);
       const file_edits = edits.get(candidate.file.fileName) ?? [];
-      file_edits.push(...comment_edits(candidate));
+      file_edits.push(...comments.edits);
       edits.set(candidate.file.fileName, file_edits);
+      for (const mention of comments.mentions) {
+        mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
+      }
     }
 
-    const by_position = (
-      left: PlannedRename | RenameConflict,
-      right: PlannedRename | RenameConflict,
-    ): number =>
+    const by_position = (left: CommentMention, right: CommentMention): number =>
       left.file.localeCompare(right.file) ||
       left.line - right.line ||
       left.oldName.localeCompare(right.oldName);
     renames.sort(by_position);
     conflicts.sort(by_position);
 
-    return { renames, conflicts, edits };
+    return { renames, conflicts, mentions: [...mentions.values()].sort(by_position), edits };
   } finally {
     await api.close();
   }
@@ -583,7 +609,14 @@ function report(plan: RenamePlan, root: string): string {
       `${relative(root, conflict.file)}:${conflict.line} conflict ${conflict.oldName} -> ${conflict.newName}: ${conflict.reason}`,
     );
   }
-  lines.push(`${plan.renames.length} renames, ${plan.conflicts.length} conflicts`);
+  for (const mention of plan.mentions) {
+    lines.push(
+      `${relative(root, mention.file)}:${mention.line} review comment mentions ${mention.oldName} (now ${mention.newName})`,
+    );
+  }
+  lines.push(
+    `${plan.renames.length} renames, ${plan.conflicts.length} conflicts, ${plan.mentions.length} comments to review`,
+  );
 
   return `${lines.join("\n")}\n`;
 }
