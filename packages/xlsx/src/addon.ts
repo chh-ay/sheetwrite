@@ -11,16 +11,16 @@ import { sheetwriteWorkbookBackend } from "./workbook.js";
  * @example
  * ```ts
  * import { fromXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
- * import { xlsx } from "@sheetwrite/xlsx";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  *
- * await initSheetwrite({ addons: [xlsx()] });
+ * await initSheetwrite({ addons: [xlsxAddon()] });
  * async function open(file: File) {
  *   return fromXlsxWorkbook(await file.arrayBuffer());
  * }
  * ```
  * @see /docs/import-export/xlsx-export/
  */
-export function xlsx(): SheetwriteAddon {
+export function xlsxAddon(): SheetwriteAddon {
   return {
     name: "xlsx",
     setup(context) {

@@ -9,7 +9,7 @@ import {
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 
-import { charts } from "../src/index.js";
+import { chartsAddon } from "../src/index.js";
 import { chartWorkbook, SALES, setCell } from "./fixtures.js";
 
 const stores: SheetwriteStore[] = [];
@@ -46,7 +46,7 @@ describe("charts add-on", () => {
   });
 
   it("opens live chart views after initSheetwrite installs it", async () => {
-    await initSheetwrite({ addons: [charts()] });
+    await initSheetwrite({ addons: [chartsAddon()] });
     const store = new SheetwriteStore(chartWorkbook());
     stores.push(store);
 
@@ -61,7 +61,7 @@ describe("charts add-on", () => {
   });
 
   it("draws the charts of a grid created after install", async () => {
-    await initSheetwrite({ addons: [charts()] });
+    await initSheetwrite({ addons: [chartsAddon()] });
     const restoreCanvas = installCanvasTestStubs();
     const host = document.createElement("div");
     document.body.append(host);

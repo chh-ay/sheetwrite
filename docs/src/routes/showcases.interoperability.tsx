@@ -2070,8 +2070,8 @@ function IsolationSection({ workbench }: Readonly<{ workbench: InteroperabilityW
           <p>
             <code>@sheetwrite/core</code> ships no XLSX implementation. Workbook interchange throws
             a typed error until a host installs the XLSX add-on. This page loads{" "}
-            <code>@sheetwrite/xlsx</code> and installs its add-on lazily on the first XLSX action; CSV/TSV
-            interchange needs no optional package at all.
+            <code>@sheetwrite/xlsx</code> and installs its add-on lazily on the first XLSX action;
+            CSV/TSV interchange needs no optional package at all.
           </p>
           <div
             className="sw-si-panel sw-si-isolation"

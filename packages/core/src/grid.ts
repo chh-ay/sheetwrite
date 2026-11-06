@@ -1,6 +1,6 @@
-import { addonRegistry, type SheetwriteAddon } from "./addons.js";
 import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
+import { addonRegistry, type SheetwriteAddon } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
   fontFor,
@@ -389,12 +389,12 @@ export interface InitSheetwriteOptions {
  *
  * @example
  * ```ts
- * import { charts } from "@sheetwrite/charts";
+ * import { chartsAddon } from "@sheetwrite/charts";
  * import { initSheetwrite } from "@sheetwrite/core";
  * import * as formulas from "@sheetwrite/formulas";
- * import { xlsx } from "@sheetwrite/xlsx";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  *
- * await initSheetwrite({ engine: formulas, addons: [charts(), xlsx()] });
+ * await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] });
  * ```
  * @see /docs/start/choose-an-engine/
  * @see createGrid

@@ -108,7 +108,7 @@ Accepted sources are `BufferSource | URL | string | Request | WebAssembly.Module
 ```ts prelude="wasm" partial="requires surrounding host state" title="Explicit asset examples"
 // Vite-family URL
 import wasmUrl from "@sheetwrite/wasm/wasm?url";
-await initSheetwrite(wasmUrl);
+await initSheetwrite({ source: wasmUrl });
 
 // webpack asset URL
 await initSheetwrite(new URL("@sheetwrite/wasm/wasm", import.meta.url));
@@ -133,7 +133,7 @@ Select the engine one time, before the app creates a grid or a store, and before
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 - An app uses one engine. After initialization starts, the engine cannot change. A call that selects a different engine rejects.
@@ -147,7 +147,7 @@ React accepts `fallback`; Vue and Svelte use fallback content or slots. Initiali
 
 ## Optional feature assets
 
-Worker rendering and XLSX stay explicit. Import the Worker entry from `@sheetwrite/core/worker`. XLSX requires `@sheetwrite/xlsx` plus `import "@sheetwrite/xlsx/register"` before toolbar or programmatic export.
+Worker rendering and XLSX stay explicit. Import the Worker entry from `@sheetwrite/core/worker`. XLSX requires `@sheetwrite/xlsx` plus `initSheetwrite({ addons: [xlsxAddon()] })` before toolbar or programmatic export.
 
 - [Build the first workbook](/docs/start/first-grid/)
 - [Choose lifecycle ownership](/docs/frameworks/lifecycle/)

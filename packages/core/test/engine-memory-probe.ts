@@ -30,25 +30,27 @@ WebAssembly.Instance = class extends NativeInstance {
   }
 };
 
-await initSheetwrite({ engine: {
-  ...provider,
-  async createEngine(source): Promise<EngineInstance> {
-    const instance = await provider.createEngine(source);
-    if (growCandidate) instance.getMemory().grow(128);
+await initSheetwrite({
+  engine: {
+    ...provider,
+    async createEngine(source): Promise<EngineInstance> {
+      const instance = await provider.createEngine(source);
+      if (growCandidate) instance.getMemory().grow(128);
 
-    const importStore = instance.CellStore.importMemoryState;
-    let importedStores = 0;
-    instance.CellStore.importMemoryState = (bytes: Uint8Array) => {
-      importedStores += 1;
-      if (importedStores === failImportAt)
-        return importStore(bytes.subarray(0, bytes.byteLength - 1));
-      return importStore(bytes);
-    };
+      const importStore = instance.CellStore.importMemoryState;
+      let importedStores = 0;
+      instance.CellStore.importMemoryState = (bytes: Uint8Array) => {
+        importedStores += 1;
+        if (importedStores === failImportAt)
+          return importStore(bytes.subarray(0, bytes.byteLength - 1));
+        return importStore(bytes);
+      };
 
-    candidateCreated?.resolve();
-    return instance;
+      candidateCreated?.resolve();
+      return instance;
+    },
   },
-} });
+});
 
 assert.equal(instancesCreated, 1, "Core boot must not eagerly instantiate the public singleton");
 

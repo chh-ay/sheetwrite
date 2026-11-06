@@ -46,7 +46,7 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const grid = createGrid(host, {
   workbook: {
     activeSheet: "sheet1",
@@ -85,7 +85,7 @@ grid.store.applyTransaction({
 
 ## Registration
 
-Host functions need the full engine. Select it with `initSheetwrite(undefined, formulas)`, where `formulas` is `import * as formulas from "@sheetwrite/formulas"`, before you create the store. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`, so the default engine binary does not grow.
+Host functions need the full engine. Select it with `initSheetwrite({ engine: formulas })`, where `formulas` is `import * as formulas from "@sheetwrite/formulas"`, before you create the store. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`, so the default engine binary does not grow.
 
 Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its JavaScript.
 

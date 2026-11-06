@@ -5,9 +5,9 @@ import { initSheetwrite } from "@sheetwrite/core";
  * dynamic because the page shows that XLSX code stays out of the first chunk.
  */
 export async function installXlsx(): Promise<void> {
-  const { xlsx } = await import("@sheetwrite/xlsx");
+  const { xlsxAddon } = await import("@sheetwrite/xlsx");
 
-  await initSheetwrite({ addons: [xlsx()] });
+  await initSheetwrite({ addons: [xlsxAddon()] });
 }
 
 /**
@@ -15,7 +15,7 @@ export async function installXlsx(): Promise<void> {
  * dynamic because the page shows that chart code stays out of the first chunk.
  */
 export async function installCharts(): Promise<void> {
-  const { charts } = await import("@sheetwrite/charts");
+  const { chartsAddon } = await import("@sheetwrite/charts");
 
-  await initSheetwrite({ addons: [charts()] });
+  await initSheetwrite({ addons: [chartsAddon()] });
 }

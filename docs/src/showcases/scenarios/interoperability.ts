@@ -31,7 +31,6 @@ import {
   withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
-import { installXlsx } from "../../lib/addons.js";
 import compressionRatioUrl from "../../../../packages/xlsx/test/fixtures/compression-ratio.xlsx?url";
 import corruptDeflateUrl from "../../../../packages/xlsx/test/fixtures/corrupt-deflate.xlsx?url";
 import deepXmlUrl from "../../../../packages/xlsx/test/fixtures/deep-xml.xlsx?url";
@@ -42,6 +41,7 @@ import libreofficeRichUrl from "../../../../packages/xlsx/test/fixtures/libreoff
 import fixtureManifest from "../../../../packages/xlsx/test/fixtures/manifest.json";
 import positiveUrl from "../../../../packages/xlsx/test/fixtures/sheetwrite-libreoffice-positive.xlsx?url";
 import traversalUrl from "../../../../packages/xlsx/test/fixtures/traversal.xlsx?url";
+import { installXlsx } from "../../lib/addons.js";
 import { errorText } from "../../lib/errors.js";
 
 export const INTEROP_ORDERS_SHEET = "orders";

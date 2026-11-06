@@ -38,19 +38,21 @@ A `ChartView` contains plain data. Each series has its values, categories, and n
 
 When you replace the workbook, you get a new store. Make a new cache for the new store.
 
-## Register with core
+## Install the add-on
 
-Core has `openChartViews(store)`, which returns the same `get`, `subscribe` and `dispose` API. It throws until a chart package is registered. Import `@sheetwrite/charts/register` once, or call `registerChartsBackend()`. Registration also sets the chart renderer, so grids that you create after it draw their charts. Without it, a grid shows a plain frame with the chart title:
+Core has `openChartViews(store)`, which returns the same `get`, `subscribe` and `dispose` API. It throws until the charts add-on is installed with `initSheetwrite({ addons: [chartsAddon()] })`. The add-on also sets the chart renderer, so grids that you create after it draw their charts. Without it, a grid shows a plain frame with the chart title:
 
 ```ts
-import "@sheetwrite/charts/register";
-import { openChartViews } from "@sheetwrite/core";
+import { chartsAddon } from "@sheetwrite/charts";
+import { initSheetwrite, openChartViews } from "@sheetwrite/core";
+
+await initSheetwrite({ addons: [chartsAddon()] });
 
 const charts = openChartViews(store);
 const view = charts.get({ sheet: "s", id: "sales" });
 ```
 
-The `@sheetwrite/charts` root entry does not register anything when you import it.
+The `@sheetwrite/charts` root entry installs nothing when you import it.
 
 ## Draw a chart
 
@@ -72,4 +74,4 @@ host.replaceChildren(renderChartSvg(view, { width: 320, height: 200 }));
 
 Series colors come from the CSS variables `--sheetwrite-chart-1` to `--sheetwrite-chart-8`, and text uses `--sheetwrite-fg`. Core styles set these variables for the light and dark themes. Set them on the grid or the page to change the colors.
 
-`createChartRenderer(store)` is the renderer that `registerChartsBackend()` gives to core. A grid uses it to draw each chart in its box. A chart draws again only when an edit changes it or its box size changes, at most once in each animation frame.
+`createChartRenderer(store)` is the renderer that `chartsAddon()` gives to core. A grid uses it to draw each chart in its box. A chart draws again only when an edit changes it or its box size changes, at most once in each animation frame.

@@ -10,7 +10,7 @@ import {
   toXlsxWorkbook,
 } from "@sheetwrite/core";
 
-import { xlsx } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -136,8 +136,8 @@ describe("XLSX add-on", () => {
     const store = new SheetwriteStore(workbook());
     const snapshot = workbookSnapshot();
 
-    await initSheetwrite({ addons: [xlsx()] });
-    await initSheetwrite({ addons: [xlsx()] });
+    await initSheetwrite({ addons: [xlsxAddon()] });
+    await initSheetwrite({ addons: [xlsxAddon()] });
 
     store.applyTransaction({
       patches: [

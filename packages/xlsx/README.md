@@ -8,21 +8,24 @@ Optional deterministic OOXML table and workbook backends for `@sheetwrite/core`.
 npm install @sheetwrite/core @sheetwrite/xlsx
 ```
 
-Register once before calling any core XLSX function or `grid.exportXlsx()`:
+Install the add-on once before calling any core XLSX function or `grid.exportXlsx()`:
 
 ```ts
-import "@sheetwrite/xlsx/register";
 import {
   fromXlsxTable,
   fromXlsxWorkbook,
+  initSheetwrite,
   toXlsxTable,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 ```
 
-The registration entry is idempotent. Importing `@sheetwrite/xlsx` itself is side-effect free. Explicit composition is available through `registerXlsxBackends()`, `sheetwriteWorkbookBackend`, `sheetwriteTableImportBackend`, and `sheetwriteTableExportBackend`.
+Installing the add-on again is a no-op. Importing `@sheetwrite/xlsx` itself is side-effect free. `sheetwriteWorkbookBackend`, `sheetwriteTableImportBackend` and `sheetwriteTableExportBackend` are public for hosts that compose their own add-on.
 
-Without registration, core XLSX functions identify the missing optional package. CSV and TSV do not require this package.
+Without the add-on, core XLSX functions identify the missing optional package. CSV and TSV do not require this package.
 
 ## Table and workbook APIs
 
@@ -45,4 +48,4 @@ Every path shares `XlsxWorkbookOptions`. `maxCells` defaults to 1,000,000 logica
 
 The reader preflights the complete ZIP central directory and OPC relationship graph before inflating referenced parts. DTDs and custom XML entities are rejected. Applications accepting untrusted files should set host-specific limits lower than the defaults when appropriate.
 
-Framework toolbar XLSX actions call the core backend contract. Applications enabling those actions must register this package explicitly or lazily import `@sheetwrite/xlsx/register` immediately before use.
+Framework toolbar XLSX actions call the core backend contract. Applications enabling those actions must install `xlsxAddon()` through `initSheetwrite`, at startup or lazily immediately before use.

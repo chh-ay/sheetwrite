@@ -126,7 +126,7 @@ function missingXlsxBackend(
   return new SheetwriteError(
     "optional-backend-unavailable",
     operation,
-    `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsx()] }) before calling ${functionName}.`,
+    `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsxAddon()] }) before calling ${functionName}.`,
     { context: { backend: "xlsx", functionName }, retryable: false },
   );
 }
@@ -170,10 +170,10 @@ function xlsxCallFailure(
  *
  * @example
  * ```ts
- * import { xlsx } from "@sheetwrite/xlsx";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  * import { initSheetwrite, toXlsxTable, downloadBytes, type Workbook, type Store } from "@sheetwrite/core";
  *
- * await initSheetwrite({ addons: [xlsx()] });
+ * await initSheetwrite({ addons: [xlsxAddon()] });
  * async function download(workbook: Workbook, store: Store) {
  *   const bytes = await toXlsxTable(workbook, store);
  *   downloadBytes(bytes, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -245,10 +245,10 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  *
  * @example
  * ```ts
- * import { xlsx } from "@sheetwrite/xlsx";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  * import { fromXlsxTable, initSheetwrite } from "@sheetwrite/core";
  *
- * await initSheetwrite({ addons: [xlsx()] });
+ * await initSheetwrite({ addons: [xlsxAddon()] });
  * async function openTable(file: File) {
  *   return fromXlsxTable(await file.arrayBuffer());
  * }
@@ -394,10 +394,10 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
  *
  * @example
  * ```ts
- * import { xlsx } from "@sheetwrite/xlsx";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  * import { initSheetwrite, toXlsxWorkbook, downloadBytes, type Grid } from "@sheetwrite/core";
  *
- * await initSheetwrite({ addons: [xlsx()] });
+ * await initSheetwrite({ addons: [xlsxAddon()] });
  * async function download(grid: Grid) {
  *   const bytes = await toXlsxWorkbook(grid);
  *   downloadBytes(bytes, "workbook.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -474,11 +474,11 @@ export async function fromXlsxWorkbookFile(
  *
  * @example
  * ```ts
- * import { xlsx } from "@sheetwrite/xlsx";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  * import { fromXlsxWorkbook, createGridFromSnapshot, initSheetwrite } from "@sheetwrite/core";
  *
  * async function openWorkbook(host: HTMLElement, file: File) {
- *   await initSheetwrite({ addons: [xlsx()] });
+ *   await initSheetwrite({ addons: [xlsxAddon()] });
  *   const snapshot = await fromXlsxWorkbook(await file.arrayBuffer());
  *   return createGridFromSnapshot(host, snapshot);
  * }

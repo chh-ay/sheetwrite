@@ -6,7 +6,7 @@ import type {
   XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 import { fromXlsxWorkbook, initSheetwrite, toXlsxWorkbook } from "@sheetwrite/core";
-import { xlsx } from "@sheetwrite/xlsx";
+import { xlsxAddon } from "@sheetwrite/xlsx";
 
 export const FORMATTING_SHEET = "budget";
 export const FORMAT_OPTIONS = [
@@ -277,7 +277,7 @@ function stylesByCell(snapshot: WorkbookSnapshot): Map<string, CellStyle> {
 
 /** Compare the actual edited workbook, not a reset seed, against the decoded XLSX bytes. */
 export async function roundTripFormatting(grid: Pick<Grid, "exportSnapshot">) {
-  await initSheetwrite({ addons: [xlsx()] });
+  await initSheetwrite({ addons: [xlsxAddon()] });
   const source = grid.exportSnapshot();
   const warnings: XlsxWorkbookWarning[] = [];
   const bytes = await toXlsxWorkbook(source, { onWarning: (warning) => warnings.push(warning) });

@@ -12,7 +12,7 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
-import { xlsx } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 import { packageProblems } from "./raw-opc.js";
 
 async function fixture(file: string): Promise<Uint8Array> {
@@ -24,7 +24,7 @@ function drawingCount(files: Record<string, Uint8Array>, part: string): number {
 }
 
 beforeAll(async () => {
-  await initSheetwrite({ addons: [xlsx()] });
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 const KINDS: ChartKind[] = ["column", "bar", "line", "area", "pie", "doughnut", "scatter"];

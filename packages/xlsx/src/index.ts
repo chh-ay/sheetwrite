@@ -1,4 +1,4 @@
-export { xlsx } from "./addon.js";
+export { xlsxAddon } from "./addon.js";
 export {
   buildXlsxModel,
   sheetwriteTableExportBackend,

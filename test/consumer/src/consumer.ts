@@ -37,7 +37,7 @@ import type { setXlsxBackend as removedSetXlsxBackend } from "@sheetwrite/core";
 import type { setXlsxImportBackend as removedSetXlsxImportBackend } from "@sheetwrite/core";
 // @ts-expect-error use `initSheetwrite({ addons })`.
 import type { setXlsxTableExportBackend as removedSetXlsxTableExportBackend } from "@sheetwrite/core";
-// @ts-expect-error use `charts()` from `@sheetwrite/charts`.
+// @ts-expect-error use `chartsAddon()` from `@sheetwrite/charts`.
 import type { setChartRendererFactory as removedSetChartRendererFactory } from "@sheetwrite/core";
 
 export type RemovedExportsMustStayAbsent = [
@@ -99,7 +99,7 @@ const canonicalTableAddon: SheetwriteAddon = {
     context.xlsx({ tableExport: canonicalTableExporter, tableImport: canonicalTableImporter });
   },
 };
-void initSheetwrite({ addons: [Xlsx.xlsx(), Charts.charts(), canonicalTableAddon] });
+void initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon(), canonicalTableAddon] });
 void canonicalOperation;
 void canonicalDatasource;
 void toXlsxTable;

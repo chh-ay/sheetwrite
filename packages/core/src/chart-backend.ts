@@ -26,7 +26,7 @@ export function createChartRenderer(store: Store): ChartRenderer | null {
 
 /**
  * Open cached chart views through the charts add-on. Call
- * `initSheetwrite({ addons: [charts()] })` from `@sheetwrite/charts` first.
+ * `initSheetwrite({ addons: [chartsAddon()] })` from `@sheetwrite/charts` first.
  * Throws a `SheetwriteError` with code `"optional-backend-unavailable"` if the
  * add-on is not installed. The caller must dispose the result.
  */
@@ -35,7 +35,7 @@ export function openChartViews(store: Store): ChartViewProvider {
     throw new SheetwriteError(
       "optional-backend-unavailable",
       "chart-view",
-      "Sheetwrite: charts add-on not installed. Install @sheetwrite/charts and call initSheetwrite({ addons: [charts()] }) before calling openChartViews.",
+      "Sheetwrite: charts add-on not installed. Install @sheetwrite/charts and call initSheetwrite({ addons: [chartsAddon()] }) before calling openChartViews.",
       { context: { backend: "charts" }, retryable: false },
     );
   }

@@ -10,7 +10,7 @@ console.log(
   typeof createGrid,
   typeof initSheetwrite,
   typeof createGridController,
-  typeof Xlsx.xlsx,
+  typeof Xlsx.xlsxAddon,
   typeof Charts.createChartViewCache,
-  typeof Charts.charts,
+  typeof Charts.chartsAddon,
 );

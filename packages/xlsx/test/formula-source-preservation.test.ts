@@ -11,7 +11,7 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, unzipSync } from "fflate";
 
-import { xlsx } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 import { escapeXml } from "../src/xml.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
 
@@ -30,7 +30,7 @@ const FORMULA_SOURCES = INVENTORY.functions
   .map((entry) => `=${entry.canonical}()`);
 FORMULA_SOURCES.push("={1,2;3,4}", "=SUM({1,2,3})", '={"A1",TRUE,#N/A}');
 beforeAll(async () => {
-  await initSheetwrite({ addons: [xlsx()] });
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 function formulaWorkbook(sources: readonly string[] = FORMULA_SOURCES): WorkbookSnapshot {

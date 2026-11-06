@@ -303,7 +303,7 @@ Every toolbar option keeps working. These parts render differently because the t
 
 ### Export buttons
 
-- The export flag always enables CSV. The XLSX button requires an explicit optional installation and `import "@sheetwrite/xlsx/register"` before use. The framework packages do not install an XLSX backend.
+- The export flag always enables CSV. The XLSX button requires an explicit optional installation and `initSheetwrite({ addons: [xlsxAddon()] })` before use. The framework packages do not install an XLSX backend.
 - Direct `grid.exportXlsx(...)` calls reject on failure.
 - Built-in toolbar and context-menu actions show an alert and emit one `export-error` event for CSV or XLSX failures.
 - `grid.actions.exportXlsx()` returns a promise that does not reject.

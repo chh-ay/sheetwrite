@@ -10,10 +10,10 @@ import { createChartViewCache } from "./view-cache.js";
  *
  * @example
  * ```ts
- * import { charts } from "@sheetwrite/charts";
+ * import { chartsAddon } from "@sheetwrite/charts";
  * import { initSheetwrite, openChartViews, type Store } from "@sheetwrite/core";
  *
- * await initSheetwrite({ addons: [charts()] });
+ * await initSheetwrite({ addons: [chartsAddon()] });
  *
  * function salesChartValues(store: Store) {
  *   const views = openChartViews(store);
@@ -25,7 +25,7 @@ import { createChartViewCache } from "./view-cache.js";
  * }
  * ```
  */
-export function charts(): SheetwriteAddon {
+export function chartsAddon(): SheetwriteAddon {
   return {
     name: "charts",
     setup(context) {

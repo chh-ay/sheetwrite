@@ -76,7 +76,9 @@ async function lifecycle(): Promise<Record<string, unknown>> {
 async function retry(): Promise<Record<string, unknown>> {
   const result: Record<string, unknown> = {};
 
-  result.firstFailure = await initSheetwrite({ source: "https://example.invalid/broken.wasm" }).then(
+  result.firstFailure = await initSheetwrite({
+    source: "https://example.invalid/broken.wasm",
+  }).then(
     () => "fulfilled",
     (error: unknown) => rejectedInitialization(error),
   );

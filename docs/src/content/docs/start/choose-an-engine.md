@@ -39,7 +39,7 @@ npm install @sheetwrite/core @sheetwrite/formulas
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 Run this before creating any grid or store and before mounting a framework

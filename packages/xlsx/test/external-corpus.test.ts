@@ -4,7 +4,7 @@ import type { WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import { fromXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
 import { strFromU8, unzipSync } from "fflate";
 
-import { xlsx } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 
 interface ExternalFixture {
   file: string;
@@ -72,7 +72,7 @@ async function fixtureBytes(fixture: ExternalFixture | GoogleExternalFixture): P
 }
 
 beforeAll(async () => {
-  await initSheetwrite({ addons: [xlsx()] });
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 describe("scheduled independent Microsoft Excel corpus", () => {

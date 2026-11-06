@@ -65,7 +65,7 @@ if (!String(uninitializedError?.message).includes("does not initialize core")) {
   throw new Error("SheetwriteStore must require initSheetwrite() even after the engine's load()");
 }
 
-await Core.initSheetwrite({ addons: [Xlsx.xlsx(), Charts.charts()] });
+await Core.initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon()] });
 
 const cssUrl = import.meta.resolve("@sheetwrite/core/styles.css");
 const css = await readFile(fileURLToPath(cssUrl), "utf8");

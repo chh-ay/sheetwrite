@@ -110,7 +110,7 @@ const tableAddon: SheetwriteAddon = {
     context.xlsx({ tableExport: tableExportBackend, tableImport: tableImportBackend });
   },
 };
-void initSheetwrite({ addons: [Xlsx.xlsx(), Charts.charts(), tableAddon] });
+void initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon(), tableAddon] });
 void toXlsxTable;
 void fromXlsxTable;
 void datasource;

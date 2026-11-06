@@ -1073,7 +1073,7 @@ export interface Grid {
    * ```ts
    * import type { Grid } from "@sheetwrite/core";
    *
-   * // Requires `initSheetwrite({ addons: [xlsx()] })` from `@sheetwrite/xlsx`.
+   * // Requires `initSheetwrite({ addons: [xlsxAddon()] })` from `@sheetwrite/xlsx`.
    * async function downloadXlsx(grid: Grid) {
    *   await grid.exportXlsx("sales.xlsx");
    * }
