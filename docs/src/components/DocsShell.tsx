@@ -345,7 +345,9 @@ export function DocsShell({
   };
 
   return (
-    <div className={`sw-docs${activeHref === "/docs/" ? " sw-docs--overview" : ""}`}>
+    <div
+      className={`sw-docs${activeHref === "/docs/" ? " sw-docs--overview" : ""}${kind === undefined ? "" : " sw-docs--api"}`}
+    >
       <a className="sw-skip-link" href="#main-content">
         Skip to content
       </a>

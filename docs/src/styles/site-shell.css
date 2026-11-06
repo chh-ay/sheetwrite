@@ -873,8 +873,17 @@ html:has(.sw-nav-dialog[open]) {
   padding: var(--sw-space-4);
 }
 
+/* Symbol pages: a wider reading column that holds the reference and its
+   example aside; the aside takes the outline's place on the right. */
+.sw-docs--api {
+  --sw-content-width: 76rem;
+}
+.sw-docs--api .sw-toc {
+  display: none;
+}
+
 @media (min-width: 88rem) {
-  .sw-docs:not(.sw-docs--overview) .sw-document {
+  .sw-docs:not(.sw-docs--overview, .sw-docs--api) .sw-document {
     grid-template-columns: minmax(0, var(--sw-content-width)) var(--sw-docs-outline-width);
     column-gap: var(--sw-space-16);
   }
