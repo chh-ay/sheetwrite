@@ -37,12 +37,27 @@ struct PreparedMeasure {
     names: Vec<String>,
     /// For each column, its table's index in the pass's table list.
     tables: Vec<usize>,
+    /// For each column, the expression that reads it: 0 for the measure's
+    /// own expression, `k + 1` for calculation `k`.
+    owners: Vec<usize>,
+    calculations: Vec<Calculation>,
     /// Whether every column is on the base table (table index 0).
     base_only: bool,
     /// Whether any column is on the base table. A cell without base rows
     /// stays blank for such a measure, as an aggregate of no rows is blank
     /// in Excel's data model.
     reads_base: bool,
+}
+
+/// One `CALCULATE` of a prepared measure. Its value depends only on the
+/// rows of its table slots, so a pivot update evaluates it once per
+/// distinct set of those rows, and the measure's expression reads it by
+/// `name`.
+struct Calculation {
+    expression: Ast,
+    name: String,
+    /// The distinct table slots its columns read.
+    slots: Vec<usize>,
 }
 
 /// The local name of column `index` in a prepared measure. Measure formulas
@@ -70,6 +85,13 @@ struct RelatedRows {
     order: Vec<u64>,
     /// The axis depths `order` was sorted for.
     depths: Option<(usize, usize)>,
+    /// Every active level set sorted for so far; a row set's identity
+    /// names its set by position.
+    active_sets: Vec<Vec<usize>>,
+    /// The keys of the cell [`RelatedRows::locate`] found.
+    wanted: Vec<KeyPart>,
+    /// The position in `order` of that cell's first row, or `u32::MAX`.
+    first: u32,
 }
 
 impl RelatedRows {
@@ -82,18 +104,23 @@ impl RelatedRows {
     }
 
     /// Orders the rows by the hash of the levels that cells at `depths`
-    /// constrain, once per pair of axis depths.
+    /// constrain. Depths that constrain the same levels keep the order.
     fn sort_for(&mut self, depths: (usize, usize)) {
         if self.depths == Some(depths) {
             return;
         }
-        self.depths = Some(depths);
-        self.active = (0..self.levels.len())
+        let active: Vec<usize> = (0..self.levels.len())
             .filter(|&index| {
                 let (on_rows, level) = self.levels[index];
                 level < if on_rows { depths.0 } else { depths.1 }
             })
             .collect();
+        let sorted = self.depths.is_some() && active == self.active;
+        self.depths = Some(depths);
+        if sorted {
+            return;
+        }
+        self.active = active;
         let mut order: Vec<u64> = (0..self.rows.len() as u32)
             .map(|index| (u64::from(keys_hash(self.active_keys(index))) << 32) | u64::from(index))
             .collect();
@@ -101,40 +128,78 @@ impl RelatedRows {
         self.order = order;
     }
 
-    /// The rows of `T` visible in the cell of `groups`, ascending: the
-    /// entries of `order` with the hash of the cell's labels at the active
-    /// levels whose keys equal those labels.
+    /// Finds the rows of `T` visible in the cell of `groups`: the entries
+    /// of `order` with the hash of the cell's labels at the active levels
+    /// whose keys equal those labels. Returns the identity of that row set:
+    /// its active level set in the high half and its first row (`u32::MAX`
+    /// for none) in the low half, so two cells with one identity see the
+    /// same rows. [`RelatedRows::collect`] lists them.
     #[inline(never)]
-    fn visible(&mut self, cache: &PivotCache, groups: (u32, u32), out: &mut Vec<u32>) {
-        out.clear();
+    fn locate(&mut self, cache: &PivotCache, groups: (u32, u32)) -> u64 {
         self.sort_for((
             cache.group_depth(true, groups.0),
             cache.group_depth(false, groups.1),
         ));
-        let mut wanted = Vec::with_capacity(self.active.len());
+        self.wanted.clear();
+        self.first = u32::MAX;
+        let set = match self.active_sets.iter().position(|set| *set == self.active) {
+            Some(set) => set,
+            None => {
+                self.active_sets.push(self.active.clone());
+                self.active_sets.len() - 1
+            }
+        };
+        let identity = |first: u32| (set as u64) << 32 | u64::from(first);
         for &index in &self.active {
             let (on_rows, level) = self.levels[index];
             let group = if on_rows { groups.0 } else { groups.1 };
             match key_part(&cache.path_label(on_rows, group, level)) {
-                Ok(key) => wanted.push(key),
-                Err(_) => return,
+                Ok(key) => self.wanted.push(key),
+                Err(_) => return identity(u32::MAX),
             }
         }
 
-        let hash = keys_hash(wanted.iter());
+        let hash = keys_hash(self.wanted.iter());
         let start = self
             .order
             .partition_point(|&entry| entry < u64::from(hash) << 32);
-        for &entry in self.order[start..]
+        if let Some(position) = self.order[start..]
             .iter()
             .take_while(|&&entry| (entry >> 32) as u32 == hash)
+            .position(|&entry| self.active_keys(entry as u32).eq(self.wanted.iter()))
+        {
+            self.first = (start + position) as u32;
+        }
+        // Entries with equal keys are in row order, so this is the set's
+        // first row.
+        let first_row = self
+            .order
+            .get(self.first as usize)
+            .map_or(u32::MAX, |&entry| self.rows[entry as u32 as usize]);
+        identity(first_row)
+    }
+
+    /// The rows [`RelatedRows::locate`] found, ascending.
+    fn collect(&self, out: &mut Vec<u32>) {
+        out.clear();
+        let Some(&first) = self.order.get(self.first as usize) else {
+            return;
+        };
+        for &entry in self.order[self.first as usize..]
+            .iter()
+            .take_while(|&&entry| entry >> 32 == first >> 32)
         {
             let index = entry as u32;
-            if self.active_keys(index).eq(wanted.iter()) {
+            if self.active_keys(index).eq(self.wanted.iter()) {
                 out.push(self.rows[index as usize]);
             }
         }
     }
+}
+
+/// The local name of calculation `index` in a prepared measure.
+fn calculation_name(index: usize) -> String {
+    format!("_measure_calculate_{index}")
 }
 
 /// A 32-bit hash of a sequence of keys.
@@ -193,6 +258,14 @@ impl CellStore {
 
         let mut cells = Vec::new();
         let mut visible = vec![Vec::new(); related.len()];
+        let mut collected = vec![false; related.len()];
+        // The identity of each slot's rows in the current cell, and the
+        // calculation values found so far in this update by measure,
+        // calculation and row identities. Cells that see the same rows, such
+        // as every region of one quarter under ALL of the region, share one
+        // evaluation; the values are freed with the update.
+        let mut identities = vec![u64::MAX; related.len()];
+        let mut known: Vec<(usize, usize, Vec<u64>, Value)> = Vec::new();
         let mut current = None;
         cache.visit_measure_cells(layout, include_empty, &mut |cell: &MeasureCell<'_>| {
             let measure = match &prepared[cell.slot] {
@@ -202,17 +275,51 @@ impl CellStore {
             };
             if current != Some(cell.groups) {
                 current = Some(cell.groups);
-                for (rows, table) in visible.iter_mut().zip(&mut related) {
-                    table.visible(cache, cell.groups, rows);
+                for (index, table) in related.iter_mut().enumerate() {
+                    identities[index] = table.locate(cache, cell.groups);
+                    collected[index] = false;
                 }
             }
 
+            let mut calculated = Vec::with_capacity(measure.calculations.len());
+            for (index, calculation) in measure.calculations.iter().enumerate() {
+                let key: Vec<u64> = calculation
+                    .slots
+                    .iter()
+                    .map(|&slot| identities[slot - 1])
+                    .collect();
+                let found = known
+                    .iter()
+                    .find(|entry| entry.0 == cell.slot && entry.1 == index && entry.2 == key);
+                if let Some(entry) = found {
+                    calculated.push(entry.3.clone());
+                    continue;
+                }
+                for &slot in &calculation.slots {
+                    if !collected[slot - 1] {
+                        related[slot - 1].collect(&mut visible[slot - 1]);
+                        collected[slot - 1] = true;
+                    }
+                }
+                let rows_of = |table: usize| visible[table - 1].as_slice();
+                let value = self.measure_family(measure, index + 1, &rows_of, &[]);
+                known.push((cell.slot, index, key, value.clone()));
+                calculated.push(value);
+            }
+
+            for (&slot, &owner) in measure.tables.iter().zip(&measure.owners) {
+                if owner == 0 && slot > 0 && !collected[slot - 1] {
+                    related[slot - 1].collect(&mut visible[slot - 1]);
+                    collected[slot - 1] = true;
+                }
+            }
             let rows_of = |table: usize| {
                 table
                     .checked_sub(1)
                     .map_or(cell.rows, |index| visible[index].as_slice())
             };
-            cells.push((cell.offset, self.measure_family(measure, &rows_of)));
+            let value = self.measure_family(measure, 0, &rows_of, &calculated);
+            cells.push((cell.offset, value));
         });
         cells
     }
@@ -254,11 +361,24 @@ impl CellStore {
         // Resolved as a cell formula at A1, so names resolve too and a
         // defined name is refused below.
         let mut expression = self.resolve_parsed_formula(expression, 0, 0, 0)?;
+        let first_context = contexts.len();
         let mut read = Vec::new();
-        self.name_columns(&mut expression, &mut read, 0, contexts)?;
+        let mut calculated = Vec::new();
+        self.name_columns(&mut expression, &mut read, 0, contexts, &mut calculated)?;
 
         let mut columns = Vec::with_capacity(read.len());
         let mut tables = Vec::with_capacity(read.len());
+        let mut owners = Vec::with_capacity(read.len());
+        // Each CALCULATE adds one context, so context `first_context + k` is
+        // that of calculation `k`.
+        let mut calculations: Vec<Calculation> = calculated
+            .into_iter()
+            .map(|(context, expression)| Calculation {
+                expression,
+                name: calculation_name(context - first_context),
+                slots: Vec::new(),
+            })
+            .collect();
         for (column, context) in read {
             let slot = slots
                 .iter()
@@ -267,8 +387,17 @@ impl CellStore {
                     slots.push((column.table_id.clone(), context));
                     slots.len() - 1
                 });
+            let owner = context
+                .checked_sub(first_context)
+                .map_or(0, |index| index + 1);
+            if let Some(calculation) = owner.checked_sub(1).map(|index| &mut calculations[index]) {
+                if !calculation.slots.contains(&slot) {
+                    calculation.slots.push(slot);
+                }
+            }
             tables.push(slot);
             columns.push(column);
+            owners.push(owner);
         }
         let names = (0..columns.len()).map(column_name).collect();
         Ok(PreparedMeasure {
@@ -278,6 +407,8 @@ impl CellStore {
             base_only: tables.iter().all(|&table| table == 0),
             reads_base: tables.contains(&0),
             tables,
+            owners,
+            calculations,
         })
     }
 
@@ -423,27 +554,44 @@ impl CellStore {
         Ok(related)
     }
 
-    /// Evaluates a prepared measure, binding each column name to the
-    /// settled values of its table's rows in the cell (`rows_of(table)`), as
-    /// LAMBDA binds parameters. A measure returns one value, so an array
-    /// result is `#VALUE!`.
+    /// Evaluates the expression of a prepared measure that `owner` names
+    /// (0 for the measure's own, `k + 1` for calculation `k`), binding each
+    /// of its column names to the settled values of its table's rows in the
+    /// cell (`rows_of(table)`), as LAMBDA binds parameters. The measure's
+    /// own expression also reads the `calculated` values; an error among
+    /// them is the measure's value. A measure returns one value, so an
+    /// array result is `#VALUE!`.
     #[inline(never)]
     fn measure_family<'r>(
         &self,
         measure: &PreparedMeasure,
+        owner: usize,
         rows_of: &dyn Fn(usize) -> &'r [u32],
+        calculated: &[Value],
     ) -> Value {
-        let bindings: Vec<(&str, Ast)> = measure
-            .names
-            .iter()
-            .zip(&measure.columns)
-            .zip(&measure.tables)
-            .map(|((name, column), &table)| {
-                (name.as_str(), self.bind_column(column, rows_of(table)))
-            })
-            .collect();
+        let mut bindings: Vec<(&str, Ast)> = Vec::with_capacity(measure.columns.len());
+        for (index, column) in measure.columns.iter().enumerate() {
+            if measure.owners[index] == owner {
+                let rows = rows_of(measure.tables[index]);
+                bindings.push((&measure.names[index], self.bind_column(column, rows)));
+            }
+        }
+        for (calculation, value) in measure.calculations.iter().zip(calculated) {
+            let value = match value {
+                Value::Number(number) => Ast::Num(*number),
+                Value::Text(text) => Ast::Str(text.to_string()),
+                Value::Bool(boolean) => Ast::Bool(*boolean),
+                Value::Blank => Ast::Missing,
+                Value::Error(error) => return Value::Error(*error),
+            };
+            bindings.push((&calculation.name, value));
+        }
 
-        match capture(&measure.expression, &bindings) {
+        let expression = match owner {
+            0 => &measure.expression,
+            owner => &measure.calculations[owner - 1].expression,
+        };
+        match capture(expression, &bindings) {
             Ok(expression) if ast_produces_array(&expression) => Value::Error(FormulaError::Value),
             Ok(expression) => {
                 self.eval_conditional_ast(&expression, 0, 0, 0, &mut FormulaResults::default())
@@ -535,6 +683,7 @@ impl CellStore {
         columns: &mut Vec<(StructuredRef, usize)>,
         context: usize,
         contexts: &mut Vec<ContextEdit>,
+        calculations: &mut Vec<(usize, Ast)>,
     ) -> Result<(), FormulaError> {
         match expression {
             Ast::Structured(reference) if is_data_column(reference) => {
@@ -562,9 +711,11 @@ impl CellStore {
                     return Err(FormulaError::Value);
                 }
                 contexts.push(self.calculate_family(&arguments[1..])?);
+                let inner_context = contexts.len() - 1;
                 let mut inner = std::mem::replace(&mut arguments[0], Ast::Missing);
-                self.name_columns(&mut inner, columns, contexts.len() - 1, contexts)?;
-                *expression = inner;
+                self.name_columns(&mut inner, columns, inner_context, contexts, calculations)?;
+                *expression = Ast::Name(calculation_name(calculations.len()));
+                calculations.push((inner_context, inner));
                 Ok(())
             }
             Ast::Func(
@@ -576,15 +727,17 @@ impl CellStore {
                 | Func::AnchorArray,
                 _,
             ) => Err(FormulaError::Value),
-            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => arguments
-                .iter_mut()
-                .try_for_each(|argument| self.name_columns(argument, columns, context, contexts)),
+            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => {
+                arguments.iter_mut().try_for_each(|argument| {
+                    self.name_columns(argument, columns, context, contexts, calculations)
+                })
+            }
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.name_columns(left, columns, context, contexts)?;
-                self.name_columns(right, columns, context, contexts)
+                self.name_columns(left, columns, context, contexts, calculations)?;
+                self.name_columns(right, columns, context, contexts, calculations)
             }
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.name_columns(inner, columns, context, contexts)
+                self.name_columns(inner, columns, context, contexts, calculations)
             }
             Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array { .. } => Ok(()),
             _ => Err(FormulaError::Value),
@@ -625,7 +778,7 @@ impl CellStore {
             // value is refused.
             let mut value = value.clone();
             let mut read = Vec::new();
-            self.name_columns(&mut value, &mut read, 1, &mut Vec::new())?;
+            self.name_columns(&mut value, &mut read, 1, &mut Vec::new(), &mut Vec::new())?;
             if !read.is_empty() {
                 return Err(FormulaError::Value);
             }
