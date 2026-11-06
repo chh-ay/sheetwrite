@@ -386,6 +386,20 @@ a.sw-card:hover {
   border-bottom: 0;
 }
 
+/* ── Sheet tabs: every Sheetwrite shell on the site ──────────────────────
+   Core paints its sheet tabs from these variables. A grid's own tab bar sets
+   them inline from its theme; the shell's tab row reads them from here, so
+   the active sheet is brand text on a raised surface in both themes. */
+.sheetwrite-shell {
+  --sheetwrite-tab-font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-body);
+  --sheetwrite-tab-bg: var(--sw-surface-1);
+  --sheetwrite-tab-fg: var(--sw-fg-muted);
+  --sheetwrite-tab-border: var(--sw-border);
+  --sheetwrite-tab-hover-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-fg: var(--sw-accent-strong);
+}
+
 /* ── Code tokens: role classes for code rendered outside Expressive Code ── */
 .sw-code-comment {
   color: var(--sw-code-comment);
