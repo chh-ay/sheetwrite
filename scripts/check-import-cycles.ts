@@ -59,6 +59,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/coordinates.ts",
     "../types/document.ts",
     "../types/store.ts",
+    "pivot-status.ts",
     "sheet-registry.ts",
     "wasm-contract.ts",
     "wire-tags.ts",
