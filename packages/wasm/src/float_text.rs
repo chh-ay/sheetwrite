@@ -182,24 +182,51 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
     // 15-digit step, so a shorter form that reads back is the 15-digit one
     // without its trailing zeros. A subnormal number has fewer significant
     // bits and is searched from one digit.
+    let binary = Binary::of(number);
+    if number >= f64::MIN_POSITIVE {
+        // One 17-digit scaling gives the 15- and 16-digit candidates too:
+        // their dropped digits join the remainder.
+        if let Some((parts, exponent)) =
+            small_digits(&binary, MAX_DIGITS, binary.exponent_guess())
+        {
+            for dropped in (0..=MAX_DIGITS - EXCEL_DIGITS).rev() {
+                let digits = parts.digits as u64 / 10u64.pow(dropped);
+                let [half, below, above] = parts.comparisons(dropped, binary.narrow_below);
+                let below_fits = fits(below, binary.inclusive);
+                let above_fits = fits(above, binary.inclusive);
+                if let Some(round_up) = shortest_round_up(half, below_fits, above_fits) {
+                    return Digits::new(digits + u64::from(round_up), MAX_DIGITS - dropped, exponent);
+                }
+            }
+        }
+    }
+
     let first_count = if number >= f64::MIN_POSITIVE {
         EXCEL_DIGITS
     } else {
         1
     };
-    let binary = Binary::of(number);
     let mut exponent = binary.exponent_guess();
     for count in first_count..=MAX_DIGITS {
         let scaled = Scaled::of(&binary, count, exponent);
         exponent = scaled.exponent;
-        let round_up = match (scaled.below_fits, scaled.above_fits) {
-            (true, true) => scaled.half != Ordering::Less,
-            (below, above) if below || above => above,
-            _ => continue,
-        };
-        return Digits::new(scaled.digits + u64::from(round_up), count, scaled.exponent);
+        if let Some(round_up) = shortest_round_up(scaled.half, scaled.below_fits, scaled.above_fits)
+        {
+            return Digits::new(scaled.digits + u64::from(round_up), count, scaled.exponent);
+        }
     }
     unreachable!("17 significant digits read back as every double")
+}
+
+/// Whether the shortest form at one digit count rounds the truncated digits
+/// up: when both candidates read back, the closer one, halfway rounding up;
+/// `None` when neither reads back.
+fn shortest_round_up(half: Ordering, below_fits: bool, above_fits: bool) -> Option<bool> {
+    match (below_fits, above_fits) {
+        (true, true) => Some(half != Ordering::Less),
+        (below, above) if below || above => Some(above),
+        _ => None,
+    }
 }
 
 /// Text of a number as `f64::to_string` writes it: plain decimal notation
@@ -377,19 +404,19 @@ impl Scaled {
         loop {
             let places = count as i32 - 1 - exponent;
             let (digits, comparisons) = scale(binary, places);
-            if digits >= u128::from(10u64.pow(count)) {
-                exponent += 1;
-            } else if digits < u128::from(10u64.pow(count - 1)) {
-                exponent -= 1;
-            } else {
-                let [half, below, above] = comparisons;
-                return Self {
-                    digits: digits as u64,
-                    exponent,
-                    half,
-                    below_fits: fits(below, binary.inclusive),
-                    above_fits: fits(above, binary.inclusive),
-                };
+            match digit_count_order(digits, count) {
+                Ordering::Greater => exponent += 1,
+                Ordering::Less => exponent -= 1,
+                Ordering::Equal => {
+                    let [half, below, above] = comparisons;
+                    return Self {
+                        digits: digits as u64,
+                        exponent,
+                        half,
+                        below_fits: fits(below, binary.inclusive),
+                        above_fits: fits(above, binary.inclusive),
+                    };
+                }
             }
         }
     }
@@ -429,7 +456,13 @@ impl Powers {
 
 /// `number × 10^places`: its integer part and where the remainder sits.
 fn scale(binary: &Binary, places: i32) -> Scale {
-    scale_small(binary, places).unwrap_or_else(|| scale_big(binary, places))
+    match scale_small(binary, places) {
+        Some(parts) => (
+            parts.digits,
+            parts.comparisons(0, binary.narrow_below),
+        ),
+        None => scale_big(binary, places),
+    }
 }
 
 /// `5^exponent` when it fits 64 bits, by plain multiplications (a checked
@@ -438,10 +471,86 @@ fn five_power(exponent: u32) -> Option<u64> {
     (exponent <= MAX_FIVE_POWER).then(|| (0..exponent).fold(1, |power, _| power * 5))
 }
 
+/// `number × 10^places` over a 128-bit denominator: the integer part, the
+/// remainder, the denominator and the gap to the next double on the same
+/// scale.
+struct SmallScale {
+    digits: u128,
+    remainder: u128,
+    denominator: u128,
+    gap: u128,
+}
+
+impl SmallScale {
+    /// The remainder against half a unit, against half the gap below and
+    /// against half the gap above, for the integer part without its last
+    /// `dropped` digits: those digits join the remainder, and the unit is
+    /// `10^dropped` denominators wide.
+    fn comparisons(&self, dropped: u32, narrow_below: bool) -> [Ordering; 3] {
+        let unit = 10u64.pow(dropped);
+        let tail = self.digits as u64 % unit;
+        let below = Units {
+            whole: tail,
+            part: self.remainder,
+        };
+        let above = if self.remainder == 0 {
+            Units {
+                whole: unit - tail,
+                part: 0,
+            }
+        } else {
+            Units {
+                whole: unit - tail - 1,
+                part: self.denominator - self.remainder,
+            }
+        };
+        let half_unit = Units {
+            whole: unit,
+            part: 0,
+        };
+        let gap = Units::of(self.gap, self.denominator);
+        let below_factor = if narrow_below { 4 } else { 2 };
+        [
+            below.times(2, self.denominator).cmp(&half_unit),
+            below.times(below_factor, self.denominator).cmp(&gap),
+            above.times(2, self.denominator).cmp(&gap),
+        ]
+    }
+}
+
+/// A distance as whole denominators and a part below one denominator, so
+/// that a few units of a 128-bit denominator never overflow.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Units {
+    whole: u64,
+    part: u128,
+}
+
+impl Units {
+    /// `value` in units of `unit`, for a value a few dozen units at most.
+    fn of(value: u128, unit: u128) -> Self {
+        let mut whole = 0;
+        let mut part = value;
+        while part >= unit {
+            part -= unit;
+            whole += 1;
+        }
+        Self { whole, part }
+    }
+
+    fn times(&self, factor: u64, unit: u128) -> Self {
+        let part = Self::of(self.part * u128::from(factor), unit);
+        Self {
+            whole: self.whole * factor + part.whole,
+            part: part.part,
+        }
+    }
+}
+
 /// The 128-bit path: a power-of-two denominator, or a numerator and
 /// denominator below 2^64. Powers of five up to `5^27` fit 64 bits, so the
 /// only wide multiplication is the mantissa times one of them.
-fn scale_small(binary: &Binary, places: i32) -> Option<Scale> {
+fn scale_small(binary: &Binary, places: i32) -> Option<SmallScale> {
     let powers = Powers::of(binary, places);
     let fives_up = u128::from(five_power(powers.fives_up)?);
     let fives_down = u128::from(five_power(powers.fives_down)?);
@@ -459,18 +568,37 @@ fn scale_small(binary: &Binary, places: i32) -> Option<Scale> {
             u128::from(numerator % denominator),
         )
     };
-
-    let twice = remainder << 1;
-    let below = if binary.narrow_below {
-        twice << 1
-    } else {
-        twice
-    };
-    let above = (denominator - remainder) << 1;
-    Some((
+    Some(SmallScale {
         digits,
-        [twice.cmp(&denominator), below.cmp(&gap), above.cmp(&gap)],
-    ))
+        remainder,
+        denominator,
+        gap,
+    })
+}
+
+/// Whether `digits` has too many (`Greater`) or too few (`Less`) digits for
+/// `count`, which moves the exponent guess.
+fn digit_count_order(digits: u128, count: u32) -> Ordering {
+    if digits >= u128::from(10u64.pow(count)) {
+        Ordering::Greater
+    } else if digits < u128::from(10u64.pow(count - 1)) {
+        Ordering::Less
+    } else {
+        Ordering::Equal
+    }
+}
+
+/// The 128-bit scaling with `count` integer digits, and the power of ten of
+/// the first digit, when the number's magnitude fits that path.
+fn small_digits(binary: &Binary, count: u32, mut exponent: i32) -> Option<(SmallScale, i32)> {
+    loop {
+        let parts = scale_small(binary, count as i32 - 1 - exponent)?;
+        match digit_count_order(parts.digits, count) {
+            Ordering::Greater => exponent += 1,
+            Ordering::Less => exponent -= 1,
+            Ordering::Equal => return Some((parts, exponent)),
+        }
+    }
 }
 
 /// `value << shift`, when the result keeps `SMALL_HEADROOM_BITS` spare high
