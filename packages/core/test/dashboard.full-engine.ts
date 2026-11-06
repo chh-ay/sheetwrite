@@ -288,3 +288,49 @@ it("filters only a read-only viewer's own view, without a document change", asyn
   expect(body()).toEqual(["East", 4, "Total", 4]);
   expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items[1]).not.toHaveProperty("selected");
 });
+
+it("dims the slicer values that no row has under the other slicers, or hides them", async () => {
+  const input = snapshot();
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [byRegion(0)];
+  const amount = {
+    id: "amount",
+    box: { x: 0, y: 0, w: 3, h: 6 },
+    kind: "slicer" as const,
+    field: { table: "orders", column: "amount" },
+    selected: [2],
+  };
+  const region = {
+    id: "region",
+    box: { x: 3, y: 0, w: 3, h: 6 },
+    kind: "slicer" as const,
+    field: { table: "orders", column: "region" },
+  };
+  dash.dashboard = { items: [amount, region] };
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  await import("../src/dashboard/dashboard-view.js");
+  await Promise.resolve();
+  const regionValues = () =>
+    [
+      ...host.querySelectorAll<HTMLElement>(
+        '[data-item-id="region"] .sheetwrite-dashboard-slicer-value',
+      ),
+    ].map(
+      (button) => `${button.textContent}${button.dataset.noData === undefined ? "" : " (no data)"}`,
+    );
+
+  // Only West has the amount 2.
+  expect(regionValues()).toEqual(["East (no data)", "West"]);
+
+  grid.applyTransaction({
+    patches: [
+      { op: "setDashboardItem", sheet: "dash", item: { ...region, itemsWithNoData: "hide" } },
+    ],
+  });
+  expect(regionValues()).toEqual(["West"]);
+});

@@ -307,7 +307,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const results = list.map((item) =>
       item.kind === "pivot"
         ? dashboardPivotResult(grid, owner, item.pivot)
-        : slicerValues(grid, item),
+        : [slicerValues(grid, item), slicerValuesWithData(grid, owner, item)],
     );
     const signature = JSON.stringify([list, results, readOnly, mode, message, [...overrides]]);
     if (!force && signature === rendered) return;
@@ -407,7 +407,11 @@ export function dashboardPivotResult(
 }
 
 /** The output cells, row-major, of the pivot at `index` in a dashboard's payload. */
-export function dashboardPivotCells(grid: Grid, sheet: SheetId, index: number): CellScalar[] | null {
+export function dashboardPivotCells(
+  grid: Grid,
+  sheet: SheetId,
+  index: number,
+): CellScalar[] | null {
   const output = storeEngine(grid.store)?.dashboardPivotOutput(sheet, index) ?? null;
   if (output === null) return null;
   try {
@@ -547,7 +551,11 @@ function sameScalar(left: CellScalar, right: CellScalar): boolean {
  * hidden pivot: one header row, then one label per row with data. Null when
  * the item shows every value or the engine has no output for it.
  */
-function slicerValuesWithData(grid: Grid, sheet: SheetId, item: DashboardSlicerItem): CellScalar[] | null {
+function slicerValuesWithData(
+  grid: Grid,
+  sheet: SheetId,
+  item: DashboardSlicerItem,
+): CellScalar[] | null {
   if (item.itemsWithNoData === "show") return null;
   const workbook = grid.store.getWorkbook();
   const owner = workbook.sheets.find((candidate) => candidate.id === sheet);

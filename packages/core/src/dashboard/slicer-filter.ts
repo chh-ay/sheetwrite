@@ -144,7 +144,11 @@ export function slicedPivots(
  * The payload index of the hidden pivot of `slicer` on `sheet`, in the
  * order `slicedPivots` adds them; -1 when it has none.
  */
-export function dataPivotIndex(sheet: Sheet, slicer: DashboardSlicerItem, sheets: readonly Sheet[]): number {
+export function dataPivotIndex(
+  sheet: Sheet,
+  slicer: DashboardSlicerItem,
+  sheets: readonly Sheet[],
+): number {
   const tables = sheets.flatMap((candidate) => candidate.tables ?? []);
   let index = sheet.pivots?.length ?? 0;
   for (const item of sheet.dashboard?.items ?? []) {
