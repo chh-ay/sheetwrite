@@ -2015,7 +2015,7 @@ impl<'a> Parser<'a> {
         // Sheet names cannot contain `:`, so a quoted name with one is the
         // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`. The `:` of a
         // drive in the path of another workbook is not.
-        if quoted && !is_external_sheet(&sheet_name) {
+        if quoted && !names_workbook(&sheet_name) {
             if let Some((first, last)) = sheet_name.split_once(':') {
                 return self.sheet_span_at(first.to_string(), last.to_string(), true);
             }
