@@ -78,7 +78,7 @@ const API_PACKAGE_ICONS: Readonly<Record<string, IconName>> = {
   "@sheetwrite/svelte": "framework-svelte",
   "@sheetwrite/vue": "framework-vue",
   "@sheetwrite/wasm": "bolt",
-  "@sheetwrite/xlsx": "file",
+  "@sheetwrite/xlsx": "xlsx",
 };
 
 /** An API package's icon. Every package has its own; a new one must add it here. */
@@ -96,7 +96,7 @@ const FORMULA_FAMILY_ICONS: Readonly<Record<string, IconName>> = {
   engineering: "sliders",
   financial: "currency",
   "information-error": "info",
-  "logical-control": "check",
+  "logical-control": "logic",
   "lookup-reference": "search",
   math: "plus",
   statistical: "chart",
@@ -149,39 +149,39 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         added: RELEASE,
       },
       // Not released yet; the label says so beside the 0.6.x version in the header.
-      { label: "Upgrade to 0.7.0 (next)", href: "/docs/start/upgrade-to-0-7-0/", icon: "arrow-up" },
+      { label: "Upgrade to 0.7.0 (next)", href: "/docs/start/upgrade-to-0-7-0/", icon: "upgrade-next" },
     ],
   },
   {
     label: "Frameworks",
     tab: "guides",
     href: "/docs/frameworks/",
-    icon: "layers",
+    icon: "frameworks",
     items: [
       { label: "Vanilla", href: "/docs/frameworks/vanilla/", icon: "framework-vanilla" },
       { label: "React", href: "/docs/frameworks/react/", icon: "framework-react" },
       { label: "Vue", href: "/docs/frameworks/vue/", icon: "framework-vue" },
       { label: "Svelte", href: "/docs/frameworks/svelte/", icon: "framework-svelte" },
-      { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/", icon: "refresh" },
+      { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/", icon: "lifecycle" },
     ],
   },
   {
     label: "Concepts",
     tab: "guides",
     href: "/docs/concepts/",
-    icon: "key",
+    icon: "lightbulb",
     items: [
       { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/", icon: "key" },
       {
         label: "Calculation engine",
         href: "/docs/concepts/calculation-engine/",
-        icon: "function",
+        icon: "engine",
         updated: RELEASE,
       },
       {
         label: "Documents and operations",
         href: "/docs/concepts/documents-and-operations/",
-        icon: "file",
+        icon: "document-ops",
       },
       { label: "Error handling", href: "/docs/concepts/error-handling/", icon: "warning" },
     ],
@@ -293,7 +293,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
           {
             label: "Authoring and references",
             href: "/docs/features/formulas/authoring-and-references/",
-            icon: "link",
+            icon: "cell-reference",
           },
           {
             label: "Operators and reference operators",
@@ -332,7 +332,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
           {
             label: "Analysis formulas (full engine)",
             href: "/docs/features/formulas/analysis-formulas/",
-            icon: "chart",
+            icon: "sigma",
           },
           {
             label: "Custom functions",
@@ -349,7 +349,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       {
         label: "Analysis",
         href: "/docs/features/analysis/",
-        icon: "chart",
+        icon: "analysis",
         items: [
           {
             label: "Pivot tables",
@@ -368,7 +368,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         ],
       },
       { label: "Collaboration", href: "/docs/features/collaboration/", icon: "users" },
-      { label: "Worker rendering", href: "/docs/features/worker-rendering/", icon: "monitor" },
+      { label: "Worker rendering", href: "/docs/features/worker-rendering/", icon: "worker" },
       { label: "Accessibility", href: "/docs/features/accessibility/", icon: "accessibility" },
     ],
   },
@@ -376,7 +376,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Import and export",
     tab: "guides",
     href: "/docs/import-export/",
-    icon: "upload",
+    icon: "import-export",
     items: [
       { label: "XLSX import", href: "/docs/import-export/xlsx-import/", icon: "upload" },
       { label: "XLSX export", href: "/docs/import-export/xlsx-export/", icon: "download" },
@@ -405,7 +405,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Tutorials",
     tab: "guides",
     href: "/docs/tutorials/",
-    icon: "book",
+    icon: "graduation",
     items: [
       {
         label: "Excel in JavaScript",
@@ -434,13 +434,13 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       {
         label: "Excel in Node.js",
         href: "/docs/tutorials/excel-in-nodejs/",
-        icon: "server",
+        icon: "terminal",
         added: RELEASE,
       },
       {
         label: "Spreadsheet app with the ribbon",
         href: "/docs/tutorials/spreadsheet-app-with-ribbon/",
-        icon: "ribbon",
+        icon: "laptop",
         added: RELEASE,
       },
     ],
@@ -452,16 +452,16 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     icon: "gauge",
     items: [
       { label: "Render", href: "/docs/performance/render/", icon: "monitor" },
-      { label: "Data engine", href: "/docs/performance/data-engine/", icon: "database" },
-      { label: "Core write path", href: "/docs/performance/core-write-path/", icon: "bolt" },
-      { label: "Formula engine", href: "/docs/performance/formula-engine/", icon: "function" },
-      { label: "XLSX codec", href: "/docs/performance/xlsx-codec/", icon: "file" },
-      { label: "Delivery size", href: "/docs/performance/delivery-size/", icon: "download" },
+      { label: "Data engine", href: "/docs/performance/data-engine/", icon: "rows" },
+      { label: "Core write path", href: "/docs/performance/core-write-path/", icon: "write" },
+      { label: "Formula engine", href: "/docs/performance/formula-engine/", icon: "formula-engine" },
+      { label: "XLSX codec", href: "/docs/performance/xlsx-codec/", icon: "xlsx" },
+      { label: "Delivery size", href: "/docs/performance/delivery-size/", icon: "weight" },
       { label: "Memory", href: "/docs/performance/memory/", icon: "memory" },
       {
         label: "Release comparison",
         href: "/docs/performance/release-comparison/",
-        icon: "compare",
+        icon: "versions",
       },
       {
         label: "Benchmark protocol",
@@ -525,7 +525,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       ...RELEASES.map((release) => ({
         label: releaseLabel(release),
         href: releaseHref(release.version),
-        icon: "clock" as const,
+        icon: "release" as const,
       })),
     ],
   },
