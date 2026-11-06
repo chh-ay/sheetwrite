@@ -6,7 +6,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
 
-function dimensionSnapshot(): WorkbookSnapshot {
+function dimension_snapshot(): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "s" },
@@ -28,7 +28,7 @@ function dimensionSnapshot(): WorkbookSnapshot {
   };
 }
 
-function firstSheetXml(bytes: Uint8Array): string {
+function first_sheet_xml(bytes: Uint8Array): string {
   const part = unzipSync(bytes)["xl/worksheets/sheet1.xml"];
   if (!part) throw new Error("Missing worksheet part");
   return strFromU8(part);
@@ -36,15 +36,15 @@ function firstSheetXml(bytes: Uint8Array): string {
 
 describe("XLSX dimension byte fidelity", () => {
   it("declares the width-metric font on default and custom native cell fonts", async () => {
-    const snapshot = dimensionSnapshot();
+    const snapshot = dimension_snapshot();
     const column = snapshot.sheets[0]?.columns[0];
     if (!column) throw new Error("Missing dimension column");
     column.cellStyle = { color: "#123456" };
     const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot));
     const styles = parts["xl/styles.xml"];
     if (!styles) throw new Error("Missing styles part");
-    const fontCollection = strFromU8(styles).match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)?.[1];
-    const fonts = [...(fontCollection ?? "").matchAll(/<font>([\s\S]*?)<\/font>/g)];
+    const font_collection = strFromU8(styles).match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)?.[1];
+    const fonts = [...(font_collection ?? "").matchAll(/<font>([\s\S]*?)<\/font>/g)];
     expect(fonts).toHaveLength(2);
     for (const font of fonts) {
       expect(font[1]).toContain('<name val="Calibri"/>');
@@ -53,7 +53,9 @@ describe("XLSX dimension byte fidelity", () => {
   });
 
   it("writes padded maximum-digit widths truncated to 1/256 character", async () => {
-    const xml = firstSheetXml(await sheetwriteWorkbookBackend.toXlsxWorkbook(dimensionSnapshot()));
+    const xml = first_sheet_xml(
+      await sheetwriteWorkbookBackend.toXlsxWorkbook(dimension_snapshot()),
+    );
     // The codec uses a shared 7px maximum-digit convention. OOXML includes the
     // 5px padding in stored width, rather than adding it after decoding.
     expect([...xml.matchAll(/<col\b[^>]*\bwidth="([^"]+)"/g)].map((match) => match[1])).toEqual([
@@ -69,7 +71,7 @@ describe("XLSX dimension byte fidelity", () => {
   });
 
   it("preserves exact Sheetwrite pixel widths through XLSX bytes including fractional widths", async () => {
-    const source = dimensionSnapshot();
+    const source = dimension_snapshot();
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       await sheetwriteWorkbookBackend.toXlsxWorkbook(source),
     );
@@ -112,7 +114,7 @@ describe("XLSX dimension byte fidelity", () => {
       [3, { hidden: true }],
       [4, { height: 36 }],
     ]);
-    const xml = firstSheetXml(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
+    const xml = first_sheet_xml(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
     expect([...xml.matchAll(/<row\b[^>]*\bht="([^"]+)"/g)].map((match) => match[1])).toEqual([
       "21",
       "27",

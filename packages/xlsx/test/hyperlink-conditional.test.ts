@@ -30,7 +30,7 @@ interface OriginalVectorOptions {
  * Original minimal OPC/SpreadsheetML vector. The XML is authored for this test from the
  * clauses recorded above; it is not copied from a producer fixture or emitted by Sheetwrite.
  */
-function originalEcmaVector(options: OriginalVectorOptions): Uint8Array {
+function original_ecma_vector(options: OriginalVectorOptions): Uint8Array {
   const files: Record<string, Uint8Array> = {
     "[Content_Types].xml": strToU8(
       `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
@@ -59,7 +59,7 @@ function originalEcmaVector(options: OriginalVectorOptions): Uint8Array {
   return zipSync(files, { level: 6, mtime: FIXED_ZIP_TIME });
 }
 
-function sourceSnapshot(): WorkbookSnapshot {
+function source_snapshot(): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "source" },
@@ -133,22 +133,22 @@ function sourceSnapshot(): WorkbookSnapshot {
 
 describe("XLSX hyperlink and conditional-format fidelity", () => {
   it("exports hyperlink appearance into native cell styles without relying on metadata", async () => {
-    const source = sourceSnapshot();
-    const firstSheet = source.sheets[0];
-    if (!firstSheet) throw new Error("Missing source worksheet");
-    firstSheet.columns[0] = {
+    const source = source_snapshot();
+    const first_sheet = source.sheets[0];
+    if (!first_sheet) throw new Error("Missing source worksheet");
+    first_sheet.columns[0] = {
       key: "a",
       header: "A",
       width: 100,
       type: "text",
       cellStyle: { bold: true, color: "#ABCDEF" },
     };
-    const block = firstSheet.cells[0];
-    const internalCell = block?.cells[1];
-    if (!block || !internalCell) throw new Error("Missing hyperlink cells");
-    internalCell.style = { color: "#654321", underline: false };
+    const block = first_sheet.cells[0];
+    const internal_cell = block?.cells[1];
+    if (!block || !internal_cell) throw new Error("Missing hyperlink cells");
+    internal_cell.style = { color: "#654321", underline: false };
     block.cells.push({ rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "Default" } });
-    firstSheet.hyperlinks?.push({
+    first_sheet.hyperlinks?.push({
       id: "default-link",
       range: { sheet: "source", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } },
       target: { kind: "external", url: "https://example.com/default" },
@@ -160,13 +160,13 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
     const styles = parts["xl/styles.xml"];
     const relationships = parts["xl/worksheets/_rels/sheet1.xml.rels"];
     if (!worksheet || !styles || !relationships) throw new Error("Missing native XLSX parts");
-    const relationshipElements = strFromU8(relationships)
+    const relationship_elements = strFromU8(relationships)
       .match(/<Relationship\b[^>]*\/>/g)
       ?.join("");
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       rawXlsx({
         sheets: [
-          { name: "Source", xml: strFromU8(worksheet), relationships: relationshipElements },
+          { name: "Source", xml: strFromU8(worksheet), relationships: relationship_elements },
           {
             name: "Destination Sheet",
             xml: `<worksheet xmlns="${MAIN_NS}"><sheetData/></worksheet>`,
@@ -179,12 +179,12 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
     expect(
       cells?.find((cell) => cell.rowOffset === 0 && cell.colOffset === 0)?.style,
     ).toMatchObject({ bold: true, color: "#123456", underline: true });
-    const nativeInternalStyle = cells?.find(
+    const native_internal_style = cells?.find(
       (cell) => cell.rowOffset === 1 && cell.colOffset === 0,
     )?.style;
-    expect(nativeInternalStyle).toMatchObject({ bold: true, color: "#654321" });
+    expect(native_internal_style).toMatchObject({ bold: true, color: "#654321" });
     // An absent OOXML <u> is the native false value.
-    expect(nativeInternalStyle?.underline ?? false).toBe(false);
+    expect(native_internal_style?.underline ?? false).toBe(false);
     expect(
       cells?.find((cell) => cell.rowOffset === 0 && cell.colOffset === 1)?.style,
     ).toMatchObject({ color: "#0563C1", underline: true });
@@ -197,7 +197,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
     ['ref="A1" r:id="rId1" display=""', ""],
   ])("uses cell text only when hyperlink display is omitted: %s", async (attributes, display) => {
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      originalEcmaVector({
+      original_ecma_vector({
         hyperlinks: `<hyperlink ${attributes}/>`,
         relationship: { target: "https://example.com/report", external: true },
       }),
@@ -210,15 +210,15 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
   });
 
   it("round-trips external relationships, stable internal targets, display/style, formula, and stop", async () => {
-    const source = sourceSnapshot();
+    const source = source_snapshot();
     const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source);
     const parts = unzipSync(bytes);
-    const sheetXml = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
+    const sheet_xml = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
     const rels = strFromU8(parts["xl/worksheets/_rels/sheet1.xml.rels"]!);
-    expect(sheetXml).toContain('<hyperlink ref="A1" r:id="rId1" display="Report"/>');
-    expect(sheetXml).toContain('location="&apos;Destination Sheet&apos;!B2"');
-    expect(sheetXml).toContain('type="expression"');
-    expect(sheetXml).toContain('stopIfTrue="1"');
+    expect(sheet_xml).toContain('<hyperlink ref="A1" r:id="rId1" display="Report"/>');
+    expect(sheet_xml).toContain('location="&apos;Destination Sheet&apos;!B2"');
+    expect(sheet_xml).toContain('type="expression"');
+    expect(sheet_xml).toContain('stopIfTrue="1"');
     expect(rels).toContain('Target="https://example.com/report?q=1" TargetMode="External"');
 
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
@@ -228,7 +228,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
 
   it("drops unsafe external schemes with an exact warning before snapshot mutation", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
-    const bytes = originalEcmaVector({
+    const bytes = original_ecma_vector({
       hyperlinks: '<hyperlink ref="A1" r:id="rId1" display="Unsafe"/>',
       relationship: { target: "javascript:alert(1)", external: true },
     });
@@ -242,7 +242,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
   });
 
   it("rejects an internal relationship target that traverses outside the package", async () => {
-    const bytes = originalEcmaVector({
+    const bytes = original_ecma_vector({
       hyperlinks: '<hyperlink ref="A1" r:id="rId1"/>',
       relationship: { target: "../../../escape.xml", external: false },
     });
@@ -262,7 +262,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
       (_, index) =>
         `<conditionalFormatting sqref="A1"><cfRule type="expression" priority="${index + 10}"><formula>TRUE</formula></cfRule></conditionalFormatting>`,
     ).join("");
-    const bytes = originalEcmaVector({
+    const bytes = original_ecma_vector({
       conditionalFormatting: `<conditionalFormatting sqref="A1"><cfRule type="colorScale" priority="2"><colorScale/></cfRule></conditionalFormatting><conditionalFormatting sqref="A1"><cfRule type="dataBar" priority="3"><dataBar/></cfRule></conditionalFormatting>${rules}`,
     });
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes, {
@@ -276,16 +276,16 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
 
   it("drops malformed, unsafe, and over-budget conditional rules independently", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
-    const oversizedFormula = `=${"A".repeat(8_192)}`;
+    const oversized_formula = `=${"A".repeat(8_192)}`;
     const rules = [
       '<cfRule type="cellIs" priority="-1" operator="equal"><formula>1</formula></cfRule>',
       '<cfRule type="cellIs" priority="2" operator="between"><formula>1</formula></cfRule>',
-      `<cfRule type="expression" priority="3"><formula>${oversizedFormula}</formula></cfRule>`,
+      `<cfRule type="expression" priority="3"><formula>${oversized_formula}</formula></cfRule>`,
       '<cfRule type="expression" priority="4"><formula>[1]Sheet1!A1</formula></cfRule>',
       '<cfRule type="containsBlanks" priority="5" dxfId="bad"/>',
       '<cfRule type="containsBlanks" priority="6" dxfId="999"/>',
     ].join("");
-    const bytes = originalEcmaVector({
+    const bytes = original_ecma_vector({
       conditionalFormatting: `<conditionalFormatting sqref="A1">${rules}</conditionalFormatting>`,
     });
 

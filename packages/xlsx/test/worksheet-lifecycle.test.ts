@@ -28,11 +28,11 @@ function sheet(
   };
 }
 
-function snapshot(sheets: SheetSnapshot[], activeSheet = sheets[0]!.id): WorkbookSnapshot {
-  return { schemaVersion: 1, workbook: { activeSheet }, sheets };
+function snapshot(sheets: SheetSnapshot[], active_sheet = sheets[0]!.id): WorkbookSnapshot {
+  return { schemaVersion: 1, workbook: { activeSheet: active_sheet }, sheets };
 }
 
-async function workbookXml(source: WorkbookSnapshot, warnings?: XlsxWorkbookWarning[]) {
+async function workbook_xml(source: WorkbookSnapshot, warnings?: XlsxWorkbookWarning[]) {
   const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source, {
     ...(warnings ? { onWarning: (warning) => warnings.push(warning) } : {}),
   });
@@ -63,8 +63,8 @@ describe("XLSX worksheet lifecycle fidelity", () => {
   });
 
   it("applies canonical blank, forbidden-character, apostrophe-edge, and UTF-16 length rules", async () => {
-    const invalidNames = ["", "Bad/Name", "'Edge", "Edge'", `${"😀".repeat(15)}AB`];
-    for (const name of invalidNames) {
+    const invalid_names = ["", "Bad/Name", "'Edge", "Edge'", `${"😀".repeat(15)}AB`];
+    for (const name of invalid_names) {
       await expect(
         sheetwriteWorkbookBackend.fromXlsxWorkbook(
           rawXlsx({ sheets: [{ name, xml: worksheet("<sheetData/>") }] }),
@@ -75,11 +75,11 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       ).rejects.toThrow();
     }
 
-    const boundaryName = `${"😀".repeat(15)}A`;
+    const boundary_name = `${"😀".repeat(15)}A`;
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({ sheets: [{ name: boundaryName, xml: worksheet("<sheetData/>") }] }),
+      rawXlsx({ sheets: [{ name: boundary_name, xml: worksheet("<sheetData/>") }] }),
     );
-    expect(imported.sheets[0]!.name).toBe(boundaryName);
+    expect(imported.sheets[0]!.name).toBe(boundary_name);
     await expect(sheetwriteWorkbookBackend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(
       Uint8Array,
     );
@@ -95,7 +95,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       ],
       "hidden",
     );
-    const { bytes, xml } = await workbookXml(source, warnings);
+    const { bytes, xml } = await workbook_xml(source, warnings);
 
     expect(xml).toContain('<workbookView activeTab="1"/>');
     expect(xml).toContain('name="Hidden" sheetId="1" state="hidden"');
@@ -116,7 +116,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       ["very-hidden", "veryHidden"],
     ]);
 
-    const hiddenActiveImport = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    const hidden_active_import = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       rawXlsx({
         sheets: [
           { name: "Hidden", state: "hidden", xml: worksheet("<sheetData/>") },
@@ -125,7 +125,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
         workbookExtra: '<bookViews><workbookView activeTab="0"/></bookViews>',
       }),
     );
-    expect(hiddenActiveImport.workbook.activeSheet).toBe(hiddenActiveImport.sheets[1]!.id);
+    expect(hidden_active_import.workbook.activeSheet).toBe(hidden_active_import.sheets[1]!.id);
   });
 
   it("gives a sheet inserted before a known sheet its own identity", async () => {

@@ -17,7 +17,7 @@ const QUALIFIED_NAME_START = /[\p{L}_\\!']/u;
  * Index after the bracket that closes the `[` at `open`. Brackets nest, and
  * `'` escapes the next character, as in a structured reference.
  */
-function closingBracket(formula: string, open: number): number {
+function closing_bracket(formula: string, open: number): number {
   let depth = 0;
   let index = open;
   while (index < formula.length) {
@@ -36,7 +36,7 @@ function closingBracket(formula: string, open: number): number {
 }
 
 /** Index after the quote that closes the `quote` at `open`; a doubled quote is one character. */
-function closingQuote(formula: string, open: number, quote: string): number {
+function closing_quote(formula: string, open: number, quote: string): number {
   let index = open + 1;
   while (index < formula.length) {
     if (formula.charAt(index) !== quote) {
@@ -51,7 +51,7 @@ function closingQuote(formula: string, open: number, quote: string): number {
 }
 
 /** Whether a quoted sheet name, such as `'C:\Books\[Budget.xlsx]Annual'`, names another workbook. */
-function quotedNameHasExternalBook(name: string): boolean {
+function quoted_name_has_external_book(name: string): boolean {
   const open = name.indexOf("[");
   const close = name.indexOf("]", open);
   return open >= 0 && close > open && EXTERNAL_BOOK.test(name.slice(open + 1, close));
@@ -62,7 +62,7 @@ function quotedNameHasExternalBook(name: string): boolean {
  * workbook (`[1]Sheet1!A1`, `[1]!Name`), rather than a structured reference
  * such as `Sales[2023]` or `[@2023]`.
  */
-function isExternalBook(formula: string, open: number, end: number): boolean {
+function is_external_book(formula: string, open: number, end: number): boolean {
   if (open > 0 && TABLE_NAME_END.test(formula.charAt(open - 1))) return false;
 
   const content = formula.slice(open + 1, end - 1);
@@ -77,21 +77,21 @@ export function formulaContainsExternalReference(formula: string): boolean {
     const char = formula.charAt(index);
     if (char === '"') {
       executable += " ";
-      index = closingQuote(formula, index, '"');
+      index = closing_quote(formula, index, '"');
       continue;
     }
 
     if (char === "'") {
-      const end = closingQuote(formula, index, "'");
-      if (quotedNameHasExternalBook(formula.slice(index + 1, end - 1))) return true;
+      const end = closing_quote(formula, index, "'");
+      if (quoted_name_has_external_book(formula.slice(index + 1, end - 1))) return true;
       executable += " ";
       index = end;
       continue;
     }
 
     if (char === "[") {
-      const end = closingBracket(formula, index);
-      if (isExternalBook(formula, index, end)) return true;
+      const end = closing_bracket(formula, index);
+      if (is_external_book(formula, index, end)) return true;
       executable += " ";
       index = end;
       continue;

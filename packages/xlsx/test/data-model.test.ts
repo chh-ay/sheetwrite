@@ -28,12 +28,12 @@ const table = (
   id,
   name,
   range: { sheet: "data", start: { row: 0, col }, end: { row: 2, col: col + 1 } },
-  columns: columns.map(([columnId, columnName]) => ({ id: columnId, name: columnName })),
+  columns: columns.map(([column_id, column_name]) => ({ id: column_id, name: column_name })),
   headerRow: true,
   totalsRow: false,
 });
 
-const ordersToCustomers: TableRelationship = {
+const orders_to_customers: TableRelationship = {
   id: "orders-customers",
   from: { table: "orders", column: "customer" },
   to: { table: "customers", column: "id" },
@@ -119,12 +119,14 @@ it("round-trips relationships and model pivots through Sheetwrite metadata", asy
     columns: [],
     values: [{ field: 1, aggregation: "SUM" }],
   };
-  const { warnings, onWarning } = collect();
+  const { warnings, onWarning: on_warning } = collect();
 
-  const saved = await toXlsxWorkbook(authored([ordersToCustomers], [pivot]), { onWarning });
+  const saved = await toXlsxWorkbook(authored([orders_to_customers], [pivot]), {
+    onWarning: on_warning,
+  });
   const reopened = await fromXlsxWorkbook(saved);
 
-  expect(reopened.workbook.dataModel).toEqual({ relationships: [ordersToCustomers] });
+  expect(reopened.workbook.dataModel).toEqual({ relationships: [orders_to_customers] });
   expect(reopened.sheets[0]?.pivots).toEqual([pivot]);
   expect(warnings.map((warning) => warning.message)).toEqual([
     expect.stringContaining("By region was not written as a native pivot"),
@@ -137,7 +139,7 @@ const connection = (name: string, source: string, id: number) =>
   `<connection id="${id}" name="${name}" type="102" refreshedVersion="6" minRefreshableVersion="5"><extLst><ext uri="{DE250136-89BD-433C-8126-D09CA5730AF9}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:connection id=""><x15:rangePr sourceName="${source}"/></x15:connection></ext></extLst></connection>`;
 
 /** `bytes` with an Excel data model that relates the worksheet tables, as Excel writes it. */
-function withExcelDataModel(bytes: Uint8Array): Uint8Array {
+function with_excel_data_model(bytes: Uint8Array): Uint8Array {
   const files = unzipSync(bytes);
   const workbook = strFromU8(files["xl/workbook.xml"] ?? new Uint8Array());
   files["xl/workbook.xml"] = strToU8(
@@ -164,14 +166,14 @@ function withExcelDataModel(bytes: Uint8Array): Uint8Array {
 }
 
 it("imports Excel's active relationships between worksheet tables and reports the rest", async () => {
-  const saved = withExcelDataModel(await toXlsxWorkbook(authored([])));
-  const { warnings, onWarning } = collect();
+  const saved = with_excel_data_model(await toXlsxWorkbook(authored([])));
+  const { warnings, onWarning: on_warning } = collect();
 
-  const reopened = await fromXlsxWorkbook(saved, { onWarning });
+  const reopened = await fromXlsxWorkbook(saved, { onWarning: on_warning });
 
   // The model table "Clients" loads the worksheet table "Customers" through its connection.
   expect(reopened.workbook.dataModel).toEqual({
-    relationships: [{ ...ordersToCustomers, id: "excel-relationship-1" }],
+    relationships: [{ ...orders_to_customers, id: "excel-relationship-1" }],
   });
   expect(warnings.map((warning) => warning.message)).toEqual([
     "Excel data model relationship Orders[Amount] → Clients[Region] was not imported because it would join two tables a second time",

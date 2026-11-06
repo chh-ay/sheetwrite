@@ -28,7 +28,7 @@ interface RawOptions {
   sheetName?: string;
 }
 
-function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
+function raw_workbook(sheet_xml: string, options: RawOptions = {}): Uint8Array {
   const main = options.strict ? STRICT_MAIN : TRANSITIONAL_MAIN;
   const rel = options.strict ? STRICT_REL : TRANSITIONAL_REL;
   const overrides = [
@@ -45,7 +45,7 @@ function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
         ]
       : []),
   ];
-  const workbookRelationships = [
+  const workbook_relationships = [
     `<Relationship Id="rId1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/>`,
     ...(options.styles
       ? [`<Relationship Id="rId2" Type="${rel}/styles" Target="styles.xml"/>`]
@@ -66,9 +66,9 @@ function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
       `<?xml version="1.0"?><workbook xmlns="${main}" xmlns:r="${rel}">${options.workbookPr ?? ""}<sheets><sheet name="${options.sheetName ?? "Raw"}" sheetId="1" r:id="rId1"/></sheets>${options.workbookExtra ?? ""}</workbook>`,
     ),
     "xl/_rels/workbook.xml.rels": strToU8(
-      `<?xml version="1.0"?><Relationships xmlns="${PACKAGE_REL}">${workbookRelationships}</Relationships>`,
+      `<?xml version="1.0"?><Relationships xmlns="${PACKAGE_REL}">${workbook_relationships}</Relationships>`,
     ),
-    "xl/worksheets/sheet1.xml": strToU8(sheetXml),
+    "xl/worksheets/sheet1.xml": strToU8(sheet_xml),
   };
   if (options.styles) files["xl/styles.xml"] = strToU8(options.styles);
   if (options.theme) files["xl/theme/theme1.xml"] = strToU8(options.theme);
@@ -79,7 +79,7 @@ function sheet(body: string, strict = false): string {
   return `<?xml version="1.0"?><worksheet xmlns="${strict ? STRICT_MAIN : TRANSITIONAL_MAIN}">${body}</worksheet>`;
 }
 
-function oneColumnSnapshot(overrides: Partial<WorkbookSnapshot> = {}): WorkbookSnapshot {
+function one_column_snapshot(overrides: Partial<WorkbookSnapshot> = {}): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "s" },
@@ -97,7 +97,7 @@ function oneColumnSnapshot(overrides: Partial<WorkbookSnapshot> = {}): WorkbookS
   };
 }
 
-function workbookXml(bytes: Uint8Array): string {
+function workbook_xml(bytes: Uint8Array): string {
   const part = unzipSync(bytes)["xl/workbook.xml"];
   if (!part) throw new Error("xl/workbook.xml is missing");
   return strFromU8(part);
@@ -106,7 +106,7 @@ function workbookXml(bytes: Uint8Array): string {
 describe("raw spec-authored OOXML fidelity", () => {
   it("keeps scoped formula names and Excel LAMBDA prefixes through native OOXML", async () => {
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(sheet("<sheetData/>"), {
+      raw_workbook(sheet("<sheetData/>"), {
         workbookExtra:
           '<definedNames><definedName name="MYFN">_xlfn.LAMBDA(_xlpm.value,_xlpm.value+1)</definedName><definedName name="Rate" localSheetId="0">0.2</definedName></definedNames>',
       }),
@@ -119,7 +119,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     ]);
 
     const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(imported);
-    expect(workbookXml(bytes)).toContain(
+    expect(workbook_xml(bytes)).toContain(
       '<definedName name="MYFN">_xlfn.LAMBDA(_xlpm.value,_xlpm.value+1)</definedName>',
     );
     const reopened = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
@@ -128,7 +128,7 @@ describe("raw spec-authored OOXML fidelity", () => {
 
   it("accepts Strict namespaces and relationship types", async () => {
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
           '<dimension ref="A1"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Strict</t></is></c></row></sheetData>',
           true,
@@ -151,7 +151,7 @@ describe("raw spec-authored OOXML fidelity", () => {
           : '<c><f t="shared" si="0"/></c>',
     ).join("");
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(`<dimension ref="A1:AB1"/><sheetData><row r="1">${cells}</row></sheetData>`),
       ),
     );
@@ -164,7 +164,7 @@ describe("raw spec-authored OOXML fidelity", () => {
 
   it("moves whole columns and rows of a shared master and keeps names past the last column", async () => {
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
           '<dimension ref="A1:D4"/><sheetData>' +
             '<row r="1"><c r="C1"><f t="shared" si="0" ref="C1:D1">SUM(A:A)+XYZ1</f></c><c r="D1"><f t="shared" si="0"/></c></row>' +
@@ -189,7 +189,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     const warnings: XlsxWorkbookWarning[] = [];
     // An unterminated string: the engine's lexer cannot read it.
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
           '<dimension ref="A1:A3"/><sheetData>' +
             '<row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A3">B1&amp;$C$1&amp;"open</f></c></row>' +
@@ -218,7 +218,7 @@ describe("raw spec-authored OOXML fidelity", () => {
   it("neutralizes external formulas and external-link workbook graphs", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
           '<dimension ref="A1"/><sheetData><row r="1"><c r="A1"><f>\'[1]Data\'!A1</f></c></row></sheetData>',
         ),
@@ -242,7 +242,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     const body =
       '<dimension ref="A1:C1"/><sheetData><row r="1"><c r="A1" s="0"><v>0</v></c><c r="B1" s="0"><v>60</v></c><c r="C1" t="d"><v>2020-01-02T03:04:05</v></c></row></sheetData>';
     const mac = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(sheet(body), { workbookPr: '<workbookPr date1904="1"/>', styles }),
+      raw_workbook(sheet(body), { workbookPr: '<workbookPr date1904="1"/>', styles }),
     );
     expect(mac.sheets[0]!.cells[0]!.cells.map((cell) => cell.value)).toEqual([
       { kind: "literal", value: 1462 },
@@ -250,7 +250,7 @@ describe("raw spec-authored OOXML fidelity", () => {
       { kind: "literal", value: dateToSerial(new Date(Date.UTC(2020, 0, 2, 3, 4, 5))) },
     ]);
     const excel = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(sheet(body), { styles }),
+      raw_workbook(sheet(body), { styles }),
     );
     expect(excel.sheets[0]!.cells[0]!.cells[1]!.value).toEqual({ kind: "literal", value: 60 });
   });
@@ -261,7 +261,7 @@ describe("raw spec-authored OOXML fidelity", () => {
       `<dimension ref="A1:D2"/><sheetData/><dataValidations count="4"><dataValidation type="whole" operator="between" sqref="A1 A2"><formula1>1</formula1><formula2>3</formula2></dataValidation><dataValidation type="decimal" operator="equal" showErrorMessage="1" errorStyle="stop" sqref="B1"><formula1>2</formula1></dataValidation><dataValidation type="decimal" operator="between" showErrorMessage="1" errorStyle="warning" sqref="C1"><formula1>0</formula1><formula2>1</formula2></dataValidation><dataValidation type="decimal" operator="between" showErrorMessage="1" errorStyle="information" prompt="${long}" sqref="D1"><formula1>0</formula1><formula2>1</formula2></dataValidation></dataValidations>`,
     );
     const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(rawWorkbook(xml), {
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(raw_workbook(xml), {
       onWarning: (warning) => warnings.push(warning),
     });
     const rules = imported.sheets[0]!.validationRules!;
@@ -287,8 +287,8 @@ describe("raw spec-authored OOXML fidelity", () => {
       { operator: "greaterThanOrEqual", value: 2 },
       { operator: "lessThanOrEqual", value: 2 },
     ];
-    const nativeTypes = ["whole", "decimal", "date", "textLength"] as const;
-    const nativeRules = nativeTypes.flatMap((type) =>
+    const native_types = ["whole", "decimal", "date", "textLength"] as const;
+    const native_rules = native_types.flatMap((type) =>
       comparisons.map((comparison) => {
         const formulas =
           "value" in comparison
@@ -299,34 +299,36 @@ describe("raw spec-authored OOXML fidelity", () => {
     );
     const warnings: XlsxWorkbookWarning[] = [];
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
-          `<dimension ref="A1"/><sheetData/><dataValidations count="${nativeRules.length}">${nativeRules.join("")}</dataValidations>`,
+          `<dimension ref="A1"/><sheetData/><dataValidations count="${native_rules.length}">${native_rules.join("")}</dataValidations>`,
         ),
       ),
       { onWarning: (warning) => warnings.push(warning) },
     );
     expect(warnings).toEqual([]);
     const rules = imported.sheets[0]!.validationRules!;
-    expect(rules).toHaveLength(nativeRules.length);
-    const expectedConditions = nativeTypes.flatMap((type) =>
+    expect(rules).toHaveLength(native_rules.length);
+    const expected_conditions = native_types.flatMap((type) =>
       comparisons.map((comparison) => {
-        const kindFields =
+        const kind_fields =
           type === "whole"
             ? { kind: "number", integer: true }
             : type === "decimal"
               ? { kind: "number" }
               : { kind: type };
-        if (comparison.operator === "between") return { ...kindFields, min: 2, max: 4 };
-        if (comparison.operator === "equal") return { ...kindFields, min: 2, max: 2 };
-        if (comparison.operator === "greaterThanOrEqual") return { ...kindFields, min: 2 };
-        if (comparison.operator === "lessThanOrEqual") return { ...kindFields, max: 2 };
-        return { ...kindFields, comparison };
+        if (comparison.operator === "between") return { ...kind_fields, min: 2, max: 4 };
+        if (comparison.operator === "equal") return { ...kind_fields, min: 2, max: 2 };
+        if (comparison.operator === "greaterThanOrEqual") return { ...kind_fields, min: 2 };
+        if (comparison.operator === "lessThanOrEqual") return { ...kind_fields, max: 2 };
+        return { ...kind_fields, comparison };
       }),
     );
-    expect(rules.map((rule) => rule.condition)).toEqual(expect.arrayContaining(expectedConditions));
+    expect(rules.map((rule) => rule.condition)).toEqual(
+      expect.arrayContaining(expected_conditions),
+    );
 
-    const source = oneColumnSnapshot();
+    const source = one_column_snapshot();
     source.sheets[0]!.validationRules = comparisons.map((comparison, index) => ({
       id: `comparison-${index}`,
       range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
@@ -340,8 +342,8 @@ describe("raw spec-authored OOXML fidelity", () => {
     for (const comparison of comparisons) {
       expect(worksheet).toContain(`operator="${comparison.operator}"`);
     }
-    const roundTripped = await sheetwriteWorkbookBackend.fromXlsxWorkbook(exported);
-    expect(roundTripped.sheets[0]!.validationRules?.map((rule) => rule.condition)).toEqual(
+    const round_tripped = await sheetwriteWorkbookBackend.fromXlsxWorkbook(exported);
+    expect(round_tripped.sheets[0]!.validationRules?.map((rule) => rule.condition)).toEqual(
       expect.arrayContaining(
         comparisons
           .filter(
@@ -360,7 +362,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     const theme = `<?xml version="1.0"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements><a:clrScheme name="Raw"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme></a:themeElements></a:theme>`;
     const styles = `<?xml version="1.0"?><styleSheet xmlns="${TRANSITIONAL_MAIN}"><fonts count="1"><font><color theme="1"/><sz val="12"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.4"/></patternFill></fill></fills><borders count="1"><border><left style="thin"><color indexed="2"/></left></border></borders><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="2" borderId="0"/></cellXfs></styleSheet>`;
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
           '<dimension ref="A1"/><sheetData><row r="1"><c r="A1" s="0"><v>1</v></c></row></sheetData>',
         ),
@@ -379,7 +381,7 @@ describe("raw spec-authored OOXML fidelity", () => {
 
   it("escapes SpreadsheetML control tokens without confusing literal escape text", async () => {
     const literal = "\u0001_x0041_😀";
-    const source = oneColumnSnapshot();
+    const source = one_column_snapshot();
     source.sheets[0]!.columns[0]!.type = "text";
     source.sheets[0]!.cells = [
       {
@@ -416,7 +418,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     ];
     for (const [calcPr, expected] of cases) {
       const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        rawWorkbook(sheet('<dimension ref="A1"/><sheetData/>'), { workbookExtra: calcPr }),
+        raw_workbook(sheet('<dimension ref="A1"/><sheetData/>'), { workbookExtra: calcPr }),
       );
       expect(imported.workbook.calculation).toEqual(expected);
 
@@ -427,21 +429,21 @@ describe("raw spec-authored OOXML fidelity", () => {
     }
 
     expect(
-      workbookXml(await sheetwriteWorkbookBackend.toXlsxWorkbook(oneColumnSnapshot())),
+      workbook_xml(await sheetwriteWorkbookBackend.toXlsxWorkbook(one_column_snapshot())),
     ).toContain('<calcPr fullCalcOnLoad="1" forceFullCalc="1"/>');
-    const iterative = oneColumnSnapshot({
+    const iterative = one_column_snapshot({
       workbook: {
         activeSheet: "s",
         calculation: { iterate: true, maxIterations: 50, maxChange: 0.01 },
       },
     });
-    expect(workbookXml(await sheetwriteWorkbookBackend.toXlsxWorkbook(iterative))).toContain(
+    expect(workbook_xml(await sheetwriteWorkbookBackend.toXlsxWorkbook(iterative))).toContain(
       '<calcPr fullCalcOnLoad="1" iterate="1" iterateCount="50" iterateDelta="0.01" forceFullCalc="1"/>',
     );
   });
 
   it("writes every canonical conditional predicate and direct whole-sheet sort state natively", async () => {
-    const source = oneColumnSnapshot();
+    const source = one_column_snapshot();
     const range = {
       sheet: "s",
       start: { row: 0, col: 0 },
@@ -467,25 +469,25 @@ describe("raw spec-authored OOXML fidelity", () => {
     const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source);
     const parts = unzipSync(bytes);
     const worksheet = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
-    const stylesXml = strFromU8(parts["xl/styles.xml"]!);
+    const styles_xml = strFromU8(parts["xl/styles.xml"]!);
     expect(worksheet).toContain('type="cellIs"');
     expect(worksheet).toContain('type="containsBlanks"');
     expect(worksheet).toContain('type="containsText"');
     expect(worksheet).toContain('type="expression"');
     expect(worksheet).toContain('<sortState ref="A1:A2">');
-    expect(stylesXml).toContain('<dxfs count="1">');
-    expect(stylesXml).toContain('<patternFill><bgColor rgb="FFDDEEFF"/></patternFill>');
+    expect(styles_xml).toContain('<dxfs count="1">');
+    expect(styles_xml).toContain('<patternFill><bgColor rgb="FFDDEEFF"/></patternFill>');
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
     expect(imported.sheets[0]!.conditionalFormats).toEqual(source.sheets[0]!.conditionalFormats);
     expect(imported.sheets[0]!.sortKeys).toEqual(source.sheets[0]!.sortKeys);
     parts["xl/worksheets/sheet1.xml"] = strToU8(
       worksheet.replace("<formula>4</formula>", "<formula>6</formula>"),
     );
-    parts["xl/styles.xml"] = strToU8(stylesXml.replace("FFDDEEFF", "FFABCDEF"));
-    const externallyEdited = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    parts["xl/styles.xml"] = strToU8(styles_xml.replace("FFDDEEFF", "FFABCDEF"));
+    const externally_edited = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
       zipSync(parts, { level: 6, mtime: FIXED_ZIP_TIME }),
     );
-    expect(externallyEdited.sheets[0]!.conditionalFormats?.[0]).toMatchObject({
+    expect(externally_edited.sheets[0]!.conditionalFormats?.[0]).toMatchObject({
       when: { kind: "greaterThan", value: 6 },
       style: { backgroundColor: "#ABCDEF" },
     });
@@ -494,7 +496,7 @@ describe("raw spec-authored OOXML fidelity", () => {
   it("warns rather than changing header-filter or authorization semantics", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
+      raw_workbook(
         sheet(
           '<dimension ref="A1:A2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Header</t></is></c></row><row r="2"><c r="A2"><v>1</v></c></row></sheetData><sheetProtection sheet="1"/><autoFilter ref="A1:A2"><filterColumn colId="0"><filters><filter val="1"/></filters></filterColumn></autoFilter><sortState ref="A1:A2"><sortCondition ref="A1:A2" descending="1"/></sortState>',
         ),
@@ -512,7 +514,7 @@ describe("raw spec-authored OOXML fidelity", () => {
   });
 
   it("rejects percent-decoded logical-name collisions and traversal", async () => {
-    const files = unzipSync(rawWorkbook(sheet('<dimension ref="A1"/><sheetData/>')));
+    const files = unzipSync(raw_workbook(sheet('<dimension ref="A1"/><sheetData/>')));
     files["XL/%77orkbook.xml"] = files["xl/workbook.xml"]!;
     await expect(
       sheetwriteWorkbookBackend.fromXlsxWorkbook(
@@ -523,7 +525,7 @@ describe("raw spec-authored OOXML fidelity", () => {
       message: expect.stringMatching(/duplicate/i),
     });
 
-    const traversal = unzipSync(rawWorkbook(sheet('<dimension ref="A1"/><sheetData/>')));
+    const traversal = unzipSync(raw_workbook(sheet('<dimension ref="A1"/><sheetData/>')));
     traversal["xl/%2e%2e/evil.xml"] = strToU8("<evil/>");
     await expect(
       sheetwriteWorkbookBackend.fromXlsxWorkbook(

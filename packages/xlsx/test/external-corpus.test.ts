@@ -33,21 +33,21 @@ interface ExternalManifest {
 const manifest = (await Bun.file(
   new URL("fixtures/external-corpus.json", import.meta.url),
 ).json()) as ExternalManifest;
-const externalDirectory = process.env.SHEETWRITE_EXTERNAL_XLSX_DIR;
-const scheduledIt =
-  process.env.SHEETWRITE_EXTERNAL_XLSX === "1" || externalDirectory ? it : it.skip;
+const external_directory = process.env.SHEETWRITE_EXTERNAL_XLSX_DIR;
+const scheduled_it =
+  process.env.SHEETWRITE_EXTERNAL_XLSX === "1" || external_directory ? it : it.skip;
 
-function populatedCells(snapshot: WorkbookSnapshot) {
+function populated_cells(snapshot: WorkbookSnapshot) {
   return snapshot.sheets.flatMap((sheet) => sheet.cells.flatMap((block) => block.cells));
 }
 
-function warningCounts(warnings: readonly XlsxWorkbookWarning[]): Record<string, number> {
+function warning_counts(warnings: readonly XlsxWorkbookWarning[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const warning of warnings) counts[warning.message] = (counts[warning.message] ?? 0) + 1;
   return counts;
 }
 
-function archiveContentSha256(archive: Record<string, Uint8Array>): string {
+function archive_content_sha256(archive: Record<string, Uint8Array>): string {
   const hasher = new Bun.CryptoHasher("sha256");
   for (const name of Object.keys(archive).sort()) {
     hasher.update(name);
@@ -58,9 +58,11 @@ function archiveContentSha256(archive: Record<string, Uint8Array>): string {
   return hasher.digest("hex");
 }
 
-async function fixtureBytes(fixture: ExternalFixture | GoogleExternalFixture): Promise<Uint8Array> {
-  if (externalDirectory) {
-    return new Uint8Array(await Bun.file(`${externalDirectory}/${fixture.file}`).arrayBuffer());
+async function fixture_bytes(
+  fixture: ExternalFixture | GoogleExternalFixture,
+): Promise<Uint8Array> {
+  if (external_directory) {
+    return new Uint8Array(await Bun.file(`${external_directory}/${fixture.file}`).arrayBuffer());
   }
   const url =
     "downloadUrl" in fixture
@@ -78,20 +80,20 @@ beforeAll(async () => {
 
 describe("scheduled independent Microsoft Excel corpus", () => {
   for (const fixture of manifest.fixtures) {
-    scheduledIt(`imports checksum-locked ${fixture.file}`, async () => {
-      const bytes = await fixtureBytes(fixture);
+    scheduled_it(`imports checksum-locked ${fixture.file}`, async () => {
+      const bytes = await fixture_bytes(fixture);
       expect(new Bun.CryptoHasher("sha256").update(bytes).digest("hex")).toBe(fixture.sha256);
 
       const archive = unzipSync(bytes);
-      const appXml = strFromU8(archive["docProps/app.xml"]!);
-      expect(appXml).toContain(`<Application>${fixture.producer}</Application>`);
-      expect(appXml).toContain(`<AppVersion>${fixture.appVersion}</AppVersion>`);
+      const app_xml = strFromU8(archive["docProps/app.xml"]!);
+      expect(app_xml).toContain(`<Application>${fixture.producer}</Application>`);
+      expect(app_xml).toContain(`<AppVersion>${fixture.appVersion}</AppVersion>`);
 
       const warnings: XlsxWorkbookWarning[] = [];
       const snapshot = await fromXlsxWorkbook(bytes, {
         onWarning: (warning) => warnings.push(warning),
       });
-      const cells = populatedCells(snapshot);
+      const cells = populated_cells(snapshot);
 
       if (fixture.file === "FormulaSheetRange.xlsx") {
         expect(archive["xl/sharedStrings.xml"]).toBeDefined();
@@ -137,13 +139,13 @@ describe("scheduled independent Microsoft Excel corpus", () => {
           kind: "list",
           values: ["IN", "US", "UK"],
         });
-        const comparisonRules = [...snapshot.sheets[0]!.validationRules!]
+        const comparison_rules = [...snapshot.sheets[0]!.validationRules!]
           .sort((left, right) => left.range.start.row - right.range.start.row)
           .map((validation) => ({
             row: validation.range.start.row,
             condition: validation.condition,
           }));
-        expect(comparisonRules).toEqual([
+        expect(comparison_rules).toEqual([
           { row: 1, condition: { kind: "list", values: ["IN", "US", "UK"] } },
           {
             row: 5,
@@ -247,7 +249,7 @@ describe("scheduled independent Microsoft Excel corpus", () => {
           },
         ]);
         expect(cells.some((cell) => cell.style?.align === "center")).toBe(true);
-        expect(warningCounts(warnings)).toEqual({
+        expect(warning_counts(warnings)).toEqual({
           "Formula-based Excel validation was dropped": 25,
           "Excel validation type custom was dropped": 1,
           "Excel validation type list was dropped": 1,
@@ -280,7 +282,7 @@ describe("scheduled independent Microsoft Excel corpus", () => {
             },
           },
         ]);
-        expect(warningCounts(warnings)).toEqual({
+        expect(warning_counts(warnings)).toEqual({
           "Unsupported worksheet relationship table was dropped": 1,
           "Defined name TableAsRangeName was not a single rectangular range": 1,
         });
@@ -291,22 +293,22 @@ describe("scheduled independent Microsoft Excel corpus", () => {
 
 describe("scheduled independent Google Sheets corpus", () => {
   for (const fixture of manifest.googleFixtures) {
-    scheduledIt(`imports checksum-locked ${fixture.file}`, async () => {
+    scheduled_it(`imports checksum-locked ${fixture.file}`, async () => {
       expect(fixture.sourcePage).toContain("highviewapps.com");
       expect(fixture.downloadUrl).toContain("docs.google.com/spreadsheets/");
       expect(fixture.producer).toBe("Google Sheets");
       expect(fixture.redistributed).toBe(false);
 
-      const bytes = await fixtureBytes(fixture);
+      const bytes = await fixture_bytes(fixture);
       const archive = unzipSync(bytes);
-      expect(archiveContentSha256(archive)).toBe(fixture.contentSha256);
+      expect(archive_content_sha256(archive)).toBe(fixture.contentSha256);
       expect(archive["xl/sharedStrings.xml"]).toBeDefined();
 
       const warnings: XlsxWorkbookWarning[] = [];
       const snapshot = await fromXlsxWorkbook(bytes, {
         onWarning: (warning) => warnings.push(warning),
       });
-      const cells = populatedCells(snapshot);
+      const cells = populated_cells(snapshot);
       const formulas = cells.flatMap((cell) =>
         cell.value.kind === "formula" ? [cell.value.src] : [],
       );
@@ -329,7 +331,7 @@ describe("scheduled independent Google Sheets corpus", () => {
       expect(formulas).toHaveLength(230);
       expect(formulas[0]).toBe('=COUNTIF(Inventory!F2:F1000, "<=0")');
       expect(snapshot.sheets.find((sheet) => sheet.name === "Inventory")?.frozenRows).toBe(1);
-      expect(warningCounts(warnings)).toEqual({
+      expect(warning_counts(warnings)).toEqual({
         "Reserved Excel fill 1 had pattern lightGray; it was treated as gray125": 1,
         "Unsupported worksheet relationship drawing was dropped": 10,
       });

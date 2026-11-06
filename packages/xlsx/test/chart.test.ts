@@ -19,7 +19,7 @@ async function fixture(file: string): Promise<Uint8Array> {
   return new Uint8Array(await Bun.file(new URL(`fixtures/${file}`, import.meta.url)).arrayBuffer());
 }
 
-function drawingCount(files: Record<string, Uint8Array>, part: string): number {
+function drawing_count(files: Record<string, Uint8Array>, part: string): number {
   return strFromU8(files[part] ?? new Uint8Array()).match(/<drawing\b/g)?.length ?? 0;
 }
 
@@ -54,11 +54,11 @@ function authored(): WorkbookSnapshot {
             colCount: 3,
             cells: [
               { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "Sales" } },
-              ...[1, 2].flatMap((rowOffset) =>
-                [0, 1, 2].map((colOffset) => ({
-                  rowOffset,
-                  colOffset,
-                  value: { kind: "literal" as const, value: rowOffset + colOffset },
+              ...[1, 2].flatMap((row_offset) =>
+                [0, 1, 2].map((col_offset) => ({
+                  rowOffset: row_offset,
+                  colOffset: col_offset,
+                  value: { kind: "literal" as const, value: row_offset + col_offset },
                 })),
               ),
             ],
@@ -90,7 +90,7 @@ function authored(): WorkbookSnapshot {
   };
 }
 
-function withoutSidecar(bytes: Uint8Array): Uint8Array {
+function without_sidecar(bytes: Uint8Array): Uint8Array {
   const parts = unzipSync(bytes);
   // Native chart tests must not get their definitions from Sheetwrite metadata.
   for (const [part, content] of Object.entries(parts)) {
@@ -107,9 +107,9 @@ function withoutSidecar(bytes: Uint8Array): Uint8Array {
 }
 
 /** Without the sidecar the sheet gets a new ID, so compare ranges by sheet name instead. */
-function portable(chart: ChartDefinition, sheetNames: ReadonlyMap<string, string>): unknown {
+function portable(chart: ChartDefinition, sheet_names: ReadonlyMap<string, string>): unknown {
   const reference = (range: ChartDefinition["series"][number]["values"] | undefined) =>
-    range && range !== "#REF!" ? { ...range, sheet: sheetNames.get(range.sheet) } : range;
+    range && range !== "#REF!" ? { ...range, sheet: sheet_names.get(range.sheet) } : range;
   return {
     ...chart,
     id: undefined,
@@ -122,7 +122,7 @@ function portable(chart: ChartDefinition, sheetNames: ReadonlyMap<string, string
   };
 }
 
-function sheetNames(snapshot: WorkbookSnapshot): Map<string, string> {
+function sheet_names(snapshot: WorkbookSnapshot): Map<string, string> {
   return new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet.name]));
 }
 
@@ -138,17 +138,17 @@ describe("native XLSX charts", () => {
   it("round trips all seven kinds, ranges, titles, axes, legends and anchors from DrawingML alone", async () => {
     const snapshot = authored();
     const bytes = await toXlsxWorkbook(snapshot);
-    const restored = await fromXlsxWorkbook(withoutSidecar(bytes));
+    const restored = await fromXlsxWorkbook(without_sidecar(bytes));
 
     expect(
-      restored.sheets[0]?.charts?.map((chart) => portable(chart, sheetNames(restored))),
-    ).toEqual(snapshot.sheets[0]?.charts?.map((chart) => portable(chart, sheetNames(snapshot))));
+      restored.sheets[0]?.charts?.map((chart) => portable(chart, sheet_names(restored))),
+    ).toEqual(snapshot.sheets[0]?.charts?.map((chart) => portable(chart, sheet_names(snapshot))));
     expect(packageProblems(bytes)).toEqual([]);
     const files = unzipSync(bytes);
     expect(Object.keys(files).filter((part) => /^xl\/charts\/[^/]+\.xml$/.test(part))).toHaveLength(
       KINDS.length,
     );
-    expect(drawingCount(files, "xl/worksheets/sheet1.xml")).toBe(1);
+    expect(drawing_count(files, "xl/worksheets/sheet1.xml")).toBe(1);
   });
 
   it("keeps chart IDs, an omitted legend and subpixel anchors through the sidecar", async () => {
@@ -212,17 +212,17 @@ describe("native XLSX charts", () => {
         },
       ],
     });
-    const { warnings, onWarning } = collect();
-    const saved = await toXlsxWorkbook(store, { onWarning });
-    const reopened = await fromXlsxWorkbook(withoutSidecar(saved));
+    const { warnings, onWarning: on_warning } = collect();
+    const saved = await toXlsxWorkbook(store, { onWarning: on_warning });
+    const reopened = await fromXlsxWorkbook(without_sidecar(saved));
 
     expect(warnings.filter((warning) => warning.part?.includes("chart"))).toEqual([]);
     expect(packageProblems(saved)).toEqual([]);
     expect(
       reopened.sheets
         .find((sheet) => sheet.name === owner.name)
-        ?.charts?.map((entry) => portable(entry, sheetNames(reopened))),
-    ).toEqual(owner.charts?.map((entry) => portable(entry, sheetNames(snapshot))));
+        ?.charts?.map((entry) => portable(entry, sheet_names(reopened))),
+    ).toEqual(owner.charts?.map((entry) => portable(entry, sheet_names(snapshot))));
   });
 
   it("adds a new chart to a sheet's kept image drawing instead of a second drawing", async () => {
@@ -245,7 +245,7 @@ describe("native XLSX charts", () => {
     const reopened = await fromXlsxWorkbook(saved);
 
     expect(packageProblems(saved)).toEqual([]);
-    expect(drawingCount(files, "xl/worksheets/sheet1.xml")).toBe(1);
+    expect(drawing_count(files, "xl/worksheets/sheet1.xml")).toBe(1);
     expect(drawing).toContain("xdr:pic");
     expect(drawing).toContain('name="new-chart"');
     expect(files["xl/media/10000000000006450000032120C875D8.jpg"]).toBeDefined();
@@ -261,8 +261,10 @@ describe("native XLSX charts", () => {
     parts[unsupported] = strToU8(
       strFromU8(parts[unsupported] ?? new Uint8Array()).replaceAll("c:barChart", "c:bar3DChart"),
     );
-    const { warnings, onWarning } = collect();
-    const imported = await fromXlsxWorkbook(withoutSidecar(zipSync(parts)), { onWarning });
+    const { warnings, onWarning: on_warning } = collect();
+    const imported = await fromXlsxWorkbook(without_sidecar(zipSync(parts)), {
+      onWarning: on_warning,
+    });
 
     expect(imported.sheets[0]?.charts?.map((chart) => chart.kind)).toEqual(
       KINDS.filter((kind) => kind !== "bar"),
@@ -275,10 +277,10 @@ describe("native XLSX charts", () => {
     // The kept chart's part name is the one export would generate first; export must pick another.
     const exported = await toXlsxWorkbook(imported);
     const output = unzipSync(exported);
-    const restored = await fromXlsxWorkbook(withoutSidecar(exported));
+    const restored = await fromXlsxWorkbook(without_sidecar(exported));
 
     expect(packageProblems(exported)).toEqual([]);
-    expect(drawingCount(output, "xl/worksheets/sheet1.xml")).toBe(1);
+    expect(drawing_count(output, "xl/worksheets/sheet1.xml")).toBe(1);
     expect(strFromU8(output[unsupported] ?? new Uint8Array())).toContain("bar3DChart");
     expect(restored.sheets[0]?.charts?.map((chart) => chart.kind)).toEqual(
       KINDS.filter((kind) => kind !== "bar"),
@@ -286,9 +288,9 @@ describe("native XLSX charts", () => {
   });
 
   it("imports one chart per part when thousands of anchors repeat it or have no chart", async () => {
-    const parts = unzipSync(withoutSidecar(await toXlsxWorkbook(authored())));
-    const drawingPart = "xl/drawings/sheetwrite-drawing1.xml";
-    const drawing = strFromU8(parts[drawingPart] ?? new Uint8Array());
+    const parts = unzipSync(without_sidecar(await toXlsxWorkbook(authored())));
+    const drawing_part = "xl/drawings/sheetwrite-drawing1.xml";
+    const drawing = strFromU8(parts[drawing_part] ?? new Uint8Array());
     const anchor = drawing.match(/<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/)?.[0];
     if (!anchor) throw new Error("authored drawing has no one-cell anchor");
     const repeats = 1_500;
@@ -300,15 +302,17 @@ describe("native XLSX charts", () => {
         /<xdr:ext\b[^>]*\/>/,
         "<xdr:to><xdr:col>16383</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1048575</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>",
       );
-    parts[drawingPart] = strToU8(
+    parts[drawing_part] = strToU8(
       drawing.replace(
         "</xdr:wsDr>",
         `${anchor.repeat(repeats)}${unlinked.repeat(repeats)}</xdr:wsDr>`,
       ),
     );
-    const { warnings, onWarning } = collect();
+    const { warnings, onWarning: on_warning } = collect();
 
-    const imported = await fromXlsxWorkbook(zipSync(parts, { level: 0 }), { onWarning });
+    const imported = await fromXlsxWorkbook(zipSync(parts, { level: 0 }), {
+      onWarning: on_warning,
+    });
 
     expect(imported.sheets[0]?.charts).toHaveLength(KINDS.length);
     // The repeated frames share one chart part, so the host gets one warning, not one per frame.
@@ -318,16 +322,16 @@ describe("native XLSX charts", () => {
   }, 5_000);
 
   it("sizes two-cell anchors from default and explicit column and row sizes", async () => {
-    const parts = unzipSync(withoutSidecar(await toXlsxWorkbook(authored())));
-    const drawingPart = "xl/drawings/sheetwrite-drawing1.xml";
-    const drawing = strFromU8(parts[drawingPart] ?? new Uint8Array());
+    const parts = unzipSync(without_sidecar(await toXlsxWorkbook(authored())));
+    const drawing_part = "xl/drawings/sheetwrite-drawing1.xml";
+    const drawing = strFromU8(parts[drawing_part] ?? new Uint8Array());
     const frame = drawing.match(/<xdr:graphicFrame\b[\s\S]*?<\/xdr:graphicFrame>/)?.[0];
     if (!frame) throw new Error("authored drawing has no chart frame");
     const marker = (row: number, col: number, offset: number) =>
       `<xdr:col>${col}</xdr:col><xdr:colOff>${offset}</xdr:colOff><xdr:row>${row}</xdr:row><xdr:rowOff>${offset}</xdr:rowOff>`;
     const namespaces = drawing.match(/<xdr:oneCellAnchor([^>]*)>/)?.[1] ?? "";
     const anchor = `<xdr:twoCellAnchor${namespaces}><xdr:from>${marker(0, 0, 9525)}</xdr:from><xdr:to>${marker(1_000, 300, 19050)}</xdr:to>${frame}<xdr:clientData/></xdr:twoCellAnchor>`;
-    parts[drawingPart] = strToU8(
+    parts[drawing_part] = strToU8(
       drawing.replace(/<xdr:oneCellAnchor\b[\s\S]*<\/xdr:oneCellAnchor>/, anchor),
     );
     parts["xl/worksheets/sheet1.xml"] = strToU8(
@@ -352,28 +356,28 @@ describe("native XLSX charts", () => {
     const chart = sheet?.charts?.[0];
     if (!sheet || !chart) throw new Error("authored workbook has no chart");
     sheet.charts = Array.from({ length: 100 }, (_, index) => ({ ...chart, id: `chart-${index}` }));
-    const parts = unzipSync(withoutSidecar(await toXlsxWorkbook(snapshot)));
-    const drawingPart = "xl/drawings/sheetwrite-drawing1.xml";
-    const drawing = strFromU8(parts[drawingPart] ?? new Uint8Array());
+    const parts = unzipSync(without_sidecar(await toXlsxWorkbook(snapshot)));
+    const drawing_part = "xl/drawings/sheetwrite-drawing1.xml";
+    const drawing = strFromU8(parts[drawing_part] ?? new Uint8Array());
     const anchor = drawing.match(/<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/)?.[0];
     if (!anchor) throw new Error("authored drawing has no chart anchor");
-    parts[drawingPart] = strToU8(
+    parts[drawing_part] = strToU8(
       drawing.replace(
         "</xdr:wsDr>",
         `${anchor.replace('r:id="rId1"', 'r:id="overflow"')}</xdr:wsDr>`,
       ),
     );
-    const relationshipsPart = "xl/drawings/_rels/sheetwrite-drawing1.xml.rels";
-    parts[relationshipsPart] = strToU8(
-      strFromU8(parts[relationshipsPart] ?? new Uint8Array()).replace(
+    const relationships_part = "xl/drawings/_rels/sheetwrite-drawing1.xml.rels";
+    parts[relationships_part] = strToU8(
+      strFromU8(parts[relationships_part] ?? new Uint8Array()).replace(
         "</Relationships>",
         '<Relationship Id="overflow" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="/xl/charts/overflow.xml"/></Relationships>',
       ),
     );
     parts["xl/charts/overflow.xml"] = strToU8("<not-well-formed");
-    const { warnings, onWarning } = collect();
+    const { warnings, onWarning: on_warning } = collect();
 
-    const imported = await fromXlsxWorkbook(zipSync(parts), { onWarning });
+    const imported = await fromXlsxWorkbook(zipSync(parts), { onWarning: on_warning });
 
     expect(imported.sheets[0]?.charts).toHaveLength(100);
     expect(warnings).toContainEqual(
@@ -386,19 +390,19 @@ describe("native XLSX charts", () => {
 
   it("reads series ranges written with lower-case column letters", async () => {
     const parts = unzipSync(await toXlsxWorkbook(authored()));
-    const expected = await fromXlsxWorkbook(withoutSidecar(zipSync(parts)));
-    const chartPart = "xl/charts/sheetwrite-chart1-1.xml";
-    parts[chartPart] = strToU8(
-      strFromU8(parts[chartPart] ?? new Uint8Array()).replace(
+    const expected = await fromXlsxWorkbook(without_sidecar(zipSync(parts)));
+    const chart_part = "xl/charts/sheetwrite-chart1-1.xml";
+    parts[chart_part] = strToU8(
+      strFromU8(parts[chart_part] ?? new Uint8Array()).replace(
         /<c:f>([^<]*)<\/c:f>/g,
         (_formula: string, source: string) =>
           `<c:f>${source.replace(/\$([A-Z]{1,3})\$/g, (column: string) => column.toLowerCase())}</c:f>`,
       ),
     );
 
-    const imported = await fromXlsxWorkbook(withoutSidecar(zipSync(parts)));
+    const imported = await fromXlsxWorkbook(without_sidecar(zipSync(parts)));
 
-    expect(strFromU8(parts[chartPart] ?? new Uint8Array())).toMatch(/<c:f>[^<]*\$[a-z]+\$/);
+    expect(strFromU8(parts[chart_part] ?? new Uint8Array())).toMatch(/<c:f>[^<]*\$[a-z]+\$/);
     expect(imported.sheets[0]?.charts?.[0]?.series).toEqual(
       expected.sheets[0]?.charts?.[0]?.series ?? [],
     );

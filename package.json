@@ -30,6 +30,7 @@
     "docs:check": "bun scripts/docs-cli.ts check",
     "docs:prepare-deployment": "bun scripts/prepare-docs-deployment.ts",
     "check:cycles": "bun scripts/check-import-cycles.ts",
+    "naming:check": "bun scripts/snake-case-internals.ts check",
     "audit:js": "bun scripts/dependency-audit.ts",
     "browser:install": "playwright install --with-deps chromium firefox webkit",
     "build:wasm": "bun run --filter '@sheetwrite/wasm' build",

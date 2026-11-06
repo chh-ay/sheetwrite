@@ -216,7 +216,7 @@ interface ReaderResourceUsage {
   merges: number;
 }
 
-function readerFailure(message: string): never {
+function reader_failure(message: string): never {
   throw new TypeError(boundedErrorText(`Sheetwrite: invalid XLSX workbook: ${message}`));
 }
 
@@ -225,42 +225,42 @@ function readerFailure(message: string): never {
  * numbers and booleans. Every styled output cell needs its own copy, and this
  * is much cheaper than `structuredClone` for such small records.
  */
-function copyStyleData(source: unknown): unknown {
+function copy_style_data(source: unknown): unknown {
   if (source === null || typeof source !== "object") return source;
-  if (Array.isArray(source)) return source.map(copyStyleData);
+  if (Array.isArray(source)) return source.map(copy_style_data);
   const copy: Record<string, unknown> = {};
   for (const key in source) {
-    if (Object.hasOwn(source, key)) copy[key] = copyStyleData(Reflect.get(source, key));
+    if (Object.hasOwn(source, key)) copy[key] = copy_style_data(Reflect.get(source, key));
   }
   return copy;
 }
 
-function displayText(element: XmlElement): string {
+function display_text(element: XmlElement): string {
   if (xmlLocalName(element.name) === "t") return decodeXstring(element.text);
   let text = "";
   for (const child of element.children) {
-    const localName = xmlLocalName(child.name);
-    if (localName === "t") text += decodeXstring(child.text);
-    else if (localName === "r") {
-      for (const runText of xmlChildren(child, "t")) text += decodeXstring(runText.text);
+    const local_name = xmlLocalName(child.name);
+    if (local_name === "t") text += decodeXstring(child.text);
+    else if (local_name === "r") {
+      for (const run_text of xmlChildren(child, "t")) text += decodeXstring(run_text.text);
     }
   }
   return text;
 }
 
-function parseUnsigned(value: string | undefined, description: string): number {
+function parse_unsigned(value: string | undefined, description: string): number {
   const text = value?.trim() ?? "";
-  if (!/^\d+$/.test(text)) return readerFailure(`${description} is invalid`);
+  if (!/^\d+$/.test(text)) return reader_failure(`${description} is invalid`);
   const parsed = Number(text);
-  if (!Number.isSafeInteger(parsed)) return readerFailure(`${description} is invalid`);
+  if (!Number.isSafeInteger(parsed)) return reader_failure(`${description} is invalid`);
   return parsed;
 }
 
-function parseRange(value: string): MergeRange {
-  return parseCellRect(value) ?? readerFailure(`range ${value} is invalid`);
+function parse_range(value: string): MergeRange {
+  return parseCellRect(value) ?? reader_failure(`range ${value} is invalid`);
 }
 
-function uniqueSheetId(name: string, order: number, used: Set<string>): string {
+function unique_sheet_id(name: string, order: number, used: Set<string>): string {
   const stem =
     name
       .toLowerCase()
@@ -281,7 +281,7 @@ function uniqueSheetId(name: string, order: number, used: Set<string>): string {
  * each sheet ID is claimed at most once, so a sheet inserted before a known
  * sheet gets a new identity.
  */
-function claimSidecarSheets(
+function claim_sidecar_sheets(
   sources: readonly ParsedSheet[],
   metadata: WorkbookSnapshot | null,
   context: XlsxCodecContext,
@@ -289,10 +289,10 @@ function claimSidecarSheets(
   const claims: (SheetSnapshot | undefined)[] = sources.map(() => undefined);
   if (!metadata) return claims;
 
-  const claimedIds = new Set<string>();
+  const claimed_ids = new Set<string>();
   const claim = (order: number, meta: SheetSnapshot | undefined): boolean => {
-    if (!meta || claimedIds.has(meta.id)) return false;
-    claimedIds.add(meta.id);
+    if (!meta || claimed_ids.has(meta.id)) return false;
+    claimed_ids.add(meta.id);
     claims[order] = meta;
     return true;
   };
@@ -320,7 +320,7 @@ function claimSidecarSheets(
 }
 
 /** Group each sheet's shared-formula cells under their master. */
-function sharedFormulaGroups(
+function shared_formula_groups(
   pending: readonly PendingSharedFormula[],
   masters: ReadonlyMap<string, SharedFormulaMaster>,
   sheet: string,
@@ -331,7 +331,7 @@ function sharedFormulaGroups(
     if (!group) {
       const master = masters.get(member.index);
       if (!master) {
-        return readerFailure(`shared formula ${member.index} at ${member.address} has no master`);
+        return reader_failure(`shared formula ${member.index} at ${member.address} has no master`);
       }
 
       group = { sheet, formula: master.formula, row: master.row, col: master.col, members: [] };
@@ -342,61 +342,61 @@ function sharedFormulaGroups(
   return [...groups.values()];
 }
 
-function parseSharedStrings(
-  packageFile: OpcPackage,
+function parse_shared_strings(
+  package_file: OpcPackage,
   part: string | undefined,
   context: XlsxCodecContext,
 ): string[] {
   if (!part) return [];
   const strings: string[] = [];
-  let warnedRichText = false;
-  let warnedPhonetic = false;
-  const processItem = (item: XmlElement): void => {
+  let warned_rich_text = false;
+  let warned_phonetic = false;
+  const process_item = (item: XmlElement): void => {
     assertResource(context, "maxSharedStrings", strings.length + 1);
-    const richRuns = xmlChildren(item, "r");
-    if (richRuns.length > 0 && !warnedRichText) {
-      warnedRichText = true;
+    const rich_runs = xmlChildren(item, "r");
+    if (rich_runs.length > 0 && !warned_rich_text) {
+      warned_rich_text = true;
       emitWarning(context, {
         code: "rich-text",
         message: "Rich text formatting was flattened",
         part,
       });
     }
-    if (!warnedPhonetic && (xmlChildren(item, "rPh").length > 0 || xmlChild(item, "phoneticPr"))) {
-      warnedPhonetic = true;
+    if (!warned_phonetic && (xmlChildren(item, "rPh").length > 0 || xmlChild(item, "phoneticPr"))) {
+      warned_phonetic = true;
       emitWarning(context, {
         code: "rich-text",
         message: "Phonetic guide text was omitted from the displayed shared string",
         part,
       });
     }
-    strings.push(displayText(item));
+    strings.push(display_text(item));
   };
   const name = normalizePartName(part);
-  const root = parseXml(packageFile.read(name), name, context, {
+  const root = parseXml(package_file.read(name), name, context, {
     parent: "sst",
     parentIsRoot: true,
-    shouldStream: (rootElement) => xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
+    shouldStream: (root_element) => xmlRootMatches(root_element, "sst", MAIN_NAMESPACES),
     // The tree path reads only `si` children; other children are skipped alike.
     child: (item) => {
-      if (xmlLocalName(item.name) === "si") processItem(item);
+      if (xmlLocalName(item.name) === "si") process_item(item);
     },
   });
   assertXmlRoot(root, "sst", MAIN_NAMESPACES, part);
   return strings;
 }
 
-function literalFromCell(
+function literal_from_cell(
   cell: XmlElement,
   type: string | undefined,
-  sharedStrings: readonly string[],
+  shared_strings: readonly string[],
   style: ParsedCellStyle,
   context: XlsxCodecContext,
   sheet: string,
   address: string,
   date1904: boolean,
 ): CellValue | null {
-  const valueText = xmlChild(cell, "v")?.text ?? "";
+  const value_text = xmlChild(cell, "v")?.text ?? "";
   if (type === "inlineStr") {
     const inline = xmlChild(cell, "is") ?? cell;
     if (xmlChildren(inline, "r").length > 0) {
@@ -415,20 +415,21 @@ function literalFromCell(
         cell: address,
       });
     }
-    return { kind: "literal", value: displayText(inline) };
+    return { kind: "literal", value: display_text(inline) };
   }
   if (type === "s") {
-    const index = parseUnsigned(valueText, `shared string index at ${address}`);
-    const value = sharedStrings[index];
+    const index = parse_unsigned(value_text, `shared string index at ${address}`);
+    const value = shared_strings[index];
     if (value === undefined)
-      return readerFailure(`shared string index ${index} at ${address} is out of range`);
+      return reader_failure(`shared string index ${index} at ${address} is out of range`);
     return { kind: "literal", value };
   }
-  if (type === "str") return { kind: "literal", value: decodeXstring(valueText) };
+  if (type === "str") return { kind: "literal", value: decodeXstring(value_text) };
   if (type === "b")
-    return { kind: "literal", value: valueText === "1" || valueText.toLowerCase() === "true" };
+    return { kind: "literal", value: value_text === "1" || value_text.toLowerCase() === "true" };
   if (type === "d") {
-    const serial = isoDateSerial(valueText) ?? readerFailure(`date value at ${address} is invalid`);
+    const serial =
+      isoDateSerial(value_text) ?? reader_failure(`date value at ${address} is invalid`);
     return { kind: "literal", value: serial };
   }
   if (type === "e") {
@@ -438,15 +439,15 @@ function literalFromCell(
       sheet,
       cell: address,
     });
-    return { kind: "literal", value: valueText };
+    return { kind: "literal", value: value_text };
   }
-  if (valueText === "") return style.style ? { kind: "literal", value: null } : null;
-  const number = Number(valueText);
-  if (!Number.isFinite(number)) return readerFailure(`numeric value at ${address} is invalid`);
+  if (value_text === "") return style.style ? { kind: "literal", value: null } : null;
+  const number = Number(value_text);
+  if (!Number.isFinite(number)) return reader_failure(`numeric value at ${address} is invalid`);
   return { kind: "literal", value: style.date && date1904 ? number + 1462 : number };
 }
 
-function parseValidation(
+function parse_validation(
   element: XmlElement,
   context: XlsxCodecContext,
   sheet: string,
@@ -526,7 +527,7 @@ function parseValidation(
       });
       return [];
     }
-    const textLengthOperandValid =
+    const text_length_operand_valid =
       comparison === undefined
         ? (bounds.min === undefined || (Number.isSafeInteger(bounds.min) && bounds.min >= 0)) &&
           (bounds.max === undefined || (Number.isSafeInteger(bounds.max) && bounds.max >= 0))
@@ -536,7 +537,7 @@ function parseValidation(
             comparison.min >= 0 &&
             Number.isSafeInteger(comparison.max) &&
             comparison.max >= 0;
-    if (type === "textLength" && !textLengthOperandValid) {
+    if (type === "textLength" && !text_length_operand_valid) {
       emitWarning(context, {
         code: "validation-loss",
         message: "Non-integer or negative text-length validation was dropped",
@@ -544,15 +545,15 @@ function parseValidation(
       });
       return [];
     }
-    const comparisonFields = comparison === undefined ? bounds : { comparison };
+    const comparison_fields = comparison === undefined ? bounds : { comparison };
     condition =
       type === "date"
-        ? { kind: "date", ...comparisonFields }
+        ? { kind: "date", ...comparison_fields }
         : type === "textLength"
-          ? { kind: "textLength", ...comparisonFields }
+          ? { kind: "textLength", ...comparison_fields }
           : {
               kind: "number",
-              ...comparisonFields,
+              ...comparison_fields,
               ...(type === "whole" ? { integer: true } : {}),
             };
   }
@@ -564,16 +565,16 @@ function parseValidation(
     });
     return [];
   }
-  const showError = xmlBoolean(xmlAttribute(element, "showErrorMessage"));
-  const errorStyle = xmlAttribute(element, "errorStyle") ?? "stop";
-  const policy: DataValidationRule["policy"] = !showError
+  const show_error = xmlBoolean(xmlAttribute(element, "showErrorMessage"));
+  const error_style = xmlAttribute(element, "errorStyle") ?? "stop";
+  const policy: DataValidationRule["policy"] = !show_error
     ? "allow"
-    : errorStyle === "stop"
+    : error_style === "stop"
       ? "reject"
       : "warn";
   const prompt = xmlAttribute(element, "prompt");
   const error = xmlAttribute(element, "error");
-  let helpText = prompt ?? error;
+  let help_text = prompt ?? error;
   if (prompt !== undefined && error !== undefined && prompt !== error) {
     emitWarning(context, {
       code: "validation-loss",
@@ -581,27 +582,27 @@ function parseValidation(
       sheet,
     });
   }
-  if (helpText && Array.from(helpText).length > 255) {
+  if (help_text && Array.from(help_text).length > 255) {
     emitWarning(context, {
       code: "validation-loss",
       message: "Excel validation prompt/error exceeded 255 characters and was dropped",
       sheet,
     });
-    helpText = undefined;
+    help_text = undefined;
   }
-  return ranges.map((rangeText) => {
-    const range = parseRange(rangeText);
+  return ranges.map((range_text) => {
+    const range = parse_range(range_text);
     return {
       range: { start: { row: range.r0, col: range.c0 }, end: { row: range.r1, col: range.c1 } },
       condition: structuredClone(condition),
       policy,
       allowBlank: xmlBoolean(xmlAttribute(element, "allowBlank")),
-      ...(helpText ? { helpText: decodeXstring(helpText) } : {}),
+      ...(help_text ? { helpText: decodeXstring(help_text) } : {}),
     };
   });
 }
 
-function conditionalScalar(formula: string | undefined): CellScalar | undefined {
+function conditional_scalar(formula: string | undefined): CellScalar | undefined {
   if (formula === undefined) return undefined;
   const value = formula.trim();
   if (/^TRUE$/i.test(value)) return true;
@@ -613,37 +614,37 @@ function conditionalScalar(formula: string | undefined): CellScalar | undefined 
   return Number.isFinite(numeric) ? numeric : undefined;
 }
 
-function parseConditionalFormats(
+function parse_conditional_formats(
   root: XmlElement,
   styles: ParsedStyles,
   sheet: string,
   context: XlsxCodecContext,
 ): ConditionalFormatRule[] {
   const parsed: { priority: number; order: number; rule: ConditionalFormatRule }[] = [];
-  let sourceOrder = 0;
+  let source_order = 0;
   const dropped = (message: string): void =>
     emitWarning(context, { code: "format-loss", message, sheet });
   for (const collection of xmlChildren(root, "conditionalFormatting")) {
     const ranges = (xmlAttribute(collection, "sqref") ?? "").trim().split(/\s+/).filter(Boolean);
     for (const element of xmlChildren(collection, "cfRule")) {
-      const order = sourceOrder++;
+      const order = source_order++;
       const type = xmlAttribute(element, "type") ?? "(missing)";
       if (type === "colorScale" || type === "dataBar" || type === "iconSet") {
         dropped(`Excel conditional-format rule type ${type} is unsupported and was dropped`);
         continue;
       }
-      const rawPriority = xmlAttribute(element, "priority");
-      const priority = rawPriority === undefined ? Number.MAX_SAFE_INTEGER : Number(rawPriority);
+      const raw_priority = xmlAttribute(element, "priority");
+      const priority = raw_priority === undefined ? Number.MAX_SAFE_INTEGER : Number(raw_priority);
       if (!Number.isSafeInteger(priority) || priority < 0) {
         dropped("Excel conditional-format rule has an invalid priority and was dropped");
         continue;
       }
       const operator = xmlAttribute(element, "operator");
-      const rawFormula = xmlChild(element, "formula")?.text;
-      const formula = rawFormula === undefined ? undefined : decodeXstring(rawFormula.trim());
+      const raw_formula = xmlChild(element, "formula")?.text;
+      const formula = raw_formula === undefined ? undefined : decodeXstring(raw_formula.trim());
       let when: ConditionalFormatPredicate | undefined;
       if (type === "cellIs") {
-        const value = conditionalScalar(formula);
+        const value = conditional_scalar(formula);
         if (value !== undefined) {
           when =
             operator === "greaterThan" && typeof value === "number"
@@ -683,20 +684,20 @@ function parseConditionalFormats(
         dropped("External-data conditional-format formula was dropped");
         continue;
       }
-      const rawDxf = xmlAttribute(element, "dxfId");
+      const raw_dxf = xmlAttribute(element, "dxfId");
       const differential =
-        rawDxf !== undefined && /^\d+$/.test(rawDxf)
-          ? styles.differentialAt(Number(rawDxf))
+        raw_dxf !== undefined && /^\d+$/.test(raw_dxf)
+          ? styles.differentialAt(Number(raw_dxf))
           : undefined;
-      if (rawDxf !== undefined && !differential) {
+      if (raw_dxf !== undefined && !differential) {
         dropped(
           `Excel conditional-format rule type ${type} has an invalid differential style and was dropped`,
         );
         continue;
       }
       const style: CellStyle = differential ?? {};
-      for (const rangeText of ranges) {
-        const range = parseRange(rangeText);
+      for (const range_text of ranges) {
+        const range = parse_range(range_text);
         parsed.push({
           priority,
           order,
@@ -724,34 +725,34 @@ function parseConditionalFormats(
   return parsed.map((entry) => entry.rule);
 }
 
-function xmlHasDescendant(element: XmlElement, localName: string): boolean {
+function xml_has_descendant(element: XmlElement, local_name: string): boolean {
   return element.children.some(
-    (child) => xmlLocalName(child.name) === localName || xmlHasDescendant(child, localName),
+    (child) => xmlLocalName(child.name) === local_name || xml_has_descendant(child, local_name),
   );
 }
 
-function parseHyperlinkLocation(
+function parse_hyperlink_location(
   value: string,
-  currentSheet: string,
+  current_sheet: string,
 ): { sheetName: string; range: Omit<CellHyperlink["range"], "sheet"> } | null {
   const location = decodeXstring(value).replace(/^#/, "");
   const separator = location.lastIndexOf("!");
-  let sheetName = currentSheet;
-  let rangeText = location;
+  let sheet_name = current_sheet;
+  let range_text = location;
   if (separator >= 0) {
-    const rawSheet = location.slice(0, separator);
-    rangeText = location.slice(separator + 1);
-    if (rawSheet.startsWith("'") && rawSheet.endsWith("'")) {
-      sheetName = rawSheet.slice(1, -1).replaceAll("''", "'");
+    const raw_sheet = location.slice(0, separator);
+    range_text = location.slice(separator + 1);
+    if (raw_sheet.startsWith("'") && raw_sheet.endsWith("'")) {
+      sheet_name = raw_sheet.slice(1, -1).replaceAll("''", "'");
     } else {
-      sheetName = rawSheet;
+      sheet_name = raw_sheet;
     }
   }
-  if (!sheetName || !rangeText) return null;
+  if (!sheet_name || !range_text) return null;
   try {
-    const parsed = parseRange(rangeText.replaceAll("$", ""));
+    const parsed = parse_range(range_text.replaceAll("$", ""));
     return {
-      sheetName,
+      sheetName: sheet_name,
       range: {
         start: { row: parsed.r0, col: parsed.c0 },
         end: { row: parsed.r1, col: parsed.c1 },
@@ -764,7 +765,7 @@ function parseHyperlinkLocation(
   }
 }
 
-function parseHyperlinks(
+function parse_hyperlinks(
   collection: XmlElement | undefined,
   relationships: readonly OpcRelationship[],
   sheet: string,
@@ -782,13 +783,13 @@ function parseHyperlinks(
   const result: ParsedHyperlink[] = [];
   for (const element of elements.slice(0, MAX_HYPERLINKS_PER_SHEET)) {
     const reference = xmlAttribute(element, "ref");
-    if (!reference) return readerFailure(`hyperlink in ${sheet} has no source range`);
-    const source = parseRange(reference);
+    if (!reference) return reader_failure(`hyperlink in ${sheet} has no source range`);
+    const source = parse_range(reference);
     const range = {
       start: { row: source.r0, col: source.c0 },
       end: { row: source.r1, col: source.c1 },
     };
-    const relationshipId = xmlAttribute(element, "id");
+    const relationship_id = xmlAttribute(element, "id");
     const location = xmlAttribute(element, "location");
     const display = xmlAttribute(element, "display");
     if (display !== undefined && display.length > MAX_HYPERLINK_DISPLAY_LENGTH) {
@@ -808,7 +809,7 @@ function parseHyperlinks(
         cell: reference,
       });
     }
-    if (relationshipId && location) {
+    if (relationship_id && location) {
       emitWarning(context, {
         code: "hyperlink",
         message: "Hyperlink combined relationship and location is unsupported and was dropped",
@@ -817,10 +818,10 @@ function parseHyperlinks(
       });
       continue;
     }
-    if (relationshipId) {
-      const relationship = relationships.find((candidate) => candidate.id === relationshipId);
+    if (relationship_id) {
+      const relationship = relationships.find((candidate) => candidate.id === relationship_id);
       if (!relationship || !relationshipTypeMatches(relationship.type, "hyperlink")) {
-        return readerFailure(`hyperlink relationship ${relationshipId} in ${sheet} is invalid`);
+        return reader_failure(`hyperlink relationship ${relationship_id} in ${sheet} is invalid`);
       }
       if (!relationship.external) {
         emitWarning(context, {
@@ -850,7 +851,7 @@ function parseHyperlinks(
       continue;
     }
     if (location) {
-      const target = parseHyperlinkLocation(location, sheet);
+      const target = parse_hyperlink_location(location, sheet);
       if (!target) {
         emitWarning(context, {
           code: "hyperlink",
@@ -881,29 +882,29 @@ function parseHyperlinks(
  * The worksheet `sortState`. Excel writes it after a sort whose cells it
  * already moved, so it is kept for export and not applied as a view sort.
  */
-function parseSortState(
+function parse_sort_state(
   root: XmlElement,
   styles: ParsedStyles,
   context: XlsxCodecContext,
-  sheetName: string,
+  sheet_name: string,
 ): WorkbookTableXmlElement | undefined {
   const element = xmlChild(root, "sortState");
   if (!element) return undefined;
 
-  const rule = tableRuleMetadata(element, styles, { remaining: MAX_TABLE_RULE_NODES });
+  const rule = table_rule_metadata(element, styles, { remaining: MAX_TABLE_RULE_NODES });
   if (rule && validWorkbookTableXmlElement(rule, "sortState")) return rule;
 
   emitWarning(context, {
     code: "unsupported-feature",
     message: "Invalid or oversized worksheet sortState was dropped",
-    sheet: sheetName,
+    sheet: sheet_name,
   });
   return undefined;
 }
 
-function parseComments(
-  packageFile: OpcPackage,
-  sheetPart: string,
+function parse_comments(
+  package_file: OpcPackage,
+  sheet_part: string,
   relationships: readonly OpcRelationship[],
   context: XlsxCodecContext,
 ): { comments: { row: number; col: number; text: string }[]; present: boolean } {
@@ -911,15 +912,15 @@ function parseComments(
     (candidate) => relationshipTypeMatches(candidate.type, "comments") && !candidate.external,
   );
   if (!relationship) return { comments: [], present: false };
-  const root = packageFile.readXml(relationship.target);
+  const root = package_file.readXml(relationship.target);
   assertXmlRoot(root, "comments", MAIN_NAMESPACES, relationship.target);
   const list = xmlChild(root, "commentList");
   if (!list) return { comments: [], present: true };
   const comments = xmlChildren(list, "comment").map((comment) => {
     const reference = xmlAttribute(comment, "ref");
-    if (!reference) return readerFailure(`comment in ${sheetPart} has no cell reference`);
+    if (!reference) return reader_failure(`comment in ${sheet_part} has no cell reference`);
     const address =
-      parseCellReference(reference) ?? readerFailure(`cell reference ${reference} is invalid`);
+      parseCellReference(reference) ?? reader_failure(`cell reference ${reference} is invalid`);
     const text = xmlChild(comment, "text") ?? comment;
     if (xmlChildren(text, "r").length > 0) {
       emitWarning(context, {
@@ -929,7 +930,7 @@ function parseComments(
         cell: reference,
       });
     }
-    return { ...address, text: displayText(text) };
+    return { ...address, text: display_text(text) };
   });
   return { comments, present: true };
 }
@@ -941,24 +942,24 @@ function parseComments(
  * last to first and each column is claimed once, so overlapping full-width
  * declarations cost one pass over the columns, not one per declaration.
  */
-function lastColumnDeclarations(spans: readonly number[]): Int32Array {
-  let columnCount = 0;
+function last_column_declarations(spans: readonly number[]): Int32Array {
+  let column_count = 0;
   for (let at = 1; at < spans.length; at += 2) {
-    columnCount = Math.max(columnCount, (spans[at] ?? 0) + 1);
+    column_count = Math.max(column_count, (spans[at] ?? 0) + 1);
   }
 
-  const owners = new Int32Array(columnCount).fill(-1);
-  // `nextFree[col]` leads to the first unclaimed column at or after `col`.
-  const nextFree = Int32Array.from({ length: columnCount + 1 }, (_, col) => col);
-  const firstFree = (col: number): number => {
+  const owners = new Int32Array(column_count).fill(-1);
+  // `next_free[col]` leads to the first unclaimed column at or after `col`.
+  const next_free = Int32Array.from({ length: column_count + 1 }, (_, col) => col);
+  const first_free = (col: number): number => {
     let free = col;
-    while (nextFree[free] !== free) free = nextFree[free] ?? columnCount;
+    while (next_free[free] !== free) free = next_free[free] ?? column_count;
 
     // Point every column on the walked path at the answer, so no path is walked twice.
     let step = col;
     while (step !== free) {
-      const next = nextFree[step] ?? columnCount;
-      nextFree[step] = free;
+      const next = next_free[step] ?? column_count;
+      next_free[step] = free;
       step = next;
     }
     return free;
@@ -967,15 +968,15 @@ function lastColumnDeclarations(spans: readonly number[]): Int32Array {
   for (let declaration = spans.length / 2 - 1; declaration >= 0; declaration--) {
     const first = spans[declaration * 2] ?? 0;
     const last = spans[declaration * 2 + 1] ?? -1;
-    for (let col = firstFree(first); col <= last; col = firstFree(col + 1)) {
+    for (let col = first_free(first); col <= last; col = first_free(col + 1)) {
       owners[col] = declaration;
-      nextFree[col] = col + 1;
+      next_free[col] = col + 1;
     }
   }
 
   return owners;
 }
-function parseColumns(
+function parse_columns(
   root: XmlElement,
   styles: ParsedStyles,
   context: XlsxCodecContext,
@@ -988,15 +989,15 @@ function parseColumns(
   const spans: number[] = [];
   const definitions: Partial<Column>[] = [];
   for (const element of xmlChildren(collection, "col")) {
-    const min = parseUnsigned(xmlAttribute(element, "min"), "column minimum");
-    const max = parseUnsigned(xmlAttribute(element, "max"), "column maximum");
-    if (min < 1 || max < min) return readerFailure("column range is invalid");
+    const min = parse_unsigned(xmlAttribute(element, "min"), "column minimum");
+    const max = parse_unsigned(xmlAttribute(element, "max"), "column maximum");
+    if (min < 1 || max < min) return reader_failure("column range is invalid");
     assertResource(context, "maxColumnsPerSheet", max);
-    const columnOutline = Number(xmlAttribute(element, "outlineLevel") ?? 0);
-    if (!Number.isInteger(columnOutline) || columnOutline < 0 || columnOutline > 7) {
-      return readerFailure("column outline level is invalid");
+    const column_outline = Number(xmlAttribute(element, "outlineLevel") ?? 0);
+    if (!Number.isInteger(column_outline) || column_outline < 0 || column_outline > 7) {
+      return reader_failure("column outline level is invalid");
     }
-    if (columnOutline > 0 || xmlBoolean(xmlAttribute(element, "collapsed"))) {
+    if (column_outline > 0 || xmlBoolean(xmlAttribute(element, "collapsed"))) {
       emitWarning(context, {
         code: "unsupported-feature",
         message:
@@ -1004,13 +1005,15 @@ function parseColumns(
         part,
       });
     }
-    const widthText = xmlAttribute(element, "width");
-    const widthChars = widthText === undefined ? undefined : Number(widthText);
-    if (widthChars !== undefined && (!Number.isFinite(widthChars) || widthChars <= 0)) {
-      return readerFailure("column width is invalid");
+    const width_text = xmlAttribute(element, "width");
+    const width_chars = width_text === undefined ? undefined : Number(width_text);
+    if (width_chars !== undefined && (!Number.isFinite(width_chars) || width_chars <= 0)) {
+      return reader_failure("column width is invalid");
     }
-    const styleText = xmlAttribute(element, "style");
-    const style = styles.at(styleText === undefined ? 0 : parseUnsigned(styleText, "column style"));
+    const style_text = xmlAttribute(element, "style");
+    const style = styles.at(
+      style_text === undefined ? 0 : parse_unsigned(style_text, "column style"),
+    );
     const type: Column["type"] | undefined = style?.date
       ? "date"
       : style?.numberFormat
@@ -1020,7 +1023,7 @@ function parseColumns(
         : undefined;
     spans.push(min - 1, max - 1);
     definitions.push({
-      ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
+      ...(width_chars !== undefined ? { width: columnWidthPixels(width_chars) } : {}),
       ...(xmlAttribute(element, "hidden") !== undefined
         ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
         : {}),
@@ -1031,7 +1034,7 @@ function parseColumns(
   }
 
   // Readers copy a definition before they change it, so columns of one declaration share it.
-  lastColumnDeclarations(spans).forEach((declaration, col) => {
+  last_column_declarations(spans).forEach((declaration, col) => {
     const definition = definitions[declaration];
     if (definition) columns.set(col, definition);
   });
@@ -1058,7 +1061,7 @@ const TABLE_TOTALS_FUNCTIONS: readonly WorkbookTableTotalsFunction[] = [
  * Returns null for a rule that cannot be kept (too deep, too large, or a
  * missing style), so the caller drops only that rule instead of the workbook.
  */
-function tableRuleMetadata(
+function table_rule_metadata(
   element: XmlElement,
   styles: ParsedStyles,
   budget: { remaining: number },
@@ -1066,7 +1069,7 @@ function tableRuleMetadata(
 ): WorkbookTableXmlElement | null {
   if (depth > MAX_TABLE_RULE_DEPTH || --budget.remaining < 0) return null;
   const attributes: Record<string, string> = {};
-  let differentialStyle: CellStyle | undefined;
+  let differential_style: CellStyle | undefined;
   for (const [name, value] of Object.entries(element.attributes)) {
     // Prefixed attributes (xmlns, xr:uid revision ids, other mc:Ignorable
     // namespaces) carry no rule meaning and are not part of the persisted subset.
@@ -1077,12 +1080,12 @@ function tableRuleMetadata(
     }
     const index = Number(value);
     if (!Number.isSafeInteger(index) || index < 0) return null;
-    differentialStyle = styles.differentialAt(index);
-    if (!differentialStyle) return null;
+    differential_style = styles.differentialAt(index);
+    if (!differential_style) return null;
   }
   const children: WorkbookTableXmlElement[] = [];
   for (const child of element.children) {
-    const copied = tableRuleMetadata(child, styles, budget, depth + 1);
+    const copied = table_rule_metadata(child, styles, budget, depth + 1);
     if (!copied) return null;
     children.push(copied);
   }
@@ -1091,186 +1094,197 @@ function tableRuleMetadata(
     attributes,
     text: element.text,
     children,
-    ...(differentialStyle ? { differentialStyle } : {}),
+    ...(differential_style ? { differentialStyle: differential_style } : {}),
   };
 }
 
-function parseTables(
-  packageFile: OpcPackage,
-  worksheetRoot: XmlElement,
+function parse_tables(
+  package_file: OpcPackage,
+  worksheet_root: XmlElement,
   relationships: readonly OpcRelationship[],
-  sheetName: string,
+  sheet_name: string,
   context: XlsxCodecContext,
   styles: ParsedStyles,
 ): ParsedSheet["tables"] {
-  const collection = xmlChild(worksheetRoot, "tableParts");
+  const collection = xmlChild(worksheet_root, "tableParts");
   if (!collection) return [];
   const parts = xmlChildren(collection, "tablePart");
   if (parts.length > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
-    return readerFailure(
-      `worksheet ${sheetName} exceeds the workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables}`,
+    return reader_failure(
+      `worksheet ${sheet_name} exceeds the workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables}`,
     );
   }
   const tables: ParsedSheet["tables"] = [];
-  for (const partElement of parts) {
-    const relationshipId = xmlAttribute(partElement, "id");
-    if (!relationshipId) return readerFailure(`tablePart in ${sheetName} has no relationship`);
-    const relationship = relationships.find((candidate) => candidate.id === relationshipId);
+  for (const part_element of parts) {
+    const relationship_id = xmlAttribute(part_element, "id");
+    if (!relationship_id) return reader_failure(`tablePart in ${sheet_name} has no relationship`);
+    const relationship = relationships.find((candidate) => candidate.id === relationship_id);
     if (
       !relationship ||
       relationship.external ||
       !relationshipTypeMatches(relationship.type, "table")
     ) {
-      return readerFailure(`tablePart relationship ${relationshipId} in ${sheetName} is invalid`);
+      return reader_failure(
+        `tablePart relationship ${relationship_id} in ${sheet_name} is invalid`,
+      );
     }
-    const root = packageFile.readXml(relationship.target);
+    const root = package_file.readXml(relationship.target);
     assertXmlRoot(root, "table", MAIN_NAMESPACES, relationship.target);
-    const nativeId = parseUnsigned(xmlAttribute(root, "id"), "table id");
-    if (nativeId < 1) return readerFailure(`table id in ${relationship.target} is invalid`);
-    const rawName = xmlAttribute(root, "displayName") ?? xmlAttribute(root, "name");
-    if (!rawName) return readerFailure(`table name in ${relationship.target} is missing`);
-    const nameResult = validateWorkbookTableName(decodeXstring(rawName));
-    if (!nameResult.ok) {
-      return readerFailure(`table name ${JSON.stringify(rawName)} is invalid (${nameResult.code})`);
+    const native_id = parse_unsigned(xmlAttribute(root, "id"), "table id");
+    if (native_id < 1) return reader_failure(`table id in ${relationship.target} is invalid`);
+    const raw_name = xmlAttribute(root, "displayName") ?? xmlAttribute(root, "name");
+    if (!raw_name) return reader_failure(`table name in ${relationship.target} is missing`);
+    const name_result = validateWorkbookTableName(decodeXstring(raw_name));
+    if (!name_result.ok) {
+      return reader_failure(
+        `table name ${JSON.stringify(raw_name)} is invalid (${name_result.code})`,
+      );
     }
     const ref = xmlAttribute(root, "ref");
-    if (!ref) return readerFailure(`table range in ${relationship.target} is missing`);
-    const parsed = parseRange(ref);
+    if (!ref) return reader_failure(`table range in ${relationship.target} is missing`);
+    const parsed = parse_range(ref);
     assertResource(context, "maxRowsPerSheet", parsed.r1 + 1);
     assertResource(context, "maxColumnsPerSheet", parsed.c1 + 1);
-    const headerCount = xmlAttribute(root, "headerRowCount");
-    const totalsCount = xmlAttribute(root, "totalsRowCount");
-    const headerRow =
-      headerCount === undefined || parseUnsigned(headerCount, "header row count") === 1;
-    const totalsRow =
-      totalsCount !== undefined && parseUnsigned(totalsCount, "totals row count") === 1;
+    const header_count = xmlAttribute(root, "headerRowCount");
+    const totals_count = xmlAttribute(root, "totalsRowCount");
+    const header_row =
+      header_count === undefined || parse_unsigned(header_count, "header row count") === 1;
+    const totals_row =
+      totals_count !== undefined && parse_unsigned(totals_count, "totals row count") === 1;
     if (
-      (headerCount !== undefined && !["0", "1"].includes(headerCount)) ||
-      (totalsCount !== undefined && !["0", "1"].includes(totalsCount))
+      (header_count !== undefined && !["0", "1"].includes(header_count)) ||
+      (totals_count !== undefined && !["0", "1"].includes(totals_count))
     ) {
-      return readerFailure(
+      return reader_failure(
         `table row metadata in ${relationship.target} exceeds the supported subset`,
       );
     }
-    const columnCollection = xmlChild(root, "tableColumns");
-    if (!columnCollection)
-      return readerFailure(`table columns in ${relationship.target} are missing`);
-    const declaredCount = parseUnsigned(
-      xmlAttribute(columnCollection, "count"),
+    const column_collection = xmlChild(root, "tableColumns");
+    if (!column_collection)
+      return reader_failure(`table columns in ${relationship.target} are missing`);
+    const declared_count = parse_unsigned(
+      xmlAttribute(column_collection, "count"),
       "table column count",
     );
-    if (declaredCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable) {
-      return readerFailure(
-        `table ${nameResult.name} exceeds the column limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable}`,
+    if (declared_count > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable) {
+      return reader_failure(
+        `table ${name_result.name} exceeds the column limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable}`,
       );
     }
-    const columnElements = xmlChildren(columnCollection, "tableColumn");
-    if (columnElements.length !== declaredCount || parsed.c1 - parsed.c0 + 1 !== declaredCount) {
-      return readerFailure(`table ${nameResult.name} column count does not match its range`);
+    const column_elements = xmlChildren(column_collection, "tableColumn");
+    if (column_elements.length !== declared_count || parsed.c1 - parsed.c0 + 1 !== declared_count) {
+      return reader_failure(`table ${name_result.name} column count does not match its range`);
     }
     const unsupported = new Set<WorkbookTableUnsupportedFeature>();
     // One budget per table, matching the aggregate limit core validation applies.
-    const copyBudget = { remaining: MAX_TABLE_RULE_NODES };
-    const validationBudget = { nodes: 0, characters: 0 };
-    const readRule = (
+    const copy_budget = { remaining: MAX_TABLE_RULE_NODES };
+    const validation_budget = { nodes: 0, characters: 0 };
+    const read_rule = (
       element: XmlElement | undefined,
       feature: WorkbookTableUnsupportedFeature,
     ): WorkbookTableXmlElement | undefined => {
       if (!element) return undefined;
       const name = xmlLocalName(element.name);
-      const rule = tableRuleMetadata(element, styles, copyBudget);
+      const rule = table_rule_metadata(element, styles, copy_budget);
       if (
         !rule ||
         (name.endsWith("Formula") && formulaContainsExternalReference(decodeXstring(rule.text))) ||
-        !validWorkbookTableXmlElement(rule, name, validationBudget)
+        !validWorkbookTableXmlElement(rule, name, validation_budget)
       ) {
         unsupported.add(feature);
         emitWarning(context, {
           code: "unsupported-feature",
-          message: `Invalid, oversized, external-data or unsupported ${name} rule on table ${nameResult.name} was dropped`,
-          sheet: sheetName,
+          message: `Invalid, oversized, external-data or unsupported ${name} rule on table ${name_result.name} was dropped`,
+          sheet: sheet_name,
           part: relationship.target,
         });
         return undefined;
       }
       return rule;
     };
-    const columns = columnElements.map((column, index) => {
-      const id = parseUnsigned(xmlAttribute(column, "id"), "table column id");
+    const columns = column_elements.map((column, index) => {
+      const id = parse_unsigned(xmlAttribute(column, "id"), "table column id");
       const name = xmlAttribute(column, "name");
-      if (id < 1 || !name) return readerFailure(`table column ${index + 1} is invalid`);
-      const totalsRowLabel = xmlAttribute(column, "totalsRowLabel");
-      const calculatedColumnFormula = readRule(
+      if (id < 1 || !name) return reader_failure(`table column ${index + 1} is invalid`);
+      const totals_row_label = xmlAttribute(column, "totalsRowLabel");
+      const calculated_column_formula = read_rule(
         xmlChild(column, "calculatedColumnFormula"),
         "calculated-columns",
       );
-      const totalsRowFormula = readRule(xmlChild(column, "totalsRowFormula"), "totals-functions");
-      const rawTotalsFunction = xmlAttribute(column, "totalsRowFunction");
-      const totalsRowFunction = TABLE_TOTALS_FUNCTIONS.find(
-        (candidate) => candidate === rawTotalsFunction,
+      const totals_row_formula = read_rule(
+        xmlChild(column, "totalsRowFormula"),
+        "totals-functions",
       );
-      if (rawTotalsFunction !== undefined && totalsRowFunction === undefined) {
-        return readerFailure(`table column ${index + 1} has an invalid totals-row function`);
+      const raw_totals_function = xmlAttribute(column, "totalsRowFunction");
+      const totals_row_function = TABLE_TOTALS_FUNCTIONS.find(
+        (candidate) => candidate === raw_totals_function,
+      );
+      if (raw_totals_function !== undefined && totals_row_function === undefined) {
+        return reader_failure(`table column ${index + 1} has an invalid totals-row function`);
       }
       return {
-        id: `xlsx-table-${nativeId}-column-${id}`,
+        id: `xlsx-table-${native_id}-column-${id}`,
         name: decodeXstring(name),
-        ...(totalsRowLabel !== undefined ? { totalsRowLabel: decodeXstring(totalsRowLabel) } : {}),
-        ...(calculatedColumnFormula ? { calculatedColumnFormula } : {}),
-        ...(totalsRowFormula ? { totalsRowFormula } : {}),
-        ...(totalsRowFunction !== undefined &&
-        !(xmlChild(column, "totalsRowFormula") && !totalsRowFormula)
-          ? { totalsRowFunction }
+        ...(totals_row_label !== undefined
+          ? { totalsRowLabel: decodeXstring(totals_row_label) }
+          : {}),
+        ...(calculated_column_formula
+          ? { calculatedColumnFormula: calculated_column_formula }
+          : {}),
+        ...(totals_row_formula ? { totalsRowFormula: totals_row_formula } : {}),
+        ...(totals_row_function !== undefined &&
+        !(xmlChild(column, "totalsRowFormula") && !totals_row_formula)
+          ? { totalsRowFunction: totals_row_function }
           : {}),
       };
     });
-    const markUnsupported = (feature: WorkbookTableUnsupportedFeature, detail: string): void => {
+    const mark_unsupported = (feature: WorkbookTableUnsupportedFeature, detail: string): void => {
       if (unsupported.has(feature)) return;
       unsupported.add(feature);
       emitWarning(context, {
         code: "unsupported-feature",
-        message: `${detail} was preserved as unsupported metadata on table ${nameResult.name} and was not activated`,
-        sheet: sheetName,
+        message: `${detail} was preserved as unsupported metadata on table ${name_result.name} and was not activated`,
+        sheet: sheet_name,
         part: relationship.target,
       });
     };
-    const autoFilter = readRule(xmlChild(root, "autoFilter"), "auto-filter");
-    const sortState = readRule(xmlChild(root, "sortState"), "sort-state");
-    if (columnElements.some((column) => xmlChild(column, "calculatedColumnFormulaArray"))) {
-      markUnsupported("calculated-columns", "Non-standard Excel table calculated-column arrays");
+    const auto_filter = read_rule(xmlChild(root, "autoFilter"), "auto-filter");
+    const sort_state = read_rule(xmlChild(root, "sortState"), "sort-state");
+    if (column_elements.some((column) => xmlChild(column, "calculatedColumnFormulaArray"))) {
+      mark_unsupported("calculated-columns", "Non-standard Excel table calculated-column arrays");
     }
     if (xmlAttribute(root, "connectionId") !== undefined) {
-      markUnsupported("external-data", "Excel table external-data binding");
+      mark_unsupported("external-data", "Excel table external-data binding");
     }
-    if (xmlChild(root, "extLst")) markUnsupported("extensions", "Excel table extensions");
-    const tableRelationships = packageFile.relationships(relationship.target);
+    if (xmlChild(root, "extLst")) mark_unsupported("extensions", "Excel table extensions");
+    const table_relationships = package_file.relationships(relationship.target);
     if (
-      tableRelationships.some((candidate) => relationshipTypeMatches(candidate.type, "queryTable"))
+      table_relationships.some((candidate) => relationshipTypeMatches(candidate.type, "queryTable"))
     ) {
-      markUnsupported("query-table", "Excel query-table binding");
+      mark_unsupported("query-table", "Excel query-table binding");
     }
-    const styleElement = xmlChild(root, "tableStyleInfo");
-    const styleName = styleElement ? xmlAttribute(styleElement, "name") : undefined;
+    const style_element = xmlChild(root, "tableStyleInfo");
+    const style_name = style_element ? xmlAttribute(style_element, "name") : undefined;
     tables.push({
-      id: `xlsx-table-${nativeId}`,
-      name: nameResult.name,
+      id: `xlsx-table-${native_id}`,
+      name: name_result.name,
       range: {
         start: { row: parsed.r0, col: parsed.c0 },
         end: { row: parsed.r1, col: parsed.c1 },
       },
       columns,
-      headerRow,
-      totalsRow,
-      ...(autoFilter ? { autoFilter } : {}),
-      ...(sortState ? { sortState } : {}),
-      ...(styleElement
+      headerRow: header_row,
+      totalsRow: totals_row,
+      ...(auto_filter ? { autoFilter: auto_filter } : {}),
+      ...(sort_state ? { sortState: sort_state } : {}),
+      ...(style_element
         ? {
             style: {
-              ...(styleName ? { name: decodeXstring(styleName) } : {}),
-              showFirstColumn: xmlBoolean(xmlAttribute(styleElement, "showFirstColumn")),
-              showLastColumn: xmlBoolean(xmlAttribute(styleElement, "showLastColumn")),
-              showRowStripes: xmlBoolean(xmlAttribute(styleElement, "showRowStripes")),
-              showColumnStripes: xmlBoolean(xmlAttribute(styleElement, "showColumnStripes")),
+              ...(style_name ? { name: decodeXstring(style_name) } : {}),
+              showFirstColumn: xmlBoolean(xmlAttribute(style_element, "showFirstColumn")),
+              showLastColumn: xmlBoolean(xmlAttribute(style_element, "showLastColumn")),
+              showRowStripes: xmlBoolean(xmlAttribute(style_element, "showRowStripes")),
+              showColumnStripes: xmlBoolean(xmlAttribute(style_element, "showColumnStripes")),
             },
           }
         : {}),
@@ -1288,38 +1302,38 @@ type RowGroups = NonNullable<SheetSnapshot["rowGroups"]>;
  * row after it is marked collapsed, or when every row of the group is hidden.
  * Each level is one walk over the outlined rows in order.
  */
-function outlineRowGroups(
+function outline_row_groups(
   levels: ReadonlyMap<number, number>,
-  collapsedRows: ReadonlySet<number>,
-  hiddenRows: ReadonlySet<number>,
+  collapsed_rows: ReadonlySet<number>,
+  hidden_rows: ReadonlySet<number>,
 ): RowGroups {
   const rows = Uint32Array.from(levels.keys()).sort();
-  const rowLevels = Uint8Array.from(rows, (row) => levels.get(row) ?? 0);
-  const maxLevel = rowLevels.reduce((maximum, level) => Math.max(maximum, level), 0);
+  const row_levels = Uint8Array.from(rows, (row) => levels.get(row) ?? 0);
+  const max_level = row_levels.reduce((maximum, level) => Math.max(maximum, level), 0);
   const groups: RowGroups = [];
 
-  for (let level = 1; level <= maxLevel; level++) {
+  for (let level = 1; level <= max_level; level++) {
     let start = -1;
     let end = -1;
-    let allHidden = true;
+    let all_hidden = true;
     const close = (): void => {
-      const collapsed = collapsedRows.has(end + 1) || collapsedRows.has(end) || allHidden;
+      const collapsed = collapsed_rows.has(end + 1) || collapsed_rows.has(end) || all_hidden;
       groups.push({ start, end, collapsed });
     };
 
     rows.forEach((row, index) => {
-      if ((rowLevels[index] ?? 0) < level) return;
+      if ((row_levels[index] ?? 0) < level) return;
 
       if (start >= 0 && row === end + 1) {
         end = row;
-        allHidden &&= hiddenRows.has(row);
+        all_hidden &&= hidden_rows.has(row);
         return;
       }
 
       if (start >= 0) close();
       start = row;
       end = row;
-      allHidden = hiddenRows.has(row);
+      all_hidden = hidden_rows.has(row);
     });
 
     if (start >= 0) close();
@@ -1330,167 +1344,174 @@ function outlineRowGroups(
 
 /**
  * Rows are streamed from the inflated worksheet; only cells and the small
- * non-row tree stay resident. `columnSource` is set for the second pass over a
+ * non-row tree stay resident. `column_source` is set for the second pass over a
  * worksheet whose `cols` follow its rows, whose row warnings were already sent.
  */
-async function parseSheet(
-  packageFile: OpcPackage,
+async function parse_sheet(
+  package_file: OpcPackage,
   reference: WorkbookSheetReference,
   styles: ParsedStyles,
-  sharedStrings: readonly string[],
+  shared_strings: readonly string[],
   context: XlsxCodecContext,
   usage: ReaderResourceUsage,
   date1904: boolean,
-  columnSource?: XmlElement,
+  column_source?: XmlElement,
 ): Promise<ParsedSheet> {
   const target = reference.relationship.target;
   const cells: SnapshotCell[] = [];
-  const cellStyles = new CellStyleIndices();
-  const columnCells = new Map<number, ColumnCells>();
-  const pendingSharedFormulas: PendingSharedFormula[] = [];
-  const sharedMasters = new Map<string, SharedFormulaMaster>();
-  let inferredRow = 0;
-  let maxRow = -1;
-  let maxCol = -1;
-  const rowMeta: NonNullable<SheetSnapshot["rowMeta"]> = [];
-  const outlineLevels = new Map<number, number>();
-  const collapsedRows = new Set<number>();
-  let internalMetadata = false;
-  const inheritedColumnStyles = new Map<number, string>();
-  let columnStylesRead = false;
-  let columnsPrecedeRows = false;
-  const cellsBeforeSheet = usage.cells;
-  const rowContext: XlsxCodecContext =
-    columnSource && context.options
+  const cell_styles = new CellStyleIndices();
+  const column_cells = new Map<number, ColumnCells>();
+  const pending_shared_formulas: PendingSharedFormula[] = [];
+  const shared_masters = new Map<string, SharedFormulaMaster>();
+  let inferred_row = 0;
+  let max_row = -1;
+  let max_col = -1;
+  const row_meta: NonNullable<SheetSnapshot["rowMeta"]> = [];
+  const outline_levels = new Map<number, number>();
+  const collapsed_rows = new Set<number>();
+  let internal_metadata = false;
+  const inherited_column_styles = new Map<number, string>();
+  let column_styles_read = false;
+  let columns_precede_rows = false;
+  const cells_before_sheet = usage.cells;
+  const row_context: XlsxCodecContext =
+    column_source && context.options
       ? { ...context, options: { ...context.options, onWarning: undefined } }
       : context;
 
-  const readColumnStyles = (root: XmlElement): void => {
-    if (columnStylesRead) return;
-    columnStylesRead = true;
-    const columnCollection = xmlChild(root, "cols");
-    columnsPrecedeRows = columnCollection !== undefined;
+  const read_column_styles = (root: XmlElement): void => {
+    if (column_styles_read) return;
+    column_styles_read = true;
+    const column_collection = xmlChild(root, "cols");
+    columns_precede_rows = column_collection !== undefined;
     const spans: number[] = [];
-    const columnStyles: string[] = [];
-    for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
-      const style = xmlAttribute(columnElement, "style");
+    const column_styles: string[] = [];
+    for (const column_element of column_collection ? xmlChildren(column_collection, "col") : []) {
+      const style = xmlAttribute(column_element, "style");
       if (style === undefined) continue;
-      const min = parseUnsigned(xmlAttribute(columnElement, "min"), "column minimum");
-      const max = parseUnsigned(xmlAttribute(columnElement, "max"), "column maximum");
-      if (min < 1 || max < min) readerFailure("column range is invalid");
+      const min = parse_unsigned(xmlAttribute(column_element, "min"), "column minimum");
+      const max = parse_unsigned(xmlAttribute(column_element, "max"), "column maximum");
+      if (min < 1 || max < min) reader_failure("column range is invalid");
       assertResource(context, "maxColumnsPerSheet", max);
       spans.push(min - 1, max - 1);
-      columnStyles.push(style);
+      column_styles.push(style);
     }
 
-    lastColumnDeclarations(spans).forEach((declaration, col) => {
-      const style = columnStyles[declaration];
-      if (style !== undefined) inheritedColumnStyles.set(col, style);
+    last_column_declarations(spans).forEach((declaration, col) => {
+      const style = column_styles[declaration];
+      if (style !== undefined) inherited_column_styles.set(col, style);
     });
   };
-  if (columnSource) readColumnStyles(columnSource);
+  if (column_source) read_column_styles(column_source);
 
-  const processRow = (rowElement: XmlElement, root: XmlElement): void => {
-    if (!columnStylesRead) assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
-    readColumnStyles(root);
+  const process_row = (row_element: XmlElement, root: XmlElement): void => {
+    if (!column_styles_read) assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
+    read_column_styles(root);
     const row =
-      xmlAttribute(rowElement, "r") === undefined
-        ? inferredRow
-        : parseUnsigned(xmlAttribute(rowElement, "r"), "row number") - 1;
-    if (row < 0) readerFailure(`row number in ${reference.name} is invalid`);
+      xmlAttribute(row_element, "r") === undefined
+        ? inferred_row
+        : parse_unsigned(xmlAttribute(row_element, "r"), "row number") - 1;
+    if (row < 0) reader_failure(`row number in ${reference.name} is invalid`);
     assertResource(context, "maxRowsPerSheet", row + 1);
-    inferredRow = row + 1;
-    maxRow = Math.max(maxRow, row);
-    const heightPoints = Number(xmlAttribute(rowElement, "ht"));
-    const hasFixedHeight =
-      xmlBoolean(xmlAttribute(rowElement, "customHeight")) &&
-      Number.isFinite(heightPoints) &&
-      heightPoints > 0;
-    const hidden = xmlBoolean(xmlAttribute(rowElement, "hidden"));
-    const outlineLevel = Number(xmlAttribute(rowElement, "outlineLevel") ?? 0);
-    if (!Number.isInteger(outlineLevel) || outlineLevel < 0 || outlineLevel > 7) {
-      readerFailure(`row outline level in ${reference.name} is invalid`);
+    inferred_row = row + 1;
+    max_row = Math.max(max_row, row);
+    const height_points = Number(xmlAttribute(row_element, "ht"));
+    const has_fixed_height =
+      xmlBoolean(xmlAttribute(row_element, "customHeight")) &&
+      Number.isFinite(height_points) &&
+      height_points > 0;
+    const hidden = xmlBoolean(xmlAttribute(row_element, "hidden"));
+    const outline_level = Number(xmlAttribute(row_element, "outlineLevel") ?? 0);
+    if (!Number.isInteger(outline_level) || outline_level < 0 || outline_level > 7) {
+      reader_failure(`row outline level in ${reference.name} is invalid`);
     }
-    if (outlineLevel > 0) outlineLevels.set(row, outlineLevel);
-    if (xmlBoolean(xmlAttribute(rowElement, "collapsed"))) collapsedRows.add(row);
-    if (hasFixedHeight || hidden) {
-      rowMeta.push([
+    if (outline_level > 0) outline_levels.set(row, outline_level);
+    if (xmlBoolean(xmlAttribute(row_element, "collapsed"))) collapsed_rows.add(row);
+    if (has_fixed_height || hidden) {
+      row_meta.push([
         row,
         {
-          ...(hasFixedHeight ? { height: (heightPoints * 96) / 72 } : {}),
+          ...(has_fixed_height ? { height: (height_points * 96) / 72 } : {}),
           ...(hidden ? { hidden: true } : {}),
         },
       ]);
     }
-    const rowStyle = xmlBoolean(xmlAttribute(rowElement, "customFormat"))
-      ? xmlAttribute(rowElement, "s")
+    const row_style = xmlBoolean(xmlAttribute(row_element, "customFormat"))
+      ? xmlAttribute(row_element, "s")
       : undefined;
-    let inferredCol = 0;
-    for (const cellElement of xmlChildren(rowElement, "c")) {
-      const addressText = xmlAttribute(cellElement, "r") ?? cellA1(row, inferredCol);
+    let inferred_col = 0;
+    for (const cell_element of xmlChildren(row_element, "c")) {
+      const address_text = xmlAttribute(cell_element, "r") ?? cellA1(row, inferred_col);
       const address =
-        parseCellReference(addressText) ??
-        readerFailure(`cell reference ${addressText} is invalid`);
-      if (address.row !== row) readerFailure(`cell ${addressText} is outside its row`);
-      inferredCol = address.col + 1;
+        parseCellReference(address_text) ??
+        reader_failure(`cell reference ${address_text} is invalid`);
+      if (address.row !== row) reader_failure(`cell ${address_text} is outside its row`);
+      inferred_col = address.col + 1;
       assertResource(context, "maxColumnsPerSheet", address.col + 1);
-      maxCol = Math.max(maxCol, address.col);
-      const styleIndex = parseUnsigned(
-        xmlAttribute(cellElement, "s") ?? rowStyle ?? inheritedColumnStyles.get(address.col) ?? "0",
-        `style index at ${addressText}`,
+      max_col = Math.max(max_col, address.col);
+      const style_index = parse_unsigned(
+        xmlAttribute(cell_element, "s") ??
+          row_style ??
+          inherited_column_styles.get(address.col) ??
+          "0",
+        `style index at ${address_text}`,
       );
-      const styleRecord = styles.at(styleIndex);
-      const formulaElement = xmlChild(cellElement, "f");
+      const style_record = styles.at(style_index);
+      const formula_element = xmlChild(cell_element, "f");
       let value: CellValue | null;
-      let sharedFormula: string | undefined;
-      let ownSharedFormula: string | undefined;
-      if (formulaElement) {
-        const formulaText = decodeXstring(formulaElement.text);
-        const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
-        if (formulaType === "shared") {
-          sharedFormula = xmlAttribute(formulaElement, "si");
-          if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
-          if (formulaText) {
-            ownSharedFormula = formulaText;
-            const authoritative = xmlAttribute(formulaElement, "ref") !== undefined;
-            const existing = sharedMasters.get(sharedFormula);
+      let shared_formula: string | undefined;
+      let own_shared_formula: string | undefined;
+      if (formula_element) {
+        const formula_text = decodeXstring(formula_element.text);
+        const formula_type = xmlAttribute(formula_element, "t") ?? "normal";
+        if (formula_type === "shared") {
+          shared_formula = xmlAttribute(formula_element, "si");
+          if (!shared_formula) reader_failure(`shared formula at ${address_text} has no index`);
+          if (formula_text) {
+            own_shared_formula = formula_text;
+            const authoritative = xmlAttribute(formula_element, "ref") !== undefined;
+            const existing = shared_masters.get(shared_formula);
             if (authoritative || !existing) {
-              sharedMasters.set(sharedFormula, { formula: formulaText, ...address, authoritative });
+              shared_masters.set(shared_formula, {
+                formula: formula_text,
+                ...address,
+                authoritative,
+              });
             }
           }
           value = null;
-        } else if (formulaType !== "normal") {
-          emitWarning(rowContext, {
+        } else if (formula_type !== "normal") {
+          emitWarning(row_context, {
             code: "unsupported-feature",
-            message: `Excel ${formulaType} formula was neutralized because its range semantics are unsupported`,
+            message: `Excel ${formula_type} formula was neutralized because its range semantics are unsupported`,
             sheet: reference.name,
-            cell: addressText,
+            cell: address_text,
           });
-          value = formulaText ? { kind: "literal", value: `=${formulaText}` } : null;
-        } else if (formulaContainsExternalReference(formulaText)) {
-          emitWarning(rowContext, {
+          value = formula_text ? { kind: "literal", value: `=${formula_text}` } : null;
+        } else if (formulaContainsExternalReference(formula_text)) {
+          emitWarning(row_context, {
             code: "external-formula",
             message: "External-data formula was neutralized as inert text",
             sheet: reference.name,
-            cell: addressText,
+            cell: address_text,
           });
-          value = { kind: "literal", value: `=${formulaText}` };
+          value = { kind: "literal", value: `=${formula_text}` };
         } else {
-          value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
+          value = formula_text ? { kind: "formula", src: `=${formula_text}` } : null;
         }
       } else {
-        value = literalFromCell(
-          cellElement,
-          xmlAttribute(cellElement, "t"),
-          sharedStrings,
-          styleRecord,
-          rowContext,
+        value = literal_from_cell(
+          cell_element,
+          xmlAttribute(cell_element, "t"),
+          shared_strings,
+          style_record,
+          row_context,
           reference.name,
-          addressText,
+          address_text,
           date1904,
         );
       }
-      if (value || styleRecord.style || sharedFormula) {
+      if (value || style_record.style || shared_formula) {
         if (
           cells.length === 0 &&
           reference.name.startsWith(META_STEM) &&
@@ -1499,9 +1520,9 @@ async function parseSheet(
           value?.kind === "literal" &&
           value.value === META_MARKER
         ) {
-          internalMetadata = true;
+          internal_metadata = true;
         }
-        if (!internalMetadata) {
+        if (!internal_metadata) {
           usage.cells += 1;
           assertResource(context, "maxCells", usage.cells);
         }
@@ -1511,22 +1532,22 @@ async function parseSheet(
           value: value ?? { kind: "literal", value: null },
         };
         cells.push(cell);
-        cellStyles.push(styleIndex);
-        let column = columnCells.get(address.col);
+        cell_styles.push(style_index);
+        let column = column_cells.get(address.col);
         if (!column) {
           column = { styleIndices: new Set(), hasNumericValue: false };
-          columnCells.set(address.col, column);
+          column_cells.set(address.col, column);
         }
-        column.styleIndices.add(styleIndex);
+        column.styleIndices.add(style_index);
         if (value?.kind === "literal" && typeof value.value === "number") {
           column.hasNumericValue = true;
         }
-        if (sharedFormula) {
-          pendingSharedFormulas.push({
+        if (shared_formula) {
+          pending_shared_formulas.push({
             cell,
-            index: sharedFormula,
-            address: addressText,
-            ownFormula: ownSharedFormula,
+            index: shared_formula,
+            address: address_text,
+            ownFormula: own_shared_formula,
           });
         }
       }
@@ -1534,90 +1555,94 @@ async function parseSheet(
   };
 
   const part = normalizePartName(target);
-  const rowStream: XmlChildStream = {
+  const row_stream: XmlChildStream = {
     parent: "sheetData",
     parentIsRoot: false,
     // The tree path read only `row` children; other children are skipped alike.
-    child: (rowElement, rootElement) => {
-      if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
+    child: (row_element, root_element) => {
+      if (xmlLocalName(row_element.name) === "row") process_row(row_element, root_element);
     },
   };
-  const entry = packageFile.archive.entries.get(part);
+  const entry = package_file.archive.entries.get(part);
   // For a small worksheet, the asynchronous XML driver costs more than the parse. Both parsers
   // apply the same XML limits, and the declared size is checked against the inflated bytes.
   const root =
     entry && entry.uncompressedSize <= BUFFERED_WORKSHEET_XML_BYTES
-      ? parseXml(await packageFile.archive.read(part), part, context, rowStream)
-      : await parseXmlChunks(packageFile.archive.chunks(part), part, context, rowStream);
+      ? parseXml(await package_file.archive.read(part), part, context, row_stream)
+      : await parseXmlChunks(package_file.archive.chunks(part), part, context, row_stream);
   assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
-  const lateColumns = xmlChild(root, "cols");
+  const late_columns = xmlChild(root, "cols");
   if (
-    columnStylesRead &&
-    !columnsPrecedeRows &&
-    lateColumns &&
-    xmlChildren(lateColumns, "col").some((column) => xmlAttribute(column, "style") !== undefined)
+    column_styles_read &&
+    !columns_precede_rows &&
+    late_columns &&
+    xmlChildren(late_columns, "col").some((column) => xmlAttribute(column, "style") !== undefined)
   ) {
     // Column styles apply to every row, including rows already streamed; a
     // second streamed pass is cheaper than retaining the worksheet document.
-    usage.cells = cellsBeforeSheet;
+    usage.cells = cells_before_sheet;
     // This frame stays alive until the second pass returns; drop its cells so
     // the worksheet is not resident twice.
     cells.length = 0;
-    cellStyles.clear();
-    columnCells.clear();
-    pendingSharedFormulas.length = 0;
-    sharedMasters.clear();
-    return parseSheet(
-      packageFile,
+    cell_styles.clear();
+    column_cells.clear();
+    pending_shared_formulas.length = 0;
+    shared_masters.clear();
+    return parse_sheet(
+      package_file,
       reference,
       styles,
-      sharedStrings,
+      shared_strings,
       context,
       usage,
       date1904,
       root,
     );
   }
-  readColumnStyles(root);
-  const sharedFormulas = sharedFormulaGroups(pendingSharedFormulas, sharedMasters, reference.name);
+  read_column_styles(root);
+  const shared_formulas = shared_formula_groups(
+    pending_shared_formulas,
+    shared_masters,
+    reference.name,
+  );
   const dimension = xmlAttribute(
     xmlChild(root, "dimension") ?? { attributes: {}, children: [], name: "", text: "" },
     "ref",
   );
   if (dimension) {
-    const range = parseRange(dimension);
+    const range = parse_range(dimension);
     assertResource(context, "maxRowsPerSheet", range.r1 + 1);
     assertResource(context, "maxColumnsPerSheet", range.c1 + 1);
-    maxRow = Math.max(maxRow, range.r1);
-    maxCol = Math.max(maxCol, range.c1);
+    max_row = Math.max(max_row, range.r1);
+    max_col = Math.max(max_col, range.c1);
   }
-  const columns = parseColumns(root, styles, context, reference.relationship.target);
-  for (const index of columns.keys()) maxCol = Math.max(maxCol, index);
-  const mergeElements = xmlChild(root, "mergeCells")
+  const columns = parse_columns(root, styles, context, reference.relationship.target);
+  for (const index of columns.keys()) max_col = Math.max(max_col, index);
+  const merge_elements = xmlChild(root, "mergeCells")
     ? xmlChildren(xmlChild(root, "mergeCells")!, "mergeCell")
     : [];
-  usage.merges += mergeElements.length;
+  usage.merges += merge_elements.length;
   assertResource(context, "maxMerges", usage.merges);
-  const merges = mergeElements.map((merge) => {
+  const merges = merge_elements.map((merge) => {
     const value = xmlAttribute(merge, "ref");
-    if (!value) return readerFailure(`merge in ${reference.name} has no range`);
-    const parsed = parseRange(value);
-    maxRow = Math.max(maxRow, parsed.r1);
-    maxCol = Math.max(maxCol, parsed.c1);
+    if (!value) return reader_failure(`merge in ${reference.name} has no range`);
+    const parsed = parse_range(value);
+    max_row = Math.max(max_row, parsed.r1);
+    max_col = Math.max(max_col, parsed.c1);
     return parsed;
   });
-  assertResource(context, "maxRowsPerSheet", maxRow + 1);
-  assertResource(context, "maxColumnsPerSheet", maxCol + 1);
-  const hiddenOutlineRows = new Set(
-    rowMeta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
+  assertResource(context, "maxRowsPerSheet", max_row + 1);
+  assertResource(context, "maxColumnsPerSheet", max_col + 1);
+  const hidden_outline_rows = new Set(
+    row_meta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
   );
-  const rowGroups = outlineRowGroups(outlineLevels, collapsedRows, hiddenOutlineRows);
+  const row_groups = outline_row_groups(outline_levels, collapsed_rows, hidden_outline_rows);
   const view = xmlChildren(xmlChild(root, "sheetViews") ?? root, "sheetView").at(-1);
   const pane = view ? xmlChild(view, "pane") : undefined;
-  const paneState = pane ? xmlAttribute(pane, "state") : undefined;
-  const frozen = paneState === "frozen" || paneState === "frozenSplit";
-  const frozenRows = frozen ? Number(xmlAttribute(pane!, "ySplit") ?? 0) : 0;
-  const frozenCols = frozen ? Number(xmlAttribute(pane!, "xSplit") ?? 0) : 0;
+  const pane_state = pane ? xmlAttribute(pane, "state") : undefined;
+  const frozen = pane_state === "frozen" || pane_state === "frozenSplit";
+  const frozen_rows = frozen ? Number(xmlAttribute(pane!, "ySplit") ?? 0) : 0;
+  const frozen_cols = frozen ? Number(xmlAttribute(pane!, "xSplit") ?? 0) : 0;
   if (view && xmlBoolean(xmlAttribute(view, "rightToLeft"))) {
     emitWarning(context, {
       code: "unsupported-feature",
@@ -1637,36 +1662,36 @@ async function parseSheet(
       sheet: reference.name,
     });
   }
-  if (pane && paneState === "split") {
+  if (pane && pane_state === "split") {
     emitWarning(context, {
       code: "unsupported-feature",
       message: "Split-pane worksheet view presentation was dropped",
       sheet: reference.name,
     });
   }
-  const validationCollection = xmlChild(root, "dataValidations");
-  const validations = validationCollection
-    ? xmlChildren(validationCollection, "dataValidation").flatMap((validation) =>
-        parseValidation(validation, context, reference.name, date1904),
+  const validation_collection = xmlChild(root, "dataValidations");
+  const validations = validation_collection
+    ? xmlChildren(validation_collection, "dataValidation").flatMap((validation) =>
+        parse_validation(validation, context, reference.name, date1904),
       )
     : [];
-  const conditionalFormats = parseConditionalFormats(root, styles, reference.name, context);
-  const sortState = parseSortState(root, styles, context, reference.name);
-  const relationships = packageFile.relationships(reference.relationship.target);
-  const hyperlinkCollection = xmlChild(root, "hyperlinks");
-  const hyperlinks = parseHyperlinks(hyperlinkCollection, relationships, reference.name, context);
-  let missingDisplays: Map<string, number[]> | undefined;
+  const conditional_formats = parse_conditional_formats(root, styles, reference.name, context);
+  const sort_state = parse_sort_state(root, styles, context, reference.name);
+  const relationships = package_file.relationships(reference.relationship.target);
+  const hyperlink_collection = xmlChild(root, "hyperlinks");
+  const hyperlinks = parse_hyperlinks(hyperlink_collection, relationships, reference.name, context);
+  let missing_displays: Map<string, number[]> | undefined;
   for (const [index, hyperlink] of hyperlinks.entries()) {
     if (hyperlink.display !== undefined) continue;
-    missingDisplays ??= new Map();
+    missing_displays ??= new Map();
     const key = `${hyperlink.range.start.row}:${hyperlink.range.start.col}`;
-    const indices = missingDisplays.get(key) ?? [];
+    const indices = missing_displays.get(key) ?? [];
     indices.push(index);
-    missingDisplays.set(key, indices);
+    missing_displays.set(key, indices);
   }
-  if (missingDisplays) {
+  if (missing_displays) {
     for (const cell of cells) {
-      const indices = missingDisplays.get(`${cell.rowOffset}:${cell.colOffset}`);
+      const indices = missing_displays.get(`${cell.rowOffset}:${cell.colOffset}`);
       if (!indices || cell.value.kind !== "literal" || cell.value.value === null) continue;
       const display = String(cell.value.value);
       if (display.length > MAX_HYPERLINK_DISPLAY_LENGTH) continue;
@@ -1677,32 +1702,32 @@ async function parseSheet(
     }
   }
   for (const hyperlink of hyperlinks) {
-    maxRow = Math.max(maxRow, hyperlink.range.end.row);
-    maxCol = Math.max(maxCol, hyperlink.range.end.col);
+    max_row = Math.max(max_row, hyperlink.range.end.row);
+    max_col = Math.max(max_col, hyperlink.range.end.col);
   }
-  for (const rule of conditionalFormats) {
-    maxRow = Math.max(maxRow, rule.range.end.row);
-    maxCol = Math.max(maxCol, rule.range.end.col);
+  for (const rule of conditional_formats) {
+    max_row = Math.max(max_row, rule.range.end.row);
+    max_col = Math.max(max_col, rule.range.end.col);
   }
-  assertResource(context, "maxRowsPerSheet", maxRow + 1);
-  assertResource(context, "maxColumnsPerSheet", maxCol + 1);
-  const extensionList = xmlChild(root, "extLst");
-  const hasConditionalFormatExtensions =
-    extensionList !== undefined && xmlHasDescendant(extensionList, "conditionalFormattings");
-  if (hasConditionalFormatExtensions) {
+  assertResource(context, "maxRowsPerSheet", max_row + 1);
+  assertResource(context, "maxColumnsPerSheet", max_col + 1);
+  const extension_list = xmlChild(root, "extLst");
+  const has_conditional_format_extensions =
+    extension_list !== undefined && xml_has_descendant(extension_list, "conditionalFormattings");
+  if (has_conditional_format_extensions) {
     emitWarning(context, {
       code: "format-loss",
       message: "Extended conditional formatting is unsupported and was dropped",
       sheet: reference.name,
     });
   }
-  const comments = parseComments(
-    packageFile,
+  const comments = parse_comments(
+    package_file,
     reference.relationship.target,
     relationships,
     context,
   );
-  const tables = parseTables(packageFile, root, relationships, reference.name, context, styles);
+  const tables = parse_tables(package_file, root, relationships, reference.name, context, styles);
   for (const relationship of relationships) {
     if (
       ["comments", "vmlDrawing", "hyperlink", "table"].some((kind) =>
@@ -1728,38 +1753,41 @@ async function parseSheet(
     state: reference.state,
     part: reference.relationship.target,
     cells,
-    cellStyles,
-    columnCells,
-    sharedFormulas,
-    rowCount: Math.max(0, maxRow + 1),
-    columnCount: Math.max(1, maxCol + 1),
+    cellStyles: cell_styles,
+    columnCells: column_cells,
+    sharedFormulas: shared_formulas,
+    rowCount: Math.max(0, max_row + 1),
+    columnCount: Math.max(1, max_col + 1),
     columns,
-    rowMeta,
+    rowMeta: row_meta,
     merges,
-    rowGroups,
-    ...(Number.isInteger(frozenRows) && frozenRows > 0 ? { frozenRows } : {}),
-    ...(Number.isInteger(frozenCols) && frozenCols > 0 ? { frozenCols } : {}),
+    rowGroups: row_groups,
+    ...(Number.isInteger(frozen_rows) && frozen_rows > 0 ? { frozenRows: frozen_rows } : {}),
+    ...(Number.isInteger(frozen_cols) && frozen_cols > 0 ? { frozenCols: frozen_cols } : {}),
     validations,
-    conditionalFormats,
-    ...(sortState ? { sortState } : {}),
+    conditionalFormats: conditional_formats,
+    ...(sort_state ? { sortState: sort_state } : {}),
     notes: comments.comments,
     hyperlinks,
-    hasUnsupportedValidation: Boolean(validationCollection && validations.length === 0),
+    hasUnsupportedValidation: Boolean(validation_collection && validations.length === 0),
     tables,
     hasConditionalFormatting: root.children.some(
       (child) => xmlLocalName(child.name) === "conditionalFormatting",
     ),
-    hasRowOutlines: outlineLevels.size > 0,
+    hasRowOutlines: outline_levels.size > 0,
     hasProtection: Boolean(xmlChild(root, "sheetProtection")),
     hasAutoFilter: Boolean(xmlChild(root, "autoFilter")),
-    hasValidationCollection: Boolean(validationCollection),
+    hasValidationCollection: Boolean(validation_collection),
     hasComments: comments.present,
-    hasHyperlinks: hyperlinkCollection !== undefined,
-    hasConditionalFormatExtensions,
+    hasHyperlinks: hyperlink_collection !== undefined,
+    hasConditionalFormatExtensions: has_conditional_format_extensions,
   };
 }
 
-function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): WorkbookSnapshot | null {
+function metadata_from_sheet(
+  sheet: ParsedSheet,
+  context: XlsxCodecContext,
+): WorkbookSnapshot | null {
   if (!sheet.name.startsWith(META_STEM)) return null;
   const ordered = sheet.cells
     .filter((cell) => cell.colOffset === 0)
@@ -1787,7 +1815,7 @@ function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): Workb
   return null;
 }
 
-function columnFromParsed(
+function column_from_parsed(
   sheet: ParsedSheet,
   styles: ParsedStyles,
   col: number,
@@ -1795,38 +1823,38 @@ function columnFromParsed(
 ): Column {
   const definition = sheet.columns.get(col);
   const formats = new Set<string>();
-  const semanticTypes = new Set<Column["type"]>();
+  const semantic_types = new Set<Column["type"]>();
   const cells = sheet.columnCells.get(col);
-  for (const styleIndex of cells?.styleIndices ?? []) {
-    const record = styles.at(styleIndex);
+  for (const style_index of cells?.styleIndices ?? []) {
+    const record = styles.at(style_index);
     if (record.numberFormat) formats.add(record.numberFormat);
-    if (record.date) semanticTypes.add("date");
+    if (record.date) semantic_types.add("date");
     else if (record.numberFormat) {
-      semanticTypes.add(/[$€£¥]|currency/i.test(record.numberFormat) ? "currency" : "number");
+      semantic_types.add(/[$€£¥]|currency/i.test(record.numberFormat) ? "currency" : "number");
     }
   }
-  const hasNumericValue = cells?.hasNumericValue === true;
-  if (definition?.type) semanticTypes.add(definition.type);
+  const has_numeric_value = cells?.hasNumericValue === true;
+  if (definition?.type) semantic_types.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
   // A column default is chosen only when every formatted cell agrees; cells
   // that differ keep their own format (see the snapshot cell mapping below).
-  const mixed = semanticTypes.size > 1 || formats.size > 1;
-  const onlyType = semanticTypes.values().next().value as Column["type"] | undefined;
-  const numberFormat = mixed
+  const mixed = semantic_types.size > 1 || formats.size > 1;
+  const only_type = semantic_types.values().next().value as Column["type"] | undefined;
+  const number_format = mixed
     ? undefined
     : (definition?.numberFormat ?? formats.values().next().value);
   const type: Column["type"] = mixed
     ? "number"
-    : (definition?.type ?? onlyType ?? (hasNumericValue ? "number" : "text"));
-  const defaultStyle = definition?.cellStyle ?? styles.at(0).style;
+    : (definition?.type ?? only_type ?? (has_numeric_value ? "number" : "text"));
+  const default_style = definition?.cellStyle ?? styles.at(0).style;
   return {
     key,
     header: colToA1(col),
     width: definition?.width ?? 75,
     type,
-    ...(numberFormat ? { numberFormat } : {}),
-    ...(defaultStyle && Object.keys(defaultStyle).length > 0
-      ? { cellStyle: structuredClone(defaultStyle) }
+    ...(number_format ? { numberFormat: number_format } : {}),
+    ...(default_style && Object.keys(default_style).length > 0
+      ? { cellStyle: structuredClone(default_style) }
       : {}),
     ...(definition?.visible === false ? { visible: false } : {}),
   };
@@ -1838,23 +1866,23 @@ function columnFromParsed(
  * in a formatted column. Text literals ignore number formats, so they never
  * need an override.
  */
-function cellNumberFormatOverride(
+function cell_number_format_override(
   record: ParsedCellStyle,
   value: CellValue,
-  columnFormat: string | undefined,
+  column_format: string | undefined,
 ): string | undefined {
   const own = record.numberFormat;
-  if (own === columnFormat) return undefined;
+  if (own === column_format) return undefined;
   if (own !== undefined) return own;
   if (value.kind === "literal" && typeof value.value !== "number") return undefined;
   return "General";
 }
 
 /** Excel links customXml items from the workbook part; other writers may link them from the root. */
-function hasCustomXml(packageFile: OpcPackage): boolean {
+function has_custom_xml(package_file: OpcPackage): boolean {
   return [
-    ...packageFile.relationships(packageFile.officeDocumentPart()),
-    ...packageFile.relationships(""),
+    ...package_file.relationships(package_file.officeDocumentPart()),
+    ...package_file.relationships(""),
   ].some(
     (relationship) =>
       !relationship.external && relationshipTypeMatches(relationship.type, "customXml"),
@@ -1862,7 +1890,7 @@ function hasCustomXml(packageFile: OpcPackage): boolean {
 }
 
 /** Restore sidecar cell fields from the sidecar sheet each worksheet claimed, by sheet order. */
-function restoreSidecarFields(
+function restore_sidecar_fields(
   snapshot: WorkbookSnapshot,
   claims: readonly (SheetSnapshot | undefined)[],
 ): void {
@@ -1871,21 +1899,21 @@ function restoreSidecarFields(
     if (!meta || sheet.cells.length === 0) continue;
     // Index the sidecar, which holds only the cells it restores, so the sheet's
     // cells are scanned once instead of indexed.
-    const sidecarCells = new Map<number, SnapshotCell[]>();
+    const sidecar_cells = new Map<number, SnapshotCell[]>();
     for (const block of meta.cells) {
       for (const sidecar of block.cells) {
         const row = block.startRow + sidecar.rowOffset;
         const col = block.startCol + sidecar.colOffset;
         const offset = row * sheet.columns.length + col;
-        const restored = sidecarCells.get(offset);
+        const restored = sidecar_cells.get(offset);
         if (restored) restored.push(sidecar);
-        else sidecarCells.set(offset, [sidecar]);
+        else sidecar_cells.set(offset, [sidecar]);
       }
     }
-    if (sidecarCells.size === 0) continue;
+    if (sidecar_cells.size === 0) continue;
     for (const existing of sheet.cells[0]?.cells ?? []) {
       const offset = existing.rowOffset * sheet.columns.length + existing.colOffset;
-      for (const sidecar of sidecarCells.get(offset) ?? []) {
+      for (const sidecar of sidecar_cells.get(offset) ?? []) {
         if (sidecar.value.kind === "ref" && existing.value.kind === "formula") {
           const reference = sidecar.value;
           const target = snapshot.sheets.find(
@@ -1895,11 +1923,11 @@ function restoreSidecarFields(
           const expected = `='${target.name.replaceAll("'", "''")}'!${cellA1(reference.target.row, reference.target.col)}`;
           if (existing.value.src === expected) existing.value = structuredClone(reference);
         }
-        const sidecarBorder = sidecar.style?.border;
-        const hasExactWidth = Object.values(sidecarBorder ?? {}).some(
+        const sidecar_border = sidecar.style?.border;
+        const has_exact_width = Object.values(sidecar_border ?? {}).some(
           (border) => border.width !== undefined && border.width !== 1 && border.width !== 2,
         );
-        if (hasExactWidth) {
+        if (has_exact_width) {
           existing.style = structuredClone(sidecar.style);
         }
       }
@@ -1907,7 +1935,7 @@ function restoreSidecarFields(
   }
 }
 
-function projectedConditionalStyle(style: CellStyle): string {
+function projected_conditional_style(style: CellStyle): string {
   const color = (value: string | undefined): string | undefined =>
     value?.replace(/^#/, "").toUpperCase();
   const projected: CellStyle = {
@@ -1941,7 +1969,7 @@ function projectedConditionalStyle(style: CellStyle): string {
   if (Object.keys(borders).length > 0) projected.border = borders;
   return JSON.stringify(projected);
 }
-function conditionalPredicateFingerprint(predicate: ConditionalFormatPredicate): string {
+function conditional_predicate_fingerprint(predicate: ConditionalFormatPredicate): string {
   if (predicate.kind === "contains") {
     return JSON.stringify({
       kind: predicate.kind,
@@ -1955,40 +1983,40 @@ function conditionalPredicateFingerprint(predicate: ConditionalFormatPredicate):
   return JSON.stringify({ kind: predicate.kind, value: predicate.value });
 }
 
-function reconcileConditionalFormats(
-  nativeRules: readonly ConditionalFormatRule[],
-  sidecarRules: readonly ConditionalFormatRule[] | undefined,
+function reconcile_conditional_formats(
+  native_rules: readonly ConditionalFormatRule[],
+  sidecar_rules: readonly ConditionalFormatRule[] | undefined,
 ): ConditionalFormatRule[] {
-  const remaining = new Set(sidecarRules?.map((_, index) => index) ?? []);
-  return nativeRules.map((native) => {
-    const match = sidecarRules?.findIndex(
+  const remaining = new Set(sidecar_rules?.map((_, index) => index) ?? []);
+  return native_rules.map((native) => {
+    const match = sidecar_rules?.findIndex(
       (sidecar, index) =>
         remaining.has(index) &&
         sidecar.range.start.row === native.range.start.row &&
         sidecar.range.start.col === native.range.start.col &&
         sidecar.range.end.row === native.range.end.row &&
         sidecar.range.end.col === native.range.end.col &&
-        conditionalPredicateFingerprint(sidecar.when) ===
-          conditionalPredicateFingerprint(native.when) &&
+        conditional_predicate_fingerprint(sidecar.when) ===
+          conditional_predicate_fingerprint(native.when) &&
         sidecar.stopIfTrue === native.stopIfTrue &&
-        projectedConditionalStyle(sidecar.style) === projectedConditionalStyle(native.style),
+        projected_conditional_style(sidecar.style) === projected_conditional_style(native.style),
     );
     if (match === undefined || match < 0) return structuredClone(native);
     remaining.delete(match);
     return {
       ...structuredClone(native),
-      style: structuredClone(sidecarRules![match]!.style),
+      style: structuredClone(sidecar_rules![match]!.style),
     };
   });
 }
 
-function reconcileHyperlinks(
-  nativeLinks: readonly CellHyperlink[],
-  sidecarLinks: readonly CellHyperlink[] | undefined,
+function reconcile_hyperlinks(
+  native_links: readonly CellHyperlink[],
+  sidecar_links: readonly CellHyperlink[] | undefined,
 ): CellHyperlink[] {
-  const remaining = new Set(sidecarLinks?.map((_, index) => index) ?? []);
-  return nativeLinks.map((native) => {
-    const match = sidecarLinks?.findIndex(
+  const remaining = new Set(sidecar_links?.map((_, index) => index) ?? []);
+  return native_links.map((native) => {
+    const match = sidecar_links?.findIndex(
       (sidecar, index) =>
         remaining.has(index) &&
         sidecar.range.start.row === native.range.start.row &&
@@ -2000,7 +2028,7 @@ function reconcileHyperlinks(
     );
     if (match === undefined || match < 0) return structuredClone(native);
     remaining.delete(match);
-    return structuredClone(sidecarLinks![match]!);
+    return structuredClone(sidecar_links![match]!);
   });
 }
 
@@ -2010,39 +2038,39 @@ function reconcileHyperlinks(
  * counts beyond Excel's range are clamped into it, so a damaged attribute never
  * rejects the file.
  */
-function workbookCalculation(workbookRoot: XmlElement): CalculationSettings | undefined {
-  const calcPr = xmlChild(workbookRoot, "calcPr");
-  if (!calcPr) return undefined;
+function workbook_calculation(workbook_root: XmlElement): CalculationSettings | undefined {
+  const calc_pr = xmlChild(workbook_root, "calcPr");
+  if (!calc_pr) return undefined;
 
-  const iterate = xmlBoolean(xmlAttribute(calcPr, "iterate"));
+  const iterate = xmlBoolean(xmlAttribute(calc_pr, "iterate"));
 
-  const count = Number(xmlAttribute(calcPr, "iterateCount") ?? DEFAULT_MAX_ITERATIONS);
-  const maxIterations = Number.isInteger(count)
+  const count = Number(xmlAttribute(calc_pr, "iterateCount") ?? DEFAULT_MAX_ITERATIONS);
+  const max_iterations = Number.isInteger(count)
     ? Math.min(Math.max(count, 1), MAX_ITERATIONS)
     : DEFAULT_MAX_ITERATIONS;
 
-  const delta = Number(xmlAttribute(calcPr, "iterateDelta") ?? DEFAULT_MAX_CHANGE);
-  const maxChange = Number.isFinite(delta) && delta >= 0 ? delta : DEFAULT_MAX_CHANGE;
+  const delta = Number(xmlAttribute(calc_pr, "iterateDelta") ?? DEFAULT_MAX_CHANGE);
+  const max_change = Number.isFinite(delta) && delta >= 0 ? delta : DEFAULT_MAX_CHANGE;
 
-  if (!iterate && maxIterations === DEFAULT_MAX_ITERATIONS && maxChange === DEFAULT_MAX_CHANGE) {
+  if (!iterate && max_iterations === DEFAULT_MAX_ITERATIONS && max_change === DEFAULT_MAX_CHANGE) {
     return undefined;
   }
-  return { iterate, maxIterations, maxChange };
+  return { iterate, maxIterations: max_iterations, maxChange: max_change };
 }
 
-function externalNamedRanges(
-  workbookRoot: XmlElement,
-  sheetIds: ReadonlyMap<string, string>,
+function external_named_ranges(
+  workbook_root: XmlElement,
+  sheet_ids: ReadonlyMap<string, string>,
   sheets: readonly WorkbookSheetReference[],
   context: XlsxCodecContext,
 ): WorkbookSnapshot["workbook"]["namedRanges"] {
-  const definitions = xmlChild(workbookRoot, "definedNames");
+  const definitions = xmlChild(workbook_root, "definedNames");
   if (!definitions) return undefined;
   const ranges: NonNullable<WorkbookSnapshot["workbook"]["namedRanges"]> = [];
   for (const definition of xmlChildren(definitions, "definedName")) {
-    const rawName = xmlAttribute(definition, "name");
-    if (!rawName) continue;
-    const name = decodeXstring(rawName);
+    const raw_name = xmlAttribute(definition, "name");
+    if (!raw_name) continue;
+    const name = decodeXstring(raw_name);
     if (name.startsWith("_xlnm.")) {
       emitWarning(context, {
         code: "unsupported-feature",
@@ -2057,17 +2085,17 @@ function externalNamedRanges(
       });
       continue;
     }
-    const localSheetId = xmlAttribute(definition, "localSheetId");
+    const local_sheet_id = xmlAttribute(definition, "localSheetId");
     let scope: string | undefined;
-    if (localSheetId !== undefined) {
-      const scopeIndex = /^\d+$/.test(localSheetId) ? Number(localSheetId) : Number.NaN;
-      const scopeSheet =
-        Number.isSafeInteger(scopeIndex) && scopeIndex >= 0 ? sheets[scopeIndex] : undefined;
-      scope = scopeSheet ? sheetIds.get(sheetNameKey(scopeSheet.name)) : undefined;
+    if (local_sheet_id !== undefined) {
+      const scope_index = /^\d+$/.test(local_sheet_id) ? Number(local_sheet_id) : Number.NaN;
+      const scope_sheet =
+        Number.isSafeInteger(scope_index) && scope_index >= 0 ? sheets[scope_index] : undefined;
+      scope = scope_sheet ? sheet_ids.get(sheetNameKey(scope_sheet.name)) : undefined;
       if (!scope) {
         emitWarning(context, {
           code: "unsupported-feature",
-          message: `Defined name ${name} had invalid localSheetId ${localSheetId} and was dropped`,
+          message: `Defined name ${name} had invalid localSheetId ${local_sheet_id} and was dropped`,
         });
         continue;
       }
@@ -2082,13 +2110,13 @@ function externalNamedRanges(
       ranges.push({ name, ...(scope ? { scope } : {}), formula: `=${source.replace(/^=/, "")}` });
       continue;
     }
-    const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
-    const sheet = sheetIds.get(sheetNameKey(sheetName));
+    const sheet_name = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
+    const sheet = sheet_ids.get(sheetNameKey(sheet_name));
     if (sheet === undefined) {
       ranges.push({ name, ...(scope ? { scope } : {}), formula: `=${source.replace(/^=/, "")}` });
       continue;
     }
-    const parsed = parseRange(reference);
+    const parsed = parse_range(reference);
     assertResource(context, "maxRowsPerSheet", parsed.r1 + 1);
     assertResource(context, "maxColumnsPerSheet", parsed.c1 + 1);
     ranges.push({
@@ -2105,7 +2133,7 @@ function externalNamedRanges(
 }
 
 /** The first of `stem`, `stem_2`, `stem_3`… that `keys` does not hold, added to `keys`. */
-function claimColumnKey(stem: string, keys: Set<string>): string {
+function claim_column_key(stem: string, keys: Set<string>): string {
   let key = stem;
   let suffix = 2;
   while (keys.has(key)) key = `${stem}_${suffix++}`;
@@ -2118,15 +2146,15 @@ function claimColumnKey(stem: string, keys: Set<string>): string {
  * spelling, in one engine session. A workbook without formulas leaves the
  * engine unloaded.
  */
-async function importWorkbookFormulas(
+async function import_workbook_formulas(
   snapshot: WorkbookSnapshot,
-  sharedFormulas: readonly SharedFormulaGroup[],
+  shared_formulas: readonly SharedFormulaGroup[],
   context: XlsxCodecContext,
 ): Promise<void> {
-  if (sharedFormulas.length === 0 && workbookFormulaSources(snapshot).length === 0) return;
+  if (shared_formulas.length === 0 && workbookFormulaSources(snapshot).length === 0) return;
 
   const converted = await withXlsxFormulaEngine((engine) => {
-    expandSharedFormulas(engine, sharedFormulas, context);
+    expandSharedFormulas(engine, shared_formulas, context);
     return convertFormulaSources(engine, workbookFormulaSources(snapshot), "import");
   });
   for (const sheet of snapshot.sheets) {
@@ -2148,13 +2176,13 @@ async function importWorkbookFormulas(
 }
 
 /** Grow `sheet` so that `row` and `col` lie inside it; references may point past the cells. */
-function extendSheet(sheet: SheetSnapshot, row: number, col: number): void {
+function extend_sheet(sheet: SheetSnapshot, row: number, col: number): void {
   sheet.rowCount = Math.max(sheet.rowCount, row + 1);
   if (sheet.columns.length <= col) {
     const keys = new Set(sheet.columns.map((column) => column.key));
     while (sheet.columns.length <= col) {
       const index = sheet.columns.length;
-      const key = claimColumnKey(`column${index + 1}`, keys);
+      const key = claim_column_key(`column${index + 1}`, keys);
       sheet.columns.push({ key, header: colToA1(index), width: 75, type: "text" });
     }
   }
@@ -2171,28 +2199,28 @@ export async function readWorkbook(
   context: XlsxCodecContext,
   readOptions: { readonly preserveOpaqueParts?: boolean } = {},
 ): Promise<WorkbookSnapshot> {
-  const packageFile = await OpcPackage.open(data, context);
-  const workbookPart = packageFile.officeDocumentPart();
-  await packageFile.load([workbookPart]);
-  const workbookRoot = packageFile.readXml(workbookPart);
-  packageFile.release([workbookPart]);
-  assertXmlRoot(workbookRoot, "workbook", MAIN_NAMESPACES, workbookPart);
+  const package_file = await OpcPackage.open(data, context);
+  const workbook_part = package_file.officeDocumentPart();
+  await package_file.load([workbook_part]);
+  const workbook_root = package_file.readXml(workbook_part);
+  package_file.release([workbook_part]);
+  assertXmlRoot(workbook_root, "workbook", MAIN_NAMESPACES, workbook_part);
   const date1904 = xmlBoolean(
-    xmlAttribute(xmlChild(workbookRoot, "workbookPr") ?? workbookRoot, "date1904"),
+    xmlAttribute(xmlChild(workbook_root, "workbookPr") ?? workbook_root, "date1904"),
   );
-  const workbookRelationships = packageFile.relationships(workbookPart);
-  const stylesPart = workbookRelationships.find(
+  const workbook_relationships = package_file.relationships(workbook_part);
+  const styles_part = workbook_relationships.find(
     (relationship) =>
       relationshipTypeMatches(relationship.type, "styles") && !relationship.external,
   )?.target;
-  const sharedStringsPart = workbookRelationships.find(
+  const shared_strings_part = workbook_relationships.find(
     (relationship) =>
       relationshipTypeMatches(relationship.type, "sharedStrings") && !relationship.external,
   )?.target;
-  const themePart = workbookRelationships.find(
+  const theme_part = workbook_relationships.find(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
-  for (const relationship of workbookRelationships) {
+  for (const relationship of workbook_relationships) {
     if (
       relationship.external ||
       ["worksheet", "styles", "sharedStrings", "theme"].some((kind) =>
@@ -2202,49 +2230,51 @@ export async function readWorkbook(
     ) {
       continue;
     }
-    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
+    const external_link = relationshipTypeMatches(relationship.type, "externalLink");
     emitWarning(context, {
-      code: externalLink ? "external-relationship" : "unsupported-feature",
-      message: externalLink
+      code: external_link ? "external-relationship" : "unsupported-feature",
+      message: external_link
         ? "External-link workbook graph was dropped"
         : `Unsupported workbook relationship ${relationship.type.slice(relationship.type.lastIndexOf("/") + 1)} was dropped`,
       part: relationship.target,
     });
   }
-  const styleParts = [stylesPart, themePart].filter((part): part is string => part !== undefined);
-  await packageFile.load(styleParts);
-  const styles = new ParsedStyles(
-    stylesPart ? packageFile.readXml(stylesPart) : undefined,
-    context,
-    themePart ? packageFile.readXml(themePart) : undefined,
-    stylesPart ?? "xl/styles.xml",
-    themePart ?? "xl/theme/theme1.xml",
+  const style_parts = [styles_part, theme_part].filter(
+    (part): part is string => part !== undefined,
   );
-  packageFile.release(styleParts);
-  if (sharedStringsPart) await packageFile.load([sharedStringsPart]);
-  const sharedStrings = parseSharedStrings(packageFile, sharedStringsPart, context);
-  if (sharedStringsPart) packageFile.release([sharedStringsPart]);
-  const sheetCollection = xmlChild(workbookRoot, "sheets");
-  if (!sheetCollection) return readerFailure("workbook has no sheet collection");
+  await package_file.load(style_parts);
+  const styles = new ParsedStyles(
+    styles_part ? package_file.readXml(styles_part) : undefined,
+    context,
+    theme_part ? package_file.readXml(theme_part) : undefined,
+    styles_part ?? "xl/styles.xml",
+    theme_part ?? "xl/theme/theme1.xml",
+  );
+  package_file.release(style_parts);
+  if (shared_strings_part) await package_file.load([shared_strings_part]);
+  const shared_strings = parse_shared_strings(package_file, shared_strings_part, context);
+  if (shared_strings_part) package_file.release([shared_strings_part]);
+  const sheet_collection = xmlChild(workbook_root, "sheets");
+  if (!sheet_collection) return reader_failure("workbook has no sheet collection");
   const references: WorkbookSheetReference[] = [];
-  const sheetNames: string[] = [];
-  for (const element of xmlChildren(sheetCollection, "sheet")) {
-    const rawName = xmlAttribute(element, "name");
-    const relationshipId = xmlAttribute(element, "id");
-    if (rawName === undefined || !relationshipId) {
-      return readerFailure("worksheet declaration is incomplete");
+  const sheet_names: string[] = [];
+  for (const element of xmlChildren(sheet_collection, "sheet")) {
+    const raw_name = xmlAttribute(element, "name");
+    const relationship_id = xmlAttribute(element, "id");
+    if (raw_name === undefined || !relationship_id) {
+      return reader_failure("worksheet declaration is incomplete");
     }
-    const validatedName = validateSheetName(decodeXstring(rawName), sheetNames);
-    if (!validatedName.ok) {
-      return readerFailure(
-        `worksheet name ${JSON.stringify(validatedName.name)} is unsafe or duplicated (${validatedName.code})`,
+    const validated_name = validateSheetName(decodeXstring(raw_name), sheet_names);
+    if (!validated_name.ok) {
+      return reader_failure(
+        `worksheet name ${JSON.stringify(validated_name.name)} is unsafe or duplicated (${validated_name.code})`,
       );
     }
-    const name = validatedName.name;
-    sheetNames.push(name);
-    const relationship = packageFile.relationship(workbookPart, relationshipId);
+    const name = validated_name.name;
+    sheet_names.push(name);
+    const relationship = package_file.relationship(workbook_part, relationship_id);
     if (!relationshipTypeMatches(relationship.type, "worksheet")) {
-      return readerFailure(`relationship ${relationshipId} is not a worksheet`);
+      return reader_failure(`relationship ${relationship_id} is not a worksheet`);
     }
     const state = xmlAttribute(element, "state");
     if (
@@ -2253,114 +2283,122 @@ export async function readWorkbook(
       state !== "hidden" &&
       state !== "veryHidden"
     ) {
-      return readerFailure(`worksheet ${name} has invalid visibility state ${state}`);
+      return reader_failure(`worksheet ${name} has invalid visibility state ${state}`);
     }
     references.push({ name, state, relationship });
   }
-  const metadataCandidates = references.filter((reference) =>
+  const metadata_candidates = references.filter((reference) =>
     reference.name.startsWith(META_STEM),
   ).length;
-  assertResource(context, "maxSheets", references.length - Math.min(1, metadataCandidates));
+  assertResource(context, "maxSheets", references.length - Math.min(1, metadata_candidates));
   const usage: ReaderResourceUsage = { cells: 0, merges: 0 };
-  const parsedSheets: ParsedSheet[] = [];
+  const parsed_sheets: ParsedSheet[] = [];
   for (const reference of references) {
     checkAbort(context);
-    const worksheetPart = reference.relationship.target;
-    // The worksheet itself is streamed by parseSheet; only its small parts are loaded.
-    const parts = packageFile
-      .relationships(worksheetPart)
+    const worksheet_part = reference.relationship.target;
+    // The worksheet itself is streamed by parse_sheet; only its small parts are loaded.
+    const parts = package_file
+      .relationships(worksheet_part)
       .filter(
         (relationship) =>
           !relationship.external &&
           ["comments", "table"].some((kind) => relationshipTypeMatches(relationship.type, kind)),
       )
       .map((relationship) => relationship.target);
-    await packageFile.load(parts);
+    await package_file.load(parts);
     try {
-      parsedSheets.push(
-        await parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904),
+      parsed_sheets.push(
+        await parse_sheet(
+          package_file,
+          reference,
+          styles,
+          shared_strings,
+          context,
+          usage,
+          date1904,
+        ),
       );
     } finally {
-      packageFile.release(parts);
+      package_file.release(parts);
     }
   }
   let metadata: WorkbookSnapshot | null = null;
-  let metadataIndex = -1;
-  for (let index = 0; index < parsedSheets.length; index++) {
-    const parsed = metadataFromSheet(parsedSheets[index]!, context);
+  let metadata_index = -1;
+  for (let index = 0; index < parsed_sheets.length; index++) {
+    const parsed = metadata_from_sheet(parsed_sheets[index]!, context);
     if (parsed) {
       metadata = parsed;
-      metadataIndex = index;
+      metadata_index = index;
       break;
     }
   }
-  const sourceSheets = parsedSheets.filter((_sheet, index) => index !== metadataIndex);
-  const sourceReferences = references.filter((_sheet, index) => index !== metadataIndex);
-  assertResource(context, "maxSheets", sourceSheets.length);
-  if (sourceSheets.length === 0)
+  const source_sheets = parsed_sheets.filter((_sheet, index) => index !== metadata_index);
+  const source_references = references.filter((_sheet, index) => index !== metadata_index);
+  assertResource(context, "maxSheets", source_sheets.length);
+  if (source_sheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX workbook has no worksheets");
   if (
-    sourceReferences.every(
+    source_references.every(
       (reference) => reference.state === "hidden" || reference.state === "veryHidden",
     )
   ) {
-    return readerFailure("workbook requires at least one visible worksheet");
+    return reader_failure("workbook requires at least one visible worksheet");
   }
-  let sourceCellCount = 0;
-  let sourceTableCount = 0;
-  for (const source of sourceSheets) {
-    sourceCellCount += source.cells.length;
-    sourceTableCount += source.tables.length;
-    assertResource(context, "maxCells", sourceCellCount);
-    if (sourceTableCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
-      return readerFailure(
+  let source_cell_count = 0;
+  let source_table_count = 0;
+  for (const source of source_sheets) {
+    source_cell_count += source.cells.length;
+    source_table_count += source.tables.length;
+    assertResource(context, "maxCells", source_cell_count);
+    if (source_table_count > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
+      return reader_failure(
         `workbook exceeds the table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables}`,
       );
     }
   }
-  const sheetIds = new Map<string, string>();
-  const resolvedMetadata = claimSidecarSheets(sourceSheets, metadata, context);
-  const usedIds = new Set<string>();
-  for (const meta of resolvedMetadata) {
-    if (meta) usedIds.add(meta.id);
+  const sheet_ids = new Map<string, string>();
+  const resolved_metadata = claim_sidecar_sheets(source_sheets, metadata, context);
+  const used_ids = new Set<string>();
+  for (const meta of resolved_metadata) {
+    if (meta) used_ids.add(meta.id);
   }
 
-  const resolvedIds = sourceSheets.map((source, order) => {
-    const id = resolvedMetadata[order]?.id ?? uniqueSheetId(source.name, order, usedIds);
-    sheetIds.set(sheetNameKey(source.name), id);
+  const resolved_ids = source_sheets.map((source, order) => {
+    const id = resolved_metadata[order]?.id ?? unique_sheet_id(source.name, order, used_ids);
+    sheet_ids.set(sheetNameKey(source.name), id);
     return id;
   });
-  const usedTableIds = new Set<string>();
-  const usedTableNames = new Set<string>();
+  const used_table_ids = new Set<string>();
+  const used_table_names = new Set<string>();
   const sheets: SheetSnapshot[] = [];
-  for (let order = 0; order < sourceSheets.length; order++) {
+  for (let order = 0; order < source_sheets.length; order++) {
     checkAbort(context);
-    const source = sourceSheets[order]!;
-    const meta = resolvedMetadata[order];
-    const id = resolvedIds[order]!;
-    const tableColumnCount = source.tables.reduce(
+    const source = source_sheets[order]!;
+    const meta = resolved_metadata[order];
+    const id = resolved_ids[order]!;
+    const table_column_count = source.tables.reduce(
       (maximum, table) => Math.max(maximum, table.range.end.col + 1),
       0,
     );
-    const columnCount = Math.max(
+    const column_count = Math.max(
       1,
       source.columnCount,
-      tableColumnCount,
+      table_column_count,
       meta?.columns.length ?? 0,
     );
-    assertResource(context, "maxColumnsPerSheet", columnCount);
+    assertResource(context, "maxColumnsPerSheet", column_count);
     const columns: Column[] = [];
     const keys = new Set<string>();
-    for (let col = 0; col < columnCount; col++) {
-      const metaColumn = meta?.columns[col];
-      const key = claimColumnKey(metaColumn?.key ?? `column${col + 1}`, keys);
-      const nativeColumn = columnFromParsed(source, styles, col, key);
-      if (!metaColumn) {
-        columns.push(nativeColumn);
+    for (let col = 0; col < column_count; col++) {
+      const meta_column = meta?.columns[col];
+      const key = claim_column_key(meta_column?.key ?? `column${col + 1}`, keys);
+      const native_column = column_from_parsed(source, styles, col, key);
+      if (!meta_column) {
+        columns.push(native_column);
         continue;
       }
-      const column = structuredClone(metaColumn);
-      if (nativeColumn.cellStyle) column.cellStyle = nativeColumn.cellStyle;
+      const column = structuredClone(meta_column);
+      if (native_column.cellStyle) column.cellStyle = native_column.cellStyle;
       else delete column.cellStyle;
       const definition = source.columns.get(col);
       if (definition) {
@@ -2370,37 +2408,37 @@ export async function readWorkbook(
           // still represents the metadata width; native edits remain authoritative.
           if (
             property === "width" &&
-            value === columnWidthPixels(columnWidthCharacters(metaColumn.width))
+            value === columnWidthPixels(columnWidthCharacters(meta_column.width))
           )
             continue;
           if (value !== undefined) Object.assign(column, { [property]: structuredClone(value) });
         }
       }
       if (source.columnCells.has(col)) {
-        column.type = nativeColumn.type;
-        if (nativeColumn.numberFormat) column.numberFormat = nativeColumn.numberFormat;
+        column.type = native_column.type;
+        if (native_column.numberFormat) column.numberFormat = native_column.numberFormat;
         else delete column.numberFormat;
       }
       column.key = key;
       columns.push(column);
     }
-    const rowCount = Math.max(
+    const row_count = Math.max(
       source.rowCount,
       source.tables.reduce((maximum, table) => Math.max(maximum, table.range.end.row + 1), 0),
     );
-    assertResource(context, "maxRowsPerSheet", rowCount);
+    assertResource(context, "maxRowsPerSheet", row_count);
     // The parsed cells become the snapshot's cells: each gets its own style copy
     // now that every column default is known, and no second array is built.
-    const snapshotCells = source.cells;
-    if (source.cellStyles.length !== snapshotCells.length) {
+    const snapshot_cells = source.cells;
+    if (source.cellStyles.length !== snapshot_cells.length) {
       throw new RangeError("Sheetwrite: XLSX cell styles and cells are out of step");
     }
-    for (let index = 0; index < snapshotCells.length; index++) {
-      const cell = snapshotCells[index];
+    for (let index = 0; index < snapshot_cells.length; index++) {
+      const cell = snapshot_cells[index];
       if (!cell) continue;
       const record = styles.at(source.cellStyles.at(index));
       // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
-      let style = record.style ? (copyStyleData(record.style) as CellStyle) : undefined;
+      let style = record.style ? (copy_style_data(record.style) as CellStyle) : undefined;
       // Native center is normally unset, but must override an inherited bottom.
       if (
         style?.verticalAlign === undefined &&
@@ -2409,17 +2447,17 @@ export async function readWorkbook(
         style ??= {};
         style.verticalAlign = "middle";
       }
-      const numberFormat = cellNumberFormatOverride(
+      const number_format = cell_number_format_override(
         record,
         cell.value,
         columns[cell.colOffset]?.numberFormat,
       );
-      const cellStyle = numberFormat ? { ...style, numberFormat } : style;
-      if (cellStyle) cell.style = cellStyle;
+      const cell_style = number_format ? { ...style, numberFormat: number_format } : style;
+      if (cell_style) cell.style = cell_style;
     }
-    const nativeValidations = source.validations.map((validation, index) => {
+    const native_validations = source.validations.map((validation, index) => {
       const sidecar = meta?.validationRules?.[index];
-      const sameBlankDefault =
+      const same_blank_default =
         sidecar !== undefined &&
         validation.allowBlank === (sidecar.allowBlank === undefined ? true : sidecar.allowBlank);
       return {
@@ -2427,7 +2465,7 @@ export async function readWorkbook(
         range: { sheet: id, ...structuredClone(validation.range) },
         condition: structuredClone(validation.condition),
         policy: validation.policy,
-        ...(sameBlankDefault
+        ...(same_blank_default
           ? sidecar?.allowBlank !== undefined
             ? { allowBlank: sidecar.allowBlank }
             : {}
@@ -2438,22 +2476,22 @@ export async function readWorkbook(
       };
     });
     const validations = source.hasValidationCollection
-      ? nativeValidations
+      ? native_validations
       : (structuredClone(meta?.validationRules) ?? []);
-    const nativeNotes = source.notes.map((note) => ({
+    const native_notes = source.notes.map((note) => ({
       addr: { sheet: id, row: note.row, col: note.col },
       text: note.text,
     }));
-    const notes = source.hasComments ? nativeNotes : (structuredClone(meta?.notes) ?? []);
-    const nativeHyperlinks = reconcileHyperlinks(
-      source.hyperlinks.flatMap((link, linkIndex): CellHyperlink[] => {
+    const notes = source.hasComments ? native_notes : (structuredClone(meta?.notes) ?? []);
+    const native_hyperlinks = reconcile_hyperlinks(
+      source.hyperlinks.flatMap((link, link_index): CellHyperlink[] => {
         let target: CellHyperlink["target"] | null;
         if (link.target.kind === "external") {
           target = structuredClone(link.target);
         } else {
           const internal = link.target;
-          const targetSheet = sheetIds.get(sheetNameKey(internal.sheetName));
-          if (!targetSheet) {
+          const target_sheet = sheet_ids.get(sheetNameKey(internal.sheetName));
+          if (!target_sheet) {
             emitWarning(context, {
               code: "hyperlink",
               message: "Hyperlink internal target references a missing worksheet and was dropped",
@@ -2463,14 +2501,14 @@ export async function readWorkbook(
           } else {
             target = {
               kind: "internal",
-              range: { sheet: targetSheet, ...structuredClone(internal.range) },
+              range: { sheet: target_sheet, ...structuredClone(internal.range) },
             };
           }
         }
         if (!target) return [];
         return [
           {
-            id: `xlsx-hyperlink-${order + 1}-${linkIndex + 1}`,
+            id: `xlsx-hyperlink-${order + 1}-${link_index + 1}`,
             range: { sheet: id, ...structuredClone(link.range) },
             target,
             ...(link.display !== undefined ? { display: link.display } : {}),
@@ -2480,48 +2518,50 @@ export async function readWorkbook(
       meta?.hyperlinks,
     );
     const hyperlinks = source.hasHyperlinks
-      ? nativeHyperlinks
+      ? native_hyperlinks
       : (structuredClone(meta?.hyperlinks) ?? []);
-    const nativeConditionalFormats = reconcileConditionalFormats(
+    const native_conditional_formats = reconcile_conditional_formats(
       source.conditionalFormats.map((rule) => ({
         ...structuredClone(rule),
         range: { ...structuredClone(rule.range), sheet: id },
       })),
       meta?.conditionalFormats,
     );
-    const conditionalFormats = source.hasConditionalFormatting
-      ? nativeConditionalFormats
+    const conditional_formats = source.hasConditionalFormatting
+      ? native_conditional_formats
       : (structuredClone(meta?.conditionalFormats) ?? []);
     // A live view sort comes only from Sheetwrite's own metadata. The
     // worksheet sortState is kept unapplied, unless it is the export of that
     // view sort.
-    const sortKeys = structuredClone(meta?.sortKeys) ?? [];
-    const sortState = sortKeys.length === 0 ? source.sortState : undefined;
-    const tables: WorkbookTable[] = source.tables.map((nativeTable, tableIndex) => {
-      const metaTable =
+    const sort_keys = structuredClone(meta?.sortKeys) ?? [];
+    const sort_state = sort_keys.length === 0 ? source.sortState : undefined;
+    const tables: WorkbookTable[] = source.tables.map((native_table, table_index) => {
+      const meta_table =
         meta?.tables?.find(
           (candidate) =>
             candidate.name.normalize("NFC").toUpperCase() ===
-            nativeTable.name.normalize("NFC").toUpperCase(),
-        ) ?? meta?.tables?.[tableIndex];
-      const tableId = metaTable?.id ?? nativeTable.id;
-      const tableNameKey = nativeTable.name.normalize("NFC").toUpperCase();
-      if (usedTableIds.has(tableId) || usedTableNames.has(tableNameKey)) {
-        return readerFailure(`workbook table ${nativeTable.name} has a duplicate identity or name`);
+            native_table.name.normalize("NFC").toUpperCase(),
+        ) ?? meta?.tables?.[table_index];
+      const table_id = meta_table?.id ?? native_table.id;
+      const table_name_key = native_table.name.normalize("NFC").toUpperCase();
+      if (used_table_ids.has(table_id) || used_table_names.has(table_name_key)) {
+        return reader_failure(
+          `workbook table ${native_table.name} has a duplicate identity or name`,
+        );
       }
-      usedTableIds.add(tableId);
-      usedTableNames.add(tableNameKey);
+      used_table_ids.add(table_id);
+      used_table_names.add(table_name_key);
       return {
-        ...structuredClone(nativeTable),
-        id: tableId,
-        range: { sheet: id, ...structuredClone(nativeTable.range) },
-        columns: nativeTable.columns.map((column, columnIndex) => ({
+        ...structuredClone(native_table),
+        id: table_id,
+        range: { sheet: id, ...structuredClone(native_table.range) },
+        columns: native_table.columns.map((column, column_index) => ({
           ...structuredClone(column),
-          id: metaTable?.columns[columnIndex]?.id ?? column.id,
+          id: meta_table?.columns[column_index]?.id ?? column.id,
         })),
-        ...(metaTable?.style !== undefined ? { style: structuredClone(metaTable.style) } : {}),
-        ...(metaTable?.unsupportedFeatures !== undefined
-          ? { unsupportedFeatures: structuredClone(metaTable.unsupportedFeatures) }
+        ...(meta_table?.style !== undefined ? { style: structuredClone(meta_table.style) } : {}),
+        ...(meta_table?.unsupportedFeatures !== undefined
+          ? { unsupportedFeatures: structuredClone(meta_table.unsupportedFeatures) }
           : {}),
       };
     });
@@ -2555,13 +2595,13 @@ export async function readWorkbook(
       ...(source.state === "hidden" || source.state === "veryHidden"
         ? { visibility: source.state }
         : {}),
-      rowCount,
+      rowCount: row_count,
       columns,
       ...(source.frozenRows ? { frozenRows: source.frozenRows } : {}),
       ...(source.frozenCols ? { frozenCols: source.frozenCols } : {}),
       ...(source.rowMeta.length > 0 ? { rowMeta: source.rowMeta } : {}),
       ...(source.merges.length > 0 ? { merges: source.merges } : {}),
-      ...(conditionalFormats.length > 0 ? { conditionalFormats } : {}),
+      ...(conditional_formats.length > 0 ? { conditionalFormats: conditional_formats } : {}),
       ...(hyperlinks.length > 0 ? { hyperlinks } : {}),
       ...(source.hasRowOutlines
         ? { rowGroups: source.rowGroups }
@@ -2573,53 +2613,68 @@ export async function readWorkbook(
         ? { protectedRanges: structuredClone(meta.protectedRanges) }
         : {}),
       ...(notes.length > 0 ? { notes } : {}),
-      ...(sortKeys.length > 0 ? { sortKeys } : {}),
-      ...(sortState ? { sortState: structuredClone(sortState) } : {}),
+      ...(sort_keys.length > 0 ? { sortKeys: sort_keys } : {}),
+      ...(sort_state ? { sortState: structuredClone(sort_state) } : {}),
       ...(!source.hasAutoFilter && meta?.filters ? { filters: structuredClone(meta.filters) } : {}),
       ...(tables.length > 0 ? { tables } : {}),
       cells:
-        snapshotCells.length > 0
-          ? [{ startRow: 0, startCol: 0, rowCount, colCount: columns.length, cells: snapshotCells }]
+        snapshot_cells.length > 0
+          ? [
+              {
+                startRow: 0,
+                startCol: 0,
+                rowCount: row_count,
+                colCount: columns.length,
+                cells: snapshot_cells,
+              },
+            ]
           : [],
     });
   }
   for (const owner of sheets) {
     for (const hyperlink of owner.hyperlinks ?? []) {
       if (hyperlink.target.kind !== "internal") continue;
-      const targetRange = hyperlink.target.range;
-      const target = sheets.find((candidate) => candidate.id === targetRange.sheet);
-      if (target) extendSheet(target, targetRange.end.row, targetRange.end.col);
+      const target_range = hyperlink.target.range;
+      const target = sheets.find((candidate) => candidate.id === target_range.sheet);
+      if (target) extend_sheet(target, target_range.end.row, target_range.end.col);
     }
   }
-  const workbookViews = xmlChildren(
-    xmlChild(workbookRoot, "bookViews") ?? workbookRoot,
+  const workbook_views = xmlChildren(
+    xmlChild(workbook_root, "bookViews") ?? workbook_root,
     "workbookView",
   );
-  const activeTab = Number(xmlAttribute(workbookViews.at(-1) ?? workbookRoot, "activeTab") ?? 0);
-  const requestedReference =
-    Number.isInteger(activeTab) && activeTab >= 0 && activeTab < references.length
-      ? references[activeTab]
+  const active_tab = Number(xmlAttribute(workbook_views.at(-1) ?? workbook_root, "activeTab") ?? 0);
+  const requested_reference =
+    Number.isInteger(active_tab) && active_tab >= 0 && active_tab < references.length
+      ? references[active_tab]
       : undefined;
-  const requestedActive = requestedReference ? sourceReferences.indexOf(requestedReference) : -1;
-  const activeIndex =
-    requestedActive >= 0 &&
-    sourceReferences[requestedActive]!.state !== "hidden" &&
-    sourceReferences[requestedActive]!.state !== "veryHidden"
-      ? requestedActive
-      : sourceReferences.findIndex(
+  const requested_active = requested_reference
+    ? source_references.indexOf(requested_reference)
+    : -1;
+  const active_index =
+    requested_active >= 0 &&
+    source_references[requested_active]!.state !== "hidden" &&
+    source_references[requested_active]!.state !== "veryHidden"
+      ? requested_active
+      : source_references.findIndex(
           (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
         );
-  const activeSheet = sheets[activeIndex]!.id;
-  const nativeNamedRanges = externalNamedRanges(workbookRoot, sheetIds, sourceReferences, context);
-  const namedRanges = xmlChild(workbookRoot, "definedNames")
-    ? nativeNamedRanges
+  const active_sheet = sheets[active_index]!.id;
+  const native_named_ranges = external_named_ranges(
+    workbook_root,
+    sheet_ids,
+    source_references,
+    context,
+  );
+  const named_ranges = xmlChild(workbook_root, "definedNames")
+    ? native_named_ranges
     : metadata?.workbook.namedRanges;
-  const definedNameKeys = new Map(
-    (namedRanges ?? []).map((named) => [named.name.normalize("NFC").toUpperCase(), named.name]),
+  const defined_name_keys = new Map(
+    (named_ranges ?? []).map((named) => [named.name.normalize("NFC").toUpperCase(), named.name]),
   );
   for (const sheet of sheets) {
     const tables = sheet.tables?.filter((table) => {
-      const collision = definedNameKeys.get(table.name.normalize("NFC").toUpperCase());
+      const collision = defined_name_keys.get(table.name.normalize("NFC").toUpperCase());
       if (collision === undefined) return true;
       emitWarning(context, {
         code: "invalid-metadata",
@@ -2631,78 +2686,83 @@ export async function readWorkbook(
     if (tables?.length) sheet.tables = tables;
     else delete sheet.tables;
   }
-  for (const namedRange of namedRanges ?? []) {
-    if (namedRange.range === undefined) continue;
-    const range = namedRange.range;
+  for (const named_range of named_ranges ?? []) {
+    if (named_range.range === undefined) continue;
+    const range = named_range.range;
     const sheet = sheets.find((candidate) => candidate.id === range.sheet);
-    if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
+    if (sheet) extend_sheet(sheet, named_range.range.end.row, named_range.range.end.col);
   }
-  const calculation = workbookCalculation(workbookRoot);
+  const calculation = workbook_calculation(workbook_root);
   // Sheetwrite's own metadata holds relationships by stable IDs; a file
   // without it may hold Excel's data model relationships.
-  let dataModel = metadata?.workbook.dataModel;
-  if (dataModel === undefined && hasExcelDataModel(workbookRoot)) {
-    const connectionsPart = workbookRelationships.find(
+  let data_model = metadata?.workbook.dataModel;
+  if (data_model === undefined && hasExcelDataModel(workbook_root)) {
+    const connections_part = workbook_relationships.find(
       (relationship) =>
         relationshipTypeMatches(relationship.type, "connections") && !relationship.external,
     )?.target;
     // A relationship can name a part the package lacks; such a file has no connections to read.
     const readable =
-      connectionsPart !== undefined && packageFile.contentType(connectionsPart) !== undefined;
-    if (readable) await packageFile.load([connectionsPart]);
-    const connections = readable ? packageFile.readXml(connectionsPart) : undefined;
-    if (readable) packageFile.release([connectionsPart]);
-    dataModel = readExcelDataModel(workbookRoot, connections, sheets, context);
+      connections_part !== undefined && package_file.contentType(connections_part) !== undefined;
+    if (readable) await package_file.load([connections_part]);
+    const connections = readable ? package_file.readXml(connections_part) : undefined;
+    if (readable) package_file.release([connections_part]);
+    data_model = readExcelDataModel(workbook_root, connections, sheets, context);
   }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),
     ...(metadata?.version !== undefined ? { version: metadata.version } : {}),
     workbook: {
-      activeSheet,
-      ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
+      activeSheet: active_sheet,
+      ...(named_ranges?.length ? { namedRanges: structuredClone(named_ranges) } : {}),
       ...(calculation ? { calculation } : {}),
-      ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
+      ...(data_model?.relationships.length ? { dataModel: structuredClone(data_model) } : {}),
     },
     sheets,
   };
-  await importWorkbookFormulas(
+  await import_workbook_formulas(
     snapshot,
-    sourceSheets.flatMap((source) => source.sharedFormulas),
+    source_sheets.flatMap((source) => source.sharedFormulas),
     context,
   );
-  restoreSidecarFields(snapshot, resolvedMetadata);
-  const sheetParts = sourceReferences.map((reference) => reference.relationship.target);
-  const modelledPivotParts = await readPivots(
-    packageFile,
+  restore_sidecar_fields(snapshot, resolved_metadata);
+  const sheet_parts = source_references.map((reference) => reference.relationship.target);
+  const modelled_pivot_parts = await readPivots(
+    package_file,
     {
       snapshot,
-      sheetParts,
+      sheetParts: sheet_parts,
       metadata,
-      extendSheet,
-      numberFormat: (numFmtId) => styles.numberFormat(numFmtId),
+      extendSheet: extend_sheet,
+      numberFormat: (num_fmt_id) => styles.numberFormat(num_fmt_id),
     },
     context,
   );
-  const chartParts = await readCharts(
-    packageFile,
-    { snapshot, sheetParts, metadata: metadata ?? undefined, extendSheet },
+  const chart_parts = await readCharts(
+    package_file,
+    {
+      snapshot,
+      sheetParts: sheet_parts,
+      metadata: metadata ?? undefined,
+      extendSheet: extend_sheet,
+    },
     context,
   );
   if (readOptions.preserveOpaqueParts !== false)
     await capturePreserved(
-      packageFile,
+      package_file,
       snapshot,
       context,
-      new Set([...modelledPivotParts, ...chartParts.modelled]),
-      chartParts.replacements,
+      new Set([...modelled_pivot_parts, ...chart_parts.modelled]),
+      chart_parts.replacements,
     );
   // The Power Query module loads only for workbooks that can hold queries:
   // saved definitions in the hidden metadata, or a customXml item.
-  const sidecarQueries = metadata?.workbook.queries;
-  if (sidecarQueries?.length || hasCustomXml(packageFile)) {
-    const { readPowerQuery } = await import("./power-query.js");
-    await readPowerQuery(packageFile, snapshot, sidecarQueries, context);
+  const sidecar_queries = metadata?.workbook.queries;
+  if (sidecar_queries?.length || has_custom_xml(package_file)) {
+    const { readPowerQuery: read_power_query } = await import("./power-query.js");
+    await read_power_query(package_file, snapshot, sidecar_queries, context);
   }
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {

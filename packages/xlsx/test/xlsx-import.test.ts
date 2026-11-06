@@ -45,7 +45,7 @@ function workbook(): Workbook {
   };
 }
 
-function roundTripWorkbook(): WorkbookSnapshot {
+function round_trip_workbook(): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: "xlsx-round-trip",
@@ -192,8 +192,8 @@ function roundTripWorkbook(): WorkbookSnapshot {
   };
 }
 
-function manualWorkbook(
-  sheetXml: string,
+function manual_workbook(
+  sheet_xml: string,
   extras: { sharedStrings?: string; sheetRelationships?: string } = {},
 ): Uint8Array {
   const overrides = [
@@ -218,7 +218,7 @@ function manualWorkbook(
     "xl/_rels/workbook.xml.rels": strToU8(
       `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>${extras.sharedStrings ? '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>' : ""}</Relationships>`,
     ),
-    "xl/worksheets/sheet1.xml": strToU8(sheetXml),
+    "xl/worksheets/sheet1.xml": strToU8(sheet_xml),
   };
   if (extras.sharedStrings) files["xl/sharedStrings.xml"] = strToU8(extras.sharedStrings);
   if (extras.sheetRelationships)
@@ -259,15 +259,15 @@ describe("independent XLSX corpus", () => {
     const inputs = imported.sheets[0]!;
     expect([inputs.frozenRows, inputs.frozenCols]).toEqual([1, 1]);
     expect(inputs.merges).toContainEqual({ r0: 1, c0: 3, r1: 1, c1: 4 });
-    const currencyFormat = inputs.columns[1]!.numberFormat;
+    const currency_format = inputs.columns[1]!.numberFormat;
     expect(inputs.columns[1]).toMatchObject({
       type: "currency",
       numberFormat: expect.stringContaining("$#,##0.00"),
     });
     expect(inputs.columns[4]!.visible).toBe(false);
     expect({
-      format: currencyFormat,
-      rendered: formatNumber(2, currencyFormat),
+      format: currency_format,
+      rendered: formatNumber(2, currency_format),
     }).toEqual({
       format: expect.stringContaining("$#,##0.00"),
       rendered: "$2.00",
@@ -348,7 +348,7 @@ describe("table XLSX interchange", () => {
 
 describe("workbook OOXML fidelity", () => {
   it("is byte-deterministic and preserves supported workbook semantics", async () => {
-    const source = roundTripWorkbook();
+    const source = round_trip_workbook();
     const warnings: XlsxWorkbookWarning[] = [];
     const first = await toXlsxWorkbook(source, { onWarning: (warning) => warnings.push(warning) });
     const second = await toXlsxWorkbook(source);
@@ -360,11 +360,11 @@ describe("workbook OOXML fidelity", () => {
     const parts = unzipSync(first);
     expect(strFromU8(parts["xl/workbook.xml"]!)).toContain('fullCalcOnLoad="1"');
     expect(strFromU8(parts["xl/workbook.xml"]!)).toContain('name="InputAmounts"');
-    const inputsXml = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
-    expect(inputsXml).toContain('<mergeCell ref="A3:B3"/>');
-    expect(inputsXml).toContain('state="frozen"');
-    expect(inputsXml).toContain('type="decimal"');
-    expect(inputsXml).toContain("<conditionalFormatting");
+    const inputs_xml = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
+    expect(inputs_xml).toContain('<mergeCell ref="A3:B3"/>');
+    expect(inputs_xml).toContain('state="frozen"');
+    expect(inputs_xml).toContain('type="decimal"');
+    expect(inputs_xml).toContain("<conditionalFormatting");
     expect(strFromU8(parts["xl/styles.xml"]!)).toContain("<dxfs count=");
     expect(strFromU8(parts["xl/comments1.xml"]!)).toContain("Imported source date");
     expect(strFromU8(parts["xl/worksheets/sheet2.xml"]!)).toContain("SUM(Inputs!B1:B2)");
@@ -528,7 +528,7 @@ describe("bounded and corrupt XLSX inputs", () => {
     ).rejects.toThrow(XlsxResourceError);
     await expect(
       fromXlsxWorkbook(
-        manualWorkbook(
+        manual_workbook(
           '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2:C3"/><sheetData/></worksheet>',
         ),
       ),
@@ -536,7 +536,7 @@ describe("bounded and corrupt XLSX inputs", () => {
       code: "xlsx-import-failed",
       message: expect.stringMatching(/A1:B2:C3/),
     });
-    await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toThrow(
+    await expect(toXlsxWorkbook(round_trip_workbook(), { maxCells: 1 })).rejects.toThrow(
       XlsxResourceError,
     );
     const controller = new AbortController();

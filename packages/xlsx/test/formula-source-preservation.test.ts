@@ -34,7 +34,7 @@ beforeAll(async () => {
   registerXlsxBackends();
 });
 
-function formulaWorkbook(sources: readonly string[] = FORMULA_SOURCES): WorkbookSnapshot {
+function formula_workbook(sources: readonly string[] = FORMULA_SOURCES): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: "formula-source-preservation",
@@ -53,8 +53,8 @@ function formulaWorkbook(sources: readonly string[] = FORMULA_SOURCES): Workbook
             startCol: 0,
             rowCount: sources.length,
             colCount: 1,
-            cells: sources.map((src, rowOffset) => ({
-              rowOffset,
+            cells: sources.map((src, row_offset) => ({
+              rowOffset: row_offset,
               colOffset: 0,
               value: { kind: "formula" as const, src },
             })),
@@ -65,7 +65,7 @@ function formulaWorkbook(sources: readonly string[] = FORMULA_SOURCES): Workbook
   };
 }
 
-function formulaSources(snapshot: WorkbookSnapshot): string[] {
+function formula_sources(snapshot: WorkbookSnapshot): string[] {
   return snapshot.sheets[0]!.cells.flatMap((block) =>
     block.cells.flatMap((cell) => (cell.value.kind === "formula" ? [cell.value.src] : [])),
   );
@@ -73,7 +73,7 @@ function formulaSources(snapshot: WorkbookSnapshot): string[] {
 
 describe("XLSX formula source preservation", () => {
   it("round-trips every required target source without asserting recalculation or producer compatibility", async () => {
-    const encoded = await toXlsxWorkbook(formulaWorkbook());
+    const encoded = await toXlsxWorkbook(formula_workbook());
     const decoded = await fromXlsxWorkbook(encoded);
     expect(FORMULA_SOURCES.length).toBeGreaterThan(0);
     expect(new Set(FORMULA_SOURCES).size).toBe(FORMULA_SOURCES.length);
@@ -86,7 +86,7 @@ describe("XLSX formula source preservation", () => {
       order: 0,
       rowCount: FORMULA_SOURCES.length,
     });
-    expect(formulaSources(decoded)).toEqual(FORMULA_SOURCES);
+    expect(formula_sources(decoded)).toEqual(FORMULA_SOURCES);
   });
 
   it("writes Excel future-function and local-binding spellings and imports editor sources", async () => {
@@ -102,14 +102,14 @@ describe("XLSX formula source preservation", () => {
       ],
     ];
     const sources = cases.map(([source]) => source);
-    const encoded = await toXlsxWorkbook(formulaWorkbook(sources));
+    const encoded = await toXlsxWorkbook(formula_workbook(sources));
     const xml = unzipSync(encoded)["xl/worksheets/sheet1.xml"];
     if (xml === undefined) throw new Error("Missing exported worksheet");
     const native = strFromU8(xml);
     for (const [, expected] of cases) {
       expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
     }
-    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual(sources);
+    expect(formula_sources(await fromXlsxWorkbook(encoded))).toEqual(sources);
   });
 
   it("strips prefixes after expanding shared formulas without shifting local names", async () => {
@@ -123,7 +123,7 @@ describe("XLSX formula source preservation", () => {
         },
       ],
     });
-    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual([
+    expect(formula_sources(await fromXlsxWorkbook(encoded))).toEqual([
       "=LET(x,A1,LAMBDA(v,v+x)(2))",
       "=LET(x,A2,LAMBDA(v,v+x)(2))",
     ]);
@@ -131,13 +131,13 @@ describe("XLSX formula source preservation", () => {
 
   it("writes spill references in Excel's ANCHORARRAY form and reads them back", async () => {
     const sources = ["=SUM(A1#)", "='My Sheet'!$B$2#", '=LEN("A1#")&C3#'];
-    const encoded = await toXlsxWorkbook(formulaWorkbook(sources));
+    const encoded = await toXlsxWorkbook(formula_workbook(sources));
     const worksheet = strFromU8(unzipSync(encoded)["xl/worksheets/sheet1.xml"]!);
     expect(worksheet).toContain("<f>SUM(_xlfn.ANCHORARRAY(A1))</f>");
     expect(worksheet).toContain("<f>_xlfn.ANCHORARRAY(&apos;My Sheet&apos;!$B$2)</f>");
     // The quoted text is not a reference and keeps its `#`.
     expect(worksheet).toContain("A1#&quot;)&amp;_xlfn.ANCHORARRAY(C3)");
-    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual(sources);
+    expect(formula_sources(await fromXlsxWorkbook(encoded))).toEqual(sources);
   });
 
   it("writes reference operators as Excel text and recalculates them after import", async () => {
@@ -158,7 +158,11 @@ describe("XLSX formula source preservation", () => {
           startCol: 0,
           rowCount: values.length,
           colCount: 1,
-          cells: values.map((value, rowOffset) => ({ rowOffset, colOffset: 0, value })),
+          cells: values.map((value, row_offset) => ({
+            rowOffset: row_offset,
+            colOffset: 0,
+            value,
+          })),
         },
       ],
     });
@@ -190,18 +194,18 @@ describe("XLSX formula source preservation", () => {
     };
 
     const encoded = await toXlsxWorkbook(snapshot);
-    const summaryXml = strFromU8(
+    const summary_xml = strFromU8(
       unzipSync(encoded)["xl/worksheets/sheet5.xml"] ?? new Uint8Array(),
     );
-    expect(summaryXml).toContain("<f>SUM(Jan:Mar!A1)</f>");
-    expect(summaryXml).toContain("<f>SUM((Jan!A1,Mar!A1))</f>");
-    expect(summaryXml).toContain("<f>SUM(Jan!A1:A3 Jan!A2:A4)</f>");
-    expect(summaryXml).toContain("<f>SUM(&apos;Jan:Q1 Close&apos;!A1)</f>");
+    expect(summary_xml).toContain("<f>SUM(Jan:Mar!A1)</f>");
+    expect(summary_xml).toContain("<f>SUM((Jan!A1,Mar!A1))</f>");
+    expect(summary_xml).toContain("<f>SUM(Jan!A1:A3 Jan!A2:A4)</f>");
+    expect(summary_xml).toContain("<f>SUM(&apos;Jan:Q1 Close&apos;!A1)</f>");
 
     const decoded = await fromXlsxWorkbook(encoded);
     const summary = decoded.sheets.find((sheet) => sheet.name === "Summary");
     if (!summary) throw new Error("the imported workbook lost the Summary sheet");
-    expect(formulaSources({ ...decoded, sheets: [summary] })).toEqual(sources);
+    expect(formula_sources({ ...decoded, sheets: [summary] })).toEqual(sources);
 
     const store = SheetwriteStore.fromSnapshot(decoded);
     const results = sources.map(

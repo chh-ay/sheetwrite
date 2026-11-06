@@ -43,32 +43,32 @@ export function expandSharedFormulas(
 
     for (const member of group.members) {
       const formula = lexes
-        ? memberFormula(engine, group, member)
-        : unreadableMemberFormula(group, member, context);
-      setMemberValue(group, member, formula, external, context);
+        ? member_formula(engine, group, member)
+        : unreadable_member_formula(group, member, context);
+      set_member_value(group, member, formula, external, context);
     }
   }
 }
 
-function memberFormula(
+function member_formula(
   engine: XlsxFormulaEngine,
   group: SharedFormulaGroup,
   member: SharedFormulaMember,
 ): string {
-  const rowDelta = member.cell.rowOffset - group.row;
-  const colDelta = member.cell.colOffset - group.col;
-  if (rowDelta === 0 && colDelta === 0) return group.formula;
+  const row_delta = member.cell.rowOffset - group.row;
+  const col_delta = member.cell.colOffset - group.col;
+  if (row_delta === 0 && col_delta === 0) return group.formula;
 
-  return engine.copy(group.formula, rowDelta, colDelta);
+  return engine.copy(group.formula, row_delta, col_delta);
 }
 
-function unreadableMemberFormula(
+function unreadable_member_formula(
   group: SharedFormulaGroup,
   member: SharedFormulaMember,
   context: XlsxCodecContext,
 ): string {
-  const isMaster = member.cell.rowOffset === group.row && member.cell.colOffset === group.col;
-  if (isMaster) return group.formula;
+  const is_master = member.cell.rowOffset === group.row && member.cell.colOffset === group.col;
+  if (is_master) return group.formula;
 
   emitWarning(context, {
     code: "unsupported-feature",
@@ -82,7 +82,7 @@ function unreadableMemberFormula(
   return member.ownFormula ?? group.formula;
 }
 
-function setMemberValue(
+function set_member_value(
   group: SharedFormulaGroup,
   member: SharedFormulaMember,
   formula: string,

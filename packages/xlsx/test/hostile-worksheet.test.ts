@@ -13,7 +13,7 @@ const LAST_COLUMN = 16_384;
 /** Each hostile workbook must import in well under the default test timeout. */
 const TIMEOUT_MS = 30_000;
 
-function outlinedRows(rows: Iterable<number>, attributes = ""): string {
+function outlined_rows(rows: Iterable<number>, attributes = ""): string {
   let xml = "";
   for (const row of rows) xml += `<row r="${row + 1}" outlineLevel="1"${attributes}/>`;
   return xml;
@@ -29,7 +29,9 @@ describe("hostile worksheets", () => {
     async () => {
       const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
         rawXlsx({
-          sheets: [{ xml: worksheet(`<sheetData>${outlinedRows(range(SHEET_ROWS))}</sheetData>`) }],
+          sheets: [
+            { xml: worksheet(`<sheetData>${outlined_rows(range(SHEET_ROWS))}</sheetData>`) },
+          ],
         }),
       );
 
@@ -43,7 +45,7 @@ describe("hostile worksheets", () => {
   it(
     "groups isolated outlined rows in one walk and keeps their hidden state",
     async () => {
-      const rows = outlinedRows(range(ISOLATED_OUTLINE_ROWS, 2), ' hidden="1"');
+      const rows = outlined_rows(range(ISOLATED_OUTLINE_ROWS, 2), ' hidden="1"');
       const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
         rawXlsx({
           sheets: [

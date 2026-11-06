@@ -28,7 +28,7 @@ export interface OpcRelationship {
   readonly external: boolean;
 }
 
-function opcFailure(message: string, cause?: unknown): never {
+function opc_failure(message: string, cause?: unknown): never {
   throw new TypeError(
     boundedErrorText(`Sheetwrite: invalid XLSX OPC package: ${message}`),
     cause === undefined ? undefined : { cause },
@@ -48,7 +48,7 @@ export function relationshipsPart(sourcePart: string): string {
 export function relationshipSourcePart(part: string): string {
   if (part.toLowerCase() === "_rels/.rels") return "";
   const match = /^(.*\/)?_rels\/([^/]+)\.rels$/i.exec(part);
-  if (!match) return opcFailure(`relationship part name ${part} is invalid`);
+  if (!match) return opc_failure(`relationship part name ${part} is invalid`);
   return `${match[1] ?? ""}${match[2]}`;
 }
 
@@ -58,7 +58,7 @@ export function resolveRelationshipTarget(sourcePart: string, rawTarget: string)
     decoded = decodeURIComponent(rawTarget);
   } catch (error) {
     if (!(error instanceof URIError)) throw error;
-    return opcFailure(`relationship target ${rawTarget} has invalid escaping`, error);
+    return opc_failure(`relationship target ${rawTarget} has invalid escaping`, error);
   }
   if (
     decoded.includes("\\") ||
@@ -66,10 +66,10 @@ export function resolveRelationshipTarget(sourcePart: string, rawTarget: string)
     decoded.includes("?") ||
     decoded.includes("#")
   ) {
-    return opcFailure(`relationship target ${rawTarget} is unsafe`);
+    return opc_failure(`relationship target ${rawTarget} is unsafe`);
   }
   if (/^[a-z][a-z\d+.-]*:/i.test(decoded))
-    return opcFailure(`internal relationship target ${rawTarget} has a URI scheme`);
+    return opc_failure(`internal relationship target ${rawTarget} has a URI scheme`);
   const output = decoded.startsWith("/")
     ? []
     : sourcePart
@@ -80,42 +80,42 @@ export function resolveRelationshipTarget(sourcePart: string, rawTarget: string)
     if (segment === "" || segment === ".") continue;
     if (segment === "..") {
       if (output.length === 0)
-        return opcFailure(`relationship target ${rawTarget} escapes the package`);
+        return opc_failure(`relationship target ${rawTarget} escapes the package`);
       output.pop();
     } else output.push(segment);
   }
   return normalizeDecodedPartName(output.join("/"), rawTarget);
 }
 
-function parseRelationships(
+function parse_relationships(
   root: XmlElement,
-  sourcePart: string,
+  source_part: string,
   context: XlsxCodecContext,
 ): OpcRelationship[] {
-  assertXmlRoot(root, "Relationships", [PACKAGE_RELATIONSHIPS_NS], relationshipsPart(sourcePart));
+  assertXmlRoot(root, "Relationships", [PACKAGE_RELATIONSHIPS_NS], relationshipsPart(source_part));
   const relationships: OpcRelationship[] = [];
   const ids = new Set<string>();
   for (const element of xmlChildren(root, "Relationship")) {
     const id = xmlAttribute(element, "Id");
     const type = xmlAttribute(element, "Type");
-    const rawTarget = xmlAttribute(element, "Target");
-    if (!id || !type || !rawTarget)
-      return opcFailure(`relationship in ${relationshipsPart(sourcePart)} is incomplete`);
+    const raw_target = xmlAttribute(element, "Target");
+    if (!id || !type || !raw_target)
+      return opc_failure(`relationship in ${relationshipsPart(source_part)} is incomplete`);
     if (ids.has(id))
-      return opcFailure(`duplicate relationship id ${id} in ${relationshipsPart(sourcePart)}`);
+      return opc_failure(`duplicate relationship id ${id} in ${relationshipsPart(source_part)}`);
     ids.add(id);
     const external = xmlAttribute(element, "TargetMode") === "External";
     if (external && !relationshipTypeMatches(type, "hyperlink")) {
       emitWarning(context, {
         code: "external-relationship",
         message: `External relationship ${id} was not followed`,
-        part: sourcePart || "/",
+        part: source_part || "/",
       });
     }
     relationships.push({
       id,
       type,
-      target: external ? rawTarget : resolveRelationshipTarget(sourcePart, rawTarget),
+      target: external ? raw_target : resolveRelationshipTarget(source_part, raw_target),
       external,
     });
   }
@@ -127,7 +127,7 @@ export class OpcPackage {
   readonly contentTypes = new Map<string, string>();
   readonly defaultContentTypes = new Map<string, string>();
   readonly #context: XlsxCodecContext;
-  readonly #relationshipCache = new Map<string, readonly OpcRelationship[]>();
+  readonly #relationship_cache = new Map<string, readonly OpcRelationship[]>();
   readonly #resident = new Map<string, Uint8Array>();
 
   private constructor(archive: ZipReader, context: XlsxCodecContext) {
@@ -140,37 +140,37 @@ export class OpcPackage {
     context: XlsxCodecContext,
   ): Promise<OpcPackage> {
     const archive = await ZipReader.open(input, context);
-    const packageFile = new OpcPackage(archive, context);
-    packageFile.#initializeTypes(
+    const package_file = new OpcPackage(archive, context);
+    package_file.#initialize_types(
       parseXml(await archive.read("[Content_Types].xml"), "[Content_Types].xml", context),
     );
     for (const part of archive.entries.keys()) {
       if (!part.toLowerCase().endsWith(".rels")) continue;
       const source = relationshipSourcePart(part);
-      packageFile.#relationshipCache.set(
+      package_file.#relationship_cache.set(
         asciiFold(source),
-        parseRelationships(parseXml(await archive.read(part), part, context), source, context),
+        parse_relationships(parseXml(await archive.read(part), part, context), source, context),
       );
     }
-    return packageFile;
+    return package_file;
   }
 
-  #initializeTypes(root: XmlElement): void {
+  #initialize_types(root: XmlElement): void {
     const context = this.#context;
     assertXmlRoot(root, "Types", [CONTENT_TYPES_NS], "[Content_Types].xml");
     for (const item of root.children) {
       const local = xmlLocalName(item.name);
-      const contentType = xmlAttribute(item, "ContentType");
-      if (!contentType) opcFailure("content type declaration is incomplete");
+      const content_type = xmlAttribute(item, "ContentType");
+      if (!content_type) opc_failure("content type declaration is incomplete");
       if (local === "Default") {
         const extension = xmlAttribute(item, "Extension")?.toLowerCase();
-        if (!extension) opcFailure("default content type has no extension");
-        this.defaultContentTypes.set(extension, contentType);
+        if (!extension) opc_failure("default content type has no extension");
+        this.defaultContentTypes.set(extension, content_type);
       } else if (local === "Override") {
-        const rawName = xmlAttribute(item, "PartName");
-        if (!rawName?.startsWith("/")) opcFailure("override part name must be absolute");
-        const name = normalizePartName(rawName.slice(1));
-        const foldedName = asciiFold(name);
+        const raw_name = xmlAttribute(item, "PartName");
+        if (!raw_name?.startsWith("/")) opc_failure("override part name must be absolute");
+        const name = normalizePartName(raw_name.slice(1));
+        const folded_name = asciiFold(name);
         if (!this.archive.has(name)) {
           emitWarning(context, {
             code: "unsupported-feature",
@@ -179,7 +179,7 @@ export class OpcPackage {
           });
           continue;
         }
-        this.contentTypes.set(foldedName, contentType);
+        this.contentTypes.set(folded_name, content_type);
       }
     }
   }
@@ -211,9 +211,9 @@ export class OpcPackage {
   }
 
   relationships(sourcePart: string): readonly OpcRelationship[] {
-    const normalizedSource = sourcePart === "" ? "" : normalizePartName(sourcePart);
-    const key = normalizedSource === "" ? "" : asciiFold(normalizedSource);
-    const cached = this.#relationshipCache.get(key);
+    const normalized_source = sourcePart === "" ? "" : normalizePartName(sourcePart);
+    const key = normalized_source === "" ? "" : asciiFold(normalized_source);
+    const cached = this.#relationship_cache.get(key);
     if (cached) return cached;
     return [];
   }
@@ -221,7 +221,7 @@ export class OpcPackage {
   relationship(sourcePart: string, id: string): OpcRelationship {
     const relationship = this.relationships(sourcePart).find((candidate) => candidate.id === id);
     if (!relationship || relationship.external)
-      return opcFailure(`relationship ${id} from ${sourcePart || "/"} is unavailable`);
+      return opc_failure(`relationship ${id} from ${sourcePart || "/"} is unavailable`);
     return relationship;
   }
 
@@ -230,7 +230,7 @@ export class OpcPackage {
       (candidate) =>
         relationshipTypeMatches(candidate.type, "officeDocument") && !candidate.external,
     );
-    if (!relationship) return opcFailure("office document relationship is missing");
+    if (!relationship) return opc_failure("office document relationship is missing");
     return relationship.target;
   }
 

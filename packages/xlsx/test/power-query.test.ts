@@ -76,14 +76,14 @@ function snapshot(queries: SavedQuery[] = [sales]): WorkbookSnapshot {
   };
 }
 
-function collect(warnings: XlsxWorkbookWarning[], withCodec = true) {
+function collect(warnings: XlsxWorkbookWarning[], with_codec = true) {
   return {
     onWarning: (warning: XlsxWorkbookWarning) => warnings.push(warning),
-    ...(withCodec ? { powerQuery: codec } : {}),
+    ...(with_codec ? { powerQuery: codec } : {}),
   };
 }
 
-function addItem(
+function add_item(
   file: Uint8Array,
   item: Uint8Array,
   extra: Record<string, Uint8Array> = {},
@@ -104,7 +104,7 @@ describe("Power Query packaging", () => {
   it("reports each M difference and binds the output table to a new connection", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), collect(warnings)));
-    const tableXml = strFromU8(files["xl/tables/table1.xml"] ?? new Uint8Array());
+    const table_xml = strFromU8(files["xl/tables/table1.xml"] ?? new Uint8Array());
 
     expect(warnings).toContainEqual(
       expect.objectContaining({
@@ -112,8 +112,8 @@ describe("Power Query packaging", () => {
         message: expect.stringContaining("host-source"),
       }),
     );
-    expect(tableXml).toContain('tableType="queryTable"');
-    expect(tableXml).toContain('queryTableFieldId="1"');
+    expect(table_xml).toContain('tableType="queryTable"');
+    expect(table_xml).toContain('queryTableFieldId="1"');
     expect(strFromU8(files["xl/tables/_rels/table1.xml.rels"] ?? new Uint8Array())).toContain(
       "queryTable1.xml",
     );
@@ -138,10 +138,10 @@ describe("Power Query packaging", () => {
   });
 
   it("restores definitions from hidden metadata when no M parts were written", async () => {
-    const valuesOnly = await backend.toXlsxWorkbook(snapshot(), collect([], false));
+    const values_only = await backend.toXlsxWorkbook(snapshot(), collect([], false));
 
     expect(
-      (await backend.fromXlsxWorkbook(valuesOnly, collect([], false))).workbook.queries,
+      (await backend.fromXlsxWorkbook(values_only, collect([], false))).workbook.queries,
     ).toEqual([sales]);
   });
 
@@ -154,7 +154,7 @@ describe("Power Query packaging", () => {
     for (let index = 0; index < item.length; index++) utf16[2 + index * 2] = item.charCodeAt(index);
 
     const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await backend.fromXlsxWorkbook(addItem(base, utf16), collect(warnings));
+    const imported = await backend.fromXlsxWorkbook(add_item(base, utf16), collect(warnings));
 
     expect(imported.workbook.queries).toBeUndefined();
     expect(warnings).toContainEqual(
