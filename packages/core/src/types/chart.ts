@@ -38,6 +38,13 @@ export interface ChartDefinition {
   legend?: "none" | "top" | "right" | "bottom" | "left";
   anchor: ChartAnchor;
   series: ChartSeries[];
+  /**
+   * The ID of a pivot on the same sheet whose result the chart shows, as an
+   * Excel PivotChart does: the row items are the categories, and each value
+   * field (for each column item) is a series. `series` is empty then. Charts
+   * over pivots show on dashboards.
+   */
+  pivot?: string;
 }
 
 /** Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order. */

@@ -17,6 +17,8 @@ mod index;
 mod info;
 mod iteration;
 mod literal_criteria;
+mod literal_products;
+mod literal_statistics;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -26,6 +28,8 @@ mod number_format;
 #[cfg(test)]
 mod number_format_corpus_tests;
 mod operators;
+#[cfg(test)]
+mod pass_rule_tests;
 mod random;
 mod range_fold;
 mod range_reader;
@@ -81,6 +85,8 @@ use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+#[cfg(feature = "analysis")]
+pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
@@ -881,15 +887,19 @@ impl CellStore {
             .index()
             .is_some_and(|index| !index.has_dynamic_arrays())
         {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.evaluate_pass(&mut pass, found_cycle);
+            if self.independent_pass() {
+                self.evaluate_independent_pass(&affected, &mut memo);
+            } else {
+                let mut pass = EvalPass {
+                    affected: &affected,
+                    results: &mut memo,
+                };
+                self.evaluate_pass(&mut pass, found_cycle);
 
-            for id in affected.ids() {
-                if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(id, result);
+                for id in affected.ids() {
+                    if let Some(result) = pass.results.remove(id) {
+                        self.store_formula_result(id, result);
+                    }
                 }
             }
 
@@ -1338,6 +1348,32 @@ impl CellStore {
         data.spill.install(range, &mut data.cells, |offset| {
             calculated_slot(strings, &matrix.values[offset])
         })
+    }
+
+    /// Whether no selected formula can read another one during the pass: no
+    /// static formula-to-formula reads, no runtime references (`OFFSET` and
+    /// `INDIRECT` are volatile) and no iteration. Each formula then reads
+    /// only stored values, so its result can go to storage at once.
+    fn independent_pass(&self) -> bool {
+        self.iteration.is_none()
+            && !self.formula_slots.has_volatile()
+            && self
+                .graph
+                .index()
+                .is_some_and(|index| !index.has_formula_dependencies())
+    }
+
+    /// Evaluates each selected formula once and writes its result to storage
+    /// at once: no pass result table, active-call bits or second write loop.
+    fn evaluate_independent_pass(&mut self, affected: &FormulaWork, memo: &mut FormulaResults) {
+        for id in affected.ids() {
+            let mut pass = EvalPass {
+                affected,
+                results: memo,
+            };
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            self.store_formula_result(id, result);
+        }
     }
 
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
@@ -1867,6 +1903,21 @@ impl CellStore {
             | Func::XLookup
             | Func::XMatch => return self.eval_lookup_family(func, args, sheet, pass, depth + 1),
             _ => {}
+        }
+
+        if func == Func::SumProduct {
+            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
+        if matches!(
+            func,
+            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
+        ) {
+            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
+                return result;
+            }
         }
 
         if func == Func::Sum {

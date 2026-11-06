@@ -157,3 +157,69 @@ mod sort {
         assert_eq!(sort_formula("=[@Qty]*Rate", 4), "=[@Qty]*Rate");
     }
 }
+
+/// Renaming a table or a column updates the structured references that name
+/// it, as Excel updates formulas: "Rename an Excel table" and "Using
+/// structured references with Excel tables" on Microsoft Support.
+mod structured_renames {
+    use crate::formula_rewrite::rename_structured_reference;
+
+    /// The column argument of a table rename.
+    const NO_COLUMN: &str = "";
+
+    #[test]
+    fn a_table_rename_updates_its_references_only() {
+        assert_eq!(
+            rename_structured_reference(
+                "=SUM(orders[amount]) / SUM(Orders2[amount])",
+                "ORDERS",
+                NO_COLUMN,
+                "Sales"
+            ),
+            "=SUM(Sales[amount]) / SUM(Orders2[amount])"
+        );
+        assert_eq!(
+            rename_structured_reference(
+                "=orders[[#Headers],[amount]]&\"orders[x]\"",
+                "orders",
+                NO_COLUMN,
+                "Sales"
+            ),
+            "=Sales[[#Headers],[amount]]&\"orders[x]\""
+        );
+    }
+
+    #[test]
+    fn a_column_rename_updates_that_tables_column_in_every_section() {
+        assert_eq!(
+            rename_structured_reference(
+                "=SUM(orders[Amount])+orders[@amount]+LEN(orders[[#Totals],[AMOUNT]])+other[amount]+orders[qty]",
+                "Orders",
+                "amount",
+                "Net"
+            ),
+            "=SUM(orders[Net])+orders[@Net]+LEN(orders[[#Totals],[Net]])+other[amount]+orders[qty]"
+        );
+    }
+
+    #[test]
+    fn an_empty_table_renames_unqualified_references() {
+        assert_eq!(
+            rename_structured_reference(
+                "=[Total Sales]/orders[total sales]+[Other]",
+                "",
+                "total sales",
+                "Revenue"
+            ),
+            "=[Revenue]/orders[total sales]+[Other]"
+        );
+    }
+
+    #[test]
+    fn text_that_does_not_lex_stays() {
+        assert_eq!(
+            rename_structured_reference("=\"open", "orders", NO_COLUMN, "x"),
+            "=\"open"
+        );
+    }
+}

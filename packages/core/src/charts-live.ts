@@ -141,6 +141,17 @@ function seriesName(
   return `Series ${index + 1}`;
 }
 
+/** Builds the view of a chart over a pivot; set by the dashboard chunk when it loads. */
+let pivotCharts: ((store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView) | null =
+  null;
+
+/** Set how charts over pivots resolve; the dashboard chunk calls it once. */
+export function setPivotChartViews(
+  views: (store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView,
+): void {
+  pivotCharts = views;
+}
+
 /**
  * Resolve one chart to plain data the renderer draws without reading cells.
  * Values that are not numbers (text, booleans, errors, empty cells) become
@@ -153,6 +164,8 @@ export function resolveChartView(store: Store, sheet: SheetId, id: string): Char
   const sheets = sheetMap(store);
   const chart = sheets.get(sheet)?.charts?.find((candidate) => candidate.id === id);
   if (!chart) return null;
+  // A chart over a pivot reads the pivot's result; the dashboard chunk supplies the reader.
+  if (chart.pivot !== undefined) return pivotCharts?.(store, sheet, chart) ?? { chart, series: [] };
 
   const series = chart.series.map((source, index) => {
     const values = readRange(store, sheets, source.values);
@@ -447,7 +460,8 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
-      // Formula results can depend on names, calculation settings and sheet identity/order.
+    case "setExternalLinks":
+      // Formula results can depend on names, calculation settings, linked values and sheet identity/order.
       context.valuesChanged = true;
       return;
 

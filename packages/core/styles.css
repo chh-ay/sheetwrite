@@ -2492,6 +2492,34 @@ textarea.sheetwrite-ribbon-field {
   padding: 6px 8px;
 }
 
+/* A KPI card shows one value, large, in the middle of its box. */
+.sheetwrite-dashboard-kpi {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A KPI card shows one value, large, in the middle of its box. */
+.sheetwrite-dashboard-kpi {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The chart renderer sizes its drawing to the whole body. */
+.sheetwrite-dashboard-item-body.sheetwrite-dashboard-chart {
+  overflow: hidden;
+  padding: 0;
+}
+
 .sheetwrite-dashboard-resize {
   position: absolute;
   right: 0;
@@ -2577,4 +2605,10 @@ textarea.sheetwrite-ribbon-field {
 .sheetwrite-panel-format input {
   flex: 1;
   min-width: 0;
+}
+
+/* A slicer value that no row has under the other slicers, as Excel dims it. */
+.sheetwrite-dashboard-slicer-value[data-no-data] {
+  color: var(--sheetwrite-widget-muted, #98a2b3);
+  border-style: dashed;
 }
