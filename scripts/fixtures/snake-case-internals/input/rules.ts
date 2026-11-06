@@ -4,7 +4,13 @@ export function exportedEntry(inputValue: number): number {
   // `localTotal` is passed to `privateHelper`.
   const localTotal = inputValue + 1;
   // A prose mention of localTotal may name an OOXML term, so it stays.
-  return privateHelper(localTotal);
+  return privateHelper(localTotal) + readLoose();
+}
+
+/** A key on an untyped value resolves to no symbol and does not block the local. */
+function readLoose(): number {
+  const looseValue = 1;
+  return JSON.parse("{}").looseValue + looseValue;
 }
 
 /**

@@ -250,6 +250,29 @@ function classify(name: Node): RenameKind | undefined {
   return undefined;
 }
 
+const KEY_PARENTS = new Set<SyntaxKind>([
+  SyntaxKind.PropertyAccessExpression,
+  SyntaxKind.PropertyAssignment,
+  SyntaxKind.PropertySignature,
+  SyntaxKind.PropertyDeclaration,
+  SyntaxKind.MethodSignature,
+  SyntaxKind.MethodDeclaration,
+  SyntaxKind.GetAccessor,
+  SyntaxKind.SetAccessor,
+  SyntaxKind.EnumMember,
+  SyntaxKind.QualifiedName,
+  SyntaxKind.JsxAttribute,
+]);
+
+/** Whether `name` is a property key or member name, which can never refer to a local. */
+function is_key_position(name: Node): boolean {
+  const parent = name.parent;
+  if (isBindingElement(parent)) return parent.propertyName === name;
+  if (!KEY_PARENTS.has(parent.kind) || !("name" in parent)) return false;
+
+  return parent.name === name;
+}
+
 function names_in(node: Node, collect: (name: Node) => void): void {
   if (isIdentifier(node) || isPrivateIdentifier(node)) collect(node);
   node.forEachChild((child) => {
@@ -477,7 +500,7 @@ async function collect_candidates(
       }
 
       if (!symbol) {
-        unresolved.add(`${file.fileName}\0${text_of(name)}`);
+        if (!is_key_position(name)) unresolved.add(`${file.fileName}\0${text_of(name)}`);
         continue;
       }
 
