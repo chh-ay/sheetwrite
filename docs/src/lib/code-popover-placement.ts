@@ -36,16 +36,25 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, Math.max(min, max)));
 }
 
-/** The panel's box on `side`, as Floating UI would place it before shifting. */
-export function panelBox(side: PanelSide, input: PlacementInput): Box {
+/** Where the panel opens: a side of the line, and how far past the gap. */
+export interface PanelPlacement {
+  readonly side: PanelSide;
+  /** Extra distance from the line, to clear highlighted mentions next to it. */
+  readonly shift: number;
+}
+
+/** The panel's box for `placement`, as Floating UI would place it before shifting. */
+export function panelBox(placement: PanelPlacement, input: PlacementInput): Box {
   const { trigger, line, lineEnd, panel, viewport, gap } = input;
-  if (side === "beside") {
-    const left = lineEnd + gap;
+  const distance = gap + placement.shift;
+  if (placement.side === "beside") {
+    const left = lineEnd + distance;
     const top = clamp(line.top, viewport.top, viewport.bottom - panel.height);
     return { left, top, right: left + panel.width, bottom: top + panel.height };
   }
   const left = clamp(trigger.left, viewport.left, viewport.right - panel.width);
-  const top = side === "below" ? line.bottom + gap : line.top - gap - panel.height;
+  const top =
+    placement.side === "below" ? line.bottom + distance : line.top - distance - panel.height;
   return { left, top, right: left + panel.width, bottom: top + panel.height };
 }
 
@@ -71,17 +80,44 @@ function sidesInOrder(input: PlacementInput): PanelSide[] {
 }
 
 /**
- * The first side, in preference order, whose panel fits the viewport and
- * covers no mention; else the fitting side that covers the fewest; else below.
+ * The same side, moved just past every mention its panel would cover, so
+ * the highlighted mentions stay visible above (or below) the panel. Narrow
+ * screens have no room beside the line, so this is how they keep mentions
+ * in view.
  */
-export function choosePanelSide(input: PlacementInput): PanelSide {
-  let best: { side: PanelSide; covered: number } | undefined;
-  for (const side of sidesInOrder(input)) {
-    const box = panelBox(side, input);
+function pastMentions(side: PanelSide, input: PlacementInput): PanelPlacement | undefined {
+  if (side === "beside") return undefined;
+  let shift = 0;
+  for (let step = 0; step < input.mentions.length; step += 1) {
+    const box = panelBox({ side, shift }, input);
+    const covered = input.mentions.filter((mention) => overlaps(box, mention));
+    if (covered.length === 0) return shift === 0 ? undefined : { side, shift };
+    shift =
+      side === "below"
+        ? Math.max(...covered.map((mention) => mention.bottom)) - input.line.bottom
+        : input.line.top - Math.min(...covered.map((mention) => mention.top));
+  }
+  return undefined;
+}
+
+/**
+ * The first placement, in preference order, whose panel fits the viewport and
+ * covers no mention: the sides at the usual gap, then the vertical sides moved
+ * past the mentions; else the fitting side that covers the fewest; else below.
+ */
+export function choosePanelPlacement(input: PlacementInput): PanelPlacement {
+  const sides = sidesInOrder(input);
+  const candidates: PanelPlacement[] = [
+    ...sides.map((side) => ({ side, shift: 0 })),
+    ...sides.flatMap((side) => pastMentions(side, input) ?? []),
+  ];
+  let best: { placement: PanelPlacement; covered: number } | undefined;
+  for (const placement of candidates) {
+    const box = panelBox(placement, input);
     if (!fitsViewport(box, input.viewport)) continue;
     const covered = input.mentions.filter((mention) => overlaps(box, mention)).length;
-    if (covered === 0) return side;
-    if (best === undefined || covered < best.covered) best = { side, covered };
+    if (covered === 0) return placement;
+    if (best === undefined || covered < best.covered) best = { placement, covered };
   }
-  return best?.side ?? "below";
+  return best?.placement ?? { side: "below", shift: 0 };
 }

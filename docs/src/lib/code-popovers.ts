@@ -26,7 +26,12 @@ import {
   type VirtualElement,
 } from "@floating-ui/dom";
 
-import { type Box, choosePanelSide, type PanelSide } from "./code-popover-placement.js";
+import {
+  type Box,
+  choosePanelPlacement,
+  type PanelPlacement,
+  type PanelSide,
+} from "./code-popover-placement.js";
 
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
 const STORE_SELECTOR = "template.sw-code-popover-store";
@@ -239,7 +244,7 @@ function anchorFor(side: PanelSide, trigger: HTMLElement): VirtualElement {
 async function positionPopover(
   anchor: VirtualElement,
   panel: HTMLElement,
-  side: PanelSide,
+  { side, shift: extra }: PanelPlacement,
 ): Promise<void> {
   const area = panelArea();
   const padding = {
@@ -253,7 +258,7 @@ async function positionPopover(
     strategy: "fixed",
     placement: FLOATING_PLACEMENT[side],
     middleware: [
-      offset(PANEL_OFFSET_PX),
+      offset(PANEL_OFFSET_PX + extra),
       // Beside the line the panel only shifts; above or below it may flip
       // when scrolling leaves no room on its side.
       ...(side === "beside" ? [] : [flip({ padding, fallbackPlacements: [opposite] })]),
@@ -290,7 +295,7 @@ export function openCodePopover(trigger: HTMLElement): void {
   // already laid out, so these reads force no layout.
   const related = relatedTriggers(trigger, panelId);
   const line = lineOf(trigger);
-  const side = choosePanelSide({
+  const placement = choosePanelPlacement({
     trigger: boxOf(trigger),
     line: boxOf(line),
     lineEnd: lineTextEnd(line),
@@ -303,13 +308,13 @@ export function openCodePopover(trigger: HTMLElement): void {
   closePopover();
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
-  const anchor = anchorFor(side, trigger);
+  const anchor = anchorFor(placement.side, trigger);
   // Positions in microtasks before the next frame, so the first painted frame
   // shows the panel in place.
   const stopPositioning = autoUpdate(
     anchor,
     panel,
-    () => void positionPopover(anchor, panel, side),
+    () => void positionPopover(anchor, panel, placement),
   );
   panel.setAttribute(PANEL_OPEN_ATTRIBUTE, "");
   activePopover = { trigger, panel, related, stopPositioning };

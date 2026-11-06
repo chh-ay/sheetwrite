@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   type Box,
-  choosePanelSide,
+  choosePanelPlacement,
   type PlacementInput,
 } from "../src/lib/code-popover-placement.js";
 
@@ -25,20 +25,23 @@ function input(mentions: readonly Box[], viewportWidth = 1440): PlacementInput {
 
 describe("code popover placement", () => {
   it("opens below the line when no mention is in the way", () => {
-    expect(choosePanelSide(input([]))).toBe("below");
+    expect(choosePanelPlacement(input([]))).toEqual({ side: "below", shift: 0 });
   });
 
   it("opens above when the symbol's other mentions are below", () => {
-    expect(choosePanelSide(input([box(420, 480, 60, 20)]))).toBe("above");
+    expect(choosePanelPlacement(input([box(420, 480, 60, 20)]))).toEqual({
+      side: "above",
+      shift: 0,
+    });
   });
 
   it("opens beside the line end when mentions are above and below", () => {
     const mentions = [box(420, 340, 60, 20), box(420, 480, 60, 20)];
-    expect(choosePanelSide(input(mentions))).toBe("beside");
+    expect(choosePanelPlacement(input(mentions))).toEqual({ side: "beside", shift: 0 });
   });
 
-  it("without room beside, covers the fewest mentions", () => {
+  it("without room beside, opens past the mentions next to the line", () => {
     const mentions = [box(420, 300, 60, 20), box(420, 480, 60, 20), box(420, 520, 60, 20)];
-    expect(choosePanelSide(input(mentions, 800))).toBe("above");
+    expect(choosePanelPlacement(input(mentions, 800))).toEqual({ side: "above", shift: 100 });
   });
 });
