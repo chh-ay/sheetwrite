@@ -79,12 +79,82 @@
     color-mix(in srgb, var(--perf-measured) 32%, transparent);
 }
 
+/* ---- Machine switch: one machine at a time, shared by the bars and the speed story ---- */
+
+.machine-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-2);
+}
+
+.machine-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.machine-switch label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  padding: var(--sw-space-1-5) var(--sw-space-4);
+  border-radius: var(--sw-radius-pill);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--sw-motion-fast, 120ms) ease,
+    color var(--sw-motion-fast, 120ms) ease;
+}
+
+.machine-switch label:hover {
+  color: var(--sw-fg-strong);
+}
+
+.machine-switch input:checked + label,
+.machine-switch:not(:has(input:checked)) input[data-default] + label {
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  box-shadow: var(--sw-shadow-sm);
+}
+
+.machine-switch input:checked + label .sw-icon,
+.machine-switch:not(:has(input:checked)) input[data-default] + label .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+.machine-switch input:focus-visible + label {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
 /* ---- Machine groups ---- */
 
 .perf-bars__group + .perf-bars__group {
   margin-top: var(--sw-space-3);
   padding-top: var(--sw-space-4);
   border-top: 1px solid var(--sw-border-strong);
+}
+
+.perf-bars[data-switched] .machine-switch {
+  margin-bottom: var(--sw-space-4);
+}
+
+/* With a switch, only the chosen machine's group shows, in the same place. */
+.perf-bars[data-switched] .perf-bars__group + .perf-bars__group {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.perf-bars[data-switched]:has(input[value="linux"]:checked) .perf-bars__group[data-machine]:not([data-machine="linux"]),
+.perf-bars[data-switched]:has(input[value="mac"]:checked) .perf-bars__group[data-machine]:not([data-machine="mac"]),
+.perf-bars[data-switched]:not(:has(.machine-switch input:checked)) .perf-bars__group[data-machine]:not([data-default]) {
+  display: none;
 }
 
 /* The machine leads its group; the capture line and the axis caption share its left edge. */

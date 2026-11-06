@@ -28,59 +28,6 @@
   margin: 0;
 }
 
-/* ---- Machine switch ---- */
-
-.speed-story__switch {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-pill);
-  background: var(--sw-surface-2);
-}
-
-.speed-story__switch input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
-}
-
-.speed-story__switch label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sw-space-1-5);
-  padding: var(--sw-space-1-5) var(--sw-space-4);
-  border-radius: var(--sw-radius-pill);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background-color var(--sw-motion-fast, 120ms) ease,
-    color var(--sw-motion-fast, 120ms) ease;
-}
-
-.speed-story__switch label:hover {
-  color: var(--sw-fg-strong);
-}
-
-.speed-story__switch input:checked + label,
-.speed-story:not(:has(.speed-story__switch input:checked)) input[data-default] + label {
-  background: var(--sw-surface-1);
-  color: var(--sw-fg-strong);
-  box-shadow: var(--sw-shadow-sm);
-}
-
-.speed-story__switch input:checked + label .sw-icon,
-.speed-story:not(:has(.speed-story__switch input:checked)) input[data-default] + label .sw-icon {
-  color: var(--sw-icon-accent);
-}
-
-.speed-story__switch input:focus-visible + label {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
-}
-
 .speed-story__panel {
   display: none;
   margin-top: var(--sw-space-5);
@@ -88,7 +35,7 @@
 
 .speed-story:has(input[value="linux"]:checked) .speed-story__panel[data-machine="linux"],
 .speed-story:has(input[value="mac"]:checked) .speed-story__panel[data-machine="mac"],
-.speed-story:not(:has(.speed-story__switch input:checked)) .speed-story__panel[data-default] {
+.speed-story:not(:has(.machine-switch input:checked)) .speed-story__panel[data-default] {
   display: block;
   animation: speed-story-in 280ms ease both;
 }

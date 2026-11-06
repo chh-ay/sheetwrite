@@ -125,5 +125,5 @@ export function renderSpeedupStory(story: SpeedupStory, icon: PerfIconMarkup): s
         `<section class="speed-story__panel" data-machine="${machine.machine}"${index === 0 ? " data-default" : ""} aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta"><b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine)}${overview(machine, story.baseName)}${details(machine, story.baseName)}</section>`,
     )
     .join("");
-  return `<div class="speed-story" data-pagefind-ignore><div class="speed-story__switch" role="radiogroup" aria-label="Machine">${radios}</div>${panels}</div>`;
+  return `<div class="speed-story" data-pagefind-ignore><div class="machine-switch" role="radiogroup" aria-label="Machine">${radios}</div>${panels}</div>`;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { type PerfFigure, type PerfRow, perfVerdict } from "../src/lib/perf-bars.ts";
 import { parsePerfCompare } from "../src/lib/perf-compare.ts";
+import { renderReleaseChange } from "../src/lib/release-change.ts";
 
 const TIME_FIGURE: PerfFigure = {
   id: "test",
@@ -101,5 +102,34 @@ describe("release-note comparisons", () => {
       /mixes times and sizes/,
     );
     expect(() => parsePerfCompare(block("Import | 1 | 2"), "x")).toThrow(/is not a value/);
+  });
+});
+
+describe("engine change", () => {
+  it("draws only workloads whose run ranges do not overlap, and counts the rest as noise", () => {
+    const workload = (id: string, base: number, measured: number) => ({
+      id,
+      label: id,
+      base: { value: base, spread: [base * 0.95, base * 1.05] as const },
+      measured: { value: measured, spread: [measured * 0.95, measured * 1.05] as const },
+    });
+    const html = renderReleaseChange(
+      {
+        id: "change",
+        baseName: "0.6.0",
+        measuredName: "0.7.0 engine",
+        machine: "linux",
+        machineLabel: "Linux",
+        note: "",
+        workloads: [workload("faster", 10, 5), workload("same", 10, 10.2), workload("slower", 10, 20)],
+      },
+      () => "",
+    );
+    const drawn = [...html.matchAll(/class="change__row" data-verdict="(\w+)"><span class="change__label">(\w+)/gu)];
+    expect(drawn.map((match) => [match[2], match[1]])).toEqual([
+      ["faster", "better"],
+      ["slower", "worse"],
+    ]);
+    expect(html).toContain("1 workload within noise");
   });
 });
