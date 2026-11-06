@@ -22,73 +22,6 @@
      the strip scrolls horizontally inside itself so the page never
      overflows. */
 
-  .sw-si-sectionnav {
-    position: sticky;
-    top: var(--sw-header-height);
-    z-index: 30;
-    display: flex;
-    align-items: stretch;
-    gap: var(--sw-space-4);
-    margin: var(--sw-space-4) 0 var(--sw-space-3);
-    overflow-x: auto;
-    border-bottom: 1px solid var(--sw-border);
-    background: color-mix(in srgb, var(--sw-surface-0) 94%, transparent);
-    scrollbar-width: none;
-  }
-
-  .sw-si-sectionnav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .sw-si-sectionnav__progress {
-    flex: none;
-    align-self: center;
-    margin-right: var(--sw-space-1);
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
-    letter-spacing: var(--sw-tracking-eyebrow);
-  }
-
-  .sw-si-sectionnav a {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: var(--sw-space-1-5);
-    padding: var(--sw-space-2) var(--sw-space-0-5) var(--sw-space-2);
-    border-bottom: 2px solid transparent;
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-medium) var(--sw-text-small) var(--font-sans);
-    text-decoration: none;
-    white-space: nowrap;
-    transition:
-      border-color var(--sw-motion-fast) var(--sw-motion-decelerate),
-      color var(--sw-motion-fast) var(--sw-motion-decelerate);
-  }
-
-  .sw-si-sectionnav a span {
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) var(--font-mono);
-  }
-
-  .sw-si-sectionnav a:hover {
-    color: var(--sw-fg-strong);
-  }
-
-  .sw-si-sectionnav a:focus-visible {
-    border-radius: var(--sw-radius-xs);
-    outline: 2px solid var(--sw-accent);
-    outline-offset: -2px;
-  }
-
-  .sw-si-sectionnav a[aria-current="true"] {
-    border-bottom-color: var(--sw-accent);
-    color: var(--sw-fg-strong);
-  }
-
-  .sw-si-sectionnav a[aria-current="true"] span {
-    color: var(--sw-accent-strong);
-  }
-
   /* ── Sections ── */
 
   .sw-si-section {
@@ -1801,10 +1734,6 @@
      --sw-header-height, so the section rail stays in flow there instead of
      sticking under (and overlapping) it — same fallback as the hub rail. */
   @media (max-width: 54rem) {
-    .sw-si-sectionnav {
-      position: static;
-    }
-
     .sw-si-section {
       scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-4));
     }
@@ -1838,15 +1767,6 @@
     .sw-si-stage {
       min-height: 0;
       block-size: 100%;
-    }
-
-    .sw-si-sectionnav {
-      gap: var(--sw-space-3);
-    }
-
-    .sw-si-sectionnav a {
-      padding-block: var(--sw-space-2) var(--sw-space-2);
-      font-size: var(--sw-text-caption);
     }
 
     .sw-si-compat {
@@ -2075,7 +1995,6 @@
   display: none;
 }
 .sw-si-disclosure > summary > strong::after,
-.sw-si-model > summary::after,
 .sw-si-source-proof > summary::after,
 .sw-si-producers summary::after,
 .sw-si-results__apps summary::after,

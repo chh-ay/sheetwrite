@@ -187,18 +187,6 @@ const COMPATIBILITY_DIALECTS = [
   ...new Set(compatibilityData.records.map((record) => record.dialect)),
 ];
 
-const SECTIONS = [
-  { id: "xlsx", label: "Live workbook" },
-  { id: "contract", label: "Compatibility evidence" },
-  { id: "fixtures", label: "Source workbooks" },
-  { id: "warnings", label: "Warning log" },
-  { id: "delimited", label: "CSV / TSV lab" },
-  { id: "limits", label: "Hostile-input lab" },
-  { id: "isolation", label: "Package boundary" },
-] as const;
-
-type SectionId = (typeof SECTIONS)[number]["id"];
-
 type WorkbenchSource =
   | { kind: "snapshot"; label: string; snapshot: WorkbookSnapshot }
   | { kind: "columnar"; label: string; columns: Column[]; data: ColumnarData };
@@ -482,7 +470,6 @@ function useInteroperabilityWorkbench() {
   const [tsvPreview, setTsvPreview] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionId>(SECTIONS[0].id);
   const [fixtureLoad, setFixtureLoad] = useState<FixtureLoad | null>(null);
   const [modelReadout, setModelReadout] = useState<AnalyticalReadout | null>(null);
   const [modelChange, setModelChange] = useState<AnalyticalChange | null>(null);
@@ -634,32 +621,6 @@ function useInteroperabilityWorkbench() {
       cancelled = true;
     };
   }, [fixtureBytes]);
-
-  // Scroll-spy for the persistent section rail: the section crossing the
-  // reading band (upper third of the viewport) is the current one.
-  useEffect(() => {
-    const intersecting = new Set<string>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) intersecting.add(entry.target.id);
-          else intersecting.delete(entry.target.id);
-        }
-        for (const section of SECTIONS) {
-          if (intersecting.has(section.id)) {
-            setActiveSection(section.id);
-            return;
-          }
-        }
-      },
-      { rootMargin: "-30% 0px -55% 0px" },
-    );
-    for (const section of SECTIONS) {
-      const element = document.getElementById(section.id);
-      if (element) observer.observe(element);
-    }
-    return () => observer.disconnect();
-  }, []);
 
   // The engine resolves --sheetwrite-* custom properties at grid mount.
   // When the site theme flips, re-run that resolution (DEFAULT < CSS < options)
@@ -926,10 +887,6 @@ function useInteroperabilityWorkbench() {
   };
 
   const injectionCsvLine = csvPreview?.split(/\r?\n/).find((line) => line.includes("'=HYPERLINK("));
-  const activeIndex = Math.max(
-    0,
-    SECTIONS.findIndex((section) => section.id === activeSection),
-  );
   const spillExamples = roundTrip?.formulaExamples ?? [];
   const spillExamplesStored = spillExamples.filter((example) => example.exported !== null).length;
   const spillExamplesEncoded = spillExamples.filter((example) =>
@@ -953,8 +910,6 @@ function useInteroperabilityWorkbench() {
   return {
     resetWorkbench,
     source,
-    activeSection,
-    activeIndex,
     action,
     run,
     hostRef,
@@ -1013,7 +968,7 @@ type InteroperabilityWorkbench = ReturnType<typeof useInteroperabilityWorkbench>
 
 function InteroperabilityRoute() {
   const workbench = useInteroperabilityWorkbench();
-  const { activeSection, activeIndex, roundTrip } = workbench;
+  const { roundTrip } = workbench;
 
   return (
     <ShowcaseLayout
@@ -1042,29 +997,17 @@ function InteroperabilityRoute() {
           <SpillProof workbench={workbench} />
         </ShowcaseSection>
       )}
-      <div className="sw-si-page">
-        <nav aria-label="Page sections" className="sw-si-sectionnav">
-          <span aria-hidden="true" className="sw-si-sectionnav__progress">
-            {String(activeIndex + 1).padStart(2, "0")}/{String(SECTIONS.length).padStart(2, "0")}
-          </span>
-          {SECTIONS.map((section, index) => (
-            <a
-              aria-current={activeSection === section.id ? "true" : undefined}
-              href={`#${section.id}`}
-              key={section.id}
-            >
-              <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-              {section.label}
-            </a>
-          ))}
-        </nav>
+      <section aria-labelledby="interop-evidence" className="sw-si-page">
+        <h2 className="sw-showcase__section-title" id="interop-evidence">
+          Evidence and labs
+        </h2>
         <ContractSection />
         <FixturesSection workbench={workbench} />
         <WarningsSection workbench={workbench} />
         <DelimitedSection workbench={workbench} />
         <LimitsSection workbench={workbench} />
         <IsolationSection workbench={workbench} />
-      </div>
+      </section>
     </ShowcaseLayout>
   );
 }

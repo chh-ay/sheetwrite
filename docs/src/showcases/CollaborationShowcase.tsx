@@ -1327,7 +1327,7 @@ export default function CollaborationShowcase({
           <span className="sw-clb__status-detail">{statusDetail}</span>
         </span>
       }
-      demoTitle="Shared forecast · two clients, one sequencing server"
+      demoTitle="Shared forecast"
     >
       <ShowcaseSection id="collaboration-faults" title="Protocol faults">
         <AdvancedDrills workbench={workbench} />
@@ -1456,7 +1456,7 @@ function ProtocolControls({ workbench }: Readonly<{ workbench: CollaborationClie
   );
 }
 
-/** Each client's forecast total and version beside the server head. */
+/** Where each client is against the server head. */
 function ConvergenceReadout({ workbench }: Readonly<{ workbench: CollaborationClients }>) {
   const { atHead, views, serverVersion, clientsAtHead } = workbench;
   return (
@@ -1465,11 +1465,13 @@ function ConvergenceReadout({ workbench }: Readonly<{ workbench: CollaborationCl
         ...CLIENT_KEYS.map((key) => {
           const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
           const pending = views[key].syncState?.pendingCount ?? 0;
-          const state =
-            pending > 0 ? `${pending} queued` : atHead(key) ? "caught up" : "catching up";
+          const version = views[key].syncState?.serverVersion ?? 0;
           return {
-            label: `${actor.displayName}'s forecast`,
-            value: `${views[key].total} · v${views[key].syncState?.serverVersion ?? 0} · ${state}`,
+            label: actor.displayName,
+            value:
+              pending > 0
+                ? `v${version} · ${pending} queued`
+                : `v${version} · ${atHead(key) ? "caught up" : "catching up"}`,
           };
         }),
         {

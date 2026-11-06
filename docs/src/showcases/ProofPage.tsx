@@ -91,7 +91,7 @@ export function ProofPage({
       </ShowcaseSection>
       <section
         aria-labelledby={`${slug}-boundary`}
-        className="sw-proofs-boundary"
+        className="sw-showcase__section sw-prose sw-proofs-boundary"
         data-testid="proof-boundary"
       >
         <h2 className="sw-showcase__section-title" id={`${slug}-boundary`}>

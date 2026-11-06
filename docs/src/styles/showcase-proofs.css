@@ -238,6 +238,12 @@
   border: 0;
 }
 
+/* The autosave switch takes its own row, so its label never clips. */
+.sw-dbx__controls .sw-proofs-switch {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 .sw-clb__steps {
   display: grid;
   gap: var(--sw-space-2);
@@ -644,7 +650,8 @@
   display: grid;
   gap: var(--sw-space-3);
   margin: 0;
-  padding-left: var(--sw-space-5);
+  padding: 0;
+  list-style: none;
 }
 
 .sw-proofs-points li {
@@ -661,10 +668,9 @@
 }
 
 /* The ownership map: two lanes and the contract between them. */
-.sw-proofs-boundary {
-  display: grid;
+.sw-showcase__section.sw-proofs-boundary {
+  max-width: none;
   gap: var(--sw-space-4);
-  min-width: 0;
 }
 
 .sw-proofs-boundary > p {
