@@ -24,6 +24,7 @@ import { contentPathForRoute } from "./docs-content-checks.js";
 import { entryLabel, entrySlug } from "./docs-paths.js";
 import {
   exists,
+  frontmatter,
   type MarkdownDocument,
   MIGRATION_ROUTES,
   PACKAGE_DIRECTORIES,
@@ -43,10 +44,6 @@ function packageSourcePath(packageName: string, source: string): string {
   if (packageDirectory === undefined) return source;
   const normalized = posix(normalize(join(packageDirectory, file)));
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
-}
-
-export function frontmatter(title: string, description: string): string {
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
 }
 
 interface DeclarationMember {
@@ -243,22 +240,29 @@ function memberDocumentationHtml(
   documentation: string,
   routes: DocumentationLinkRoutes,
 ): string {
-  return html(documentation).replace(
-    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
-    (_match, target: string, label: string | undefined) => {
-      const text = label?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
-      return route === undefined
-        ? `<code>${text}</code>`
-        : `<a href="${route}"><code>${text}</code></a>`;
-    },
-  );
+  return html(documentation)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(
+      /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
+      (_match, target: string, label: string | undefined) => {
+        const text = label?.trim() || target;
+        const route = documentationLinkRoute(pkg, entry, item, target, routes);
+        return route === undefined
+          ? `<code>${text}</code>`
+          : `<a href="${route}"><code>${text}</code></a>`;
+      },
+    );
 }
 
-function compactSummary(markdown: string): string {
+/**
+ * The first sentence of a doc comment as one line. Inline code keeps its
+ * backticks when the summary is rendered as HTML (member rows); search and
+ * social descriptions are plain text.
+ */
+function compactSummary(markdown: string, keepInlineCode = false): string {
   const plain = markdown
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[`*_~]/g, "")
+    .replace(keepInlineCode ? /[*_~]/g : /[`*_~]/g, "")
     .replace(/\s+/g, " ")
     .trim();
   const firstSentence = /^.{24,240}?[.!?](?=\s|$)/.exec(plain)?.[0];
@@ -736,8 +740,9 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
 }
 
 /**
- * Member rows plus an anchor index for long lists. Members start collapsed;
- * explicit fragment navigation reveals its target through the docs shell.
+ * The Members section: its heading, an anchor index for long lists, then the
+ * member rows. Members start collapsed; explicit fragment navigation reveals
+ * its target through the docs shell.
  */
 function renderMembers(
   pkg: ApiPackage,
@@ -746,7 +751,7 @@ function renderMembers(
   members: readonly DeclarationMember[],
   routes: DocumentationLinkRoutes,
   aliases: ReadonlyMap<string, UnionAlias>,
-): { index: string; list: string } {
+): string {
   const searchTargets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
       (target) =>
@@ -778,7 +783,7 @@ function renderMembers(
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
     const summary =
-      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "");
+      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "", true);
     const summaryDoc =
       documentation === undefined
         ? ""
@@ -800,14 +805,15 @@ function renderMembers(
       `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
       `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
       "",
-      // A fenced block so member signatures get real syntax highlighting.
-      "```ts generated",
+      // A fenced block so member signatures get real syntax highlighting; the
+      // member grammar reads a lone `readonly name: Type;` as a class member.
+      "```ts-member generated",
       signature,
       "```",
       "",
       // Skip the body paragraph when it would only restate the summary line.
       ...(documentation === undefined ||
-      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
+      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary.replace(/`/g, "")
         ? []
         : [
             /(?:^|\n)@(example|see)\b/.test(documentation)
@@ -817,23 +823,29 @@ function renderMembers(
       "</details>",
     ].join("\n");
   });
-  return {
-    index:
-      members.length <= MEMBER_INDEX_MINIMUM
-        ? ""
-        : [
-            '<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>',
-            ...indexLinks,
-            "</nav>",
-          ].join("\n"),
-    list: [
-      `## Members <span class="api-count" data-pagefind-ignore>${members.length}</span>`,
-      "",
-      '<div class="api-member-list">',
-      ...rows,
-      "</div>",
-    ].join("\n"),
-  };
+  // Overloads share one entry in the index and in the count.
+  const memberCount = new Set(members.map((member) => member.name)).size;
+  const index =
+    members.length <= MEMBER_INDEX_MINIMUM
+      ? []
+      : [
+          // Collapsed: a hundred names would push the first member a screen down.
+          '<details class="api-member-index" data-pagefind-ignore>',
+          `<summary>Jump to a member <span class="api-count">${memberCount}</span></summary>`,
+          '<nav aria-label="Members">',
+          ...indexLinks,
+          "</nav>",
+          "</details>",
+          "",
+        ];
+  return [
+    `## Members <span class="api-count" data-pagefind-ignore>${memberCount}</span>`,
+    "",
+    ...index,
+    '<div class="api-member-list">',
+    ...rows,
+    "</div>",
+  ].join("\n");
 }
 
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
@@ -856,9 +868,8 @@ export async function renderSymbolPage(
   const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
   const body = [
-    frontmatter(`${item.name} | ${label}`, description).trimEnd(),
+    frontmatter(`${item.name} | ${label}`, description, item.kind).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
-    `<div class="api-pagehead"><a class="api-backlink" href="/docs/api/${entrySlug(pkg.name, entry.subpath)}/">${html(label)}</a><span class="api-status" data-kind="${item.kind}">${item.kind}</span></div>`,
     "",
     summary,
     "",
@@ -868,9 +879,7 @@ export async function renderSymbolPage(
     "",
   ];
   if (shape.members.length > 0) {
-    const members = renderMembers(pkg, entry, item, shape.members, routes, aliases);
-    if (members.index.length > 0) body.push(members.index, "");
-    body.push(members.list, "");
+    body.push(renderMembers(pkg, entry, item, shape.members, routes, aliases), "");
   }
 
   // A variants section earns its space only for structured unions; scalar

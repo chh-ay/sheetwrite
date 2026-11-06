@@ -1,11 +1,13 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, refresh_sheet_spans, rename_sheet_refs, serialize, shift_cols,
-    shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    invalidate_sheet_refs, move_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs,
+    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
+use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
+use std::borrow::Cow;
 use std::rc::Rc;
 
 // TypeScript mirrors these values in packages/core/src/store/wire-tags.ts;
@@ -322,6 +324,26 @@ pub(crate) enum FormulaValueKind {
     Blank,
 }
 
+/// Values, cell references and operators only, with no function, range,
+/// name, array or LET anywhere in the tree.
+fn ast_is_plain(ast: &Ast) -> bool {
+    match ast {
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::InvalidRef => true,
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_is_plain(left) && ast_is_plain(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_plain(inner),
+        _ => false,
+    }
+}
+
 fn ast_is_volatile(ast: &Ast) -> bool {
     match ast {
         Ast::Func(
@@ -377,7 +399,10 @@ fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
 #[derive(Clone, Debug)]
 pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
-    pub(crate) source: String,
+    /// The formula text as the user wrote it. After an edit rewrites the
+    /// references of the tree, its references are out of date until
+    /// [`FormulaEntry::source`] writes them again; read it through that.
+    source: String,
     pub(crate) reads: ReadSet,
     // Low nibble: source-error slot + 1 (zero means none). Upper bits are
     // independent predicates. Keep this private to prevent invalid encodings.
@@ -391,6 +416,22 @@ impl FormulaEntry {
     const PRODUCES_ARRAY: u16 = 1 << 6;
     const REFERENCE: u16 = 1 << 7;
     const CALLS_SUBTOTAL: u16 = 1 << 8;
+    /// An edit changed the references of the tree after `source` was set.
+    const STALE_REFERENCES: u16 = 1 << 9;
+
+    /// The formula text: the text the user wrote, with each reference that
+    /// an edit has changed since written from the tree. An edit only marks
+    /// the text, so a rename or a row edit over many formulas writes none of
+    /// them; the text is written when it is read. Out of line: many readers.
+    #[inline(never)]
+    pub(crate) fn source(&self) -> Cow<'_, str> {
+        match &self.ast {
+            Some(ast) if self.flags & Self::STALE_REFERENCES != 0 => {
+                Cow::Owned(write_references(&self.source, ast))
+            }
+            _ => Cow::Borrowed(&self.source),
+        }
+    }
 
     /// Source parse rejection; recalculation never mutates this value.
     pub(crate) fn source_error(&self) -> Option<FormulaError> {
@@ -444,6 +485,18 @@ impl FormulaEntry {
     }
 
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
+        // A formula of values, cells and operators has no function, range,
+        // name or array: every flag below stays clear, and its reads are the
+        // only metadata that needs a walk.
+        if ast_is_plain(&ast) {
+            return Self {
+                flags: 0,
+                reads: ReadSet::from_ast(&ast, sheet),
+                ast: Some(ast),
+                source,
+            };
+        }
+
         let (reads, volatile) = formula_metadata(&ast, sheet);
 
         let mut entry = Self {
@@ -547,8 +600,11 @@ impl FormulaEntry {
     }
 
     /// Applies `rewrite` to the entry's tree. When it reports a change, the
-    /// source text and read metadata follow the new tree; otherwise the text
-    /// stays as the user wrote it. Returns whether anything changed.
+    /// read metadata follows the new tree, and the source text is marked so
+    /// that its references are written from the tree when it is read; the
+    /// rest stays as the user wrote it, as in Excel. Returns whether anything
+    /// changed. Out of line, so the edits that call it share one copy.
+    #[inline(never)]
     fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
@@ -556,9 +612,13 @@ impl FormulaEntry {
         if !rewrite(ast) {
             return false;
         }
-        self.source = serialize(ast);
+
         let (reads, volatile) = formula_metadata(ast, formula_sheet);
         self.reads = reads;
+
+        // A plain reference has no source text: its tree is the target.
+        let has_text = self.flags & Self::REFERENCE == 0;
+        self.set_flag(Self::STALE_REFERENCES, has_text);
         self.set_volatile(volatile);
         true
     }
@@ -593,6 +653,44 @@ impl FormulaEntry {
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
         self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
+    }
+
+    /// Follow `block` (`from`, `count`, `to`) rows or, with `columns`,
+    /// columns of `edited_sheet` that moved; see [`move_refs`].
+    pub(crate) fn move_axis(
+        &mut self,
+        edited_sheet: u32,
+        formula_sheet: u32,
+        columns: bool,
+        block: (u32, u32, u32),
+    ) -> bool {
+        self.rewrite_ast(formula_sheet, |ast| {
+            move_refs(ast, edited_sheet, formula_sheet, columns, block)
+        })
+    }
+
+    /// Point the entry's references to a sheet of another workbook at the
+    /// link sheet `handle` (`Some`), or back to unresolved references when
+    /// the link sheet `key` names goes away (`None`).
+    pub(crate) fn relink_sheet(
+        &mut self,
+        key: &str,
+        handle: Option<u32>,
+        formula_sheet: u32,
+    ) -> bool {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !relink_sheet_refs(ast, key, handle) {
+            return false;
+        }
+
+        // A relinked reference writes the same text, so the source stays as
+        // the user wrote it instead of being written again from the tree.
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.set_volatile(volatile);
+        true
     }
 
     /// Re-places the entry's 3-D references in the tab `order`; `names` holds

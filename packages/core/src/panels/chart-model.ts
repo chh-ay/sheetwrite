@@ -1,11 +1,13 @@
 // Chart definitions that Insert › Chart and the Chart panel build, as plain
 // data, so the rules are tested without a DOM.
 
-import { MAX_CHART_POINTS } from "../charts-live.js";
+import { MAX_CHART_POINTS, MAX_CHART_SERIES } from "../chart-definition.js";
 import { cellRange, normalizedRange } from "../store/ranges.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartAnchor, ChartDefinition, ChartKind, ChartSeries } from "../types/chart.js";
 import type { Range, Selection, SheetId } from "../types/coordinates.js";
+import type { PivotValueField } from "../types/pivot.js";
+import { AGGREGATION_LABELS } from "./pivot-model.js";
 
 /** Size of a new chart in CSS pixels; Excel's default chart is 5 by 3 inches. */
 export const DEFAULT_CHART_WIDTH = 480;
@@ -123,4 +125,50 @@ export function chartFromRange(
     height: DEFAULT_CHART_HEIGHT,
   };
   return { id, kind, anchor, series };
+}
+
+/**
+ * The caption of each value field of a pivot, in order, as the Field List
+ * shows it: the value's own name, its measure's name, or "Sum of Field".
+ */
+export function pivotValueCaptions(
+  values: readonly PivotValueField[],
+  fieldName: (field: number) => string,
+  measureName: (id: string) => string | undefined,
+): string[] {
+  return values.map((value) => {
+    if (value.name !== undefined) return value.name;
+    if ("measure" in value) return measureName(value.measure) ?? value.measure;
+    const aggregation = AGGREGATION_LABELS.find(([key]) => key === value.aggregation)?.[1];
+    return `${aggregation ?? value.aggregation} of ${fieldName(value.field)}`;
+  });
+}
+
+/** Whether a chart over a pivot plots the pivot's value `slot`. */
+export function plotsPivotValue(chart: ChartDefinition, slot: number): boolean {
+  return chart.pivotValues === undefined || chart.pivotValues.includes(slot);
+}
+
+/**
+ * `chart`, over a pivot with `count` value fields, with value `slot` plotted
+ * or not. Null when that leaves no value plotted, or when `slot` cannot be
+ * listed. Plotting every value drops `pivotValues`, the default.
+ */
+export function withPivotValue(
+  chart: ChartDefinition,
+  count: number,
+  slot: number,
+  plotted: boolean,
+): ChartDefinition | null {
+  if (slot >= MAX_CHART_SERIES) return null;
+  const all = Array.from({ length: Math.min(count, MAX_CHART_SERIES) }, (_, index) => index);
+  const current = chart.pivotValues ?? all;
+  const next = plotted
+    ? [...new Set([...current, slot])].sort((left, right) => left - right)
+    : current.filter((candidate) => candidate !== slot);
+  if (next.length === 0) return null;
+
+  const { pivotValues: _plotted, ...rest } = chart;
+  const everyValue = next.length === count && next.every((candidate, index) => candidate === index);
+  return everyValue ? rest : { ...rest, pivotValues: next };
 }

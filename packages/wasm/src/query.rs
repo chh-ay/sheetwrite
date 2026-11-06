@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
+use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
 use crate::sort_text::push_collation_key;
@@ -1144,57 +1145,32 @@ pub(crate) fn ascii_contains_ignore_case(hay: &[u8], needle: &[u8]) -> bool {
     })
 }
 
-/// Match a numeric cell's textual form against `needle` without the per-cell
-/// `f64::to_string` heap allocation. Formatting uses a stack buffer and falls
-/// back to an owned string on overflow so results stay correct.
+/// Match a numeric cell's textual form against `needle`. The text is the
+/// one `f64::to_string` gives, written on the stack so a cell does not
+/// allocate.
 pub(crate) fn number_matches_text(
     value: f64,
     needle: &str,
     case_insensitive: bool,
     whole_cell: bool,
 ) -> bool {
-    use std::fmt::Write as _;
-
-    let mut buf = NumBuf::new();
-    if write!(buf, "{value}").is_ok() {
-        matches_needle(buf.as_str(), needle, case_insensitive, whole_cell)
-    } else {
-        matches_needle(&value.to_string(), needle, case_insensitive, whole_cell)
+    // A finite number's text has only digits, `-` and `.`, none of which
+    // has a case: a needle with any other character cannot match it, so the
+    // number is not written out.
+    if value.is_finite() && !needle.bytes().all(is_number_text_byte) {
+        return false;
     }
+
+    matches_needle(
+        NumberText::of(value).as_str(),
+        needle,
+        case_insensitive,
+        whole_cell,
+    )
 }
 
-/// Fixed stack buffer implementing [`std::fmt::Write`], used to format an `f64`
-/// off the heap. Overflow reports an error so the caller can fall back to an owned string.
-pub(crate) struct NumBuf {
-    buf: [u8; 32],
-    len: usize,
-}
-
-impl NumBuf {
-    pub(crate) fn new() -> Self {
-        Self {
-            buf: [0; 32],
-            len: 0,
-        }
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        // `write_str` only appends ASCII float text, so the bytes are valid UTF-8.
-        std::str::from_utf8(&self.buf[..self.len]).unwrap_or("")
-    }
-}
-
-impl std::fmt::Write for NumBuf {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        let bytes = s.as_bytes();
-        let end = self.len + bytes.len();
-        if end > self.buf.len() {
-            return Err(std::fmt::Error);
-        }
-        self.buf[self.len..end].copy_from_slice(bytes);
-        self.len = end;
-        Ok(())
-    }
+fn is_number_text_byte(byte: u8) -> bool {
+    byte.is_ascii_digit() || byte == b'-' || byte == b'.'
 }
 
 /// Number of direct-mapped slots in [`MatchCache`]. A power of two so the slot

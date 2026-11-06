@@ -1,0 +1,223 @@
+/* Code hovers: the hoverable symbols inside code blocks and the panel that
+   opens for them (`lib/code-popovers.ts`). The panel is appended to `body`,
+   outside every code block, so its rules are not scoped to `.sw-prose`. */
+
+/* ── Triggers ─────────────────────────────────────────────────────────────
+   At rest code reads as plain highlighted code: only Sheetwrite API names
+   carry a very faint dotted underline. A symbol shows its tint when pointed
+   at or focused. Rules are scoped to `.expressive-code` so they win over the
+   prose link style on symbols that are also links. */
+.expressive-code {
+  /* The symbol highlight: every code token colour keeps 4.5:1 on it in both
+     themes (measured: 4.8:1 for the weakest token). */
+  --sw-code-symbol-highlight: color-mix(in srgb, var(--sw-accent-soft) 70%, var(--sw-code-bg));
+}
+
+.expressive-code .sw-code-popover__trigger {
+  border-radius: var(--sw-radius-xs);
+  color: inherit;
+  text-decoration: underline dotted transparent;
+  text-decoration-thickness: var(--sw-border-width);
+  text-underline-offset: 0.25em;
+  cursor: help;
+  outline: none;
+  transition:
+    background-color var(--sw-motion-fast) var(--sw-motion-standard),
+    text-decoration-color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.expressive-code a.sw-code-popover__trigger {
+  cursor: pointer;
+}
+
+/* Only public Sheetwrite API names keep a very faint dotted underline at
+   rest; locals, library names and keywords show the affordance (the symbol
+   tint below) only while the pointer is on them or they hold focus. */
+.expressive-code .sw-code-popover__trigger[data-sw-api] {
+  text-decoration-color: color-mix(in srgb, var(--sw-border-strong) 60%, transparent);
+}
+
+/* The open symbol and its other mentions in the same block share one tint;
+   the open one adds an accent edge. */
+.expressive-code .sw-code-popover__trigger:hover,
+.expressive-code .sw-code-popover__trigger[data-popover-open="true"],
+.expressive-code .sw-code-popover__trigger[data-popover-related] {
+  background: var(--sw-code-symbol-highlight);
+  text-decoration-color: transparent;
+}
+
+.expressive-code .sw-code-popover__trigger[data-popover-open="true"] {
+  box-shadow: inset 0 0 0 var(--sw-border-width) var(--sw-accent);
+}
+
+/* An outline, not a shadow, so the ring stays visible in forced-colors mode. */
+.expressive-code .sw-code-popover__trigger:focus-visible {
+  background: var(--sw-code-symbol-highlight);
+  outline: var(--sw-focus-ring-width) solid var(--sw-accent);
+  outline-offset: var(--sw-border-width);
+}
+
+/* Identifiers in generated declarations link to their API pages. */
+.sw-prose .expressive-code a.sw-code-ref {
+  color: inherit;
+  text-decoration: underline dotted var(--sw-field-edge);
+  text-decoration-thickness: var(--sw-border-width);
+  text-underline-offset: 0.25em;
+}
+
+.sw-prose .expressive-code a.sw-code-ref:hover {
+  color: var(--sw-accent-strong);
+  text-decoration-color: currentColor;
+}
+
+/* ── Panel ──────────────────────────────────────────────────────────────── */
+/* Panels are prepared hidden in `body` (laid out, invisible, out of the
+   accessibility tree) and shown with `data-open`. */
+.sw-code-popover__panel {
+  z-index: 1000;
+  display: block;
+  box-sizing: border-box;
+  /* Size to content: a short signature gets a small panel. Floating UI sets
+     the viewport clamp inline as the panel opens. */
+  width: max-content;
+  max-width: min(34rem, calc(100vw - var(--sw-space-6)));
+  max-height: 30rem;
+  overflow: auto;
+  visibility: hidden;
+  pointer-events: none;
+  border: var(--sw-border-width) solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow-lg);
+  color: var(--sw-fg);
+  font: var(--sw-weight-regular) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+  text-align: start;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--sw-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.sw-code-popover__panel[data-open] {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* The signature uses the site code theme: tokens carry the `sw-code-<role>`
+   classes from components.css, which read the theme's colour tokens. */
+.sw-code-popover__signature {
+  display: block;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  overflow-x: auto;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-code-bg);
+  color: var(--sw-code-fg);
+  font: var(--sw-weight-regular) var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
+  tab-size: 2;
+  white-space: pre;
+}
+
+.sw-code-popover__signature--narrow {
+  display: none;
+}
+
+.sw-code-popover__docs,
+.sw-code-popover__tags {
+  display: block;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  white-space: normal;
+}
+
+.sw-code-popover__docs {
+  max-width: var(--sw-measure-lead);
+  color: var(--sw-fg);
+}
+
+.sw-code-popover__tags {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-code-popover__docs + .sw-code-popover__tags {
+  padding-top: 0;
+}
+
+/* Tag labels and the "See also" lead-in read as body text, one weight up. */
+.sw-code-popover__tag-name {
+  margin-inline-end: var(--sw-space-1-5);
+  color: var(--sw-fg);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-code-popover__separator {
+  margin-inline: var(--sw-space-2);
+  color: var(--sw-fg-muted);
+}
+
+.sw-code-popover__tag-link {
+  color: var(--sw-accent);
+  font-weight: var(--sw-weight-semibold);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.sw-code-popover__tag-link:hover {
+  color: var(--sw-accent-strong);
+  text-decoration: underline;
+}
+
+.sw-code-popover__link {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  padding: var(--sw-space-2) var(--sw-space-4);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-0);
+  color: var(--sw-accent);
+  font-weight: var(--sw-weight-semibold);
+  text-decoration: none;
+}
+
+.sw-code-popover__link:hover {
+  background: var(--sw-surface-2);
+  color: var(--sw-accent-strong);
+}
+
+.sw-code-popover__link::after {
+  content: "";
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentColor;
+  mask: var(--sw-icon-mask-arrow-right) center / contain no-repeat;
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-code-popover__link:hover::after {
+  transform: translateX(var(--sw-space-0-5));
+}
+
+.sw-code-popover__accessible-signature {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 48rem) {
+  .sw-code-popover__signature--wide {
+    display: none;
+  }
+
+  .sw-code-popover__signature--narrow {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-code-popover__trigger {
+    transition: none;
+  }
+}

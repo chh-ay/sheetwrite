@@ -4,6 +4,7 @@
 // a collaborator) in place, so a field the user is typing in keeps its draft.
 
 import { CHART_KINDS } from "../chart-kinds.js";
+import { findMeasure } from "../data-model.js";
 import { iconNode } from "../icons/resolve.js";
 import type {
   ChartDefinition,
@@ -13,6 +14,7 @@ import type {
   ChartSeries,
 } from "../types/chart.js";
 import type { Grid, GridPanel, IconOverrides } from "../types/grid.js";
+import { pivotValueCaptions, plotsPivotValue, withPivotValue } from "./chart-model.js";
 import {
   committingInput,
   panelField,
@@ -36,6 +38,7 @@ const LEGEND_OPTIONS: readonly (readonly [string, string])[] = [
 
 const VALUES_REQUIRED = "A series needs a values range.";
 const MISSING_CHART = "This chart no longer exists.";
+const LAST_PIVOT_VALUE = "A chart plots at least one value.";
 
 /** A series name that starts with `=` is a cell reference, as in Excel's series dialog. */
 const REFERENCE_PREFIX = "=";
@@ -167,6 +170,55 @@ function renderChartPanel(
     seriesSection.append(...seriesViews.map((view) => view.element));
   };
 
+  // Values of a chart over a pivot: one checkbox per value field, measures
+  // next to fields, as the Field List picks a PivotChart's values.
+  const valueSection = panelSection("Values");
+  const valueList = document.createElement("div");
+  valueList.setAttribute("role", "group");
+  valueList.setAttribute("aria-label", "Values to plot");
+  const valueError = document.createElement("p");
+  valueError.className = "sheetwrite-panel-note";
+  valueError.hidden = true;
+  valueSection.append(valueList, valueError);
+  let valueCaptions = "";
+  const showValues = (chart: ChartDefinition): void => {
+    const pivot = grid.getPivots(ref.sheet).find((candidate) => candidate.id === chart.pivot);
+    const values = pivot?.values ?? [];
+    const fields = pivot === undefined ? [] : grid.getPivotFields(ref.sheet, pivot.id);
+    const captions = pivotValueCaptions(
+      values,
+      (field) =>
+        fields.find((candidate) => candidate.index === field)?.header ?? `Field ${field + 1}`,
+      (id) => findMeasure(grid.store.getWorkbook().dataModel, id)?.name,
+    );
+    if (captions.join("\n") !== valueCaptions) {
+      valueCaptions = captions.join("\n");
+      valueList.replaceChildren(
+        ...captions.map((caption, slot) => {
+          const label = document.createElement("label");
+          label.className = "sheetwrite-panel-check";
+          const box = document.createElement("input");
+          box.type = "checkbox";
+          box.dataset.focusKey = `value-${slot}`;
+          box.addEventListener("change", () => {
+            const message = commit(
+              (current) =>
+                withPivotValue(current, captions.length, slot, box.checked) ?? LAST_PIVOT_VALUE,
+            );
+            valueError.textContent = message ?? "";
+            valueError.hidden = message === null;
+            if (message !== null) box.checked = !box.checked;
+          });
+          label.append(box, document.createTextNode(caption));
+          return label;
+        }),
+      );
+    }
+    valueList.querySelectorAll("input").forEach((box, slot) => {
+      box.checked = plotsPivotValue(chart, slot);
+    });
+  };
+
   // Titles and legend.
   const textSection = panelSection("Titles");
   const titleField = textField("Chart title", "title", (text) =>
@@ -195,7 +247,7 @@ function renderChartPanel(
   missing.textContent = MISSING_CHART;
   missing.hidden = true;
 
-  body.append(missing, kindSection, seriesSection, textSection, legendSection);
+  body.append(missing, kindSection, seriesSection, valueSection, textSection, legendSection);
 
   const show = (): void => {
     const chart = read();
@@ -203,9 +255,16 @@ function renderChartPanel(
     for (const section of [kindSection, seriesSection, textSection, legendSection]) {
       section.hidden = chart === null;
     }
-    if (chart === null) return;
+    if (chart === null) {
+      valueSection.hidden = true;
+      return;
+    }
 
     showKind(chart.kind);
+    // A chart over a pivot takes its data from the pivot, not from ranges.
+    seriesSection.hidden = chart.pivot !== undefined;
+    valueSection.hidden = chart.pivot === undefined;
+    if (chart.pivot !== undefined) showValues(chart);
     if (seriesViews.length !== chart.series.length) buildSeries(chart);
     else chart.series.forEach((series, index) => seriesViews[index]?.show(series));
     titleField.input.show(chart.title ?? "");

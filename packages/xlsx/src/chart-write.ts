@@ -1,6 +1,7 @@
 import type {
   ChartDefinition,
   ChartRange,
+  ChartView,
   SheetSnapshot,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
@@ -85,6 +86,38 @@ function positionLiteral(count: number): string {
   return `<c:xVal><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="${count}"/>${points}</c:numLit></c:xVal>`;
 }
 
+/** One literal point list: `numLit` for numbers, `strLit` for labels; null points are gaps. */
+function literalXml(
+  tag: string,
+  values: readonly (string | number | boolean | null)[],
+  numeric: boolean,
+): string {
+  let points = "";
+  for (const [index, value] of values.entries()) {
+    if (value === null || (numeric && typeof value !== "number")) continue;
+    points += `<c:pt idx="${index}"><c:v>${chartText(String(value))}</c:v></c:pt>`;
+  }
+  const type = numeric ? "numLit" : "strLit";
+  const format = numeric ? "<c:formatCode>General</c:formatCode>" : "";
+  return `<c:${tag}><c:${type}>${format}<c:ptCount val="${values.length}"/>${points}</c:${type}></c:${tag}>`;
+}
+
+/**
+ * Series with literal data, for a chart whose data has no source cells, such
+ * as a dashboard PivotChart: Excel shows the points without a reference.
+ */
+function literalSeriesXml(chart: ChartDefinition, view: ChartView, xml: XmlBuffer): void {
+  const scatter = chart.kind === "scatter";
+  for (const [index, series] of view.series.entries()) {
+    xml.append(`<c:ser><c:idx val="${index}"/><c:order val="${index}"/>`);
+    xml.append(`<c:tx><c:v>${chartText(series.name)}</c:v></c:tx>`);
+    if (scatter) xml.append(positionLiteral(series.values.length));
+    else xml.append(literalXml("cat", series.categories, false));
+    xml.append(literalXml(scatter ? "yVal" : "val", series.values, true));
+    xml.append("</c:ser>");
+  }
+}
+
 function seriesXml(chart: ChartDefinition, snapshot: WorkbookSnapshot, xml: XmlBuffer): void {
   const scatter = chart.kind === "scatter";
   for (const [index, series] of chart.series.entries()) {
@@ -121,6 +154,7 @@ function chartXml(
   chart: ChartDefinition,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
+  literal?: ChartView,
 ): Uint8Array {
   const bar = chart.kind === "column" || chart.kind === "bar";
   const circular = chart.kind === "pie" || chart.kind === "doughnut";
@@ -143,7 +177,8 @@ function chartXml(
     xml.append('<c:grouping val="standard"/>');
   else if (chart.kind === "scatter") xml.append('<c:scatterStyle val="lineMarker"/>');
   xml.append(`<c:varyColors val="${circular ? 1 : 0}"/>`);
-  seriesXml(chart, snapshot, xml);
+  if (literal) literalSeriesXml(chart, literal, xml);
+  else seriesXml(chart, snapshot, xml);
   if (chart.kind === "doughnut")
     xml.append(`<c:firstSliceAng val="0"/><c:holeSize val="${DOUGHNUT_HOLE_PERCENT}"/>`);
   if (!circular) xml.append(`<c:axId val="${CATEGORY_AXIS_ID}"/><c:axId val="${VALUE_AXIS_ID}"/>`);
@@ -202,6 +237,7 @@ export function writeCharts(
   sheetNumber: number,
   keptParts: ReadonlySet<string>,
   context: XlsxCodecContext,
+  literalCharts?: ReadonlyMap<string, ChartView>,
 ): SheetCharts | undefined {
   if (!sheet.charts?.length) return undefined;
 
@@ -210,7 +246,10 @@ export function writeCharts(
   const charts: DrawingChart[] = [];
   for (const [index, chart] of sheet.charts.entries()) {
     const part = freePartName(`xl/charts/sheetwrite-chart${sheetNumber}-${index + 1}`, keptParts);
-    parts.push({ name: part, data: chartXml(chart, snapshot, context) });
+    parts.push({
+      name: part,
+      data: chartXml(chart, snapshot, context, literalCharts?.get(chart.id)),
+    });
     overrides.push({ part, contentType: CHART_CONTENT });
     charts.push({
       target: `/${part}`,

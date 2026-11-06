@@ -131,7 +131,24 @@ One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes
 
 A1 cells (`A1`, `$B12`, `AA$3`), rectangular ranges (`A1:B3`), whole columns and rows (`A:C`, `$2:$5`), and cross-sheet references (`Sales!E2`, `'Sales 2026'!E2:E10`, `Sales!E:E`) are supported. A reference must be inside column `XFD` and row 1048576; a token past them, such as `XYZ1`, is a name. A whole column or row reads only the cells that the sheet has, and a row or column edit keeps it whole. Numbers can have an exponent, such as `1E3` or `1.5E-3`. Absolute markers affect fill/structural rewriting; they do not change evaluation.
 
-References to other workbooks use Excel's forms: `[Budget.xlsx]Annual!C10`, `[Budget.xlsx]Annual!C10:C25`, `'[Budget 2024.xlsx]Annual Plan'!C10` and `'C:\Reports\[Budget.xlsx]Annual'!C10`. The formula text stays as written, a fill moves relative references, and row, column and sheet edits in this workbook do not change them. Sheetwrite does not open the other workbook, so these references show `#REF!` ([#226](https://github.com/chh-ay/sheetwrite/issues/226)). XLSX import still keeps formulas with external links as text.
+References to other workbooks use Excel's forms: `[Budget.xlsx]Annual!C10`, `[Budget.xlsx]Annual!C10:C25`, `'[Budget 2024.xlsx]Annual Plan'!C10` and `'C:\Reports\[Budget.xlsx]Annual'!C10`. The formula text stays as written, a fill moves relative references, and row, column and sheet edits in this workbook do not change them. Sheetwrite never opens the other workbook. A reference shows the value saved for its link, as Excel does when it opens a file with links, and `#REF!` when the workbook has no saved values for that link ([#226](https://github.com/chh-ay/sheetwrite/issues/226)).
+
+The saved values are `workbook.externalLinks` in a snapshot: for each linked workbook, its file name (`book`), where it is (`target`), and the saved cells of each sheet. `validateWorkbookSnapshot` checks only the shape of the links; the store checks each saved cell when it loads, and fails the load with `invalid-snapshot` for a cell outside the sheet limits or a value that formulas cannot hold. XLSX import reads them from Excel's external link parts, and formulas that read a link stay live. XLSX export writes an unchanged link part back byte for byte, writes a changed link from its saved values, and adds a link without values for a workbook that a formula names but the workbook has no link for. A link also keeps the defined names of the linked workbook (`names`: each `name`, the cell or range it `refersTo`, and its `sheet` for a name of one sheet). Formulas use them as Excel shows them: `Budget.xlsx!Total`, `'C:\Reports\Budget.xlsx'!Total`, or `[Budget.xlsx]Annual!Total` for a name of one sheet. A name shows the saved values of the cells it refers to, and `#REF!` when the link does not hold it. XLSX import reads the names from the link part and turns `[1]!Total` into `Budget.xlsx!Total`; export writes them back.
+
+The link commands load from `@sheetwrite/core/external-links`. `updateExternalLinks(grid, resolve)` asks your resolver for the current values of each linked workbook, as Excel's **Update Values** does. The resolver receives the book name, its target and the sheet names. It returns the sheets with their cells, or `null` when the workbook is not available:
+
+```ts prelude="core" partial="requires a mounted grid" title="Partial example"
+import { updateExternalLinks } from "@sheetwrite/core/external-links";
+
+const updates = await updateExternalLinks(grid, async ({ target }) => {
+  const response = await fetch(`/api/workbook-values?target=${encodeURIComponent(target)}`);
+  return response.ok ? await response.json() : null;
+});
+```
+
+`changeExternalLinkSource(grid, book, { book, target })` points the formulas at another workbook, as **Change Source** does. `breakExternalLinks(grid, books)` replaces them with their values and removes the links, as **Break Link** does. Each command is one undoable change, which syncs to collaborators. Excel clears Undo after **Update Values** and **Break Link**; Sheetwrite keeps them undoable, and an undo restores the links and the formulas.
+
+In the grid, **Data › Queries & Connections › Edit Links** lists each link with its location and status, and offers **Update Values**, **Change Source** and **Break Link**. The command shows only for a workbook with links, and the panel loads on first use. **Update Values** needs a resolver: connect one with `connectExternalLinks(grid, resolve)` from `@sheetwrite/core/external-links`. Without it, the panel offers **Change Source** and **Break Link** only.
 
 Named ranges are document operations and snapshot metadata:
 

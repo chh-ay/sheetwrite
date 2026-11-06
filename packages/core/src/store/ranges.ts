@@ -321,6 +321,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setNamedRange":
     case "removeNamedRange":
     case "setCalculation":
+    case "setExternalLinks":
     case "setRelationship":
     case "removeRelationship":
     case "setMeasure":
@@ -488,4 +489,85 @@ export function moveIndex(index: number, from: number, count: number, to: number
   if (index >= from && index < from + count) return to + index - from;
   const removed = index < from ? index : index - count;
   return removed >= to ? removed + count : removed;
+}
+
+/**
+ * The span `start..end` after `count` indexes move from `from` to `to`, as
+ * Excel's Cut and Insert Cut Cells changes a range: a span inside the moved
+ * block moves with it; any other span changes as if the block were deleted
+ * where it was and inserted where it lands. It loses the moved indexes it
+ * held, a moved edge included, and grows by the block only when the block
+ * lands after its first index and at or before its last. The engine applies
+ * the same rule to formula references (`moved_span`).
+ */
+function movedSpan(
+  start: number,
+  end: number,
+  from: number,
+  count: number,
+  to: number,
+): [number, number] | null {
+  if (start >= from && end < from + count) return [to + start - from, to + end - from];
+
+  const removed = remapSpan(start, end, deleteRemap(from, count));
+  return removed && remapSpan(removed[0], removed[1], insertRemap(to, count));
+}
+
+/**
+ * `range` after the move of `move.count` rows or columns along `axis` from
+ * `move.from` to `move.to` (see `movedSpan`). A range on another sheet, or
+ * one the move does not change, is returned as it is; a range that keeps no
+ * index keeps its place.
+ */
+export function rebaseMovedRange(
+  range: Range,
+  axis: SheetAxis,
+  move: {
+    readonly sheet: SheetId;
+    readonly from: number;
+    readonly count: number;
+    readonly to: number;
+  },
+): Range {
+  if (range.sheet !== move.sheet) return range;
+
+  const key = axis === "row" ? "row" : "col";
+  const span = movedSpan(range.start[key], range.end[key], move.from, move.count, move.to);
+  if (!span || (span[0] === range.start[key] && span[1] === range.end[key])) return range;
+
+  return {
+    ...range,
+    start: { ...range.start, [key]: span[0] },
+    end: { ...range.end, [key]: span[1] },
+  };
+}
+
+/**
+ * Whether the rows or columns of `range` stay next to each other after the
+ * move, so no other row or column lands between them. Excel refuses a move
+ * that would split a table this way.
+ */
+export function staysWholeAfterMove(
+  range: Range,
+  axis: SheetAxis,
+  move: {
+    readonly sheet: SheetId;
+    readonly from: number;
+    readonly count: number;
+    readonly to: number;
+  },
+): boolean {
+  if (range.sheet !== move.sheet) return true;
+
+  const key = axis === "row" ? "row" : "col";
+  const start = Math.min(range.start[key], range.end[key]);
+  const end = Math.max(range.start[key], range.end[key]);
+  let low = Number.POSITIVE_INFINITY;
+  let high = Number.NEGATIVE_INFINITY;
+  for (let index = start; index <= end; index++) {
+    const moved = moveIndex(index, move.from, move.count, move.to);
+    low = Math.min(low, moved);
+    high = Math.max(high, moved);
+  }
+  return high - low === end - start;
 }

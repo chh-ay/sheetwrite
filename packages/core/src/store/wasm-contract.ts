@@ -28,7 +28,7 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
     /** Full engine only: source fields of the pivot at `index` in the sheet's payload. */
     pivotFields?(sheet: number, index: number): PivotFieldList;
 
-    /** Full engine only: the output cells of a pivot on a dashboard, which places none in cells. */
+    /** Full engine only: the output cells of a pivot that places none in cells, such as a dashboard pivot. */
     pivotOutput?(sheet: number, index: number): PivotOutputCells;
 
     /**
@@ -45,6 +45,8 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
 export interface PivotOutputCells {
   /** 0 blank, 1 number, 2 text, 3 boolean, 4 error. */
   kinds(): Uint8Array;
+  /** `[rows, cols, headerRows, labelCols]` of the output. */
+  layout(): Uint32Array;
   /** Per cell: the number, the boolean as 0 or 1, or the error slot. */
   numbers(): Float64Array;
   /** The text cells, in order. */

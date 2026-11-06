@@ -1,0 +1,85 @@
+/**
+ * The Sheetwrite icons (`sprite.svg`), one language drawn on a 24-unit grid:
+ * - 2-unit strokes with round joins and caps, set by the `<svg>` that uses a
+ *   symbol (`.sw-icon`); 2-unit corner radius on containers, like cells.
+ * - Colour is `currentColor`. One accent, `--sw-icon-accent`, marks the
+ *   selection: the active cell and its fill handle, a found cell, a result,
+ *   a live signal. Actions (arrows, undo, sort) stay pure strokes; things and
+ *   states carry the accent.
+ * The sprite ships to every page, so its drawing rules live here, not in it.
+ */
+
+/** Every icon in `sprite.svg`, in sprite order; `test/icons.test.ts` keeps the two in step. */
+export const ICON_NAMES = [
+  "arrow-right",
+  "arrow-up",
+  "arrow-down",
+  "arrow-left",
+  "chevron-down",
+  "chevron-right",
+  "close",
+  "plus",
+  "minus",
+  "menu",
+  "external",
+  "check",
+  "search",
+  "copy",
+  "link",
+  "sun",
+  "moon",
+  "terminal",
+  "code",
+  "book",
+  "info",
+  "tip",
+  "warning",
+  "danger",
+  "sheet",
+  "table",
+  "file",
+  "spill",
+  "formula",
+  "pivot",
+  "chart",
+  "dashboard",
+  "database",
+  "layers",
+  "bolt",
+  "sparkle",
+  "history",
+  "clock",
+  "live",
+  "users",
+  "merge",
+  "cloud",
+  "cloud-off",
+  "monitor",
+  "laptop",
+  "server",
+  "shield",
+  "lock",
+  "eye",
+  "filter",
+  "sort",
+  "sort-asc",
+  "sort-desc",
+  "play",
+  "pause",
+  "refresh",
+  "undo",
+  "redo",
+  "eye-off",
+  "sliders",
+  "save",
+  "compare",
+  "restore",
+  "key",
+  "gauge",
+  "function",
+  "download",
+  "upload",
+] as const;
+
+/** The name of one icon in the Sheetwrite sprite. */
+export type IconName = (typeof ICON_NAMES)[number];

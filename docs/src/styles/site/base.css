@@ -5,7 +5,7 @@
 html {
   min-height: 100%;
   background: var(--sw-surface-0);
-  scroll-padding-top: calc(var(--sw-header-height) + 1.5rem);
+  scroll-padding-top: calc(var(--sw-header-height) + var(--sw-space-6));
   /* Short and long pages keep the same width, so moving between them does
      not shift the header, sidebar or text sideways. */
   scrollbar-gutter: stable;
@@ -17,7 +17,7 @@ body {
   color: var(--sw-fg);
   background: var(--sw-surface-0);
   font-family: var(--sw-font-body);
-  font-size: 0.9375rem;
+  font-size: var(--sw-text-small);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
@@ -45,7 +45,7 @@ a {
    colors keeps the UA scrollbar untouched. */
 @media (forced-colors: none) {
   :root {
-    --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-dim) 55%, transparent);
+    --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-muted) 55%, transparent);
     --sw-scrollbar-track: transparent;
     scrollbar-width: thin;
   }
@@ -65,13 +65,13 @@ a {
 
   ::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
-    border-radius: 999px;
+    border-radius: var(--sw-radius-pill);
     background: var(--sw-scrollbar-thumb);
     background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--sw-fg-dim) 78%, transparent);
+    background: color-mix(in srgb, var(--sw-fg-muted) 78%, transparent);
   }
 
   ::-webkit-scrollbar-corner {
@@ -79,35 +79,27 @@ a {
   }
 }
 
-/* Focus affordance: a tight radius-following ring, never a detached outline.
-   Keyboard focus stays visible on every control; only the canvas grid host is
-   exempt because its cell selection is the focus affordance. */
+/* Focus affordance: one solid outline that follows each control's radius, at
+   least 3:1 on every surface. Keyboard focus stays visible on every control;
+   only the canvas grid host is exempt because its cell selection is the focus
+   affordance. Forced-colors mode keeps the outline in the system colour. */
 :focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
 }
 
 .sheetwrite:focus-visible {
-  box-shadow: none;
+  outline: none;
 }
 
 .expressive-code pre:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 40%, transparent);
-}
-
-/* Forced-colors mode removes box shadows, so the focus ring above disappears.
-   There, a real outline in the system highlight color shows focus instead. */
-@media (forced-colors: active) {
-  :focus-visible:not(.sheetwrite) {
-    outline: 2px solid Highlight;
-    outline-offset: 2px;
-  }
+  outline-offset: calc(-1 * var(--sw-focus-ring-width));
 }
 
 /* Text links get a rounded ring shape so the ring never reads as a bare rectangle. */
 .sw-prose a:focus-visible,
 .sw-document__footer a:focus-visible {
-  border-radius: 0.25rem;
+  border-radius: var(--sw-radius-xs);
 }
 
 .sw-visually-hidden {
@@ -119,35 +111,16 @@ a {
   white-space: nowrap;
 }
 
-.sw-brand {
-  display: inline-flex;
-  width: max-content;
-  align-items: center;
-  gap: 0.7rem;
-  color: var(--sw-fg-strong);
-  font: 650 1.05rem / 1 var(--sw-font-display);
-  letter-spacing: -0.025em;
-  text-decoration: none;
-}
-
-.sw-brand svg {
-  width: 1.65rem;
-  height: 1.65rem;
-  fill: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-1));
-  stroke: var(--sw-accent-strong);
-  stroke-width: 1.5;
-}
-
 .sw-skip-link {
   position: fixed;
   top: 0.65rem;
   left: 0.65rem;
   z-index: 2000;
-  border-radius: 0.45rem;
-  padding: 0.6rem 0.9rem;
+  border-radius: var(--sw-radius-md);
+  padding: var(--sw-space-2) var(--sw-space-4);
   color: var(--sw-accent-ink);
   background: var(--sw-accent);
-  font-weight: 700;
+  font-weight: var(--sw-weight-bold);
   transform: translateY(-300%);
 }
 
@@ -155,43 +128,15 @@ a {
   transform: none;
 }
 
-.sw-icon-button {
-  display: inline-grid;
-  width: 2.35rem;
-  height: 2.35rem;
-  place-items: center;
-  border: 0;
-  border-radius: 0.45rem;
-  color: var(--sw-fg-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.sw-icon-button:hover {
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-}
-
-.sw-icon-button svg,
-.sw-search-button svg,
-.sw-search-dialog svg {
-  width: 1rem;
-  height: 1rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.7;
-}
-
 .sw-search-button {
   display: flex;
   width: 100%;
   height: 2.35rem;
   align-items: center;
-  gap: 0.65rem;
+  gap: var(--sw-space-3);
   border: 1px solid var(--sw-border);
-  border-radius: 0.55rem;
-  padding-inline: 0.75rem;
+  border-radius: var(--sw-radius-md);
+  padding-inline: var(--sw-space-3);
   color: var(--sw-fg-muted);
   background: var(--sw-surface-0);
   text-align: left;
@@ -222,29 +167,29 @@ a {
 
 .sw-search-button kbd {
   border: 1px solid var(--sw-border);
-  border-radius: 0.3rem;
-  padding: 0 0.4rem;
-  color: var(--sw-fg-dim);
+  border-radius: var(--sw-radius-xs);
+  padding: 0 var(--sw-space-1-5);
+  color: var(--sw-fg-muted);
   background: var(--sw-surface-1);
-  font: 600 0.7rem / 1.55 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.55 var(--sw-font-mono);
 }
 
 .sw-search-dialog {
   width: min(43rem, calc(100vw - 2rem));
   /* The global margin reset removes the UA's dialog centering; restore it
      as a top-centered command palette. */
-  margin: clamp(2rem, 12vh, 7rem) auto auto;
+  margin: clamp(var(--sw-space-8), 12vh, var(--sw-space-section)) auto auto;
   max-height: min(42rem, calc(100vh - 4rem));
   border: 1px solid var(--sw-border-strong);
-  border-radius: 0.85rem;
+  border-radius: var(--sw-radius-lg);
   padding: 0;
   color: var(--sw-fg);
   background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
+  box-shadow: var(--sw-shadow-lg);
 }
 
 .sw-search-dialog::backdrop {
-  background: rgb(4 8 16 / 72%);
+  background: var(--sw-backdrop);
   backdrop-filter: blur(5px);
 }
 
@@ -257,8 +202,8 @@ a {
 .sw-search-dialog form {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: var(--sw-space-3);
+  padding: var(--sw-space-3);
   border-bottom: 1px solid var(--sw-border);
 }
 
@@ -267,7 +212,7 @@ a {
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 0.7rem;
+  gap: var(--sw-space-3);
 }
 
 .sw-search-dialog input {
@@ -277,36 +222,36 @@ a {
   outline: 0;
   color: var(--sw-fg-strong);
   background: transparent;
-  font-size: 1rem;
+  font-size: var(--sw-text-body);
 }
 
 .sw-search-dialog form > button {
   border: 1px solid var(--sw-border);
-  border-radius: 0.35rem;
-  padding: 0.25rem 0.45rem;
-  color: var(--sw-fg-dim);
+  border-radius: var(--sw-radius-sm);
+  padding: var(--sw-space-1) var(--sw-space-2);
+  color: var(--sw-fg-muted);
   background: var(--sw-surface-2);
-  font: 600 0.7rem var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
 }
 
 .sw-search-results {
   display: grid;
-  gap: 0.3rem;
+  gap: var(--sw-space-1);
   overflow: auto;
   max-height: 32rem;
-  padding: 0.65rem;
+  padding: var(--sw-space-3);
 }
 
 .sw-search-results > p {
-  margin: 1rem;
+  margin: var(--sw-space-4);
   color: var(--sw-fg-muted);
 }
 
 .sw-search-results a {
   display: grid;
-  gap: 0.25rem;
-  border-radius: 0.55rem;
-  padding: 0.75rem;
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-md);
+  padding: var(--sw-space-3);
   color: var(--sw-fg);
   text-decoration: none;
 }
@@ -318,28 +263,28 @@ a {
 .sw-search-results a span {
   overflow: hidden;
   color: var(--sw-fg-muted);
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sw-search-results a strong {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   align-items: baseline;
   min-width: 0;
-  font-weight: 600;
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-search-results a strong code {
   overflow: hidden;
   flex: 0 1 auto;
   border: 1px solid var(--sw-border);
-  border-radius: 0.3rem;
-  padding: 0.05rem 0.4rem;
+  border-radius: var(--sw-radius-xs);
+  padding: var(--sw-space-0-5) var(--sw-space-1-5);
   color: var(--sw-fg-muted);
   background: var(--sw-surface-2);
-  font: 500 0.68rem / 1.5 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.5 var(--sw-font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -348,7 +293,7 @@ a {
 .sw-search-results a span mark {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
-  border-radius: 0.2rem;
+  border-radius: var(--sw-radius-xs);
 }
 
 .sw-prose {
@@ -368,21 +313,21 @@ a {
 .sw-prose h4 {
   color: var(--sw-fg-strong);
   font-family: var(--sw-font-display);
-  font-weight: 650;
-  letter-spacing: -0.025em;
-  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+  font-weight: var(--sw-weight-semibold);
+  letter-spacing: var(--sw-tracking-display);
+  scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-6));
 }
 
 .sw-prose h2 {
-  margin: 3.5rem 0 1rem;
-  padding-top: 0.6rem;
-  font-size: 1.65rem;
+  margin: var(--sw-space-16) 0 var(--sw-space-4);
+  padding-top: var(--sw-space-2);
+  font-size: var(--sw-text-h2);
   line-height: 1.2;
 }
 
 .sw-prose h3 {
-  margin: 2.4rem 0 0.8rem;
-  font-size: 1.2rem;
+  margin: var(--sw-space-10) 0 var(--sw-space-3);
+  font-size: var(--sw-text-h3);
 }
 
 .sw-prose p,
@@ -391,13 +336,13 @@ a {
 }
 
 .sw-prose p {
-  margin: 1rem 0;
+  margin: var(--sw-space-4) 0;
 }
 
 .sw-prose ol,
 .sw-prose ul {
-  margin: 1rem 0;
-  padding-inline-start: 1.5rem;
+  margin: var(--sw-space-4) 0;
+  padding-inline-start: var(--sw-space-6);
 }
 
 .sw-prose ol {
@@ -409,11 +354,11 @@ a {
 }
 
 .sw-prose li {
-  margin-block: 0.35rem;
+  margin-block: var(--sw-space-1-5);
 }
 
 .sw-prose li::marker {
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
 }
 
 /* Links carry an underline at rest so they never rely on color alone; hover
@@ -436,13 +381,13 @@ a {
 
 .sw-prose strong {
   color: var(--sw-fg-strong);
-  font-weight: 680;
+  font-weight: var(--sw-weight-semibold);
 }
 
 /* Inline code is a quiet tint, not a boxed chip: dense API prose has many of
    them, and borders turn a sentence into a row of buttons. */
 .sw-prose :not(pre) > code {
-  border-radius: 0.32rem;
+  border-radius: var(--sw-radius-sm);
   padding: 0.12em 0.36em;
   color: var(--sw-fg-strong);
   background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
@@ -464,7 +409,7 @@ a {
    shadow shows only while more columns sit out of view on that side: the
    covers scroll with the content, the shadows stay with the frame. */
 .sw-prose .sw-table-frame {
-  margin: 1.75rem -0.75rem 2.25rem;
+  margin: var(--sw-space-8) calc(var(--sw-space-3) * -1) var(--sw-space-10);
   overflow-x: auto;
   background:
     linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
@@ -479,12 +424,12 @@ a {
 .sw-prose table {
   display: table;
   width: 100%;
-  margin: 1.5rem 0 2rem;
+  margin: var(--sw-space-6) 0 var(--sw-space-8);
   border-spacing: 0;
   border-collapse: separate;
   border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
-  font-size: 0.875rem;
+  border-radius: var(--sw-radius-lg);
+  font-size: var(--sw-text-small);
   line-height: 1.6;
 }
 
@@ -505,7 +450,7 @@ a {
 
 .sw-prose th,
 .sw-prose td {
-  padding: 0.7rem 0.75rem;
+  padding: var(--sw-space-3) var(--sw-space-3);
   border-bottom: 1px solid var(--sw-border);
   text-align: left;
   vertical-align: top;
@@ -514,17 +459,17 @@ a {
 .sw-prose th {
   color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
-  font-weight: 680;
+  font-weight: var(--sw-weight-semibold);
 }
 
 .sw-prose .sw-table-frame th {
-  padding-block: 0.55rem;
+  padding-block: var(--sw-space-2);
   border-bottom-color: var(--sw-border-strong);
   color: var(--sw-fg-muted);
   background: transparent;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: var(--sw-text-eyebrow);
+  font-weight: var(--sw-weight-semibold);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -555,10 +500,10 @@ a {
 }
 
 .sw-prose blockquote {
-  margin: 1.75rem 0;
+  margin: var(--sw-space-8) 0;
   border-left: 3px solid var(--sw-accent);
   border-radius: 0 0.5rem 0.5rem 0;
-  padding: 0.75rem 1.1rem;
+  padding: var(--sw-space-3) var(--sw-space-4);
   color: var(--sw-fg);
   background: color-mix(in srgb, var(--sw-accent) 7%, transparent);
 }
@@ -599,73 +544,53 @@ a {
 }
 
 .sw-tabs {
-  margin: 1.5rem 0 2.5rem;
-  border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  margin: var(--sw-space-6) 0 var(--sw-space-10);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
 }
 
-.sw-tabs__list {
-  display: flex;
-  gap: 0.25rem;
-  overflow-x: auto;
-  padding: 0.45rem;
-  border-bottom: 1px solid var(--sw-border);
-}
-
-.sw-tabs__list button {
-  border: 0;
-  border-radius: 0.42rem;
-  padding: 0.45rem 0.7rem;
-  color: var(--sw-fg-muted);
-  background: transparent;
-  font-size: 0.78rem;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.sw-tabs__list button[aria-selected="true"] {
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-3);
+.sw-tabs .sw-tabs__list {
+  padding: 0 var(--sw-space-2);
 }
 
 .sw-tabs__panel {
-  padding: 0.35rem 1rem 0.5rem;
+  padding: var(--sw-space-1) var(--sw-space-4) var(--sw-space-2);
 }
 
 .sw-architecture {
-  margin: 1.5rem 0 2.5rem;
+  margin: var(--sw-space-6) 0 var(--sw-space-10);
   border: 1px solid var(--sw-border);
-  border-radius: 0.8rem;
-  padding: 1rem;
+  border-radius: var(--sw-radius-lg);
+  padding: var(--sw-space-4);
   background: var(--sw-surface-1);
 }
 
 .sw-architecture__flow {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--sw-space-1-5);
 }
 
 .sw-architecture__step > div {
   display: grid;
   grid-template-columns: 2rem 10rem minmax(0, 1fr);
   align-items: baseline;
-  gap: 0.75rem;
+  gap: var(--sw-space-3);
   border: 1px solid var(--sw-border);
-  border-radius: 0.55rem;
-  padding: 0.8rem;
+  border-radius: var(--sw-radius-md);
+  padding: var(--sw-space-3);
   background: var(--sw-surface-2);
 }
 
 .sw-architecture__step > span {
   display: block;
-  color: var(--sw-fg-dim);
+  color: var(--sw-fg-muted);
   text-align: center;
 }
 
 .sw-architecture__step div > span {
   color: var(--sw-accent-strong);
-  font: 600 0.68rem var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
 }
 
 .sw-architecture__step strong {
@@ -675,43 +600,32 @@ a {
 .sw-architecture__step p {
   margin: 0;
   color: var(--sw-fg-muted);
-  font-size: 0.82rem;
+  font-size: var(--sw-text-caption);
 }
 
 .sw-architecture figcaption {
-  margin: 0.8rem 0.25rem 0;
-  color: var(--sw-fg-dim);
-  font-size: 0.74rem;
-}
-
-body .sw-code-popover__tag-link {
-  color: var(--sw-accent-strong);
-  font-weight: 650;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-body .sw-code-popover__tag-link:hover {
-  text-decoration: underline;
+  margin: var(--sw-space-3) var(--sw-space-1) 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
 }
 
 /* Reading order first, colophon last: the footer closes the page with where
    to go next rather than with licence small print. */
 .sw-document__footer {
   display: grid;
-  gap: 1.5rem;
-  margin-top: 5rem;
-  padding-top: 1.5rem;
+  gap: var(--sw-space-6);
+  margin-top: var(--sw-space-20);
+  padding-top: var(--sw-space-6);
   border-top: 1px solid var(--sw-border);
-  color: var(--sw-fg-dim);
-  font-size: 0.75rem;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
 }
 
 .sw-document__colophon {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.6rem 1rem;
+  gap: var(--sw-space-2) var(--sw-space-4);
 }
 
 .sw-document__footer a {
@@ -719,13 +633,13 @@ body .sw-code-popover__tag-link:hover {
 }
 
 .sw-prose .expressive-code {
-  margin-block: 1.4rem 2rem;
+  margin-block: var(--sw-space-6) var(--sw-space-8);
 }
 
 .sw-prose .expressive-code figure.frame {
   overflow: hidden;
   border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  border-radius: var(--sw-radius-lg);
   box-shadow: none;
 }
 
@@ -735,7 +649,7 @@ body .sw-code-popover__tag-link:hover {
   min-height: 2.4rem;
   align-items: center;
   justify-content: flex-start;
-  padding-inline: 1rem;
+  padding-inline: var(--sw-space-4);
   border-bottom: 1px solid var(--sw-border);
   background: var(--sw-surface-0);
 }
@@ -755,7 +669,7 @@ body .sw-code-popover__tag-link:hover {
   border-radius: 0;
   background: transparent;
   color: var(--sw-fg-muted);
-  font: 650 0.72rem / 1.2 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.2 var(--sw-font-body);
   letter-spacing: 0.01em;
 }
 
@@ -764,6 +678,6 @@ body .sw-code-popover__tag-link:hover {
   border: 0;
   border-radius: 0;
   background: var(--sw-surface-0);
-  font-size: 0.84rem;
+  font-size: var(--sw-text-caption);
   line-height: 1.7;
 }

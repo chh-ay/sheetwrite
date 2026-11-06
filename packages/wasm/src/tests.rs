@@ -191,7 +191,7 @@ fn incumbent_operators_cover_precedence_coercion_errors_and_unicode() {
 }
 
 #[test]
-fn formula_ingest_preserves_original_source_until_a_structural_rewrite() {
+fn a_structural_rewrite_changes_only_the_reference_text_of_the_source() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 2);
     let source = " =  A1 & \" λ \"  ";
@@ -201,7 +201,7 @@ fn formula_ingest_preserves_original_source_until_a_structural_rewrite() {
     store.add_rows(sheet, 0, 1);
     assert_eq!(
         store.formula_source(sheet, 1, 1).as_deref(),
-        Some("=(A2&\" λ \")")
+        Some(" =  A2 & \" λ \"  ")
     );
 }
 
@@ -901,7 +901,7 @@ fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles(
     assert!(store.rename_sheet(source, "sales", "Sales Data"));
     assert_eq!(
         store.formula_source(summary, 0, 0).as_deref(),
-        Some("=('Sales Data'!A1+1)")
+        Some("='Sales Data'!A1+1")
     );
     assert_eq!(
         store.formula_source(summary, 0, 1).as_deref(),
@@ -913,7 +913,7 @@ fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles(
     assert!(store.rename_sheet(source, "sales", "O'Brien"));
     assert_eq!(
         store.formula_source(summary, 0, 0).as_deref(),
-        Some("=('O''Brien'!A1+1)")
+        Some("='O''Brien'!A1+1")
     );
     assert!(store.sheet_alive[source]);
     assert!(store.sheet_alive[summary]);
@@ -937,7 +937,7 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
 
     assert_eq!(
         store.formula_source(summary, 0, 0).as_deref(),
-        Some("=(#REF!+1)")
+        Some("=#REF!+1")
     );
     assert_eq!(string(&store, summary, 0, 0).as_deref(), Some("#REF!"));
     assert_eq!(string(&store, summary, 0, 1).as_deref(), Some("#REF!"));
@@ -2833,7 +2833,7 @@ fn array_constants_survive_structural_rewrites() {
     store.recompute(sheet);
     assert_eq!(
         store.formula_source(sheet, 1, 1).as_deref(),
-        Some("=(SUM({1,2;3,4})+A2)")
+        Some("=SUM({1,2;3,4})+A2")
     );
     assert_close(number(&store, sheet, 1, 1), 15.0);
 }
@@ -3004,7 +3004,7 @@ fn stable_table_and_column_identities_rewrite_formula_source_on_rename_and_remov
     );
     assert_eq!(
         store.formula_source(sheet, 1, 1).as_deref(),
-        Some("=([@Value]*2)")
+        Some("=[@Value]*2")
     );
     assert_close(number(&store, sheet, 0, 2), 7.0);
     assert_close(number(&store, sheet, 1, 1), 14.0);

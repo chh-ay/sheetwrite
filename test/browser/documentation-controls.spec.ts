@@ -152,7 +152,10 @@ test("the outline lists only symbol groups that the filter shows", async ({ page
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(siteUrl("/docs/api/core/"));
   await waitForHydration(page);
-  const outline = page.getByRole("navigation", { name: "On this page", exact: true });
+  const outline = page.getByRole("navigation", {
+    name: "On this page",
+    exact: true,
+  });
   await expect(outline.getByRole("link", { name: "Classes", exact: true })).toHaveCount(1);
 
   await page.getByRole("searchbox", { name: "Filter exported symbols" }).fill("createGrid");
@@ -223,22 +226,34 @@ const AFTER_POPOVER_CLOSE_MS = 300;
 async function popoverWithLink(page: Page): Promise<{ trigger: Locator; panelId: string }> {
   // The URL and shell can change before lazy MDX replaces the old article.
   // Scope discovery to this page's example, never the outgoing page's triggers.
-  const example = page.getByRole("figure", { name: "Complete first grid", exact: true });
+  const example = page.getByRole("figure", {
+    name: "Complete first grid",
+    exact: true,
+  });
   await expect(example).toBeVisible();
+  // Panels wait in the page's inert store until a trigger opens one.
   const findPanelId = () =>
     example.evaluate((element) => {
+      const stores = [
+        ...document.querySelectorAll<HTMLTemplateElement>("template.sw-code-popover-store"),
+      ];
       for (const trigger of element.querySelectorAll<HTMLElement>(
         "[data-sw-code-popover-trigger]",
       )) {
         const id = trigger.dataset.swCodePopoverTrigger ?? "";
-        if (document.getElementById(id)?.querySelector("a[href]")) return id;
+        if (stores.some((store) => store.content.getElementById(id)?.querySelector("a[href]"))) {
+          return id;
+        }
       }
       return "";
     });
   // The article mounts after hydration and after client-side navigation.
   await expect.poll(findPanelId).not.toBe("");
   const panelId = await findPanelId();
-  return { trigger: page.locator(`[data-sw-code-popover-trigger="${panelId}"]`).first(), panelId };
+  return {
+    trigger: page.locator(`[data-sw-code-popover-trigger="${panelId}"]`).first(),
+    panelId,
+  };
 }
 
 test("a code popover stays open while focus is on its link and closes on Escape", async ({
@@ -261,6 +276,25 @@ test("a code popover stays open while focus is on its link and closes on Escape"
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test("keyboard focus and pointer hover show the same code popover", async ({ page }) => {
+  await page.goto(FIRST_GRID_URL);
+  await waitForHydration(page);
+  const { trigger, panelId } = await popoverWithLink(page);
+  const panel = page.locator(`[id="${panelId}"]`);
+
+  await trigger.focus();
+  await expect(panel).toBeVisible();
+  const focusedText = await panel.innerText();
+  await expect(trigger).toHaveAccessibleDescription(/\S/);
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+
+  await trigger.blur();
+  await trigger.hover();
+  await expect(panel).toBeVisible();
+  expect(await panel.innerText()).toBe(focusedText);
 });
 
 test("leaving and revisiting a page leaves one copy of each code popover", async ({ page }) => {

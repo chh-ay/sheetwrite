@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
+import { Icon } from "../components/Icon.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
@@ -132,7 +133,10 @@ export function ShowcasePage({
             </a>
             <Link to={nextItem.href}>
               <span>Next example</span>
-              <strong>{nextItem.label} →</strong>
+              <strong>
+                {nextItem.label}
+                <Icon name="arrow-right" size="sm" />
+              </strong>
             </Link>
           </nav>
         </footer>
