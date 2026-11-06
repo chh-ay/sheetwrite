@@ -7,6 +7,11 @@ const MAX_EXTERNAL_LINKS = 1_024;
 const MAX_NAME_LENGTH = 2_048;
 /** Most saved cells over all links, which bounds the engine memory they use. */
 const MAX_EXTERNAL_CELLS = 1_000_000;
+/**
+ * Most cells in the rectangle from A1 to the last saved cell of one linked
+ * sheet: the engine holds that rectangle densely, so this matches its limit.
+ */
+export const MAX_EXTERNAL_SHEET_AREA = 5_000_000;
 /** Excel's sheet limits; link cells use the same coordinates. */
 const MAX_ROWS = 1_048_576;
 const MAX_COLUMNS = 16_384;
@@ -97,14 +102,30 @@ export function validateExternalLinksShape(
         return;
       }
       cells += sheetCells.length;
+      let rows = 1;
+      let columns = 1;
       sheetCells.forEach((cell: unknown, cellIndex) => {
+        const row = isPlainRecord(cell) ? ownValue(cell, "row") : undefined;
+        const col = isPlainRecord(cell) ? ownValue(cell, "col") : undefined;
         const valid =
           isPlainRecord(cell) &&
-          isIndex(ownValue(cell, "row"), MAX_ROWS) &&
-          isIndex(ownValue(cell, "col"), MAX_COLUMNS) &&
+          isIndex(row, MAX_ROWS) &&
+          isIndex(col, MAX_COLUMNS) &&
           isLinkValue(ownValue(cell, "value"));
-        if (!valid) invalid(`${sheetAt}.cells[${cellIndex}]`, "invalid external link cell");
+        if (!valid) {
+          invalid(`${sheetAt}.cells[${cellIndex}]`, "invalid external link cell");
+          return;
+        }
+        rows = Math.max(rows, row + 1);
+        columns = Math.max(columns, col + 1);
       });
+      if (rows * columns > MAX_EXTERNAL_SHEET_AREA) {
+        issues.push({
+          path: sheetAt,
+          code: "resource-limit",
+          message: `External link sheet area limit ${MAX_EXTERNAL_SHEET_AREA} exceeded`,
+        });
+      }
     });
   });
 

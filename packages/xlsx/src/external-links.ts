@@ -1,4 +1,9 @@
-import { cellA1, type ExternalLink, type ExternalLinkValue } from "@sheetwrite/core";
+import {
+  cellA1,
+  type ExternalLink,
+  type ExternalLinkValue,
+  MAX_EXTERNAL_SHEET_AREA,
+} from "@sheetwrite/core";
 
 import { parseCellReference } from "./cell-reference.js";
 import { MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
@@ -121,6 +126,21 @@ function readLink(
     }
   }
 
+  for (const sheet of sheets) {
+    let rows = 1;
+    let columns = 1;
+    for (const cell of sheet.cells) {
+      rows = Math.max(rows, cell.row + 1);
+      columns = Math.max(columns, cell.col + 1);
+    }
+    if (rows * columns <= MAX_EXTERNAL_SHEET_AREA) continue;
+    emitWarning(context, {
+      code: "unsupported-feature",
+      message: `Saved values of linked sheet ${sheet.name} span more than ${MAX_EXTERNAL_SHEET_AREA} cells and were dropped`,
+      part,
+    });
+    sheet.cells = [];
+  }
   return { book: bookName(target), target, sheets: sheets.filter((sheet) => sheet.name) };
 }
 

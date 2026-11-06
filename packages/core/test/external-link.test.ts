@@ -90,6 +90,8 @@ describe("external workbook links", () => {
       withCell({ error: "#BUSY!" }),
       withCell(Number.NaN),
       withCell(1, 1_048_576),
+      // The engine holds a linked sheet from A1 to its last cell.
+      [{ ...budget, sheets: [{ name: "Annual", cells: [{ row: 999_999, col: 9, value: 1 }] }] }],
     ]) {
       expect(validateWorkbookSnapshot(snapshot(invalid)).ok).toBe(false);
     }
