@@ -121,10 +121,10 @@ const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/xlsx",
     extraFiles: [
-      "dist/register.d.ts",
-      "dist/register.js",
-      "dist/registration.d.ts",
-      "dist/registration.js",
+      "dist/addon.d.ts",
+      "dist/addon.js",
+      "dist/codec.d.ts",
+      "dist/codec.js",
       "dist/table-export.d.ts",
       "dist/table-export.js",
       "dist/table-import.d.ts",
@@ -136,8 +136,8 @@ const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/charts",
     extraFiles: [
-      "dist/registration.d.ts",
-      "dist/registration.js",
+      "dist/addon.d.ts",
+      "dist/addon.js",
       "dist/view-cache.d.ts",
       "dist/view-cache.js",
     ],
