@@ -27,6 +27,10 @@
   scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-3));
 }
 
+.sw-sp-demo[data-state="loading"] .sw-sp-grid {
+  opacity: 0.72;
+}
+
 .sw-sp-grid {
   width: 100%;
   height: clamp(28rem, calc(100dvh - 16rem), 44rem);
