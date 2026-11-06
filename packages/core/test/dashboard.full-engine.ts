@@ -208,3 +208,24 @@ it("shows measure values in a dashboard pivot, equal to the same pivot on a work
   expect(onDashboard?.cells).toEqual(onSheet?.cells);
   expect(onDashboard?.cells).toContain(8);
 });
+
+it("shows a value field's number format in the dashboard view", async () => {
+  const input = snapshot();
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [
+    { ...byRegion(0), values: [{ field: 1, aggregation: "SUM", numberFormat: "$#,##0.00" }] },
+  ];
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input);
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  await import("../src/dashboard/dashboard-view.js");
+  await Promise.resolve();
+
+  const values = [...document.querySelectorAll(".sheetwrite-dashboard-pivot td")].map(
+    (cell) => cell.textContent,
+  );
+  expect(values).toEqual(["$4.00", "$2.00", "$6.00"]);
+});
