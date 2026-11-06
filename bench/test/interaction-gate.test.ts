@@ -283,7 +283,12 @@ function scriptSamples(
 
 describe("cold-route long-task attribution", () => {
   test.each([
-    ["mostly runs package frames, so it is charged to Sheetwrite", 50, 5, { ownedMs: 60, unattributedMs: 0 }],
+    [
+      "mostly runs package frames, so it is charged to Sheetwrite",
+      50,
+      5,
+      { ownedMs: 60, unattributedMs: 0 },
+    ],
     ["mostly runs other code, so it is unattributed", 20, 40, { ownedMs: 0, unattributedMs: 60 }],
   ] as const)("a long task that %s", (_case, packageSamples, shellSamples, expected) => {
     const events = [
