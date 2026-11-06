@@ -792,6 +792,22 @@ impl SheetFormulas {
                 *last = merged;
                 return;
             }
+
+            // A block written row by row (or column by column) reaches each
+            // new row one cell at a time. Growing the latest rectangle by
+            // that whole adjacent row keeps the block one rectangle; the
+            // row's other cells are marked early, and the next writes are
+            // usually exactly those cells.
+            let next_row = last.row_end.checked_add(1) == Some(rect.row_start)
+                && last.col_start <= rect.col_start
+                && rect.col_end <= last.col_end;
+            let next_col = last.col_end.checked_add(1) == Some(rect.col_start)
+                && last.row_start <= rect.row_start
+                && rect.row_end <= last.row_end;
+            if next_row || next_col {
+                *last = merged;
+                return;
+            }
         }
 
         if ranges.len() < MAX_DIRTY_RECTS {
