@@ -246,7 +246,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     const LINK_PART = "xl/externalLinks/externalLink1.xml";
     const linkPart = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="${TRANSITIONAL_MAIN}" xmlns:r="${TRANSITIONAL_REL}"><externalBook r:id="rId1"><sheetNames><sheetName val="Annual Plan"/></sheetNames><sheetDataSet><sheetData sheetId="0"><row r="10"><cell r="C10"><v>7</v></cell><cell r="D10" t="str"><v>North</v></cell></row><row r="11"><cell r="C11"><v>5</v></cell><cell r="D11" t="e"><v>#N/A</v></cell></row></sheetData></sheetDataSet></externalBook></externalLink>`;
     const target = "file:///C:\\Reports\\Budget%202024.xlsx";
-    const linked = (formulas: readonly string[]) =>
+    const linked = (formulas: readonly string[], part = linkPart) =>
       rawWorkbook(
         sheet(
           `<dimension ref="A1"/><sheetData>${formulas
@@ -263,7 +263,7 @@ describe("raw spec-authored OOXML fidelity", () => {
           overrides:
             '<Override PartName="/xl/externalLinks/externalLink1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"/>',
           parts: {
-            [LINK_PART]: linkPart,
+            [LINK_PART]: part,
             "xl/externalLinks/_rels/externalLink1.xml.rels": `<?xml version="1.0"?><Relationships xmlns="${PACKAGE_REL}"><Relationship Id="rId1" Type="${TRANSITIONAL_REL}/externalLinkPath" Target="${target}" TargetMode="External"/></Relationships>`,
           },
         },
@@ -341,6 +341,59 @@ describe("raw spec-authored OOXML fidelity", () => {
         "Budget 2024.xlsx",
         "Sales.xlsx",
       ]);
+    });
+
+    // ECMA-376 Part 1, §18.14.5: a link part keeps the defined names of the
+    // linked workbook, and `[1]!Total` names one in a formula.
+    describe("defined names of a link", () => {
+      const NAMES =
+        '<definedNames><definedName name="Total" refersTo="=\'Annual Plan\'!$C$10"/>' +
+        '<definedName name="Local" refersTo="=\'Annual Plan\'!$C$11" sheetId="0"/></definedNames>';
+      const namedPart = linkPart.replace("</sheetNames>", `</sheetNames>${NAMES}`);
+      const named = (formulas: readonly string[]) => linked(formulas, namedPart);
+
+      it("imports the names and keeps formulas that use them live", async () => {
+        const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+          named(["[1]!Total*2", "'[1]Annual Plan'!Local"]),
+        );
+
+        expect(imported.workbook.externalLinks?.[0]?.names).toEqual([
+          { name: "Total", refersTo: "='Annual Plan'!$C$10" },
+          { name: "Local", refersTo: "='Annual Plan'!$C$11", sheet: "Annual Plan" },
+        ]);
+        expect(imported.sheets[0]!.cells[0]!.cells.map((cell) => cell.value)).toEqual([
+          { kind: "formula", src: "='Budget 2024.xlsx'!Total*2" },
+          { kind: "formula", src: "='[Budget 2024.xlsx]Annual Plan'!Local" },
+        ]);
+      });
+
+      it("writes the names and `[1]!Total` back, and a changed link with its names", async () => {
+        const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(named(["[1]!Total*2"]));
+        const kept = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
+        expect(strFromU8(kept["xl/worksheets/sheet1.xml"]!)).toContain("<f>[1]!Total*2</f>");
+        expect(strFromU8(kept[LINK_PART]!)).toBe(namedPart);
+
+        const changed = structuredClone(imported);
+        changed.workbook.externalLinks![0]!.sheets[0]!.cells[0]!.value = 9;
+        const written = strFromU8(
+          unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(changed))[
+            "xl/externalLinks/sheetwriteLink1.xml"
+          ]!,
+        );
+        expect(written).toContain(
+          '<sheetNames><sheetName val="Annual Plan"/></sheetNames><definedNames>' +
+            '<definedName name="Total" refersTo="=&apos;Annual Plan&apos;!$C$10"/>' +
+            '<definedName name="Local" refersTo="=&apos;Annual Plan&apos;!$C$11" sheetId="0"/>' +
+            "</definedNames><sheetDataSet>",
+        );
+
+        const reimported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+          await sheetwriteWorkbookBackend.toXlsxWorkbook(changed),
+        );
+        expect(reimported.workbook.externalLinks?.[0]?.names).toEqual(
+          imported.workbook.externalLinks?.[0]?.names,
+        );
+      });
     });
   });
 

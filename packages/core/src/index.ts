@@ -338,6 +338,7 @@ export type {
   DocumentOp,
   ExternalLink,
   ExternalLinkCell,
+  ExternalLinkName,
   ExternalLinkSheet,
   ExternalLinkValue,
   Grid,

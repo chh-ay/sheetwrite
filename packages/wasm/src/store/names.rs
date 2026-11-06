@@ -224,7 +224,16 @@ impl CellStore {
             }
             key = scoped.1;
         }
-        None
+
+        // A name of a linked workbook that the link does not hold is
+        // `#REF!`, as in Excel.
+        name.contains('!').then(|| {
+            NameTarget::Formula(Rc::new(NamedFormulaRef {
+                name: name.to_string(),
+                expression: Ast::InvalidRef,
+                nodes: 1,
+            }))
+        })
     }
 
     /// Mark the definition being resolved for every sheet as depending on

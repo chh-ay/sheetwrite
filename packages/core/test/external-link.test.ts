@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import {
   type ExternalLink,
   type ExternalLinkCell,
+  type ExternalLinkName,
   initSheetwrite,
   SheetwriteStore,
   validateWorkbookSnapshot,
@@ -31,6 +32,13 @@ const budget: ExternalLink = {
   ],
 };
 
+/** Names that `Budget.xlsx` defines, as its link part saves them. */
+const names: ExternalLinkName[] = [
+  { name: "Total", refersTo: "=Annual!$C$10" },
+  { name: "Both", refersTo: "=Annual!$C$10:$C$11" },
+  { name: "Local", refersTo: "=Annual!$C$11", sheet: "Annual" },
+];
+
 function linkedStore(externalLinks: ExternalLink[] | undefined): SheetwriteStore {
   const workbook = makeWorkbook(8);
   if (externalLinks) workbook.externalLinks = externalLinks;
@@ -54,6 +62,30 @@ describe("external workbook links", () => {
       expect(resolvedAfter(store, "=[Sales.xlsx]Annual!C10")).toBe("#REF!");
     } finally {
       store.dispose();
+    }
+  });
+
+  // Microsoft, "Create workbook links": a formula uses a defined name of
+  // another workbook as `=SUM(Budget.xlsx!Sales)`, and shows the values the
+  // link saved for it.
+  it("reads the defined names of a linked workbook from its saved values", () => {
+    const store = linkedStore([{ ...budget, names }]);
+    try {
+      expect(resolvedAfter(store, "=Budget.xlsx!Total*2")).toBe(14);
+      expect(resolvedAfter(store, "=SUM('C:\\Reports\\Budget.xlsx'!Both)")).toBe(12);
+      expect(resolvedAfter(store, "=[Budget.xlsx]Annual!Local")).toBe(5);
+      expect(resolvedAfter(store, "=Budget.xlsx!Missing")).toBe("#REF!");
+      expect(store.exportSnapshot().workbook.externalLinks).toEqual([{ ...budget, names }]);
+    } finally {
+      store.dispose();
+    }
+
+    // Without values for the link, a name is `#REF!`, as in Excel.
+    const unlinked = linkedStore(undefined);
+    try {
+      expect(resolvedAfter(unlinked, "=Budget.xlsx!Total")).toBe("#REF!");
+    } finally {
+      unlinked.dispose();
     }
   });
 
@@ -85,6 +117,14 @@ describe("external workbook links", () => {
       [{ ...budget, book: "[Budget.xlsx]" }],
       [budget, { ...budget, book: "budget.XLSX" }],
       [{ ...budget, sheets: [{ name: "Annual" }] }],
+    ]) {
+      expect(validateWorkbookSnapshot(snapshot(invalid)).ok).toBe(false);
+    }
+    expect(validateWorkbookSnapshot(snapshot([{ ...budget, names }])).ok).toBe(true);
+    for (const invalid of [
+      [{ ...budget, names: {} }],
+      [{ ...budget, names: [{ name: "Total" }] }],
+      [{ ...budget, names: [{ name: "Total", refersTo: "=Annual!$C$10", sheet: 1 }] }],
     ]) {
       expect(validateWorkbookSnapshot(snapshot(invalid)).ok).toBe(false);
     }
