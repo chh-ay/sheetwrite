@@ -7,11 +7,7 @@
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
 import { sheetNameKey } from "../name-key.js";
-import {
-  assertRibbonConfig,
-  RIBBON_EXPANDED_HEIGHT,
-  TOOLBAR_HEIGHT,
-} from "../ribbon/ribbon-metrics.js";
+import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { Scope } from "../scope.js";
 import { changesSheetTabs, SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
@@ -101,7 +97,8 @@ function mountRibbon(
 ): ShellPiece {
   return mountWhenLoaded(
     host,
-    RIBBON_EXPANDED_HEIGHT,
+    // The ribbon spans its row, so the row's width decides its layout now.
+    ribbonHeight(layout, host.clientWidth),
     async () => {
       const { createRibbon } = await import("./ribbon-factory.js");
       return () =>

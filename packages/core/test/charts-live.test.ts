@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { MAX_CHART_POINTS } from "../src/chart-definition.js";
 import { resolveChartView, subscribeChartChanges } from "../src/charts-live.js";
-import { initSheetwrite } from "../src/grid.js";
+import { createGrid, initSheetwrite } from "../src/grid.js";
 import type {
   ChartChangeEvent,
   ChartDefinition,
@@ -11,6 +11,8 @@ import type {
   Workbook,
 } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
+import { storeEngine } from "../src/store/engine-registry.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import { range, sheet } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -327,6 +329,42 @@ it("plots the leaf items of worksheet pivots on the full engine, in its own proc
     exitCode: 0,
     failures: [],
   });
+});
+
+it("calls no engine when its grid is destroyed while the pivot views load", async () => {
+  const restore = installCanvasTestStubs();
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const pivotChart: ChartDefinition = {
+    ...chart("over-pivot", range("data", 0, 1, 1, 1)),
+    series: [],
+    pivot: "sales",
+  };
+  const grid = createGrid(host, {
+    workbook: { activeSheet: "data", sheets: [{ ...sheet("data"), charts: [pivotChart] }] },
+  });
+  const engine = storeEngine(grid.store);
+  if (engine === null) throw new Error("the grid's store has no engine");
+  const calls: string[] = [];
+  engine.setPivotView = () => {
+    calls.push("setPivotView");
+  };
+
+  try {
+    // The first resolve of a chart over a pivot starts loading the pivot views.
+    resolveChartView(grid.store, "data", "over-pivot");
+    grid.destroy();
+    await import("../src/dashboard/dashboard-engine.js");
+    // One macrotask turn runs every microtask queued by the load, including its callback.
+    const { promise: turn, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, 0);
+    await turn;
+
+    expect(calls).toEqual([]);
+  } finally {
+    host.remove();
+    restore();
+  }
 });
 
 describe("resolveChartView", () => {

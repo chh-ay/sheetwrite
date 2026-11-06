@@ -44,7 +44,7 @@ import {
   fromXlsxTable, toXlsxWorkbook, downloadBytes, isSheetwriteError,
   type ColumnarData, type Workbook, type Grid, type XlsxWorkbookOptions,
 } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { xlsxAddon } from "@sheetwrite/xlsx";
 
 const initialData: ColumnarData = {
   rowCount: 2, columns: { Item: ["Tea", "Coffee"], Amount: [12, 18] },
@@ -63,7 +63,7 @@ const message = (error: unknown) => isSheetwriteError(error)
 const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export async function mountExcel(host: HTMLElement) {
-  await initSheetwrite();
+  await initSheetwrite({ addons: [xlsxAddon()] });
   const controller = new AbortController();
   const controls = document.createElement("div");
   const picker = document.createElement("input");

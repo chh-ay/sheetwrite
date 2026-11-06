@@ -36,7 +36,7 @@ const ROW_COUNT = SOURCE_ROWS + 1;
 
 const output = requiredOption(process.argv.slice(2), "--output");
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const restoreCanvas = installCanvasTestStubs();
 const host = document.createElement("div");
 Object.defineProperties(host, {

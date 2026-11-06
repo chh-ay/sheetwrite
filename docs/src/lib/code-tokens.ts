@@ -2,9 +2,10 @@ import type { CodeRole } from "./code-roles.ts";
 
 /**
  * Tokenizers for code that only exists at run time: JSON results a demo
- * computes and formulas read from a live workbook. Static code is highlighted
- * at build time by Expressive Code; these two small grammars give runtime code
- * the same roles (and so the same colours) without shipping a highlighter.
+ * computes, formulas read from a live workbook, and TypeScript a reader edits
+ * in a runnable example. Static code is highlighted at build time by
+ * Expressive Code; these small grammars give runtime code the same roles (and
+ * so the same colours) without shipping a highlighter.
  */
 
 /** A run of source text and its syntax role; `undefined` is plain text. */
@@ -14,7 +15,7 @@ export interface CodeToken {
 }
 
 /** Languages the runtime tokenizer understands. */
-export type RuntimeCodeLanguage = "json" | "formula";
+export type RuntimeCodeLanguage = "json" | "formula" | "typescript";
 
 interface TokenRule {
   readonly pattern: RegExp;
@@ -52,9 +53,36 @@ const FORMULA_RULES: readonly TokenRule[] = [
   { pattern: /[(),;{}]/y, role: () => "punctuation" },
 ];
 
+const TYPESCRIPT_KEYWORDS =
+  /\b(?:as|async|await|break|case|catch|class|const|continue|default|delete|do|else|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|satisfies|static|switch|this|throw|true|try|type|typeof|undefined|var|void|while|yield)\b/y;
+
+/**
+ * Enough of TypeScript to colour a docs example while a reader edits it:
+ * comments, strings, numbers, keywords, calls, types (capitalised names) and
+ * properties. Template literal substitutions stay string-coloured.
+ */
+const TYPESCRIPT_RULES: readonly TokenRule[] = [
+  { pattern: /\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/y, role: () => "comment" },
+  {
+    pattern: /"(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?|`(?:[^`\\]|\\.)*`?/y,
+    role: () => "string",
+  },
+  { pattern: /(?<![\w$])\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?n?/y, role: () => "number" },
+  { pattern: TYPESCRIPT_KEYWORDS, role: () => "keyword" },
+  { pattern: /(?<=\.)[A-Za-z_$][\w$]*(?=\s*\()/y, role: () => "function" },
+  { pattern: /(?<=\.)[A-Za-z_$][\w$]*/y, role: () => "property" },
+  { pattern: /\b[A-Z][\w$]*/y, role: () => "type" },
+  { pattern: /[A-Za-z_$][\w$]*(?=\s*\()/y, role: () => "function" },
+  // An object key: a name that starts a line or follows `{` or `,`, then a colon.
+  { pattern: /(?<=(?:^|\n|[{,])[ \t]*)[A-Za-z_$][\w$]*(?=\??:)/y, role: () => "property" },
+  { pattern: /[A-Za-z_$][\w$]*/y, role: () => undefined },
+  { pattern: /=>|[{}()[\];,.<>:=+\-*/%!?&|^~]/y, role: () => "punctuation" },
+];
+
 const RULES: Readonly<Record<RuntimeCodeLanguage, readonly TokenRule[]>> = {
   json: JSON_RULES,
   formula: FORMULA_RULES,
+  typescript: TYPESCRIPT_RULES,
 };
 
 /** Splits `source` into role-tagged tokens; text no rule matches stays plain. */

@@ -15,7 +15,7 @@
  */
 import { fromXlsxWorkbook, initSheetwrite, type WorkbookSnapshot } from "@sheetwrite/core";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 
 const CELL_PREFIX = "kept-cell-";
 const PROBE_ABORT = "probe abort";
@@ -101,8 +101,7 @@ if (!path) throw new Error("missing workbook path");
 const abortAt = Number(abortAtText);
 if (!Number.isSafeInteger(abortAt) || abortAt < 1) throw new Error("missing abort check");
 
-await initSheetwrite();
-registerXlsxBackends();
+await initSheetwrite({ addons: [xlsxAddon()] });
 const bytes = new Uint8Array(await Bun.file(path).arrayBuffer());
 
 /** Results kept by the `held` scenario, so they stay reachable while cells are counted. */

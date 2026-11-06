@@ -23,7 +23,7 @@ export type { SyncInitInput } from "./pkg/sheetwrite_wasm.js";
  * import { initSheetwrite } from "@sheetwrite/core";
  * import * as formulas from "@sheetwrite/formulas";
  *
- * await initSheetwrite(undefined, formulas);
+ * await initSheetwrite({ engine: formulas });
  * ```
  * @see /docs/start/choose-an-engine/
  */

@@ -181,3 +181,14 @@ export interface PowerQueryCodec {
   /** Throws when the text is not a `section Section1;` document. */
   decode(section: string): PowerQueryImport;
 }
+
+/** What the Data commands need from a query session. Messages are for the user. */
+export interface QueryCommands {
+  /** Checks the plan in the engine, then saves it; returns why it was not saved, or null. */
+  define(query: SavedQuery): string | null;
+  /**
+   * Refreshes the given queries, or every query with an output table when
+   * `ids` is null. Resolves to why nothing was written, or null when it was.
+   */
+  refresh(ids: readonly string[] | null, signal: AbortSignal): Promise<string | null>;
+}

@@ -82,6 +82,8 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   /** Controls link activation: emit an event, also navigate internally, or disable it. */
   hyperlinkActivation?: GridOptions["hyperlinkActivation"];
+  /** Settings for add-ons installed by `initSheetwrite`, keyed by add-on name; applied when the Grid is created. */
+  addons?: GridOptions["addons"];
   /** Named custom renderers registered when the Grid is created. */
   renderers?: Record<string, CellRenderer>;
   /** Named custom editors registered when the Grid is created. */
@@ -214,6 +216,8 @@ const gridProps = {
     type: String as PropType<GridOptions["hyperlinkActivation"]>,
     default: undefined,
   },
+  /** Settings for add-ons installed by `initSheetwrite`, keyed by add-on name; applied when the Grid is created. */
+  addons: { type: Object as PropType<GridOptions["addons"]>, default: undefined },
   /** Named custom renderers registered when the Grid is created. */
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
   /** Named custom editors registered when the Grid is created. */

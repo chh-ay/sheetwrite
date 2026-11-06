@@ -12,6 +12,7 @@ import type {
 } from "@sheetwrite/core";
 import { createSpreadsheetShell, type SpreadsheetShell } from "@sheetwrite/core/shell";
 
+import { installCharts } from "../../lib/addons.js";
 import { initFullEngine, whenStylesReady } from "../../lib/full-engine.js";
 import { observeSiteTheme } from "../../lib/site-theme.js";
 import { siteGridTheme } from "../site-grid-theme.js";
@@ -237,8 +238,7 @@ export function createAnalysisScenario(host: HTMLElement): AnalysisScenario {
     // Pivot tables need the full engine; charts draw through the optional package.
     if (!(await initFullEngine())) return;
 
-    const { registerChartsBackend } = await import("@sheetwrite/charts");
-    registerChartsBackend();
+    await installCharts();
     await whenStylesReady();
     if (disposed) return;
 

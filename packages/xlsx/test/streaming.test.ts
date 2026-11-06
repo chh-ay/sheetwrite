@@ -16,14 +16,14 @@ import {
 } from "@sheetwrite/core";
 import { deflateSync, strToU8, unzipSync } from "fflate";
 
-import { registerXlsxBackends } from "../src/index.js";
+import { xlsxAddon } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
+import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
 import { rawXlsx, rawZip, worksheet } from "./raw-opc.js";
 
 beforeAll(async () => {
-  await initSheetwrite();
-  registerXlsxBackends();
+  await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
 function largeSnapshot(rows: number): WorkbookSnapshot {
@@ -470,7 +470,9 @@ describe("worksheet one-step parse boundary", () => {
         const archive = rawXlsx({ sheets: [{ xml: sizedWorksheet(size, SMALL_SHEET_DATA) }] });
         const buffered = spyOn(ZipReader.prototype, "read");
         try {
-          const snapshot = await fromXlsxWorkbook(archive);
+          // This file's codec, directly: the spy watches this module's ZipReader, and the
+          // installed add-on may come from another copy of the package in the test run.
+          const snapshot = await sheetwriteWorkbookBackend.fromXlsxWorkbook(archive);
           const cells = JSON.stringify(snapshot.sheets[0]?.cells);
           expect(cells).toContain('"hello"');
           expect(cells).toContain("42");

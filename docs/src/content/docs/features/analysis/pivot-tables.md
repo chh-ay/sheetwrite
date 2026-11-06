@@ -31,7 +31,7 @@ grid.setPivot({
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="A full-engine grid with a pivot of four orders"
+```ts compile runnable title="A full-engine grid with a pivot of four orders"
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 
@@ -40,7 +40,7 @@ if (!host) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
 // Pivot tables need the full engine.
-await initSheetwrite(undefined, await import("@sheetwrite/formulas"));
+await initSheetwrite({ engine: await import("@sheetwrite/formulas") });
 
 const workbook: Workbook = {
   activeSheet: "summary",

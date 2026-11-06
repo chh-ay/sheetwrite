@@ -20,6 +20,22 @@ export function pageTitle(name: string): string {
   return branded.length <= TITLE_LIMIT ? branded : name;
 }
 
+/** Where the build writes a docs page's social card: `/docs/start/first-grid/` → `/og/docs/start/first-grid.png`. */
+export function ogImagePath(href: string): string {
+  return `/og${href.replace(/\/$/, "")}.png`;
+}
+
+/** The social-card image of a docs page; the root's og:image size tags hold for every card. */
+export function pageImageMeta(href: string, title: string) {
+  const image = `${SITE_URL}${ogImagePath(href)}`;
+  return [
+    { property: "og:image", content: image },
+    { property: "og:image:alt", content: title },
+    { name: "twitter:image", content: image },
+    { name: "twitter:image:alt", content: title },
+  ];
+}
+
 /**
  * Page title/description mirrored into the OG/Twitter card tags. Route-level
  * meta overrides the root defaults key-by-key, so every page shares one

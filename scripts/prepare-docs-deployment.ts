@@ -19,6 +19,14 @@ const requiredFiles = [
  * deployment is visible immediately.
  */
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+/**
+ * Files whose type the static host cannot tell from the extension. The
+ * changelog feed is RSS, which feed readers expect as `application/rss+xml`,
+ * not the `application/xml` an `.xml` file gets.
+ */
+const CONTENT_TYPES: Readonly<Record<string, string>> = {
+  "^/changelog/rss\\.xml$": "application/rss+xml; charset=utf-8",
+};
 const IMMUTABLE_PATHS = [
   // Vite emits every bundled script, stylesheet, font, and WASM file here with a content hash.
   "^/assets/.+$",
@@ -86,6 +94,11 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
           ...IMMUTABLE_PATHS.map((src) => ({
             src,
             headers: { "cache-control": IMMUTABLE_CACHE },
+            continue: true,
+          })),
+          ...Object.entries(CONTENT_TYPES).map(([src, type]) => ({
+            src,
+            headers: { "content-type": type },
             continue: true,
           })),
           // Moved docs pages answer with a permanent redirect; the new page

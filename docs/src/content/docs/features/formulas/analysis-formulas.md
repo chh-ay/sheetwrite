@@ -37,7 +37,7 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const grid = createGrid(host, {
   workbook: {
     activeSheet: "sheet1",
@@ -80,7 +80,7 @@ of the API does not change.
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 With the default engine, these functions return `#NAME?`, and formula assist
@@ -316,7 +316,7 @@ Sheetwrite has two engine builds with the same API. `@sheetwrite/wasm` is the de
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 | Family | Examples |

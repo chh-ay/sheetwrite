@@ -1,6 +1,8 @@
 import { SheetwriteError } from "./errors.js";
 import { externalSheetText, rewriteExternalSheets } from "./external-link-formula.js";
 import { connectExternalLinkResolver, type ExternalLinkResolver } from "./external-link-session.js";
+import { storeEngine } from "./store/engine-registry.js";
+import type { SheetwriteAddon } from "./types/addon.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { ExternalLink, ExternalLinkSheet } from "./types/external-link.js";
@@ -36,14 +38,48 @@ function sameBook(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
 
+/** Options of the external links add-on, at init or for one grid. */
+export interface ExternalLinksAddonOptions {
+  /** Gives the current values of a linked workbook to the Update Values button. */
+  readonly resolve?: ExternalLinkResolver;
+}
+
 /**
- * Give the Edit Links panel of `grid` a resolver, so its Update Values
- * button can ask the host for current values. Without one, the panel lists
- * the links and offers Change Source and Break Link only. Returns a function
- * that disconnects the resolver.
+ * The external links add-on. It gives the Edit Links panel of each grid a
+ * resolver, so its Update Values button can ask the host for current values.
+ * `resolve` applies to every grid; `createGrid(host, { addons:
+ * { externalLinks: { resolve } } })` gives one grid its own. Without a
+ * resolver, the panel lists the links and offers Change Source and Break Link
+ * only.
+ *
+ * @example
+ * ```ts
+ * import { initSheetwrite } from "@sheetwrite/core";
+ * import { externalLinksAddon } from "@sheetwrite/core/external-links";
+ *
+ * await initSheetwrite({
+ *   addons: [
+ *     externalLinksAddon({
+ *       resolve: async ({ book }) => {
+ *         const response = await fetch(`/workbooks/${encodeURIComponent(book)}/values`);
+ *         return response.ok ? response.json() : null;
+ *       },
+ *     }),
+ *   ],
+ * });
+ * ```
+ * @see /docs/features/formulas/authoring-and-references/
  */
-export function connectExternalLinks(grid: Grid, resolve: ExternalLinkResolver): () => void {
-  return connectExternalLinkResolver(grid, resolve);
+export function externalLinksAddon(
+  options: ExternalLinksAddonOptions = {},
+): SheetwriteAddon<ExternalLinksAddonOptions> {
+  return {
+    name: "externalLinks",
+    grid({ grid, settings }) {
+      const resolve = settings?.resolve ?? options.resolve;
+      if (resolve) return connectExternalLinkResolver(grid, resolve);
+    },
+  };
 }
 
 /** The workbook's links; an absent list is empty. */
@@ -122,6 +158,14 @@ export async function updateExternalLinks(
     }
   }
   if (values.size === 0) return results;
+  // The grid can be destroyed, with its store, while the resolver runs.
+  if (storeEngine(grid.store)?.isDisposed) {
+    throw new SheetwriteError(
+      "aborted",
+      "external-link",
+      "The grid was destroyed while the links resolved",
+    );
+  }
 
   // The links can change while the resolver runs, so the update applies to
   // the current list.

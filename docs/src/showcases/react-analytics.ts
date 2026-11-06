@@ -20,6 +20,7 @@ import { downloadBytes, fromCsv, parseCellInput, toCsv } from "@sheetwrite/core"
 import type { GridReadyEvent, GridReadyReason } from "@sheetwrite/core/adapter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { installXlsx } from "../lib/addons.js";
 import { errorText } from "../lib/errors.js";
 import { selectionLabel } from "../lib/selection-label.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
@@ -492,10 +493,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     if (!grid) return;
     await runXlsx(
       async () => {
-        // Dynamic on purpose: the XLSX backend is an optional package boundary
-        // this workbench demonstrates — a static import would bundle it into the
-        // route chunk and defeat the isolation story.
-        await import("@sheetwrite/xlsx/register");
+        await installXlsx();
         await grid.exportXlsx("analytics-pipeline.xlsx");
         record("XLSX export prepared");
       },
