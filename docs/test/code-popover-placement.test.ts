@@ -45,4 +45,15 @@ describe("code popover placement", () => {
     const mentions = [box(420, 300, 60, 20), box(420, 480, 60, 20), box(420, 520, 60, 20)];
     expect(choosePanelPlacement(input(mentions, 800))).toEqual({ side: "above", shift: 100 });
   });
+
+  it("moves past a single mention when the other side has no room", () => {
+    const atBottom: PlacementInput = {
+      ...input([box(100, 729, 60, 20)]),
+      line: box(380, 794, 700, 44),
+      trigger: box(60, 794, 40, 20),
+      panel: { width: 360, height: 49 },
+      viewport: box(12, 68, 366, 764),
+    };
+    expect(choosePanelPlacement(atBottom)).toEqual({ side: "above", shift: 65 });
+  });
 });

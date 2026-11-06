@@ -54,10 +54,14 @@ const PANEL_MAX_WIDTH_PX = 544;
 const PANEL_MAX_HEIGHT_PX = 480;
 /** A panel taller than the room beside its line shrinks and scrolls, down to this. */
 const PANEL_MIN_HEIGHT_PX = 160;
-/** Code blocks this close to the viewport get their panels prepared. */
-const PREPARE_MARGIN = "50% 0px";
-/** The latest an idle preparation waits when the browser never goes idle. */
-const PREPARE_TIMEOUT_MS = 1000;
+/**
+ * At most this many panels stay prepared; the oldest leave first. Each one is
+ * laid out with the page, so preparing every panel would make every page
+ * update slower.
+ */
+const MAX_PREPARED_PANELS = 24;
+/** An idle callback prepares another panel only with this much time left. */
+const PREPARE_SLICE_MS = 6;
 
 const FLOATING_PLACEMENT: Readonly<Record<PanelSide, Placement>> = {
   below: "bottom-start",
@@ -74,6 +78,8 @@ interface OpenPopover {
 
 /** Prepared panels by the store they were cloned from. */
 const panelsByStore = new Map<HTMLTemplateElement, Map<string, HTMLElement>>();
+/** Prepared panels, oldest first, with where each came from. */
+const preparedOrder: { panel: HTMLElement; store: HTMLTemplateElement; id: string }[] = [];
 let activePopover: OpenPopover | null = null;
 let closeTimer: number | undefined;
 // Escape returns focus to the trigger; that focus must not open the panel again.
@@ -88,6 +94,20 @@ function closestElement(target: EventTarget | null, selector: string): HTMLEleme
 function isInsideActivePopover(target: EventTarget | null): boolean {
   if (activePopover === null || !(target instanceof Node)) return false;
   return activePopover.trigger.contains(target) || activePopover.panel.contains(target);
+}
+
+/** Drops the oldest prepared panels beyond the cap, never the open one. */
+function evictOldPanels(): void {
+  for (let index = 0; preparedOrder.length > MAX_PREPARED_PANELS && index < preparedOrder.length;) {
+    const entry = preparedOrder[index];
+    if (entry === undefined || entry.panel === activePopover?.panel) {
+      index += 1;
+      continue;
+    }
+    preparedOrder.splice(index, 1);
+    entry.panel.remove();
+    panelsByStore.get(entry.store)?.delete(entry.id);
+  }
 }
 
 /**
@@ -109,7 +129,9 @@ function panelFor(id: string): HTMLElement | null {
       panelsByStore.set(store, panels);
     }
     panels.set(id, panel);
+    preparedOrder.push({ panel, store, id });
     document.body.append(panel);
+    evictOldPanels();
     return panel;
   }
   return null;
@@ -121,6 +143,9 @@ function pruneDetachedStores(): void {
     if (store.isConnected) continue;
     for (const panel of panels.values()) panel.remove();
     panelsByStore.delete(store);
+  }
+  for (let index = preparedOrder.length - 1; index >= 0; index -= 1) {
+    if (!preparedOrder[index]?.store.isConnected) preparedOrder.splice(index, 1);
   }
 }
 
@@ -366,27 +391,23 @@ function handleClick(event: MouseEvent): void {
   else if (!isInsideActivePopover(event.target)) closePopover();
 }
 
-/** Prepares the panels of one code block. */
-function preparePanelsOf(block: Element): void {
-  for (const trigger of block.querySelectorAll<HTMLElement>(TRIGGER_SELECTOR)) {
-    const panelId = trigger.dataset.swCodePopoverTrigger;
-    if (panelId !== undefined) panelFor(panelId);
-  }
-}
-
 /**
- * Prepares panels for code blocks as they come near the viewport, one block
- * per idle callback, and drops the panels of pages that leave the document.
+ * Prepares the panels of code blocks as they scroll into view, one panel at a
+ * time while the browser is idle, laying each out in the idle time so the
+ * next frame and the first hover have nothing left to do; and drops the
+ * panels of pages that leave the document.
  */
 function installPanelPreparation(): () => void {
-  const pending = new Set<Element>();
+  const pending = new Set<string>();
   let idleHandle: number | undefined;
   const drain = (deadline?: IdleDeadline): void => {
     idleHandle = undefined;
-    for (const block of pending) {
-      pending.delete(block);
-      if (block.isConnected) preparePanelsOf(block);
-      if (deadline !== undefined && deadline.timeRemaining() <= 0) break;
+    for (const id of pending) {
+      if (deadline !== undefined && deadline.timeRemaining() < PREPARE_SLICE_MS) break;
+      pending.delete(id);
+      // Reading the size lays the new panel out now, inside the idle time.
+      void panelFor(id)?.offsetHeight;
+      if (deadline === undefined) break;
     }
     if (pending.size > 0) scheduleDrain();
   };
@@ -394,20 +415,20 @@ function installPanelPreparation(): () => void {
     if (idleHandle !== undefined) return;
     idleHandle =
       typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback(drain, { timeout: PREPARE_TIMEOUT_MS })
+        ? window.requestIdleCallback(drain)
         : window.setTimeout(drain, 0);
   };
-  const intersections = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        intersections.unobserve(entry.target);
-        pending.add(entry.target);
+  const intersections = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      intersections.unobserve(entry.target);
+      for (const trigger of entry.target.querySelectorAll<HTMLElement>(TRIGGER_SELECTOR)) {
+        const panelId = trigger.dataset.swCodePopoverTrigger;
+        if (panelId !== undefined) pending.add(panelId);
       }
-      if (pending.size > 0) scheduleDrain();
-    },
-    { rootMargin: PREPARE_MARGIN },
-  );
+    }
+    if (pending.size > 0) scheduleDrain();
+  });
   const observeBlocks = (root: ParentNode): void => {
     for (const block of root.querySelectorAll("pre")) {
       if (block.querySelector(TRIGGER_SELECTOR) !== null) intersections.observe(block);
@@ -466,6 +487,7 @@ export function installCodePopovers(): () => void {
       for (const panel of panels.values()) panel.remove();
     }
     panelsByStore.clear();
+    preparedOrder.length = 0;
     uninstallListeners = null;
   };
   return uninstallListeners;

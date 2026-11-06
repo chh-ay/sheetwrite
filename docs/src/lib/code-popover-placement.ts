@@ -102,7 +102,9 @@ function sidesInOrder(input: PlacementInput): PanelSide[] {
 function pastMentions(side: PanelSide, input: PlacementInput): PanelPlacement | undefined {
   if (side === "beside") return undefined;
   let shift = 0;
-  for (let step = 0; step < input.mentions.length; step += 1) {
+  // Each step clears at least one more mention, so one step per mention plus
+  // the final check suffices.
+  for (let step = 0; step <= input.mentions.length; step += 1) {
     const box = panelBox({ side, shift }, input);
     const covered = input.mentions.filter((mention) => overlaps(box, mention));
     if (covered.length === 0) return shift === 0 ? undefined : { side, shift };
