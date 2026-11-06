@@ -43,13 +43,15 @@ describe("generated formula documentation contract", () => {
     const families = pages.filter((page) => page.route !== "reference/formula-functions.md");
     for (const formula of inventory.functions) {
       const holders = families.filter((page) =>
-        page.content.includes(`<span class="sw-code-function">${formula.canonical}</span>`),
+        page.table?.html.includes(`<span class="sw-code-function">${formula.canonical}</span>`),
       );
       expect(holders.map((page) => page.route)).toHaveLength(1);
     }
     for (const page of families) {
+      // The page holds the profiles; its separate table links to them.
+      expect(page.content).toContain(`<FormulaReference family="${page.table?.family}">`);
       const ids = new Set([...page.content.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]));
-      for (const [, target] of page.content.matchAll(/ href="#([^"]+)"/g)) {
+      for (const [, target] of `${page.content}${page.table?.html}`.matchAll(/ href="#([^"]+)"/g)) {
         expect(ids.has(target)).toBeTrue();
       }
     }

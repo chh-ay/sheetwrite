@@ -375,6 +375,16 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       content: renderCompatibilityResults(),
     },
     ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
+    ...formulaPages.flatMap(({ table }) =>
+      table === undefined
+        ? []
+        : [
+            {
+              path: join(generatedDataRoot, `formula-tables/${table.family}.html`),
+              content: table.html,
+            },
+          ],
+    ),
     { path: join(contentRoot, excelCoverage.route), content: excelCoverage.content },
     ...siteDataFiles(manifest, formulaPages),
     {

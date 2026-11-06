@@ -23,7 +23,9 @@ import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
+import { formulaTables } from "./src/lib/formula-tables.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
+import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
@@ -149,14 +151,19 @@ function alertCallout(blockquote: HastNode): HastNode | undefined {
   };
 }
 
-/** Generated Markdown keeps its content static; only the filter needs hydration. */
+/**
+ * A family page's `<FormulaReference family>` becomes the filter component;
+ * the family's table is static HTML outside the page (see formula-tables.ts).
+ */
 function hydrateFormulaReference() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.tagName === "formulareference") {
         node.type = "mdxJsxFlowElement";
         node.name = "FormulaReference";
-        node.attributes = [];
+        node.attributes = [
+          { type: "mdxJsxAttribute", name: "family", value: String(node.properties?.family ?? "") },
+        ];
         delete node.tagName;
         delete node.properties;
       }
@@ -288,12 +295,6 @@ function wrapProseTables() {
   };
 }
 
-/**
- * Inline code shorter than this fits a phone line, so it never needs to break
- * at a hyphen or quote; longer code keeps wrapping to avoid sideways scroll.
- */
-const SHORT_CODE_LENGTH = 32;
-
 /** Gives short inline code a class, so an identifier reads as one token. */
 function markShortInlineCode() {
   return (tree: HastNode): void => {
@@ -302,7 +303,7 @@ function markShortInlineCode() {
         if (child.tagName === "pre") continue;
         if (child.tagName === "code" && textOf(child).length <= SHORT_CODE_LENGTH) {
           const className = [child.properties?.className ?? []].flat().map(String);
-          child.properties = { ...child.properties, className: [...className, "sw-code-token"] };
+          child.properties = { ...child.properties, className: [...className, SHORT_CODE_CLASS] };
         }
         visit(child);
       }
@@ -471,6 +472,7 @@ export default defineConfig({
       enforce: "pre",
     },
     expressiveCodeAssets(),
+    formulaTables(),
     tailwindcss(),
     tanstackStart({
       pages: [

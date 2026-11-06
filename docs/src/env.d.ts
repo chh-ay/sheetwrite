@@ -11,3 +11,9 @@ declare module "*.mdx" {
 declare module "virtual:expressive-code-scripts" {
   export function installExpressiveCodeScripts(): void;
 }
+
+/** Formula family tables; see `formulaTables` in src/lib/formula-tables.ts. */
+declare module "virtual:formula-tables" {
+  export function formulaTableHtml(family: string): string | null;
+  export function formulaTableUrl(family: string): string | null;
+}

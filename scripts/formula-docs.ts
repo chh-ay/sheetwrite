@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "../docs/src/lib/inline-code.js";
 import { repositorySourceUrl } from "../docs/src/lib/repository.js";
 import { html } from "./evidence-format.js";
 import { validateFormulaContractRepository } from "./formula-contract.js";
@@ -126,6 +127,15 @@ function parseSignatureProfiles(value: unknown): Record<string, SignatureProfile
 
 /** A run of an Excel syntax line: punctuation, an ellipsis, or argument text. */
 const SYNTAX_TOKEN = /(\[|\]|\(|\)|,\s*|\.\.\.|…|[^[\](),.…]+)/g;
+
+/**
+ * Inline code in a static table, classed as the docs build classes inline
+ * code in pages (short code stays on one line).
+ */
+function inlineCode(text: string): string {
+  const className = text.length <= SHORT_CODE_LENGTH ? ` class="${SHORT_CODE_CLASS}"` : "";
+  return `<code${className}>${html(text)}</code>`;
+}
 
 /**
  * A function's call syntax as Microsoft documents it (`AVERAGEIF(range,
@@ -299,10 +309,23 @@ export async function loadFormulaContractInventory(
   return inventory;
 }
 
+/**
+ * A family's function table as static HTML, published apart from its page so
+ * the page's script carries no table rows: the server render inlines it, and
+ * a client-side navigation fetches it.
+ */
+export interface FormulaTable {
+  /** The family's route slug, which also names the table file. */
+  readonly family: string;
+  readonly html: string;
+}
+
 /** One generated formula reference page, relative to the docs content root. */
 export interface FormulaReferencePage {
   readonly route: string;
   readonly content: string;
+  /** The family's function table, on family pages. */
+  readonly table?: FormulaTable;
 }
 
 const FORMULA_FUNCTIONS_ROUTE = "/docs/reference/formula-functions/";
@@ -480,24 +503,12 @@ export function renderFormulaFunctionPages(
     const used = (key: "signature" | "semantics" | "dialects" | "implementation"): string[] => [
       ...new Set(family.functions.map((formula) => formula[key])),
     ];
-    const lines = [
-      "---",
-      `title: ${JSON.stringify(`${family.title} functions`)}`,
-      `description: ${JSON.stringify(`Every ${family.title.toLowerCase()} formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.`)}`,
-      "---",
-      "",
-      `This page lists the ${family.functions.length} functions of the ${family.title.toLowerCase()} family. Taxonomy/source: [${family.section}](${family.sourceUrl}). The [formula function contract](${FORMULA_FUNCTIONS_ROUTE}) has every family, the engine builds, and the evaluation limits.`,
-      "",
-      "## Functions",
-      "",
-      "<FormulaReference>",
-      "",
-      '<section class="sw-formula-family">',
-      "",
-      '<table class="sw-formula-table"><thead><tr><th>Function and syntax</th><th>What it does</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
+    const slug = anchor(family.id);
+    const tableHtml = [
+      '<section class="sw-formula-family"><table class="sw-formula-table"><thead><tr><th>Function and syntax</th><th>What it does</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
       ...family.functions.map((formula) => {
         const names = [formula.canonical, ...formula.aliases];
-        const aliases = formula.aliases.map((name) => `<code>${html(name)}</code>`).join(", ");
+        const aliases = formula.aliases.map((name) => inlineCode(name)).join(", ");
         const inDefaultEngine = formula.builds.includes("@sheetwrite/wasm");
         const contractLabel =
           formula.contractStatus === "required-supported"
@@ -517,7 +528,7 @@ export function renderFormulaFunctionPages(
         )
           .map(
             ([label, prefix, id]) =>
-              `<a href="#${prefix}-${anchor(id)}">${label}: <code>${html(id)}</code></a>`,
+              `<a href="#${prefix}-${anchor(id)}">${label}: ${inlineCode(id)}</a>`,
           )
           .join("<br />");
         const entry = entries[formula.canonical];
@@ -527,11 +538,19 @@ export function renderFormulaFunctionPages(
         );
         return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}</td><td class="sw-formula-summary">${html(entry?.summary ?? "")}</td><td data-label="Engine"><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td data-label="Contract"><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
       }),
-      "</tbody></table>",
+      "</tbody></table></section>",
+    ].join("");
+    const lines = [
+      "---",
+      `title: ${JSON.stringify(`${family.title} functions`)}`,
+      `description: ${JSON.stringify(`Every ${family.title.toLowerCase()} formula function, its engine build, and its signature, semantic, dialect, and implementation profiles.`)}`,
+      "---",
       "",
-      "</section>",
+      `This page lists the ${family.functions.length} functions of the ${family.title.toLowerCase()} family. Taxonomy/source: [${family.section}](${family.sourceUrl}). The [formula function contract](${FORMULA_FUNCTIONS_ROUTE}) has every family, the engine builds, and the evaluation limits.`,
       "",
-      "</FormulaReference>",
+      "## Functions",
+      "",
+      `<FormulaReference family="${slug}"></FormulaReference>`,
       "",
       "## Signature profiles",
       "",
@@ -623,8 +642,9 @@ export function renderFormulaFunctionPages(
       );
     }
     return {
-      route: `reference/formula-functions/${anchor(family.id)}.md`,
+      route: `reference/formula-functions/${slug}.md`,
       content: `${lines.join("\n").trimEnd()}\n`,
+      table: { family: slug, html: `${tableHtml}\n` },
     };
   });
 

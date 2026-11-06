@@ -4,7 +4,6 @@ import {
   type LazyExoticComponent,
   lazy,
 } from "react";
-import type { ReactNode } from "react";
 
 export interface DocumentFrontmatter {
   title: string;
@@ -18,7 +17,8 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  FormulaReference?: ComponentType<{ children: ReactNode }>;
+  /** A formula family's table and filter; see FormulaReference.tsx. */
+  FormulaReference?: ComponentType<{ family: string }>;
 }
 
 type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;
