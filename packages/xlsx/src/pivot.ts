@@ -22,6 +22,7 @@ import {
   relationshipTypeMatches,
 } from "./opc.js";
 import { checkAbort, emitWarning, isAbort, type XlsxCodecContext } from "./resources.js";
+import type { StylesRegistry } from "./styles.js";
 import {
   decodeXstring,
   encodeXstring,
@@ -223,6 +224,7 @@ function pivot_from_xml(
   table: XmlElement,
   cache: XmlElement,
   snapshot: WorkbookSnapshot,
+  numberFormat: (numFmtId: number) => string | undefined,
 ): ReadPivot | string {
   const name = decodeXstring(xmlAttribute(table, "name") ?? "");
   if (!name) return "it has no name";
@@ -277,10 +279,13 @@ function pivot_from_xml(
     const aggregation = AGGREGATION_BY_SUBTOTAL.get(subtotal);
     if (!aggregation) return `it uses the ${subtotal} summary`;
     const caption = xmlAttribute(data, "name");
+    const format_id = xmlAttribute(data, "numFmtId");
+    const format = format_id === undefined ? undefined : numberFormat(Number(format_id));
     values.push({
       field: value_fields[index] ?? 0,
       aggregation,
       ...(caption !== undefined ? { name: decodeXstring(caption) } : {}),
+      ...(format !== undefined ? { numberFormat: format } : {}),
     });
   }
 
@@ -530,6 +535,8 @@ export interface PivotReadInput {
   readonly metadata: WorkbookSnapshot | null;
   /** Grows a sheet so a reference past its last cell stays inside it. */
   extendSheet(sheet: SheetSnapshot, row: number, col: number): void;
+  /** The format code of a `numFmtId` in `styles.xml`, or undefined for General. */
+  numberFormat(numFmtId: number): string | undefined;
 }
 
 /**
@@ -539,7 +546,7 @@ export interface PivotReadInput {
  */
 export async function readPivots(
   packageFile: OpcPackage,
-  { snapshot, sheetParts, metadata, extendSheet }: PivotReadInput,
+  { snapshot, sheetParts, metadata, extendSheet, numberFormat }: PivotReadInput,
   context: XlsxCodecContext,
 ): Promise<ReadonlySet<string>> {
   const modelled = new Set<string>();
@@ -587,7 +594,9 @@ export async function readPivots(
           context,
         );
         read =
-          table && cache ? pivot_from_xml(table, cache, snapshot) : "its XML could not be read";
+          table && cache
+            ? pivot_from_xml(table, cache, snapshot, numberFormat)
+            : "its XML could not be read";
         if (typeof read !== "string") users.modelled += 1;
       }
       if (typeof read === "string") {
@@ -1040,6 +1049,7 @@ function pivot_table_xml(
   plan: WritePlan,
   cache_id: number,
   saved_rect: CellRect | undefined,
+  styles: StylesRegistry,
   context: XlsxCodecContext,
 ): Uint8Array {
   const { pivot } = plan;
@@ -1132,7 +1142,7 @@ function pivot_table_xml(
     for (const value of data_fields) {
       const subtotal = SUBTOTAL_BY_AGGREGATION.get(value.aggregation) ?? "sum";
       xml.append(
-        `<dataField${value.name !== undefined ? ` name="${escapeXml(encodeXstring(value.name))}"` : ""} fld="${value.field}"${subtotal === "sum" ? "" : ` subtotal="${subtotal}"`} baseField="0" baseItem="0"/>`,
+        `<dataField${value.name !== undefined ? ` name="${escapeXml(encodeXstring(value.name))}"` : ""} fld="${value.field}"${subtotal === "sum" ? "" : ` subtotal="${subtotal}"`} baseField="0" baseItem="0"${value.numberFormat ? ` numFmtId="${styles.numberFormatId(value.numberFormat)}"` : ""}/>`,
       );
     }
     xml.append("</dataFields>");
@@ -1180,6 +1190,7 @@ export interface PivotWrite {
 export function preparePivots(
   snapshot: WorkbookSnapshot,
   ordered: readonly SheetSnapshot[],
+  styles: StylesRegistry,
   context: XlsxCodecContext,
 ): PivotWrite | undefined {
   if (!ordered.some((sheet) => (sheet.pivots?.length ?? 0) > 0)) return undefined;
@@ -1265,7 +1276,7 @@ export function preparePivots(
     if (!saved || saved_rect) native_ids.add(plan.pivot.id);
     parts.push(
       { name: cache_part, data: cache_definition_xml(plan, names, context) },
-      { name: table_part, data: pivot_table_xml(plan, cache_id, saved_rect, context) },
+      { name: table_part, data: pivot_table_xml(plan, cache_id, saved_rect, styles, context) },
       {
         name: `xl/pivotTables/_rels/pivotTable${table_number}.xml.rels`,
         data: relationshipsXml(

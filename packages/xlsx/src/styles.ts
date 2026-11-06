@@ -489,9 +489,27 @@ export class StylesRegistry {
   readonly #style_ids = new Map<string, number>([[style_key(undefined, undefined), 0]]);
   readonly #differentials: CellStyle[] = [];
   readonly #differential_ids = new Map<string, number>();
+  readonly #custom_formats: string[] = [];
+  readonly #custom_format_ids = new Map<string, number>();
 
   constructor(context: XlsxCodecContext) {
     this.#context = context;
+  }
+
+  /**
+   * The `numFmtId` of `format`: a built-in id, or a custom id from 164 that
+   * `styles.xml` lists. Cell styles and pivot value fields share the ids.
+   */
+  numberFormatId(format: string): number {
+    const builtin = Object.entries(BUILTIN_NUMBER_FORMATS).find(([, value]) => value === format);
+    if (builtin) return Number(builtin[0]);
+    let custom = this.#custom_format_ids.get(format);
+    if (custom === undefined) {
+      custom = 164 + this.#custom_formats.length;
+      this.#custom_formats.push(format);
+      this.#custom_format_ids.set(format, custom);
+    }
+    return custom;
   }
 
   register(style: CellStyle | undefined, numberFormat: string | undefined): number {
@@ -544,8 +562,6 @@ export class StylesRegistry {
     const font_ids = new Map<string, number>([["{}", 0]]);
     const fill_ids = new Map<string, number>([["{}", 0]]);
     const border_ids = new Map<string, number>([["{}", 0]]);
-    const custom_formats: string[] = [];
-    const custom_format_ids = new Map<string, number>();
     const xfs: {
       fontId: number;
       fillId: number;
@@ -582,22 +598,7 @@ export class StylesRegistry {
         borders.push(border);
         border_ids.set(border_key, border_id);
       }
-      let num_fmt_id = 0;
-      if (record.numberFormat) {
-        const builtin = Object.entries(BUILTIN_NUMBER_FORMATS).find(
-          ([, value]) => value === record.numberFormat,
-        );
-        if (builtin) num_fmt_id = Number(builtin[0]);
-        else {
-          let custom = custom_format_ids.get(record.numberFormat);
-          if (custom === undefined) {
-            custom = 164 + custom_formats.length;
-            custom_formats.push(record.numberFormat);
-            custom_format_ids.set(record.numberFormat, custom);
-          }
-          num_fmt_id = custom;
-        }
-      }
+      const num_fmt_id = record.numberFormat ? this.numberFormatId(record.numberFormat) : 0;
       xfs.push({
         fontId: font_id,
         fillId: fill_id,
@@ -610,6 +611,7 @@ export class StylesRegistry {
     const xml = new XmlBuffer(this.#context);
     xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     xml.append(`<styleSheet xmlns="${MAIN_NS}">`);
+    const custom_formats = this.#custom_formats;
     if (custom_formats.length > 0) {
       xml.append(`<numFmts count="${custom_formats.length}">`);
       for (let index = 0; index < custom_formats.length; index++) {
@@ -763,6 +765,13 @@ function parsed_differential_style(
 export class ParsedStyles {
   readonly #styles: ParsedCellStyle[];
   readonly #differentials: CellStyle[];
+  readonly #formats = new Map<number, string>();
+
+  /** The format code of `numFmtId`, or undefined for an unknown id or General. */
+  numberFormat(numFmtId: number): string | undefined {
+    const format = this.#formats.get(numFmtId);
+    return format === "General" ? undefined : format;
+  }
 
   constructor(
     root: XmlElement | undefined,
@@ -778,7 +787,7 @@ export class ParsedStyles {
     }
     assertXmlRoot(root, "styleSheet", MAIN_NAMESPACES, part);
     const theme = parsed_theme_colors(themeRoot, themePart);
-    const formats = new Map<number, string>();
+    const formats = this.#formats;
     for (const [id, value] of Object.entries(BUILTIN_NUMBER_FORMATS)) {
       formats.set(Number(id), value);
     }

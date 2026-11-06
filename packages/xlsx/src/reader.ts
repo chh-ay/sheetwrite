@@ -2730,7 +2730,13 @@ export async function readWorkbook(
   const sheet_parts = source_references.map((reference) => reference.relationship.target);
   const modelled_pivot_parts = await readPivots(
     package_file,
-    { snapshot, sheetParts: sheet_parts, metadata, extendSheet: extend_sheet },
+    {
+      snapshot,
+      sheetParts: sheet_parts,
+      metadata,
+      extendSheet: extend_sheet,
+      numberFormat: (num_fmt_id) => styles.numberFormat(num_fmt_id),
+    },
     context,
   );
   const chart_parts = await readCharts(

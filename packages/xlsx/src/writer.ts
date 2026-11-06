@@ -1206,9 +1206,9 @@ function* write_workbook_parts(
   snapshot = checked.value;
   const hook = resolve_hook?.(snapshot);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
-  const pivots = preparePivots(snapshot, ordered, context);
-  const metadata_name = metadata_sheet_name(snapshot);
   const styles = new StylesRegistry(context);
+  const pivots = preparePivots(snapshot, ordered, styles, context);
+  const metadata_name = metadata_sheet_name(snapshot);
   const overrides: ContentTypeOverride[] = [
     { part: "xl/workbook.xml", contentType: WORKBOOK_CONTENT },
     { part: "xl/styles.xml", contentType: STYLES_CONTENT },
