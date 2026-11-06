@@ -55,7 +55,7 @@ function ratioOf(interaction: StoryInteraction): number | undefined {
   return interaction.base === undefined ? undefined : interaction.base / interaction.measured.value;
 }
 
-function headlineCards(machine: StoryMachine, baseName: string, icon: PerfIconMarkup): string {
+function headlineCards(machine: StoryMachine): string {
   const cards = STORY_CATEGORIES.slice(0, 4).flatMap((category) => {
     const best = machine.interactions
       .filter(
@@ -65,7 +65,7 @@ function headlineCards(machine: StoryMachine, baseName: string, icon: PerfIconMa
     const ratio = best === undefined ? undefined : ratioOf(best);
     if (best === undefined || ratio === undefined || best.base === undefined) return [];
     return [
-      `<li class="speed-story__card"><p class="speed-story__kicker">${icon("bolt")}${escapeHtml(category)}</p><p class="speed-story__big"><b>${formatTimes(ratio)}</b><span>faster</span></p><p class="speed-story__what">${escapeHtml(best.label)}</p><p class="speed-story__vs"><b>${formatTime(best.measured.value)}</b> vs ${formatTime(best.base)}</p></li>`,
+      `<li class="speed-story__card"><p class="speed-story__kicker">${escapeHtml(category)}</p><p class="speed-story__big"><b>${formatTimes(ratio)}</b><span>faster</span></p><p class="speed-story__what">${escapeHtml(best.label)}</p><p class="speed-story__vs"><b>${formatTime(best.measured.value)}</b> vs ${formatTime(best.base)}</p></li>`,
     ];
   });
   return `<ul class="speed-story__cards">${cards.join("")}</ul>`;
@@ -122,7 +122,7 @@ export function renderSpeedupStory(story: SpeedupStory, icon: PerfIconMarkup): s
   const panels = story.machines
     .map(
       (machine, index) =>
-        `<section class="speed-story__panel" data-machine="${machine.machine}"${index === 0 ? " data-default" : ""} aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta">${icon(MACHINE_ICONS[machine.machine])}<b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine, story.baseName, icon)}${overview(machine, story.baseName)}${details(machine, story.baseName)}</section>`,
+        `<section class="speed-story__panel" data-machine="${machine.machine}"${index === 0 ? " data-default" : ""} aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta"><b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine)}${overview(machine, story.baseName)}${details(machine, story.baseName)}</section>`,
     )
     .join("");
   return `<div class="speed-story" data-pagefind-ignore><div class="speed-story__switch" role="radiogroup" aria-label="Machine">${radios}</div>${panels}</div>`;

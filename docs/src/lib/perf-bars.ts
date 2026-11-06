@@ -78,7 +78,7 @@ export interface PerfFigure {
 /** Icon markup for one sprite icon; inline SVG at build time, a sprite reference on pages. */
 export type PerfIconMarkup = (name: PerfIconName) => string;
 
-export type PerfIconName = "arrow-down" | "arrow-up" | "bolt" | "minus" | "laptop" | "server";
+export type PerfIconName = "arrow-down" | "arrow-up" | "minus" | "laptop" | "server";
 
 export type PerfVerdictKind = "better" | "worse" | "noise" | "missing";
 

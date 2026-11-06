@@ -110,10 +110,6 @@
   font-size: var(--sw-text-caption);
 }
 
-.speed-story__meta .sw-icon {
-  color: var(--sw-icon-accent);
-}
-
 .speed-story__meta b {
   color: var(--sw-fg-strong);
   font-size: var(--sw-text-small);
@@ -152,10 +148,6 @@
   font: 600 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.speed-story__kicker .sw-icon {
-  color: var(--sw-icon-accent);
 }
 
 .sw-prose .speed-story__big,
