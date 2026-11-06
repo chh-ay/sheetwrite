@@ -126,6 +126,8 @@ The slicers of a dashboard filter its pivots together. A slicer on a column of t
 
 In an editable grid, a slicer selection is a saved, synced change of its item, so it is one undo step. In a read-only grid, a slicer filters only that viewer's view: it makes no document change and no undo step.
 
+A slicer dims each value that no row has under the other slicers, and the value stays selectable, as Excel's "Visually indicate items with no data" does. Set `itemsWithNoData` on the slicer item to `"hide"` to hide those values (Excel's "Hide items with no data"), or to `"show"` to show every value plainly.
+
 The dashboard view applies the slicers, so they filter once a dashboard has been shown.
 
 ## Undo and collaboration
