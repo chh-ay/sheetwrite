@@ -15,8 +15,8 @@ import { SiteTopbar } from "../components/SiteTopbar.js";
 import { localPassed, regressions, totalTests } from "../generated/compatibility-summary.json";
 import landingBench from "../generated/landing-bench.json";
 import releaseFacts from "../generated/release-facts.json" with { type: "json" };
-import { opensFreshDocument } from "../lib/site-links.js";
 import { pageMeta } from "../lib/seo.js";
+import { opensFreshDocument } from "../lib/site-links.js";
 
 import landingStylesheet from "../styles/landing.css?url";
 
