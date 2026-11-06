@@ -3,15 +3,18 @@
  *
  * Renamed: non-exported functions, local variables, parameters whose names are not
  * emitted in declaration files, and private class members (`private` or `#name`).
- * Comments inside the symbol's scope that mention the old name, including `@param`
- * tags, are updated; a mention after `.` is a property path and stays.
+ * Comment mentions inside the symbol's scope written as code (in backticks or as a
+ * `@param` name) are updated; bare mentions are reported for review, and a mention
+ * after `.` is a property path and stays.
  *
  * Never renamed: exported or re-exported names, anything declared outside the target
  * files, object and interface property keys (they can cross persisted, wire, public or
- * DOM boundaries), public and protected class members, parameter properties, and names
- * whose snake_case form would collide with another binding. Shorthand properties and
- * destructured bindings keep their key and only rename the local
- * (`{ rowIndex }` becomes `{ rowIndex: row_index }`).
+ * DOM boundaries), public and protected class members, and parameter properties.
+ * Shorthand properties and destructured bindings keep their key and only rename the
+ * local (`{ rowIndex }` becomes `{ rowIndex: row_index }`). A name is reported as a
+ * conflict instead when its snake_case form is already bound, when another renamed
+ * name in the file maps to the same form, or when the file uses the old name in a value
+ * position the checker resolves to no symbol.
  *
  * Every run plans from the type checker's view of the current files, so it can be
  * re-run at any time: output is sorted, and a second `apply` changes nothing.
