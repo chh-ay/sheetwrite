@@ -882,6 +882,7 @@ export class RowBridge<
         return this.metadata(transaction, operation, "named-range");
 
       case "setCalculation":
+      case "setExternalLinks":
         return this.metadata(transaction, operation, "calculation");
 
       case "setRelationship":

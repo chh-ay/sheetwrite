@@ -4,10 +4,14 @@ import {
   type ExternalLinkValue,
   MAX_EXTERNAL_SHEET_AREA,
 } from "@sheetwrite/core";
+import {
+  externalSheetText,
+  formulaCallsExternalData,
+  rewriteExternalSheets,
+} from "@sheetwrite/core/external-links";
 
 import { parseCellReference } from "./cell-reference.js";
 import { MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
-import { externalSheetText, formulaCallsExternalData, rewriteExternalSheets } from "./formula.js";
 import type { OpcPackage, OpcRelationship } from "./opc.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 import {

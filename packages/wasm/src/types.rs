@@ -1,8 +1,8 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, refresh_sheet_spans, rename_sheet_refs, serialize, shift_cols,
-    shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    invalidate_sheet_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, serialize,
+    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::memory::MemoryOwnerStats;
@@ -593,6 +593,18 @@ impl FormulaEntry {
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
         self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
+    }
+
+    /// Point the entry's references to a sheet of another workbook at the
+    /// link sheet `handle` (`Some`), or back to unresolved references when
+    /// the link sheet `key` names goes away (`None`).
+    pub(crate) fn relink_sheet(
+        &mut self,
+        key: &str,
+        handle: Option<u32>,
+        formula_sheet: u32,
+    ) -> bool {
+        self.rewrite_ast(formula_sheet, |ast| relink_sheet_refs(ast, key, handle))
     }
 
     /// Re-places the entry's 3-D references in the tab `order`; `names` holds
