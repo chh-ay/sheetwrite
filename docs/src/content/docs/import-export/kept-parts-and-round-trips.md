@@ -4,8 +4,10 @@ description: Keep eligible unmodelled XLSX parts as original compressed bytes an
 ---
 
 ```ts prelude="core" partial="bytes contains an imported XLSX or XLSM file" title="Open and save without edits"
-import { fromXlsxWorkbook, toXlsxWorkbook } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbook, toXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const bytes: Uint8Array;
 const options = {
@@ -33,8 +35,10 @@ The saved workbook retains its modelled cells. Eligible charts, pivots, images a
 Use the [complete import setup](/docs/import-export/xlsx-import/) to obtain a snapshot, or read bytes from a host file input. Keep the imported snapshot's `workbook.xlsxSource` when persisting it. The source is JSON-safe; no separate original file is required for eligible parts.
 
 ```ts compile title="Round-trip a host-selected file"
-import { fromXlsxWorkbookFile, toXlsxWorkbook } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbookFile, toXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 const input = document.querySelector<HTMLInputElement>('input[type="file"]');
 const file = input?.files?.[0];

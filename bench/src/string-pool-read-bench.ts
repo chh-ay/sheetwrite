@@ -18,7 +18,7 @@ const { SheetwriteStore } = (await import(
 const { getEngine } = (await import(
   `${root}/packages/core/src/engine.ts`
 )) as typeof CoreEngineModule;
-await initSheetwrite(readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`));
+await initSheetwrite({ source: readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`) });
 const selectedEngine = getEngine();
 const engineResolution = {
   commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),

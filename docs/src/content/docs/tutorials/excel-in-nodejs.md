@@ -5,8 +5,10 @@ description: Read real XLSX file bytes and save a workbook snapshot on the serve
 
 ```ts prelude="xlsx" partial="Node file paths and options are declared in Full setup"
 import { readFile, writeFile } from "node:fs/promises";
-import { fromXlsxWorkbook, toXlsxWorkbook, type XlsxWorkbookOptions } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbook, toXlsxWorkbook, type XlsxWorkbookOptions, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const source: string;
 declare const destination: string;
@@ -48,8 +50,11 @@ import { readFile, writeFile, stat } from "node:fs/promises";
 import {
   fromXlsxWorkbook, toXlsxWorkbook, isSheetwriteError,
   type XlsxWorkbookOptions,
+  initSheetwrite,
 } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 const [source, destination] = process.argv.slice(2);
 if (!source || !destination) throw new Error("Usage: roundtrip.mts input.xlsx output.xlsx");

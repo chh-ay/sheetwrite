@@ -28,7 +28,13 @@ import {
 } from "@sheetwrite/core/external-links";
 
 import { areaA1 } from "./cell-reference.js";
-import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
+import {
+  chartDrawingParts,
+  type DrawingChart,
+  freePartName,
+  type PivotChartData,
+  writeCharts,
+} from "./chart-write.js";
 import { DRAWING_REL } from "./chart-xml.js";
 import { staticDashboard, warnStaticDashboards } from "./dashboard.js";
 import {
@@ -742,7 +748,7 @@ function* writeSheet(
   tableStartId: number,
   hook?: WorkbookWriteHook,
   pivotRelationships: readonly ExtraRelationship[] = [],
-  literalCharts?: ReadonlyMap<string, ChartView>,
+  pivotCharts?: ReadonlyMap<string, PivotChartData>,
 ): Generator<Uint8Array, SheetWriteResult> {
   const byRow = new Map<number, AbsoluteCell[]>();
   for (const block of sheet.cells) {
@@ -1005,7 +1011,7 @@ function* writeSheet(
       ? (hook?.contentTypeOverrides ?? []).map((override) => override.part.toLowerCase())
       : [],
   );
-  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context, literalCharts);
+  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context, pivotCharts);
   const chartParts: ZipPart[] = charts?.parts ?? [];
   const chartOverrides: ContentTypeOverride[] = charts?.overrides ?? [];
   if (charts && !hook?.appendCharts?.(sheet, charts.charts)) {
@@ -1226,6 +1232,40 @@ export interface EngineContent {
   readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
 }
 
+/**
+ * The charts over pivots of worksheet `sheet`, each with the output of its
+ * pivot at the pivot's anchor: the cells written for a pivot kept in
+ * metadata, or the cells Excel lays out when it refreshes a native pivot.
+ */
+function worksheetPivotCharts(
+  sheet: SheetSnapshot,
+  content: EngineContent,
+  nativeIds: ReadonlySet<string> | undefined,
+): ReadonlyMap<string, PivotChartData> | undefined {
+  const views = content.pivotCharts?.get(sheet.id);
+  if (views === undefined) return undefined;
+
+  const outputs = content.pivotOutputs?.find((entry) => entry.sheet === sheet.id)?.items ?? [];
+  const charts = new Map<string, PivotChartData>();
+  for (const [id, view] of views) {
+    const pivot = sheet.pivots?.find((candidate) => candidate.id === view.chart.pivot);
+    const output = outputs.find((item) => item.id === pivot?.id);
+    if (pivot === undefined || output === undefined) {
+      charts.set(id, { view });
+      continue;
+    }
+
+    const native = nativeIds?.has(pivot.id) === true;
+    const cells = {
+      cells: output.cells,
+      origin: pivot.anchor,
+      ...(native ? { pivotTable: pivot.name } : {}),
+    };
+    charts.set(id, { view, cells });
+  }
+  return charts;
+}
+
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
 function* writeWorkbookParts(
   snapshot: WorkbookSnapshot,
@@ -1289,7 +1329,7 @@ function* writeWorkbookParts(
         sheetTableId,
         hook,
         pivots?.sheetRelationships(exportSheet.id),
-        dashboard?.charts ?? content.pivotCharts?.get(sheet.id),
+        dashboard?.charts ?? worksheetPivotCharts(sheet, content, pivots?.nativeIds),
       );
     }
     const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);

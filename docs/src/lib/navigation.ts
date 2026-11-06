@@ -60,7 +60,8 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "First grid", href: "/docs/start/first-grid/" },
       { label: "Choose an engine", href: "/docs/start/choose-an-engine/", added: RELEASE },
       { label: "Upgrade to 0.6.0", href: "/docs/start/upgrade-to-0-6-0/", added: RELEASE },
-      { label: "Upgrade to 0.7.0", href: "/docs/start/upgrade-to-0-7-0/" },
+      // Not released yet; the label says so beside the 0.6.x version in the header.
+      { label: "Upgrade to 0.7.0 (next)", href: "/docs/start/upgrade-to-0-7-0/" },
     ],
   },
   {

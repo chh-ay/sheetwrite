@@ -62,7 +62,7 @@ The default engine, `@sheetwrite/wasm`, has the standard functions and the small
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 See [Choose an engine](https://www.sheetwrite.dev/docs/start/choose-an-engine/) and the [function reference](https://www.sheetwrite.dev/docs/reference/formula-functions/) for the functions in each engine.
@@ -79,20 +79,23 @@ npm install @sheetwrite/xlsx
 ```
 
 ```ts
-import "@sheetwrite/xlsx/register";
 import {
   fromXlsxTable,
   fromXlsxWorkbook,
+  initSheetwrite,
   toXlsxTable,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 ```
 
 The table APIs exchange the first sheet with a synthesized header row. The
 workbook APIs preserve multi-sheet `WorkbookSnapshot` semantics and use an
 in-memory backend with a default 1,000,000-populated-cell limit. Without
-registration, each core XLSX function throws an error telling the caller to
-install `@sheetwrite/xlsx` and import `@sheetwrite/xlsx/register`.
+the add-on, each core XLSX function throws an error telling the caller to
+install `@sheetwrite/xlsx` and call `initSheetwrite({ addons: [xlsxAddon()] })`.
 
 Workbook import and export also keep unmodeled XLSX parts within resource limits.
 Cell edits drop kept charts and pivot tables with a warning. Structural edits

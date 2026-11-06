@@ -355,6 +355,7 @@ describe("resolveChartView", () => {
         name: "Series 1",
         values: [10, null],
         categories: ["Q1", "Q2"],
+        categoryLevels: [],
         // The cell style wins over the column format, as in the painted grid.
         numberFormats: ["0.0%", "#,##0"],
         categoryFormats: ["@", "@"],
@@ -363,6 +364,76 @@ describe("resolveChartView", () => {
         referenceError: false,
       },
     ]);
+  });
+
+  it("reads a category range of several columns as one level per column, the last innermost", () => {
+    const { store, events } = setup();
+    apply(store, [
+      set("data", 3, 0, "East"),
+      set("data", 5, 0, "West"),
+      ...["Retail", "Online", "Retail", "Online"].map((segment, index) =>
+        set("data", 3 + index, 1, segment),
+      ),
+      ...[1, 2, 3, 4].map((value, index) => set("data", 3 + index, 2, value)),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: chart("levels", range("data", 3, 2, 6, 2), range("data", 3, 0, 6, 1)),
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "levels")?.series[0];
+    expect(series?.values).toEqual([1, 2, 3, 4]);
+    expect(series?.categories).toEqual(["Retail", "Online", "Retail", "Online"]);
+    // A blank outer cell continues the group above it, as in Excel.
+    expect(series?.categoryLevels.map((level) => level.labels)).toEqual([
+      ["East", null, "West", null],
+    ]);
+
+    // An edit of an outer label redraws the chart.
+    events.length = 0;
+    apply(store, [set("data", 4, 0, "North")]);
+    expect(events[0]?.charts).toContainEqual({ sheet: "data", id: "levels" });
+    expect(resolveChartView(store, "data", "levels")?.series[0]?.categoryLevels[0]?.labels).toEqual(
+      ["East", "North", "West", null],
+    );
+  });
+
+  it("reads a category range of several rows as one level per row when the values run along a row", () => {
+    const { store } = setup();
+    apply(store, [
+      set("data", 5, 0, 2024),
+      set("data", 5, 2, 2025),
+      ...["H1", "H2", "H1", "H2"].map((half, col) => set("data", 6, col, half)),
+      ...[1, 2, 3, 4].map((value, col) => set("data", 7, col, value)),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: chart("rows", range("data", 7, 0, 7, 3), range("data", 5, 0, 6, 3)),
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "rows")?.series[0];
+    expect(series?.categories).toEqual(["H1", "H2", "H1", "H2"]);
+    expect(series?.categoryLevels.map((level) => level.labels)).toEqual([[2024, null, 2025, null]]);
+  });
+
+  it("keeps one category level for a scatter chart, whose categories are x values", () => {
+    const { store } = setup();
+    apply(store, [
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: {
+          ...chart("xy", range("data", 0, 2, 1, 2), range("data", 0, 0, 1, 1)),
+          kind: "scatter",
+        },
+      },
+    ]);
+
+    const series = resolveChartView(store, "data", "xy")?.series[0];
+    expect(series?.categories).toEqual(["Q1", 10, "Q2", 20]);
+    expect(series?.categoryLevels).toEqual([]);
   });
 
   it("reads the first nameRange cell and follows edits to that label", () => {

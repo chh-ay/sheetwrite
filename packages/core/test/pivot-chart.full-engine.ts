@@ -6,24 +6,25 @@ import * as formulas from "@sheetwrite/formulas";
 
 import {
   type ChartDefinition,
+  type ChartSeriesView,
   type ChartView,
   createGridFromSnapshot,
   type Grid,
   initSheetwrite,
   type PivotDefinition,
   resolveChartView,
-  setXlsxWorkbookBackend,
   subscribeChartChanges,
   toXlsxWorkbook,
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 
 const RIBBON_MODULE = "../src/ribbon/ribbon.js";
 
 beforeAll(async () => {
-  await initSheetwrite(undefined, formulas);
+  await initSheetwrite({ engine: formulas });
 });
 
 let restore: () => void;
@@ -188,9 +189,24 @@ function view(grid: Grid): ChartView | null {
   return resolveChartView(grid.store, "report", CHART.id);
 }
 
-/** Each series as its categories and values. */
+/**
+ * The item of each category of `series`: its levels from the outside in,
+ * each outer label carried down to the rest of its group.
+ */
+function categoryItems(series: ChartSeriesView): string[] {
+  const carried = series.categoryLevels.map(() => "");
+  return series.categories.map((category, index) => {
+    series.categoryLevels.forEach((level, depth) => {
+      const label = level.labels[index];
+      if (label !== null && label !== undefined) carried[depth] = String(label);
+    });
+    return [...carried, String(category)].join(" / ");
+  });
+}
+
+/** Each series as the items of its categories and its values. */
 function points(chartView: ChartView | null) {
-  return chartView?.series.map((series) => [series.categories, series.values]);
+  return chartView?.series.map((series) => [categoryItems(series), series.values]);
 }
 
 describe("a chart over a worksheet pivot", () => {
@@ -208,6 +224,16 @@ describe("a chart over a worksheet pivot", () => {
       });
     }
   }
+
+  it("fills the category levels from the row fields: the outer item once at the start of its group", async () => {
+    const grid = mount(salesPivot({ layout: "tabular" }));
+    const [series] = (await loadedView(grid))?.series ?? [];
+
+    expect(series?.categories).toEqual(["Online", "Retail", "Retail", "Online", "Retail"]);
+    expect(series?.categoryLevels.map((level) => level.labels)).toEqual([
+      ["East", null, "North", "West", null],
+    ]);
+  });
 
   it("plots one series per column item, with gaps where a leaf item has no value", async () => {
     const grid = mount(salesPivot({ columns: [QUARTER] }));

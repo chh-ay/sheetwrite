@@ -173,6 +173,174 @@ describe("renderChartSvg", () => {
     expect(labels.length).toBeLessThan(count / 4);
   });
 
+  describe("multi-level category labels", () => {
+    const NULLS = [null, null, null, null];
+    const REGIONS = seriesView("Sales", [3, 5, 2, 4], {
+      categories: ["Retail", "Online", "Retail", "Online"],
+      categoryLevels: [{ labels: ["East", null, "West", null], formats: NULLS }],
+    });
+
+    function levelLabels(svg: Element, level: number): Element[] {
+      return [
+        ...svg.querySelectorAll(`.sheetwrite-chart-category-axis text[data-level="${level}"]`),
+      ];
+    }
+
+    function dividers(svg: Element): Element[] {
+      return [...svg.querySelectorAll(".sheetwrite-chart-category-dividers line")];
+    }
+
+    it("draws the inner labels on the first row and each outer label once, centered on its group", () => {
+      const svg = render(chartView("column", [REGIONS]));
+      const inner = levelLabels(svg, 0);
+      const outer = levelLabels(svg, 1);
+
+      expect(inner.map((node) => node.textContent)).toEqual([
+        "Retail",
+        "Online",
+        "Retail",
+        "Online",
+      ]);
+      expect(outer.map((node) => node.textContent)).toEqual(["East", "West"]);
+      const innerXs = inner.map((node) => numberAttribute(node, "x"));
+      expect(numberAttribute(outer[0], "x")).toBeCloseTo(
+        ((innerXs[0] ?? 0) + (innerXs[1] ?? 0)) / 2,
+      );
+      expect(numberAttribute(outer[1], "x")).toBeCloseTo(
+        ((innerXs[2] ?? 0) + (innerXs[3] ?? 0)) / 2,
+      );
+      expect(numberAttribute(outer[0], "y")).toBeGreaterThan(numberAttribute(inner[0], "y"));
+    });
+
+    it("divides the categories, and the groups through every row of labels", () => {
+      const lines = dividers(render(chartView("line", [REGIONS])));
+      const lengths = lines.map(
+        (line) => numberAttribute(line, "y2") - numberAttribute(line, "y1"),
+      );
+
+      // Boundaries 0 to 4; 0, 2 and 4 end or start a group.
+      expect(lines).toHaveLength(5);
+      expect(lengths[0]).toBeGreaterThan(lengths[1] ?? 0);
+      expect(lengths[2]).toBe(lengths[0] ?? 0);
+      expect(lengths[4]).toBe(lengths[0] ?? 0);
+      expect(lengths[3]).toBe(lengths[1] ?? 0);
+    });
+
+    it("starts a group where an outer group starts, also under a blank label", () => {
+      const svg = render(
+        chartView("column", [
+          seriesView("Sales", [1, 2, 3, 4], {
+            categories: ["1", "2", "3", "4"],
+            categoryLevels: [
+              { labels: ["A", null, null, "B"], formats: NULLS },
+              { labels: ["x", null, "y", null], formats: NULLS },
+            ],
+          }),
+        ]),
+      );
+      const inner = levelLabels(svg, 0);
+      const outermost = levelLabels(svg, 2);
+
+      expect(levelLabels(svg, 1).map((node) => node.textContent)).toEqual(["x", "y"]);
+      expect(outermost.map((node) => node.textContent)).toEqual(["A", "B"]);
+      // B's group is the last category only, so its label sits over that category.
+      expect(numberAttribute(outermost[1], "x")).toBeCloseTo(numberAttribute(inner[3], "x"));
+      expect(dividers(svg)).toHaveLength(5);
+    });
+
+    it("turns crowded inner labels to read upward and keeps the outer labels level", () => {
+      const count = 20;
+      const categories = Array.from({ length: count }, (_, index) => `Category ${index + 1}`);
+      const groups = categories.map((_, index) =>
+        index % 10 === 0 ? `Group ${index / 10 + 1}` : null,
+      );
+      const svg = render(
+        chartView("column", [
+          seriesView(
+            "Sales",
+            categories.map(() => 1),
+            { categories, categoryLevels: [{ labels: groups, formats: groups.map(() => null) }] },
+          ),
+        ]),
+      );
+      const inner = levelLabels(svg, 0);
+
+      expect(inner.map((node) => node.textContent)).toEqual(categories);
+      expect(inner.every((node) => node.getAttribute("transform")?.startsWith("rotate(-90"))).toBe(
+        true,
+      );
+      expect(
+        levelLabels(svg, 1).map((node) => [node.textContent, node.getAttribute("transform")]),
+      ).toEqual([
+        ["Group 1", null],
+        ["Group 2", null],
+      ]);
+    });
+
+    it("wraps an outer label onto more lines when its group is narrow", () => {
+      const labels = ["North East", "South", null, null, null, null, null, null];
+      const svg = render(
+        chartView("column", [
+          seriesView("Sales", [1, 1, 1, 1, 1, 1, 1, 1], {
+            categories: ["a", "b", "c", "d", "e", "f", "g", "h"],
+            categoryLevels: [{ labels, formats: labels.map(() => null) }],
+          }),
+        ]),
+      );
+      const [north, east, south] = levelLabels(svg, 1);
+
+      expect([north, east, south].map((node) => node?.textContent)).toEqual([
+        "North",
+        "East",
+        "South",
+      ]);
+      expect(numberAttribute(east, "x")).toBe(numberAttribute(north, "x"));
+      expect(numberAttribute(east, "y")).toBeGreaterThan(numberAttribute(north, "y"));
+    });
+
+    it("draws the outer labels of a bar chart left of the inner labels, reading upward", () => {
+      const svg = render(chartView("bar", [REGIONS]));
+      const inner = levelLabels(svg, 0);
+      const outer = levelLabels(svg, 1);
+
+      expect(outer.map((node) => node.textContent)).toEqual(["East", "West"]);
+      expect(outer.every((node) => node.getAttribute("transform")?.startsWith("rotate(-90"))).toBe(
+        true,
+      );
+      expect(numberAttribute(outer[0], "x")).toBeLessThan(numberAttribute(inner[0], "x"));
+      const innerYs = inner.map((node) => numberAttribute(node, "y"));
+      expect(numberAttribute(outer[0], "y")).toBeCloseTo(
+        ((innerYs[0] ?? 0) + (innerYs[1] ?? 0)) / 2,
+      );
+      expect(
+        dividers(svg).every((line) => line.getAttribute("y1") === line.getAttribute("y2")),
+      ).toBe(true);
+    });
+
+    it("draws one row of labels from the outside in when multi-level labels are off", () => {
+      const svg = render(chartView("column", [REGIONS], { axes: { multiLevelLabels: false } }));
+
+      expect(texts(svg, ".sheetwrite-chart-category-axis text")).toEqual([
+        "East Retail",
+        "Online",
+        "West Retail",
+        "Online",
+      ]);
+      expect(dividers(svg)).toEqual([]);
+    });
+
+    it("names pie slices from the outside in", () => {
+      const svg = render(chartView("pie", [REGIONS]));
+
+      expect(texts(svg, ".sheetwrite-chart-legend-item text")).toEqual([
+        "East Retail",
+        "Online",
+        "West Retail",
+        "Online",
+      ]);
+    });
+  });
+
   it("leaves a gap for each null value", () => {
     const svg = render(chartView("line", [seriesView("Sales", [1, null, 3, 4, null])]));
     const lines = svg.querySelectorAll(".sheetwrite-chart-line");

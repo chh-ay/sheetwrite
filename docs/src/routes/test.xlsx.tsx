@@ -1,5 +1,10 @@
-import { fromXlsxWorkbook, toXlsxWorkbook, type WorkbookSnapshot } from "@sheetwrite/core";
-import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import {
+  fromXlsxWorkbook,
+  initSheetwrite,
+  toXlsxWorkbook,
+  type WorkbookSnapshot,
+} from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
@@ -48,7 +53,6 @@ const snapshot: WorkbookSnapshot = {
 };
 
 function XlsxFixture() {
-  registerXlsxBackends();
   const [result, setResult] = useState<{ status: "running" | "ready" | "error"; text: string }>({
     status: "running",
     text: "running",
@@ -58,6 +62,7 @@ function XlsxFixture() {
     let cancelled = false;
     void (async () => {
       try {
+        await initSheetwrite({ addons: [xlsxAddon()] });
         const bytes = await toXlsxWorkbook(snapshot);
         const imported = await fromXlsxWorkbook(bytes);
         const formula = imported.sheets[1]?.cells[0]?.cells[0]?.value;

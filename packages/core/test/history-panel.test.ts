@@ -1,10 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
-import {
-  createHistoryCommands,
-  HistoryArchive,
-  MemoryHistoryStorage,
-} from "../src/history-archive.js";
+import { HistoryArchive, historyAddon, MemoryHistoryStorage } from "../src/history-archive.js";
 import {
   type CommittedTransaction,
   createGridFromSnapshot,
@@ -20,7 +16,7 @@ import { installCanvasTestStubs } from "../src/testing.js";
 const DOCUMENT = "book";
 
 beforeAll(async () => {
-  await initSheetwrite();
+  await initSheetwrite({ addons: [historyAddon()] });
 });
 
 let restoreStubs: () => void;
@@ -75,17 +71,17 @@ async function setup() {
   document.body.append(host);
   let sync: SyncCoordinator | undefined;
   const grid = createGridFromSnapshot(host, snapshot(), {
-    config: {
-      ribbon: true,
-      history: createHistoryCommands({
+    config: { ribbon: true },
+    addons: {
+      history: {
         archive,
         authorId: "alice",
-        authorName: (id) => (id === "alice" ? "Alice" : id),
+        authorName: (id: string) => (id === "alice" ? "Alice" : id),
         sync: () => {
           if (!sync) throw new Error("sync is not ready");
           return sync;
         },
-      }),
+      },
     },
   });
   sync = new SyncCoordinator(grid, adapter, {

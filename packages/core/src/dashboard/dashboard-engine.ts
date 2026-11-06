@@ -3,6 +3,7 @@
 // results through it, so they see the same slicer filters and hidden pivots.
 
 import { isDashboard } from "../dashboard.js";
+import { scanColumnValues } from "../data-window-reads.js";
 import { compareScalars, sourceDataRange } from "../panels/pivot-model.js";
 import { PIVOT_ERRORS } from "../store/data-engine.js";
 import { storeEngine } from "../store/engine-registry.js";
@@ -150,12 +151,18 @@ export function slicerValuesOf(store: Store, item: DashboardSlicerItem): CellSca
   if (table === undefined || offset < 0) return null;
 
   const range = sourceDataRange({ table: table.id }, tables);
+  if (range === null) return [];
+
   const seen = new Set<CellScalar>();
-  for (let row = range?.start.row ?? 1; range !== null && row <= range.end.row; row++) {
-    const address = { sheet: range.sheet, row, col: range.start.col + offset };
-    const value = store.getCell(address).resolved;
+  const span = {
+    sheet: range.sheet,
+    col: range.start.col + offset,
+    startRow: range.start.row,
+    endRow: range.end.row,
+  };
+  scanColumnValues(store, span, (value) => {
     seen.add(value === "" ? null : value);
-    if (seen.size >= MAX_SLICER_VALUES) break;
-  }
+    return seen.size < MAX_SLICER_VALUES;
+  });
   return [...seen].sort(compareScalars);
 }
