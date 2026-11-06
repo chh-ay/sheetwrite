@@ -731,8 +731,14 @@ impl FormulaResults {
     /// Hands the waiting results to the pass to write; give the list back
     /// with [`Self::restore_pulled`] to keep its capacity.
     pub(crate) fn take_pulled(&mut self) -> Vec<(FormulaId, EvalResult)> {
-        for &(id, _) in &self.pulled {
-            self.pulled_bits.remove(id);
+        // Every pulled bit belongs to an entry: a long list clears all words
+        // at once, a short one only its own.
+        if self.pulled.len() > BITS_PER_WORD {
+            self.pulled_bits.clear_all();
+        } else {
+            for &(id, _) in &self.pulled {
+                self.pulled_bits.remove(id);
+            }
         }
         std::mem::take(&mut self.pulled)
     }
@@ -836,12 +842,17 @@ impl FormulaResults {
         std::mem::swap(&mut self.regexes, &mut other.regexes);
     }
 
-    /// Clears this pass's settled, pulled and active-call bits.
+    /// Clears this pass's pulled results and any bits left set. A finished
+    /// pass has already cleared its own settled bits, so a small edit does
+    /// not touch every word.
     pub(crate) fn clear(&mut self) {
+        for &(id, _) in &self.pulled {
+            self.pulled_bits.remove(id);
+        }
+        self.pulled.clear();
         self.settled.clear_all();
         self.visiting.clear_all();
         self.pulled_bits.clear_all();
-        self.pulled.clear();
         self.order.clear();
         self.ordered = false;
         self.range_sums.sums.clear();
@@ -855,6 +866,10 @@ impl FormulaResults {
 
     /// Release wide result buffers before saving the cleared primary work space.
     pub(crate) fn finish(&mut self, mut work: FormulaWork) {
+        // Settled formulas are selected ones, so the selection clears them.
+        for id in work.ids() {
+            self.settled.remove(id);
+        }
         self.clear();
 
         // Small edits reuse one page of empty buffers instead of two

@@ -1441,15 +1441,17 @@ impl CellStore {
             _ => self.flush_pulled(results),
         }
         if results.ordered {
+            // The walk lists every selected formula it did not resolve to an
+            // error, and those errors are already written.
             let order = std::mem::take(&mut results.order);
             for &id in &order {
                 self.evaluate_one(id, affected, results);
             }
             results.order = order;
-        }
-        // Formulas the walk did not list, or every formula when it did not run.
-        for id in affected.ids() {
-            self.evaluate_one(id, affected, results);
+        } else {
+            for id in affected.ids() {
+                self.evaluate_one(id, affected, results);
+            }
         }
     }
 
@@ -1461,7 +1463,9 @@ impl CellStore {
         affected: &FormulaWork,
         results: &mut FormulaResults,
     ) {
-        if results.has(id) {
+        // Between top-level formulas only iteration's seeded cycles wait in
+        // the pulled list, so most checks need only the settled bit.
+        if results.is_settled(id) || (results.has_pulled() && results.has(id)) {
             return;
         }
         let mut pass = EvalPass { affected, results };
