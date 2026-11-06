@@ -5,7 +5,7 @@ import {
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
 import { SheetwriteError } from "./errors.js";
-import { assertGridAddons, attachGridAddons, GridImpl } from "./grid.js";
+import { GridImpl } from "./grid.js";
 import { boundedJsonByteLength, JsonByteLengthError } from "./json-bytes.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { SheetwriteStore } from "./store.js";
@@ -75,7 +75,6 @@ export function createGridFromSnapshot(
   options: SnapshotGridOptions = {},
 ): Grid {
   const { snapshotResourceLimits, ...gridOptions } = options;
-  assertGridAddons(gridOptions.addons);
   let store: SheetwriteStore;
   try {
     store = SheetwriteStore.fromSnapshot(snapshot, {
@@ -98,9 +97,8 @@ export function createGridFromSnapshot(
     throw error;
   }
 
-  let grid: GridImpl;
   try {
-    grid = new GridImpl(host, { ...gridOptions, workbook: store.getWorkbook() }, store, true);
+    return new GridImpl(host, { ...gridOptions, workbook: store.getWorkbook() }, store, true);
   } catch (error) {
     store.dispose();
     if (
@@ -111,9 +109,6 @@ export function createGridFromSnapshot(
     }
     throw error;
   }
-
-  attachGridAddons(grid, gridOptions.addons);
-  return grid;
 }
 
 /** Executable database-neutral reference adapter for tests, demos, and local workflows. */
