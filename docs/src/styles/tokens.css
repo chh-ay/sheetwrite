@@ -136,9 +136,9 @@
 /* Metric-matched fallbacks: Arial (Liberation Sans on Linux) scaled to each
    face's width, with line metrics from the face's hhea table divided by the
    scale, so text keeps its line breaks and height while the web fonts load.
-   Widths are measured per weight range (headings at display size, where a
-   shift shows most; body text at 14–16 px); each fallback stays slightly
-   narrower than its face, so text never gains a line. */
+   Widths are measured per weight the docs use (body text at 400, bold and
+   navigation at 600, headings at 600 and 700) on the same English text, and
+   match the face's width, so the swap does not re-wrap a line. */
 @font-face {
   font-family: "Bricolage Grotesque Fallback";
   font-weight: 100 549;
@@ -157,9 +157,9 @@
   src:
     local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 92.8%;
-  ascent-override: 100.22%;
-  descent-override: 29.09%;
+  size-adjust: 93.4%;
+  ascent-override: 99.58%;
+  descent-override: 28.9%;
   line-gap-override: 0%;
 }
 
@@ -169,9 +169,9 @@
   src:
     local("Liberation Sans"), local("LiberationSans"), local("Arial"), local("ArialMT"),
     local("Helvetica");
-  size-adjust: 102.5%;
-  ascent-override: 94.63%;
-  descent-override: 24.39%;
+  size-adjust: 101.06%;
+  ascent-override: 95.98%;
+  descent-override: 24.74%;
   line-gap-override: 0%;
 }
 
@@ -181,9 +181,9 @@
   src:
     local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arial Bold"),
     local("Arial-BoldMT"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 96.8%;
-  ascent-override: 100.21%;
-  descent-override: 25.83%;
+  size-adjust: 97.04%;
+  ascent-override: 99.96%;
+  descent-override: 25.77%;
   line-gap-override: 0%;
 }
 
