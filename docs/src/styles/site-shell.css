@@ -93,12 +93,13 @@
   display: grid;
   gap: var(--sw-space-0-5);
 }
+/* Labels sit below the page rows in weight and colour: the pages lead. */
 .sw-nav-section > h2 {
   margin: 0 0 var(--sw-space-2);
   padding-inline: var(--sw-space-3);
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-    var(--sw-font-display);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui)
+    var(--sw-font-body);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -121,12 +122,19 @@
     color var(--sw-motion-fast) var(--sw-motion-standard),
     background-color var(--sw-motion-fast) var(--sw-motion-standard);
 }
+/* At rest every glyph is one muted colour, accent marks included; the accent
+   returns on hover and on the current page. */
 .sw-sidebar__nav a > .sw-icon,
 .sw-nav-subgroup > summary > .sw-icon:first-child {
+  --sw-icon-accent: currentColor;
   flex: none;
   width: var(--sw-icon-sm);
   height: var(--sw-icon-sm);
   color: var(--sw-fg-muted);
+}
+.sw-sidebar__nav a:hover > .sw-icon,
+.sw-nav-subgroup > summary:hover > .sw-icon:first-child {
+  --sw-icon-accent: var(--sw-accent);
 }
 .sw-sidebar__nav a > span:first-of-type,
 .sw-nav-subgroup > summary > span {
@@ -146,6 +154,7 @@
   font-weight: var(--sw-weight-semibold);
 }
 .sw-sidebar__nav a[aria-current="page"] > .sw-icon {
+  --sw-icon-accent: var(--sw-accent-strong);
   color: var(--sw-accent-strong);
 }
 /* Disclosure rows (nested groups, the inline outline): no native marker; a

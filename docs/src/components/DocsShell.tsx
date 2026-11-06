@@ -1,13 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
-import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import {
+  CURRENT_RELEASE,
   type DocsTabId,
   type DocumentNeighbours,
   documentNeighbours,
   type NavigationItem,
   type NavigationLocation,
+  type NavigationSection,
   navigationBadge,
   nearestNavigationItem,
   tabForHref,
@@ -49,12 +50,12 @@ interface DocsShellProps {
 }
 
 /**
- * The one sidebar marker: "New" on a page added in the latest release; text,
+ * The one sidebar marker: "New" on a page added in the current release; text,
  * so screen readers announce it. Only page links carry it: a group marker
  * would repeat its pages' markers on a collapsed row.
  */
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
-  if (item.items !== undefined || navigationBadge(item, releaseFacts.latest.version) !== "new") {
+  if (item.items !== undefined || navigationBadge(item, CURRENT_RELEASE) !== "new") {
     return null;
   }
   return <span className="sw-nav-badge">New</span>;
@@ -124,6 +125,11 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
   });
 }
 
+/** A section of one page and no overview leads with that page, unlabelled. */
+function sectionLabelHidden(section: NavigationSection): boolean {
+  return section.href === undefined && section.items.length === 1;
+}
+
 /**
  * The current tab's sections, shared by the sidebar and the drawer so the two
  * can never advertise different documentation: each section is a small label
@@ -141,7 +147,7 @@ function NavigationSections({
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       {tabSections(tab).map((section) => (
         <section className="sw-nav-section" key={section.label}>
-          <h2>{section.label}</h2>
+          {sectionLabelHidden(section) ? null : <h2>{section.label}</h2>}
           <NavigationEntries
             current={current}
             // A section's own page leads its list, named Overview as a group's is.

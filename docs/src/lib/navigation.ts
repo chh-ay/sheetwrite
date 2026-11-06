@@ -119,8 +119,16 @@ function isPage(item: NavigationItem): item is NavigationPage {
 /** The one generated section; the authored sections leave it out. */
 const API_PACKAGES_LABEL = "API packages";
 
-/** Release whose pages carry New and Updated badges in this tree. */
+/** The release that added the pages marked with it below. */
 const RELEASE = "0.6.0";
+
+/**
+ * The newest release the docs describe, published or next: only pages it
+ * added carry "New". The release links list the newest release first.
+ */
+export const CURRENT_RELEASE: string =
+  /\/releases\/([^/]+)\/$/.exec(releaseFacts.links[1]?.href ?? "")?.[1] ??
+  releaseFacts.latest.version;
 
 export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
