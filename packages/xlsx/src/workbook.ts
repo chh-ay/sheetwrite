@@ -35,7 +35,7 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
     try {
       const context = createCodecContext("export", options);
       const hook = await writeHook(snapshot, context, exportContext?.sourceTracked === true);
-      return await writeWorkbook(snapshot, context, hook);
+      return await writeWorkbook(snapshot, context, hook, exportContext?.dashboards);
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);
     }
@@ -44,7 +44,7 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
     try {
       const context = createCodecContext("export", options);
       const hook = await writeHook(snapshot, context, exportContext?.sourceTracked === true);
-      yield* streamWorkbook(snapshot, context, hook);
+      yield* streamWorkbook(snapshot, context, hook, exportContext?.dashboards);
     } catch (error) {
       throw xlsxFailure(error, "export", "sheetwrite-ooxml", options?.signal);
     }

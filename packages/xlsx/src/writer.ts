@@ -1,6 +1,8 @@
 import type {
   CellStyle,
+  ChartView,
   ConditionalFormatRule,
+  DashboardExport,
   DataValidationRule,
   SheetSnapshot,
   SnapshotCell,
@@ -22,6 +24,7 @@ import {
 import { areaA1 } from "./cell-reference.js";
 import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
 import { DRAWING_REL } from "./chart-xml.js";
+import { staticDashboard, warnStaticDashboards } from "./dashboard.js";
 import {
   EXTERNAL_LINK_CONTENT,
   EXTERNAL_LINK_REL,
@@ -729,6 +732,7 @@ function* writeSheet(
   tableStartId: number,
   hook?: WorkbookWriteHook,
   pivotRelationships: readonly ExtraRelationship[] = [],
+  literalCharts?: ReadonlyMap<string, ChartView>,
 ): Generator<Uint8Array, SheetWriteResult> {
   const byRow = new Map<number, AbsoluteCell[]>();
   for (const block of sheet.cells) {
@@ -991,7 +995,7 @@ function* writeSheet(
       ? (hook?.contentTypeOverrides ?? []).map((override) => override.part.toLowerCase())
       : [],
   );
-  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context);
+  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context, literalCharts);
   const chartParts: ZipPart[] = charts?.parts ?? [];
   const chartOverrides: ContentTypeOverride[] = charts?.overrides ?? [];
   if (charts && !hook?.appendCharts?.(sheet, charts.charts)) {
@@ -1204,6 +1208,7 @@ function* writeWorkbookParts(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   resolveHook?: WorkbookWriteHookResolver,
+  dashboards: readonly DashboardExport[] = [],
 ): Generator<ZipPart> {
   preflightSnapshot(snapshot, context);
   if (snapshot.sheets.length === 0)
@@ -1225,6 +1230,7 @@ function* writeWorkbookParts(
   );
   context.externalFormula = (formula) => links.fileFormula(formula);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
+  if (ordered.some((sheet) => sheet.kind === "dashboard")) warnStaticDashboards(context);
   const styles = new StylesRegistry(context);
   const pivots = preparePivots(snapshot, ordered, styles, context);
   const metadataName = metadataSheetName(snapshot);
@@ -1240,6 +1246,15 @@ function* writeWorkbookParts(
     const part = `xl/worksheets/sheet${number}.xml`;
     let result: SheetWriteResult | undefined;
     const sheetTableId = nextTableId;
+    // Excel has no dashboard sheet: it gets a worksheet of the dashboard's current values.
+    const dashboard =
+      sheet.kind === "dashboard"
+        ? staticDashboard(
+            sheet,
+            dashboards.find((entry) => entry.sheet === sheet.id),
+            context,
+          )
+        : undefined;
     function* chunks(exportSheet: SheetSnapshot): Generator<Uint8Array> {
       result = yield* writeSheet(
         snapshot,
@@ -1250,9 +1265,11 @@ function* writeWorkbookParts(
         sheetTableId,
         hook,
         pivots?.sheetRelationships(exportSheet.id),
+        dashboard?.charts,
       );
     }
-    yield { name: part, data: chunks(pivots ? pivots.withSavedOutput(sheet) : sheet) };
+    const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);
+    yield { name: part, data: chunks(exportSheet) };
     if (!result) throw new Error(`Sheetwrite: worksheet ${part} was not consumed before advancing`);
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
     workbookRelationships.push({
@@ -1369,16 +1386,24 @@ export async function writeWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
+  dashboards?: readonly DashboardExport[],
 ): Promise<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  return writeZip(writeWorkbookParts(snapshot, { ...context, formulas }, hook), context);
+  return writeZip(
+    writeWorkbookParts(snapshot, { ...context, formulas }, hook, dashboards),
+    context,
+  );
 }
 
 export async function* streamWorkbook(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
   hook?: WorkbookWriteHookResolver,
+  dashboards?: readonly DashboardExport[],
 ): AsyncGenerator<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  yield* zipChunks(writeWorkbookParts(snapshot, { ...context, formulas }, hook), context);
+  yield* zipChunks(
+    writeWorkbookParts(snapshot, { ...context, formulas }, hook, dashboards),
+    context,
+  );
 }
