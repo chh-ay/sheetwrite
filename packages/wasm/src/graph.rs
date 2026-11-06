@@ -89,19 +89,16 @@ impl DirtyRect {
     }
 }
 
-/// Exact dirty source cells in one flat list: a sorted, unique prefix and a
-/// tail. Writes in address order (a load or a fill) extend the prefix. A
-/// write that restarts lower (the next column of a spill) starts the tail,
-/// which stays a sorted run while writes keep ascending. A write already in
-/// either sorted run is found by binary search and adds nothing. Once the
-/// tail is out of order it may hold repeats, so the whole list is sorted and
-/// deduplicated in place before it grows: repeated edits of a few cells stay
-/// bounded without hashing.
+/// Exact dirty source cells in one flat list: a sorted, unique prefix and an
+/// unsorted tail. Writes in address order (a load or a fill) extend the
+/// prefix, and a write already in it is found by binary search. Other single
+/// writes append to the tail, which may hold repeats, so the list is sorted
+/// and deduplicated in place before it grows: repeated edits of a few cells
+/// stay bounded without hashing.
 #[derive(Default)]
 struct DirtyCells {
     cells: Vec<CellKey>,
     sorted_len: usize,
-    tail_sorted: bool,
 }
 
 impl DirtyCells {
@@ -116,31 +113,21 @@ impl DirtyCells {
             return;
         }
 
-        let prefix_only = self.sorted_len == len;
-        if prefix_only && last < key {
+        if self.sorted_len == len && last < key {
             self.cells.push(key);
             self.sorted_len += 1;
             return;
         }
 
-        let (prefix, tail) = self.cells.split_at(self.sorted_len.min(len));
+        let prefix = self.cells.get(..self.sorted_len).unwrap_or_default();
         if prefix.binary_search(&key).is_ok() {
             return;
         }
 
-        if prefix_only {
-            self.tail_sorted = true;
-        } else if self.tail_sorted && last > key {
-            if tail.binary_search(&key).is_ok() {
-                return;
-            }
-            self.tail_sorted = false;
-        }
-
-        // Fold before growing. Sorting two ascending runs is a linear merge,
-        // and room for as many cells again as survive keeps folds amortized.
+        // Fold before growing. Room for as many cells again as survive the
+        // fold keeps each fold amortized.
         if len == self.cells.capacity() {
-            self.cells.sort();
+            self.cells.sort_unstable();
             self.cells.dedup();
             self.sorted_len = self.cells.len();
             if self.cells.binary_search(&key).is_ok() {
@@ -150,32 +137,41 @@ impl DirtyCells {
             self.cells.reserve(self.cells.len());
             if self.cells.last().is_none_or(|&last| last < key) {
                 self.sorted_len += 1;
-            } else {
-                self.tail_sorted = true;
             }
         }
 
         self.cells.push(key);
     }
 
-    /// Appends a batch, then folds it with one sort unless it continued the
-    /// sorted list. A batch is a few ascending runs (a vacated spill, then
-    /// its reinstalled cells), which a stable sort merges in linear time,
-    /// where a binary search per cell is not.
+    /// Adds a batch in one step. A batch is usually one ascending run (a
+    /// vacated or reinstalled spill): it either continues the sorted list or
+    /// merges with it in one linear pass, where a binary search per cell
+    /// would not be linear. Any other batch is sorted in with the list.
     fn extend(&mut self, keys: impl IntoIterator<Item = CellKey>) {
-        let mut ascending = self.sorted_len == self.cells.len();
+        let start = self.cells.len();
+        let sorted = self.sorted_len == start;
+        let mut ascending = true;
         for key in keys {
             let last = self.cells.last().copied();
             if last == Some(key) {
                 continue;
             }
 
-            ascending &= last.is_none_or(|last| last < key);
+            if self.cells.len() > start {
+                ascending &= last.is_none_or(|last| last < key);
+            }
             self.cells.push(key);
         }
 
-        if !ascending {
-            self.cells.sort();
+        let (old, new) = self.cells.split_at(start);
+        let continues = match (old.last(), new.first()) {
+            (Some(last), Some(first)) => last < first,
+            _ => true,
+        };
+        if sorted && ascending && !continues {
+            self.cells = merge_unique(old, new);
+        } else if !(sorted && ascending) {
+            self.cells.sort_unstable();
             self.cells.dedup();
         }
         self.sorted_len = self.cells.len();
@@ -184,6 +180,27 @@ impl DirtyCells {
     fn is_empty(&self) -> bool {
         self.cells.is_empty()
     }
+}
+
+/// Merges two ascending, unique lists into one, keeping a cell in both once.
+fn merge_unique(old: &[CellKey], new: &[CellKey]) -> Vec<CellKey> {
+    let mut merged = Vec::with_capacity(old.len() + new.len());
+    let mut old_index = 0;
+    let mut new_index = 0;
+    while let (Some(&old_key), Some(&new_key)) = (old.get(old_index), new.get(new_index)) {
+        if old_key <= new_key {
+            merged.push(old_key);
+            old_index += 1;
+            new_index += usize::from(old_key == new_key);
+        } else {
+            merged.push(new_key);
+            new_index += 1;
+        }
+    }
+
+    merged.extend_from_slice(old.get(old_index..).unwrap_or_default());
+    merged.extend_from_slice(new.get(new_index..).unwrap_or_default());
+    merged
 }
 
 /// What one sheet contributes to the next recompute.
@@ -1073,21 +1090,31 @@ mod tests {
     }
 
     /// A spill edit marks one source cell, then the vacated column and the
-    /// reinstalled column: the second run repeats the first and adds nothing.
+    /// reinstalled column as batches: the second run merges into the first
+    /// and the list stays sorted and unique.
     #[test]
-    fn repeated_column_run_after_a_later_cell_adds_nothing() {
+    fn repeated_column_batch_after_a_later_cell_adds_nothing() {
         let mut cells = DirtyCells::default();
         cells.insert((999, 1));
         for _ in 0..2 {
-            for row in 0..999 {
-                cells.insert((row, 2));
-            }
+            cells.extend((0..999).map(|row| (row, 2)));
         }
 
         let mut expected: Vec<_> = (0..999).map(|row| (row, 2)).collect();
         expected.push((999, 1));
-        assert_eq!(distinct(&cells), expected);
-        assert_eq!(cells.cells.len(), expected.len());
+        assert_eq!(cells.cells, expected);
+        assert_eq!(cells.sorted_len, expected.len());
+    }
+
+    /// A batch out of address order is sorted in with the list.
+    #[test]
+    fn unordered_batch_is_sorted_in() {
+        let mut cells = DirtyCells::default();
+        cells.extend([(5, 0), (1, 0)]);
+        cells.extend([(3, 0), (1, 0), (9, 0), (3, 0)]);
+
+        assert_eq!(cells.cells, [(1, 0), (3, 0), (5, 0), (9, 0)]);
+        assert_eq!(cells.sorted_len, 4);
     }
 
     /// Scattered repeated writes keep every cell and fold duplicates, so the
