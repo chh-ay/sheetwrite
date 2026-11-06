@@ -261,7 +261,8 @@ export function setPivotChartViews(
 
 /**
  * Load the pivot view chunk and let the engine of `store` compute the pivot
- * views, once per engine. A failed load tries again at the next request.
+ * views, once per engine. A failed load tries again at the next request. A
+ * store disposed while the chunk loads is not called again.
  */
 function requestPivotViews(store: Store): void {
   const engine = storeEngine(store);
@@ -270,6 +271,7 @@ function requestPivotViews(store: Store): void {
   pivotEngines.add(engine);
   void import("./dashboard/dashboard-engine.js").then(
     (module) => {
+      if (engine.isDisposed) return;
       module.applyPivotViews(store, []);
       setPivotChartViews(store, module.pivotChartViewOf);
     },
