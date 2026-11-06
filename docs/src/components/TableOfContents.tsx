@@ -1,13 +1,11 @@
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { MIN_OUTLINE_ENTRIES, type OutlineItem } from "../lib/outline.js";
 import { Icon } from "./Icon.js";
 
-export interface OutlineItem {
-  id: string;
-  label: string;
-  depth: number;
-}
+/** The outline before the page says otherwise; one constant, so effects see a stable value. */
+const NO_ENTRIES: readonly OutlineItem[] = [];
 
 /**
  * Outline of the rendered document: h2/h3 headings (ids come from rehype-slug
@@ -15,14 +13,20 @@ export interface OutlineItem {
  * generated API member rows. Read from the DOM because that is the one source
  * the shell and the generator cannot disagree about - the ids the reader can
  * click are exactly the ids the article has.
+ *
+ * `initial` is the outline the build collected from the same headings (see
+ * lib/outline.ts), so the server render and the first client render already
+ * show it; the DOM read then keeps it current (the symbol filter hides groups).
  */
-export function useDocumentOutline(): readonly OutlineItem[] {
-  const [items, setItems] = useState<readonly OutlineItem[]>([]);
+export function useDocumentOutline(
+  initial: readonly OutlineItem[] = NO_ENTRIES,
+): readonly OutlineItem[] {
+  const [items, setItems] = useState<readonly OutlineItem[]>(initial);
   // Client-side navigations swap the article without remounting the shell.
   const pathname = useLocation({ select: (location) => location.pathname });
 
   useEffect(() => {
-    setItems([]);
+    setItems(initial);
     // Scope to the prose article: the outline itself lives inside <main>, and
     // observing our own renders would loop scan -> setItems -> scan.
     const article = document.querySelector<HTMLElement>("#main-content article.sw-prose");
@@ -73,7 +77,7 @@ export function useDocumentOutline(): readonly OutlineItem[] {
       const next = collected.map((item) => `${item.depth}:${item.id}`).join("|");
       if (next === signature) return;
       signature = next;
-      setItems(collected.length >= 2 ? collected : []);
+      setItems(collected.length >= MIN_OUTLINE_ENTRIES ? collected : []);
     };
 
     scan();
@@ -88,7 +92,7 @@ export function useDocumentOutline(): readonly OutlineItem[] {
       attributeFilter: ["hidden"],
     });
     return () => mutations.disconnect();
-  }, [pathname]);
+  }, [pathname, initial]);
 
   return items;
 }
@@ -166,9 +170,6 @@ function OutlineLinks({
     </ul>
   );
 }
-
-/** Fewer than two entries is not an outline worth a navigation surface. */
-const MIN_OUTLINE_ENTRIES = 2;
 
 /**
  * Right-rail outline for guide and API pages on wide screens. Smaller

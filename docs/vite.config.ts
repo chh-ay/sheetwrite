@@ -26,6 +26,7 @@ import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
 import { formulaTables } from "./src/lib/formula-tables.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
+import { exportOutline } from "./src/lib/outline.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
@@ -464,6 +465,8 @@ export default defineConfig({
           rovingCodeFocus,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,
+          // After the ids exist: the server render shows the outline from these.
+          exportOutline,
           markResponsiveCodeBlocks,
           wrapProseTables,
           markShortInlineCode,

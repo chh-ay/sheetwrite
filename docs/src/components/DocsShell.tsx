@@ -12,6 +12,7 @@ import {
   navigationBadge,
   nearestNavigationItem,
 } from "../lib/navigation.js";
+import type { OutlineItem } from "../lib/outline.js";
 import {
   LATEST_RELEASE,
   RELEASES_HREF,
@@ -44,6 +45,8 @@ interface DocsShellProps {
    * Include a collapsible outline above the article on narrow screens.
    * The task-oriented overview omits it.
    */
+  /** The page's outline from the build, shown before the article is read. */
+  outline?: readonly OutlineItem[];
   reserveOutline?: boolean;
   title: string;
 }
@@ -346,6 +349,7 @@ export function DocsShell({
   children,
   description,
   kind,
+  outline: buildOutline,
   reserveOutline,
   title,
 }: Readonly<DocsShellProps>) {
@@ -353,7 +357,7 @@ export function DocsShell({
   // better as a chip than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
 
-  const outline = useDocumentOutline();
+  const outline = useDocumentOutline(buildOutline);
   const neighbours = documentNeighbours(activeHref);
 
   const release = releaseContext(activeHref);

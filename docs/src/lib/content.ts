@@ -5,11 +5,15 @@ import {
   lazy,
 } from "react";
 
+import type { OutlineItem } from "./outline.js";
+
 export interface DocumentFrontmatter {
   title: string;
   description: string;
   /** Declaration kind of a generated API symbol page (`interface`, `function`, …). */
   kind?: string;
+  /** The page's outline, collected at build time; see lib/outline.ts. */
+  outline?: readonly OutlineItem[];
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -70,6 +74,7 @@ export async function documentForSplat(
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
+    outline: module.frontmatter?.outline ?? [],
   };
 }
 

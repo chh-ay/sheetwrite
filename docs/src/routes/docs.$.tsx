@@ -32,6 +32,7 @@ export const Route = createFileRoute("/docs/$")({
         title: "Page moved",
         description: "This page has a new address.",
         kind: undefined,
+        outline: [],
         moved: href,
         href,
       };
@@ -44,6 +45,7 @@ export const Route = createFileRoute("/docs/$")({
       title: document.title,
       description: document.description,
       kind: document.kind,
+      outline: document.outline ?? [],
       moved: undefined,
       href,
     };
@@ -142,6 +144,7 @@ function DocumentRoute() {
       activeHref={activeHref}
       description={metadata.description}
       kind={metadata.kind}
+      outline={metadata.outline}
       reserveOutline
       title={metadata.title}
     >
