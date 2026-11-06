@@ -50,6 +50,11 @@ export interface SheetwriteAddonGridContext<Settings> {
    * destroyed; the returned function removes them earlier.
    */
   queryCommands(commands: QueryCommands): () => void;
+  /**
+   * Shows the grid's Version History and Save Version commands; they call
+   * `command` with `"open"` or `"save"`.
+   */
+  historyCommand(command: (action: "open" | "save") => void): void;
 }
 
 /**

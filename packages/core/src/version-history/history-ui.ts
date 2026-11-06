@@ -1,4 +1,3 @@
-import { setHistoryCommand } from "../history-commands.js";
 import type { SheetwriteAddon } from "../types/addon.js";
 import type { HistoryAddonOptions } from "./panel-contract.js";
 
@@ -32,13 +31,13 @@ export function historyAddon(
 ): SheetwriteAddon<Partial<HistoryAddonOptions>> {
   return {
     name: "history",
-    grid({ grid, settings }) {
+    grid({ grid, settings, historyCommand }) {
       const merged = { ...options, ...settings };
       const { archive, authorId } = merged;
       if (archive === undefined || authorId === undefined) return;
 
       const gridOptions: HistoryAddonOptions = { ...merged, archive, authorId };
-      return setHistoryCommand(grid, (action) => {
+      historyCommand((action) => {
         void import("../panels/panel-controller.js").then(({ openHistoryPanel }) => {
           openHistoryPanel(grid, async () => {
             const { historyPanel } = await import("../panels/history-panel.js");

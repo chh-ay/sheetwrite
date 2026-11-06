@@ -27,6 +27,14 @@ const setupContext: SheetwriteAddonContext = {
   },
 };
 
+/** What the registry needs of a grid beyond its public interface. */
+interface AddonGrid extends Grid {
+  /** Runs `cleanup` when the grid is destroyed. */
+  addCleanup(cleanup: () => void): void;
+  /** Opens the history panel or its Save Version form. */
+  historyCommand?: (action: "open" | "save") => void;
+}
+
 /**
  * The add-ons installed in this page, in install order. Add-ons register
  * page-wide parts, the same way the engine is one per page, so core keeps one
@@ -71,14 +79,10 @@ export class AddonRegistry {
 
   /**
    * Run each installed add-on's grid hook in install order. The cleanups run
-   * through `onDestroy` when the grid is destroyed. A failing hook destroys
-   * the grid, which runs the cleanups of the hooks before it, and rethrows.
+   * when the grid is destroyed. A failing hook destroys the grid, which runs
+   * the cleanups of the hooks before it, and rethrows.
    */
-  attach(
-    grid: Grid,
-    settings: SheetwriteAddonSettings | undefined,
-    onDestroy: (cleanup: () => void) => void,
-  ): void {
+  attach(grid: AddonGrid, settings: SheetwriteAddonSettings | undefined): void {
     try {
       for (const addon of this.installed.values()) {
         const cleanup = addon.grid?.({
@@ -86,11 +90,14 @@ export class AddonRegistry {
           settings: settings?.[addon.name],
           queryCommands(commands) {
             const remove = registerQueryCommands(grid, commands);
-            onDestroy(remove);
+            grid.addCleanup(remove);
             return remove;
           },
+          historyCommand(command) {
+            grid.historyCommand = command;
+          },
         });
-        if (cleanup) onDestroy(cleanup);
+        if (cleanup) grid.addCleanup(cleanup);
       }
     } catch (error) {
       grid.destroy();
