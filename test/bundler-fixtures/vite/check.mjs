@@ -259,7 +259,9 @@ if (queryWasmFiles.length !== 1) {
 
 // The add-ons page imports `@sheetwrite/core/history`, whose diff kernel has
 // its own WASM that loads on the first version diff.
-const historyWasmFiles = wasmFiles.filter((file) => /(?:^|\/)sheetwrite_history_bg-[^/]*\.wasm$/.test(file));
+const historyWasmFiles = wasmFiles.filter((file) =>
+  /(?:^|\/)sheetwrite_history_bg-[^/]*\.wasm$/.test(file),
+);
 if (historyWasmFiles.length !== 1) {
   throw new Error(`Expected one lazy history kernel WASM asset, got ${historyWasmFiles.length}`);
 }
