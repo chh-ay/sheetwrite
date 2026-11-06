@@ -94,7 +94,7 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
 
-**Insert Function** lists the functions registered with `registerFunction`, with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. Insert Function, in the ribbon and in the toolbar, appears when the first function is registered and goes away when the last one is removed. Built-in functions are offered by [formula autocomplete](/docs/features/formulas/formula-help/) as you type.
+**Insert Function** lists the grid's host functions from the [functions add-on](/docs/features/formulas/custom-functions/), with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. Insert Function, in the ribbon and in the toolbar, appears only in a grid with host functions. Built-in functions are offered by [formula autocomplete](/docs/features/formulas/formula-help/) as you type.
 
 **Explain Formula** opens a side panel that describes the formula in the focus cell: its functions, their arguments, its references and its problems. See [Formula help](/docs/features/formulas/formula-help/#explain-formula).
 
@@ -102,7 +102,7 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
 
-**Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
+**Version History** and **Save Version** (Review › Version History) appear in a grid that the history add-on applies to; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
 
 ### Layout for the 0.7 features
 

@@ -148,7 +148,7 @@ const updates = await updateExternalLinks(grid, async ({ target }) => {
 
 `changeExternalLinkSource(grid, book, { book, target })` points the formulas at another workbook, as **Change Source** does. `breakExternalLinks(grid, books)` replaces them with their values and removes the links, as **Break Link** does. Each command is one undoable change, which syncs to collaborators. Excel clears Undo after **Update Values** and **Break Link**; Sheetwrite keeps them undoable, and an undo restores the links and the formulas.
 
-In the grid, **Data › Queries & Connections › Edit Links** lists each link with its location and status, and offers **Update Values**, **Change Source** and **Break Link**. The command shows only for a workbook with links, and the panel loads on first use. **Update Values** needs a resolver: connect one with `connectExternalLinks(grid, resolve)` from `@sheetwrite/core/external-links`. Without it, the panel offers **Change Source** and **Break Link** only.
+In the grid, **Data › Queries & Connections › Edit Links** lists each link with its location and status, and offers **Update Values**, **Change Source** and **Break Link**. The command shows only for a workbook with links, and the panel loads on first use. **Update Values** needs a resolver: install `externalLinksAddon({ resolve })` from `@sheetwrite/core/external-links` through `initSheetwrite`, or give one grid its own with `createGrid(host, { addons: { externalLinks: { resolve } } })`. Without it, the panel offers **Change Source** and **Break Link** only.
 
 Named ranges are document operations and snapshot metadata:
 

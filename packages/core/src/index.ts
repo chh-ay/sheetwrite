@@ -1,11 +1,3 @@
-export {
-  type SheetwriteAddon,
-  type SheetwriteAddonContext,
-  type SheetwriteAddonGridContext,
-  type SheetwriteChartParts,
-  type SheetwriteXlsxParts,
-} from "./addons.js";
-
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
 
 export {
@@ -165,7 +157,6 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 
-export { type QueryCommands, registerQueryCommands } from "./query-commands.js";
 export {
   type DocumentRebaseResult,
   type RebaseConflict,
@@ -452,7 +443,13 @@ export type {
   XlsxSourcePart,
   XlsxSourceSnapshot,
   XlsxUnsupportedQuery,
+  QueryCommands,
+  SheetwriteAddon,
+  SheetwriteAddonContext,
+  SheetwriteAddonGridContext,
   SheetwriteAddonSettings,
+  SheetwriteChartParts,
+  SheetwriteXlsxParts,
   XlsxResourceLimits,
   XlsxTableExportBackend,
   XlsxTableImportBackend,

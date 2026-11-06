@@ -234,22 +234,31 @@ or typed batches; they never fetch a URL. See the
 ## Saved queries and refresh
 
 A workbook can save queries in `workbook.queries`. Each saved query has a source,
-its steps, and an optional output table. `createQuerySession` is the only call
-that loads the query engine. It binds the saved queries of one grid to the
-host's `fetchSource` callback.
+its steps, and an optional output table. The queries add-on binds the saved
+queries of each grid to the host's `fetchSource` callback: install
+`queriesAddon({ fetchSource })` through `initSheetwrite`, or give one grid its
+own with `createGrid(host, { addons: { queries: { fetchSource } } })`. The query
+engine loads in the background when such a grid is created; `querySession(grid)`
+resolves to the grid's session.
 
 ```ts compile title="Refresh saved queries through host fetch"
-import type { Grid } from "@sheetwrite/core";
-import { createQuerySession } from "@sheetwrite/queries";
+import { type Grid, initSheetwrite } from "@sheetwrite/core";
+import { queriesAddon, querySession } from "@sheetwrite/queries";
+
+await initSheetwrite({
+  addons: [
+    queriesAddon({
+      // The host applies its own credentials and network policy here.
+      fetchSource: async (request, { signal }) => {
+        const response = await fetch(`/sources/${request.sourceId}`, { signal });
+        return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+      },
+    }),
+  ],
+});
 
 async function refreshSales(grid: Grid) {
-  const session = await createQuerySession(grid, {
-    // The host applies its own credentials and network policy here.
-    fetchSource: async (request, { signal }) => {
-      const response = await fetch(`/sources/${request.sourceId}`, { signal });
-      return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
-    },
-  });
+  const session = await querySession(grid);
 
   session.define({
     id: "sales",
@@ -286,8 +295,8 @@ async function refreshSales(grid: Grid) {
 
 ### Query commands in the ribbon
 
-While a query session is alive, the ribbon, the compact ribbon and the toolbar
-show three Data commands. `session.dispose()` removes them again.
+In a grid with a query session, the ribbon, the compact ribbon and the toolbar
+show three Data commands. `session.dispose()` or `grid.destroy()` removes them.
 
 | Command | Ribbon place | What it does |
 | --- | --- | --- |

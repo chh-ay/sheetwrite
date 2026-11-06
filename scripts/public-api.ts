@@ -123,6 +123,12 @@ const FORBIDDEN_EXPORTS = new Set([
   "setChartViewProviderFactory",
   "registerChartsBackend",
   "registerXlsxBackends",
+  "registerFunction",
+  "unregisterFunction",
+  "registerQueryCommands",
+  "createQuerySession",
+  "createHistoryCommands",
+  "connectExternalLinks",
 ]);
 
 const REQUIRED_CORE_EXPORTS = new Set([

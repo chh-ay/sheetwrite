@@ -14,10 +14,10 @@ import {
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import * as formulas from "@sheetwrite/formulas";
 
-import { createQuerySession } from "../src/node.js";
+import { queriesAddon, querySession } from "../src/node.js";
 
 beforeAll(async () => {
-  await initSheetwrite({ engine: formulas });
+  await initSheetwrite({ engine: formulas, addons: [queriesAddon()] });
 });
 
 let restoreStubs: () => void;
@@ -137,11 +137,15 @@ const relationships = (grid: Grid) => grid.store.getWorkbook().dataModel?.relati
 it("keeps a query output table's relationship through a refresh that updates the model pivot in one undo step", async () => {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  const grid = createGridFromSnapshot(host, snapshot());
   let feed = "Region,Total\nNorth,5\nSouth,7\n";
-  const session = await createQuerySession(grid, {
-    fetchSource: async () => ({ kind: "bytes", bytes: new TextEncoder().encode(feed) }),
+  const grid = createGridFromSnapshot(host, snapshot(), {
+    addons: {
+      queries: {
+        fetchSource: async () => ({ kind: "bytes", bytes: new TextEncoder().encode(feed) }),
+      },
+    },
   });
+  const session = await querySession(grid);
   try {
     session.define(sales);
     expect((await session.refresh("sales")).status).toBe("applied");

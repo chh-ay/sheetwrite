@@ -1,13 +1,12 @@
 import { readFile } from "node:fs/promises";
 
-import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
+import type { PowerQueryCodec, SheetwriteAddon } from "@sheetwrite/core";
 
-import { connect } from "./connect.js";
+import { createQueriesAddon, type QueriesAddonOptions, type QueryEngineOptions } from "./addon.js";
 import {
   loadPowerQueryCodec as loadCodecWithArtifact,
   loadQueryEngine as loadWithArtifact,
 } from "./index.js";
-import type { QueryEngineOptions, QuerySession, QuerySessionOptions } from "./index.js";
 import type { QueryEngine } from "./types.js";
 
 export * from "./index.js";
@@ -32,10 +31,7 @@ export async function loadPowerQueryCodec(
   return loadCodecWithArtifact(await artifact(options));
 }
 
-/** Node variant of `createQuerySession`; it reads the artifact from this package. */
-export async function createQuerySession(
-  grid: Grid,
-  options: QuerySessionOptions & QueryEngineOptions,
-): Promise<QuerySession> {
-  return connect(grid, options, await loadQueryEngine(options));
+/** Node variant of `queriesAddon`; it reads the artifact from this package. */
+export function queriesAddon(options: QueriesAddonOptions = {}): SheetwriteAddon<QueriesAddonOptions> {
+  return createQueriesAddon(loadQueryEngine, options);
 }

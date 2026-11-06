@@ -40,6 +40,7 @@ const forbiddenCoreExports = [
   "setXlsxWorkbookBackend",
   "setChartRendererFactory",
   "setChartViewProviderFactory",
+  "registerQueryCommands",
 ];
 for (const name of forbiddenCoreExports) {
   if (name in Core) throw new Error(`@sheetwrite/core still exports removed ${name}`);

@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import type { SheetwriteAddon } from "../src/addons.js";
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid } from "../src/types.js";
+import type { Grid, SheetwriteAddon } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 let restoreStubs: () => void;
@@ -114,5 +113,36 @@ describe("createGrid add-on settings", () => {
       { grid: second, settings: undefined },
     ]);
     expect(detached).toEqual([first]);
+  });
+
+  it("destroys the grid and runs earlier cleanups when a grid hook throws", async () => {
+    const cleanedUp: string[] = [];
+    const failure = new Error("grid hook failed");
+    // Add-ons stay installed for the page, so these hooks act only on grids that name them.
+    await initSheetwrite({
+      addons: [
+        {
+          name: "hook-before",
+          grid: ({ settings }) => (settings ? () => cleanedUp.push("hook-before") : undefined),
+        },
+        {
+          name: "hook-failing",
+          grid: ({ settings }) => {
+            if (settings) throw failure;
+          },
+        },
+      ],
+    });
+    const host = mountHost();
+
+    expect(() =>
+      createGrid(host, {
+        workbook: makeWorkbook(5),
+        addons: { "hook-before": true, "hook-failing": true },
+      }),
+    ).toThrow(failure);
+
+    expect(cleanedUp).toEqual(["hook-before"]);
+    expect(host.childElementCount).toBe(0);
   });
 });

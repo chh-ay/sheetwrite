@@ -199,11 +199,19 @@ await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] })
 | `setChartRendererFactory`, `setChartViewProviderFactory` | An add-on whose `setup` calls `context.charts({ views, renderer })` |
 | `setXlsxWorkbookBackend`, `setXlsxTableImportBackend`, `setXlsxTableExportBackend` | An add-on whose `setup` calls `context.xlsx({ workbook, tableImport, tableExport })` |
 | `initSheetwrite(source, engine)` | `initSheetwrite({ source, engine })` |
+| `registerFunction(store, metadata, fn)` from `@sheetwrite/core/functions` | `functionsAddon([{ metadata, implementation: fn }])` for every grid, or `createGrid(host, { addons: { functions: [...] } })` for one grid |
+| `unregisterFunction(store, name)` | None: functions register when a grid is created. Create the grid again without the function. |
+| `createQuerySession(grid, { fetchSource })` from `@sheetwrite/queries` | `queriesAddon({ fetchSource })`, or `addons: { queries: { fetchSource } }` for one grid; then `await querySession(grid)` |
+| `registerQueryCommands(grid, commands)` from `@sheetwrite/core` | An add-on whose `grid` hook calls `context.queryCommands(commands)` |
+| `GridConfig.history` with `createHistoryCommands({ archive, authorId })` | `historyAddon()` from `@sheetwrite/core/history`, and `addons: { history: { archive, authorId } }` for the grid |
+| `connectExternalLinks(grid, resolve)` from `@sheetwrite/core/external-links` | `externalLinksAddon({ resolve })`, or `addons: { externalLinks: { resolve } }` for one grid |
 
 Add-ons set up once, in list order. A name listed twice in one call rejects
 with `invalid-argument`; a name installed by an earlier call is kept. Settings
 in `createGrid` for an add-on that `initSheetwrite` did not install reject with
-`invalid-argument`.
+`invalid-argument`. Each add-on loads its heavy code on first use: the XLSX codec
+on the first XLSX call, the chart drawing code and the query engine when a grid
+that uses them is created, and the history panel on its first command.
 
 ## Errors and cancellation
 

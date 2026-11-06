@@ -26,7 +26,7 @@ async function writeHook(
 }
 
 /** Deterministic optional OOXML workbook backend implemented by Sheetwrite. */
-export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
+export const sheetwriteWorkbookBackend = {
   name: "sheetwrite-ooxml",
   verifySource(snapshot) {
     return admitPreserved(snapshot, createCodecContext("import"));
@@ -63,4 +63,4 @@ export const sheetwriteWorkbookBackend: XlsxWorkbookBackend = {
       throw xlsxFailure(error, "import", "sheetwrite-ooxml", options?.signal);
     }
   },
-};
+} satisfies XlsxWorkbookBackend;

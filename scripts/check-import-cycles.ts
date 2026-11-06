@@ -160,6 +160,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "PowerQueryLoss",
       "PowerQueryUnsupported",
       "QueryAggregate",
+      "QueryCommands",
       "QueryColumnSpec",
       "QueryColumnType",
       "QueryJoinKind",
@@ -397,6 +398,17 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ToolbarActionName",
       "ToolbarIcon",
       "ToolbarItem",
+    ],
+  },
+  addon: {
+    source: "packages/core/src/types/addon.ts",
+    dependencies: ["grid", "query", "store", "xlsx"],
+    exports: [
+      "SheetwriteAddon",
+      "SheetwriteAddonContext",
+      "SheetwriteAddonGridContext",
+      "SheetwriteChartParts",
+      "SheetwriteXlsxParts",
     ],
   },
 };

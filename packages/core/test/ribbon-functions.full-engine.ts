@@ -4,16 +4,19 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";
 
-import { registerFunction, unregisterFunction } from "../src/functions.js";
-import { GridImpl, initSheetwrite } from "../src/grid.js";
-import { SheetwriteStore } from "../src/store.js";
+import {
+  type FormulaFunctionDefinition,
+  type FormulaFunctionMetadata,
+  functionsAddon,
+} from "../src/functions.js";
+import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 const RIBBON_MODULE = "../src/ribbon/ribbon.js";
 
-const TAX_RATE = {
+const TAX_RATE: FormulaFunctionMetadata = {
   name: "TAXRATE",
   description: "Sales tax rate of a region.",
   arguments: [
@@ -27,7 +30,7 @@ let restore: () => void;
 const cleanups: (() => void)[] = [];
 
 beforeAll(async () => {
-  await initSheetwrite({ engine: formulas });
+  await initSheetwrite({ engine: formulas, addons: [functionsAddon()] });
   // Load the chrome chunk once, so each grid's own import resolves at once.
   await import(RIBBON_MODULE);
 });
@@ -47,20 +50,20 @@ function settled(): Promise<void> {
   return promise;
 }
 
-async function setup(config: GridConfig) {
-  const workbook = makeWorkbook(3);
-  const store = new SheetwriteStore(workbook);
+const TAX_RATE_FUNCTION: FormulaFunctionDefinition = {
+  metadata: TAX_RATE,
+  implementation: () => 0.2,
+};
+
+async function setup(config: GridConfig, functions: readonly FormulaFunctionDefinition[]) {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
   document.body.appendChild(host);
-  const grid = new GridImpl(host, { workbook, config }, store);
-  cleanups.push(() => {
-    grid.destroy();
-    store.dispose();
-  });
+  const grid = createGrid(host, { workbook: makeWorkbook(3), config, addons: { functions } });
+  cleanups.push(() => grid.destroy());
   await import(RIBBON_MODULE);
   await settled();
-  return { grid, host, store };
+  return { grid, host };
 }
 
 function tab(host: HTMLElement, name: string): HTMLElement {
@@ -71,16 +74,21 @@ function tab(host: HTMLElement, name: string): HTMLElement {
   return found;
 }
 
-it("Formulas › Insert Function shows only while host functions exist, and starts a formula", async () => {
-  const { grid, host, store } = await setup({ ribbon: true });
-  const formulasTab = tab(host, "Formulas");
-  formulasTab.click();
+it("Formulas › Insert Function shows only in a grid with host functions, and starts a formula", async () => {
+  const plain = await setup({ ribbon: true }, []);
+  tab(plain.host, "Formulas").click();
+  const plainInsert = plain.host.querySelector<HTMLButtonElement>(
+    '[data-command="insertFunction"]',
+  );
+  if (plainInsert === null) throw new Error("no Insert Function command");
+  // Explain Formula keeps the tab when there is no host function.
+  expect(plainInsert.hidden).toBe(true);
+  expect(tab(plain.host, "Formulas").hidden).toBe(false);
+
+  const { grid, host } = await setup({ ribbon: true }, [TAX_RATE_FUNCTION]);
+  tab(host, "Formulas").click();
   const insert = host.querySelector<HTMLButtonElement>('[data-command="insertFunction"]');
   if (insert === null) throw new Error("no Insert Function command");
-  expect(insert.hidden).toBe(true);
-
-  registerFunction(store, TAX_RATE, () => 0.2);
-  await settled();
   expect(insert.hidden).toBe(false);
 
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
@@ -96,23 +104,20 @@ it("Formulas › Insert Function shows only while host functions exist, and star
   expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe(
     "=TAXRATE(",
   );
-
-  // The last function going away hides the command; Explain Formula keeps the tab.
-  unregisterFunction(store, "TAXRATE");
-  await settled();
-  expect(insert.hidden).toBe(true);
-  expect(formulasTab.hidden).toBe(false);
 });
 
-it("the toolbar shows Insert Function only while host functions exist", async () => {
-  const { host, store } = await setup({});
-  const command = host.querySelector<HTMLElement>(
-    '.sheetwrite-command-toolbar [data-command="insertFunction"]',
-  );
-  if (command === null) throw new Error("no toolbar Insert Function command");
-  expect(command.hidden).toBe(true);
+it("the toolbar shows Insert Function only in a grid with host functions", async () => {
+  const toolbarCommand = (host: HTMLElement): HTMLElement => {
+    const command = host.querySelector<HTMLElement>(
+      '.sheetwrite-command-toolbar [data-command="insertFunction"]',
+    );
+    if (command === null) throw new Error("no toolbar Insert Function command");
+    return command;
+  };
 
-  registerFunction(store, TAX_RATE, () => 0.2);
-  await settled();
-  expect(command.hidden).toBe(false);
+  const plain = await setup({}, []);
+  const withFunction = await setup({}, [TAX_RATE_FUNCTION]);
+
+  expect(toolbarCommand(plain.host).hidden).toBe(true);
+  expect(toolbarCommand(withFunction.host).hidden).toBe(false);
 });

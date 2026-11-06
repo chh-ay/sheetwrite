@@ -18,6 +18,17 @@ afterEach(() => {
   for (const store of stores.splice(0)) store.dispose();
 });
 
+/** Resolves with the first value `read` returns, checking after each task; the drawing code loads asynchronously. */
+async function until<T>(read: () => T | null | undefined): Promise<T> {
+  const MAX_TASKS = 50;
+  for (let task = 0; task < MAX_TASKS; task++) {
+    const value = read();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error("the value did not appear");
+}
+
 function openFailure(store: SheetwriteStore): unknown {
   try {
     openChartViews(store).dispose();
@@ -60,7 +71,7 @@ describe("charts add-on", () => {
     }
   });
 
-  it("draws the charts of a grid created after install", async () => {
+  it("draws the charts of a grid created after install once the drawing code loads", async () => {
     await initSheetwrite({ addons: [chartsAddon()] });
     const restoreCanvas = installCanvasTestStubs();
     const host = document.createElement("div");
@@ -71,7 +82,8 @@ describe("charts add-on", () => {
     });
 
     try {
-      expect(host.querySelector(".sheetwrite-chart")?.getAttribute("role")).toBe("img");
+      const chart = await until(() => host.querySelector(".sheetwrite-chart"));
+      expect(chart.getAttribute("role")).toBe("img");
       expect(host.querySelector(".sheetwrite-object-fallback")).toBeNull();
     } finally {
       grid.destroy();
