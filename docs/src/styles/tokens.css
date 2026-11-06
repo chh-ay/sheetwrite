@@ -1,8 +1,4 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/space-grotesk";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/600.css";
 
 /* Tailwind skips gitignored files when it looks for class names, and the
    generated pages and data are gitignored, so name them here. */
@@ -23,14 +19,214 @@
  * `test/design-tokens.test.ts` measures every text and icon pair below
  * against WCAG AA in both themes.
  */
+/* ── Typefaces ─────────────────────────────────────────────────────────
+   Bricolage Grotesque for headings, Instrument Sans for body and interface
+   text, JetBrains Mono for code and numbers. All SIL Open Font License,
+   self-hosted, latin and latin-ext only; the browser fetches latin-ext only
+   for text that needs it. The latin heading and body files are preloaded
+   first in the document head (routes/__root.tsx).
+
+   The latin heading file (src/fonts, licence beside it) is the fontsource
+   optical-size file cut to what headings use: one weight (650) for every
+   heading role, the 14–72 optical sizes, and latin text characters:
+     fonttools varLib.instancer <latin-opsz.woff2> wght=650 opsz=14:72
+     pyftsubset <instance> --unicodes=<the range below>
+       --layout-features=kern,liga,calt,ccmp,mark,mkmk,locl --flavor=woff2
+   That is 31.9 KB instead of 77 KB. */
+@font-face {
+  font-family: "Bricolage Grotesque Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 700;
+  src: url("../fonts/bricolage-grotesque-latin-650-opsz.woff2") format("woff2-variations");
+  unicode-range:
+    U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A,
+    U+201C-201E, U+2022, U+2026, U+2032-2033, U+20AC, U+2122, U+2190-2193, U+2212;
+}
+
+/* Same descriptors as the latin face: Chromium joins unicode-range subsets
+   only when their weight ranges match, and otherwise picks one face for all
+   characters. */
+@font-face {
+  font-family: "Bricolage Grotesque Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 700;
+  src: url("@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-ext-opsz-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-400-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-600-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* Metric-matched fallbacks: Arial (Liberation Sans on Linux) scaled to each
+   face's width, with line metrics from the face's hhea table divided by the
+   scale, so text keeps its line breaks and height while the web fonts load.
+   Widths are measured per weight range (headings at display size, where a
+   shift shows most; body text at 14–16 px); each fallback stays slightly
+   narrower than its face, so text never gains a line. */
+@font-face {
+  font-family: "Bricolage Grotesque Fallback";
+  font-weight: 100 549;
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"),
+    local("Helvetica");
+  size-adjust: 100%;
+  ascent-override: 93%;
+  descent-override: 27%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque Fallback";
+  font-weight: 550 900;
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+    local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
+  size-adjust: 92.8%;
+  ascent-override: 100.22%;
+  descent-override: 29.09%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Sans Fallback";
+  font-weight: 100 549;
+  src:
+    local("Liberation Sans"), local("LiberationSans"), local("Arial"), local("ArialMT"),
+    local("Helvetica");
+  size-adjust: 102.5%;
+  ascent-override: 94.63%;
+  descent-override: 24.39%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Sans Fallback";
+  font-weight: 550 900;
+  src:
+    local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arial Bold"),
+    local("Arial-BoldMT"), local("Helvetica Bold"), local("Helvetica-Bold");
+  size-adjust: 96.8%;
+  ascent-override: 100.21%;
+  descent-override: 25.83%;
+  line-gap-override: 0%;
+}
+
+/* Code: a monospace fallback scaled to JetBrains Mono's 0.6 em advance and
+   line metrics, so a code line that fits in the web font also fits before it
+   loads, and wrapped lines keep their count. Courier New and Liberation Mono
+   advance 0.6001 em; the scale keeps the fallback a hair narrower. */
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  font-weight: 100 549;
+  src:
+    local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
+    local("LiberationMono"), local("Cousine");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  font-weight: 550 900;
+  src:
+    local("Courier New Bold"), local("CourierNewPS-BoldMT"), local("Liberation Mono Bold"),
+    local("LiberationMono-Bold"), local("Cousine Bold");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* ── Type ─────────────────────────────────────────────────────────────
-     Three families: Space Grotesk for display and headings, Inter for body
-     and interface text, JetBrains Mono for code and eyebrows. Roles, not raw
-     sizes: a stylesheet picks the role that matches the text's job. */
-  --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
-  --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
-  --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
+     Three families: Bricolage Grotesque for display and headings, Instrument
+     Sans for body and interface text, JetBrains Mono for code, numbers and
+     eyebrows. Roles, not raw sizes: a stylesheet picks the role that matches
+     the text's job. */
+  --sw-font-body:
+    "Instrument Sans Variable", "Instrument Sans", "Instrument Sans Fallback", system-ui, sans-serif;
+  --sw-font-display:
+    "Bricolage Grotesque Variable", "Bricolage Grotesque", "Bricolage Grotesque Fallback",
+    system-ui, sans-serif;
+  --sw-font-mono: "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);
@@ -70,9 +266,15 @@
   --sw-weight-semibold: 600;
   --sw-weight-bold: 700;
 
-  --sw-tracking-display: -0.025em;
-  --sw-tracking-heading: -0.015em;
+  /* Bricolage Grotesque's display optical size is already tight; headings
+     take only a trace of negative tracking. */
+  --sw-tracking-display: -0.01em;
+  --sw-tracking-heading: -0.005em;
   --sw-tracking-eyebrow: 0.08em;
+  /* Instrument Sans has a narrow word space (0.21 em); body text adds a
+     little, so short captions and dense 13–14 px text read as separate
+     words. Code and headings keep their own spacing. */
+  --sw-word-spacing-body: 0.05em;
 
   /* Line lengths: prose stays near 70 characters, leads a little shorter. */
   --sw-measure-prose: 70ch;
@@ -107,7 +309,10 @@
   --sw-radius-xl: 1rem;
   --sw-radius-pill: 999px;
   --sw-border-width: 1px;
+  /* One keyboard focus ring for every control: a solid outline in
+     `--sw-focus-ring`, at least 3:1 on every surface. */
   --sw-focus-ring-width: 2px;
+  --sw-focus-ring-offset: 2px;
 
   /* ── Icons ────────────────────────────────────────────────────────────
      The Sheetwrite sprite (src/icons/sprite.svg): one stroke, three sizes on
@@ -130,6 +335,8 @@
      One page frame for the landing, the hub, every showcase and the product
      bar: content and the brand mark share the same edges at every width. */
   --sw-header-height: 4rem;
+  /* One-row header of documentation pages on phones. */
+  --sw-header-height-compact: 3.5rem;
   --sw-sidebar-width: 17.5rem;
   --sw-content-width: 51rem;
   /* The docs reading area beside the sidebar, without and with the outline. */
@@ -179,6 +386,7 @@
   --sw-accent-strong: #005a3d;
   --sw-accent-soft: #d6f5e6;
   --sw-accent-ink: #ffffff;
+  --sw-focus-ring: #005a3d;
   /* The icon accent: a brighter brand green for the selected part of an
      icon; a graphic, so it clears 3:1 on every surface. */
   --sw-icon-accent: #00936a;
@@ -214,12 +422,12 @@
   --sw-code-bg: #f7f9fc;
   --sw-code-fg: #1f2a3c;
   --sw-code-comment: #5c6779;
-  --sw-code-keyword: #8a2bb9;
-  --sw-code-function: #1a5fc8;
-  --sw-code-string: #0d7148;
-  --sw-code-number: #a64300;
-  --sw-code-type: #00728a;
-  --sw-code-property: #b0225a;
+  --sw-code-keyword: #8417c4;
+  --sw-code-function: #0f5bd6;
+  --sw-code-string: #027a45;
+  --sw-code-number: #b04200;
+  --sw-code-type: #00748f;
+  --sw-code-property: #c0185a;
   --sw-code-punctuation: #4b5567;
   --sw-code-line-highlight: #e3ecff;
   --sw-code-line-marker: #1d5fd6;
@@ -261,6 +469,7 @@
   --sw-accent-strong: #7eeabd;
   --sw-accent-soft: #0b3a2a;
   --sw-accent-ink: #03190f;
+  --sw-focus-ring: #7eeabd;
   --sw-icon-accent: #3edc9b;
   --sw-violet: #b69cff;
   --sw-violet-soft: #2a1f4d;
@@ -287,12 +496,12 @@
   --sw-code-bg: #0d1524;
   --sw-code-fg: #d9e1ec;
   --sw-code-comment: #8a96aa;
-  --sw-code-keyword: #d49bff;
-  --sw-code-function: #7cb4ff;
-  --sw-code-string: #6fe0a8;
-  --sw-code-number: #ffb370;
-  --sw-code-type: #5fd4e8;
-  --sw-code-property: #ff8fb8;
+  --sw-code-keyword: #c38bff;
+  --sw-code-function: #6aa8ff;
+  --sw-code-string: #3ddc91;
+  --sw-code-number: #ff9f4a;
+  --sw-code-type: #2fd0ea;
+  --sw-code-property: #ff6fa3;
   --sw-code-punctuation: #a2adbf;
   --sw-code-line-highlight: #16284a;
   --sw-code-line-marker: #6aa5ff;

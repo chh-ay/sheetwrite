@@ -919,7 +919,7 @@ pub(crate) struct DenseColumn<'a> {
     styles: &'a [u32],
 }
 
-impl DenseColumn<'_> {
+impl<'a> DenseColumn<'a> {
     /// Resolved kind, payload and style of `row`.
     #[inline]
     pub(crate) fn cell(&self, row: usize) -> (u8, u64, u32) {
@@ -951,7 +951,7 @@ impl DenseColumn<'_> {
     /// loop bounded by the kinds needs no bounds check on the payloads. A
     /// literal's raw kind is its kind; use [`source_kind`] for the others.
     #[inline]
-    pub(crate) fn raw_slices(&self) -> (&[u8], &[u64]) {
+    pub(crate) fn raw_slices(&self) -> (&'a [u8], &'a [u64]) {
         (self.kinds, &self.payloads[..self.kinds.len()])
     }
 

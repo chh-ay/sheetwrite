@@ -26,10 +26,11 @@ use wasm_bindgen::prelude::*;
 
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
-    invalidate_sheet_refs, parse, rename_sheet_refs, resolve_named_ranges, resolve_structured_refs,
-    serialize, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget, NamedFormulaRef,
-    NamedRangeRef, RangeFlags, RefFlags,
+    invalidate_sheet_refs, move_refs, moved_span, parse, rename_sheet_refs, resolve_named_ranges,
+    resolve_structured_refs, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget,
+    NamedFormulaRef, NamedRangeRef, RangeFlags, RefFlags,
 };
+use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
 
@@ -80,12 +81,13 @@ enum Visit {
 }
 
 impl Definition {
-    /// Rewrite the tree with `rewrite`; the source follows a changed tree.
+    /// Rewrite the tree with `rewrite`; the source follows a changed tree in
+    /// the references it writes differently.
     fn rewrite(&mut self, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         if !rewrite(&mut self.ast) {
             return false;
         }
-        self.source = serialize(&self.ast);
+        self.source = write_references(&self.source, &self.ast);
         true
     }
 }
@@ -196,27 +198,6 @@ impl CellStore {
             DefinedName::Range(_) => None,
         }
     }
-
-    /// Rewrite a saved name definition after a row/column move. Unqualified
-    /// relative references keep their A1-relative meaning; only references
-    /// qualified by the moved sheet follow that sheet's cells.
-    #[wasm_bindgen(js_name = moveNamedFormulaSource)]
-    pub fn move_named_formula_source(
-        &self,
-        source: &str,
-        sheet: u32,
-        columns: bool,
-        from: u32,
-        count: u32,
-        to: u32,
-    ) -> Option<String> {
-        let mut ast = self.resolve_sheets(parse(source).ok()?).ok()?;
-        if crate::calc::move_named_formula_refs(&mut ast, sheet, columns, from, count, to) {
-            Some(serialize(&ast))
-        } else {
-            Some(source.to_owned())
-        }
-    }
 }
 
 impl CellStore {
@@ -243,7 +224,16 @@ impl CellStore {
             }
             key = scoped.1;
         }
-        None
+
+        // A name of a linked workbook that the link does not hold is
+        // `#REF!`, as in Excel.
+        name.contains('!').then(|| {
+            NameTarget::Formula(Rc::new(NamedFormulaRef {
+                name: name.to_string(),
+                expression: Ast::InvalidRef,
+                nodes: 1,
+            }))
+        })
     }
 
     /// Mark the definition being resolved for every sheet as depending on
@@ -483,6 +473,44 @@ impl CellStore {
                         shift_rows(ast, at, delta, NO_SHEET, edited_sheet)
                     }
                 });
+        }
+        refresh
+    }
+
+    /// Follow `count` rows (or, with `columns`, columns) of `edited_sheet`
+    /// moved from `from` to `to` in every name: a named range's span and the
+    /// references of a name's formula. Returns whether formulas need
+    /// resolving again.
+    pub(super) fn move_named_references(
+        &mut self,
+        edited_sheet: u32,
+        columns: bool,
+        (from, count, to): (u32, u32, u32),
+    ) -> bool {
+        let mut refresh = false;
+        for definition in self.defined_names.values_mut() {
+            refresh |= match definition {
+                DefinedName::Formula(definition) => {
+                    definition.positional
+                        | definition.rewrite(|ast| {
+                            move_refs(ast, edited_sheet, NO_SHEET, columns, (from, count, to))
+                        })
+                }
+                DefinedName::Range(range) if range.sheet == edited_sheet => {
+                    let (start, end) = if columns {
+                        (&mut range.col_start, &mut range.col_end)
+                    } else {
+                        (&mut range.row_start, &mut range.row_end)
+                    };
+                    let moved = moved_span(*start, *end, from, count, to);
+                    let changed = moved.is_some_and(|span| span != (*start, *end));
+                    if let Some(span) = moved {
+                        (*start, *end) = span;
+                    }
+                    changed
+                }
+                DefinedName::Range(_) => false,
+            };
         }
         refresh
     }

@@ -991,7 +991,7 @@ const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wo
         h("h3", "Host persistence"),
         h("p", "Local document changes stay pending until acknowledged."),
       ]),
-      h("a", { href: "/showcases/database/" }, "Durable proof →"),
+      h("a", { href: "/showcases/database/" }, ["Durable proof", sheetwriteIcon("arrow-right")]),
     ]),
     h("div", { class: "sw-vuewb-persist" }, [
       h(

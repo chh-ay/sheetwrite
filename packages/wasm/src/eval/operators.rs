@@ -66,7 +66,7 @@ pub(super) fn binary<Right: std::borrow::Borrow<Value>>(
 }
 
 #[inline]
-pub(super) fn comparison(op: CmpOp, left: &Value, right: &Value) -> Value {
+pub(crate) fn comparison(op: CmpOp, left: &Value, right: &Value) -> Value {
     let ordering = match compare_values(left, right) {
         Ok(ordering) => ordering,
         Err(error) => return Value::Error(error),

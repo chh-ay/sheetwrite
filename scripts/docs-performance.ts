@@ -6,8 +6,7 @@ import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { median } from "../bench/src/stats.js";
 import type { PerfRow, PerfStat } from "../docs/src/lib/perf-bars.js";
 import type { StoryMachine } from "../docs/src/lib/speedup-story.js";
-import { frontmatter } from "./docs-api.js";
-import { exists, posix, repositoryRoot } from "./docs-shared.js";
+import { exists, frontmatter, posix, repositoryRoot } from "./docs-shared.js";
 import {
   allMeasurements,
   evidenceHeadline,

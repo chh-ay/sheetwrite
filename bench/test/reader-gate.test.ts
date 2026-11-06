@@ -103,8 +103,15 @@ function aaReport(meta: Record<string, unknown> = {}, verdict: unknown = null): 
   };
 }
 
+/**
+ * The floor of `aaReport()`. Resampling 20,000 medians per reader takes about
+ * a second, so the tests share one floor; the fixed seed makes it the same
+ * floor every call would build.
+ */
+const FLOOR: ReaderNoiseFloor = noiseFloorFromAaResults(aaReport(), AA_PATH);
+
 function floor(): ReaderNoiseFloor {
-  return noiseFloorFromAaResults(aaReport(), AA_PATH);
+  return FLOOR;
 }
 
 function verdict(ratios: readonly number[], candidateDigest = BASE_DIGEST): boolean | undefined {

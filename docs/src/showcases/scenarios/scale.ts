@@ -41,7 +41,7 @@ export const SCALE_SHEETS = {
 } as const;
 
 export const SCALE_THEME: Partial<Theme> = {
-  font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
+  font: '500 13px "Instrument Sans Variable", system-ui, sans-serif',
   rowHeight: 30,
   headerHeight: 34,
   rowHeaderWidth: 72,

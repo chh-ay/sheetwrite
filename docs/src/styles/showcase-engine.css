@@ -21,18 +21,9 @@
 
 /* The stage is one instrument in the demo palette, which follows the page theme. */
 .sw-engine-stage {
-  --sw-accent: var(--sw-accent);
-  --sw-accent-ink: var(--sw-accent-ink);
   --sw-accent-soft: var(--sw-surface-2);
-  --sw-accent-strong: var(--sw-accent-strong);
-  --sw-border: var(--sw-border);
-  --sw-border-strong: var(--sw-border-strong);
-  --sw-fg: var(--sw-fg);
-  --sw-fg-strong: var(--sw-fg-strong);
   --sw-fg-muted: var(--sw-fg);
   --sw-surface-0: var(--sw-surface-1);
-  --sw-surface-1: var(--sw-surface-1);
-  --sw-surface-2: var(--sw-surface-2);
   --sw-surface-3: var(--sw-border-strong);
   overflow: hidden;
   border: 1px solid var(--sw-border);

@@ -79,29 +79,21 @@ a {
   }
 }
 
-/* Focus affordance: a tight radius-following ring, never a detached outline.
-   Keyboard focus stays visible on every control; only the canvas grid host is
-   exempt because its cell selection is the focus affordance. */
+/* Focus affordance: one solid outline that follows each control's radius, at
+   least 3:1 on every surface. Keyboard focus stays visible on every control;
+   only the canvas grid host is exempt because its cell selection is the focus
+   affordance. Forced-colors mode keeps the outline in the system colour. */
 :focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
 }
 
 .sheetwrite:focus-visible {
-  box-shadow: none;
+  outline: none;
 }
 
 .expressive-code pre:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 40%, transparent);
-}
-
-/* Forced-colors mode removes box shadows, so the focus ring above disappears.
-   There, a real outline in the system highlight color shows focus instead. */
-@media (forced-colors: active) {
-  :focus-visible:not(.sheetwrite) {
-    outline: 2px solid Highlight;
-    outline-offset: 2px;
-  }
+  outline-offset: calc(-1 * var(--sw-focus-ring-width));
 }
 
 /* Text links get a rounded ring shape so the ring never reads as a bare rectangle. */
