@@ -319,6 +319,7 @@ export type {
   DashboardBox,
   DashboardChartItem,
   DashboardItem,
+  DashboardKpiItem,
   DashboardPivotItem,
   DashboardSlicerItem,
   DataCell,

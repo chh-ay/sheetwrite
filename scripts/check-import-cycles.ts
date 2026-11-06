@@ -126,6 +126,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "DashboardBox",
       "DashboardChartItem",
       "DashboardItem",
+      "DashboardKpiItem",
       "DashboardPivotItem",
       "DashboardSlicerItem",
       "SheetKind",

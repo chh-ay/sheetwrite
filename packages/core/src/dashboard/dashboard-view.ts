@@ -21,6 +21,7 @@ import type { SheetId } from "../types/coordinates.js";
 import type {
   DashboardBox,
   DashboardItem,
+  DashboardKpiItem,
   DashboardPivotItem,
   DashboardSlicerItem,
 } from "../types/dashboard.js";
@@ -96,12 +97,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     engine?.setPivotView((owner) => {
       if (!isDashboard(owner)) return undefined;
       const workbook = grid.store.getWorkbook();
-      return dashboardPayload(
-        owner,
-        workbook.sheets,
-        workbook.dataModel?.relationships ?? [],
-        overrides,
-      )?.pivots;
+      return dashboardPayload(owner, workbook.sheets, workbook.dataModel, overrides)?.pivots;
     }, dashboards);
   };
 
@@ -110,12 +106,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const workbook = grid.store.getWorkbook();
     const ownerSheet = workbook.sheets.find((candidate) => candidate.id === owner);
     if (ownerSheet === undefined) return -1;
-    const payload = dashboardPayload(
-      ownerSheet,
-      workbook.sheets,
-      workbook.dataModel?.relationships ?? [],
-      overrides,
-    );
+    const payload = dashboardPayload(ownerSheet, workbook.sheets, workbook.dataModel, overrides);
     return payload?.hidden.get(itemId) ?? -1;
   };
 
@@ -353,6 +344,9 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       // The chart renderer draws into this box once the build is in the page.
       body.dataset.chartId = item.chart;
       body.classList.add("sheetwrite-dashboard-chart");
+    } else if (item.kind === "kpi") {
+      const output = dashboardPivotOutputOf(grid, owner, hiddenIndex(owner, item.id));
+      body.appendChild(output === null ? note(NEEDS_FULL_ENGINE) : kpiValue(item, output));
     } else {
       const kept = readOnly ? slicerSelection(item, overrides) : item.selected;
       const withData = slicerValuesWithData(
@@ -409,6 +403,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       if (item.kind === "pivot") return dashboardPivotResult(grid, owner, item.pivot);
       const output = dashboardPivotOutputOf(grid, owner, hiddenIndex(owner, item.id));
       if (item.kind === "chart") return [chartOf(grid, owner, item.chart), output];
+      if (item.kind === "kpi") return output;
       return [slicerValues(grid, item), output];
     });
     const signature = JSON.stringify([list, results, readOnly, mode, message, [...overrides]]);
@@ -463,6 +458,7 @@ function itemTitle(grid: Grid, item: DashboardItem): string {
   }
   if (item.kind === "chart")
     return chartOf(grid, grid.getActiveSheet(), item.chart)?.title ?? "Chart";
+  if (item.kind === "kpi") return item.title ?? measureName(grid, item.measure);
   if (item.title !== undefined) return item.title;
   const table = grid.store
     .getWorkbook()
@@ -573,6 +569,27 @@ function pivotTable(
     table.appendChild(tr);
   }
   return table;
+}
+
+/** The caption of measure `id`, or `#REF!` when the data model has no such measure. */
+function measureName(grid: Grid, id: string): string {
+  const measures = grid.store.getWorkbook().dataModel?.measures ?? [];
+  return measures.find((measure) => measure.id === id)?.name ?? "#REF!";
+}
+
+/**
+ * The value of a KPI card, large, in its number format. The hidden pivot has
+ * no rows or columns, so its last cell is the measure's value.
+ */
+function kpiValue(item: DashboardKpiItem, output: PivotOutputRead): HTMLElement {
+  const value = output.cells.at(-1) ?? null;
+  const element = document.createElement("p");
+  element.className = "sheetwrite-dashboard-kpi";
+  element.textContent =
+    item.numberFormat !== undefined && typeof value === "number"
+      ? formatNumber(value, item.numberFormat)
+      : cellScalarToText(value);
+  return element;
 }
 
 /** Distinct values of the slicer's column, sorted as filter lists are; null when it is missing. */
