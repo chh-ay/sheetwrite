@@ -60,13 +60,13 @@ describe("content components", () => {
 
   it("renders a screenshot in both themes, lazily, with its size", async () => {
     const html = await render(`<Screenshot name="dashboard" alt="A dashboard" size="panel" />`);
-    expect(html).toContain('src="/figures/shots/dashboard-light@1x.avif"');
+    expect(html).toContain('src="/figures/shots/dashboard-light-1x.avif"');
     expect(html).toContain(
-      'srcSet="/figures/shots/dashboard-dark@1x.avif 1x, /figures/shots/dashboard-dark@2x.avif 2x"',
+      'srcSet="/figures/shots/dashboard-dark-1x.avif 720w, /figures/shots/dashboard-dark-2x.avif 1440w"',
     );
     expect(html).toContain('width="720" height="480" loading="lazy"');
-    // The second capture is the same picture: assistive technology reads one.
-    expect(html.match(/alt="A dashboard"/g)).toHaveLength(1);
+    // The hidden theme's image is display: none, so assistive technology reads the shown one.
+    expect(html.match(/alt="A dashboard"/g)).toHaveLength(2);
   });
 
   it("references a diagram file that follows the page theme", async () => {
