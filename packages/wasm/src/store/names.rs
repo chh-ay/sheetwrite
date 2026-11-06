@@ -198,27 +198,6 @@ impl CellStore {
             DefinedName::Range(_) => None,
         }
     }
-
-    /// Rewrite a saved name definition after a row/column move. Unqualified
-    /// relative references keep their A1-relative meaning; only references
-    /// qualified by the moved sheet follow that sheet's cells.
-    #[wasm_bindgen(js_name = moveNamedFormulaSource)]
-    pub fn move_named_formula_source(
-        &self,
-        source: &str,
-        sheet: u32,
-        columns: bool,
-        from: u32,
-        count: u32,
-        to: u32,
-    ) -> Option<String> {
-        let mut ast = self.resolve_sheets(parse(source).ok()?).ok()?;
-        if move_refs(&mut ast, sheet, NO_SHEET, columns, (from, count, to)) {
-            Some(write_references(source, &ast))
-        } else {
-            Some(source.to_owned())
-        }
-    }
 }
 
 impl CellStore {

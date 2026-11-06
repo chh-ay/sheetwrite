@@ -490,3 +490,54 @@ export function moveIndex(index: number, from: number, count: number, to: number
   const removed = index < from ? index : index - count;
   return removed >= to ? removed + count : removed;
 }
+
+/**
+ * The span `start..end` after `count` indexes move from `from` to `to`, as
+ * Excel's Cut and Insert Cut Cells changes a range: a span inside the moved
+ * block moves with it; any other span changes as if the block were deleted
+ * where it was and inserted where it lands. It loses the moved indexes it
+ * held, a moved edge included, and grows by the block only when the block
+ * lands after its first index and at or before its last. The engine applies
+ * the same rule to formula references (`moved_span`).
+ */
+export function movedSpan(
+  start: number,
+  end: number,
+  from: number,
+  count: number,
+  to: number,
+): [number, number] | null {
+  if (start >= from && end < from + count) return [to + start - from, to + end - from];
+
+  const removed = remapSpan(start, end, deleteRemap(from, count));
+  return removed && remapSpan(removed[0], removed[1], insertRemap(to, count));
+}
+
+/**
+ * `range` after the move of `move.count` rows or columns along `axis` from
+ * `move.from` to `move.to` (see `movedSpan`). A range on another sheet, or
+ * one the move does not change, is returned as it is; a range that keeps no
+ * index keeps its place.
+ */
+export function rebaseMovedRange(
+  range: Range,
+  axis: SheetAxis,
+  move: {
+    readonly sheet: SheetId;
+    readonly from: number;
+    readonly count: number;
+    readonly to: number;
+  },
+): Range {
+  if (range.sheet !== move.sheet) return range;
+
+  const key = axis === "row" ? "row" : "col";
+  const span = movedSpan(range.start[key], range.end[key], move.from, move.count, move.to);
+  if (!span || (span[0] === range.start[key] && span[1] === range.end[key])) return range;
+
+  return {
+    ...range,
+    start: { ...range.start, [key]: span[0] },
+    end: { ...range.end, [key]: span[1] },
+  };
+}
