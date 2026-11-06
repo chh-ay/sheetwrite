@@ -500,7 +500,7 @@ export function moveIndex(index: number, from: number, count: number, to: number
  * lands after its first index and at or before its last. The engine applies
  * the same rule to formula references (`moved_span`).
  */
-export function movedSpan(
+function movedSpan(
   start: number,
   end: number,
   from: number,
