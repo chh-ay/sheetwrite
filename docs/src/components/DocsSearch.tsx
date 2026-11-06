@@ -77,8 +77,19 @@ function loadPagefind(): Promise<PagefindModule> {
   return pagefindModule;
 }
 
+/** Apple platforms name the Command key; others use Ctrl. */
+function isApplePlatform(): boolean {
+  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+}
+
 export function DocsSearch() {
   const dialog = useRef<HTMLDialogElement>(null);
+  // The prerendered page shows the Command key; other platforms switch to
+  // Ctrl after hydration, in a key cap of fixed width.
+  const [shortcut, setShortcut] = useState("⌘K");
+  useEffect(() => {
+    if (!isApplePlatform()) setShortcut("Ctrl K");
+  }, []);
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchEntry[]>([]);
@@ -175,7 +186,7 @@ export function DocsSearch() {
       >
         <Icon name="search" />
         <span>Search docs</span>
-        <kbd>Ctrl K</kbd>
+        <kbd>{shortcut}</kbd>
       </button>
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- only a backdrop click closes the dialog; Escape is the keyboard path. */}
       <dialog
