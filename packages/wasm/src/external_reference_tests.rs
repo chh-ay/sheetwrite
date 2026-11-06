@@ -161,3 +161,36 @@ fn new_link_values_recalculate_the_formulas_that_read_them() {
         annual
     );
 }
+
+#[test]
+fn formulas_follow_a_link_that_is_added_removed_and_added_again() {
+    let mut store = CellStore::new();
+    let report = store.add_sheet(1, 2);
+    store.set_sheet_name(report, "report", "Report");
+    let formula = "=SUM([Budget.xlsx]Annual!C10:C11)";
+    store.set_formula(report, 0, 0, formula, 0);
+    store.recompute(report);
+    assert_eq!(
+        store.get_cell(report, 0, 0).string().as_deref(),
+        Some("#REF!")
+    );
+
+    let annual = store.add_external_sheet("Budget.xlsx", "Annual", 3, 11);
+    store.set_number(annual, 9, 2, 7.0, 0);
+    store.recompute(annual);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 7.0);
+
+    assert!(store.remove_external_sheet("budget.xlsx", "ANNUAL"));
+    assert!(!store.remove_external_sheet("Budget.xlsx", "Annual"));
+    assert_eq!(
+        store.get_cell(report, 0, 0).string().as_deref(),
+        Some("#REF!")
+    );
+    assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(formula));
+
+    let annual = store.add_external_sheet("Budget.xlsx", "Annual", 3, 11);
+    store.set_number(annual, 10, 2, 5.0, 0);
+    store.recompute(annual);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
+    assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(formula));
+}

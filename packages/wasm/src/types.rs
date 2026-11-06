@@ -1,8 +1,8 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, refresh_sheet_spans, rename_sheet_refs, serialize, shift_cols,
-    shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    invalidate_sheet_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, serialize,
+    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::memory::MemoryOwnerStats;
@@ -593,6 +593,30 @@ impl FormulaEntry {
 
     pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
         self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
+    }
+
+    /// Point the entry's references to a sheet of another workbook at the
+    /// link sheet `handle` (`Some`), or back to unresolved references when
+    /// the link sheet `key` names goes away (`None`).
+    pub(crate) fn relink_sheet(
+        &mut self,
+        key: &str,
+        handle: Option<u32>,
+        formula_sheet: u32,
+    ) -> bool {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !relink_sheet_refs(ast, key, handle) {
+            return false;
+        }
+
+        // A relinked reference writes the same text, so the source stays as
+        // the user wrote it instead of being written again from the tree.
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.set_volatile(volatile);
+        true
     }
 
     /// Re-places the entry's 3-D references in the tab `order`; `names` holds

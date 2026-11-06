@@ -588,6 +588,7 @@ function transformDirectTarget(
     case "removeNamedRange":
     case "removeTable":
     case "setCalculation":
+    case "setExternalLinks":
     case "setRelationship":
     case "removeRelationship":
     case "setMeasure":
@@ -1184,6 +1185,10 @@ function operationIdentity(operation: DocumentOp): string {
     // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
     case "setCalculation":
       return "calculation";
+
+    // The whole list is replaced, so the last writer wins.
+    case "setExternalLinks":
+      return "external-links";
 
     // The model is checked as a whole (no cycle, one relationship per pair of
     // tables), so any two concurrent relationship changes conflict.

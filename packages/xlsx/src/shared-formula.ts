@@ -1,7 +1,7 @@
 import type { SnapshotCell, XlsxFormulaEngine } from "@sheetwrite/core";
+import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { linkedFormula } from "./external-links.js";
-import { formulaContainsExternalReference } from "./formula.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 
 /** A cell of a shared-formula group, which uses the master's text as if it were copied there. */

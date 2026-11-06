@@ -20,6 +20,10 @@ import {
   sheetNameKey,
   validateSheetName,
 } from "@sheetwrite/core";
+import {
+  formulaCallsExternalData,
+  formulaContainsExternalReference,
+} from "@sheetwrite/core/external-links";
 
 import { areaA1 } from "./cell-reference.js";
 import { chartDrawingParts, type DrawingChart, freePartName, writeCharts } from "./chart-write.js";
@@ -38,11 +42,7 @@ import {
   META_STEM,
   RELATIONSHIPS_NS,
 } from "./format.js";
-import {
-  convertWorkbookFormulas,
-  formulaCallsExternalData,
-  formulaContainsExternalReference,
-} from "./formula.js";
+import { convertWorkbookFormulas } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
 import {

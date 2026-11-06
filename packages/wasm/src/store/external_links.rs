@@ -17,8 +17,8 @@ impl CellStore {
     /// that sheet, names compared without case, this returns its handle and
     /// changes nothing.
     ///
-    /// Formulas read the sheet when they are entered after it is added;
-    /// until then, a reference to it is `#REF!`.
+    /// Formulas that already name the sheet read it from now on; until a
+    /// sheet is added, a reference to it is `#REF!`.
     #[wasm_bindgen(js_name = addExternalSheet)]
     pub fn add_external_sheet(
         &mut self,
@@ -40,8 +40,54 @@ impl CellStore {
             Err(error) => wasm_bindgen::throw_str(&error),
         };
         self.sheet_order = Some(Box::new(tabs));
-        self.sheet_lookup.insert(sheet_name_key(&name), handle);
+        let key = sheet_name_key(&name);
+        self.sheet_lookup.insert(key.clone(), handle);
         self.sheet_names[handle] = name;
+        self.relink_external_sheet(&key, Some(handle as u32));
         handle
+    }
+
+    /// Remove the sheet `sheet` of the linked workbook `book` and its values.
+    /// Formulas that read it keep their text and show `#REF!` until the sheet
+    /// is added again. Returns `false` when the store does not hold it.
+    #[wasm_bindgen(js_name = removeExternalSheet)]
+    pub fn remove_external_sheet(&mut self, book: &str, sheet: &str) -> bool {
+        let key = sheet_name_key(&format!("[{book}]{sheet}"));
+        let Some(&handle) = self.sheet_lookup.get(&key) else {
+            return false;
+        };
+
+        // Unlink first, so removing the sheet leaves no reference to turn
+        // into #REF! text.
+        self.relink_external_sheet(&key, None);
+        self.remove_sheet(handle)
+    }
+}
+
+impl CellStore {
+    /// Point every formula reference to the linked sheet `key` at `handle`,
+    /// or back to an unresolved reference, and recalculate those formulas.
+    fn relink_external_sheet(&mut self, key: &str, handle: Option<u32>) {
+        let mut affected = Vec::new();
+        for (formula_sheet, data) in self.sheets.iter_mut().enumerate() {
+            if !self.sheet_alive[formula_sheet] {
+                continue;
+            }
+
+            let mut changed = false;
+            data.formulas
+                .rewrite_entries(&mut self.formula_slots, |entry| {
+                    changed |= entry.relink_sheet(key, handle, formula_sheet as u32);
+                });
+            if changed {
+                data.formulas.mark_all_dirty();
+                affected.push(formula_sheet);
+            }
+        }
+
+        if !affected.is_empty() {
+            self.graph.invalidate();
+            self.recompute_with_volatile_sheets(affected);
+        }
     }
 }

@@ -2392,6 +2392,10 @@ export function validateDocumentOperationShape(
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
+    case "setExternalLinks":
+      validateExternalLinksShape(ownValue(operation, "links"), `${path}.links`, errors);
+      break;
+
     case "setMeasure":
       validateMeasureShape(ownValue(operation, "measure"), `${path}.measure`, errors);
       break;
@@ -3558,6 +3562,9 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setExternalLinks":
+      return "external-links";
 
     case "setMeasure":
       return `measure:${operation.measure.id}`;
