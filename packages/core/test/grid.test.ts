@@ -26,7 +26,14 @@ import type {
   XlsxTableExportBackend,
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
-import { keepXlsxSlots, makeColumnarData, makeWorkbook, mountGridWithData, mountHost, scrollerOf } from "./fixtures.js";
+import {
+  keepXlsxSlots,
+  makeColumnarData,
+  makeWorkbook,
+  mountGridWithData,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -42,7 +49,7 @@ function makeFakeStore(
     getFormula: () => null,
     getSpillAnchor: () => null,
     getRefTarget: () => null,
-    recalculateVolatile: () => { },
+    recalculateVolatile: () => {},
     getVisibleWindow: (sheet, rows, cols) => {
       hooks.onWindow?.();
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
@@ -58,9 +65,9 @@ function makeFakeStore(
         styles: [{}],
       };
     },
-    ensureColumns: () => { },
+    ensureColumns: () => {},
     applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),
-    on: () => () => { },
+    on: () => () => {},
     viewRowCount: (sheet) => workbook.sheets.find((s) => s.id === sheet)?.rowCount ?? 0,
   };
 }
@@ -522,31 +529,31 @@ describe("Grid transaction resource ingress", () => {
       rows: number;
       expected: CellScalar[];
     }> = [
-        {
-          remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
-          rows: 7,
-          expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
-        },
+      {
+        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+        rows: 7,
+        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+      },
 
-        {
-          remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
-          localReplay: true,
-          rows: 7,
-          expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
-        },
+      {
+        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+        localReplay: true,
+        rows: 7,
+        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+      },
 
-        {
-          remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
-          rows: 5,
-          expected: [10.5, 20.5, 30.5, 40.5, 50.5],
-        },
+      {
+        remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+        rows: 5,
+        expected: [10.5, 20.5, 30.5, 40.5, 50.5],
+      },
 
-        {
-          remote: { op: "removeRows", sheet: "s1", at: 3, count: 1 },
-          rows: 5,
-          expected: [0.5, 10.5, 20.5, 40.5, 50.5],
-        },
-      ];
+      {
+        remote: { op: "removeRows", sheet: "s1", at: 3, count: 1 },
+        rows: 5,
+        expected: [0.5, 10.5, 20.5, 40.5, 50.5],
+      },
+    ];
 
     for (const { remote, localReplay, rows, expected } of cases) {
       const grid = new GridImpl(mountHost(), {
@@ -602,7 +609,7 @@ describe("Grid transaction resource ingress", () => {
             patch.value = { kind: "literal", value: "x".repeat(200) };
           }
         }
-        return { ok: true, reservation: { cancel: () => { }, finish: () => { } } };
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
       },
     });
 
@@ -1842,8 +1849,8 @@ describe("element height cap measurement", () => {
     const scroller = {
       style: { cssText: "" },
       clientHeight,
-      append: () => { },
-      remove: () => { },
+      append: () => {},
+      remove: () => {},
       _scrollTop: 0,
       get scrollTop() {
         return this._scrollTop;
@@ -1859,7 +1866,7 @@ describe("element height cap measurement", () => {
     };
     let calls = 0;
     return {
-      body: { append: () => { } },
+      body: { append: () => {} },
       createElement: () => (calls++ === 0 ? scroller : sizer),
     } as unknown as Document;
   };

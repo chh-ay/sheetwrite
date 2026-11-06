@@ -15,7 +15,13 @@ import type {
   VisibleWindowView,
   Workbook,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountGridWithData, mountHost, scrollerOf } from "./fixtures.js";
+import {
+  makeColumnarData,
+  makeWorkbook,
+  mountGridWithData,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
@@ -333,7 +339,7 @@ describe("zoom", () => {
 describe("view composition", () => {
   // The Grid interface owns displayed-row geometry for every commit path.
   it("composes filter, hide, and sort into a shrunken painted view", () => {
-    const { store, grid } = mountGridWithData(50);
+    const { grid } = mountGridWithData(50);
 
     const recorder = makeRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);

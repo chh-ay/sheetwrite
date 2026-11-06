@@ -14,7 +14,14 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook, mountGridWithData, mountHost, scrollerOf } from "./fixtures.js";
+import {
+  elementAdded,
+  makeColumnarData,
+  makeWorkbook,
+  mountGridWithData,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
