@@ -33,6 +33,7 @@ export const Route = createFileRoute("/docs/$")({
         description: "This page has a new address.",
         kind: undefined,
         outline: [],
+        sourcePath: undefined,
         moved: href,
         href,
       };
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/docs/$")({
       description: document.description,
       kind: document.kind,
       outline: document.outline ?? [],
+      sourcePath: document.sourcePath,
       moved: undefined,
       href,
     };
@@ -146,6 +148,7 @@ function DocumentRoute() {
       kind={metadata.kind}
       outline={metadata.outline}
       reserveOutline
+      sourcePath={metadata.sourcePath}
       title={metadata.title}
     >
       {/* Prerendered HTML can still hold this placeholder; search must not quote it. */}

@@ -5,7 +5,8 @@ description: Release notes for each Sheetwrite version, with new features, chang
 
 All Sheetwrite packages release together with one version number. Each release
 post lists what is new, what changed, what is fixed, the measured performance
-results, and the steps to upgrade.
+results, and the steps to upgrade. Follow new releases with the
+[changelog RSS feed](/changelog/rss.xml).
 
 <ol class="sw-release-list">
 <li>

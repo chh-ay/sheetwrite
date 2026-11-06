@@ -91,6 +91,13 @@ export const Route = createRootRoute({
         ...(showcaseChrome ? [] : [{ rel: "stylesheet", href: docsFiguresStylesheet }]),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        // The changelog feed, written by the docs build (scripts/docs-feed.ts).
+        {
+          rel: "alternate",
+          type: "application/rss+xml",
+          title: "Sheetwrite changelog",
+          href: "/changelog/rss.xml",
+        },
       ],
       meta: [
         { charSet: "utf-8" },

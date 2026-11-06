@@ -5,7 +5,7 @@ description: Initialize Sheetwrite, create a workbook, and observe committed cha
 
 This complete TypeScript example uses the imperative core. [Install Sheetwrite](/docs/start/installation/) first; the framework adapters expose the same `Grid` after their client-only initialization completes.
 
-```ts compile title="Complete first grid"
+```ts compile runnable title="Complete first grid"
 import {
   createGrid,
   initSheetwrite,

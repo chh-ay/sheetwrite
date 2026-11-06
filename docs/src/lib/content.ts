@@ -14,6 +14,8 @@ export interface DocumentFrontmatter {
   kind?: string;
   /** The page's outline, collected at build time; see lib/outline.ts. */
   outline?: readonly OutlineItem[];
+  /** Set on pages the docs generator writes; see `markGeneratedPages` in lib/generated-content.ts. */
+  generated?: boolean;
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -36,9 +38,14 @@ interface DocumentSource {
   component: LazyExoticComponent<DocumentComponent>;
   fallbackTitle: string;
   load: () => Promise<DocumentModule>;
+  /** The glob key, `../content/docs/<page>.md`, relative to `docs/src/lib`. */
+  key: string;
 }
 
-export type DocumentRecord = DocumentFrontmatter;
+export interface DocumentRecord extends DocumentFrontmatter {
+  /** The page's source file in the repository; generated pages have none. */
+  sourcePath: string | undefined;
+}
 
 const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
@@ -55,7 +62,7 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     const href = hrefFromSource(source);
     const fallbackTitle =
       href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite";
-    return [href, { component: lazy(load), fallbackTitle, load }];
+    return [href, { component: lazy(load), fallbackTitle, load, key: source }];
   }),
 );
 
@@ -75,6 +82,7 @@ export async function documentForSplat(
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
+    sourcePath: module.frontmatter?.generated ? undefined : source.key.replace("..", "docs/src"),
   };
 }
 

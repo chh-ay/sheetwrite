@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
+import { GENERATED_CONTENT_DIRECTORIES } from "../docs/src/lib/generated-content.js";
 import { MOVED_HEADINGS } from "../docs/src/lib/moved-headings.js";
 import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
@@ -46,6 +47,7 @@ import {
   unresolvedCssTokens,
   validateMarkdown,
 } from "./docs-content-checks.js";
+import { expectedChangelogFeed } from "./docs-feed.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import { entrySlug } from "./docs-paths.js";
 import {
@@ -59,8 +61,8 @@ import {
   exists,
   type ExpectedFile,
   generatedDataRoot,
-  GENERATED_CONTENT_DIRECTORIES,
   generatedManifestPath,
+  generatedPublicRoots,
   isGeneratedContent,
   type MarkdownDocument,
   MIGRATION_ROUTES,
@@ -420,6 +422,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     { path: docsContractPath, content: stableJson(contract) },
   ];
   files.push(...(await expectedLlmsFiles(manifest, repositoryRoot, files)));
+  files.push(expectedChangelogFeed());
   const unowned = files.filter(
     (file) => file.path.startsWith(`${contentRoot}${sep}`) && !isGeneratedContent(file.path),
   );
@@ -450,6 +453,7 @@ async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Pro
   const roots = [
     generatedDataRoot,
     ...GENERATED_CONTENT_DIRECTORIES.map((directory) => join(contentRoot, directory)),
+    ...generatedPublicRoots,
   ];
   for (const root of roots) {
     for (const path of await filesUnder(root)) {
@@ -503,7 +507,13 @@ async function checkDocs(
   }
   failures.push(...movedPageIssues(MOVED_PAGES, documents, MOVED_HEADINGS));
   failures.push(...(await siteLinkIssues(documents)));
-  failures.push(...(await validateMarkdown(documents, manifest)));
+  const publicRoot = join(repositoryRoot, "docs/public");
+  const generatedPublicFiles = new Set(
+    expected
+      .filter((file) => file.path.startsWith(`${publicRoot}${sep}`))
+      .map((file) => `/${posix(relative(publicRoot, file.path))}`),
+  );
+  failures.push(...(await validateMarkdown(documents, manifest, generatedPublicFiles)));
   failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
   failures.push(...adapterContractIssues(manifest));
 
