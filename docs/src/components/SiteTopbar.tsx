@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { LATEST_RELEASE, RELEASES_HREF } from "../lib/releases.js";
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
@@ -46,34 +46,24 @@ function currentSection(pathname: string, active: SiteTopbarProps["active"]): Se
  * The one site header: brand, Docs, Showcases, Releases, GitHub and the theme
  * toggle, on every page. Documentation pages add their search and menu button
  * through the `search` and `trailing` slots. On phones the header is one row;
- * the site links open from the menu button.
+ * the site links open from the menu button as a native popover (open, close,
+ * Escape, light dismiss and focus come from the browser, without script).
  */
 export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
   const pathname = useLocation({ select: (location) => location.pathname });
   const section = currentSection(pathname, active);
-  const [menuOpen, setMenuOpen] = useState(false);
-  // A link in the menu navigates; the next page starts with the menu closed.
-  useEffect(() => setMenuOpen(false), [pathname]);
-  useEffect(() => {
-    if (!menuOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [menuOpen]);
   // The landing pages of each section are the destination; deeper pages are
   // inside the section.
   const marker = (name: Exclude<Section, undefined>, href: string) =>
     section !== name ? undefined : pathname === href ? ("page" as const) : ("true" as const);
 
   return (
-    <header className="sw-header" data-has-search={search !== undefined} data-menu-open={menuOpen}>
+    <header className="sw-header" data-has-search={search !== undefined}>
       <Link aria-label="Sheetwrite home" className="sw-header__brand" to="/">
         <BrandMark />
         <span>Sheetwrite</span>
       </Link>
-      <nav aria-label="Site" className="sw-header__nav" id="site-nav">
+      <nav aria-label="Site" className="sw-header__nav" id="site-nav" popover="auto">
         <Link activeOptions={EXACT} aria-current={marker("docs", "/docs/")} to="/docs/">
           Docs
         </Link>
@@ -104,14 +94,12 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
         <ThemeToggle />
         {trailing ?? (
           <button
-            aria-controls="site-nav"
-            aria-expanded={menuOpen}
             aria-label="Site menu"
             className="sw-icon-button sw-header__menu"
-            onClick={() => setMenuOpen((open) => !open)}
+            popoverTarget="site-nav"
             type="button"
           >
-            <Icon name={menuOpen ? "close" : "menu"} />
+            <Icon name="menu" />
           </button>
         )}
       </div>

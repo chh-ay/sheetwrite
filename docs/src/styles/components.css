@@ -522,11 +522,22 @@ samp,
   text-decoration: none;
 }
 
+/* The nav is a popover (the phone menu); on wide screens it sits in the bar,
+   so the browser's popover box styles are reset here. */
 .sw-header__nav {
+  position: static;
   display: flex;
+  width: auto;
+  height: auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
   gap: var(--sw-space-1);
   align-items: center;
+  overflow: visible;
+  border: 0;
+  background: none;
+  color: inherit;
 }
 
 .sw-header__nav a,
@@ -587,8 +598,8 @@ samp,
 }
 
 /* Phones: one row (brand, search or menu, theme). The site links open from
-   the menu button as a panel under the bar; documentation pages hold the same
-   links in their own menu drawer. */
+   the menu button as a popover panel under the bar; documentation pages hold
+   the same links in their own menu drawer. */
 @media (max-width: 54rem) {
   .sw-header,
   .sw-header[data-has-search="true"] {
@@ -610,8 +621,9 @@ samp,
   }
 
   .sw-header__nav {
-    position: absolute;
-    top: 100%;
+    position: fixed;
+    top: var(--sw-header-height-compact);
+    bottom: auto;
     right: 0;
     left: 0;
     display: none;
@@ -623,7 +635,7 @@ samp,
     box-shadow: var(--sw-shadow-md);
   }
 
-  .sw-header[data-menu-open="true"]:not([data-has-search="true"]) .sw-header__nav {
+  .sw-header__nav:popover-open {
     display: flex;
   }
 
