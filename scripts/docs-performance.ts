@@ -2023,7 +2023,12 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     );
 
     lines.push(...(await renderEngineChange()));
-    lines.push("### Every workload", "", formulaFigure(formulaCaptures.machines));
+    lines.push(
+      "### Every workload",
+      "",
+      // The engine change leads; the absolute time of every workload is on demand.
+      ...allMeasurements([formulaFigure(formulaCaptures.machines)]),
+    );
     lines.push(
       "",
       FORMULA_METHOD,

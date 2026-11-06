@@ -226,6 +226,15 @@
   transform: translateX(-50%);
 }
 
+/* The end labels stay inside the track; the others centre on their gridline. */
+.perf-bars__tick:first-child {
+  transform: none;
+}
+
+.perf-bars__tick:last-child {
+  transform: translateX(-100%);
+}
+
 @container perf-bars (max-width: 36rem) {
   .perf-bars__tick[data-narrow="hidden"] {
     visibility: hidden;

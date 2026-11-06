@@ -172,6 +172,15 @@
   transform: translateX(-50%);
 }
 
+/* The end labels stay inside the lane; the others centre on their gridline. */
+.speed-story__ticks span:first-child {
+  transform: none;
+}
+
+.speed-story__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
 .speed-story__group {
   padding: var(--sw-space-2) 0;
   border-bottom: 1px solid var(--sw-border);
