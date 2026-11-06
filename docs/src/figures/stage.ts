@@ -40,7 +40,7 @@ const PLACEHOLDER_WORKBOOK: Workbook = {
  * dark), `sheet` (orders,
  * regions or dashboard), `ribbon` (full or compact), `width` and `height` of
  * the stage in CSS pixels, `links=1` to give the workbook a linked
- * workbook, and `history=1` to start its version history with a named version. Marks the document `data-figure-ready`
+ * workbook, `layout=phone` for the phone dashboard layout, and `history=1` to start its version history with a named version. Marks the document `data-figure-ready`
  * once the first frame is drawn.
  */
 async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<void> {
@@ -83,7 +83,9 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
       },
     },
   });
-  await shell.grid.importWorkbook(figureWorkbook(sheet));
+  await shell.grid.importWorkbook(
+    figureWorkbook(sheet, params.get("layout") === "phone" ? "phone" : "wide"),
+  );
   if (params.get("links") === "1") linkBudget(shell.grid);
 
   if (params.get("history") === "1") await saveDraft(archive, figureWorkbook(sheet));

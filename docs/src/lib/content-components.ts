@@ -54,8 +54,8 @@ export const CONTENT_COMPONENTS = {
   CodeGroup: ["sync"],
   AccordionGroup: [],
   Accordion: ["title", "description", "defaultOpen", "id"],
-  Frame: ["caption", "hint"],
-  Screenshot: ["name", "alt", "size", "phone"],
+  Frame: ["caption", "phoneCaption", "hint"],
+  Screenshot: ["name", "alt", "size", "phone", "phoneAlt"],
   Diagram: ["name", "alt", "caption", "width", "height"],
   Annotated: ["name", "alt", "size", "caption", "points"],
   Compare: ["before", "after"],
@@ -100,8 +100,8 @@ export const SHOT_SIZES = {
   panel: { width: 720, height: 480 },
   wide: { width: 1200, height: 480 },
   card: { width: 640, height: 400 },
-  /** A crop of a panel-sized capture, for phones: shown near its own width. */
-  phone: { width: 420, height: 340 },
+  /** The phone layout of a dashboard, cropped to its items: shown near its own width. */
+  phone: { width: 320, height: 688 },
 } as const;
 
 export type ShotSize = keyof typeof SHOT_SIZES;
@@ -347,7 +347,18 @@ function accordionGroup(node: ContentNode): ContentNode {
 
 function frame(node: ContentNode): ContentNode {
   const caption = attribute(node, "caption");
+  const phoneCaption = attribute(node, "phoneCaption");
   const hint = attribute(node, "hint");
+  // With a phone crop inside, each width shows the caption of its own image.
+  const captionText =
+    caption === undefined || phoneCaption === undefined
+      ? caption === undefined
+        ? []
+        : [text(caption)]
+      : [
+          element("span", [text(caption)], { className: ["sw-frame__caption--wide"] }),
+          element("span", [text(phoneCaption)], { className: ["sw-frame__caption--narrow"] }),
+        ];
   return element(
     "figure",
     [
@@ -355,7 +366,7 @@ function frame(node: ContentNode): ContentNode {
         ? []
         : [element("p", [text(hint)], { className: ["sw-frame__hint"] })]),
       element("div", node.children ?? [], { className: ["sw-frame__media"] }),
-      ...(caption === undefined ? [] : [element("figcaption", [text(caption)], {})]),
+      ...(captionText.length === 0 ? [] : [element("figcaption", captionText, {})]),
     ],
     { className: ["sw-frame"] },
   );
@@ -365,8 +376,8 @@ function frame(node: ContentNode): ContentNode {
 const PAGE_SHOT_SIZES = "(max-width: 48rem) 100vw, 46rem";
 /** The width of a screenshot across the top of a card in a two-column card group. */
 const CARD_SHOT_SIZES = "(max-width: 40rem) 100vw, 23rem";
-/** Where a screenshot with a phone crop shows the crop. */
-const PHONE_MEDIA = "(max-width: 40rem)";
+/** The width a phone crop shows at: the column, at most 26rem (figures.css). */
+const PHONE_SHOT_SIZES = "min(26rem, 100vw)";
 
 /**
  * One theme's capture: the 1× and 2× AVIF files, lazy, so only the shown
@@ -378,11 +389,10 @@ function themedShot(
   alt: string,
   size: ShotSize,
   sizes: string,
-  phone?: string,
 ) {
   const { width, height } = SHOT_SIZES[size];
-  const image = element("img", [], {
-    className: phone === undefined ? ["sw-shot", `sw-shot--${theme}`] : ["sw-shot"],
+  return element("img", [], {
+    className: ["sw-shot", `sw-shot--${theme}`],
     src: shotUrl(name, theme, 1),
     srcSet: `${shotUrl(name, theme, 1)} ${width}w, ${shotUrl(name, theme, 2)} ${width * 2}w`,
     sizes,
@@ -393,23 +403,6 @@ function themedShot(
     loading: "lazy",
     decoding: "async",
   });
-  if (phone === undefined) return image;
-  // Phones get their own crop, so the labels stay near their own size.
-  const crop = SHOT_SIZES.phone;
-  return element(
-    "picture",
-    [
-      element("source", [], {
-        media: PHONE_MEDIA,
-        srcSet: `${shotUrl(phone, theme, 1)} ${crop.width}w, ${shotUrl(phone, theme, 2)} ${crop.width * 2}w`,
-        sizes: "100vw",
-        width: crop.width,
-        height: crop.height,
-      }),
-      image,
-    ],
-    { className: ["sw-shot-picture", `sw-shot--${theme}`] },
-  );
 }
 
 /** Both themes' captures; CSS shows the one that matches the page. */
@@ -418,15 +411,12 @@ function themedShots(
   alt: string,
   size: ShotSize,
   sizes: string,
-  phone?: string,
+  variant?: "wide" | "narrow",
 ): ContentNode {
   return element(
     "span",
-    [
-      themedShot(name, "light", alt, size, sizes, phone),
-      themedShot(name, "dark", alt, size, sizes, phone),
-    ],
-    { className: ["sw-shots"] },
+    [themedShot(name, "light", alt, size, sizes), themedShot(name, "dark", alt, size, sizes)],
+    { className: variant === undefined ? ["sw-shots"] : ["sw-shots", `sw-shots--${variant}`] },
   );
 }
 
@@ -441,7 +431,18 @@ function screenshot(node: ContentNode): ContentNode {
   const size = (attribute(node, "size") ?? "app") as ShotSize;
   if (!(size in SHOT_SIZES))
     throw new Error(`<Screenshot size> is one of ${Object.keys(SHOT_SIZES)}`);
-  return themedShots(name, alt, size, PAGE_SHOT_SIZES, attribute(node, "phone"));
+  const phone = attribute(node, "phone");
+  if (phone === undefined) return themedShots(name, alt, size, PAGE_SHOT_SIZES);
+  // Narrow screens show the phone crop, with its own alt text; CSS shows one
+  // of the two, and the hidden one never loads.
+  return element(
+    "span",
+    [
+      themedShots(name, alt, size, PAGE_SHOT_SIZES, "wide"),
+      themedShots(phone, required(node, "phoneAlt"), "phone", PHONE_SHOT_SIZES, "narrow"),
+    ],
+    { className: ["sw-shots-set"] },
+  );
 }
 
 /**

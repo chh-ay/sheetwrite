@@ -53,11 +53,6 @@
   display: none;
 }
 
-/* A screenshot with a phone crop: the picture holds the theme class. */
-.sw-shot-picture {
-  display: block;
-}
-
 .sw-shot {
   border: var(--sw-border-width) solid var(--sw-border);
   background: var(--sw-surface-1);
@@ -158,5 +153,31 @@
   .sw-frame--diagram .sw-frame__media > .sw-diagram {
     width: 36rem;
     max-width: none;
+  }
+}
+
+/* A screenshot with a phone crop: up to 820 px the crop shows, at most
+   26rem wide and centred, so its labels stay 11 px and up; wider screens
+   show the full capture. Each caption goes with its image. */
+.sw-shots-set {
+  display: block;
+}
+
+@media (max-width: 51.25rem) {
+  .sw-shots--wide,
+  .sw-frame__caption--wide {
+    display: none;
+  }
+
+  .sw-shots--narrow {
+    max-width: 26rem;
+    margin-inline: auto;
+  }
+}
+
+@media (min-width: 51.3125rem) {
+  .sw-shots--narrow,
+  .sw-frame__caption--narrow {
+    display: none;
   }
 }
