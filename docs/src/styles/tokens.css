@@ -124,10 +124,11 @@
 }
 
 /* Metric-matched fallbacks: Arial (Liberation Sans on Linux) scaled to each
-   face's width, with its line metrics from the face's hhea table, so text
-   keeps its line breaks and height while the web fonts load. Widths are
-   measured on headings and body text at each weight range; each fallback
-   stays slightly narrower than its face, so text never gains a line. */
+   face's width, with line metrics from the face's hhea table divided by the
+   scale, so text keeps its line breaks and height while the web fonts load.
+   Widths are measured per weight range (headings at display size, where a
+   shift shows most; body text at 14–16 px); each fallback stays slightly
+   narrower than its face, so text never gains a line. */
 @font-face {
   font-family: "Bricolage Grotesque Fallback";
   font-weight: 100 549;
@@ -146,9 +147,9 @@
   src:
     local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 100%;
-  ascent-override: 93%;
-  descent-override: 27%;
+  size-adjust: 93.5%;
+  ascent-override: 99.47%;
+  descent-override: 28.88%;
   line-gap-override: 0%;
 }
 
@@ -158,9 +159,9 @@
   src:
     local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"),
     local("Helvetica");
-  size-adjust: 100%;
-  ascent-override: 97%;
-  descent-override: 25%;
+  size-adjust: 102.5%;
+  ascent-override: 94.63%;
+  descent-override: 24.39%;
   line-gap-override: 0%;
 }
 
@@ -170,9 +171,9 @@
   src:
     local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 100%;
-  ascent-override: 97%;
-  descent-override: 25%;
+  size-adjust: 96.8%;
+  ascent-override: 100.21%;
+  descent-override: 25.83%;
   line-gap-override: 0%;
 }
 
