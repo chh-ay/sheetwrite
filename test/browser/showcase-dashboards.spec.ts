@@ -22,7 +22,9 @@ test("a slicer filters the dashboard and each change is one undo step", async ({
   const allRegions = (await revenueCard(page).textContent()) ?? "";
 
   // The slicer narrows the KPI card it filters; undo brings every region back.
-  await controls(page).getByRole("button", { name: /in the Region slicer/ }).click();
+  await controls(page)
+    .getByRole("button", { name: /in the Region slicer/ })
+    .click();
   await expect(page.getByTestId("dashboard-region-selection")).toHaveText("Americas");
   await expect(revenueCard(page)).not.toHaveText(allRegions);
   await controls(page).getByRole("button", { name: "Undo" }).click();
