@@ -322,6 +322,26 @@ pub(crate) enum FormulaValueKind {
     Blank,
 }
 
+/// Values, cell references and operators only, with no function, range,
+/// name, array or LET anywhere in the tree.
+fn ast_is_plain(ast: &Ast) -> bool {
+    match ast {
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::InvalidRef => true,
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_is_plain(left) && ast_is_plain(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_plain(inner),
+        _ => false,
+    }
+}
+
 fn ast_is_volatile(ast: &Ast) -> bool {
     match ast {
         Ast::Func(
@@ -444,6 +464,18 @@ impl FormulaEntry {
     }
 
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
+        // A formula of values, cells and operators has no function, range,
+        // name or array: every flag below stays clear, and its reads are the
+        // only metadata that needs a walk.
+        if ast_is_plain(&ast) {
+            return Self {
+                flags: 0,
+                reads: ReadSet::from_ast(&ast, sheet),
+                ast: Some(ast),
+                source,
+            };
+        }
+
         let (reads, volatile) = formula_metadata(&ast, sheet);
 
         let mut entry = Self {
