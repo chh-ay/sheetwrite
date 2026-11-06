@@ -175,12 +175,24 @@
 .perf-bars__row {
   display: grid;
   gap: var(--sw-space-1-5);
-  margin: 0;
-  padding: var(--sw-space-3) 0;
+  margin: 0 calc(var(--sw-space-2) * -1);
+  padding: var(--sw-space-3) var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  transition: background-color var(--sw-motion-fast, 120ms) ease;
 }
 
 .perf-bars__row + .perf-bars__row {
   border-top: 1px solid var(--sw-border);
+}
+
+/* The row under the pointer lifts slightly, so its label, bars and values read as one line. */
+.perf-bars__row:hover {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.perf-bars__row:hover + .perf-bars__row,
+.perf-bars__row:hover {
+  border-top-color: transparent;
 }
 
 .perf-bars__row-head {
@@ -295,8 +307,8 @@
   border-inline: 2px solid var(--perf-whisker);
   background: linear-gradient(var(--perf-whisker), var(--perf-whisker)) center / 100% 2px no-repeat;
   transform: translateY(-50%);
-  /* A thin halo in the card colour keeps the band readable where it crosses a fill. */
-  filter: drop-shadow(0 0 1px var(--sw-surface-1)) drop-shadow(0 0 1px var(--sw-surface-1));
+  /* A halo in the card colour keeps the band readable where it crosses a fill. */
+  filter: drop-shadow(0 0 1px var(--sw-surface-1));
 }
 
 /* Single-series figures need no series column: the track starts under the label. */
@@ -355,15 +367,41 @@
 .perf-bars__table > summary {
   display: inline-flex;
   align-items: center;
-  gap: var(--sw-space-1-5);
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-sm);
   color: var(--sw-accent);
   font-size: var(--sw-text-caption);
   font-weight: 600;
+  list-style: none;
   cursor: pointer;
 }
 
+.perf-bars__table > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The site's chevron mask turns to point down while the table is open. */
+.perf-bars__table > summary::before {
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentcolor;
+  content: "";
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: rotate var(--sw-motion-fast, 120ms) ease;
+}
+
+.perf-bars__table[open] > summary::before {
+  rotate: 90deg;
+}
+
 .perf-bars__table > summary:hover {
+  color: var(--sw-accent-strong);
   text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.perf-bars__table tbody tr:hover :is(td, th[scope="row"]) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
 }
 
 .perf-bars__table-frame {
