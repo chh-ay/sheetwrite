@@ -1,6 +1,4 @@
 import type { CellScalar } from "./cell.js";
-import type { ChartView } from "./chart.js";
-import type { SheetId } from "./coordinates.js";
 import type { TableColumnRef } from "./data-model.js";
 
 /** The kind of a sheet: cells, or a dashboard of items. Absent means `"worksheet"`. */
@@ -93,25 +91,4 @@ export type DashboardItem =
 export interface Dashboard {
   /** Items in reading order: by `box.y`, then by `box.x`. */
   items: DashboardItem[];
-}
-
-/**
- * The static content of one dashboard item, as core computes it for an XLSX
- * export: Excel has no dashboard sheet, so the export writes these values.
- */
-export interface DashboardItemExport {
-  /** The item's ID. */
-  readonly id: string;
-  /** Rows of values from the top-left corner of the box; the first row is the caption. */
-  readonly cells: readonly (readonly CellScalar[])[];
-  /** Excel number format of each cell in `cells`, in the same shape; null shows it as General. */
-  readonly numberFormats: readonly (readonly (string | null)[])[];
-  /** A chart item's resolved view; the export writes it as a chart with literal data. */
-  readonly chart?: ChartView;
-}
-
-/** The static content of the items of one dashboard sheet. */
-export interface DashboardExport {
-  readonly sheet: SheetId;
-  readonly items: readonly DashboardItemExport[];
 }

@@ -48,7 +48,8 @@ const QUERY_PANEL_MARKER = "Kept from the file";
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
 // The dashboard view and the New Dashboard command load with the first dashboard.
-const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
+// The view and the XLSX export share the code that names the hidden pivots.
+const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"', "chart-data-"];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
