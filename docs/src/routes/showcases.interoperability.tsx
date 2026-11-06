@@ -42,7 +42,13 @@ import type {
   CompatibilityResultStatus,
   CompatibilityResults,
 } from "../showcases/compatibility-results.js";
-import { ShowcaseLayout } from "../showcases/layout/ShowcaseLayout.js";
+import {
+  ShowcaseControlGroup,
+  ShowcaseLayout,
+  ShowcaseReadout,
+  ShowcaseSection,
+  ShowcaseStatus,
+} from "../showcases/layout/ShowcaseLayout.js";
 import {
   ADVERSARIAL_FIXTURES,
   abortedImport,
@@ -70,6 +76,8 @@ import {
   sha256Hex,
   tsvOfSelection,
 } from "../showcases/scenarios/interoperability.js";
+import InteroperabilitySnippet from "../showcases/snippets/interoperability.mdx";
+import { DemoButton } from "../showcases/ui/DemoButton.js";
 
 import stylesheet from "../styles/showcase-interoperability.css?url";
 import "@sheetwrite/core/styles.css";
@@ -917,7 +925,22 @@ function useInteroperabilityWorkbench() {
     example.exported?.includes("_xlfn.ANCHORARRAY("),
   ).length;
 
+  /** Back to the starting workbook, with every report cleared. */
+  const resetWorkbench = () => {
+    setFileReport(null);
+    setBulkReport(null);
+    setRoundTrip(null);
+    setWarningLog(null);
+    setFixtureLoad(null);
+    setSource({
+      kind: "snapshot",
+      label: "Q1 2026 · workplace equipment sales",
+      snapshot: createInteropSnapshot(),
+    });
+  };
+
   return {
+    resetWorkbench,
     source,
     activeSection,
     activeIndex,
@@ -979,16 +1002,16 @@ type InteroperabilityWorkbench = ReturnType<typeof useInteroperabilityWorkbench>
 
 function InteroperabilityRoute() {
   const workbench = useInteroperabilityWorkbench();
-  const { activeSection, activeIndex } = workbench;
+  const { activeSection, activeIndex, roundTrip } = workbench;
 
   return (
     <ShowcaseLayout
-      demo={
-        <div className="sw-si-page">
-          <ExchangeWorkbenchSection workbench={workbench} />
-        </div>
-      }
+      code={{ title: "The code behind it", Snippet: InteroperabilitySnippet }}
+      controls={<ExchangeControls workbench={workbench} />}
+      demo={<ExchangeDemo workbench={workbench} />}
+      demoActions={<ExchangeSource workbench={workbench} />}
       demoLabel="Live XLSX and CSV exchange workbook"
+      demoTitle="Exchange workbook"
       eyebrow="Spreadsheet interoperability"
       facts={[
         { label: "Source workbooks", value: POSITIVE_FIXTURES.length.toLocaleString("en") },
@@ -1000,9 +1023,14 @@ function InteroperabilityRoute() {
       ]}
       guide={{ href: "/docs/import-export/xlsx-export/", label: "Read the XLSX interchange guide" }}
       id="interoperability"
-      task="A real editable grid sits in the exchange path: load source bytes, make a change, then export, re-import and inspect the fidelity result beside the workbook."
+      task="Load a workbook into a live grid, change it, then export it to XLSX, import it again and compare every cell."
       title="Open the workbook. Change it. Bring it back intact."
     >
+      {roundTrip && roundTrip.formulaExamples.length > 0 && (
+        <ShowcaseSection id="interop-spill" title="Array constants and spill references">
+          <SpillProof workbench={workbench} />
+        </ShowcaseSection>
+      )}
       <div className="sw-si-page">
         <nav aria-label="Page sections" className="sw-si-sectionnav">
           <span aria-hidden="true" className="sw-si-sectionnav__progress">
@@ -1030,319 +1058,289 @@ function InteroperabilityRoute() {
   );
 }
 
-/** The editable Grid with XLSX import, export and the round-trip report. */
-function ExchangeWorkbenchSection({
-  workbench,
-}: Readonly<{ workbench: InteroperabilityWorkbench }>) {
+/** The workbook in the grid and whether the grid is ready, in the demo window bar. */
+function ExchangeSource({ workbench }: Readonly<{ workbench: InteroperabilityWorkbench }>) {
+  const { source, gridReady } = workbench;
+  return (
+    <span className="sw-si-source" data-testid="interop-source">
+      <span className="sw-si-source__label">{source.label}</span>
+      <ShowcaseStatus tone={gridReady ? "ok" : "neutral"}>
+        {gridReady ? "Editable" : "Loading"}
+      </ShowcaseStatus>
+    </span>
+  );
+}
+
+/** The editable workbook, a drop target for files, and its formula model. */
+function ExchangeDemo({ workbench }: Readonly<{ workbench: InteroperabilityWorkbench }>) {
+  const { action, run, hostRef, formulaRowRef, statusRowRef, gridReady, dragActive } = workbench;
+  const { setDragActive, handleFile } = workbench;
+
+  return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a file drop target; the file picker is the keyboard path.
+    <section
+      aria-label="Live workbook and spreadsheet drop target"
+      className="sw-si-workbench"
+      data-dragging={dragActive || undefined}
+      data-ready={gridReady || undefined}
+      data-testid="interop-drop-stage"
+      id="xlsx"
+      onDragLeave={() => setDragActive(false)}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragActive(false);
+        const file = event.dataTransfer.files[0] ?? null;
+        run(() => handleFile(file));
+      }}
+    >
+      <ActionError error={action.error} />
+      {/* shell.css sizes .sheetwrite-shell at height:100%, so the definite
+          height lives on this owned wrapper. */}
+      <div className="sw-si-stage">
+        <div className="sheetwrite-shell">
+          <div className="sheetwrite-shell-row sheetwrite-shell-formula-row" ref={formulaRowRef} />
+          {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
+          <div
+            aria-label="Interoperability workbench grid"
+            className="sheetwrite-shell-grid sw-si-grid"
+            ref={hostRef}
+            role="grid"
+          />
+          <div className="sheetwrite-shell-row sheetwrite-shell-bottom-row" ref={statusRowRef} />
+        </div>
+      </div>
+      <FormulaModel workbench={workbench} />
+    </section>
+  );
+}
+
+/** The lease and cash-flow model in the workbook: two inputs and its results. */
+function FormulaModel({ workbench }: Readonly<{ workbench: InteroperabilityWorkbench }>) {
+  const { modelReadout, modelChange, handleModelInput } = workbench;
+  return (
+    <details className="sw-si-model" data-testid="interop-model-disclosure">
+      <summary>
+        <Icon name="chevron-right" />
+        Change the lease model's inputs and read its formula results
+      </summary>
+      <p className="sw-si-model__evidence" data-testid="interop-model-evidence">
+        The local engine evaluates the model now; the compatibility results below are the checked
+        record from other spreadsheet apps.
+      </p>
+      <fieldset className="sw-si-model__controls">
+        <legend className="sw-visually-hidden">Analytical model inputs</legend>
+        <fieldset
+          className="sw-si-model__choice"
+          data-testid="interop-rate-input"
+          disabled={!modelReadout}
+        >
+          <legend>Base annual rate</legend>
+          <div className="sw-si-model__segments">
+            {[
+              { label: "6.0%", value: 0.06 },
+              { label: "9.0%", value: 0.09 },
+            ].map((option) => (
+              <label key={option.value}>
+                <input
+                  checked={modelReadout?.selectedRate === option.value}
+                  name="interop-base-rate"
+                  onChange={(event) =>
+                    handleModelInput(1, 3, Number(event.currentTarget.value), "Base annual rate")
+                  }
+                  type="radio"
+                  value={option.value}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset
+          className="sw-si-model__choice"
+          data-testid="interop-spill-input"
+          disabled={!modelReadout}
+        >
+          <legend>Projection rows</legend>
+          <div className="sw-si-model__segments">
+            {[3, 4, 6].map((periods) => (
+              <label key={periods}>
+                <input
+                  checked={modelReadout?.spill.filter((value) => value !== null).length === periods}
+                  name="interop-spill-periods"
+                  onChange={(event) =>
+                    handleModelInput(4, 1, Number(event.currentTarget.value), "Projection rows")
+                  }
+                  type="radio"
+                  value={periods}
+                />
+                <span>
+                  {periods}
+                  <span className="sw-visually-hidden"> rows</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </fieldset>
+      <dl className="sw-si-model__results" data-testid="interop-model-readout">
+        {[
+          ["XLOOKUP rate", "interop-model-rate", formatPercent(modelReadout?.selectedRate ?? null)],
+          ["PMT / month", "interop-model-payment", formatCurrency(modelReadout?.payment ?? null)],
+          ["NPV", "interop-model-npv", formatCurrency(modelReadout?.npv ?? null)],
+          ["IRR", "interop-model-irr", formatPercent(modelReadout?.irr ?? null)],
+          [
+            "STDEV.S",
+            "interop-model-statistical",
+            formatCurrency(modelReadout?.statistical ?? null),
+          ],
+          [
+            "LET remaining payments",
+            "interop-model-let",
+            formatCurrency(modelReadout?.letResult ?? null),
+          ],
+          [
+            "Schedule end",
+            "interop-model-date",
+            formatSerialDate(modelReadout?.scheduleEnd ?? null),
+          ],
+          [
+            "SEQUENCE output",
+            "interop-model-spill",
+            modelReadout
+              ? modelReadout.spill.filter((value) => value !== null).join(", ")
+              : "Unavailable",
+          ],
+        ].map(([label, testId, value]) => (
+          <div key={testId}>
+            <dt>{label}</dt>
+            <dd data-testid={testId}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p
+        aria-live="polite"
+        className="sw-si-model__scope"
+        data-change-count={modelChange?.committedCells ?? 0}
+        data-changed-results={modelChange?.changedResults.join(",") ?? ""}
+        data-testid="interop-model-change-scope"
+      >
+        {modelChange
+          ? `Public change event: ${modelChange.committedCells} input cell at ${modelChange.address}. Changed dependent results: ${
+              modelChange.changedResults.join(", ") || "none"
+            }.`
+          : "Public change event: awaiting an analytical input edit."}
+      </p>
+    </details>
+  );
+}
+
+/** The side panel: the round trip and its result, your own file, and the streamed import. */
+function ExchangeControls({ workbench }: Readonly<{ workbench: InteroperabilityWorkbench }>) {
   const {
     action,
     run,
-    hostRef,
-    formulaRowRef,
-    statusRowRef,
-    source,
-    setSource,
     gridReady,
     status,
     warningLog,
-    setWarningLog,
     roundTrip,
-    setRoundTrip,
-    dragActive,
-    setDragActive,
-    bulkReport,
-    setBulkReport,
-    fileReport,
-    setFileReport,
-    setFixtureLoad,
-    modelReadout,
-    modelChange,
-    handleDownload,
     handleRoundTrip,
-    handleModelInput,
+    handleDownload,
     handleFile,
     handleBulkImport,
-    spillExamplesStored,
-    spillExamplesEncoded,
+    bulkReport,
+    fileReport,
+    resetWorkbench,
   } = workbench;
 
   return (
-    <section aria-label="Workbook exchange workbench" className="sw-si-section" id="xlsx">
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a file drop target; the file picker is the keyboard path. */}
-      <section
-        className="sw-si-workbench"
-        aria-label="Live workbook and spreadsheet drop target"
-        data-testid="interop-drop-stage"
-        data-ready={gridReady || undefined}
-        data-dragging={dragActive || undefined}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          const file = event.dataTransfer.files[0] ?? null;
-          run(() => handleFile(file));
-        }}
+    <>
+      <ShowcaseControlGroup
+        title="Round trip"
+        description="Export the workbook to XLSX, import the bytes again and compare every cell."
       >
-        <ActionError error={action.error} />
-        <p className="sw-si-workbench__label" data-testid="interop-source">
-          <span>Source workbook</span>
-          <strong>{source.label}</strong>
-          <span data-state={gridReady ? "ready" : "loading"}>
-            {gridReady ? "Editable Grid ready" : "Loading editable Grid"}
-          </span>
-        </p>
-        <aside
-          className="sw-si-ledger"
-          data-testid="interop-fidelity-ledger"
-          aria-label="Live exchange results"
+        <DemoButton
+          data-testid="interop-roundtrip"
+          {...pendingProps(action.pending)}
+          disabled={!gridReady || action.pending}
+          onClick={() => run(handleRoundTrip)}
+          variant="primary"
         >
-          <header className="sw-si-flight-head">
-            <div>
-              <p>
-                LIVE XLSX EXCHANGE
-                <span
-                  className="sw-si-hud-state"
-                  data-state={roundTrip ? "complete" : "ready"}
-                  data-testid="interop-run-state"
-                >
-                  {roundTrip ? "Exchange complete" : "Not run yet"}
-                </span>
-              </p>
-              <h2>Take the workbook out. Bring the proof back.</h2>
-            </div>
-            <button
-              className="sw-si-btn sw-si-btn--primary"
-              data-testid="interop-roundtrip"
-              {...pendingProps(action.pending)}
-              disabled={!gridReady || action.pending}
-              onClick={() => run(handleRoundTrip)}
-              type="button"
-            >
-              {action.pending ? "Comparing workbook…" : "Export, re-import & compare"}
-            </button>
-          </header>
-          <dl
-            className="sw-si-hud"
-            data-state={roundTrip ? "complete" : "ready"}
-            aria-live="polite"
-          >
-            {/* Before the first exchange every card reads "Not run": the badge
-                above and the button beside it already say how to fill them. */}
-            <div>
-              <dt>Cells compared</dt>
-              <dd data-testid="interop-cells-compared" data-empty={!roundTrip}>
-                {roundTrip ? roundTrip.cellsCompared.toLocaleString() : NOT_RUN}
-              </dd>
-            </div>
-            <div>
-              <dt>Formulas preserved</dt>
-              <dd data-empty={!roundTrip}>
-                {roundTrip ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore}` : NOT_RUN}
-              </dd>
-            </div>
-            <div>
-              <dt>Warnings</dt>
-              <dd data-empty={!warningLog}>{warningLog ? warningLog.warnings.length : NOT_RUN}</dd>
-            </div>
-            <div>
-              <dt>XLSX size</dt>
-              <dd data-empty={!roundTrip}>
-                {roundTrip ? formatBytes(roundTrip.exportedBytes, { kib: 1, mib: 2 }) : NOT_RUN}
-              </dd>
-            </div>
-            <div>
-              <dt>Exchange time</dt>
-              <dd data-empty={!roundTrip}>
-                {roundTrip ? `${roundTrip.elapsedMs.toFixed(0)} ms` : NOT_RUN}
-              </dd>
-            </div>
-          </dl>
-          {/* One status line for the whole page: actions in the labs below
-              report here too, next to the workbook they change. */}
-          <p
-            aria-live="polite"
-            className="sw-si-after-action"
-            data-testid="interop-status"
-            role="status"
-          >
-            {status}
-          </p>
-        </aside>
-        <details className="sw-si-model" data-testid="interop-model-disclosure">
-          <summary>Inspect the equipment lease and cash-flow model</summary>
-          <div className="sw-si-model__heading">
-            <div>
-              <p className="sw-si-model__eyebrow">LIVE FORMULA MODEL</p>
-              <h3 id="analytical-model-title">Equipment lease &amp; cash-flow model</h3>
-            </div>
-            <p className="sw-si-model__evidence" data-testid="interop-model-evidence">
-              Local engine: evaluated now. No new Excel or Google Sheets result is added; the
-              on-demand evidence vault remains the source of truth.
-            </p>
-          </div>
-          <fieldset className="sw-si-model__controls">
-            <legend>Analytical model inputs</legend>
-            <fieldset
-              className="sw-si-model__choice"
-              data-testid="interop-rate-input"
-              disabled={!modelReadout}
-            >
-              <legend>Base annual rate</legend>
-              <div className="sw-si-model__segments">
-                {[
-                  { label: "6.0%", value: 0.06 },
-                  { label: "9.0%", value: 0.09 },
-                ].map((option) => (
-                  <label key={option.value}>
-                    <input
-                      checked={modelReadout?.selectedRate === option.value}
-                      name="interop-base-rate"
-                      onChange={(event) =>
-                        handleModelInput(
-                          1,
-                          3,
-                          Number(event.currentTarget.value),
-                          "Base annual rate",
-                        )
-                      }
-                      type="radio"
-                      value={option.value}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset
-              className="sw-si-model__choice"
-              data-testid="interop-spill-input"
-              disabled={!modelReadout}
-            >
-              <legend>Projection rows</legend>
-              <div className="sw-si-model__segments">
-                {[3, 4, 6].map((periods) => (
-                  <label key={periods}>
-                    <input
-                      checked={
-                        modelReadout?.spill.filter((value) => value !== null).length === periods
-                      }
-                      name="interop-spill-periods"
-                      onChange={(event) =>
-                        handleModelInput(4, 1, Number(event.currentTarget.value), "Projection rows")
-                      }
-                      type="radio"
-                      value={periods}
-                    />
-                    <span>
-                      {periods}
-                      <span className="sw-visually-hidden"> rows</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </fieldset>
-          <dl className="sw-si-model__results" data-testid="interop-model-readout">
-            <div>
-              <dt>XLOOKUP rate</dt>
-              <dd data-testid="interop-model-rate">
-                {formatPercent(modelReadout?.selectedRate ?? null)}
-              </dd>
-            </div>
-            <div>
-              <dt>PMT / month</dt>
-              <dd data-testid="interop-model-payment">
-                {formatCurrency(modelReadout?.payment ?? null)}
-              </dd>
-            </div>
-            <div>
-              <dt>NPV</dt>
-              <dd data-testid="interop-model-npv">{formatCurrency(modelReadout?.npv ?? null)}</dd>
-            </div>
-            <div>
-              <dt>IRR</dt>
-              <dd data-testid="interop-model-irr">{formatPercent(modelReadout?.irr ?? null)}</dd>
-            </div>
-            <div>
-              <dt>STDEV.S</dt>
-              <dd data-testid="interop-model-statistical">
-                {formatCurrency(modelReadout?.statistical ?? null)}
-              </dd>
-            </div>
-            <div>
-              <dt>LET remaining payments</dt>
-              <dd data-testid="interop-model-let">
-                {formatCurrency(modelReadout?.letResult ?? null)}
-              </dd>
-            </div>
-            <div>
-              <dt>Schedule end</dt>
-              <dd data-testid="interop-model-date">
-                {formatSerialDate(modelReadout?.scheduleEnd ?? null)}
-              </dd>
-            </div>
-            <div>
-              <dt>SEQUENCE output</dt>
-              <dd data-testid="interop-model-spill">
-                {modelReadout
-                  ? modelReadout.spill.filter((value) => value !== null).join(", ")
-                  : "Unavailable"}
-              </dd>
-            </div>
-          </dl>
-          <p
-            aria-live="polite"
-            className="sw-si-model__scope"
-            data-change-count={modelChange?.committedCells ?? 0}
-            data-changed-results={modelChange?.changedResults.join(",") ?? ""}
-            data-testid="interop-model-change-scope"
-          >
-            {modelChange
-              ? `Public change event: ${modelChange.committedCells} input cell at ${modelChange.address}. Changed dependent results: ${
-                  modelChange.changedResults.join(", ") || "none"
-                }.`
-              : "Public change event: awaiting an analytical input edit."}
-          </p>
-        </details>
-        {/* shell.css sizes .sheetwrite-shell at height:100% (unlayered),
-            so the definite height lives on this owned wrapper. */}
-        <div className="sw-si-stage">
-          <div className="sheetwrite-shell">
-            <div
-              className="sheetwrite-shell-row sheetwrite-shell-formula-row"
-              ref={formulaRowRef}
-            />
-            {/* Sheetwrite upgrades this host into a virtualized ARIA grid; a table cannot host the runtime. */}
-            <div
-              aria-label="Interoperability workbench grid"
-              role="grid"
-              className="sheetwrite-shell-grid sw-si-grid"
-              ref={hostRef}
-            />
-            <div className="sheetwrite-shell-row sheetwrite-shell-bottom-row" ref={statusRowRef} />
-          </div>
+          <Icon name="refresh" />
+          {action.pending ? "Comparing workbook…" : "Export, re-import & compare"}
+        </DemoButton>
+        <div aria-live="polite" data-testid="interop-fidelity-ledger">
+          <ShowcaseReadout
+            items={[
+              {
+                label: "Cells matched",
+                value: roundTrip ? (
+                  <span data-testid="interop-roundtrip-cells">
+                    {roundTrip.cellsMatched}/{roundTrip.cellsCompared}
+                  </span>
+                ) : (
+                  <span data-testid="interop-cells-compared">{NOT_RUN}</span>
+                ),
+              },
+              {
+                label: "Formulas preserved",
+                value: roundTrip ? (
+                  <span data-testid="interop-roundtrip-formulas">
+                    {roundTrip.formulasPreserved}/{roundTrip.formulasBefore}
+                  </span>
+                ) : (
+                  NOT_RUN
+                ),
+              },
+              {
+                label: "Sheets, merges, frozen rows",
+                value: roundTrip
+                  ? [
+                      roundTrip.sheetsPreserved,
+                      roundTrip.mergePreserved,
+                      roundTrip.frozenRowsPreserved,
+                    ]
+                      .map((kept) => (kept ? "kept" : "lost"))
+                      .join(" · ")
+                  : NOT_RUN,
+              },
+              {
+                label: "Warnings",
+                value: warningLog ? warningLog.warnings.length.toLocaleString() : NOT_RUN,
+              },
+              {
+                label: "XLSX size",
+                value: roundTrip
+                  ? formatBytes(roundTrip.exportedBytes, { kib: 1, mib: 2 })
+                  : NOT_RUN,
+              },
+              {
+                label: "Exchange time",
+                value: roundTrip ? `${roundTrip.elapsedMs.toFixed(0)} ms` : NOT_RUN,
+              },
+            ]}
+          />
         </div>
-        <div aria-label="Workbook interchange actions" className="sw-si-actions" role="toolbar">
-          <button
-            className="sw-si-btn sw-si-btn--secondary"
-            data-testid="interop-download"
-            {...pendingProps(action.pending)}
-            onClick={() => run(handleDownload)}
-            type="button"
-          >
-            {action.pending ? "Exporting XLSX…" : "Download .xlsx"}
-          </button>
-          <label className="sw-si-btn sw-si-btn--secondary sw-si-file">
-            {action.pending ? "Importing file…" : "Drop your own .xlsx / .csv"}
+        <p aria-live="polite" className="sw-si-status" data-testid="interop-status" role="status">
+          {status}
+        </p>
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup
+        title="Your own file"
+        description="Drop an .xlsx or .csv on the workbook, or pick one. Download the current workbook as .xlsx."
+      >
+        <div className="sw-si-actions">
+          <label className="sw-button sw-si-file" data-variant="default">
+            <Icon name="upload" />
+            {action.pending ? "Importing file…" : "Open .xlsx or .csv"}
             <input
               accept=".xlsx,.csv"
+              aria-busy={action.pending || undefined}
               data-testid="interop-file-input"
               disabled={action.pending}
-              aria-busy={action.pending || undefined}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0] ?? null;
                 event.currentTarget.value = "";
@@ -1351,170 +1349,113 @@ function ExchangeWorkbenchSection({
               type="file"
             />
           </label>
-          <span aria-hidden="true" className="sw-si-actions__spacer" />
-          <button
-            className="sw-si-btn sw-si-btn--quiet"
+          <DemoButton
+            data-testid="interop-download"
+            {...pendingProps(action.pending)}
+            onClick={() => run(handleDownload)}
+          >
+            <Icon name="download" />
+            {action.pending ? "Exporting XLSX…" : "Download .xlsx"}
+          </DemoButton>
+          <DemoButton
             data-testid="interop-reset"
             disabled={action.pending}
-            onClick={() => {
-              setFileReport(null);
-              setBulkReport(null);
-              setRoundTrip(null);
-              setWarningLog(null);
-              setFixtureLoad(null);
-              setSource({
-                kind: "snapshot",
-                label: "Q1 2026 · workplace equipment sales",
-                snapshot: createInteropSnapshot(),
-              });
-            }}
-            type="button"
+            onClick={resetWorkbench}
+            variant="quiet"
           >
+            <Icon name="restore" />
             Reset workbench
-          </button>
+          </DemoButton>
         </div>
-      </section>
-      <div className="sw-si-release-lab">
-        <div>
-          <p className="sw-si-release-label">STREAMED IMPORT</p>
-          <h3>Put 200,000 sales records through the CSV importer.</h3>
-          <p>
-            Records go straight into typed columns. XLSX imports also stream rows and shared
-            strings. This demo measures CSV parse time, not peak memory.
+        {fileReport && (
+          <p className="sw-si-report-line" data-testid="interop-file-report" role="status">
+            <strong>{fileReport.name}</strong>: {fileReport.sheets}{" "}
+            {fileReport.sheets === 1 ? "sheet" : "sheets"} · {fileReport.cells.toLocaleString()}{" "}
+            stored cells · {fileReport.formulas} formula sources · {fileReport.warnings} import
+            warnings · {fileReport.bytes.toLocaleString()} bytes · {fileReport.ms.toFixed(0)} ms.
           </p>
-        </div>
-        <button
-          type="button"
-          className="sw-si-btn sw-si-btn--secondary"
-          data-testid="interop-bulk-import"
+        )}
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup
+        title="Streamed import"
+        description="Generate 200,000 sales records and put them through the CSV importer into typed columns. The time is the CSV parse."
+      >
+        <DemoButton
           aria-busy={action.pending || undefined}
+          data-testid="interop-bulk-import"
           disabled={action.pending}
           onClick={() => run(handleBulkImport)}
         >
+          <Icon name="bolt" />
           {action.pending ? "Importing rows…" : "Generate & import 200,000 rows"}
-        </button>
+        </DemoButton>
         {bulkReport && (
-          <p className="sw-si-bulk-report" data-testid="interop-bulk-report" role="status">
+          <p className="sw-si-report-line" data-testid="interop-bulk-report" role="status">
             <strong>
               {bulkReport.rows.toLocaleString()} rows × {bulkReport.columns} columns
-            </strong>
-            <span>
-              {bulkReport.ms.toFixed(0)} ms CSV parse · {bulkReport.bytes.toLocaleString()} bytes ·{" "}
-              {gridReady ? "Live Grid ready" : "Loading the live Grid"}
-            </span>
+            </strong>{" "}
+            · {bulkReport.ms.toFixed(0)} ms CSV parse · {bulkReport.bytes.toLocaleString()} bytes
           </p>
         )}
+      </ShowcaseControlGroup>
+    </>
+  );
+}
+
+/** Each array or spill formula before export, inside the exported file, and after import. */
+function SpillProof({ workbench }: Readonly<{ workbench: InteroperabilityWorkbench }>) {
+  const { roundTrip, spillExamplesStored, spillExamplesEncoded } = workbench;
+  if (!roundTrip) return null;
+  return (
+    <div className="sw-si-source-proof" data-testid="interop-spill-proof">
+      <p>
+        Excel stores <code>A1#</code> as <code>_xlfn.ANCHORARRAY(A1)</code>. Each row shows the same
+        formula as a grid source, as the text inside the exported .xlsx file, and after the file is
+        imported again.
+      </p>
+      <div className="sw-si-tablewrap">
+        <table className="sw-si-matrix">
+          <thead>
+            <tr>
+              <th>Cell</th>
+              <th>Before export</th>
+              <th>In the exported .xlsx</th>
+              <th>After import</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roundTrip.formulaExamples.map((example) => (
+              <tr
+                data-exported={example.exported === null ? "missing" : "found"}
+                data-matched={example.before === example.after}
+                data-spill-encoding={
+                  example.exported?.includes("_xlfn.ANCHORARRAY(") ? "anchorarray" : "plain"
+                }
+                key={`${example.sheet}:${example.row}:${example.col}`}
+              >
+                <th>
+                  {example.sheet} · {cellA1(example.row, example.col)}
+                </th>
+                <td>
+                  <code>{example.before}</code>
+                </td>
+                <td>
+                  <code>{example.exported ?? "Not found in the exported file"}</code>
+                </td>
+                <td>
+                  <code>{example.after ?? "Not preserved"}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      {fileReport && (
-        <p className="sw-si-import-report" data-testid="interop-file-report" role="status">
-          <strong>{fileReport.name}</strong> loaded into the live Grid: {fileReport.sheets}{" "}
-          {fileReport.sheets === 1 ? "sheet" : "sheets"} · {fileReport.cells.toLocaleString()}{" "}
-          stored cells · {fileReport.formulas} formula sources · {fileReport.warnings} import
-          warnings · {fileReport.bytes.toLocaleString()} bytes · {fileReport.ms.toFixed(0)} ms. Run
-          the exchange to compare its exported copy.
-        </p>
-      )}
-      {roundTrip && (
-        <dl
-          className="sw-si-report"
-          data-state={
-            roundTrip.formulasPreserved === roundTrip.formulasBefore &&
-            roundTrip.sheetsPreserved &&
-            roundTrip.mergePreserved &&
-            roundTrip.frozenRowsPreserved &&
-            roundTrip.cellsMatched === roundTrip.cellsCompared
-              ? "pass"
-              : "partial"
-          }
-          data-testid="interop-roundtrip-report"
-        >
-          <div>
-            <dt>Cells matched</dt>
-            <dd data-testid="interop-roundtrip-cells">
-              {roundTrip.cellsMatched}/{roundTrip.cellsCompared}
-            </dd>
-          </div>
-          <div>
-            <dt>Exported bytes</dt>
-            <dd>{roundTrip.exportedBytes.toLocaleString()}</dd>
-          </div>
-          <div>
-            <dt>Formulas preserved</dt>
-            <dd data-testid="interop-roundtrip-formulas">
-              {roundTrip.formulasPreserved}/{roundTrip.formulasBefore}
-            </dd>
-          </div>
-          <div>
-            <dt>Sheets preserved</dt>
-            <dd>{roundTrip.sheetsPreserved ? "yes" : "no"}</dd>
-          </div>
-          <div>
-            <dt>Merge preserved</dt>
-            <dd>{roundTrip.mergePreserved ? "yes" : "no"}</dd>
-          </div>
-          <div>
-            <dt>Frozen rows preserved</dt>
-            <dd>{roundTrip.frozenRowsPreserved ? "yes" : "no"}</dd>
-          </div>
-          <div>
-            <dt>Warnings</dt>
-            <dd>{roundTrip.exportWarnings.length + roundTrip.importWarnings.length}</dd>
-          </div>
-        </dl>
-      )}
-      {roundTrip && roundTrip.formulaExamples.length > 0 && (
-        <details className="sw-si-source-proof" open data-testid="interop-spill-proof">
-          <summary>Array constants and spill references survived the exchange</summary>
-          <p>
-            Excel stores <code>A1#</code> as <code>_xlfn.ANCHORARRAY(A1)</code>. Each row shows the
-            same formula as a grid source, as the text inside the exported .xlsx file, and after the
-            file is imported again.
-          </p>
-          <div className="sw-si-tablewrap">
-            <table className="sw-si-matrix">
-              <thead>
-                <tr>
-                  <th>Cell</th>
-                  <th>Before export</th>
-                  <th>In the exported .xlsx</th>
-                  <th>After import</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roundTrip.formulaExamples.map((example) => (
-                  <tr
-                    key={`${example.sheet}:${example.row}:${example.col}`}
-                    data-exported={example.exported === null ? "missing" : "found"}
-                    data-matched={example.before === example.after}
-                    data-spill-encoding={
-                      example.exported?.includes("_xlfn.ANCHORARRAY(") ? "anchorarray" : "plain"
-                    }
-                  >
-                    <th>
-                      {example.sheet} · {cellA1(example.row, example.col)}
-                    </th>
-                    <td>
-                      <code>{example.before}</code>
-                    </td>
-                    <td>
-                      <code>{example.exported ?? "Not found in the exported file"}</code>
-                    </td>
-                    <td>
-                      <code>{example.after ?? "Not preserved"}</code>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="sw-si-note" data-testid="interop-spill-file-check">
-            Exported-file check: {spillExamplesStored} of {roundTrip.formulaExamples.length} example
-            formulas found in the bytes this page just wrote; {spillExamplesEncoded} stored as{" "}
-            <code>_xlfn.ANCHORARRAY(...)</code>.
-          </p>
-        </details>
-      )}
-    </section>
+      <p className="sw-si-note" data-testid="interop-spill-file-check">
+        Exported-file check: {spillExamplesStored} of {roundTrip.formulaExamples.length} example
+        formulas found in the bytes this page just wrote; {spillExamplesEncoded} stored as{" "}
+        <code>_xlfn.ANCHORARRAY(...)</code>.
+      </p>
+    </div>
   );
 }
 

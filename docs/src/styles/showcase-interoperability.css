@@ -97,15 +97,6 @@
     scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-12));
   }
 
-  .sw-si-section-kicker {
-    margin: 0 0 var(--sw-space-1);
-    color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-      var(--sw-font-mono);
-    letter-spacing: var(--sw-tracking-eyebrow);
-    text-transform: uppercase;
-  }
-
   /* Evidence is intentionally subordinate to the live workbook. Native
      disclosures retain keyboard and screen-reader behavior without a second
      bespoke tab system. */
@@ -271,18 +262,6 @@
     border-color: var(--sw-accent);
   }
 
-  .sw-si-btn--quiet {
-    border-color: transparent;
-    background: transparent;
-    color: var(--sw-fg-muted);
-  }
-
-  .sw-si-btn--quiet:hover:not(:disabled),
-  .sw-si-btn--quiet:focus-visible {
-    background: var(--sw-surface-2);
-    color: var(--sw-fg-strong);
-  }
-
   .sw-si-btn--danger {
     border-color: color-mix(in srgb, var(--sw-danger) 55%, var(--sw-border-strong));
     background: color-mix(in srgb, var(--sw-danger) 12%, var(--sw-surface-1));
@@ -315,15 +294,38 @@
   }
 
   .sw-si-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
     gap: var(--sw-space-2);
-    margin: var(--sw-space-4) 0;
   }
 
-  .sw-si-actions__spacer {
-    flex: 1;
+  /* The workbook and readiness in the demo window bar. */
+  .sw-si-source {
+    display: inline-flex;
+    gap: var(--sw-space-2);
+    align-items: center;
+    min-width: 0;
+  }
+
+  .sw-si-source__label {
+    overflow: hidden;
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-text-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Side-panel status and result lines. */
+  .sw-si-status,
+  .sw-si-report-line {
+    margin: 0;
+    color: var(--sw-fg);
+    font-size: var(--sw-text-small);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .sw-si-status:empty {
+    display: none;
   }
 
   /* ── Workbench: one instrument in the demo palette ── */
@@ -335,6 +337,7 @@
     --sw-surface-3: var(--sw-border-strong);
     /* Danger text sits on the workbench surface, so it uses the demo colour. */
     --sw-si-danger: var(--sw-danger);
+    --sw-si-grid-block-size: clamp(28rem, calc(100dvh - 18rem), 40rem);
     --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
     --sheetwrite-bg: var(--sw-surface-1);
     --sheetwrite-fg: var(--sw-fg);
@@ -366,124 +369,13 @@
 
     display: grid;
     grid-template:
-      "label" auto
-      "ledger" auto
       "stage" var(--sw-si-grid-block-size)
-      "actions" auto
       "model" auto /
       minmax(0, 1fr);
-    overflow: hidden;
-    border: 1px solid var(--sw-border-strong);
-    border-radius: var(--sw-radius-lg);
-    background: var(--sw-surface-1);
-    box-shadow: var(--sw-shadow-lg);
     color: var(--sw-fg);
-  }
-
-  .sw-si-workbench__label {
-    grid-area: label;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sw-space-2);
-    margin: 0;
-    padding: var(--sw-space-3) var(--sw-space-4);
-    border-bottom: 1px solid var(--sw-border);
-    background: var(--sw-surface-2);
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-small) var(--font-sans);
-  }
-
-  .sw-si-workbench__label > span:first-child {
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui)
-      var(--sw-font-mono);
-    letter-spacing: var(--sw-tracking-eyebrow);
-    text-transform: uppercase;
-  }
-
-  .sw-si-workbench__label > strong {
-    overflow: hidden;
-    color: var(--sw-fg-strong);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sw-si-workbench__label > span:last-child {
-    padding: var(--sw-space-1) var(--sw-space-2);
-    border: 1px solid var(--sw-border-strong);
-    border-radius: var(--sw-radius-pill);
-    font-size: var(--sw-text-caption);
-  }
-
-  .sw-si-workbench__label > span[data-state="ready"] {
-    border-color: color-mix(in srgb, var(--sw-accent) 46%, var(--sw-border));
-    background: var(--sw-accent-soft);
-    color: var(--sw-accent-strong);
-  }
-
-  .sw-si-ledger {
-    grid-area: ledger;
-    min-width: 0;
-    padding: var(--sw-space-5) var(--sw-space-6) var(--sw-space-4);
-    background: var(--sw-surface-1);
-    border-bottom: 1px solid var(--sw-border);
-  }
-
-  .sw-si-flight-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sw-space-4);
-  }
-
-  .sw-si-flight-head > div > p,
-  .sw-si-release-label {
-    margin: 0 0 var(--sw-space-1-5);
-    color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-mono);
-    letter-spacing: var(--sw-tracking-eyebrow);
-  }
-
-  .sw-si-section .sw-si-ledger h2 {
-    margin: 0;
-    font: var(--sw-weight-semibold) var(--sw-text-h2) / 1.2 var(--sw-font-display);
-    color: var(--sw-fg-strong);
-    letter-spacing: var(--sw-tracking-display);
-  }
-
-  .sw-si-flight-head > button {
-    flex: none;
-  }
-
-  .sw-si-hud {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--sw-space-4);
-    margin: var(--sw-space-5) 0 var(--sw-space-3);
-  }
-
-  .sw-si-hud dt {
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-medium) var(--sw-text-caption) var(--sw-font-body);
-  }
-
-  .sw-si-hud dd {
-    margin: var(--sw-space-1-5) 0 0;
-    color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-h1) / 1 var(--sw-font-mono);
-    letter-spacing: var(--sw-tracking-display);
   }
 
   /* The page's single live status line, inside the exchange panel. */
-  .sw-si-after-action {
-    margin: 0;
-    padding-left: var(--sw-space-2);
-    border-left: 2px solid var(--sw-accent);
-    color: var(--sw-fg);
-    font-size: var(--sw-text-small);
-    line-height: 1.5;
-  }
 
   .sw-si-workbench[data-dragging] {
     outline: 3px dashed var(--sw-accent);
@@ -491,54 +383,31 @@
   }
 
   .sw-si-model > summary {
-    color: var(--sw-fg-muted);
+    display: flex;
+    gap: var(--sw-space-2);
+    align-items: center;
+    color: var(--sw-fg-strong);
     font: var(--sw-weight-semibold) var(--sw-text-small) var(--sw-font-body);
+    list-style: none;
     cursor: pointer;
   }
 
+  .sw-si-model > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sw-si-model > summary .sw-icon {
+    transition: rotate var(--sw-motion-fast) var(--sw-motion-standard);
+  }
+
   .sw-si-model[open] > summary {
-    margin-bottom: var(--sw-space-4);
+    margin-bottom: var(--sw-space-3);
   }
 
-  .sw-si-release-lab {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--sw-space-4);
-    align-items: center;
-    padding: var(--sw-space-5);
-    margin-top: var(--sw-space-4);
-    border: 1px solid var(--sw-border);
-    border-radius: var(--sw-radius-md);
-    background: var(--sw-surface-1);
+  .sw-si-model[open] > summary .sw-icon {
+    rotate: 90deg;
   }
 
-  .sw-si-section .sw-si-release-lab h3 {
-    margin: 0 0 var(--sw-space-1-5);
-    font-size: var(--sw-text-body);
-  }
-
-  .sw-si-release-lab > div > p:last-child {
-    margin: 0;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-text-caption);
-    line-height: 1.5;
-  }
-
-  .sw-si-bulk-report {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sw-space-2) var(--sw-space-6);
-    margin: 0;
-    color: var(--sw-fg-muted);
-    font: var(--sw-weight-medium) var(--sw-text-small) var(--sw-font-mono);
-  }
-
-  .sw-si-bulk-report strong {
-    color: var(--sw-accent-strong);
-  }
-
-  .sw-si-import-report,
   .sw-si-source-proof {
     padding: var(--sw-space-4);
     margin-top: var(--sw-space-4);
@@ -570,32 +439,12 @@
     background: color-mix(in srgb, var(--sw-accent) 4%, var(--sw-surface-1));
   }
 
-  .sw-si-model__heading {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: var(--sw-space-6);
-    margin-bottom: var(--sw-space-3);
-  }
-
-  .sw-si-section .sw-si-model__heading h3 {
-    margin: var(--sw-space-0-5) 0 0;
-    font-size: var(--sw-text-body);
-  }
-
-  .sw-si-model__eyebrow {
-    margin: 0;
-    color: var(--sw-accent-strong);
-    font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--font-mono);
-    letter-spacing: var(--sw-tracking-eyebrow);
-  }
-
   .sw-si-model__evidence {
-    max-width: 32rem;
-    margin: 0;
+    max-width: var(--sw-measure-prose);
+    margin: 0 0 var(--sw-space-3);
     color: var(--sw-fg-muted);
-    font: var(--sw-weight-medium) var(--sw-text-caption) / 1.45 var(--font-sans);
-    text-align: right;
+    font-size: var(--sw-text-caption);
+    line-height: 1.5;
   }
 
   .sw-si-model__controls {
@@ -749,22 +598,6 @@
   /* Engine chrome overrides (.sheetwrite-*) live at the END of this file,
      OUTSIDE @layer components: core's styles.css and shell.css are unlayered,
      and unlayered author styles always beat layered ones. */
-
-  /* Action toolbar inside the instrument: the page's adaptive button
-     language on the panel's raised strip. */
-  .sw-si-workbench .sw-si-actions {
-    grid-area: actions;
-    margin: 0;
-    padding: var(--sw-space-3) var(--sw-space-4);
-    border-top: 1px solid var(--sw-border);
-    background: var(--sw-surface-2);
-  }
-
-  /* The quiet reset needs one surface step beyond the strip it sits on. */
-  .sw-si-workbench .sw-si-btn--quiet:hover:not(:disabled),
-  .sw-si-workbench .sw-si-btn--quiet:focus-visible {
-    background: var(--sw-surface-3);
-  }
 
   /* ── Executable compatibility contract ── */
 
@@ -1997,57 +1830,14 @@
 
     .sw-si-workbench {
       grid-template:
-        "label" auto
-        "ledger" auto
         "stage" 22rem
-        "actions" auto
         "model" auto /
         minmax(0, 1fr);
     }
 
-    .sw-si-workbench__label {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .sw-si-workbench__label > span:first-child {
-      display: none;
-    }
-
-    .sw-si-workbench__label > span:last-child {
-      width: fit-content;
-    }
-
-    .sw-si-ledger {
-      border-top: 1px solid var(--sw-border);
-      border-left: 0;
-    }
     .sw-si-stage {
       min-height: 0;
       block-size: 100%;
-    }
-
-    .sw-si-flight-head {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
-    .sw-si-hud {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--sw-space-4);
-    }
-
-    .sw-si-ledger {
-      padding: var(--sw-space-4);
-    }
-
-    .sw-si-release-lab {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .sw-si-flight-head > button,
-    .sw-si-release-lab > button {
-      width: 100%;
-      min-width: 0;
     }
 
     .sw-si-sectionnav {
@@ -2089,18 +1879,6 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .sw-si-workbench .sw-si-actions {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .sw-si-workbench .sw-si-btn {
-      justify-content: center;
-    }
-
-    .sw-si-actions__spacer {
-      display: none;
-    }
     .sw-si-fixture,
     .sw-si-producers > li,
     .sw-si-isolation {
@@ -2118,11 +1896,6 @@
 
     .sw-si-fixture .sw-si-btn {
       width: fit-content;
-    }
-
-    .sw-si-model__heading {
-      display: grid;
-      gap: var(--sw-space-2);
     }
 
     .sw-si-model__evidence {
@@ -2290,21 +2063,6 @@
 .sw-si-workbench .sheetwrite-tab-add:hover {
   color: var(--sw-fg-strong);
 }
-
-.sw-si-safety-note {
-  grid-column: 1;
-  margin: 0;
-  padding: var(--sw-space-3) var(--sw-space-4);
-  border-top: 1px solid var(--sw-border);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-  line-height: 1.5;
-}
-
-.sw-si-page :is(.sw-si-compat__records, .sw-si-filter__options, .sw-si-tablewrap, pre) {
-  scrollbar-width: thin;
-  scrollbar-color: var(--sw-border-strong) var(--sw-surface-1);
-}
 .sw-si-disclosure > summary,
 .sw-si-model > summary,
 .sw-si-source-proof > summary,
@@ -2333,15 +2091,6 @@
 .sw-si-disclosure[open] > summary > strong::after {
   content: " −";
 }
-.sw-si-hud > div {
-  padding: var(--sw-space-3);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-  background: var(--sw-surface-0);
-}
-.sw-si-hud dt {
-  font-size: var(--sw-text-small);
-}
 .sw-si-model__results dt,
 .sw-si-model__results dd {
   white-space: normal;
@@ -2350,12 +2099,6 @@
 }
 .sw-si-model__results dt {
   font-size: var(--sw-text-caption);
-}
-.sw-si-hud[data-state="ready"] dd {
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-body);
-  letter-spacing: 0;
-  line-height: 1.4;
 }
 
 /* ── Canvas palette on the grid root ─────────────────────────────────────────
@@ -2453,20 +2196,3 @@
 }
 
 /* Run state beside the exchange headline: text, not colour alone. */
-.sw-si-flight-head > div > p .sw-si-hud-state {
-  display: inline-block;
-  margin-left: var(--sw-space-2);
-  padding: var(--sw-space-0-5) var(--sw-space-2);
-  border: 1px solid var(--sw-border-strong);
-  border-radius: var(--sw-radius-pill);
-  color: var(--sw-fg);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.5 var(--sw-font-body);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.sw-si-flight-head > div > p .sw-si-hud-state[data-state="complete"] {
-  border-color: color-mix(in srgb, var(--sw-accent) 46%, var(--sw-border));
-  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
-  color: var(--sw-accent-strong);
-}
