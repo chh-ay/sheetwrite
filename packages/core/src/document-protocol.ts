@@ -2774,17 +2774,11 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
     }
 
-    const queries = ownValue(graph, "queries");
-    if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
-      invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
-    }
-
-    const externalLink = ownValue(graph, "externalLink");
-    if (
-      externalLink !== undefined &&
-      (typeof externalLink !== "string" || !/^[0-9a-f]{16}$/.test(externalLink))
-    ) {
-      invalid(errors, `${graphPath}.externalLink`, "externalLink must be a 64-bit hex digest");
+    for (const key of ["queries", "externalLink"]) {
+      const digest = ownValue(graph, key);
+      if (digest !== undefined && (typeof digest !== "string" || !/^[0-9a-f]{16}$/.test(digest))) {
+        invalid(errors, `${graphPath}.${key}`, `${key} must be a 64-bit hex digest`);
+      }
     }
 
     const unsupportedPath = `${graphPath}.unsupportedQueries`;
