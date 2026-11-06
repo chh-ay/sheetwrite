@@ -72,7 +72,9 @@ describe("external link commands", () => {
     const failed = await updateExternalLinks(grid, () => Promise.reject(new Error("offline")), [
       "budget.xlsx",
     ]);
-    expect(failed.map((update) => update.status)).toEqual(["failed"]);
+    expect(failed.map((update) => [update.status, update.error?.code])).toEqual([
+      ["failed", "datasource-request-failed"],
+    ]);
     expect(shown(grid, 0)).toBe(9);
 
     grid.undo();

@@ -1,3 +1,4 @@
+import { SheetwriteError } from "./errors.js";
 import { externalSheetText, rewriteExternalSheets } from "./external-link-formula.js";
 import type { CellAddress } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
@@ -40,7 +41,12 @@ export interface ExternalLinkUpdate {
    * failed, or the document rejected the values; the link keeps its values.
    */
   readonly status: "updated" | "unavailable" | "failed";
-  readonly error?: unknown;
+  /**
+   * Why a `failed` update failed: `datasource-request-failed` when the
+   * resolver failed (the cause is its error), `commit-rejected` when the
+   * document rejected the values.
+   */
+  readonly error?: SheetwriteError;
 }
 
 function sameBook(left: string, right: string): boolean {
@@ -112,7 +118,13 @@ export async function updateExternalLinks(
         values.set(link.book.toLowerCase(), sheets);
         results.push({ book: link.book, status: "updated" });
       }
-    } catch (error) {
+    } catch (cause) {
+      const error = new SheetwriteError(
+        "datasource-request-failed",
+        "external-link",
+        `The values of ${link.book} could not be resolved`,
+        { cause, context: { book: link.book } },
+      );
       results.push({ book: link.book, status: "failed", error });
     }
   }
@@ -127,8 +139,13 @@ export async function updateExternalLinks(
   const outcome = grid.applyTransaction({ patches: [{ op: "setExternalLinks", links }] });
   if (outcome.status === "applied") return results;
 
+  const error = new SheetwriteError(
+    "commit-rejected",
+    "external-link",
+    `The document rejected the new link values (${outcome.status})`,
+  );
   return results.map((result) =>
-    result.status === "updated" ? { ...result, status: "failed", error: outcome } : result,
+    result.status === "updated" ? { ...result, status: "failed", error } : result,
   );
 }
 
