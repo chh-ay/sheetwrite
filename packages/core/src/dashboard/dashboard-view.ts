@@ -5,6 +5,7 @@
 // is one undo step. This module loads as its own chunk (#231).
 
 import { cellScalarToText } from "../cell-input.js";
+import { scanColumnValues } from "../data-window-reads.js";
 import { pivotsAvailable } from "../panels/panel-loader.js";
 import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
 import { compareScalars, scalarLabel, sourceDataRange } from "../panels/pivot-model.js";
@@ -396,12 +397,18 @@ function slicerValues(grid: Grid, item: DashboardSlicerItem): CellScalar[] | nul
 
   const range = sourceDataRange({ table: table.id }, tables);
   const seen = new Set<CellScalar>();
-  for (let row = range?.start.row ?? 1; range !== null && row <= range.end.row; row++) {
-    const address = { sheet: range.sheet, row, col: range.start.col + offset };
-    const value = grid.store.getCell(address).resolved;
+  if (range === null) return [];
+
+  const span = {
+    sheet: range.sheet,
+    col: range.start.col + offset,
+    startRow: range.start.row,
+    endRow: range.end.row,
+  };
+  scanColumnValues(grid.store, span, (value) => {
     seen.add(value === "" ? null : value);
-    if (seen.size >= MAX_SLICER_VALUES) break;
-  }
+    return seen.size < MAX_SLICER_VALUES;
+  });
   return [...seen].sort(compareScalars);
 }
 

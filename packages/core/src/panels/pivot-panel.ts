@@ -3,6 +3,7 @@
 // keyboard through the menu button on each field. Each change is ONE
 // `grid.setPivot`, so it is one undo step and the output updates at once.
 
+import { scanColumnValues } from "../data-window-reads.js";
 import { Scope } from "../scope.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -97,11 +98,16 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     if (offset < 0) return [];
     // Related fields can be blank because a fact key has no matching row.
     const seen = new Set<CellScalar>(modelField ? [null] : []);
-    const col = range.start.col + offset;
-    for (let row = range.start.row; row <= range.end.row; row++) {
-      seen.add(grid.store.getCell({ sheet: range.sheet, row, col }).resolved);
-      if (seen.size > MAX_FILTER_VALUES) break;
-    }
+    const span = {
+      sheet: range.sheet,
+      col: range.start.col + offset,
+      startRow: range.start.row,
+      endRow: range.end.row,
+    };
+    scanColumnValues(grid.store, span, (value) => {
+      seen.add(value);
+      return seen.size <= MAX_FILTER_VALUES;
+    });
     return [...seen].sort(compareScalars);
   };
 
