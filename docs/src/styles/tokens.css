@@ -277,8 +277,11 @@
   --sw-word-spacing-body: 0.05em;
 
   /* Line lengths: prose stays near 70 characters, leads a little shorter. */
-  --sw-measure-prose: 70ch;
-  --sw-measure-lead: 60ch;
+  /* Line lengths in rem, not ch: ch follows the font that is loaded, so a
+     ch measure changes width when the web font swaps in. These are the widths
+     70ch and 60ch give in Instrument Sans (1ch = 0.676em). */
+  --sw-measure-prose: 47.25rem;
+  --sw-measure-lead: calc(40.5 * var(--sw-text-lead));
 
   /* ── Spacing ──────────────────────────────────────────────────────────
      A 4 px step. Density rules:
