@@ -1,9 +1,8 @@
 import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
-import { Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
-import { FormulaReference } from "../components/FormulaReference.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import {
   type DocumentComponents,
@@ -15,6 +14,14 @@ import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageMeta, pageTitle } from "../lib/seo.js";
+
+/**
+ * The formula reference filter and its select load only with the formula
+ * family pages that use them, not with every documentation page.
+ */
+const FormulaReference = lazy(async () => ({
+  default: (await import("../components/FormulaReference.js")).FormulaReference,
+}));
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
