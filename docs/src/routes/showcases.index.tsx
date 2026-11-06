@@ -50,7 +50,7 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   formatting: "A styled P&L, mixed number formats, and a live XLSX fidelity check.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
   engine: "A 50,000-row forecast with every public engine event traced beside it.",
-  "data-tools": "Sort, filter and organize 4,800 orders; exercise validation and protection.",
+  "data-tools": "Filter and organize 4,800 orders; exercise validation and protection.",
   spreadsheet:
     "An Excel-style ribbon, formula bar and sheet tabs around one grid. Narrow it and watch the groups fold.",
   analysis: "A pivot table and a live chart over two years of orders. Edit an order and both move.",

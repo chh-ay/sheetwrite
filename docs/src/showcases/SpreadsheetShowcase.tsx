@@ -1,12 +1,24 @@
 import type { Grid } from "@sheetwrite/core";
 import { useEffect, useRef, useState } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
 import { errorText } from "../lib/errors.js";
 import { ActionError } from "../lib/use-action.js";
-import { CapabilityHero } from "./CapabilityHero.js";
-import { createSpreadsheetScenario } from "./scenarios/spreadsheet.js";
+import {
+  ShowcaseControlGroup,
+  ShowcaseKeys,
+  ShowcaseLayout,
+  ShowcaseSection,
+  type ShowcaseStep,
+  ShowcaseSteps,
+} from "./layout/ShowcaseLayout.js";
+import {
+  createSpreadsheetScenario,
+  SALES_ROWS,
+  salesOperations,
+  salesWorkbook,
+} from "./scenarios/spreadsheet.js";
 import SpreadsheetSetupSnippet from "./snippets/spreadsheet-setup.mdx";
+import { DemoButton } from "./ui/DemoButton.js";
 
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -24,41 +36,11 @@ const WIDTHS = [
 ] as const;
 type WidthId = (typeof WIDTHS)[number]["id"];
 
-/** Each step: what to do, how, and what the grid shows back. */
-const TRIES = [
-  {
-    action: "Total a column",
-    how: "Select Sales!G2:G49, then Home › Editing › AutoSum.",
-    result: "A SUM lands under the last row.",
-  },
-  {
-    action: "Format a region",
-    how: "Pick a region cell, then Fill Color, Borders or Merge & Center.",
-    result: "The format is stored on the cells and survives XLSX export.",
-  },
-  {
-    action: "Change a price",
-    how: "Edit a unit price on the Sales sheet.",
-    result: "Summary recalculates across sheets.",
-  },
-  {
-    action: "Read a note",
-    how: "Point at the amber corner on Sales!G3 to read it. Select the cell and press Shift+F2 to edit.",
-    result: "The note opens beside the cell. Clear the note to delete it.",
-  },
-  {
-    action: "Use the right-click menu",
-    how: "Right-click a cell, then Insert › Row above. The arrow keys work too.",
-    result: "Undo removes the new row.",
-  },
-  {
-    action: "Narrow the window",
-    how: "Use the button to switch between a wide and narrow window.",
-    result:
-      "The ribbon turns compact, one row like Excel's simplified ribbon, and groups fold into dropdowns.",
-    control: "fold-ribbon",
-  },
-] as const;
+/** The workbook's sheets and cross-sheet formulas, counted from the workbook the page loads. */
+const SHEET_COUNT = salesWorkbook().sheets.length;
+const FORMULA_COUNT = salesOperations().filter(
+  (operation) => operation.op === "set" && operation.value.kind === "formula",
+).length;
 
 /** The ribbon's keyboard model, as the shell implements it. */
 const KEYS = [
@@ -66,6 +48,44 @@ const KEYS = [
   { keys: ["←", "→"], does: "Move between tabs" },
   { keys: ["Esc"], does: "Return to the grid" },
 ] as const;
+
+/** The walkthrough; the last step gets its fold control at render. */
+function spreadsheetSteps(foldRibbon: ShowcaseStep["control"]): ShowcaseStep[] {
+  return [
+    {
+      action: "Total a column",
+      how: `Select Sales!G2:G${SALES_ROWS + 1}, then Home › Editing › AutoSum.`,
+      result: "A SUM lands under the last row.",
+    },
+    {
+      action: "Format a region",
+      how: "Pick a region cell, then Fill Color, Borders or Merge & Center.",
+      result: "The format is stored on the cells and survives XLSX export.",
+    },
+    {
+      action: "Change a price",
+      how: "Edit a unit price on the Sales sheet.",
+      result: "Summary recalculates across sheets.",
+    },
+    {
+      action: "Read a note",
+      how: "Point at the amber corner on Sales!G3 to read it. Select the cell and press Shift+F2 to edit.",
+      result: "The note opens beside the cell. Clear the note to delete it.",
+    },
+    {
+      action: "Use the right-click menu",
+      how: "Right-click a cell, then Insert › Row above.",
+      result: "Undo removes the new row.",
+    },
+    {
+      action: "Narrow the window",
+      how: "Switch between a wide and a narrow window.",
+      result:
+        "The ribbon turns compact, one row like Excel's simplified ribbon, and groups fold into dropdowns.",
+      control: foldRibbon,
+    },
+  ];
+}
 
 export default function SpreadsheetShowcase() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -98,93 +118,81 @@ export default function SpreadsheetShowcase() {
   const frameWidth = WIDTHS.find((option) => option.id === width)?.width ?? null;
 
   return (
-    <div className="sw-spreadsheet-frame">
-      <SiteTopbar active="spreadsheet" />
-      <main className="sw-spreadsheet" id="main-content">
-        <CapabilityHero
-          eyebrow="CAPABILITY / SPREADSHEET APP"
-          title="A spreadsheet app, not just a grid"
-          description="The composable shell puts an Excel-style ribbon, name box, formula bar and sheet tabs around one grid. Everything here is the public API."
-          facts={[
-            { label: "Chrome", value: "Ribbon, formula bar, tabs" },
-            { label: "Workbook", value: "3 sheets, cross-sheet SUMIF, a saved query" },
-            { label: "Setup", value: 'createSpreadsheetShell({ ribbon: { mode: "auto" } })' },
-          ]}
-        />
-        <section aria-label="Live spreadsheet" className="sw-spreadsheet-workspace">
-          <div className="sw-spreadsheet-bar">
-            <strong>Northwind / 2026 sales.xlsx</strong>
-            <div aria-label="Window width" className="sw-spreadsheet-widths" role="group">
-              {WIDTHS.map((option) => (
-                <button
-                  aria-pressed={width === option.id}
+    <ShowcaseLayout
+      code={{ title: "How it is built", Snippet: SpreadsheetSetupSnippet }}
+      controls={
+        <>
+          <ShowcaseControlGroup title="Try it">
+            <ShowcaseSteps
+              steps={spreadsheetSteps(
+                <DemoButton
                   disabled={!ready}
-                  key={option.id}
-                  onClick={() => setWidth(option.id)}
-                  type="button"
+                  onClick={() => setWidth(width === "narrow" ? "wide" : "narrow")}
                 >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
+                  {width === "narrow" ? "Unfold the ribbon" : "Fold the ribbon"}
+                </DemoButton>,
+              )}
+            />
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup
+            title="Keyboard"
+            description="Double-click a tab to hide or show the panel."
+          >
+            <ShowcaseKeys keys={KEYS} />
+          </ShowcaseControlGroup>
+        </>
+      }
+      demo={
+        <>
           <div
             className="sw-spreadsheet-window"
             data-testid="spreadsheet-window"
             style={frameWidth === null ? undefined : { maxWidth: `${frameWidth}px` }}
           >
-            <div className="sw-spreadsheet-host" ref={hostRef} />
+            <div className="sw-showcase__grid" ref={hostRef} />
           </div>
           <ActionError error={error} />
-        </section>
-        <section aria-labelledby="spreadsheet-try" className="sw-spreadsheet-notes">
-          <div>
-            <h2 id="spreadsheet-try">Try it</h2>
-            <ol className="sw-spreadsheet-steps">
-              {TRIES.map((step) => (
-                <li key={step.action}>
-                  <strong>{step.action}</strong>
-                  <span>{step.how}</span>
-                  {"control" in step && step.control === "fold-ribbon" && (
-                    <button
-                      disabled={!ready}
-                      onClick={() => setWidth(width === "narrow" ? "wide" : "narrow")}
-                      type="button"
-                    >
-                      {width === "narrow" ? "Unfold the ribbon" : "Fold the ribbon"}
-                    </button>
-                  )}
-                  <span className="sw-spreadsheet-steps__result">{step.result}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <div>
-            <h2>How it is built</h2>
-            <div className="sw-spreadsheet-code">
-              <SpreadsheetSetupSnippet />
-            </div>
-            <p>
-              Every ribbon command calls <code>grid.actions</code>, so your own toolbar can call the
-              same methods.
-            </p>
-            <h3>Keyboard</h3>
-            <dl className="sw-spreadsheet-keys">
-              {KEYS.map((entry) => (
-                <div key={entry.does}>
-                  <dt>
-                    {entry.keys.map((key) => (
-                      <kbd key={key}>{key}</kbd>
-                    ))}
-                  </dt>
-                  <dd>{entry.does}</dd>
-                </div>
-              ))}
-            </dl>
-            <p>Hide or show the panel (double-click a tab).</p>
-          </div>
-        </section>
-      </main>
-    </div>
+        </>
+      }
+      demoActions={
+        <div aria-label="Window width" className="sw-spreadsheet-widths" role="group">
+          {WIDTHS.map((option) => (
+            <DemoButton
+              aria-pressed={width === option.id}
+              data-size="sm"
+              disabled={!ready}
+              key={option.id}
+              onClick={() => setWidth(option.id)}
+              variant="quiet"
+            >
+              {option.label}
+            </DemoButton>
+          ))}
+        </div>
+      }
+      demoLabel="Live spreadsheet"
+      demoTitle="Northwind / 2026 sales.xlsx"
+      eyebrow="Spreadsheet app"
+      facts={[
+        { label: "Sheets", value: SHEET_COUNT.toLocaleString("en") },
+        { label: "Orders", value: SALES_ROWS.toLocaleString("en") },
+        { label: "Formulas", value: FORMULA_COUNT.toLocaleString("en") },
+      ]}
+      guide={{
+        href: "/docs/tutorials/spreadsheet-app-with-ribbon/",
+        label: "Build it step by step",
+      }}
+      id="spreadsheet"
+      task="The composable shell puts an Excel-style ribbon, name box, formula bar and sheet tabs around one grid. Try the ribbon on a sales workbook, then narrow the window."
+      title="A spreadsheet app, not just a grid"
+    >
+      <ShowcaseSection id="spreadsheet-commands" title="One command model">
+        <p>
+          Every ribbon command calls <code>grid.actions</code>, so your own toolbar can call the
+          same methods. The Targets sheet is a saved query that Data › Refresh All reloads; the{" "}
+          <a href="/showcases/queries/">queries showcase</a> shows saved queries in depth.
+        </p>
+      </ShowcaseSection>
+    </ShowcaseLayout>
   );
 }
