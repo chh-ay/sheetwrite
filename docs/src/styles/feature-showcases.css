@@ -180,6 +180,14 @@
   min-width: 40rem;
 }
 
+/* Charts and slicer chips take the site accent, as the sheet tabs do. The
+   :root raises this over the grid stylesheet's own per-theme defaults. */
+:root .sw-feature-grid .sheetwrite {
+  --sheetwrite-chart-1: var(--sw-accent);
+  --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+  --sheetwrite-selection-border: var(--sw-accent);
+}
+
 /* Rows of the side-panel lists answer the pointer like the readout rows. */
 :is(.sw-feature-changes, .sw-feature-runs) > li {
   border-radius: var(--sw-radius-xs);
