@@ -127,6 +127,7 @@
 .sw-live-grid__sheet {
   position: relative;
   height: var(--sw-live-grid-height);
+  overflow: hidden;
 }
 
 .sw-live-grid__host {
@@ -145,16 +146,22 @@
   height: 100%;
 }
 
+/* Like the live sheet, columns keep their width and run past a narrow frame
+   instead of squeezing their values. */
 .sw-live-grid__preview {
   position: absolute;
-  inset: 0;
-  width: 100%;
+  top: 0;
+  left: 0;
+  min-width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
   color: var(--sw-fg);
   font: var(--sw-text-caption) / 1 var(--sw-font-body);
   font-variant-numeric: tabular-nums;
   transition: opacity var(--sw-motion-base) var(--sw-motion-standard);
+}
+
+.sw-live-grid__preview td {
+  min-width: 5.25rem;
 }
 
 .sw-live-grid[data-state="live"] .sw-live-grid__preview {
