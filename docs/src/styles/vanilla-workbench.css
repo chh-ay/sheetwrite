@@ -144,11 +144,14 @@
   outline-offset: 2px;
 }
 
-/* Product stage first, ownership instrument adjacent. */
+/* Product stage first, ownership instrument adjacent. The grid stage keeps a
+   fixed height: a taller instrument must not stretch the grid, or its visible
+   rows would change with the instrument's content. */
 .sw-vw-workspace {
   display: grid;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr) var(--sw-vw-instrument-width);
+  align-items: start;
 }
 
 .sw-vw-gridstage {
@@ -201,7 +204,7 @@
 .sw-vw-stagewrap {
   position: relative;
   display: grid;
-  min-height: 28rem;
+  height: 30.5rem;
   overflow: hidden;
 }
 
@@ -830,6 +833,7 @@
   }
 
   .sw-vw-stagewrap {
+    height: auto;
     min-height: 24rem;
   }
 
