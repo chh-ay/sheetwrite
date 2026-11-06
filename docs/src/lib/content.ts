@@ -1,9 +1,4 @@
-import {
-  type AnchorHTMLAttributes,
-  type ComponentType,
-  type LazyExoticComponent,
-  lazy,
-} from "react";
+import { type AnchorHTMLAttributes, type ComponentType, use } from "react";
 
 import type { OutlineItem } from "./outline.js";
 
@@ -35,7 +30,6 @@ export interface DocumentModule {
 }
 
 interface DocumentSource {
-  component: LazyExoticComponent<DocumentComponent>;
   fallbackTitle: string;
   load: () => Promise<DocumentModule>;
 }
@@ -57,7 +51,7 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     const href = hrefFromSource(source);
     const fallbackTitle =
       href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite";
-    return [href, { component: lazy(load), fallbackTitle, load }];
+    return [href, { fallbackTitle, load }];
   }),
 );
 
@@ -66,12 +60,30 @@ export function normalizeDocumentHref(splat: string | undefined): string {
   return `/docs/${path}${path.length === 0 ? "" : "/"}`;
 }
 
+/** Document modules already loaded, by href: they render without suspending. */
+const loadedModules = new Map<string, DocumentModule>();
+/** One load per document, shared by the route loader and the page render. */
+const moduleLoads = new Map<string, Promise<DocumentModule>>();
+
+function loadModule(href: string, source: DocumentSource): Promise<DocumentModule> {
+  let load = moduleLoads.get(href);
+  if (load === undefined) {
+    load = source.load().then((module) => {
+      loadedModules.set(href, module);
+      return module;
+    });
+    moduleLoads.set(href, load);
+  }
+  return load;
+}
+
 export async function documentForSplat(
   splat: string | undefined,
 ): Promise<DocumentRecord | undefined> {
-  const source = DOCUMENT_SOURCES.get(normalizeDocumentHref(splat));
+  const href = normalizeDocumentHref(splat);
+  const source = DOCUMENT_SOURCES.get(href);
   if (source === undefined) return undefined;
-  const module = await source.load();
+  const module = await loadModule(href, source);
   return {
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
@@ -81,8 +93,21 @@ export async function documentForSplat(
   };
 }
 
-export function documentComponentForSplat(
-  splat: string | undefined,
-): LazyExoticComponent<DocumentComponent> | undefined {
-  return DOCUMENT_SOURCES.get(normalizeDocumentHref(splat))?.component;
+/** Whether a documentation page exists at the splat. */
+export function hasDocument(splat: string | undefined): boolean {
+  return DOCUMENT_SOURCES.has(normalizeDocumentHref(splat));
+}
+
+/**
+ * The page's compiled document, read while rendering. The route loader has
+ * already loaded it on the server and on client navigations, so the article
+ * renders in the same pass and the prerendered page holds it in full. Only
+ * the first render after a page load waits for the module, while hydration
+ * keeps the server's article on screen.
+ */
+export function useDocumentComponent(splat: string | undefined): DocumentComponent | undefined {
+  const href = normalizeDocumentHref(splat);
+  const source = DOCUMENT_SOURCES.get(href);
+  if (source === undefined) return undefined;
+  return (loadedModules.get(href) ?? use(loadModule(href, source))).default;
 }

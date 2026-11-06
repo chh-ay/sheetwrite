@@ -6,8 +6,9 @@ import { DocsShell } from "../components/DocsShell.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import {
   type DocumentComponents,
-  documentComponentForSplat,
+  hasDocument,
   normalizeDocumentHref,
+  useDocumentComponent,
 } from "../lib/content.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
@@ -157,11 +158,10 @@ function DocumentRoute() {
     };
   }, [href, activeHref]);
   const metadata = Route.useLoaderData();
-  const Content = documentComponentForSplat(params._splat);
   if (metadata.moved !== undefined) {
     return <MovedDocument from={metadata.moved} target={metadata.movedTo ?? "/docs/"} />;
   }
-  if (Content === undefined) return <DocumentNotFound />;
+  if (!hasDocument(params._splat)) return <DocumentNotFound />;
 
   return (
     <DocsShell
@@ -172,19 +172,20 @@ function DocumentRoute() {
       reserveOutline
       title={metadata.title}
     >
-      {/* Prerendered HTML can still hold this placeholder; search must not quote it. */}
-      <Suspense
-        fallback={
-          <p className="sw-document-loading" data-pagefind-ignore="">
-            Loading documentation…
-          </p>
-        }
-      >
-        <Content components={DOCUMENT_COMPONENTS} />
+      {/* The loader has loaded the article, so the server renders it in full;
+          hydration keeps that article on screen while the module loads. */}
+      <Suspense fallback={null}>
+        <DocumentArticle splat={params._splat} />
         <DocumentReady key={activeHref} />
       </Suspense>
     </DocsShell>
   );
+}
+
+/** The page's article: its compiled document with the site's components. */
+function DocumentArticle({ splat }: Readonly<{ splat: string | undefined }>) {
+  const Content = useDocumentComponent(splat);
+  return Content === undefined ? null : <Content components={DOCUMENT_COMPONENTS} />;
 }
 
 function DocumentNotFound() {
