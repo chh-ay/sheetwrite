@@ -163,7 +163,7 @@ export default function SortShowcase() {
       facts={[
         { label: "Orders", value: ORDER_COUNT.toLocaleString("en") },
         { label: "Formulas", value: FORMULA_COUNT.toLocaleString("en") },
-        { label: "Engine", value: "@sheetwrite/formulas" },
+        { label: "Engine", value: "@sheetwrite/formulas", code: true },
       ]}
       guide={{
         href: "/docs/features/data/data-operations/#sort-cells-in-place",

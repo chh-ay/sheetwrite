@@ -137,7 +137,7 @@ export default function FunctionsShowcase() {
       facts={[
         { label: "Families", value: FAMILIES.length.toLocaleString("en") },
         { label: "Functions shown", value: FUNCTION_NAMES.length.toLocaleString("en") },
-        { label: "Engine", value: "@sheetwrite/formulas" },
+        { label: "Engine", value: "@sheetwrite/formulas", code: true },
       ]}
       guide={{ href: "/docs/reference/formula-functions/", label: "Browse every function" }}
       id="functions"

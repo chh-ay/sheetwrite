@@ -170,7 +170,7 @@ export default function QueriesShowcase() {
       facts={[
         { label: "Orders in the feed", value: FEED_START_ROWS.toLocaleString("en") },
         { label: "Saved queries", value: "Region totals, Large orders" },
-        { label: "Package", value: "@sheetwrite/queries" },
+        { label: "Package", value: "@sheetwrite/queries", code: true },
       ]}
       guide={{
         href: "/docs/features/data/data-operations/#saved-queries-and-refresh",

@@ -40,9 +40,11 @@
   text-wrap: pretty;
 }
 
+/* One even row: three facts never wrap as two and one. */
 .sw-showcase__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: var(--sw-space-2);
   margin: 0;
 }
@@ -67,8 +69,44 @@
   color: var(--sw-fg-strong);
   font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-ui) var(--sw-font-display);
   font-variant-numeric: tabular-nums;
-  /* Package paths such as @sheetwrite/core/history have no spaces to break at. */
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+
+/* Package paths wrap at their <wbr> after each "/", not inside a name. */
+.sw-showcase__fact dd code {
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-medium);
+}
+
+/* Phones: the facts are one list of label and value rows. */
+@media (max-width: 39.99rem) {
+  .sw-showcase__facts {
+    grid-auto-flow: row;
+    gap: 0;
+    border: var(--sw-border-width) solid var(--sw-border);
+    border-radius: var(--sw-radius-md);
+    background: var(--sw-surface-1);
+  }
+
+  .sw-showcase__fact {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--sw-space-4);
+    align-items: baseline;
+    padding: var(--sw-space-2) var(--sw-space-4);
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .sw-showcase__fact + .sw-showcase__fact {
+    border-top: var(--sw-border-width) solid var(--sw-border);
+  }
+
+  .sw-showcase__fact dd {
+    font-size: var(--sw-text-body);
+    text-align: end;
+  }
 }
 
 .sw-showcase__stage {
@@ -159,8 +197,8 @@
     var(--sw-font-display);
 }
 
-/* Tablet up: the facts sit beside the intro. */
-@media (min-width: 52rem) {
+/* Desktop: the facts sit beside the intro; narrower, they run under it. */
+@media (min-width: 72rem) {
   .sw-showcase__header {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   }

@@ -177,7 +177,7 @@ export default function VersionHistoryShowcase() {
       facts={[
         { label: "Authors", value: `${authorName("you")}, ${authorName(SAM)}` },
         { label: "Starts from", value: BASELINE_NAME },
-        { label: "Entry point", value: "@sheetwrite/core/history" },
+        { label: "Entry point", value: "@sheetwrite/core/history", code: true },
       ]}
       guide={{
         href: "/docs/features/data/persistence/#opt-in-version-archives",
