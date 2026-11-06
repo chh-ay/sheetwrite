@@ -69,6 +69,11 @@ a:not([class]) > .sw-icon:last-child {
   letter-spacing: var(--sw-tracking-heading);
 }
 
+/* Numbers in tables line up: tabular figures in every table on the site. */
+:where(table) {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Eyebrow: the label above a title ───────────────────────────────────── */
 .sw-eyebrow {
   margin: 0;
