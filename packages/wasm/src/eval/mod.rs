@@ -1465,7 +1465,17 @@ impl CellStore {
             return;
         }
         let mut pass = EvalPass { affected, results };
-        let _ = self.eval_formula_id(id, &mut pass, 0);
+        if self.iteration.is_some() {
+            let _ = self.eval_formula_id(id, &mut pass, 0);
+        } else {
+            // Without iteration nothing on the evaluation path needs this
+            // result before it is written, so it goes straight to the cell.
+            pass.results.visiting.insert(id);
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            pass.results.visiting.remove(id);
+            self.store_formula_result(id, result);
+            results.settle(id);
+        }
         self.flush_pulled(results);
     }
 
@@ -1550,7 +1560,11 @@ impl CellStore {
 
         if let Some(key) = cell_key(row, col) {
             if let Some(id) = s.formulas.id(key) {
-                if pass.affected.contains(id) {
+                // A settled formula's result is already in its cell, read as
+                // a clean formula is; iteration still records the read.
+                if pass.affected.contains(id)
+                    && !(pass.results.is_settled(id) && self.iteration.is_none())
+                {
                     return self.eval_formula_id(id, pass, depth + 1);
                 }
 

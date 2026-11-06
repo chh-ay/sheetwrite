@@ -1313,12 +1313,9 @@ fn seed_depth_errors(
         walk.order = std::mem::take(&mut results.order);
         walk.order.clear();
         let mut found_cycle = false;
-        // Roots in selection order keep volatile draws in the order a
-        // pull-based pass made them.
-        for id in affected.ids() {
-            let Some(node) = slots.location(id).and_then(|key| walk.formulas.node(key)) else {
-                continue;
-            };
+        // Roots in column-major order: the walk finishes each formula after
+        // the formulas it reads, which is the order the pass evaluates.
+        for node in 0..walk.formulas.len() {
             if let Err(error) = walk.depth(node) {
                 found_cycle |= error == FormulaError::Cycle;
             }
