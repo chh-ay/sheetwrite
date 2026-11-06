@@ -71,7 +71,7 @@ import {
 import { siteDataFiles } from "./docs-site-data.js";
 import {
   loadFormulaContractInventory,
-  loadFormulaSummaries,
+  loadFormulaReferenceEntries,
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
@@ -255,11 +255,12 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ...(await collectCompatibilityDigestIssues()),
   ];
   if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
-  const [formulaInventory, formulaSummaries, publishedCompatibilityResults] = await Promise.all([
-    loadFormulaContractInventory(repositoryRoot),
-    loadFormulaSummaries(repositoryRoot),
-    compatibilityResults(),
-  ]);
+  const [formulaInventory, formulaReferenceEntries, publishedCompatibilityResults] =
+    await Promise.all([
+      loadFormulaContractInventory(repositoryRoot),
+      loadFormulaReferenceEntries(repositoryRoot),
+      compatibilityResults(),
+    ]);
 
   // Link resolution and entry pages read declaration shapes synchronously, so every
   // manifest declaration is parsed up front, in one batch.
@@ -354,7 +355,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     }
   }
 
-  const formulaPages = renderFormulaFunctionPages(formulaInventory, formulaSummaries);
+  const formulaPages = renderFormulaFunctionPages(formulaInventory, formulaReferenceEntries);
   const excelCatalog: unknown = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
   );

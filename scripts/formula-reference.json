@@ -1,0 +1,1982 @@
+{
+  "ARRAYTOTEXT": {
+    "summary": "The values of an array as one text value.",
+    "syntax": "ARRAYTOTEXT(array, [format])"
+  },
+  "DOLLAR": {
+    "summary": "Formats a number as currency text.",
+    "syntax": "DOLLAR(number, [decimals])"
+  },
+  "FIXED": {
+    "summary": "Formats a number as text with a fixed number of decimals.",
+    "syntax": "FIXED(number, [decimals], [no_commas])"
+  },
+  "REGEXEXTRACT": {
+    "summary": "The parts of a text that match a regular expression.",
+    "syntax": "REGEXEXTRACT(text, pattern, [return_mode], [case_sensitivity])"
+  },
+  "REGEXREPLACE": {
+    "summary": "Replaces the parts of a text that match a regular expression.",
+    "syntax": "REGEXREPLACE(text, pattern, replacement, [occurrence], [case_sensitivity])"
+  },
+  "REGEXTEST": {
+    "summary": "TRUE when a text matches a regular expression.",
+    "syntax": "REGEXTEST(text, pattern, [case_sensitivity])"
+  },
+  "TEXTAFTER": {
+    "summary": "The text after a delimiter.",
+    "syntax": "TEXTAFTER(text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found])"
+  },
+  "TEXTBEFORE": {
+    "summary": "The text before a delimiter.",
+    "syntax": "TEXTBEFORE(text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found])"
+  },
+  "TEXTSPLIT": {
+    "summary": "Splits a text into rows and columns at delimiters.",
+    "syntax": "TEXTSPLIT(text, col_delimiter, [row_delimiter], [ignore_empty], [match_mode], [pad_with])"
+  },
+  "VALUETOTEXT": {
+    "summary": "Any value as text.",
+    "syntax": "VALUETOTEXT(value, [format])"
+  },
+  "SUM": {
+    "summary": "Adds its arguments: numbers, ranges and arrays.",
+    "syntax": "SUM(number1, [number2], …)"
+  },
+  "AVERAGE": {
+    "summary": "The arithmetic mean of its arguments.",
+    "syntax": "AVERAGE(number1, [number2], …)"
+  },
+  "MIN": {
+    "summary": "The smallest number among its arguments.",
+    "syntax": "MIN(number1, [number2], …)"
+  },
+  "MAX": {
+    "summary": "The largest number among its arguments.",
+    "syntax": "MAX(number1, [number2], …)"
+  },
+  "COUNT": {
+    "summary": "The number of cells and arguments that hold numbers.",
+    "syntax": "COUNT(value1, [value2], …)"
+  },
+  "IF": {
+    "summary": "One value when a condition is TRUE, another when it is FALSE.",
+    "syntax": "IF(logical_test, value_if_true, [value_if_false])"
+  },
+  "ABS": {
+    "summary": "The absolute value of a number.",
+    "syntax": "ABS(number)"
+  },
+  "ROUND": {
+    "summary": "Rounds a number to a given number of digits.",
+    "syntax": "ROUND(number, num_digits)"
+  },
+  "SQRT": {
+    "summary": "The positive square root of a number.",
+    "syntax": "SQRT(number)"
+  },
+  "MOD": {
+    "summary": "The remainder after division, with the sign of the divisor.",
+    "syntax": "MOD(number, divisor)"
+  },
+  "POW": {
+    "summary": "Raises a number to a power; the same as POWER.",
+    "syntax": "POW(base, exponent)"
+  },
+  "AND": {
+    "summary": "TRUE when every argument is TRUE.",
+    "syntax": "AND(A2>1, A2<100)"
+  },
+  "OR": {
+    "summary": "TRUE when any argument is TRUE.",
+    "syntax": "OR(A2>1, A2<100)"
+  },
+  "NOT": {
+    "summary": "Reverses a logical value.",
+    "syntax": "NOT(A2>100)"
+  },
+  "FLOOR": {
+    "summary": "Rounds a number down to the nearest multiple of a significance.",
+    "syntax": "FLOOR(number, significance)"
+  },
+  "CEILING": {
+    "summary": "Rounds a number up to the nearest multiple of a significance.",
+    "syntax": "CEILING(number, significance)"
+  },
+  "INT": {
+    "summary": "Rounds a number down to the nearest integer.",
+    "syntax": "INT(number)"
+  },
+  "TRUNC": {
+    "summary": "Cuts a number to an integer, or to a number of digits, without rounding.",
+    "syntax": "TRUNC(number, [num_digits])"
+  },
+  "SIGN": {
+    "summary": "1 for a positive number, 0 for zero, −1 for a negative number.",
+    "syntax": "SIGN(number)"
+  },
+  "PI": {
+    "summary": "The value of π to 15 digits.",
+    "syntax": "PI()"
+  },
+  "IFERROR": {
+    "summary": "A value, or a fallback when the value is any error.",
+    "syntax": "IFERROR(value, value_if_error)"
+  },
+  "IFNA": {
+    "summary": "A value, or a fallback when the value is #N/A.",
+    "syntax": "IFNA(value, value_if_na)"
+  },
+  "IFS": {
+    "summary": "The value for the first condition that is TRUE.",
+    "syntax": "IFS(logical_test1, value_if_true1, [logical_test2, value_if_true2], [logical_test3, value_if_true3], …)"
+  },
+  "SWITCH": {
+    "summary": "Compares a value with a list of cases and returns the matching result.",
+    "syntax": "SWITCH(expression, value1, result1, [value2, result2], …, [default])"
+  },
+  "XOR": {
+    "summary": "TRUE when an odd number of arguments are TRUE.",
+    "syntax": "XOR(logical1, [logical2], …)"
+  },
+  "TRUE": {
+    "summary": "The logical value TRUE.",
+    "syntax": "TRUE()"
+  },
+  "FALSE": {
+    "summary": "The logical value FALSE.",
+    "syntax": "FALSE()"
+  },
+  "ISBLANK": {
+    "summary": "TRUE when a cell is empty.",
+    "syntax": "ISBLANK(value)"
+  },
+  "ISNUMBER": {
+    "summary": "TRUE when a value is a number.",
+    "syntax": "ISNUMBER(value)"
+  },
+  "ISTEXT": {
+    "summary": "TRUE when a value is text.",
+    "syntax": "ISTEXT(value)"
+  },
+  "ISLOGICAL": {
+    "summary": "TRUE when a value is TRUE or FALSE.",
+    "syntax": "ISLOGICAL(value)"
+  },
+  "ISERROR": {
+    "summary": "TRUE when a value is any error.",
+    "syntax": "ISERROR(value)"
+  },
+  "ISERR": {
+    "summary": "TRUE when a value is an error other than #N/A.",
+    "syntax": "ISERR(value)"
+  },
+  "ISNA": {
+    "summary": "TRUE when a value is #N/A.",
+    "syntax": "ISNA(value)"
+  },
+  "TYPE": {
+    "summary": "A number for the type of a value: number, text, logical, error or array.",
+    "syntax": "TYPE(value)"
+  },
+  "ISFORMULA": {
+    "summary": "TRUE when a cell holds a formula.",
+    "syntax": "ISFORMULA(reference)"
+  },
+  "N": {
+    "summary": "A value converted to a number.",
+    "syntax": "N(value)"
+  },
+  "T": {
+    "summary": "The text of a value, or empty text when it is not text.",
+    "syntax": "T(value)"
+  },
+  "COUNTA": {
+    "summary": "The number of cells and arguments that are not empty.",
+    "syntax": "COUNTA(value1, [value2], …)"
+  },
+  "LEN": {
+    "summary": "The number of characters in a text.",
+    "syntax": "LEN(text)"
+  },
+  "LEFT": {
+    "summary": "The first characters of a text.",
+    "syntax": "LEFT(text, [num_chars])"
+  },
+  "RIGHT": {
+    "summary": "The last characters of a text.",
+    "syntax": "RIGHT(text, [num_chars])"
+  },
+  "MID": {
+    "summary": "Characters from the middle of a text, from a start position.",
+    "syntax": "MID(text, start_num, num_chars)"
+  },
+  "CONCAT": {
+    "summary": "Joins texts, ranges and arrays into one text.",
+    "syntax": "CONCAT(text1, [text2], …)"
+  },
+  "UPPER": {
+    "summary": "A text in upper case.",
+    "syntax": "UPPER(text)"
+  },
+  "LOWER": {
+    "summary": "A text in lower case.",
+    "syntax": "LOWER(text)"
+  },
+  "TRIM": {
+    "summary": "A text without leading, trailing and repeated spaces.",
+    "syntax": "TRIM(text)"
+  },
+  "TEXT": {
+    "summary": "Formats a value as text with a number format.",
+    "syntax": "TEXT(Value you want to format, \"Format code you want to apply\")"
+  },
+  "EXACT": {
+    "summary": "TRUE when two texts are the same, case included.",
+    "syntax": "EXACT(text1, text2)"
+  },
+  "DATE": {
+    "summary": "The date serial number for a year, month and day.",
+    "syntax": "DATE(year, month, day)"
+  },
+  "DATEVALUE": {
+    "summary": "Converts a date written as text to a date serial number.",
+    "syntax": "DATEVALUE(\"1/1/2008\")"
+  },
+  "DAY": {
+    "summary": "The day of the month of a date.",
+    "syntax": "DAY(serial_number)"
+  },
+  "MONTH": {
+    "summary": "The month of a date, 1 to 12.",
+    "syntax": "MONTH(serial_number)"
+  },
+  "YEAR": {
+    "summary": "The year of a date.",
+    "syntax": "YEAR(serial_number)"
+  },
+  "TODAY": {
+    "summary": "Today's date, updated on every recalculation.",
+    "syntax": "TODAY()"
+  },
+  "NOW": {
+    "summary": "The current date and time, updated on every recalculation.",
+    "syntax": "NOW()"
+  },
+  "RAND": {
+    "summary": "A random number from 0 up to 1, new on every recalculation.",
+    "syntax": "RAND()"
+  },
+  "RANDBETWEEN": {
+    "summary": "A random integer between two bounds, new on every recalculation.",
+    "syntax": "RANDBETWEEN(bottom, top)"
+  },
+  "COUNTIF": {
+    "summary": "The number of cells that meet one criterion.",
+    "syntax": "COUNTIF(Where do you want to look?, What do you want to look for?)"
+  },
+  "COUNTIFS": {
+    "summary": "The number of cells that meet every one of several criteria.",
+    "syntax": "COUNTIFS(criteria_range1, criteria1, [criteria_range2, criteria2], …)"
+  },
+  "SUMIF": {
+    "summary": "Adds the cells that meet one criterion.",
+    "syntax": "SUMIF(B2:B25, \">5\")"
+  },
+  "SUMIFS": {
+    "summary": "Adds the cells that meet every one of several criteria.",
+    "syntax": "SUMIFS(sum_range, criteria_range1, criteria1, [criteria_range2, criteria2], …)"
+  },
+  "AVERAGEIF": {
+    "summary": "The average of the cells that meet one criterion.",
+    "syntax": "AVERAGEIF(range, criteria, [average_range])"
+  },
+  "AVERAGEIFS": {
+    "summary": "The average of the cells that meet every one of several criteria.",
+    "syntax": "AVERAGEIFS(average_range, criteria_range1, criteria1, [criteria_range2, criteria2], …)"
+  },
+  "INDEX": {
+    "summary": "The value or reference at a row and column of a range.",
+    "syntax": "INDEX(array, row_num, [column_num])"
+  },
+  "MATCH": {
+    "summary": "The position of a value in a row or column.",
+    "syntax": "MATCH(25, A1:A3, 0)"
+  },
+  "VLOOKUP": {
+    "summary": "Finds a value in the first column of a table and returns a cell from its row.",
+    "syntax": "VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup])"
+  },
+  "HLOOKUP": {
+    "summary": "Finds a value in the first row of a table and returns a cell from its column.",
+    "syntax": "HLOOKUP(lookup_value, table_array, row_index_num, [range_lookup])"
+  },
+  "XLOOKUP": {
+    "summary": "Finds a value in one range and returns the matching item from another.",
+    "syntax": "XLOOKUP(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode])"
+  },
+  "NA": {
+    "summary": "The #N/A error value.",
+    "syntax": "NA()"
+  },
+  "FILTER": {
+    "summary": "The rows or columns of an array that meet a condition.",
+    "syntax": "FILTER(A5:D20, C5:C20=H2, \"\")"
+  },
+  "SORT": {
+    "summary": "An array sorted by one of its columns or rows.",
+    "syntax": "SORT(array, [sort_index], [sort_order], [by_col])"
+  },
+  "UNIQUE": {
+    "summary": "The distinct rows or values of an array.",
+    "syntax": "UNIQUE(array, [by_col], [exactly_once])"
+  },
+  "LET": {
+    "summary": "Names intermediate results inside a formula.",
+    "syntax": "LET(name1, name_value1, calculation_or_name2, [name_value2, calculation_or_name3], …)"
+  },
+  "PRODUCT": {
+    "summary": "Multiplies its arguments.",
+    "syntax": "PRODUCT(number1, [number2], …)"
+  },
+  "SUMPRODUCT": {
+    "summary": "Multiplies matching items of arrays and adds the products.",
+    "syntax": "SUMPRODUCT(array1, [array2], [array3], …)"
+  },
+  "POWER": {
+    "summary": "Raises a number to a power.",
+    "syntax": "POWER(number, power)"
+  },
+  "EXP": {
+    "summary": "e raised to the power of a number.",
+    "syntax": "EXP(number)"
+  },
+  "LN": {
+    "summary": "The natural logarithm of a number.",
+    "syntax": "LN(number)"
+  },
+  "LOG": {
+    "summary": "The logarithm of a number to a base, 10 by default.",
+    "syntax": "LOG(number, [base])"
+  },
+  "LOG10": {
+    "summary": "The base-10 logarithm of a number.",
+    "syntax": "LOG10(number)"
+  },
+  "ROUNDUP": {
+    "summary": "Rounds a number away from zero to a number of digits.",
+    "syntax": "ROUNDUP(number, num_digits)"
+  },
+  "ROUNDDOWN": {
+    "summary": "Rounds a number toward zero to a number of digits.",
+    "syntax": "ROUNDDOWN(number, num_digits)"
+  },
+  "MROUND": {
+    "summary": "Rounds a number to the nearest multiple of another number.",
+    "syntax": "MROUND(number, multiple)"
+  },
+  "EVEN": {
+    "summary": "Rounds a number away from zero to the nearest even integer.",
+    "syntax": "EVEN(number)"
+  },
+  "ODD": {
+    "summary": "Rounds a number away from zero to the nearest odd integer.",
+    "syntax": "ODD(number)"
+  },
+  "QUOTIENT": {
+    "summary": "The integer part of a division.",
+    "syntax": "QUOTIENT(5, 2)"
+  },
+  "GCD": {
+    "summary": "The greatest common divisor of integers.",
+    "syntax": "GCD(number1, [number2], …)"
+  },
+  "LCM": {
+    "summary": "The least common multiple of integers.",
+    "syntax": "LCM(number1, [number2], …)"
+  },
+  "SUBTOTAL": {
+    "summary": "A sum, count, average or other summary of a range, skipping other subtotals.",
+    "syntax": "SUBTOTAL(function_num, ref1, [ref2], …)"
+  },
+  "TEXTJOIN": {
+    "summary": "Joins texts with a delimiter, optionally skipping empty values.",
+    "syntax": "TEXTJOIN(delimiter, ignore_empty, text1, [text2], …)"
+  },
+  "SUBSTITUTE": {
+    "summary": "Replaces occurrences of one text with another.",
+    "syntax": "SUBSTITUTE(text, old_text, new_text, [instance_num])"
+  },
+  "REPLACE": {
+    "summary": "Replaces characters at a position in a text.",
+    "syntax": "REPLACE(old_text, start_num, num_chars, new_text)"
+  },
+  "FIND": {
+    "summary": "The position of one text in another, case-sensitive.",
+    "syntax": "FIND(find_text, within_text, [start_num])"
+  },
+  "SEARCH": {
+    "summary": "The position of one text in another, ignoring case and allowing wildcards.",
+    "syntax": "SEARCH(\"n\", \"printer\")"
+  },
+  "VALUE": {
+    "summary": "Converts a text that looks like a number to a number.",
+    "syntax": "VALUE(text)"
+  },
+  "CLEAN": {
+    "summary": "A text without non-printing characters.",
+    "syntax": "CLEAN(text)"
+  },
+  "REPT": {
+    "summary": "Repeats a text a number of times.",
+    "syntax": "REPT(text, number_times)"
+  },
+  "CHAR": {
+    "summary": "The character with a given code.",
+    "syntax": "CHAR(number)"
+  },
+  "CODE": {
+    "summary": "The code of the first character of a text.",
+    "syntax": "CODE(text)"
+  },
+  "UNICHAR": {
+    "summary": "The Unicode character with a given code point.",
+    "syntax": "UNICHAR(number)"
+  },
+  "UNICODE": {
+    "summary": "The Unicode code point of the first character of a text.",
+    "syntax": "UNICODE(text)"
+  },
+  "PROPER": {
+    "summary": "A text with the first letter of each word capitalised.",
+    "syntax": "PROPER(text)"
+  },
+  "NUMBERVALUE": {
+    "summary": "Converts text to a number with given decimal and group separators.",
+    "syntax": "NUMBERVALUE(Text, [Decimal_separator], [Group_separator ])"
+  },
+  "TIME": {
+    "summary": "The time serial number for an hour, minute and second.",
+    "syntax": "TIME(hour, minute, second)"
+  },
+  "TIMEVALUE": {
+    "summary": "Converts a time written as text to a time serial number.",
+    "syntax": "TIMEVALUE(time_text)"
+  },
+  "HOUR": {
+    "summary": "The hour of a time, 0 to 23.",
+    "syntax": "HOUR(serial_number)"
+  },
+  "MINUTE": {
+    "summary": "The minute of a time, 0 to 59.",
+    "syntax": "MINUTE(serial_number)"
+  },
+  "SECOND": {
+    "summary": "The second of a time, 0 to 59.",
+    "syntax": "SECOND(serial_number)"
+  },
+  "DAYS": {
+    "summary": "The number of days between two dates.",
+    "syntax": "DAYS(end_date, start_date)"
+  },
+  "EDATE": {
+    "summary": "The date a number of months before or after a date.",
+    "syntax": "EDATE(start_date, months)"
+  },
+  "EOMONTH": {
+    "summary": "The last day of the month a number of months before or after a date.",
+    "syntax": "EOMONTH(start_date, months)"
+  },
+  "WEEKDAY": {
+    "summary": "The day of the week of a date, as a number.",
+    "syntax": "WEEKDAY(serial_number, [return_type])"
+  },
+  "WEEKNUM": {
+    "summary": "The week number of a date in its year.",
+    "syntax": "WEEKNUM(serial_number, [return_type])"
+  },
+  "WORKDAY": {
+    "summary": "The date a number of working days before or after a date.",
+    "syntax": "WORKDAY(start_date, days, [holidays])"
+  },
+  "NETWORKDAYS": {
+    "summary": "The number of working days between two dates.",
+    "syntax": "NETWORKDAYS(start_date, end_date, [holidays])"
+  },
+  "YEARFRAC": {
+    "summary": "The fraction of a year between two dates, by a day-count basis.",
+    "syntax": "YEARFRAC(start_date, end_date, [basis])"
+  },
+  "DAYS360": {
+    "summary": "The number of days between two dates on a 360-day year.",
+    "syntax": "DAYS360(start_date, end_date, [method])"
+  },
+  "MEDIAN": {
+    "summary": "The middle value of a set of numbers.",
+    "syntax": "MEDIAN(number1, [number2], …)"
+  },
+  "MODE.SNGL": {
+    "summary": "The most frequent value in a set of numbers.",
+    "syntax": "MODE.SNGL(number1, [number2], …)"
+  },
+  "LARGE": {
+    "summary": "The k-th largest value in a set.",
+    "syntax": "LARGE(array, k)"
+  },
+  "SMALL": {
+    "summary": "The k-th smallest value in a set.",
+    "syntax": "SMALL(array, k)"
+  },
+  "RANK.EQ": {
+    "summary": "The rank of a number in a list; ties share the top rank.",
+    "syntax": "RANK.EQ(number, ref, [order])"
+  },
+  "PERCENTILE.INC": {
+    "summary": "The k-th percentile of a set, for k from 0 to 1 inclusive.",
+    "syntax": "PERCENTILE.INC(array, k)"
+  },
+  "QUARTILE.INC": {
+    "summary": "A quartile of a set, from percentiles 0 to 1 inclusive.",
+    "syntax": "QUARTILE.INC(array, quart)"
+  },
+  "STDEV.S": {
+    "summary": "The standard deviation of a sample.",
+    "syntax": "STDEV.S(number1, [number2], …)"
+  },
+  "STDEV.P": {
+    "summary": "The standard deviation of a whole population.",
+    "syntax": "STDEV.P(number1, [number2], …)"
+  },
+  "VAR.S": {
+    "summary": "The variance of a sample.",
+    "syntax": "VAR.S(number1, [number2], …)"
+  },
+  "VAR.P": {
+    "summary": "The variance of a whole population.",
+    "syntax": "VAR.P(number1, [number2], …)"
+  },
+  "GEOMEAN": {
+    "summary": "The geometric mean of positive numbers.",
+    "syntax": "GEOMEAN(number1, [number2], …)"
+  },
+  "CORREL": {
+    "summary": "The correlation coefficient of two sets of values.",
+    "syntax": "CORREL(array1, array2)"
+  },
+  "COVARIANCE.S": {
+    "summary": "The sample covariance of two sets of values.",
+    "syntax": "COVARIANCE.S(array1, array2)"
+  },
+  "COVARIANCE.P": {
+    "summary": "The population covariance of two sets of values.",
+    "syntax": "COVARIANCE.P(array1, array2)"
+  },
+  "COUNTBLANK": {
+    "summary": "The number of empty cells in a range.",
+    "syntax": "COUNTBLANK(A2:B4)"
+  },
+  "MAXIFS": {
+    "summary": "The largest value among the cells that meet every criterion.",
+    "syntax": "MAXIFS(max_range, criteria_range1, criteria1, [criteria_range2, criteria2], …)"
+  },
+  "MINIFS": {
+    "summary": "The smallest value among the cells that meet every criterion.",
+    "syntax": "MINIFS(min_range, criteria_range1, criteria1, [criteria_range2, criteria2], …)"
+  },
+  "XMATCH": {
+    "summary": "The position of a value in a range, with exact, next-smaller, next-larger, wildcard and binary search modes.",
+    "syntax": "XMATCH(lookup_value, lookup_array, [match_mode], [search_mode])"
+  },
+  "CHOOSE": {
+    "summary": "The value at an index in a list of arguments.",
+    "syntax": "CHOOSE(index_num, value1, [value2], …)"
+  },
+  "ROW": {
+    "summary": "The row number of a reference.",
+    "syntax": "ROW([reference])"
+  },
+  "ROWS": {
+    "summary": "The number of rows in a reference or array.",
+    "syntax": "ROWS(array)"
+  },
+  "COLUMN": {
+    "summary": "The column number of a reference.",
+    "syntax": "COLUMN([reference])"
+  },
+  "COLUMNS": {
+    "summary": "The number of columns in a reference or array.",
+    "syntax": "COLUMNS(array)"
+  },
+  "ADDRESS": {
+    "summary": "A cell address as text from a row and column number.",
+    "syntax": "ADDRESS(2, 3)"
+  },
+  "OFFSET": {
+    "summary": "A reference shifted by rows and columns from a starting reference.",
+    "syntax": "OFFSET(reference, rows, cols, [height], [width])"
+  },
+  "INDIRECT": {
+    "summary": "The reference named by a text.",
+    "syntax": "INDIRECT(ref_text, [a1])"
+  },
+  "AREAS": {
+    "summary": "The number of areas in a reference.",
+    "syntax": "AREAS(reference)"
+  },
+  "FORMULATEXT": {
+    "summary": "The formula of a cell, as text.",
+    "syntax": "FORMULATEXT(reference)"
+  },
+  "HYPERLINK": {
+    "summary": "A link to a URL or cell, shown with a friendly name.",
+    "syntax": "HYPERLINK(link_location, [friendly_name])"
+  },
+  "CELL": {
+    "summary": "Information about a cell: its address, format, contents and more.",
+    "syntax": "CELL(info_type, [reference])"
+  },
+  "TRANSPOSE": {
+    "summary": "An array with its rows and columns swapped.",
+    "syntax": "TRANSPOSE(A1:B4)"
+  },
+  "SEQUENCE": {
+    "summary": "An array of sequential numbers.",
+    "syntax": "SEQUENCE(4, 5)"
+  },
+  "TAKE": {
+    "summary": "Rows or columns from the start or end of an array.",
+    "syntax": "TAKE(array, rows, [columns])"
+  },
+  "DROP": {
+    "summary": "An array without rows or columns at its start or end.",
+    "syntax": "DROP(array, rows, [columns])"
+  },
+  "CHOOSECOLS": {
+    "summary": "The given columns of an array.",
+    "syntax": "CHOOSECOLS(array, col_num1, [col_num2], …)"
+  },
+  "CHOOSEROWS": {
+    "summary": "The given rows of an array.",
+    "syntax": "CHOOSEROWS(array, row_num1, [row_num2], …)"
+  },
+  "PV": {
+    "summary": "The present value of a series of equal payments.",
+    "syntax": "PV(rate, nper, pmt, [fv], [type])"
+  },
+  "FV": {
+    "summary": "The future value of an investment with equal payments and a fixed rate.",
+    "syntax": "FV(rate, nper, pmt, [pv], [type])"
+  },
+  "PMT": {
+    "summary": "The payment per period of a loan with a fixed rate.",
+    "syntax": "PMT(rate, nper, pv, [fv], [type])"
+  },
+  "NPV": {
+    "summary": "The net present value of future cash flows at a discount rate.",
+    "syntax": "NPV(rate, value1, [value2], …)"
+  },
+  "IRR": {
+    "summary": "The internal rate of return of periodic cash flows.",
+    "syntax": "IRR(values, [guess])"
+  },
+  "RATE": {
+    "summary": "The interest rate per period of an annuity.",
+    "syntax": "RATE(nper, pmt, pv, [fv], [type], [guess])"
+  },
+  "IPMT": {
+    "summary": "The interest part of one payment of a loan.",
+    "syntax": "IPMT(rate, per, nper, pv, [fv], [type])"
+  },
+  "PPMT": {
+    "summary": "The principal part of one payment of a loan.",
+    "syntax": "PPMT(rate, per, nper, pv, [fv], [type])"
+  },
+  "NORM.DIST": {
+    "summary": "The normal distribution for a mean and standard deviation.",
+    "syntax": "NORM.DIST(x, mean, standard_dev, cumulative)"
+  },
+  "NORM.INV": {
+    "summary": "The inverse of the normal cumulative distribution.",
+    "syntax": "NORM.INV(probability, mean, standard_dev)"
+  },
+  "NORM.S.DIST": {
+    "summary": "The standard normal distribution.",
+    "syntax": "NORM.S.DIST(z, cumulative)"
+  },
+  "NORM.S.INV": {
+    "summary": "The inverse of the standard normal cumulative distribution.",
+    "syntax": "NORM.S.INV(probability)"
+  },
+  "T.DIST": {
+    "summary": "The left-tailed Student's t-distribution.",
+    "syntax": "T.DIST(x, deg_freedom, cumulative)"
+  },
+  "T.DIST.2T": {
+    "summary": "The two-tailed Student's t-distribution.",
+    "syntax": "T.DIST.2T(x, deg_freedom)"
+  },
+  "T.DIST.RT": {
+    "summary": "The right-tailed Student's t-distribution.",
+    "syntax": "T.DIST.RT(x, deg_freedom)"
+  },
+  "T.INV": {
+    "summary": "The left-tailed inverse of the Student's t-distribution.",
+    "syntax": "T.INV(probability, deg_freedom)"
+  },
+  "T.INV.2T": {
+    "summary": "The two-tailed inverse of the Student's t-distribution.",
+    "syntax": "T.INV.2T(probability, deg_freedom)"
+  },
+  "CHISQ.DIST": {
+    "summary": "The left-tailed chi-squared distribution.",
+    "syntax": "CHISQ.DIST(x, deg_freedom, cumulative)"
+  },
+  "CHISQ.DIST.RT": {
+    "summary": "The right-tailed chi-squared distribution.",
+    "syntax": "CHISQ.DIST.RT(x, deg_freedom)"
+  },
+  "CHISQ.INV": {
+    "summary": "The inverse of the left-tailed chi-squared distribution.",
+    "syntax": "CHISQ.INV(probability, deg_freedom)"
+  },
+  "CHISQ.INV.RT": {
+    "summary": "The inverse of the right-tailed chi-squared distribution.",
+    "syntax": "CHISQ.INV.RT(probability, deg_freedom)"
+  },
+  "F.DIST": {
+    "summary": "The left-tailed F probability distribution.",
+    "syntax": "F.DIST(x, deg_freedom1, deg_freedom2, cumulative)"
+  },
+  "F.DIST.RT": {
+    "summary": "The right-tailed F probability distribution.",
+    "syntax": "F.DIST.RT(x, deg_freedom1, deg_freedom2)"
+  },
+  "F.INV": {
+    "summary": "The inverse of the left-tailed F distribution.",
+    "syntax": "F.INV(probability, deg_freedom1, deg_freedom2)"
+  },
+  "F.INV.RT": {
+    "summary": "The inverse of the right-tailed F distribution.",
+    "syntax": "F.INV.RT(probability, deg_freedom1, deg_freedom2)"
+  },
+  "BINOM.DIST": {
+    "summary": "The binomial distribution probability of a number of successes.",
+    "syntax": "BINOM.DIST(number_s, trials, probability_s, cumulative)"
+  },
+  "POISSON.DIST": {
+    "summary": "The Poisson distribution.",
+    "syntax": "POISSON.DIST(x, mean, cumulative)"
+  },
+  "EXPON.DIST": {
+    "summary": "The exponential distribution.",
+    "syntax": "EXPON.DIST(x, lambda, cumulative)"
+  },
+  "GAMMA": {
+    "summary": "The gamma function of a number.",
+    "syntax": "GAMMA(number)"
+  },
+  "GAMMALN": {
+    "summary": "The natural logarithm of the gamma function.",
+    "syntax": "GAMMALN(x)"
+  },
+  "GAMMA.DIST": {
+    "summary": "The gamma distribution.",
+    "syntax": "GAMMA.DIST(x, alpha, beta, cumulative)"
+  },
+  "GAMMA.INV": {
+    "summary": "The inverse of the gamma cumulative distribution.",
+    "syntax": "GAMMA.INV(probability, alpha, beta)"
+  },
+  "BETA.DIST": {
+    "summary": "The beta distribution.",
+    "syntax": "BETA.DIST(x, alpha, beta, cumulative, [A], [B])"
+  },
+  "BETA.INV": {
+    "summary": "The inverse of the beta cumulative distribution.",
+    "syntax": "BETA.INV(probability, alpha, beta, [A], [B])"
+  },
+  "LOGNORM.DIST": {
+    "summary": "The lognormal distribution.",
+    "syntax": "LOGNORM.DIST(x, mean, standard_dev, cumulative)"
+  },
+  "LOGNORM.INV": {
+    "summary": "The inverse of the lognormal cumulative distribution.",
+    "syntax": "LOGNORM.INV(probability, mean, standard_dev)"
+  },
+  "WEIBULL.DIST": {
+    "summary": "The Weibull distribution.",
+    "syntax": "WEIBULL.DIST(x, alpha, beta, cumulative)"
+  },
+  "CONFIDENCE.NORM": {
+    "summary": "The half-width of a confidence interval for a mean, from the normal distribution.",
+    "syntax": "CONFIDENCE.NORM(alpha, standard_dev, size)"
+  },
+  "CONFIDENCE.T": {
+    "summary": "The half-width of a confidence interval for a mean, from the t-distribution.",
+    "syntax": "CONFIDENCE.T(alpha, standard_dev, size)"
+  },
+  "STANDARDIZE": {
+    "summary": "A value as a z-score for a mean and standard deviation.",
+    "syntax": "STANDARDIZE(x, mean, standard_dev)"
+  },
+  "FISHER": {
+    "summary": "The Fisher transformation of a value.",
+    "syntax": "FISHER(x)"
+  },
+  "FISHERINV": {
+    "summary": "The inverse of the Fisher transformation.",
+    "syntax": "FISHERINV(y)"
+  },
+  "PHI": {
+    "summary": "The density of the standard normal distribution at a value.",
+    "syntax": "PHI(x)"
+  },
+  "GAUSS": {
+    "summary": "The probability that a standard normal value lies between the mean and z standard deviations from it.",
+    "syntax": "GAUSS(z)"
+  },
+  "AVEDEV": {
+    "summary": "The average absolute deviation of values from their mean.",
+    "syntax": "AVEDEV(number1, [number2], …)"
+  },
+  "DEVSQ": {
+    "summary": "The sum of squared deviations from the mean.",
+    "syntax": "DEVSQ(number1, [number2], …)"
+  },
+  "HARMEAN": {
+    "summary": "The harmonic mean of positive numbers.",
+    "syntax": "HARMEAN(number1, [number2], …)"
+  },
+  "KURT": {
+    "summary": "The kurtosis of a data set.",
+    "syntax": "KURT(number1, [number2], …)"
+  },
+  "SKEW": {
+    "summary": "The skewness of a sample.",
+    "syntax": "SKEW(number1, [number2], …)"
+  },
+  "SKEW.P": {
+    "summary": "The skewness of a population.",
+    "syntax": "SKEW.P(number1, [number2], …)"
+  },
+  "TRIMMEAN": {
+    "summary": "The mean of a data set without a share of its highest and lowest values.",
+    "syntax": "TRIMMEAN(array, percent)"
+  },
+  "PERCENTILE.EXC": {
+    "summary": "The k-th percentile of a set, for k strictly between 0 and 1.",
+    "syntax": "PERCENTILE.EXC(array, k)"
+  },
+  "QUARTILE.EXC": {
+    "summary": "A quartile of a set, from percentiles strictly between 0 and 1.",
+    "syntax": "QUARTILE.EXC(array, quart)"
+  },
+  "PERCENTRANK.INC": {
+    "summary": "The rank of a value in a set as a percentage, 0 to 1 inclusive.",
+    "syntax": "PERCENTRANK.INC(array, x, [significance])"
+  },
+  "PERCENTRANK.EXC": {
+    "summary": "The rank of a value in a set as a percentage, strictly between 0 and 1.",
+    "syntax": "PERCENTRANK.EXC(array, x, [significance])"
+  },
+  "RANK.AVG": {
+    "summary": "The rank of a number in a list; ties share their average rank.",
+    "syntax": "RANK.AVG(number, ref, [order])"
+  },
+  "PEARSON": {
+    "summary": "The Pearson correlation coefficient of two sets of values.",
+    "syntax": "PEARSON(array1, array2)"
+  },
+  "RSQ": {
+    "summary": "The square of the Pearson correlation coefficient.",
+    "syntax": "RSQ(known_y's, known_x's)"
+  },
+  "SLOPE": {
+    "summary": "The slope of the linear regression line through data points.",
+    "syntax": "SLOPE(known_y's, known_x's)"
+  },
+  "INTERCEPT": {
+    "summary": "The y-intercept of the linear regression line through data points.",
+    "syntax": "INTERCEPT(known_y's, known_x's)"
+  },
+  "STEYX": {
+    "summary": "The standard error of the predicted y in a linear regression.",
+    "syntax": "STEYX(known_y's, known_x's)"
+  },
+  "FORECAST.LINEAR": {
+    "summary": "A future value on the linear trend of existing values.",
+    "syntax": "FORECAST.LINEAR(x, known_y's, known_x's)"
+  },
+  "DATEDIF": {
+    "summary": "The difference between two dates in years, months or days.",
+    "syntax": "DATEDIF(Start_date, End_date, \"Y\")"
+  },
+  "ISOWEEKNUM": {
+    "summary": "The ISO week number of a date.",
+    "syntax": "ISOWEEKNUM(date)"
+  },
+  "NETWORKDAYS.INTL": {
+    "summary": "The number of working days between two dates, with custom weekend days.",
+    "syntax": "NETWORKDAYS.INTL(start_date, end_date, [weekend], [holidays])"
+  },
+  "WORKDAY.INTL": {
+    "summary": "The date a number of working days away, with custom weekend days.",
+    "syntax": "WORKDAY.INTL(start_date, days, [weekend], [holidays])"
+  },
+  "CUMIPMT": {
+    "summary": "The interest paid on a loan between two periods.",
+    "syntax": "CUMIPMT(rate, nper, pv, start_period, end_period, type)"
+  },
+  "CUMPRINC": {
+    "summary": "The principal paid on a loan between two periods.",
+    "syntax": "CUMPRINC(rate, nper, pv, start_period, end_period, type)"
+  },
+  "DB": {
+    "summary": "Depreciation for a period by the fixed-declining-balance method.",
+    "syntax": "DB(cost, salvage, life, period, [month])"
+  },
+  "DDB": {
+    "summary": "Depreciation for a period by the double-declining-balance method.",
+    "syntax": "DDB(cost, salvage, life, period, [factor])"
+  },
+  "EFFECT": {
+    "summary": "The effective annual interest rate from a nominal rate.",
+    "syntax": "EFFECT(nominal_rate, npery)"
+  },
+  "FVSCHEDULE": {
+    "summary": "The future value of a principal after a series of interest rates.",
+    "syntax": "FVSCHEDULE(principal, schedule)"
+  },
+  "MIRR": {
+    "summary": "The modified internal rate of return of periodic cash flows.",
+    "syntax": "MIRR(values, finance_rate, reinvest_rate)"
+  },
+  "NOMINAL": {
+    "summary": "The nominal annual interest rate from an effective rate.",
+    "syntax": "NOMINAL(effect_rate, npery)"
+  },
+  "NPER": {
+    "summary": "The number of periods of an investment with equal payments.",
+    "syntax": "NPER(rate, pmt, pv, [fv], [type])"
+  },
+  "PDURATION": {
+    "summary": "The number of periods an investment needs to reach a value.",
+    "syntax": "PDURATION(rate, pv, fv)"
+  },
+  "RRI": {
+    "summary": "The equivalent interest rate for the growth of an investment.",
+    "syntax": "RRI(nper, pv, fv)"
+  },
+  "SLN": {
+    "summary": "Straight-line depreciation for one period.",
+    "syntax": "SLN(cost, salvage, life)"
+  },
+  "SYD": {
+    "summary": "Sum-of-years'-digits depreciation for a period.",
+    "syntax": "SYD(cost, salvage, life, per)"
+  },
+  "XIRR": {
+    "summary": "The internal rate of return of cash flows on given dates.",
+    "syntax": "XIRR(values, dates, [guess])"
+  },
+  "XNPV": {
+    "summary": "The net present value of cash flows on given dates.",
+    "syntax": "XNPV(rate, values, dates)"
+  },
+  "FREQUENCY": {
+    "summary": "How many values fall in each bin, as a vertical array.",
+    "syntax": "FREQUENCY(data_array, bins_array)"
+  },
+  "MODE.MULT": {
+    "summary": "Every most-frequent value of a set, as a vertical array.",
+    "syntax": "MODE.MULT((number1, [number2], …)"
+  },
+  "GROWTH": {
+    "summary": "Values on an exponential trend fitted to known data.",
+    "syntax": "GROWTH(known_y's, [known_x's], [new_x's], [const])"
+  },
+  "LINEST": {
+    "summary": "The statistics of a least-squares straight-line fit.",
+    "syntax": "LINEST(known_y's, [known_x's], [const], [stats])"
+  },
+  "LOGEST": {
+    "summary": "The statistics of an exponential curve fit.",
+    "syntax": "LOGEST(known_y's, [known_x's], [const], [stats])"
+  },
+  "PERCENTILE": {
+    "summary": "The k-th percentile of a set; the older form of PERCENTILE.INC.",
+    "syntax": "PERCENTILE(array, k)"
+  },
+  "PERCENTRANK": {
+    "summary": "The percentage rank of a value; the older form of PERCENTRANK.INC.",
+    "syntax": "PERCENTRANK(array, x, [significance])"
+  },
+  "PROB": {
+    "summary": "The probability that values fall between two limits.",
+    "syntax": "PROB(x_range, prob_range, [lower_limit], [upper_limit])"
+  },
+  "QUARTILE": {
+    "summary": "A quartile of a set; the older form of QUARTILE.INC.",
+    "syntax": "QUARTILE(array, quart)"
+  },
+  "RANK": {
+    "summary": "The rank of a number in a list; the older form of RANK.EQ.",
+    "syntax": "RANK(number, ref, [order])"
+  },
+  "TREND": {
+    "summary": "Values on the linear trend fitted to known data.",
+    "syntax": "TREND(known_y's, [known_x's], [new_x's], [const])"
+  },
+  "DAVERAGE": {
+    "summary": "The average of a database field over the records that meet criteria.",
+    "syntax": "DAVERAGE(database, field, criteria)"
+  },
+  "DCOUNT": {
+    "summary": "The number of numeric values in a database field over matching records.",
+    "syntax": "DCOUNT(database, field, criteria)"
+  },
+  "DCOUNTA": {
+    "summary": "The number of non-empty values in a database field over matching records.",
+    "syntax": "DCOUNTA(database, field, criteria)"
+  },
+  "DGET": {
+    "summary": "The one value of a database field that meets criteria.",
+    "syntax": "DGET(database, field, criteria)"
+  },
+  "DMAX": {
+    "summary": "The largest value of a database field over matching records.",
+    "syntax": "DMAX(database, field, criteria)"
+  },
+  "DMIN": {
+    "summary": "The smallest value of a database field over matching records.",
+    "syntax": "DMIN(database, field, criteria)"
+  },
+  "DPRODUCT": {
+    "summary": "The product of a database field over matching records.",
+    "syntax": "DPRODUCT(database, field, criteria)"
+  },
+  "DSTDEV": {
+    "summary": "The sample standard deviation of a database field over matching records.",
+    "syntax": "DSTDEV(database, field, criteria)"
+  },
+  "DSTDEVP": {
+    "summary": "The population standard deviation of a database field over matching records.",
+    "syntax": "DSTDEVP(database, field, criteria)"
+  },
+  "DSUM": {
+    "summary": "The sum of a database field over matching records.",
+    "syntax": "DSUM(database, field, criteria)"
+  },
+  "DVAR": {
+    "summary": "The sample variance of a database field over matching records.",
+    "syntax": "DVAR(database, field, criteria)"
+  },
+  "DVARP": {
+    "summary": "The population variance of a database field over matching records.",
+    "syntax": "DVARP(database, field, criteria)"
+  },
+  "AGGREGATE": {
+    "summary": "A summary of a range that can skip errors, hidden rows and subtotals.",
+    "syntax": "AGGREGATE(function_num, options, ref1, [ref2], …)"
+  },
+  "CEILING.MATH": {
+    "summary": "Rounds a number up to the nearest integer or multiple, with a mode for negatives.",
+    "syntax": "CEILING.MATH(24.3, 5)"
+  },
+  "COMBIN": {
+    "summary": "The number of combinations of a number of items taken k at a time.",
+    "syntax": "COMBIN(number, number_chosen)"
+  },
+  "COMBINA": {
+    "summary": "The number of combinations with repetitions.",
+    "syntax": "COMBINA(number, number_chosen)"
+  },
+  "FACT": {
+    "summary": "The factorial of a number.",
+    "syntax": "FACT(number)"
+  },
+  "FACTDOUBLE": {
+    "summary": "The double factorial of a number.",
+    "syntax": "FACTDOUBLE(number)"
+  },
+  "FLOOR.MATH": {
+    "summary": "Rounds a number down to the nearest integer or multiple, with a mode for negatives.",
+    "syntax": "FLOOR.MATH(number, significance, mode)"
+  },
+  "MDETERM": {
+    "summary": "The determinant of a square matrix.",
+    "syntax": "MDETERM(array)"
+  },
+  "MINVERSE": {
+    "summary": "The inverse of a square matrix.",
+    "syntax": "MINVERSE(array)"
+  },
+  "MMULT": {
+    "summary": "The matrix product of two arrays.",
+    "syntax": "MMULT(array1, array2)"
+  },
+  "MULTINOMIAL": {
+    "summary": "The multinomial coefficient of a set of numbers.",
+    "syntax": "MULTINOMIAL(number1, [number2], …)"
+  },
+  "MUNIT": {
+    "summary": "The identity matrix of a given size.",
+    "syntax": "MUNIT(dimension)"
+  },
+  "PERMUT": {
+    "summary": "The number of permutations of a number of items taken k at a time.",
+    "syntax": "PERMUT(number, number_chosen)"
+  },
+  "PERMUTATIONA": {
+    "summary": "The number of permutations with repetitions.",
+    "syntax": "PERMUTATIONA(number, number-chosen)"
+  },
+  "SERIESSUM": {
+    "summary": "The sum of a power series.",
+    "syntax": "SERIESSUM(x, n, m, coefficients)"
+  },
+  "SQRTPI": {
+    "summary": "The square root of a number multiplied by π.",
+    "syntax": "SQRTPI(number)"
+  },
+  "SUMSQ": {
+    "summary": "The sum of the squares of its arguments.",
+    "syntax": "SUMSQ(number1, [number2], …)"
+  },
+  "SUMX2MY2": {
+    "summary": "The sum of the differences of squares of matching values in two arrays.",
+    "syntax": "SUMX2MY2(array_x, array_y)"
+  },
+  "SUMX2PY2": {
+    "summary": "The sum of the sums of squares of matching values in two arrays.",
+    "syntax": "SUMX2PY2(array_x, array_y)"
+  },
+  "SUMXMY2": {
+    "summary": "The sum of the squared differences of matching values in two arrays.",
+    "syntax": "SUMXMY2(array_x, array_y)"
+  },
+  "EXPAND": {
+    "summary": "An array padded to a given number of rows and columns.",
+    "syntax": "EXPAND(array, rows, [columns], [pad_with])"
+  },
+  "HSTACK": {
+    "summary": "Arrays joined side by side.",
+    "syntax": "HSTACK(array1, [array2], …)"
+  },
+  "SORTBY": {
+    "summary": "An array sorted by the values of other arrays.",
+    "syntax": "SORTBY(array, by_array1, [sort_order1], [by_array2, sort_order2], …)"
+  },
+  "TOCOL": {
+    "summary": "An array as a single column.",
+    "syntax": "TOCOL(array, [ignore], [scan_by_column])"
+  },
+  "TOROW": {
+    "summary": "An array as a single row.",
+    "syntax": "TOROW(array, [ignore], [scan_by_column])"
+  },
+  "VSTACK": {
+    "summary": "Arrays stacked one above another.",
+    "syntax": "VSTACK(array1, [array2], …)"
+  },
+  "WRAPCOLS": {
+    "summary": "A row or column wrapped into columns of a given length.",
+    "syntax": "WRAPCOLS(vector, wrap_count, [pad_with])"
+  },
+  "WRAPROWS": {
+    "summary": "A row or column wrapped into rows of a given length.",
+    "syntax": "WRAPROWS(vector, wrap_count, [pad_with])"
+  },
+  "LAMBDA": {
+    "summary": "Defines a reusable function with parameters.",
+    "syntax": "LAMBDA([parameter1, parameter2, …], calculation)"
+  },
+  "MAP": {
+    "summary": "Applies a LAMBDA to each value of arrays and returns the results.",
+    "syntax": "MAP(array1, lambda_or_array<#>)"
+  },
+  "REDUCE": {
+    "summary": "Folds an array into one value with a LAMBDA accumulator.",
+    "syntax": "REDUCE([initial_value], array, lambda(accumulator, value, body))"
+  },
+  "SCAN": {
+    "summary": "Applies a LAMBDA accumulator to an array and returns every step.",
+    "syntax": "SCAN([initial_value], array, lambda(accumulator, value, body))"
+  },
+  "BYROW": {
+    "summary": "Applies a LAMBDA to each row of an array.",
+    "syntax": "BYROW(array, lambda(row))"
+  },
+  "BYCOL": {
+    "summary": "Applies a LAMBDA to each column of an array.",
+    "syntax": "BYCOL(array, lambda(column))"
+  },
+  "MAKEARRAY": {
+    "summary": "Builds an array of a size from a LAMBDA of row and column.",
+    "syntax": "MAKEARRAY(rows, cols, lambda(row, col))"
+  },
+  "ISOMITTED": {
+    "summary": "TRUE when a LAMBDA parameter was not passed.",
+    "syntax": "ISOMITTED(argument)"
+  },
+  "GROUPBY": {
+    "summary": "Groups rows by key columns and summarises their values.",
+    "syntax": "GROUPBY(row_fields, values, function, [field_headers], [total_depth], [sort_order], [filter_array], [field_relationship])"
+  },
+  "PIVOTBY": {
+    "summary": "Groups values by row and column keys into a summary table.",
+    "syntax": "PIVOTBY(row_fields, col_fields, values, function, [field_headers], [row_total_depth], [row_sort_order], [col_total_depth], [col_sort_order], [filter_array], [relative_to])"
+  },
+  "PERCENTOF": {
+    "summary": "The share of a subset's total in the total of all values.",
+    "syntax": "PERCENTOF(data_subset, data_all)"
+  },
+  "BETADIST": {
+    "summary": "The cumulative beta distribution; the older form of BETA.DIST.",
+    "syntax": "BETADIST(x, alpha, beta, [A], [B])"
+  },
+  "BETAINV": {
+    "summary": "The inverse of the cumulative beta distribution; the older form of BETA.INV.",
+    "syntax": "BETAINV(probability, alpha, beta, [A], [B])"
+  },
+  "BINOMDIST": {
+    "summary": "The binomial distribution; the older form of BINOM.DIST.",
+    "syntax": "BINOMDIST(number_s, trials, probability_s, cumulative)"
+  },
+  "CHIDIST": {
+    "summary": "The right-tailed chi-squared distribution; the older form of CHISQ.DIST.RT.",
+    "syntax": "CHIDIST(x, deg_freedom)"
+  },
+  "CHIINV": {
+    "summary": "The inverse right-tailed chi-squared distribution; the older form of CHISQ.INV.RT.",
+    "syntax": "CHIINV(probability, deg_freedom)"
+  },
+  "CHITEST": {
+    "summary": "The chi-squared test of independence; the older form of CHISQ.TEST.",
+    "syntax": "CHITEST(actual_range, expected_range)"
+  },
+  "CONFIDENCE": {
+    "summary": "A confidence interval half-width from the normal distribution; the older form of CONFIDENCE.NORM.",
+    "syntax": "CONFIDENCE(alpha, standard_dev, size)"
+  },
+  "COVAR": {
+    "summary": "The population covariance; the older form of COVARIANCE.P.",
+    "syntax": "COVAR(array1, array2)"
+  },
+  "CRITBINOM": {
+    "summary": "The smallest number of successes whose cumulative binomial probability reaches a criterion.",
+    "syntax": "CRITBINOM(trials, probability_s, alpha)"
+  },
+  "EXPONDIST": {
+    "summary": "The exponential distribution; the older form of EXPON.DIST.",
+    "syntax": "EXPONDIST(x, lambda, cumulative)"
+  },
+  "FDIST": {
+    "summary": "The right-tailed F distribution; the older form of F.DIST.RT.",
+    "syntax": "FDIST(x, deg_freedom1, deg_freedom2)"
+  },
+  "FINV": {
+    "summary": "The inverse right-tailed F distribution; the older form of F.INV.RT.",
+    "syntax": "FINV(probability, deg_freedom1, deg_freedom2)"
+  },
+  "FTEST": {
+    "summary": "The two-tailed probability that two samples' variances are not significantly different; the older form of F.TEST.",
+    "syntax": "FTEST(array1, array2)"
+  },
+  "GAMMADIST": {
+    "summary": "The gamma distribution; the older form of GAMMA.DIST.",
+    "syntax": "GAMMADIST(x, alpha, beta, cumulative)"
+  },
+  "GAMMAINV": {
+    "summary": "The inverse gamma distribution; the older form of GAMMA.INV.",
+    "syntax": "GAMMAINV(probability, alpha, beta)"
+  },
+  "HYPGEOMDIST": {
+    "summary": "The hypergeometric distribution; the older form of HYPGEOM.DIST.",
+    "syntax": "HYPGEOMDIST(sample_s, number_sample, population_s, number_pop)"
+  },
+  "LOGINV": {
+    "summary": "The inverse lognormal distribution; the older form of LOGNORM.INV.",
+    "syntax": "LOGINV(probability, mean, standard_dev)"
+  },
+  "LOGNORMDIST": {
+    "summary": "The cumulative lognormal distribution; the older form of LOGNORM.DIST.",
+    "syntax": "LOGNORMDIST(x, mean, standard_dev)"
+  },
+  "MODE": {
+    "summary": "The most frequent value; the older form of MODE.SNGL.",
+    "syntax": "MODE(number1, [number2], …)"
+  },
+  "NEGBINOMDIST": {
+    "summary": "The negative binomial distribution; the older form of NEGBINOM.DIST.",
+    "syntax": "NEGBINOMDIST(number_f, number_s, probability_s)"
+  },
+  "NORMDIST": {
+    "summary": "The normal distribution; the older form of NORM.DIST.",
+    "syntax": "NORMDIST(x, mean, standard_dev, cumulative)"
+  },
+  "NORMINV": {
+    "summary": "The inverse normal distribution; the older form of NORM.INV.",
+    "syntax": "NORMINV(probability, mean, standard_dev)"
+  },
+  "NORMSDIST": {
+    "summary": "The cumulative standard normal distribution; the older form of NORM.S.DIST.",
+    "syntax": "NORMSDIST(z)"
+  },
+  "NORMSINV": {
+    "summary": "The inverse standard normal distribution; the older form of NORM.S.INV.",
+    "syntax": "NORMSINV(probability)"
+  },
+  "POISSON": {
+    "summary": "The Poisson distribution; the older form of POISSON.DIST.",
+    "syntax": "POISSON(x, mean, cumulative)"
+  },
+  "STDEV": {
+    "summary": "The standard deviation of a sample; the older form of STDEV.S.",
+    "syntax": "STDEV(number1, [number2], …)"
+  },
+  "STDEVP": {
+    "summary": "The standard deviation of a population; the older form of STDEV.P.",
+    "syntax": "STDEVP(number1, [number2], …)"
+  },
+  "TDIST": {
+    "summary": "The right-tailed or two-tailed Student's t-distribution; the older form of T.DIST.RT and T.DIST.2T.",
+    "syntax": "TDIST(x, deg_freedom, tails)"
+  },
+  "TINV": {
+    "summary": "The two-tailed inverse t-distribution; the older form of T.INV.2T.",
+    "syntax": "TINV(probability, deg_freedom)"
+  },
+  "TTEST": {
+    "summary": "The probability from a Student's t-test; the older form of T.TEST.",
+    "syntax": "TTEST(array1, array2, tails, type)"
+  },
+  "VAR": {
+    "summary": "The variance of a sample; the older form of VAR.S.",
+    "syntax": "VAR(number1, [number2], …)"
+  },
+  "VARP": {
+    "summary": "The variance of a population; the older form of VAR.P.",
+    "syntax": "VARP(number1, [number2], …)"
+  },
+  "WEIBULL": {
+    "summary": "The Weibull distribution; the older form of WEIBULL.DIST.",
+    "syntax": "WEIBULL(x, alpha, beta, cumulative)"
+  },
+  "ZTEST": {
+    "summary": "The one-tailed probability of a z-test; the older form of Z.TEST.",
+    "syntax": "ZTEST(array, x, [sigma])"
+  },
+  "BIN2DEC": {
+    "summary": "Converts a binary number to decimal.",
+    "syntax": "BIN2DEC(number)"
+  },
+  "BIN2HEX": {
+    "summary": "Converts a binary number to hexadecimal.",
+    "syntax": "BIN2HEX(number, [places])"
+  },
+  "BIN2OCT": {
+    "summary": "Converts a binary number to octal.",
+    "syntax": "BIN2OCT(number, [places])"
+  },
+  "BITAND": {
+    "summary": "The bitwise AND of two numbers.",
+    "syntax": "BITAND(number1, number2)"
+  },
+  "BITLSHIFT": {
+    "summary": "A number shifted left by a number of bits.",
+    "syntax": "BITLSHIFT(number, shift_amount)"
+  },
+  "BITOR": {
+    "summary": "The bitwise OR of two numbers.",
+    "syntax": "BITOR(number1, number2)"
+  },
+  "BITRSHIFT": {
+    "summary": "A number shifted right by a number of bits.",
+    "syntax": "BITRSHIFT(number, shift_amount)"
+  },
+  "BITXOR": {
+    "summary": "The bitwise exclusive OR of two numbers.",
+    "syntax": "BITXOR(number1, number2)"
+  },
+  "DEC2BIN": {
+    "summary": "Converts a decimal number to binary.",
+    "syntax": "DEC2BIN(number, [places])"
+  },
+  "DEC2HEX": {
+    "summary": "Converts a decimal number to hexadecimal.",
+    "syntax": "DEC2HEX(number, [places])"
+  },
+  "DEC2OCT": {
+    "summary": "Converts a decimal number to octal.",
+    "syntax": "DEC2OCT(number, [places])"
+  },
+  "DELTA": {
+    "summary": "1 when two numbers are equal, otherwise 0.",
+    "syntax": "DELTA(number1, [number2])"
+  },
+  "ERF": {
+    "summary": "The error function, between two limits or from 0.",
+    "syntax": "ERF(lower_limit, [upper_limit])"
+  },
+  "ERF.PRECISE": {
+    "summary": "The error function from 0 to a limit.",
+    "syntax": "ERF.PRECISE(x)"
+  },
+  "ERFC": {
+    "summary": "The complementary error function.",
+    "syntax": "ERFC(x)"
+  },
+  "ERFC.PRECISE": {
+    "summary": "The complementary error function from a limit to infinity.",
+    "syntax": "ERFC.PRECISE(x)"
+  },
+  "GESTEP": {
+    "summary": "1 when a number is at least a step value, otherwise 0.",
+    "syntax": "GESTEP(number, [step])"
+  },
+  "HEX2BIN": {
+    "summary": "Converts a hexadecimal number to binary.",
+    "syntax": "HEX2BIN(number, [places])"
+  },
+  "HEX2DEC": {
+    "summary": "Converts a hexadecimal number to decimal.",
+    "syntax": "HEX2DEC(number)"
+  },
+  "HEX2OCT": {
+    "summary": "Converts a hexadecimal number to octal.",
+    "syntax": "HEX2OCT(number, [places])"
+  },
+  "OCT2BIN": {
+    "summary": "Converts an octal number to binary.",
+    "syntax": "OCT2BIN(number, [places])"
+  },
+  "OCT2DEC": {
+    "summary": "Converts an octal number to decimal.",
+    "syntax": "OCT2DEC(number)"
+  },
+  "OCT2HEX": {
+    "summary": "Converts an octal number to hexadecimal.",
+    "syntax": "OCT2HEX(number, [places])"
+  },
+  "COMPLEX": {
+    "summary": "A complex number as text from real and imaginary parts.",
+    "syntax": "COMPLEX(real_num, i_num, [suffix])"
+  },
+  "IMABS": {
+    "summary": "The absolute value (modulus) of a complex number.",
+    "syntax": "IMABS(inumber)"
+  },
+  "IMAGINARY": {
+    "summary": "The imaginary part of a complex number.",
+    "syntax": "IMAGINARY(inumber)"
+  },
+  "IMARGUMENT": {
+    "summary": "The argument (angle) of a complex number, in radians.",
+    "syntax": "IMARGUMENT(inumber)"
+  },
+  "IMCONJUGATE": {
+    "summary": "The complex conjugate of a complex number.",
+    "syntax": "IMCONJUGATE(inumber)"
+  },
+  "IMCOS": {
+    "summary": "The cosine of a complex number.",
+    "syntax": "IMCOS(inumber)"
+  },
+  "IMCOSH": {
+    "summary": "The hyperbolic cosine of a complex number.",
+    "syntax": "IMCOSH(inumber)"
+  },
+  "IMCOT": {
+    "summary": "The cotangent of a complex number.",
+    "syntax": "IMCOT(inumber)"
+  },
+  "IMCSC": {
+    "summary": "The cosecant of a complex number.",
+    "syntax": "IMCSC(inumber)"
+  },
+  "IMCSCH": {
+    "summary": "The hyperbolic cosecant of a complex number.",
+    "syntax": "IMCSCH(inumber)"
+  },
+  "IMDIV": {
+    "summary": "The quotient of two complex numbers.",
+    "syntax": "IMDIV(inumber1, inumber2)"
+  },
+  "IMEXP": {
+    "summary": "e raised to the power of a complex number.",
+    "syntax": "IMEXP(inumber)"
+  },
+  "IMLN": {
+    "summary": "The natural logarithm of a complex number.",
+    "syntax": "IMLN(inumber)"
+  },
+  "IMLOG10": {
+    "summary": "The base-10 logarithm of a complex number.",
+    "syntax": "IMLOG10(inumber)"
+  },
+  "IMLOG2": {
+    "summary": "The base-2 logarithm of a complex number.",
+    "syntax": "IMLOG2(inumber)"
+  },
+  "IMPOWER": {
+    "summary": "A complex number raised to a power.",
+    "syntax": "IMPOWER(inumber, number)"
+  },
+  "IMPRODUCT": {
+    "summary": "The product of complex numbers.",
+    "syntax": "IMPRODUCT(inumber1, [inumber2], …)"
+  },
+  "IMREAL": {
+    "summary": "The real part of a complex number.",
+    "syntax": "IMREAL(inumber)"
+  },
+  "IMSEC": {
+    "summary": "The secant of a complex number.",
+    "syntax": "IMSEC(inumber)"
+  },
+  "IMSECH": {
+    "summary": "The hyperbolic secant of a complex number.",
+    "syntax": "IMSECH(inumber)"
+  },
+  "IMSIN": {
+    "summary": "The sine of a complex number.",
+    "syntax": "IMSIN(inumber)"
+  },
+  "IMSINH": {
+    "summary": "The hyperbolic sine of a complex number.",
+    "syntax": "IMSINH(inumber)"
+  },
+  "IMSQRT": {
+    "summary": "The square root of a complex number.",
+    "syntax": "IMSQRT(inumber)"
+  },
+  "IMSUB": {
+    "summary": "The difference of two complex numbers.",
+    "syntax": "IMSUB(inumber1, inumber2)"
+  },
+  "IMSUM": {
+    "summary": "The sum of complex numbers.",
+    "syntax": "IMSUM(inumber1, [inumber2], …)"
+  },
+  "IMTAN": {
+    "summary": "The tangent of a complex number.",
+    "syntax": "IMTAN(inumber)"
+  },
+  "BESSELI": {
+    "summary": "The modified Bessel function In(x).",
+    "syntax": "BESSELI(X, N)"
+  },
+  "BESSELJ": {
+    "summary": "The Bessel function Jn(x).",
+    "syntax": "BESSELJ(X, N)"
+  },
+  "BESSELK": {
+    "summary": "The modified Bessel function Kn(x).",
+    "syntax": "BESSELK(X, N)"
+  },
+  "BESSELY": {
+    "summary": "The Bessel function Yn(x).",
+    "syntax": "BESSELY(X, N)"
+  },
+  "CONVERT": {
+    "summary": "Converts a number from one measurement unit to another.",
+    "syntax": "CONVERT(1, \"lbm\", \"kg\")"
+  },
+  "ACCRINT": {
+    "summary": "The accrued interest of a security that pays periodic interest.",
+    "syntax": "ACCRINT(issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method])"
+  },
+  "ACCRINTM": {
+    "summary": "The accrued interest of a security that pays interest at maturity.",
+    "syntax": "ACCRINTM(issue, settlement, rate, par, [basis])"
+  },
+  "AMORDEGRC": {
+    "summary": "Depreciation for an accounting period, with a depreciation coefficient.",
+    "syntax": "AMORDEGRC(cost, date_purchased, first_period, salvage, period, rate, [basis])"
+  },
+  "AMORLINC": {
+    "summary": "Linear depreciation for an accounting period.",
+    "syntax": "AMORLINC(cost, date_purchased, first_period, salvage, period, rate, [basis])"
+  },
+  "COUPDAYBS": {
+    "summary": "The days from the start of the coupon period to settlement.",
+    "syntax": "COUPDAYBS(settlement, maturity, frequency, [basis])"
+  },
+  "COUPDAYS": {
+    "summary": "The days in the coupon period that holds the settlement date.",
+    "syntax": "COUPDAYS(settlement, maturity, frequency, [basis])"
+  },
+  "COUPDAYSNC": {
+    "summary": "The days from settlement to the next coupon date.",
+    "syntax": "COUPDAYSNC(settlement, maturity, frequency, [basis])"
+  },
+  "COUPNCD": {
+    "summary": "The next coupon date after settlement.",
+    "syntax": "COUPNCD(settlement, maturity, frequency, [basis])"
+  },
+  "COUPNUM": {
+    "summary": "The number of coupons payable between settlement and maturity.",
+    "syntax": "COUPNUM(settlement, maturity, frequency, [basis])"
+  },
+  "COUPPCD": {
+    "summary": "The previous coupon date before settlement.",
+    "syntax": "COUPPCD(settlement, maturity, frequency, [basis])"
+  },
+  "DISC": {
+    "summary": "The discount rate of a security.",
+    "syntax": "DISC(settlement, maturity, pr, redemption, [basis])"
+  },
+  "DOLLARDE": {
+    "summary": "Converts a price written as a fraction to a decimal number.",
+    "syntax": "DOLLARDE(fractional_dollar, fraction)"
+  },
+  "DOLLARFR": {
+    "summary": "Converts a decimal price to a price written as a fraction.",
+    "syntax": "DOLLARFR(decimal_dollar, fraction)"
+  },
+  "DURATION": {
+    "summary": "The Macaulay duration of a security with periodic interest.",
+    "syntax": "DURATION(settlement, maturity, coupon, yld, frequency, [basis])"
+  },
+  "INTRATE": {
+    "summary": "The interest rate of a fully invested security.",
+    "syntax": "INTRATE(settlement, maturity, investment, redemption, [basis])"
+  },
+  "ISPMT": {
+    "summary": "The interest paid in a period of a loan with equal principal payments.",
+    "syntax": "ISPMT(rate, per, nper, pv)"
+  },
+  "MDURATION": {
+    "summary": "The modified Macaulay duration of a security.",
+    "syntax": "MDURATION(settlement, maturity, coupon, yld, frequency, [basis])"
+  },
+  "ODDFPRICE": {
+    "summary": "The price per 100 face value of a security with an odd first period.",
+    "syntax": "ODDFPRICE(settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis])"
+  },
+  "ODDFYIELD": {
+    "summary": "The yield of a security with an odd first period.",
+    "syntax": "ODDFYIELD(settlement, maturity, issue, first_coupon, rate, pr, redemption, frequency, [basis])"
+  },
+  "ODDLPRICE": {
+    "summary": "The price per 100 face value of a security with an odd last period.",
+    "syntax": "ODDLPRICE(settlement, maturity, last_interest, rate, yld, redemption, frequency, [basis])"
+  },
+  "ODDLYIELD": {
+    "summary": "The yield of a security with an odd last period.",
+    "syntax": "ODDLYIELD(settlement, maturity, last_interest, rate, pr, redemption, frequency, [basis])"
+  },
+  "PRICE": {
+    "summary": "The price per 100 face value of a security that pays periodic interest.",
+    "syntax": "PRICE(settlement, maturity, rate, yld, redemption, frequency, [basis])"
+  },
+  "PRICEDISC": {
+    "summary": "The price per 100 face value of a discounted security.",
+    "syntax": "PRICEDISC(settlement, maturity, discount, redemption, [basis])"
+  },
+  "PRICEMAT": {
+    "summary": "The price per 100 face value of a security that pays interest at maturity.",
+    "syntax": "PRICEMAT(settlement, maturity, issue, rate, yld, [basis])"
+  },
+  "RECEIVED": {
+    "summary": "The amount received at maturity for a fully invested security.",
+    "syntax": "RECEIVED(settlement, maturity, investment, discount, [basis])"
+  },
+  "TBILLEQ": {
+    "summary": "The bond-equivalent yield of a Treasury bill.",
+    "syntax": "TBILLEQ(settlement, maturity, discount)"
+  },
+  "TBILLPRICE": {
+    "summary": "The price per 100 face value of a Treasury bill.",
+    "syntax": "TBILLPRICE(settlement, maturity, discount)"
+  },
+  "TBILLYIELD": {
+    "summary": "The yield of a Treasury bill.",
+    "syntax": "TBILLYIELD(settlement, maturity, pr)"
+  },
+  "VDB": {
+    "summary": "Declining-balance depreciation for any period, partial periods included.",
+    "syntax": "VDB(cost, salvage, life, start_period, end_period, [factor], [no_switch])"
+  },
+  "YIELD": {
+    "summary": "The yield of a security that pays periodic interest.",
+    "syntax": "YIELD(settlement, maturity, rate, pr, redemption, frequency, [basis])"
+  },
+  "YIELDDISC": {
+    "summary": "The annual yield of a discounted security.",
+    "syntax": "YIELDDISC(settlement, maturity, pr, redemption, [basis])"
+  },
+  "YIELDMAT": {
+    "summary": "The annual yield of a security that pays interest at maturity.",
+    "syntax": "YIELDMAT(settlement, maturity, issue, rate, pr, [basis])"
+  },
+  "ACOS": {
+    "summary": "The arccosine of a number, in radians.",
+    "syntax": "ACOS(number)"
+  },
+  "ACOSH": {
+    "summary": "The inverse hyperbolic cosine of a number.",
+    "syntax": "ACOSH(number)"
+  },
+  "ACOT": {
+    "summary": "The arccotangent of a number, in radians.",
+    "syntax": "ACOT(number)"
+  },
+  "ACOTH": {
+    "summary": "The inverse hyperbolic cotangent of a number.",
+    "syntax": "ACOTH(number)"
+  },
+  "ARABIC": {
+    "summary": "Converts a Roman numeral to a number.",
+    "syntax": "ARABIC(text)"
+  },
+  "ASIN": {
+    "summary": "The arcsine of a number, in radians.",
+    "syntax": "ASIN(number)"
+  },
+  "ASINH": {
+    "summary": "The inverse hyperbolic sine of a number.",
+    "syntax": "ASINH(number)"
+  },
+  "ATAN": {
+    "summary": "The arctangent of a number, in radians.",
+    "syntax": "ATAN(number)"
+  },
+  "ATAN2": {
+    "summary": "The arctangent of x and y coordinates, in radians.",
+    "syntax": "ATAN2(x_num, y_num)"
+  },
+  "ATANH": {
+    "summary": "The inverse hyperbolic tangent of a number.",
+    "syntax": "ATANH(number)"
+  },
+  "BASE": {
+    "summary": "Converts a number to text in another base (radix).",
+    "syntax": "BASE(Number, Radix [Min_length])"
+  },
+  "CEILING.PRECISE": {
+    "summary": "Rounds a number up to the nearest multiple, whatever its sign.",
+    "syntax": "CEILING.PRECISE(number, [significance])"
+  },
+  "COS": {
+    "summary": "The cosine of an angle in radians.",
+    "syntax": "COS(number)"
+  },
+  "COSH": {
+    "summary": "The hyperbolic cosine of a number.",
+    "syntax": "COSH(number)"
+  },
+  "COT": {
+    "summary": "The cotangent of an angle in radians.",
+    "syntax": "COT(number)"
+  },
+  "COTH": {
+    "summary": "The hyperbolic cotangent of a number.",
+    "syntax": "COTH(number)"
+  },
+  "CSC": {
+    "summary": "The cosecant of an angle in radians.",
+    "syntax": "CSC(number)"
+  },
+  "CSCH": {
+    "summary": "The hyperbolic cosecant of a number.",
+    "syntax": "CSCH(number)"
+  },
+  "DECIMAL": {
+    "summary": "Converts text in a given base to a number.",
+    "syntax": "DECIMAL(text, radix)"
+  },
+  "DEGREES": {
+    "summary": "Converts radians to degrees.",
+    "syntax": "DEGREES(angle)"
+  },
+  "FLOOR.PRECISE": {
+    "summary": "Rounds a number down to the nearest multiple, whatever its sign.",
+    "syntax": "FLOOR.PRECISE(number, [significance])"
+  },
+  "ISO.CEILING": {
+    "summary": "Rounds a number up to the nearest multiple, whatever its sign; the same as CEILING.PRECISE.",
+    "syntax": "ISO.CEILING(number, [significance])"
+  },
+  "RADIANS": {
+    "summary": "Converts degrees to radians.",
+    "syntax": "RADIANS(angle)"
+  },
+  "ROMAN": {
+    "summary": "Converts a number to Roman numerals, as text.",
+    "syntax": "ROMAN(number, [form])"
+  },
+  "SEC": {
+    "summary": "The secant of an angle in radians.",
+    "syntax": "SEC(number)"
+  },
+  "SECH": {
+    "summary": "The hyperbolic secant of a number.",
+    "syntax": "SECH(number)"
+  },
+  "SIN": {
+    "summary": "The sine of an angle in radians.",
+    "syntax": "SIN(number)"
+  },
+  "SINH": {
+    "summary": "The hyperbolic sine of a number.",
+    "syntax": "SINH(number)"
+  },
+  "TAN": {
+    "summary": "The tangent of an angle in radians.",
+    "syntax": "TAN(number)"
+  },
+  "TANH": {
+    "summary": "The hyperbolic tangent of a number.",
+    "syntax": "TANH(number)"
+  },
+  "AVERAGEA": {
+    "summary": "The mean of its arguments, counting text as 0 and TRUE as 1.",
+    "syntax": "AVERAGEA(value1, [value2], …)"
+  },
+  "MAXA": {
+    "summary": "The largest value, counting text as 0 and TRUE as 1.",
+    "syntax": "MAXA(value1, [value2], …)"
+  },
+  "MINA": {
+    "summary": "The smallest value, counting text as 0 and TRUE as 1.",
+    "syntax": "MINA(value1, [value2], …)"
+  },
+  "STDEVA": {
+    "summary": "The sample standard deviation, counting text as 0 and TRUE as 1.",
+    "syntax": "STDEVA(value1, [value2], …)"
+  },
+  "STDEVPA": {
+    "summary": "The population standard deviation, counting text as 0 and TRUE as 1.",
+    "syntax": "STDEVPA(value1, [value2], …)"
+  },
+  "VARA": {
+    "summary": "The sample variance, counting text as 0 and TRUE as 1.",
+    "syntax": "VARA(value1, [value2], …)"
+  },
+  "VARPA": {
+    "summary": "The population variance, counting text as 0 and TRUE as 1.",
+    "syntax": "VARPA(value1, [value2], …)"
+  },
+  "CHISQ.TEST": {
+    "summary": "The probability from a chi-squared test of independence.",
+    "syntax": "CHISQ.TEST(actual_range, expected_range)"
+  },
+  "F.TEST": {
+    "summary": "The two-tailed probability that two samples' variances are not significantly different.",
+    "syntax": "F.TEST(array1, array2)"
+  },
+  "T.TEST": {
+    "summary": "The probability from a Student's t-test.",
+    "syntax": "T.TEST(array1, array2, tails, type)"
+  },
+  "Z.TEST": {
+    "summary": "The one-tailed probability of a z-test.",
+    "syntax": "Z.TEST(array, x, [sigma])"
+  },
+  "GAMMALN.PRECISE": {
+    "summary": "The natural logarithm of the gamma function.",
+    "syntax": "GAMMALN.PRECISE(x)"
+  },
+  "BINOM.INV": {
+    "summary": "The smallest number of successes whose cumulative binomial probability reaches a criterion.",
+    "syntax": "BINOM.INV(trials, probability_s, alpha)"
+  },
+  "HYPGEOM.DIST": {
+    "summary": "The hypergeometric distribution.",
+    "syntax": "HYPGEOM.DIST(sample_s, number_sample, population_s, number_pop, cumulative)"
+  },
+  "NEGBINOM.DIST": {
+    "summary": "The negative binomial distribution.",
+    "syntax": "NEGBINOM.DIST(number_f, number_s, probability_s, cumulative)"
+  },
+  "BINOM.DIST.RANGE": {
+    "summary": "The binomial probability of a number of successes, or of a range of them.",
+    "syntax": "BINOM.DIST.RANGE(trials, probability_s, number_s, [number_s2])"
+  },
+  "ERROR.TYPE": {
+    "summary": "A number for the kind of an error value.",
+    "syntax": "ERROR.TYPE(error_val)"
+  },
+  "ISEVEN": {
+    "summary": "TRUE when a number is even.",
+    "syntax": "ISEVEN(number)"
+  },
+  "ISNONTEXT": {
+    "summary": "TRUE when a value is not text.",
+    "syntax": "ISNONTEXT(value)"
+  },
+  "ISODD": {
+    "summary": "TRUE when a number is odd.",
+    "syntax": "ISODD(value)"
+  },
+  "ISREF": {
+    "summary": "TRUE when a value is a reference.",
+    "syntax": "ISREF(value)"
+  },
+  "SHEET": {
+    "summary": "The sheet number of a reference or sheet name.",
+    "syntax": "SHEET(value)"
+  },
+  "SHEETS": {
+    "summary": "The number of sheets in a reference, or in the workbook.",
+    "syntax": "SHEETS(reference)"
+  },
+  "INFO": {
+    "summary": "Information about the operating environment.",
+    "syntax": "INFO(type_text)"
+  },
+  "LENB": {
+    "summary": "The number of bytes in a text, counting double-byte characters as two.",
+    "syntax": "LENB(text)"
+  },
+  "LEFTB": {
+    "summary": "The first bytes of a text.",
+    "syntax": "LEFTB(text, [num_bytes])"
+  },
+  "RIGHTB": {
+    "summary": "The last bytes of a text.",
+    "syntax": "RIGHTB(text, [num_bytes])"
+  },
+  "MIDB": {
+    "summary": "Bytes from the middle of a text, from a start position.",
+    "syntax": "MIDB(text, start_num, num_bytes)"
+  },
+  "REPLACEB": {
+    "summary": "Replaces bytes at a position in a text.",
+    "syntax": "REPLACEB(old_text, start_num, num_bytes, new_text)"
+  },
+  "FINDB": {
+    "summary": "The byte position of one text in another, case-sensitive.",
+    "syntax": "FINDB(find_text, within_text, [start_num])"
+  },
+  "SEARCHB": {
+    "summary": "The byte position of one text in another, ignoring case.",
+    "syntax": "SEARCHB(find_text, within_text, [start_num])"
+  },
+  "ASC": {
+    "summary": "Converts full-width (double-byte) characters to half-width.",
+    "syntax": "ASC(text)"
+  },
+  "DBCS": {
+    "summary": "Converts half-width (single-byte) characters to full-width.",
+    "syntax": "DBCS(text)"
+  },
+  "BAHTTEXT": {
+    "summary": "A number as Thai text with \"Baht\".",
+    "syntax": "BAHTTEXT(number)"
+  },
+  "LOOKUP": {
+    "summary": "Finds a value in one row or column and returns the item at the same position in another.",
+    "syntax": "LOOKUP(lookup_value, lookup_vector, [result_vector])"
+  },
+  "TRIMRANGE": {
+    "summary": "A range without its empty outer rows and columns.",
+    "syntax": "TRIMRANGE(range, [trim_rows], [trim_cols])"
+  },
+  "GETPIVOTDATA": {
+    "summary": "A value from a pivot table, by field and item names.",
+    "syntax": "GETPIVOTDATA(data_field, pivot_table, [field1, item1, field2, item2], …)"
+  }
+}

@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 import { siteDataFiles } from "./docs-site-data.js";
 import {
   loadFormulaContractInventory,
-  loadFormulaSummaries,
+  loadFormulaReferenceEntries,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
 import { generateFunctionMetadata } from "./function-metadata.js";
@@ -29,7 +29,7 @@ async function runDocs(mode: string | undefined): Promise<string> {
   const analysis = await analyzePublicApi(repositoryRoot);
   const formulaPages = renderFormulaFunctionPages(
     await loadFormulaContractInventory(repositoryRoot),
-    await loadFormulaSummaries(repositoryRoot),
+    await loadFormulaReferenceEntries(repositoryRoot),
   );
   for (const file of siteDataFiles(analysis.manifest, formulaPages)) {
     await writeIfChanged(file.path, file.content);

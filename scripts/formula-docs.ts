@@ -124,25 +124,24 @@ function parseSignatureProfiles(value: unknown): Record<string, SignatureProfile
   );
 }
 
-/** One argument as a call shows it: `[name]` when optional. */
-function argumentHtml(argument: FormulaArgument): string {
-  const name = `<span class="sw-code-property">${html(argument.name)}</span>`;
-  return argument.required
-    ? name
-    : `<span class="sw-code-punctuation">[</span>${name}<span class="sw-code-punctuation">]</span>`;
-}
+/** A run of an Excel syntax line: punctuation, an ellipsis, or argument text. */
+const SYNTAX_TOKEN = /(\[|\]|\(|\)|,\s*|\.\.\.|…|[^[\](),.…]+)/g;
 
 /**
- * A function's call syntax from its signature profile, coloured with the
- * site's code roles: `SUMSQ(value, …)`, `ROUND(number, digits)`. Optional
- * arguments are bracketed; arguments that repeat end the list with `, …`.
+ * A function's call syntax as Microsoft documents it (`AVERAGEIF(range,
+ * criteria, [average_range])`), coloured with the site's code roles:
+ * argument names as properties, brackets, commas and ellipses as punctuation.
  */
-function formulaSyntaxHtml(name: string, signature: SignatureProfile | undefined): string {
-  const parts = (signature?.arguments ?? []).map(argumentHtml);
-  const repeats = signature?.arguments.some((argument) => argument.repeat !== "once") ?? false;
-  if (repeats) parts.push("…");
-  const comma = '<span class="sw-code-punctuation">, </span>';
-  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span><span class="sw-code-punctuation">(</span>${parts.join(comma)}<span class="sw-code-punctuation">)</span></code>`;
+function excelSyntaxHtml(name: string, syntax: string): string {
+  const open = syntax.indexOf("(");
+  const close = syntax.lastIndexOf(")");
+  const argumentsText = open < 0 || close < open ? "" : syntax.slice(open + 1, close);
+  const tokens = [...argumentsText.matchAll(SYNTAX_TOKEN)].map(([token]) => {
+    const role =
+      /^[\w '-]+$/.test(token.trim()) && token.trim() !== "" ? "property" : "punctuation";
+    return `<span class="sw-code-${role}">${html(token)}</span>`;
+  });
+  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span><span class="sw-code-punctuation">(</span>${tokens.join("")}<span class="sw-code-punctuation">)</span></code>`;
 }
 
 function parseFunctions(value: unknown): FormulaRecord[] {
@@ -255,21 +254,34 @@ function statusPaths(value: unknown, label: string): string {
     : `${status}<br />${paths.map((path) => sourceLink(path)).join("<br />")}`;
 }
 
-const SUMMARIES_PATH = "scripts/formula-summaries.json";
+const REFERENCE_PATH = "scripts/formula-reference.json";
+
+/** One function's reference text on its family page. */
+export interface FormulaReferenceEntry {
+  /** What the function does, in one line, written for these docs. */
+  readonly summary: string;
+  /** The call syntax with Excel's argument names, as Microsoft's function page gives it. */
+  readonly syntax: string;
+}
 
 /**
- * One-line descriptions of the formula functions, keyed by canonical name,
- * for the formula reference pages. Written for these docs, one per function
- * in the inventory.
+ * The summary and Excel call syntax of every formula function, keyed by
+ * canonical name. Each syntax line names its own function.
  */
-export async function loadFormulaSummaries(
+export async function loadFormulaReferenceEntries(
   root: string,
-): Promise<Readonly<Record<string, string>>> {
-  const value: unknown = JSON.parse(await readFile(resolve(root, SUMMARIES_PATH), "utf8"));
-  const summaries = object(value, SUMMARIES_PATH);
-  for (const [name, summary] of Object.entries(summaries))
-    string(summary, `${SUMMARIES_PATH}.${name}`);
-  return summaries as Record<string, string>;
+): Promise<Readonly<Record<string, FormulaReferenceEntry>>> {
+  const value: unknown = JSON.parse(await readFile(resolve(root, REFERENCE_PATH), "utf8"));
+  const entries = object(value, REFERENCE_PATH);
+  for (const [name, entryValue] of Object.entries(entries)) {
+    const entry = object(entryValue, `${REFERENCE_PATH}.${name}`);
+    string(entry.summary, `${REFERENCE_PATH}.${name}.summary`);
+    const syntax = string(entry.syntax, `${REFERENCE_PATH}.${name}.syntax`);
+    if (!syntax.startsWith(`${name}(`) || !syntax.endsWith(")")) {
+      throw new Error(`${REFERENCE_PATH}.${name}.syntax must be a call of ${name}: ${syntax}`);
+    }
+  }
+  return entries as Record<string, FormulaReferenceEntry>;
 }
 
 export async function loadFormulaContractInventory(
@@ -300,7 +312,7 @@ const FORMULA_FUNCTIONS_ROUTE = "/docs/reference/formula-functions/";
  */
 export function renderFormulaFunctionPages(
   inventoryValue: unknown,
-  summaries: Readonly<Record<string, string>>,
+  entries: Readonly<Record<string, FormulaReferenceEntry>>,
 ): FormulaReferencePage[] {
   const inventory = object(inventoryValue, "formula inventory");
   const contract = string(inventory.contract, "contract");
@@ -342,16 +354,16 @@ export function renderFormulaFunctionPages(
     );
   }
 
-  const unsummarized = functions.filter((formula) => !summaries[formula.canonical]);
-  if (unsummarized.length > 0) {
+  const undescribed = functions.filter((formula) => entries[formula.canonical] === undefined);
+  if (undescribed.length > 0) {
     throw new Error(
-      `${SUMMARIES_PATH} has no summary for ${unsummarized.map((formula) => formula.canonical).join(", ")}`,
+      `${REFERENCE_PATH} has no entry for ${undescribed.map((formula) => formula.canonical).join(", ")}`,
     );
   }
   const canonicalNames = new Set(functions.map((formula) => formula.canonical));
-  const unknown = Object.keys(summaries).filter((name) => !canonicalNames.has(name));
+  const unknown = Object.keys(entries).filter((name) => !canonicalNames.has(name));
   if (unknown.length > 0) {
-    throw new Error(`${SUMMARIES_PATH} describes unknown functions: ${unknown.join(", ")}`);
+    throw new Error(`${REFERENCE_PATH} describes unknown functions: ${unknown.join(", ")}`);
   }
 
   for (const formula of functions) {
@@ -506,8 +518,12 @@ export function renderFormulaFunctionPages(
               `<a href="#${prefix}-${anchor(id)}">${label}: <code>${html(id)}</code></a>`,
           )
           .join("<br />");
-        const syntax = formulaSyntaxHtml(formula.canonical, signatures[formula.signature]);
-        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}</td><td class="sw-formula-summary">${html(summaries[formula.canonical] ?? "")}</td><td data-label="Engine"><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td data-label="Contract"><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
+        const entry = entries[formula.canonical];
+        const syntax = excelSyntaxHtml(
+          formula.canonical,
+          entry?.syntax ?? `${formula.canonical}()`,
+        );
+        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}</td><td class="sw-formula-summary">${html(entry?.summary ?? "")}</td><td data-label="Engine"><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td data-label="Contract"><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
       }),
       "</tbody></table>",
       "",
