@@ -136,7 +136,7 @@
 }
 
 .sw-vw-tab:focus-visible,
-.sw-vw .sw-demo-button:focus-visible,
+.sw-vw .sw-button:focus-visible,
 .sw-vw-toggle:has(input:focus-visible),
 .sw-vw-details summary:focus-visible,
 .sw-vw .sw-demo-radio-item:focus-visible {
@@ -144,11 +144,14 @@
   outline-offset: 2px;
 }
 
-/* Product stage first, ownership instrument adjacent. */
+/* Product stage first, ownership instrument adjacent. The grid stage keeps a
+   fixed height: a taller instrument must not stretch the grid, or its visible
+   rows would change with the instrument's content. */
 .sw-vw-workspace {
   display: grid;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr) var(--sw-vw-instrument-width);
+  align-items: start;
 }
 
 .sw-vw-gridstage {
@@ -201,7 +204,7 @@
 .sw-vw-stagewrap {
   position: relative;
   display: grid;
-  min-height: 28rem;
+  height: 30.5rem;
   overflow: hidden;
 }
 
@@ -562,7 +565,7 @@
   gap: var(--sw-space-2);
 }
 
-.sw-vw .sw-demo-button {
+.sw-vw .sw-button {
   padding: 0 var(--sw-space-3);
   border: 1px solid var(--sw-border-strong);
   border-radius: var(--sw-radius-md);
@@ -576,12 +579,12 @@
     background var(--sw-motion-fast) var(--sw-motion-decelerate);
 }
 
-.sw-vw .sw-demo-button:hover:not(:disabled) {
+.sw-vw .sw-button:hover:not(:disabled) {
   border-color: var(--sw-accent-strong);
   color: var(--sw-accent-strong);
 }
 
-.sw-vw .sw-demo-button:disabled {
+.sw-vw .sw-button:disabled {
   color: var(--sw-fg-muted);
   cursor: not-allowed;
   opacity: 0.62;
@@ -589,7 +592,7 @@
 
 /* Rail actions keep a comfortable target and grow with a long label instead
    of overflowing the shared fixed height. */
-.sw-workbench-stage .sw-vw .sw-demo-button {
+.sw-workbench-stage .sw-vw .sw-button {
   height: auto;
   min-height: 2.25rem;
 }
@@ -830,6 +833,7 @@
   }
 
   .sw-vw-stagewrap {
+    height: auto;
     min-height: 24rem;
   }
 

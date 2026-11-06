@@ -32,6 +32,8 @@
    (details summaries, link arrows). Each URL is the symbol's own path data;
    test/icons.test.ts keeps them in step with the sprite. */
 :root {
+  /* The mask a .sw-mask-icon draws; each use sets it to one of the masks below. */
+  --sw-icon-mask: none;
   --sw-icon-mask-chevron-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9.5 6 6 6-6 6'/%3E%3C/svg%3E");
   --sw-icon-mask-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
   --sw-icon-mask-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12h15M13.5 6l6 6-6 6'/%3E%3C/svg%3E");
