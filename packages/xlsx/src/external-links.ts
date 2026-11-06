@@ -8,7 +8,7 @@ import {
 import { parseCellReference } from "./cell-reference.js";
 import { MAIN_NS, RELATIONSHIPS_NS } from "./format.js";
 import { externalSheetText, formulaCallsExternalData, rewriteExternalSheets } from "./formula.js";
-import { type OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
+import type { OpcPackage, OpcRelationship } from "./opc.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
   decodeXstring,
@@ -283,9 +283,4 @@ export function externalLinkPartXml(link: ExternalLink): { part: string; relatio
       `<Relationship Id="rId1" Type="${EXTERNAL_LINK_PATH_REL}" Target="${escapeXml(link.target)}" TargetMode="External"/>` +
       `</Relationships>`,
   };
-}
-
-/** Whether a workbook relationship is an external link. */
-export function isExternalLinkRelationship(relationship: OpcRelationship): boolean {
-  return relationshipTypeMatches(relationship.type, "externalLink");
 }

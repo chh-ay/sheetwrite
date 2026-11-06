@@ -16,28 +16,13 @@ export const MAX_EXTERNAL_SHEET_AREA = 5_000_000;
 const MAX_ROWS = 1_048_576;
 const MAX_COLUMNS = 16_384;
 /** The errors that formulas can hold as values. */
-const ERROR_VALUES: Readonly<Record<string, true>> = {
-  "#DIV/0!": true,
-  "#NULL!": true,
-  "#SPILL!": true,
-  "#CALC!": true,
-  "#VALUE!": true,
-  "#REF!": true,
-  "#NAME?": true,
-  "#NUM!": true,
-  "#N/A": true,
-};
-
-/** A path-qualified problem; structurally a `DocumentValidationError`. */
-export interface ExternalLinkIssue {
-  path: string;
-  code: "invalid-value" | "resource-limit";
-  message: string;
-}
+const ERROR_VALUE = /^#(?:DIV\/0!|NULL!|SPILL!|CALC!|VALUE!|REF!|NAME\?|NUM!|N\/A)$/;
 
 /** Where checks append issues; a `DocumentValidationError[]` qualifies. */
 export interface ExternalLinkIssueSink {
-  push(...issues: ExternalLinkIssue[]): number;
+  push(
+    ...issues: { path: string; code: "invalid-value" | "resource-limit"; message: string }[]
+  ): number;
 }
 
 function isName(value: unknown): value is string {
@@ -49,92 +34,83 @@ function isIndex(value: unknown, limit: number): value is number {
 }
 
 function isLinkValue(value: unknown): value is ExternalLinkValue {
-  if (typeof value === "string" || typeof value === "boolean") return true;
   if (typeof value === "number") return Number.isFinite(value);
-  return isPlainRecord(value) && Object.hasOwn(ERROR_VALUES, String(ownValue(value, "error")));
+  return (
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (isPlainRecord(value) && ERROR_VALUE.test(String(ownValue(value, "error"))))
+  );
 }
 
-/** Check that `value` is a list of external links within the resource limits. */
+/** Whether one linked sheet has a name and valid cells within the area limit. */
+function isLinkSheet(sheet: unknown, budget: { cells: number }): boolean {
+  const cells = isPlainRecord(sheet) ? ownValue(sheet, "cells") : undefined;
+  if (!isPlainRecord(sheet) || !isName(ownValue(sheet, "name")) || !Array.isArray(cells)) {
+    return false;
+  }
+
+  budget.cells += cells.length;
+  let rows = 1;
+  let columns = 1;
+  for (const cell of cells) {
+    const row = isPlainRecord(cell) ? ownValue(cell, "row") : undefined;
+    const col = isPlainRecord(cell) ? ownValue(cell, "col") : undefined;
+    if (
+      !isPlainRecord(cell) ||
+      !isIndex(row, MAX_ROWS) ||
+      !isIndex(col, MAX_COLUMNS) ||
+      !isLinkValue(ownValue(cell, "value"))
+    ) {
+      return false;
+    }
+    rows = Math.max(rows, row + 1);
+    columns = Math.max(columns, col + 1);
+  }
+  return rows * columns <= MAX_EXTERNAL_SHEET_AREA;
+}
+
+/**
+ * Check that `value` is a list of external links within the resource limits:
+ * unique book names without brackets, named sheets, and saved values that
+ * formulas can hold. One issue names the first link that fails.
+ */
 export function validateExternalLinksShape(
   value: unknown,
   path: string,
   issues: ExternalLinkIssueSink,
 ): void {
-  const invalid = (at: string, message: string) => {
-    issues.push({ path: at, code: "invalid-value", message });
-  };
-  if (!Array.isArray(value)) {
-    invalid(path, "externalLinks must be an array");
-    return;
-  }
-  if (value.length > MAX_EXTERNAL_LINKS) {
+  if (!Array.isArray(value) || value.length > MAX_EXTERNAL_LINKS) {
     issues.push({
       path,
-      code: "resource-limit",
-      message: `External link limit ${MAX_EXTERNAL_LINKS} exceeded`,
+      code: "invalid-value",
+      message: `externalLinks must be an array of at most ${MAX_EXTERNAL_LINKS} links`,
     });
     return;
   }
 
-  let cells = 0;
   const books = new Set<string>();
-  value.forEach((link: unknown, index) => {
-    const at = `${path}[${index}]`;
+  const budget = { cells: 0 };
+  for (const [index, link] of value.entries()) {
     const book = isPlainRecord(link) ? ownValue(link, "book") : undefined;
     const sheets = isPlainRecord(link) ? ownValue(link, "sheets") : undefined;
-    if (!isPlainRecord(link) || !isName(book) || /[[\]]/.test(book)) {
-      invalid(at, "an external link needs a book name without brackets");
-      return;
-    }
-    if (books.has(book.toLowerCase())) invalid(`${at}.book`, "book names must be unique");
-    books.add(book.toLowerCase());
-    if (!isName(ownValue(link, "target"))) invalid(`${at}.target`, "target must be a name");
-    if (!Array.isArray(sheets)) {
-      invalid(`${at}.sheets`, "sheets must be an array");
-      return;
-    }
-
-    sheets.forEach((sheet: unknown, sheetIndex) => {
-      const sheetAt = `${at}.sheets[${sheetIndex}]`;
-      const sheetCells = isPlainRecord(sheet) ? ownValue(sheet, "cells") : undefined;
-      if (!isPlainRecord(sheet) || !isName(ownValue(sheet, "name")) || !Array.isArray(sheetCells)) {
-        invalid(sheetAt, "a sheet needs a name and a cells array");
-        return;
-      }
-      cells += sheetCells.length;
-      let rows = 1;
-      let columns = 1;
-      sheetCells.forEach((cell: unknown, cellIndex) => {
-        const row = isPlainRecord(cell) ? ownValue(cell, "row") : undefined;
-        const col = isPlainRecord(cell) ? ownValue(cell, "col") : undefined;
-        const valid =
-          isPlainRecord(cell) &&
-          isIndex(row, MAX_ROWS) &&
-          isIndex(col, MAX_COLUMNS) &&
-          isLinkValue(ownValue(cell, "value"));
-        if (!valid) {
-          invalid(`${sheetAt}.cells[${cellIndex}]`, "invalid external link cell");
-          return;
-        }
-        rows = Math.max(rows, row + 1);
-        columns = Math.max(columns, col + 1);
+    const valid =
+      isPlainRecord(link) &&
+      isName(book) &&
+      !/[[\]]/.test(book) &&
+      !books.has(book.toLowerCase()) &&
+      isName(ownValue(link, "target")) &&
+      Array.isArray(sheets) &&
+      sheets.every((sheet) => isLinkSheet(sheet, budget)) &&
+      budget.cells <= MAX_EXTERNAL_CELLS;
+    if (!valid) {
+      issues.push({
+        path: `${path}[${index}]`,
+        code: "invalid-value",
+        message: `An external link needs a unique book name without brackets, a target, and sheets of valid cells within ${MAX_EXTERNAL_CELLS} cells and an area of ${MAX_EXTERNAL_SHEET_AREA}`,
       });
-      if (rows * columns > MAX_EXTERNAL_SHEET_AREA) {
-        issues.push({
-          path: sheetAt,
-          code: "resource-limit",
-          message: `External link sheet area limit ${MAX_EXTERNAL_SHEET_AREA} exceeded`,
-        });
-      }
-    });
-  });
-
-  if (cells > MAX_EXTERNAL_CELLS) {
-    issues.push({
-      path,
-      code: "resource-limit",
-      message: `External link cell limit ${MAX_EXTERNAL_CELLS} exceeded`,
-    });
+      return;
+    }
+    books.add(book.toLowerCase());
   }
 }
 
