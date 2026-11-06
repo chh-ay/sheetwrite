@@ -441,8 +441,9 @@ impl SheetFormulas {
     }
 
     /// Adds `id` at `key`. Returns `false`, leaving the index unchanged, when
-    /// another formula already holds `key`; every caller then retires `id`,
-    /// so an occupied formula slot is always indexed at its location.
+    /// another formula already holds `key`. A new formula goes to an empty
+    /// address, and a moved one that cannot index is retired, so an occupied
+    /// formula slot is always indexed at its location.
     #[inline(never)]
     #[must_use]
     fn index_id(&mut self, key: CellKey, id: FormulaId) -> bool {
@@ -555,11 +556,10 @@ impl SheetFormulas {
                 let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), entry) else {
                     return (None, None);
                 };
-                // `key` holds no formula, so the new id always indexes.
-                if !self.index_id(key, id) {
-                    let _ = slots.retire(id);
-                    return (None, None);
-                }
+                // `key` holds no formula (`self.id(key)` is `None` above), so
+                // the new id always indexes.
+                let indexed = self.index_id(key, id);
+                debug_assert!(indexed, "a new formula indexes at an empty address");
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
                 (None, Some(id))
