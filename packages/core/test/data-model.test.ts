@@ -442,6 +442,46 @@ describe("relationship collaboration", () => {
     });
   });
 
+  it("conflicts on a measure write and a concurrent table or column rename, either way", () => {
+    const measure: DocumentOp = { op: "setMeasure", measure: revenueMeasure };
+    const renames: DocumentOp[] = [
+      { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
+      {
+        op: "updateTable",
+        sheet: "data",
+        tableId: "customers",
+        patch: {
+          columns: [
+            { id: "id", name: "id" },
+            { id: "region", name: "Area" },
+          ],
+        },
+      },
+    ];
+    for (const rename of renames) {
+      for (const [local, remote] of [
+        [measure, rename],
+        [rename, measure],
+      ]) {
+        expect(rebaseDocumentOperations([local!], [remote!])).toMatchObject({
+          status: "conflict",
+          conflict: { code: "overlapping-edit" },
+        });
+      }
+    }
+
+    const styled: DocumentOp = {
+      op: "updateTable",
+      sheet: "data",
+      tableId: "orders",
+      patch: { headerRow: true },
+    };
+    expect(rebaseDocumentOperations([measure], [styled])).toEqual({
+      status: "rebased",
+      operations: [measure],
+    });
+  });
+
   it("delivers relationship and measure changes to a synced peer", async () => {
     const base = { ...snapshot([]), documentId: "model-doc", version: 0 };
     const adapter = new MemoryPersistenceAdapter(base);

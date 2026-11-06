@@ -53,33 +53,72 @@ struct RelatedRows {
     rows: Vec<u32>,
     /// `levels.len()` keys per entry of `rows`, row-major.
     keys: Vec<KeyPart>,
+    /// The levels a cell at `depths` constrains: those above its row and
+    /// column depths.
+    active: Vec<usize>,
+    /// Indices into `rows`, sorted by their keys at `active` and ascending
+    /// within equal keys, so each cell's rows are one range.
+    order: Vec<u32>,
+    /// The axis depths `order` was sorted for.
+    depths: Option<(usize, usize)>,
 }
 
 impl RelatedRows {
-    /// The rows of `T` visible in the cell of `groups`, ascending.
-    fn visible(&self, cache: &PivotCache, groups: (u32, u32), out: &mut Vec<u32>) {
-        out.clear();
-        let mut wanted = Vec::with_capacity(self.levels.len());
-        for &(on_rows, level) in &self.levels {
-            let group = if on_rows { groups.0 } else { groups.1 };
-            wanted.push(
-                (level < cache.group_depth(on_rows, group))
-                    .then(|| key_part(&cache.path_label(on_rows, group, level)).ok())
-                    .flatten(),
-            );
-        }
+    /// The keys of entry `index` of `rows` at the active levels.
+    fn active_keys(&self, index: u32) -> impl Iterator<Item = &KeyPart> {
+        let start = index as usize * self.levels.len();
+        self.active
+            .iter()
+            .map(move |&level| &self.keys[start + level])
+    }
 
-        let width = self.levels.len();
-        for (index, &row) in self.rows.iter().enumerate() {
-            let keys = &self.keys[index * width..(index + 1) * width];
-            let matches = wanted
-                .iter()
-                .zip(keys)
-                .all(|(wanted, key)| wanted.as_ref().is_none_or(|wanted| wanted == key));
-            if matches {
-                out.push(row);
+    /// Sorts the rows by the levels that cells at `depths` constrain, once
+    /// per pair of axis depths.
+    fn sort_for(&mut self, depths: (usize, usize)) {
+        if self.depths == Some(depths) {
+            return;
+        }
+        self.depths = Some(depths);
+        self.active = (0..self.levels.len())
+            .filter(|&index| {
+                let (on_rows, level) = self.levels[index];
+                level < if on_rows { depths.0 } else { depths.1 }
+            })
+            .collect();
+        let mut order: Vec<u32> = (0..self.rows.len() as u32).collect();
+        order.sort_by(|&left, &right| self.active_keys(left).cmp(self.active_keys(right)));
+        self.order = order;
+    }
+
+    /// The rows of `T` visible in the cell of `groups`, ascending: the range
+    /// of `order` whose keys equal the cell's labels at the active levels.
+    fn visible(&mut self, cache: &PivotCache, groups: (u32, u32), out: &mut Vec<u32>) {
+        out.clear();
+        self.sort_for((
+            cache.group_depth(true, groups.0),
+            cache.group_depth(false, groups.1),
+        ));
+        let mut wanted = Vec::with_capacity(self.active.len());
+        for &index in &self.active {
+            let (on_rows, level) = self.levels[index];
+            let group = if on_rows { groups.0 } else { groups.1 };
+            match key_part(&cache.path_label(on_rows, group, level)) {
+                Ok(key) => wanted.push(key),
+                Err(_) => return,
             }
         }
+
+        let start = self
+            .order
+            .partition_point(|&index| self.active_keys(index).lt(wanted.iter()));
+        let end = self
+            .order
+            .partition_point(|&index| self.active_keys(index).le(wanted.iter()));
+        out.extend(
+            self.order[start..end]
+                .iter()
+                .map(|&index| self.rows[index as usize]),
+        );
     }
 }
 
@@ -101,7 +140,7 @@ impl CellStore {
             .iter()
             .map(|value| self.prepare_pivot_measure(value.measure.as_deref(), &mut tables))
             .collect();
-        let related: Vec<Result<RelatedRows, FormulaError>> = tables[1..]
+        let mut related: Vec<Result<RelatedRows, FormulaError>> = tables[1..]
             .iter()
             .map(|table| self.related_rows(cache, table, fields))
             .collect();
@@ -120,7 +159,7 @@ impl CellStore {
             };
             if current != Some(cell.groups) {
                 current = Some(cell.groups);
-                for (rows, table) in visible.iter_mut().zip(&related) {
+                for (rows, table) in visible.iter_mut().zip(&mut related) {
                     if let Ok(table) = table {
                         table.visible(cache, cell.groups, rows);
                     }
@@ -317,6 +356,9 @@ impl CellStore {
             levels,
             rows: Vec::new(),
             keys: Vec::new(),
+            active: Vec::new(),
+            order: Vec::new(),
+            depths: None,
         };
         let mut folded = String::new();
         'rows: for row in 0..count as usize {

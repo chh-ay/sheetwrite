@@ -54,6 +54,8 @@ struct Fixture {
     store: CellStore,
     customers_sheet: usize,
     output: usize,
+    /// Months down and regions across, instead of regions down.
+    transposed: bool,
     customers: Vec<Customer>,
     orders: Vec<Order>,
 }
@@ -132,6 +134,7 @@ impl Fixture {
             store,
             customers_sheet,
             output,
+            transposed: false,
             customers,
             orders,
         };
@@ -163,7 +166,8 @@ impl Fixture {
         self.store.set_number(sheet, row + 1, 2, customer.credit, 0);
     }
 
-    /// Regions down, months across, with a region and a month filter.
+    /// Regions down and months across (or transposed), with a region and a
+    /// month filter.
     fn install(&mut self) {
         let mut strings: Vec<String> = ["pivot", "orders", "customers", "region", "month"]
             .map(String::from)
@@ -175,7 +179,12 @@ impl Fixture {
 
         // Fields: 0 customers.region, 1 orders.month.
         let mut numbers = vec![0.0, MODEL_SOURCE, 1.0, 2.0, 2.0, 3.0, 1.0, 4.0];
-        numbers.extend([0.0, 0.0, 1.0, 0.0, 1.0, 1.0]);
+        let (down, across) = if self.transposed {
+            (1.0, 0.0)
+        } else {
+            (0.0, 1.0)
+        };
+        numbers.extend([0.0, 0.0, 1.0, down, 1.0, across]);
         numbers.push(VALUES.len() as f64);
         for index in 0..VALUES.len() {
             numbers.extend([(measure_strings + index) as f64, MEASURE_VALUE, NO_NAME]);
@@ -245,12 +254,17 @@ impl Fixture {
         let (rows, cols) = (status[3] as usize, status[4] as usize);
         let mut checked = 0;
         for row in 2..rows {
-            let region = settled(&self.store, self.output, row, 0);
+            let row_label = settled(&self.store, self.output, row, 0);
             for col in 1..cols {
                 let slot = (col - 1) % VALUES.len();
-                let month = settled(&self.store, self.output, 0, col - slot);
+                let col_label = settled(&self.store, self.output, 0, col - slot);
+                let (region, month) = if self.transposed {
+                    (&col_label, &row_label)
+                } else {
+                    (&row_label, &col_label)
+                };
                 let actual = settled(&self.store, self.output, row, col);
-                let expected = self.expected(VALUES[slot], &region, &month);
+                let expected = self.expected(VALUES[slot], region, month);
                 match (&actual, &expected) {
                     (Value::Number(actual), Value::Number(expected)) => {
                         assert!(
@@ -280,6 +294,14 @@ fn settled(store: &CellStore, sheet: usize, row: usize, col: usize) -> Value {
 #[test]
 fn related_table_measures_follow_one_way_filters_and_measure_references() {
     let fixture = Fixture::new();
+    fixture.assert_matches();
+}
+
+#[test]
+fn related_table_measures_follow_reachable_column_fields() {
+    let mut fixture = Fixture::new();
+    fixture.transposed = true;
+    fixture.install();
     fixture.assert_matches();
 }
 
