@@ -67,10 +67,53 @@ function sliced(
   };
 }
 
+/** The slicers of `sheet` in item order, with the values each keeps in this view. */
+function slicersOf(sheet: Sheet, overrides: SlicerOverrides) {
+  return (sheet.dashboard?.items ?? []).flatMap((item) =>
+    item.kind === "slicer" ? [{ item, values: slicerSelection(item, overrides) }] : [],
+  );
+}
+
 /**
- * The definitions the engine computes for the pivots of `sheet`, in their
- * order: each with the keep-list of every slicer that reaches it. Undefined
- * when no slicer of the sheet keeps a selection, so the saved ones apply.
+ * The hidden pivot that lists the values of `slicer` that some row of its
+ * table has under the other slicers: its column on rows, no values and no
+ * totals. A value missing from its labels has no data, as Excel's slicer
+ * cross filtering shows ([MS-XLSX] 2.3.2.1.7).
+ */
+function dataPivot(
+  slicer: DashboardSlicerItem,
+  others: readonly { item: DashboardSlicerItem; values: readonly CellScalar[] | undefined }[],
+  tables: readonly WorkbookTable[],
+  relationships: readonly TableRelationship[],
+): PivotDefinition | null {
+  const table = tables.find((candidate) => candidate.id === slicer.field.table);
+  const field = table?.columns.findIndex((column) => column.id === slicer.field.column) ?? -1;
+  if (table === undefined || field < 0) return null;
+  const base: PivotDefinition = {
+    id: `slicer-data-${slicer.id}`,
+    name: slicer.id,
+    source: { table: table.id },
+    anchor: { row: 0, col: 0 },
+    rows: [field],
+    columns: [],
+    values: [],
+    rowTotals: false,
+    columnTotals: false,
+  };
+  return others.reduce(
+    (current, { item, values }) =>
+      values === undefined || item.id === slicer.id
+        ? current
+        : sliced(current, item, values, tables, relationships),
+    base,
+  );
+}
+
+/**
+ * The definitions the engine computes for the pivots of `sheet`: first its
+ * pivots in their order, each with the keep-list of every slicer that reaches
+ * it, then one hidden pivot per slicer that marks values with no data.
+ * Undefined when nothing differs from the saved definitions.
  */
 export function slicedPivots(
   sheet: Sheet,
@@ -78,18 +121,42 @@ export function slicedPivots(
   relationships: readonly TableRelationship[],
   overrides: SlicerOverrides,
 ): PivotDefinition[] | undefined {
-  const slicers = (sheet.dashboard?.items ?? []).flatMap((item) => {
-    if (item.kind !== "slicer") return [];
-    const values = slicerSelection(item, overrides);
-    return values === undefined ? [] : [{ item, values }];
-  });
-  if (slicers.length === 0 || !sheet.pivots?.length) return undefined;
+  const slicers = slicersOf(sheet, overrides);
+  if (slicers.length === 0) return undefined;
 
   const tables = sheets.flatMap((candidate) => candidate.tables ?? []);
-  return sheet.pivots.map((pivot) =>
+  const pivots = (sheet.pivots ?? []).map((pivot) =>
     slicers.reduce(
-      (current, { item, values }) => sliced(current, item, values, tables, relationships),
+      (current, { item, values }) =>
+        values === undefined ? current : sliced(current, item, values, tables, relationships),
       pivot,
     ),
   );
+  const hidden = slicers.flatMap(({ item }) => {
+    if (item.itemsWithNoData === "show") return [];
+    const pivot = dataPivot(item, slicers, tables, relationships);
+    return pivot === null ? [] : [pivot];
+  });
+  return [...pivots, ...hidden];
+}
+
+/**
+ * The payload index of the hidden pivot of `slicer` on `sheet`, in the
+ * order `slicedPivots` adds them; -1 when it has none.
+ */
+export function dataPivotIndex(
+  sheet: Sheet,
+  slicer: DashboardSlicerItem,
+  sheets: readonly Sheet[],
+): number {
+  const tables = sheets.flatMap((candidate) => candidate.tables ?? []);
+  let index = sheet.pivots?.length ?? 0;
+  for (const item of sheet.dashboard?.items ?? []) {
+    if (item.kind !== "slicer" || item.itemsWithNoData === "show") continue;
+    const table = tables.find((candidate) => candidate.id === item.field.table);
+    if (!table?.columns.some((column) => column.id === item.field.column)) continue;
+    if (item.id === slicer.id) return index;
+    index += 1;
+  }
+  return -1;
 }

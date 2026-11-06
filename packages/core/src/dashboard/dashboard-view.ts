@@ -30,13 +30,19 @@ import {
   movedBox,
   resizedBox,
 } from "./dashboard-layout.js";
-import { slicedPivots, slicerSelection } from "./slicer-filter.js";
+import { dataPivotIndex, slicedPivots, slicerSelection } from "./slicer-filter.js";
 
 const NEEDS_FULL_ENGINE =
   "This item needs the full engine. Load @sheetwrite/formulas to compute it.";
 const TAKEN = "Another item is in that place.";
 const MOVE_HINT = "Arrow keys move the item. Enter or Escape ends.";
 const RESIZE_HINT = "Arrow keys resize the item. Enter or Escape ends.";
+/** The slicer settings for values with no data, in Excel's words; `dim` is the default. */
+const NO_DATA_SETTINGS: readonly (readonly ["dim" | "hide" | "show", string])[] = [
+  ["dim", "Dim Items with No Data"],
+  ["hide", "Hide Items with No Data"],
+  ["show", "Show Items with No Data"],
+];
 /** Most values one slicer lists; more would not fit a box and would read every row. */
 const MAX_SLICER_VALUES = 1_000;
 
@@ -222,6 +228,19 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     element.addEventListener("pointercancel", onUp);
   };
 
+  /** Excel's slicer settings for values with no data, one saved change each. */
+  const noDataSettings = (item: DashboardSlicerItem): PanelMenuItem[] =>
+    NO_DATA_SETTINGS.map(([setting, label]) => ({
+      label,
+      disabled: (item.itemsWithNoData ?? "dim") === setting,
+      run: () => {
+        const changed: DashboardSlicerItem = { ...item };
+        if (setting === "dim") delete changed.itemsWithNoData;
+        else changed.itemsWithNoData = setting;
+        commit(changed);
+      },
+    }));
+
   const itemMenu = (item: DashboardItem): HTMLElement =>
     menuButton(
       `${itemTitle(grid, item)} item actions`,
@@ -229,6 +248,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       (): readonly PanelMenuItem[] => [
         { label: "Move", run: () => startMode(item, "move") },
         { label: "Resize", run: () => startMode(item, "resize") },
+        ...(item.kind === "slicer" ? noDataSettings(item) : []),
         { label: "Remove", run: () => remove(item) },
       ],
       lifetime.signal,
@@ -257,7 +277,8 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     if (item.kind === "pivot") renderPivot(body, grid, sheet ?? grid.getActiveSheet(), item);
     else {
       const kept = readOnly ? slicerSelection(item, overrides) : item.selected;
-      renderSlicer(body, grid, item, kept, (next) => chooseSlicer(item, next));
+      const withData = slicerValuesWithData(grid, sheet ?? grid.getActiveSheet(), item);
+      renderSlicer(body, grid, item, kept, withData, (next) => chooseSlicer(item, next));
     }
     element.appendChild(body);
 
@@ -306,7 +327,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const results = list.map((item) =>
       item.kind === "pivot"
         ? dashboardPivotResult(grid, owner, item.pivot)
-        : slicerValues(grid, item),
+        : [slicerValues(grid, item), slicerValuesWithData(grid, owner, item)],
     );
     const signature = JSON.stringify([list, results, readOnly, mode, message, [...overrides]]);
     if (!force && signature === rendered) return;
@@ -399,14 +420,26 @@ export function dashboardPivotResult(
   id: string,
 ): PivotResultView | null {
   const result = grid.getPivotResult(sheet, id);
-  const output = storeEngine(grid.store)?.dashboardPivotOutput(sheet, id) ?? null;
-  if (result === null || result.status !== "ok" || output === null) return result;
+  const index = grid.getPivots(sheet).findIndex((pivot) => pivot.id === id);
+  const cells = dashboardPivotCells(grid, sheet, index);
+  if (result === null || result.status !== "ok" || cells === null) return result;
+  return { ...result, cells };
+}
+
+/** The output cells, row-major, of the pivot at `index` in a dashboard's payload. */
+export function dashboardPivotCells(
+  grid: Grid,
+  sheet: SheetId,
+  index: number,
+): CellScalar[] | null {
+  const output = storeEngine(grid.store)?.dashboardPivotOutput(sheet, index) ?? null;
+  if (output === null) return null;
   try {
     const kinds = output.kinds();
     const numbers = output.numbers();
     const texts = output.texts();
     let text = 0;
-    const cells = Array.from(kinds, (kind, cell): CellScalar => {
+    return Array.from(kinds, (kind, cell): CellScalar => {
       const number = numbers[cell] ?? 0;
       if (kind === 1) return number;
       if (kind === 2) return texts[text++] ?? "";
@@ -414,7 +447,6 @@ export function dashboardPivotResult(
       if (kind === 4) return PIVOT_ERRORS[number] ?? "#VALUE!";
       return null;
     });
-    return { ...result, cells };
   } finally {
     output.free();
   }
@@ -477,6 +509,7 @@ function renderSlicer(
   grid: Grid,
   item: DashboardSlicerItem,
   kept: readonly CellScalar[] | undefined,
+  withData: readonly CellScalar[] | null,
   choose: (next: CellScalar[] | undefined) => void,
 ): void {
   const values = slicerValues(grid, item);
@@ -504,7 +537,11 @@ function renderSlicer(
   list.setAttribute("role", "group");
   list.setAttribute("aria-label", `${itemTitle(grid, item)} values`);
   for (const value of values) {
+    const noData = withData !== null && !withData.some((entry) => sameScalar(entry, value));
+    if (noData && item.itemsWithNoData === "hide") continue;
     const button = document.createElement("button");
+    // Excel dims a value that no row has under the other slicers; it stays selectable.
+    if (noData) button.dataset.noData = "";
     button.type = "button";
     button.className = "sheetwrite-dashboard-slicer-value";
     button.textContent = scalarLabel(value);
@@ -521,4 +558,30 @@ function renderSlicer(
     list.appendChild(button);
   }
   body.appendChild(list);
+}
+
+/** Blank labels are null or empty text, depending on where they come from. */
+function sameScalar(left: CellScalar, right: CellScalar): boolean {
+  const blank = (value: CellScalar) => value === null || value === "";
+  return blank(left) ? blank(right) : left === right;
+}
+
+/**
+ * The values of `item` that some row has under the other slicers, from its
+ * hidden pivot: one header cell, then one label per value with data. Null when
+ * the item shows every value or the engine has no output for it.
+ */
+function slicerValuesWithData(
+  grid: Grid,
+  sheet: SheetId,
+  item: DashboardSlicerItem,
+): CellScalar[] | null {
+  if (item.itemsWithNoData === "show") return null;
+  const workbook = grid.store.getWorkbook();
+  const owner = workbook.sheets.find((candidate) => candidate.id === sheet);
+  if (owner === undefined) return null;
+  const cells = dashboardPivotCells(grid, sheet, dataPivotIndex(owner, item, workbook.sheets));
+  if (cells === null || cells.length === 0) return null;
+  // A pivot with no value fields and no totals is one label column under its header.
+  return cells.slice(1);
 }

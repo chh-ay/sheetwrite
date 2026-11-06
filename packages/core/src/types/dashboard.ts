@@ -45,6 +45,12 @@ export interface DashboardSlicerItem {
   selected?: CellScalar[];
   /** Caption; absent shows the column name. */
   title?: string;
+  /**
+   * Values that no row has under the other slicers, as Excel's slicer
+   * settings: `"dim"` (Visually indicate items with no data, the default),
+   * `"hide"` (Hide items with no data) or `"show"` (neither).
+   */
+  itemsWithNoData?: "dim" | "hide" | "show";
 }
 
 /** One item of a dashboard. */
