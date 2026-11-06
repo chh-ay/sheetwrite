@@ -35,7 +35,7 @@ export const CONTENT_COMPONENTS = {
   Steps: [],
   Step: ["title", "id", "titleSize"],
   CardGroup: ["cols"],
-  Card: ["title", "href", "icon", "illustration", "cta"],
+  Card: ["title", "href", "icon", "illustration", "screenshot", "alt", "cta"],
   Note: ["title"],
   Tip: ["title"],
   Warning: ["title"],
@@ -48,13 +48,14 @@ export const CONTENT_COMPONENTS = {
   AccordionGroup: [],
   Accordion: ["title", "description", "defaultOpen", "id"],
   Frame: ["caption", "hint"],
-  Screenshot: ["name", "alt", "size", "eager"],
+  Screenshot: ["name", "alt", "size"],
   Diagram: ["name", "alt", "caption", "width", "height"],
   Annotated: ["name", "alt", "size", "caption", "points"],
   Compare: ["before", "after"],
   Badge: ["color", "size"],
   Tooltip: ["tip", "headline", "href"],
   Update: ["version", "tags"],
+  LiveGrid: ["name", "height", "label", "caption"],
 } as const satisfies Record<string, readonly string[]>;
 
 type ComponentName = keyof typeof CONTENT_COMPONENTS;
@@ -99,7 +100,7 @@ export type ShotSize = keyof typeof SHOT_SIZES;
 /** Where the capture script writes screenshots, and the URL of one capture. */
 export const SHOTS_PATH = "/figures/shots/";
 export function shotUrl(name: string, theme: "light" | "dark", scale: 1 | 2): string {
-  return `${SHOTS_PATH}${name}-${theme}@${scale}x.avif`;
+  return `${SHOTS_PATH}${name}-${theme}-${scale}x.avif`;
 }
 
 /** Where diagram and illustration SVG files live. */
@@ -207,32 +208,85 @@ function cardGroup(node: ContentNode): ContentNode {
 }
 
 function card(node: ContentNode): ContentNode {
-  const title = required(node, "title");
-  const href = attribute(node, "href");
-  const icon = attribute(node, "icon");
-  const illustration = attribute(node, "illustration");
-  const cta = attribute(node, "cta");
-  const art =
-    illustration === undefined
-      ? icon === undefined
-        ? []
-        : [element("span", [spriteIcon(icon, "lg")], { className: ["sw-card__icon"] })]
-      : [
-          element(
-            "svg",
-            [element("use", [], { href: `${ILLUSTRATIONS_PATH}${illustration}.svg#art` })],
-            {
-              className: ["sw-card__art"],
-              viewBox: "0 0 320 160",
-              ariaHidden: "true",
-              focusable: "false",
-            },
-          ),
-        ];
+  return docCard({
+    title: required(node, "title"),
+    href: attribute(node, "href"),
+    icon: attribute(node, "icon"),
+    illustration: attribute(node, "illustration"),
+    screenshot:
+      attribute(node, "screenshot") === undefined
+        ? undefined
+        : { name: required(node, "screenshot"), alt: required(node, "alt") },
+    cta: attribute(node, "cta"),
+    body: node.children ?? [],
+  });
+}
+
+/** What one card shows: `<Card>` on a page, or a page in a section's card grid. */
+export interface DocCard {
+  title: string;
+  body: HastNode[];
+  href?: string;
+  /** A sprite icon above the title. */
+  icon?: string;
+  /** An illustration in public/figures/illustrations, across the top; replaces the icon. */
+  illustration?: string;
+  /** A capture from the screenshot script, across the top; replaces the icon. */
+  screenshot?: { name: string; alt: string };
+  /** The link text at the foot of a linked card. */
+  cta?: string;
+  /** A label beside the title, such as a New badge. */
+  badge?: HastNode;
+}
+
+/** What a card shows above its title: a screenshot, an illustration, an icon or nothing. */
+function cardArt(
+  icon: string | undefined,
+  illustration: string | undefined,
+  screenshot: DocCard["screenshot"],
+): HastNode[] {
+  if (screenshot !== undefined) {
+    const shots = themedShots(screenshot.name, screenshot.alt, "app", CARD_SHOT_SIZES);
+    return [{ ...shots, properties: { className: ["sw-shots", "sw-card__shot"] } }];
+  }
+  if (illustration !== undefined) {
+    return [
+      element(
+        "svg",
+        [element("use", [], { href: `${ILLUSTRATIONS_PATH}${illustration}.svg#art` })],
+        {
+          className: ["sw-card__art"],
+          viewBox: "0 0 320 160",
+          ariaHidden: "true",
+          focusable: "false",
+        },
+      ),
+    ];
+  }
+  return icon === undefined
+    ? []
+    : [element("span", [spriteIcon(icon, "lg")], { className: ["sw-card__icon"] })];
+}
+
+/** One card: a link when it has an `href`, with its illustration or icon on top. */
+export function docCard({
+  title,
+  body,
+  href,
+  icon,
+  illustration,
+  screenshot,
+  cta,
+  badge,
+}: DocCard): HastNode {
+  const art = cardArt(icon, illustration, screenshot);
+  const heading = element("span", [text(title)], { className: ["sw-card__title"] });
   const content = [
     ...art,
-    element("span", [text(title)], { className: ["sw-card__title"] }),
-    element("div", node.children ?? [], { className: ["sw-card__body"] }),
+    badge === undefined
+      ? heading
+      : element("span", [heading, badge], { className: ["sw-card__heading"] }),
+    element("div", body, { className: ["sw-card__body"] }),
     ...(cta === undefined || href === undefined
       ? []
       : [element("span", [text(cta), spriteIcon("arrow-right")], { className: ["sw-card__cta"] })]),
@@ -294,25 +348,44 @@ function frame(node: ContentNode): ContentNode {
   );
 }
 
-/** One theme's capture: 1× and 2× AVIF, lazy, so only the shown theme's file loads. */
+/** The width a screenshot shows at in the docs column, for the browser's pick of 1× or 2×. */
+const PAGE_SHOT_SIZES = "(max-width: 48rem) 100vw, 46rem";
+/** The width of a screenshot across the top of a card in a two-column card group. */
+const CARD_SHOT_SIZES = "(max-width: 40rem) 100vw, 23rem";
+
+/**
+ * One theme's capture: the 1× and 2× AVIF files, lazy, so only the shown
+ * theme's file loads, and only the resolution the layout needs.
+ */
 function themedShot(
   name: string,
   theme: "light" | "dark",
   alt: string,
   size: ShotSize,
-  eager: boolean,
+  sizes: string,
 ) {
   const { width, height } = SHOT_SIZES[size];
   return element("img", [], {
     className: ["sw-shot", `sw-shot--${theme}`],
     src: shotUrl(name, theme, 1),
-    srcSet: `${shotUrl(name, theme, 1)} 1x, ${shotUrl(name, theme, 2)} 2x`,
+    srcSet: `${shotUrl(name, theme, 1)} ${width}w, ${shotUrl(name, theme, 2)} ${width * 2}w`,
+    sizes,
     alt,
     width,
     height,
-    loading: eager ? "eager" : "lazy",
+    // Eager loading would fetch the hidden theme too; a lazy image in view loads at once.
+    loading: "lazy",
     decoding: "async",
   });
+}
+
+/** Both themes' captures; CSS shows the one that matches the page. */
+function themedShots(name: string, alt: string, size: ShotSize, sizes: string): ContentNode {
+  return element(
+    "span",
+    [themedShot(name, "light", alt, size, sizes), themedShot(name, "dark", alt, size, sizes)],
+    { className: ["sw-shots"] },
+  );
 }
 
 /**
@@ -326,12 +399,7 @@ function screenshot(node: ContentNode): ContentNode {
   const size = (attribute(node, "size") ?? "app") as ShotSize;
   if (!(size in SHOT_SIZES))
     throw new Error(`<Screenshot size> is one of ${Object.keys(SHOT_SIZES)}`);
-  const eager = attribute(node, "eager") === "true";
-  return element(
-    "span",
-    [themedShot(name, "light", alt, size, eager), themedShot(name, "dark", "", size, eager)],
-    { className: ["sw-shots"] },
-  );
+  return themedShots(name, alt, size, PAGE_SHOT_SIZES);
 }
 
 /**
@@ -468,7 +536,8 @@ function update(node: ContentNode): ContentNode {
   if (release === undefined)
     throw new Error(`<Update version="${version}"> is not in lib/releases.ts`);
   const tags = listAttribute(node, "tags");
-  const id = anchorOf(version);
+  // An id such as v0-7-0: a version's dots do not survive a slug.
+  const id = `v${version.replaceAll(".", "-")}`;
   const when =
     release.unreleased === true
       ? element("span", [text("Next release")], { className: ["sw-update__date"] })
@@ -578,12 +647,20 @@ function codeGroup(node: ContentNode): ContentNode {
   };
 }
 
-/** The module that renders Tabs on the pages that use them, from the docs root. */
-const TABS_MODULE = "/src/components/Tabs.tsx";
+/**
+ * Components that render in the browser, each with the module that exports
+ * them (from the docs root). A page imports one only when it uses it.
+ */
+const RUNTIME_MODULES = {
+  Tabs: { module: "/src/components/Tabs.tsx", names: ["Tab", "Tabs"] },
+  LiveGrid: { module: "/src/components/LiveGrid.tsx", names: ["LiveGrid"] },
+} as const;
 
-/** `import { Tab, Tabs } from "<Tabs.tsx>"`, as an MDX ESM node. */
-function tabsImport(): ContentNode {
-  const specifiers = ["Tab", "Tabs"].map((name) => ({
+type RuntimeComponent = keyof typeof RUNTIME_MODULES;
+
+/** `import { …names } from "<module>"`, as an MDX ESM node. */
+function runtimeImport({ module, names }: (typeof RUNTIME_MODULES)[RuntimeComponent]): ContentNode {
+  const specifiers = names.map((name) => ({
     type: "ImportSpecifier",
     imported: { type: "Identifier", name },
     local: { type: "Identifier", name },
@@ -599,7 +676,7 @@ function tabsImport(): ContentNode {
           {
             type: "ImportDeclaration",
             specifiers,
-            source: { type: "Literal", value: TABS_MODULE, raw: JSON.stringify(TABS_MODULE) },
+            source: { type: "Literal", value: module, raw: JSON.stringify(module) },
           },
         ],
       },
@@ -622,17 +699,21 @@ function isComponent(node: ContentNode): node is ContentNode & { name: Component
  */
 export function contentComponents() {
   return (tree: ContentNode): void => {
-    let usesTabs = false;
+    const used = new Set<RuntimeComponent>();
     const visit = (node: ContentNode): ContentNode => {
       if (node.children !== undefined) node.children = node.children.map(visit);
       if (!isComponent(node)) return node;
       if (node.name === "Tabs" || node.name === "Tab") {
-        usesTabs = true;
+        used.add("Tabs");
         return node;
       }
       if (node.name === "CodeGroup") {
-        usesTabs = true;
+        used.add("Tabs");
         return codeGroup(node);
+      }
+      if (node.name === "LiveGrid") {
+        used.add("LiveGrid");
+        return node;
       }
       const tone = node.name in CALLOUTS ? CALLOUTS[node.name as keyof typeof CALLOUTS] : undefined;
       if (tone !== undefined) return callout(tone, node.children ?? [], attribute(node, "title"));
@@ -641,6 +722,7 @@ export function contentComponents() {
       return render === undefined ? node : render(node);
     };
     visit(tree);
-    if (usesTabs) tree.children = [tabsImport(), ...(tree.children ?? [])];
+    const imports = [...used].map((name) => runtimeImport(RUNTIME_MODULES[name]));
+    tree.children = [...imports, ...(tree.children ?? [])];
   };
 }

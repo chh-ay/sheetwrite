@@ -46,7 +46,7 @@
   bottom: var(--sw-space-2);
   left: calc(var(--sw-space-8) / 2);
   width: var(--sw-border-width);
-  background: var(--sw-border);
+  background: var(--sw-border-strong);
   content: "";
 }
 
@@ -138,6 +138,38 @@
   border-bottom: var(--sw-border-width) solid var(--sw-border);
   border-radius: var(--sw-radius-xl) var(--sw-radius-xl) 0 0;
   background: var(--sw-surface-2);
+}
+
+/* A screenshot across the top of a card, edge to edge, cropped to the card's frame. */
+.sw-card__shot {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 2 / 1;
+  margin: calc(var(--sw-space-5) * -1) calc(var(--sw-space-5) * -1) var(--sw-space-3);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-xl) var(--sw-radius-xl) 0 0;
+  background: var(--sw-surface-2);
+}
+
+.sw-card__shot .sw-shot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+  object-position: top left;
+}
+
+.sw-card__heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  align-items: center;
+}
+
+/* Section pages open with their card grid. */
+.sw-prose > .sw-section-cards:first-child {
+  margin-top: 0;
 }
 
 .sw-card__title {
@@ -552,4 +584,35 @@ a.sw-tooltip__term {
 .sw-prose .sw-tabs[data-variant="code"] .expressive-code pre {
   border: 0;
   border-radius: 0;
+}
+
+/* ── LiveGrid: an editable grid; its space is held before it loads ─────── */
+.sw-live-grid {
+  margin: var(--sw-space-6) 0;
+}
+
+.sw-live-grid__host {
+  position: relative;
+  overflow: hidden;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-live-grid[data-state="loading"] .sw-live-grid__host {
+  background: linear-gradient(var(--sw-surface-2) 0 2rem, var(--sw-surface-1) 2rem);
+}
+
+.sw-live-grid__status {
+  margin: 0;
+  padding: var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-live-grid > figcaption {
+  margin-top: var(--sw-space-2);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  text-align: center;
 }

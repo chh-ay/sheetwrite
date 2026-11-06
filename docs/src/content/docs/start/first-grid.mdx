@@ -3,7 +3,19 @@ title: Your first grid
 description: Initialize Sheetwrite, create a workbook, and observe committed changes.
 ---
 
-This complete TypeScript example uses the imperative core. [Install Sheetwrite](/docs/start/installation/) first; the framework adapters expose the same `Grid` after their client-only initialization completes.
+This example uses the imperative core in TypeScript. The framework adapters expose the same `Grid` once their client-only initialization completes.
+
+<Steps>
+<Step title="Install the packages" titleSize="h2">
+
+Add the core package. [Installation](/docs/start/installation/) covers the bundler setup and the optional packages.
+
+```sh verify
+npm install @sheetwrite/core
+```
+
+</Step>
+<Step title="Create the grid" titleSize="h2">
 
 ```ts compile title="Complete first grid"
 import {
@@ -49,7 +61,8 @@ grid.on("change", ({ transaction }) => {
 
 `initSheetwrite()` is re-entrant. Call it before `createGrid`; concurrent calls share initialization and a failed call can be retried. Destroy the returned grid when its host is permanently removed.
 
-## Add a formula
+</Step>
+<Step title="Add a formula" titleSize="h2">
 
 A formula is a cell value with `kind: "formula"`. The engine calculates it at once, and dependent cells follow every later edit.
 
@@ -69,7 +82,8 @@ console.log(grid.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); //
 
 Users can type the same formula in the cell. To use `GROUPBY`, `LAMBDA`, regression, and the other analysis functions, select the [full formula engine](/docs/features/formulas/analysis-formulas/) before you create the grid.
 
-## Save and open the document
+</Step>
+<Step title="Save and open the document" titleSize="h2">
 
 `exportSnapshot()` returns the complete document: values, formulas, styles, and sheet settings. Store it as JSON, and open it later with `createGridFromSnapshot`. Selection, scroll position, and zoom are session state; they are not in the snapshot.
 
@@ -83,10 +97,26 @@ console.log(reopened.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved)
 
 For a server, save each change as an ordered operation instead of whole snapshots. The [persistence guide](/docs/features/data/persistence/) explains the adapter and the offline queue.
 
+</Step>
+</Steps>
+
+## Try it
+
+<LiveGrid name="first-grid" height={176} label="The Sales sheet of the first grid" caption="The grid from the example. Edit an amount, or type =SUM(B1:B3) in the empty row." />
+
 ## Next steps
 
-- Open the [Vanilla example](/vanilla/) to exercise the same lifecycle in a production build.
-- Choose a [framework integration](/docs/frameworks/lifecycle/).
-- Learn when the [`Grid` and `Store` own state](/docs/concepts/runtime-ownership/).
-- Read [what is new in 0.5.0](/docs/releases/0.5.0/).
-- Browse the generated [`@sheetwrite/core` API](/docs/api/core/).
+<CardGroup cols={2}>
+  <Card title="Vanilla example" icon="framework-vanilla" href="/vanilla/">
+    The same lifecycle in a production build.
+  </Card>
+  <Card title="Frameworks" icon="framework-react" href="/docs/frameworks/lifecycle/">
+    React, Vue and Svelte adapters, and when each creates and destroys the grid.
+  </Card>
+  <Card title="Runtime ownership" icon="layers" href="/docs/concepts/runtime-ownership/">
+    When the `Grid` and the `Store` own state.
+  </Card>
+  <Card title="API reference" icon="tab-api" href="/docs/api/core/">
+    Every export of `@sheetwrite/core`.
+  </Card>
+</CardGroup>

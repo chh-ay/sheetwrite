@@ -404,10 +404,13 @@ export function DocsShell({
           {release === undefined ? null : (
             <>
               <ReleaseStrip {...release} />
-              <PackageCommand
-                note={`Update each adapter and add-on you use to ${release.release.version} too: all packages release together.`}
-                packages={`@sheetwrite/core@${release.release.version}`}
-              />
+              {/* An unreleased version has no package to install yet. */}
+              {release.release.unreleased === true ? null : (
+                <PackageCommand
+                  note={`Update each adapter and add-on you use to ${release.release.version} too: all packages release together.`}
+                  packages={`@sheetwrite/core@${release.release.version}`}
+                />
+              )}
             </>
           )}
         </header>
