@@ -1,0 +1,29 @@
+{
+  "protocol": "sheetwrite-engine-comparison-v1",
+  "base": {
+    "version": "0.6.0",
+    "commit": "e2f59ab7b65c30c4d20546386c9fe7c073f70697"
+  },
+  "candidate": {
+    "commit": "006943813203de185a6167146506d4647e581557"
+  },
+  "order": [
+    "base",
+    "candidate"
+  ],
+  "machine": {
+    "os": "linux 7.3.0-4-cachyos",
+    "arch": "x64",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "logicalCores": 20,
+    "memoryBytes": 16432848896,
+    "bun": "1.4.4"
+  },
+  "startedAt": "2026-11-06T10:49:43.334Z",
+  "finishedAt": "2026-11-06T10:50:23.529Z",
+  "command": "bench-run --slot <cpu> bun src/engine-comparison.ts --base 0.6.0 --base-checkout <clean checkout of v0.6.0, packages built> --candidate-checkout <clean checkout of the candidate, packages built>",
+  "artifacts": {
+    "base": "formula-base.json",
+    "candidate": "formula-candidate.json"
+  }
+}
