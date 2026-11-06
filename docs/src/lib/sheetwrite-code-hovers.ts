@@ -204,6 +204,8 @@ interface RenderedHover {
   referenceRoute?: string;
   /** When set, the trigger itself is an anchor: hover previews, click navigates. */
   navigable?: boolean;
+  /** The token is an exported Sheetwrite API name, not a local or a member. */
+  isApiName?: boolean;
 }
 
 function nestedRendererConfig(config: ResolvedExpressiveCodeEngineConfig) {
@@ -699,8 +701,8 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
             dataHoverKind: kind,
-            // A public Sheetwrite API symbol: the only kind marked at rest.
-            ...(referenceRoute === undefined ? {} : { dataSwApi: "" }),
+            // An exported Sheetwrite API name: the only kind marked at rest.
+            ...(this.rendered.isApiName === true ? { dataSwApi: "" } : {}),
           },
           [node],
         ),
@@ -894,6 +896,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                   tags: [],
                   referenceRoute: link.route,
                   navigable: true,
+                  isApiName: true,
                 },
                 hoverPopoverId(codeBlock, hover, linkIndex),
               ),
@@ -974,6 +977,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 seeRoutes,
                 referenceRoute,
                 navigable: referenceRoute !== undefined,
+                isApiName: !isLibrarySymbol && routes.has(hover.target),
               },
               popoverId,
             ),
