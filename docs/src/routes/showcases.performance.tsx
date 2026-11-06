@@ -1,18 +1,18 @@
 import type {
-  CellAddress,
-  Grid,
-  PagedStoreStats,
-  QueryCapability,
-  RuntimeResourcePhaseDelta,
-  RuntimeResourceSnapshot,
-  Selection,
+ CellAddress,
+ Grid,
+ PagedStoreStats,
+ QueryCapability,
+ RuntimeResourcePhaseDelta,
+ RuntimeResourceSnapshot,
+ Selection,
 } from "@sheetwrite/core";
 import {
-  cellA1,
-  colToA1,
-  createGrid,
-  diffRuntimeResourcePhases,
-  initSheetwrite,
+ cellA1,
+ colToA1,
+ createGrid,
+ diffRuntimeResourcePhases,
+ initSheetwrite,
 } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { createFileRoute } from "@tanstack/react-router";
@@ -24,43 +24,43 @@ import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import {
-  ShowcaseControlGroup,
-  ShowcaseLayout,
-  ShowcaseReadout,
-  ShowcaseStatus,
+ ShowcaseControlGroup,
+ ShowcaseLayout,
+ ShowcaseReadout,
+ ShowcaseStatus,
 } from "../showcases/layout/ShowcaseLayout.js";
 import {
-  FlightControls,
-  FlightReadout,
-  type ScaleFlight,
-  ScaleMinimap,
-  useScaleFlight,
+ FlightControls,
+ FlightReadout,
+ type ScaleFlight,
+ ScaleMinimap,
+ useScaleFlight,
 } from "../showcases/ScaleFlight.js";
 import {
-  attemptColumnScan,
-  attemptFullCsvExport,
-  COMPARISON_EVIDENCE,
-  type CrossingReport,
-  createScaleDataSource,
-  createScaleWorkbook,
-  type DatasourceTelemetry,
-  type DatasourceTile,
-  emptyTelemetry,
-  FEED_SHEET,
-  type FullExportAttempt,
-  INTERACTION_EVIDENCE,
-  measureBulkMutation,
-  PAGE_LATENCY_MS,
-  PAGED_EVIDENCE,
-  pagedStatsOf,
-  queryCapabilityOf,
-  SCALE_COLUMNS,
-  SCALE_EVICTION_STRESS_STORAGE,
-  SCALE_LOGICAL_CELLS,
-  SCALE_ROWS,
-  SCALE_STORAGE,
-  SCALE_THEME,
-  type ScanAttempt,
+ attemptColumnScan,
+ attemptFullCsvExport,
+ COMPARISON_EVIDENCE,
+ type CrossingReport,
+ createScaleDataSource,
+ createScaleWorkbook,
+ type DatasourceTelemetry,
+ type DatasourceTile,
+ emptyTelemetry,
+ FEED_SHEET,
+ type FullExportAttempt,
+ INTERACTION_EVIDENCE,
+ measureBulkMutation,
+ PAGE_LATENCY_MS,
+ PAGED_EVIDENCE,
+ pagedStatsOf,
+ queryCapabilityOf,
+ SCALE_COLUMNS,
+ SCALE_EVICTION_STRESS_STORAGE,
+ SCALE_LOGICAL_CELLS,
+ SCALE_ROWS,
+ SCALE_STORAGE,
+ SCALE_THEME,
+ type ScanAttempt,
 } from "../showcases/scenarios/scale.js";
 import PerformanceSnippet from "../showcases/snippets/performance.mdx";
 import { DemoButton } from "../showcases/ui/DemoButton.js";
@@ -70,111 +70,113 @@ import "@sheetwrite/core/styles.css";
 import stylesheet from "../styles/showcase-performance.css?url";
 
 declare global {
-  interface Window {
-    __sheetwriteScaleGrid?: Grid;
-  }
+ interface Window {
+  __sheetwriteScaleGrid?: Grid;
+ }
 }
 
 const description =
-  "A live grid over 1,000,000 rows by 1,000 columns: windowed loading, a bounded cache, sparse edits and measured runtime evidence, in your browser.";
+ "A live grid over 1,000,000 rows by 1,000 columns: windowed loading, a bounded cache, sparse edits and measured runtime evidence, in your browser.";
 
 export const Route = createFileRoute("/showcases/performance")({
-  head: () => ({
-    meta: pageMeta("One-billion-address Grid — Sheetwrite", description),
-    links: [{ rel: "stylesheet", href: stylesheet }],
-  }),
-  component: PerformanceRoute,
+ head: () => ({
+  meta: pageMeta("One-billion-address Grid — Sheetwrite", description),
+  links: [{ rel: "stylesheet", href: stylesheet }],
+ }),
+ component: PerformanceRoute,
 });
 
+/** Jumps to shares of the sheet's height, from the first row to the last. */
+const LANDMARKS = [0, 0.25, 0.5, 0.75, 1] as const;
 const SCALE_OVERSCAN = 4;
 const COMPARISON_LOG_MAX_EXPONENT = COMPARISON_EVIDENCE.available
-  ? Math.max(
-      1,
-      Math.ceil(
-        Math.log10(
-          Math.max(...COMPARISON_EVIDENCE.sizes.map((size) => Math.max(size.medianRatio, 1))),
-        ),
-      ),
-    )
-  : 1;
+ ? Math.max(
+  1,
+  Math.ceil(
+   Math.log10(
+    Math.max(...COMPARISON_EVIDENCE.sizes.map((size) => Math.max(size.medianRatio, 1))),
+   ),
+  ),
+ )
+ : 1;
 const COMPARISON_LOG_TICKS = Array.from(
-  { length: COMPARISON_LOG_MAX_EXPONENT + 1 },
-  (_, exponent) => 10 ** exponent,
+ { length: COMPARISON_LOG_MAX_EXPONENT + 1 },
+ (_, exponent) => 10 ** exponent,
 );
 
 function comparisonLogPercent(ratio: number): number {
-  if (!Number.isFinite(ratio) || ratio <= 1) return 0;
-  return Math.min(100, (Math.log10(ratio) / COMPARISON_LOG_MAX_EXPONENT) * 100);
+ if (!Number.isFinite(ratio) || ratio <= 1) return 0;
+ return Math.min(100, (Math.log10(ratio) / COMPARISON_LOG_MAX_EXPONENT) * 100);
 }
 
 interface VisibleWindow {
-  firstRow: number;
-  lastRow: number;
-  scrollLeft: number;
-  firstColumn: number;
-  lastColumn: number;
+ firstRow: number;
+ lastRow: number;
+ scrollLeft: number;
+ firstColumn: number;
+ lastColumn: number;
 }
 
 interface LiveStats {
-  paged: PagedStoreStats | null;
-  query: QueryCapability | null;
-  resource: RuntimeResourceSnapshot | null;
+ paged: PagedStoreStats | null;
+ query: QueryCapability | null;
+ resource: RuntimeResourceSnapshot | null;
 }
 
 interface EvictionWatch {
-  dirty: CellAddress;
-  clean: CellAddress;
-  dirtyState: string;
-  cleanState: string;
-  value: string;
+ dirty: CellAddress;
+ clean: CellAddress;
+ dirtyState: string;
+ cleanState: string;
+ value: string;
 }
 
 type TileResidence = DatasourceTile["state"] | "resident" | "evicted" | "dirty";
 
 function selectionA1(selection: Selection | null): string {
-  if (!selection) return "A1";
-  if (selection.kind === "cell") return cellA1(selection.addr.row, selection.addr.col);
-  if (selection.kind === "range")
-    return cellA1(selection.range.start.row, selection.range.start.col);
-  if (selection.kind === "row") return `Row ${selection.row + 1}`;
-  if (selection.kind === "column") return colToA1(selection.col);
-  const first = selection.ranges[0]?.start;
-  return first ? cellA1(first.row, first.col) : "A1";
+ if (!selection) return "A1";
+ if (selection.kind === "cell") return cellA1(selection.addr.row, selection.addr.col);
+ if (selection.kind === "range")
+  return cellA1(selection.range.start.row, selection.range.start.col);
+ if (selection.kind === "row") return `Row ${selection.row + 1}`;
+ if (selection.kind === "column") return colToA1(selection.col);
+ const first = selection.ranges[0]?.start;
+ return first ? cellA1(first.row, first.col) : "A1";
 }
 function selectedCellAddress(selection: Selection | null): CellAddress | null {
-  if (!selection) return null;
-  if (selection.kind === "cell") return selection.addr;
-  if (selection.kind === "range") return { sheet: FEED_SHEET, ...selection.range.start };
-  if (selection.kind === "multi") {
-    const start = selection.ranges[0]?.start;
-    return start ? { sheet: FEED_SHEET, ...start } : null;
-  }
-  return null;
+ if (!selection) return null;
+ if (selection.kind === "cell") return selection.addr;
+ if (selection.kind === "range") return { sheet: FEED_SHEET, ...selection.range.start };
+ if (selection.kind === "multi") {
+  const start = selection.ranges[0]?.start;
+  return start ? { sheet: FEED_SHEET, ...start } : null;
+ }
+ return null;
 }
 
 function columnBandsLabel(columns: readonly DatasourceTile["columns"][number][]): string {
-  return columns
-    .map((band) => `${colToA1(band.start)}–${colToA1(Math.max(band.start, band.end - 1))}`)
-    .join(", ");
+ return columns
+  .map((band) => `${colToA1(band.start)}–${colToA1(Math.max(band.start, band.end - 1))}`)
+  .join(", ");
 }
 
 function tileResidence(grid: Grid | null, tile: DatasourceTile): TileResidence {
-  if (tile.state !== "returned" || !grid?.store.getCellLoadState) return tile.state;
-  const firstBand = tile.columns[0];
-  if (!firstBand) return "evicted";
-  const state = grid.store.getCellLoadState({
-    sheet: tile.sheet,
-    row: tile.start,
-    col: firstBand.start,
-  });
-  if (state === "unloaded") return "evicted";
-  if (state === "local-edit") return "dirty";
-  return "resident";
+ if (tile.state !== "returned" || !grid?.store.getCellLoadState) return tile.state;
+ const firstBand = tile.columns[0];
+ if (!firstBand) return "evicted";
+ const state = grid.store.getCellLoadState({
+  sheet: tile.sheet,
+  row: tile.start,
+  col: firstBand.start,
+ });
+ if (state === "unloaded") return "evicted";
+ if (state === "local-edit") return "dirty";
+ return "resident";
 }
 
 function formatByteDelta(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  return `${bytes > 0 ? "+" : "−"}${formatBytes(Math.abs(bytes), { kib: 1, mib: 1, gib: 2 })}`;
+ if (bytes === 0) return "0 B";
+ return `${bytes > 0 ? "+" : "−"}${formatBytes(Math.abs(bytes), { kib: 1, mib: 1, gib: 2 })}`;
 }
 
 const BYTES_PER_MIB = 1024 * 1024;
@@ -184,33 +186,33 @@ const DELTA_FLAT_PERCENT = 0.5;
 const DELTA_COARSE_PERCENT = 10;
 
 interface InteractionWin {
-  label: string;
-  value: string;
-  testId?: string;
-  delta: { direction: "better" | "worse" | "flat"; text: string } | null;
-  note: string;
+ label: string;
+ value: string;
+ testId?: string;
+ delta: { direction: "better" | "worse" | "flat"; text: string } | null;
+ note: string;
 }
 
 /** Percentage change against the previous release. All four metrics are lower-is-better. */
 function interactionDelta(current: number, previous: number | undefined) {
-  if (previous === undefined || !Number.isFinite(current) || !Number.isFinite(previous)) {
-    return null;
-  }
-  if (previous === 0) {
-    return current === 0
-      ? { direction: "flat" as const, text: "unchanged from the previous release" }
-      : null;
-  }
-  const percent = ((current - previous) / previous) * 100;
-  const magnitude = Math.abs(percent);
-  if (magnitude < DELTA_FLAT_PERCENT) {
-    return { direction: "flat" as const, text: "unchanged from the previous release" };
-  }
-  const shown = magnitude >= DELTA_COARSE_PERCENT ? magnitude.toFixed(0) : magnitude.toFixed(1);
-  return {
-    direction: percent < 0 ? ("better" as const) : ("worse" as const),
-    text: `${shown}% ${percent < 0 ? "lower" : "higher"} than the previous release`,
-  };
+ if (previous === undefined || !Number.isFinite(current) || !Number.isFinite(previous)) {
+  return null;
+ }
+ if (previous === 0) {
+  return current === 0
+   ? { direction: "flat" as const, text: "unchanged from the previous release" }
+   : null;
+ }
+ const percent = ((current - previous) / previous) * 100;
+ const magnitude = Math.abs(percent);
+ if (magnitude < DELTA_FLAT_PERCENT) {
+  return { direction: "flat" as const, text: "unchanged from the previous release" };
+ }
+ const shown = magnitude >= DELTA_COARSE_PERCENT ? magnitude.toFixed(0) : magnitude.toFixed(1);
+ return {
+  direction: percent < 0 ? ("better" as const) : ("worse" as const),
+  text: `${shown}% ${percent < 0 ? "lower" : "higher"} than the previous release`,
+ };
 }
 
 /**
@@ -219,59 +221,59 @@ function interactionDelta(current: number, previous: number | undefined) {
  * same schema.
  */
 function interactionWinList(): InteractionWin[] {
-  const { current, previous, ceilings } = INTERACTION_EVIDENCE;
-  return [
-    {
-      label: "Lookup latency",
-      value: `${current.lookupMedianNs.toFixed(2)} ns`,
-      delta: interactionDelta(current.lookupMedianNs, previous?.lookupMedianNs),
-      note: `Median address lookup. p95 ${current.lookupP95Ns.toFixed(0)} ns, release ceiling ${ceilings.lookupP95Ns.toLocaleString("en-US")} ns.`,
-    },
-    {
-      label: "Inverse index",
-      value: formatBytes(current.viewIndexBytes, { kib: 1, mib: 1, gib: 2 }),
-      delta: interactionDelta(current.viewIndexBytes, previous?.viewIndexBytes),
-      note: `Retained inverse row index for 1,000,000 rows. Ceiling ${formatBytes(ceilings.inverseIndexBytes, { kib: 1, mib: 1, gib: 2 })}.`,
-    },
-    {
-      label: "100 distant edits",
-      value: formatBytes(current.dirty100Bytes, { kib: 1, mib: 1, gib: 2 }),
-      delta: interactionDelta(current.dirty100Bytes, previous?.dirty100Bytes),
-      note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${formatBytes(ceilings.dirty100Bytes, { kib: 1, mib: 1, gib: 2 })}.`,
-    },
-    {
-      label: "Owned cold long task",
-      value: `${current.coldOwnedLongTaskMs.toFixed(1)} ms`,
-      testId: "scale-evidence-cold",
-      delta: interactionDelta(current.coldOwnedLongTaskMs, previous?.coldOwnedLongTaskMs),
-      note: `Longest Sheetwrite-owned task during a cold page load. Ceiling ${ceilings.ownedColdLongTaskMs} ms.`,
-    },
-  ];
+ const { current, previous, ceilings } = INTERACTION_EVIDENCE;
+ return [
+  {
+   label: "Lookup latency",
+   value: `${current.lookupMedianNs.toFixed(2)} ns`,
+   delta: interactionDelta(current.lookupMedianNs, previous?.lookupMedianNs),
+   note: `Median address lookup. p95 ${current.lookupP95Ns.toFixed(0)} ns, release ceiling ${ceilings.lookupP95Ns.toLocaleString("en-US")} ns.`,
+  },
+  {
+   label: "Inverse index",
+   value: formatBytes(current.viewIndexBytes, { kib: 1, mib: 1, gib: 2 }),
+   delta: interactionDelta(current.viewIndexBytes, previous?.viewIndexBytes),
+   note: `Retained inverse row index for 1,000,000 rows. Ceiling ${formatBytes(ceilings.inverseIndexBytes, { kib: 1, mib: 1, gib: 2 })}.`,
+  },
+  {
+   label: "100 distant edits",
+   value: formatBytes(current.dirty100Bytes, { kib: 1, mib: 1, gib: 2 }),
+   delta: interactionDelta(current.dirty100Bytes, previous?.dirty100Bytes),
+   note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${formatBytes(ceilings.dirty100Bytes, { kib: 1, mib: 1, gib: 2 })}.`,
+  },
+  {
+   label: "Owned cold long task",
+   value: `${current.coldOwnedLongTaskMs.toFixed(1)} ms`,
+   testId: "scale-evidence-cold",
+   delta: interactionDelta(current.coldOwnedLongTaskMs, previous?.coldOwnedLongTaskMs),
+   note: `Longest Sheetwrite-owned task during a cold page load. Ceiling ${ceilings.ownedColdLongTaskMs} ms.`,
+  },
+ ];
 }
 
 /** Leading-and-trailing throttle: applies a value at once when idle, else at most every `ms`. */
 function throttled<T>(apply: (value: T) => void, ms = 100) {
-  let pending: { value: T } | null = null;
-  let timer = 0;
-  let last = Number.NEGATIVE_INFINITY;
-  const flush = () => {
-    timer = 0;
-    last = performance.now();
-    if (pending) apply(pending.value);
-    pending = null;
-  };
-  return {
-    push(value: T) {
-      pending = { value };
-      if (timer !== 0) return;
-      const wait = last + ms - performance.now();
-      if (wait <= 0) flush();
-      else timer = window.setTimeout(flush, wait);
-    },
-    cancel() {
-      window.clearTimeout(timer);
-    },
-  };
+ let pending: { value: T } | null = null;
+ let timer = 0;
+ let last = Number.NEGATIVE_INFINITY;
+ const flush = () => {
+  timer = 0;
+  last = performance.now();
+  if (pending) apply(pending.value);
+  pending = null;
+ };
+ return {
+  push(value: T) {
+   pending = { value };
+   if (timer !== 0) return;
+   const wait = last + ms - performance.now();
+   if (wait <= 0) flush();
+   else timer = window.setTimeout(flush, wait);
+  },
+  cancel() {
+   window.clearTimeout(timer);
+  },
+ };
 }
 
 /**
@@ -279,1393 +281,1390 @@ function throttled<T>(apply: (value: T) => void, ms = 100) {
  * cache, crossing and evidence reports its sections show.
  */
 function usePerformanceWorkbench() {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<Grid | null>(null);
-  const zoomRef = useRef(1);
-  const visibleRef = useRef<VisibleWindow>({
-    firstRow: 0,
-    lastRow: 0,
-    scrollLeft: 0,
-    firstColumn: 0,
-    lastColumn: 0,
-  });
-  const [renderer, setRenderer] = useState<RenderingMode>("canvas");
-  const [rendererState, setRendererState] = useState<RendererState | null>(null);
-  const [gridState, setGridState] = useState<"loading" | "ready" | "error">("loading");
-  const [telemetry, setTelemetry] = useState<DatasourceTelemetry>(emptyTelemetry);
-  const [stats, setStats] = useState<LiveStats>({ paged: null, query: null, resource: null });
-  const [visible, setVisible] = useState<VisibleWindow>({
-    firstRow: 0,
-    lastRow: 0,
-    scrollLeft: 0,
-    firstColumn: 0,
-    lastColumn: 0,
-  });
-  const [selection, setSelection] = useState("A1");
-  const [selectedAddress, setSelectedAddress] = useState<CellAddress>({
-    sheet: FEED_SHEET,
-    row: 0,
-    col: 0,
-  });
-  const [zoom, setZoom] = useState(1);
-  const [evictionStress, setEvictionStress] = useState(false);
-  const [jumpRow, setJumpRow] = useState("742000");
-  const [jumpColumn, setJumpColumn] = useState("4");
-  const [status, setStatus] = useState("Loading the WASM engine on demand…");
-  const [crossings, setCrossings] = useState<CrossingReport[]>([]);
-  const [exportAttempt, setExportAttempt] = useState<FullExportAttempt | null>(null);
-  const [scan, setScan] = useState<ScanAttempt | null>(null);
-  const [resourceDelta, setResourceDelta] = useState<RuntimeResourcePhaseDelta | null>(null);
-  const [evictionWatch, setEvictionWatch] = useState<EvictionWatch | null>(null);
-  const activeStorage = evictionStress ? SCALE_EVICTION_STRESS_STORAGE : SCALE_STORAGE;
+ const hostRef = useRef<HTMLDivElement>(null);
+ const gridRef = useRef<Grid | null>(null);
+ const zoomRef = useRef(1);
+ const visibleRef = useRef<VisibleWindow>({
+  firstRow: 0,
+  lastRow: 0,
+  scrollLeft: 0,
+  firstColumn: 0,
+  lastColumn: 0,
+ });
+ const [renderer, setRenderer] = useState<RenderingMode>("canvas");
+ const [rendererState, setRendererState] = useState<RendererState | null>(null);
+ const [gridState, setGridState] = useState<"loading" | "ready" | "error">("loading");
+ const [telemetry, setTelemetry] = useState<DatasourceTelemetry>(emptyTelemetry);
+ const [stats, setStats] = useState<LiveStats>({ paged: null, query: null, resource: null });
+ const [visible, setVisible] = useState<VisibleWindow>({
+  firstRow: 0,
+  lastRow: 0,
+  scrollLeft: 0,
+  firstColumn: 0,
+  lastColumn: 0,
+ });
+ const [selection, setSelection] = useState("A1");
+ const [selectedAddress, setSelectedAddress] = useState<CellAddress>({
+  sheet: FEED_SHEET,
+  row: 0,
+  col: 0,
+ });
+ const [zoom, setZoom] = useState(1);
+ const [evictionStress, setEvictionStress] = useState(false);
+ const [jumpRow, setJumpRow] = useState("742000");
+ const [jumpColumn, setJumpColumn] = useState("4");
+ const [status, setStatus] = useState("Loading the WASM engine on demand…");
+ const [crossings, setCrossings] = useState<CrossingReport[]>([]);
+ const [exportAttempt, setExportAttempt] = useState<FullExportAttempt | null>(null);
+ const [scan, setScan] = useState<ScanAttempt | null>(null);
+ const [resourceDelta, setResourceDelta] = useState<RuntimeResourcePhaseDelta | null>(null);
+ const [evictionWatch, setEvictionWatch] = useState<EvictionWatch | null>(null);
+ const activeStorage = evictionStress ? SCALE_EVICTION_STRESS_STORAGE : SCALE_STORAGE;
 
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    let disposed = false;
-    let grid: Grid | null = null;
-    const unsubscribes: Array<() => void> = [];
-    // Flights fire a scroll event and several tile updates every frame. Each
-    // readout redraws at once when idle and at most ten times a second during
-    // a burst, always ending on the latest value.
-    const visibleUpdates = throttled(setVisible);
-    const telemetryUpdates = throttled(setTelemetry);
-    unsubscribes.push(visibleUpdates.cancel, telemetryUpdates.cancel);
-    setGridState("loading");
-    setTelemetry(emptyTelemetry());
-    setEvictionWatch(null);
-    setStatus("Loading the WASM engine on demand…");
+ useEffect(() => {
+  const host = hostRef.current;
+  if (!host) return;
+  let disposed = false;
+  let grid: Grid | null = null;
+  const unsubscribes: Array<() => void> = [];
+  // Flights fire a scroll event and several tile updates every frame. Each
+  // readout redraws at once when idle and at most ten times a second during
+  // a burst, always ending on the latest value.
+  const visibleUpdates = throttled(setVisible);
+  const telemetryUpdates = throttled(setTelemetry);
+  unsubscribes.push(visibleUpdates.cancel, telemetryUpdates.cancel);
+  setGridState("loading");
+  setTelemetry(emptyTelemetry());
+  setEvictionWatch(null);
+  setStatus("Loading the WASM engine on demand…");
 
-    void initSheetwrite()
-      .then(() => {
-        if (disposed) return;
-        grid = createGrid(host, {
-          workbook: createScaleWorkbook(),
-          datasource: createScaleDataSource((update) => {
-            telemetryUpdates.push({ ...update });
-          }),
-          datasourceStorage: activeStorage,
-          theme: SCALE_THEME,
-          presentation: "data-grid",
-          config: {
-            toolbar: false,
-            tabs: false,
-            contextMenu: [
-              { action: "copy", label: "Copy loaded value" },
-              {
-                label: "Jump to last row",
-                onClick(instance) {
-                  const addr = { sheet: FEED_SHEET, row: SCALE_ROWS - 1, col: 0 };
-                  instance.setSelection({ kind: "cell", addr });
-                  instance.scrollToCell(addr);
-                },
-              },
-              {
-                label: "Return to first cell",
-                onClick(instance) {
-                  const addr = { sheet: FEED_SHEET, row: 0, col: 0 };
-                  instance.setSelection({ kind: "cell", addr });
-                  instance.scrollToCell(addr);
-                },
-              },
-            ],
-            keyboard: (event, mountedGrid) => {
-              if (
-                event.key !== "PageUp" ||
-                event.shiftKey ||
-                event.altKey ||
-                event.ctrlKey ||
-                event.metaKey
-              ) {
-                return false;
-              }
-              const selected = mountedGrid.getSelection();
-              if (selected?.kind !== "cell") return false;
+  void initSheetwrite()
+   .then(() => {
+    if (disposed) return;
+    grid = createGrid(host, {
+     workbook: createScaleWorkbook(),
+     datasource: createScaleDataSource((update) => {
+      telemetryUpdates.push({ ...update });
+     }),
+     datasourceStorage: activeStorage,
+     theme: SCALE_THEME,
+     presentation: "data-grid",
+     config: {
+      toolbar: false,
+      tabs: false,
+      contextMenu: [
+       { action: "copy", label: "Copy loaded value" },
+       {
+        label: "Jump to last row",
+        onClick(instance) {
+         const addr = { sheet: FEED_SHEET, row: SCALE_ROWS - 1, col: 0 };
+         instance.setSelection({ kind: "cell", addr });
+         instance.scrollToCell(addr);
+        },
+       },
+       {
+        label: "Return to first cell",
+        onClick(instance) {
+         const addr = { sheet: FEED_SHEET, row: 0, col: 0 };
+         instance.setSelection({ kind: "cell", addr });
+         instance.scrollToCell(addr);
+        },
+       },
+      ],
+      keyboard: (event, mountedGrid) => {
+       if (
+        event.key !== "PageUp" ||
+        event.shiftKey ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+       ) {
+        return false;
+       }
+       const selected = mountedGrid.getSelection();
+       if (selected?.kind !== "cell") return false;
 
-              const window = visibleRef.current;
-              const pageRows = Math.max(1, window.lastRow - window.firstRow + 1);
-              const selectedAddr = {
-                ...selected.addr,
-                row: Math.max(0, window.firstRow - pageRows),
-              };
-              mountedGrid.setSelection({ kind: "cell", addr: selectedAddr });
-              mountedGrid.scrollToCell(selectedAddr);
-              event.preventDefault();
-              return true;
-            },
-          },
-          renderer,
-          overscan: evictionStress ? 0 : SCALE_OVERSCAN,
-          ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
-        });
-        gridRef.current = grid;
-        window.__sheetwriteScaleGrid = grid;
-        grid.setZoom(zoomRef.current);
-        setRendererState({ requested: renderer, active: grid.rendererKind(), fallback: null });
-        setSelection(selectionA1(grid.getSelection()));
-        setSelectedAddress(
-          selectedCellAddress(grid.getSelection()) ?? { sheet: FEED_SHEET, row: 0, col: 0 },
-        );
-        unsubscribes.push(
-          grid.on("scroll", (event) => {
-            const nextVisible = {
-              firstRow: event.firstRow,
-              lastRow: event.lastRow,
-              scrollLeft: event.scrollLeft,
-              firstColumn: event.firstVisibleColumn ?? 0,
-              lastColumn: event.lastVisibleColumn ?? event.firstVisibleColumn ?? 0,
-            };
-            visibleRef.current = nextVisible;
-            visibleUpdates.push(nextVisible);
-          }),
-          grid.on("selection", ({ selection: next }) => {
-            setSelection(selectionA1(next));
-            const address = selectedCellAddress(next);
-            if (address) setSelectedAddress(address);
-          }),
-          grid.on("edit-commit", ({ addr }) => {
-            const mountedGrid = gridRef.current;
-            const cleanRow =
-              addr.row >= SCALE_STORAGE.chunkRows
-                ? addr.row - SCALE_STORAGE.chunkRows
-                : Math.min(SCALE_ROWS - 1, addr.row + SCALE_STORAGE.chunkRows);
-            const clean = { ...addr, row: cleanRow };
-            if (mountedGrid) {
-              setEvictionWatch({
-                dirty: addr,
-                clean,
-                dirtyState: mountedGrid.store.getCellLoadState?.(addr) ?? "unavailable",
-                cleanState: mountedGrid.store.getCellLoadState?.(clean) ?? "unavailable",
-                value: String(mountedGrid.store.getCell(addr).resolved ?? ""),
-              });
-            }
-            setStatus(
-              `${cellA1(addr.row, addr.col)} committed through the Grid; its sparse dirty value is outside the clean-tile eviction budget.`,
-            );
-          }),
-          grid.on("renderer-fallback", ({ error }) => {
-            const reason = errorText(error);
-            setRendererState({
-              requested: "worker",
-              active: gridRef.current?.rendererKind() ?? "canvas",
-              fallback: reason,
-            });
-          }),
-          grid.on("datasource-error", ({ error }) => {
-            setStatus(`Datasource error: ${error.message}`);
-          }),
-        );
-        setGridState("ready");
-        setStatus(
-          `${evictionStress ? "Optional 1 MiB eviction stress active. " : ""}Ready: exactly ${SCALE_ROWS.toLocaleString()} rows × ${SCALE_COLUMNS.toLocaleString()} columns = ${SCALE_LOGICAL_CELLS.toLocaleString()} logical addresses. Only requested tiles may become resident.`,
-        );
-      })
-      .catch((error: unknown) => {
-        if (disposed) return;
-        setGridState("error");
-        setStatus(`Grid failed to start: ${errorText(error)}`);
-      });
-
-    return () => {
-      disposed = true;
-      for (const unsubscribe of unsubscribes) unsubscribe();
-      if (gridRef.current === grid) {
-        gridRef.current = null;
-        delete window.__sheetwriteScaleGrid;
-      }
-      grid?.destroy();
-    };
-  }, [renderer, evictionStress, activeStorage]);
-
-  useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme(SCALE_THEME)), []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const grid = gridRef.current;
-      if (!grid) return;
-      setStats({
-        paged: pagedStatsOf(grid, FEED_SHEET),
-        query: queryCapabilityOf(grid, FEED_SHEET),
-        resource: grid.getRuntimeResourceSnapshot("scroll", "settled"),
-      });
-      setEvictionWatch((current) => {
-        if (!current) return current;
-        const dirtyState = grid.store.getCellLoadState?.(current.dirty) ?? "unavailable";
-        const cleanState = grid.store.getCellLoadState?.(current.clean) ?? "unavailable";
-        const value = String(grid.store.getCell(current.dirty).resolved ?? "");
-        if (
-          dirtyState === current.dirtyState &&
-          cleanState === current.cleanState &&
-          value === current.value
-        ) {
-          return current;
-        }
-        return { ...current, dirtyState, cleanState, value };
-      });
-    }, 250);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const jumpTo = (
-    row: number,
-    column: number,
-    source: "form" | "overview" | "column-overview" | "landmark",
-  ) => {
-    const grid = gridRef.current;
-    if (!grid) return;
-    const resolvedRow = Math.min(Math.max(Math.round(row), 0), SCALE_ROWS - 1);
-    const resolvedColumn = Math.min(Math.max(Math.round(column), 0), SCALE_COLUMNS - 1);
-    const addr = { sheet: FEED_SHEET, row: resolvedRow, col: resolvedColumn };
-    grid.setSelection({ kind: "cell", addr });
-    grid.scrollToCell(addr);
-    if (source === "form") hostRef.current?.focus({ preventScroll: true });
-    if (source !== "overview" && source !== "column-overview") {
-      setStatus(
-        `${source === "form" ? "Exact jump" : "Overview landmark"}: ${cellA1(resolvedRow, resolvedColumn)} is selected; its rectangular tile is requested on demand.`,
-      );
-    }
-  };
-
-  const handleJump = () => {
-    const row = Number(jumpRow);
-    const column = Number(jumpColumn);
-    if (
-      !/^\d+$/.test(jumpRow.trim()) ||
-      !/^\d+$/.test(jumpColumn.trim()) ||
-      !Number.isSafeInteger(row) ||
-      !Number.isSafeInteger(column) ||
-      row < 1 ||
-      column < 1
-    ) {
-      setStatus("Enter whole numbers: row 1–1,000,000 and column 1–1,000.");
-      return;
-    }
-    jumpTo(row - 1, column - 1, "form");
-  };
-  const handleZoom = (nextZoom: number) => {
-    const grid = gridRef.current;
-    const host = hostRef.current;
-    if (!grid || !host) return;
-    const anchor = visibleRef.current;
-    grid.setZoom(nextZoom);
-
-    const theme = grid.getEffectiveTheme();
-    const bodyRows = Math.max(
-      1,
-      Math.floor(
-        Math.max(theme.rowHeight, host.clientHeight - theme.headerHeight) / theme.rowHeight,
-      ),
-    );
-    const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === FEED_SHEET);
-    const availableWidth = Math.max(1, host.clientWidth - theme.rowHeaderWidth);
-    let anchorRight = anchor.firstColumn;
-    let coveredWidth = 0;
-    while (anchorRight < SCALE_COLUMNS) {
-      coveredWidth += (sheet?.columns[anchorRight]?.width ?? 96) * grid.getZoom();
-      if (coveredWidth >= availableWidth) break;
-      anchorRight += 1;
-    }
-
-    const bodyColumns = Math.max(1, anchorRight - anchor.firstColumn + 1);
-    const forceRow =
-      anchor.firstRow === 0
-        ? Math.min(SCALE_ROWS - 1, bodyRows + SCALE_OVERSCAN + 1)
-        : Math.max(0, anchor.firstRow - bodyRows - SCALE_OVERSCAN - 1);
-    const forceColumn =
-      anchor.firstColumn === 0
-        ? Math.min(SCALE_COLUMNS - 1, anchorRight + 1)
-        : Math.max(0, anchor.firstColumn - bodyColumns - 1);
-    grid.scrollToCell({ sheet: FEED_SHEET, row: forceRow, col: forceColumn });
-    grid.scrollToCell({
-      sheet: FEED_SHEET,
-      row:
-        anchor.firstRow === 0
-          ? 0
-          : Math.min(SCALE_ROWS - 1, anchor.firstRow + SCALE_OVERSCAN + bodyRows),
-      col: anchor.firstColumn === 0 ? 0 : Math.min(SCALE_COLUMNS - 1, anchorRight),
+       const window = visibleRef.current;
+       const pageRows = Math.max(1, window.lastRow - window.firstRow + 1);
+       const selectedAddr = {
+        ...selected.addr,
+        row: Math.max(0, window.firstRow - pageRows),
+       };
+       mountedGrid.setSelection({ kind: "cell", addr: selectedAddr });
+       mountedGrid.scrollToCell(selectedAddr);
+       event.preventDefault();
+       return true;
+      },
+     },
+     renderer,
+     overscan: evictionStress ? 0 : SCALE_OVERSCAN,
+     ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
     });
-    setZoom(grid.getZoom());
-    zoomRef.current = grid.getZoom();
-  };
-
-  const handleScan = () => {
-    const grid = gridRef.current;
-    if (grid) setScan(attemptColumnScan(grid, 3, "sum"));
-  };
-
-  const handleExport = () => {
-    const grid = gridRef.current;
-    if (grid) setExportAttempt(attemptFullCsvExport(grid, FEED_SHEET));
-  };
-
-  const handleCrossings = (kind: "values" | "styles") => {
-    const grid = gridRef.current;
-    if (!grid) return;
-    const before = grid.getRuntimeResourceSnapshot("edit", "before");
-    const report = measureBulkMutation(grid, kind, 20_000);
-    const after = grid.getRuntimeResourceSnapshot("edit", "settled");
-    setResourceDelta(diffRuntimeResourcePhases(before, after));
-    setCrossings((previous) => [report, ...previous.slice(0, 3)]);
-    setStatus(
-      `${kind === "values" ? "Value" : "Style"} transaction touched ${report.cells.toLocaleString()} cells in ${report.durationMs.toFixed(1)} ms with ${report.ffiCalls} measured JS↔WASM crossing${report.ffiCalls === 1 ? "" : "s"}.`,
+    gridRef.current = grid;
+    window.__sheetwriteScaleGrid = grid;
+    grid.setZoom(zoomRef.current);
+    setRendererState({ requested: renderer, active: grid.rendererKind(), fallback: null });
+    setSelection(selectionA1(grid.getSelection()));
+    setSelectedAddress(
+     selectedCellAddress(grid.getSelection()) ?? { sheet: FEED_SHEET, row: 0, col: 0 },
     );
-  };
+    unsubscribes.push(
+     grid.on("scroll", (event) => {
+      const nextVisible = {
+       firstRow: event.firstRow,
+       lastRow: event.lastRow,
+       scrollLeft: event.scrollLeft,
+       firstColumn: event.firstVisibleColumn ?? 0,
+       lastColumn: event.lastVisibleColumn ?? event.firstVisibleColumn ?? 0,
+      };
+      visibleRef.current = nextVisible;
+      visibleUpdates.push(nextVisible);
+     }),
+     grid.on("selection", ({ selection: next }) => {
+      setSelection(selectionA1(next));
+      const address = selectedCellAddress(next);
+      if (address) setSelectedAddress(address);
+     }),
+     grid.on("edit-commit", ({ addr }) => {
+      const mountedGrid = gridRef.current;
+      const cleanRow =
+       addr.row >= SCALE_STORAGE.chunkRows
+        ? addr.row - SCALE_STORAGE.chunkRows
+        : Math.min(SCALE_ROWS - 1, addr.row + SCALE_STORAGE.chunkRows);
+      const clean = { ...addr, row: cleanRow };
+      if (mountedGrid) {
+       setEvictionWatch({
+        dirty: addr,
+        clean,
+        dirtyState: mountedGrid.store.getCellLoadState?.(addr) ?? "unavailable",
+        cleanState: mountedGrid.store.getCellLoadState?.(clean) ?? "unavailable",
+        value: String(mountedGrid.store.getCell(addr).resolved ?? ""),
+       });
+      }
+      setStatus(
+       `${cellA1(addr.row, addr.col)} committed through the Grid; its sparse dirty value is outside the clean-tile eviction budget.`,
+      );
+     }),
+     grid.on("renderer-fallback", ({ error }) => {
+      const reason = errorText(error);
+      setRendererState({
+       requested: "worker",
+       active: gridRef.current?.rendererKind() ?? "canvas",
+       fallback: reason,
+      });
+     }),
+     grid.on("datasource-error", ({ error }) => {
+      setStatus(`Datasource error: ${error.message}`);
+     }),
+    );
+    setGridState("ready");
+    setStatus(
+     `${evictionStress ? "Optional 1 MiB eviction stress active. " : ""}Ready: exactly ${SCALE_ROWS.toLocaleString()} rows × ${SCALE_COLUMNS.toLocaleString()} columns = ${SCALE_LOGICAL_CELLS.toLocaleString()} logical addresses. Only requested tiles may become resident.`,
+    );
+   })
+   .catch((error: unknown) => {
+    if (disposed) return;
+    setGridState("error");
+    setStatus(`Grid failed to start: ${errorText(error)}`);
+   });
 
-  const firstColumn = Math.min(visible.firstColumn, SCALE_COLUMNS - 1);
-  const lastColumn = Math.min(Math.max(visible.lastColumn, firstColumn), SCALE_COLUMNS - 1);
-  const firstRow = Math.min(visible.firstRow, SCALE_ROWS - 1);
-  const lastRow = Math.min(Math.max(visible.lastRow, firstRow), SCALE_ROWS - 1);
-  const windowA1 = `${cellA1(firstRow, firstColumn)}:${cellA1(lastRow, lastColumn)}`;
-  const currentColumns = lastColumn - firstColumn + 1;
-  const averageRequestedColumns =
-    telemetry.returnedRows > 0 ? telemetry.returnedCells / telemetry.returnedRows : 0;
-  const cachePercent = Math.min(
-    ((stats.paged?.allocatedBytes ?? 0) / activeStorage.cacheBytes) * 100,
-    100,
+  return () => {
+   disposed = true;
+   for (const unsubscribe of unsubscribes) unsubscribe();
+   if (gridRef.current === grid) {
+    gridRef.current = null;
+    delete window.__sheetwriteScaleGrid;
+   }
+   grid?.destroy();
+  };
+ }, [renderer, evictionStress, activeStorage]);
+
+ useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme(SCALE_THEME)), []);
+
+ useEffect(() => {
+  const timer = window.setInterval(() => {
+   const grid = gridRef.current;
+   if (!grid) return;
+   setStats({
+    paged: pagedStatsOf(grid, FEED_SHEET),
+    query: queryCapabilityOf(grid, FEED_SHEET),
+    resource: grid.getRuntimeResourceSnapshot("scroll", "settled"),
+   });
+   setEvictionWatch((current) => {
+    if (!current) return current;
+    const dirtyState = grid.store.getCellLoadState?.(current.dirty) ?? "unavailable";
+    const cleanState = grid.store.getCellLoadState?.(current.clean) ?? "unavailable";
+    const value = String(grid.store.getCell(current.dirty).resolved ?? "");
+    if (
+     dirtyState === current.dirtyState &&
+     cleanState === current.cleanState &&
+     value === current.value
+    ) {
+     return current;
+    }
+    return { ...current, dirtyState, cleanState, value };
+   });
+  }, 250);
+  return () => window.clearInterval(timer);
+ }, []);
+
+ const jumpTo = (
+  row: number,
+  column: number,
+  source: "form" | "overview" | "column-overview" | "landmark",
+ ) => {
+  const grid = gridRef.current;
+  if (!grid) return;
+  const resolvedRow = Math.min(Math.max(Math.round(row), 0), SCALE_ROWS - 1);
+  const resolvedColumn = Math.min(Math.max(Math.round(column), 0), SCALE_COLUMNS - 1);
+  const addr = { sheet: FEED_SHEET, row: resolvedRow, col: resolvedColumn };
+  grid.setSelection({ kind: "cell", addr });
+  grid.scrollToCell(addr);
+  if (source === "form") hostRef.current?.focus({ preventScroll: true });
+  if (source !== "overview" && source !== "column-overview") {
+   setStatus(
+    `${source === "form" ? "Exact jump" : "Overview landmark"}: ${cellA1(resolvedRow, resolvedColumn)} is selected; its rectangular tile is requested on demand.`,
+   );
+  }
+ };
+
+ const handleJump = () => {
+  const row = Number(jumpRow);
+  const column = Number(jumpColumn);
+  if (
+   !/^\d+$/.test(jumpRow.trim()) ||
+   !/^\d+$/.test(jumpColumn.trim()) ||
+   !Number.isSafeInteger(row) ||
+   !Number.isSafeInteger(column) ||
+   row < 1 ||
+   column < 1
+  ) {
+   setStatus("Enter whole numbers: row 1–1,000,000 and column 1–1,000.");
+   return;
+  }
+  jumpTo(row - 1, column - 1, "form");
+ };
+ const handleZoom = (nextZoom: number) => {
+  const grid = gridRef.current;
+  const host = hostRef.current;
+  if (!grid || !host) return;
+  const anchor = visibleRef.current;
+  grid.setZoom(nextZoom);
+
+  const theme = grid.getEffectiveTheme();
+  const bodyRows = Math.max(
+   1,
+   Math.floor(
+    Math.max(theme.rowHeight, host.clientHeight - theme.headerHeight) / theme.rowHeight,
+   ),
   );
-  const cacheCeilingMiB = activeStorage.cacheBytes / BYTES_PER_MIB;
-  const stressCeilingMiB = SCALE_EVICTION_STRESS_STORAGE.cacheBytes / BYTES_PER_MIB;
-  const defaultCeilingMiB = SCALE_STORAGE.cacheBytes / BYTES_PER_MIB;
-  const recentTiles = telemetry.recentTiles.map((tile) => ({
-    ...tile,
-    residence: tileResidence(gridRef.current, tile),
-  }));
-  const recentEvictions = recentTiles.filter((tile) => tile.residence === "evicted").length;
-  const residentTiles = recentTiles.filter(
-    (tile) => tile.residence === "resident" || tile.residence === "dirty",
-  ).length;
-  const resourceOwners = stats.resource
-    ? [...stats.resource.wasm.owners, ...stats.resource.jsOwners]
-        .filter((owner) => owner.logicalBytes > 0 || owner.allocatedBytes > 0)
-        .sort((left, right) => right.allocatedBytes - left.allocatedBytes)
-        .slice(0, 8)
-    : [];
-  const changedResourceOwners =
-    resourceDelta?.owners.filter(
-      (owner) => owner.logicalBytes !== 0 || owner.allocatedBytes !== 0 || owner.entries !== 0,
-    ) ?? [];
-  const latestCrossing = crossings[0];
-  const interactionWins = interactionWinList();
+  const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === FEED_SHEET);
+  const availableWidth = Math.max(1, host.clientWidth - theme.rowHeaderWidth);
+  let anchorRight = anchor.firstColumn;
+  let coveredWidth = 0;
+  while (anchorRight < SCALE_COLUMNS) {
+   coveredWidth += (sheet?.columns[anchorRight]?.width ?? 96) * grid.getZoom();
+   if (coveredWidth >= availableWidth) break;
+   anchorRight += 1;
+  }
 
-  const selectedFormula = gridRef.current?.store.getFormula(selectedAddress) ?? null;
-  return {
-    hostRef,
-    gridRef,
-    renderer,
-    setRenderer,
-    rendererState,
-    gridState,
-    telemetry,
-    stats,
-    selection,
-    zoom,
-    evictionStress,
-    setEvictionStress,
-    jumpRow,
-    setJumpRow,
-    jumpColumn,
-    setJumpColumn,
-    status,
-    setStatus,
-    evictionWatch,
-    activeStorage,
-    jumpTo,
-    handleJump,
-    handleZoom,
-    firstColumn,
-    lastColumn,
-    firstRow,
-    lastRow,
-    windowA1,
-    cachePercent,
-    cacheCeilingMiB,
-    stressCeilingMiB,
-    defaultCeilingMiB,
-    recentTiles,
-    recentEvictions,
-    residentTiles,
-    selectedFormula,
-    visible,
-    exportAttempt,
-    scan,
-    handleScan,
-    handleExport,
-    currentColumns,
-    averageRequestedColumns,
-    resourceOwners,
-    crossings,
-    resourceDelta,
-    handleCrossings,
-    changedResourceOwners,
-    latestCrossing,
-    interactionWins,
-  };
+  const bodyColumns = Math.max(1, anchorRight - anchor.firstColumn + 1);
+  const forceRow =
+   anchor.firstRow === 0
+    ? Math.min(SCALE_ROWS - 1, bodyRows + SCALE_OVERSCAN + 1)
+    : Math.max(0, anchor.firstRow - bodyRows - SCALE_OVERSCAN - 1);
+  const forceColumn =
+   anchor.firstColumn === 0
+    ? Math.min(SCALE_COLUMNS - 1, anchorRight + 1)
+    : Math.max(0, anchor.firstColumn - bodyColumns - 1);
+  grid.scrollToCell({ sheet: FEED_SHEET, row: forceRow, col: forceColumn });
+  grid.scrollToCell({
+   sheet: FEED_SHEET,
+   row:
+    anchor.firstRow === 0
+     ? 0
+     : Math.min(SCALE_ROWS - 1, anchor.firstRow + SCALE_OVERSCAN + bodyRows),
+   col: anchor.firstColumn === 0 ? 0 : Math.min(SCALE_COLUMNS - 1, anchorRight),
+  });
+  setZoom(grid.getZoom());
+  zoomRef.current = grid.getZoom();
+ };
+
+ const handleScan = () => {
+  const grid = gridRef.current;
+  if (grid) setScan(attemptColumnScan(grid, 3, "sum"));
+ };
+
+ const handleExport = () => {
+  const grid = gridRef.current;
+  if (grid) setExportAttempt(attemptFullCsvExport(grid, FEED_SHEET));
+ };
+
+ const handleCrossings = (kind: "values" | "styles") => {
+  const grid = gridRef.current;
+  if (!grid) return;
+  const before = grid.getRuntimeResourceSnapshot("edit", "before");
+  const report = measureBulkMutation(grid, kind, 20_000);
+  const after = grid.getRuntimeResourceSnapshot("edit", "settled");
+  setResourceDelta(diffRuntimeResourcePhases(before, after));
+  setCrossings((previous) => [report, ...previous.slice(0, 3)]);
+  setStatus(
+   `${kind === "values" ? "Value" : "Style"} transaction touched ${report.cells.toLocaleString()} cells in ${report.durationMs.toFixed(1)} ms with ${report.ffiCalls} measured JS↔WASM crossing${report.ffiCalls === 1 ? "" : "s"}.`,
+  );
+ };
+
+ const firstColumn = Math.min(visible.firstColumn, SCALE_COLUMNS - 1);
+ const lastColumn = Math.min(Math.max(visible.lastColumn, firstColumn), SCALE_COLUMNS - 1);
+ const firstRow = Math.min(visible.firstRow, SCALE_ROWS - 1);
+ const lastRow = Math.min(Math.max(visible.lastRow, firstRow), SCALE_ROWS - 1);
+ const windowA1 = `${cellA1(firstRow, firstColumn)}:${cellA1(lastRow, lastColumn)}`;
+ const currentColumns = lastColumn - firstColumn + 1;
+ const averageRequestedColumns =
+  telemetry.returnedRows > 0 ? telemetry.returnedCells / telemetry.returnedRows : 0;
+ const cachePercent = Math.min(
+  ((stats.paged?.allocatedBytes ?? 0) / activeStorage.cacheBytes) * 100,
+  100,
+ );
+ const cacheCeilingMiB = activeStorage.cacheBytes / BYTES_PER_MIB;
+ const stressCeilingMiB = SCALE_EVICTION_STRESS_STORAGE.cacheBytes / BYTES_PER_MIB;
+ const defaultCeilingMiB = SCALE_STORAGE.cacheBytes / BYTES_PER_MIB;
+ const recentTiles = telemetry.recentTiles.map((tile) => ({
+  ...tile,
+  residence: tileResidence(gridRef.current, tile),
+ }));
+ const recentEvictions = recentTiles.filter((tile) => tile.residence === "evicted").length;
+ const residentTiles = recentTiles.filter(
+  (tile) => tile.residence === "resident" || tile.residence === "dirty",
+ ).length;
+ const resourceOwners = stats.resource
+  ? [...stats.resource.wasm.owners, ...stats.resource.jsOwners]
+   .filter((owner) => owner.logicalBytes > 0 || owner.allocatedBytes > 0)
+   .sort((left, right) => right.allocatedBytes - left.allocatedBytes)
+   .slice(0, 8)
+  : [];
+ const changedResourceOwners =
+  resourceDelta?.owners.filter(
+   (owner) => owner.logicalBytes !== 0 || owner.allocatedBytes !== 0 || owner.entries !== 0,
+  ) ?? [];
+ const latestCrossing = crossings[0];
+ const interactionWins = interactionWinList();
+
+ const selectedFormula = gridRef.current?.store.getFormula(selectedAddress) ?? null;
+ return {
+  hostRef,
+  gridRef,
+  renderer,
+  setRenderer,
+  rendererState,
+  gridState,
+  telemetry,
+  stats,
+  selection,
+  zoom,
+  evictionStress,
+  setEvictionStress,
+  jumpRow,
+  setJumpRow,
+  jumpColumn,
+  setJumpColumn,
+  status,
+  setStatus,
+  evictionWatch,
+  activeStorage,
+  jumpTo,
+  handleJump,
+  handleZoom,
+  firstColumn,
+  lastColumn,
+  firstRow,
+  lastRow,
+  windowA1,
+  cachePercent,
+  cacheCeilingMiB,
+  stressCeilingMiB,
+  defaultCeilingMiB,
+  recentTiles,
+  recentEvictions,
+  residentTiles,
+  selectedFormula,
+  visible,
+  exportAttempt,
+  scan,
+  handleScan,
+  handleExport,
+  currentColumns,
+  averageRequestedColumns,
+  resourceOwners,
+  crossings,
+  resourceDelta,
+  handleCrossings,
+  changedResourceOwners,
+  latestCrossing,
+  interactionWins,
+ };
 }
 
 type PerformanceWorkbench = ReturnType<typeof usePerformanceWorkbench>;
 
 function PerformanceRoute() {
-  const workbench = usePerformanceWorkbench();
-  const flight = useScaleFlight(
-    () => workbench.gridRef.current,
-    workbench.telemetry.requests,
-    workbench.setStatus,
-  );
+ const workbench = usePerformanceWorkbench();
+ const flight = useScaleFlight(
+  () => workbench.gridRef.current,
+  workbench.telemetry.requests,
+  workbench.setStatus,
+ );
 
-  return (
-    <ShowcaseLayout
-      code={{ title: "The code behind it", Snippet: PerformanceSnippet }}
-      controls={<WorkbenchControls flight={flight} workbench={workbench} />}
-      demo={<WorkbenchDemo workbench={workbench} />}
-      demoActions={<GridZoom workbench={workbench} />}
-      demoLabel="Billion-address Grid workbench"
-      demoTitle={`Financial operations · ${SCALE_ROWS.toLocaleString()} × ${SCALE_COLUMNS.toLocaleString()}`}
-      eyebrow="Data and scale"
-      facts={[
-        { label: "Rows", value: SCALE_ROWS.toLocaleString() },
-        { label: "Columns", value: SCALE_COLUMNS.toLocaleString() },
-        { label: "Addresses", value: SCALE_LOGICAL_CELLS.toLocaleString() },
-      ]}
-      guide={{ href: "/docs/features/data/datasources/", label: "Read the datasource guide" }}
-      id="performance"
-      task={
-        <>
-          Fly through {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns
-          of financial operations, or go to any cell. Only the tiles you visit load.
-        </>
-      }
-      title="A billion cells. Within reach."
-    >
-      <div className="sw-sp-page">
-        <PagingSection workbench={workbench} />
-        <ResourcesSection workbench={workbench} />
-        <CrossingsSection workbench={workbench} />
-        <EvidenceSection workbench={workbench} />
-      </div>
-    </ShowcaseLayout>
-  );
+ return (
+  <ShowcaseLayout
+   code={{ title: "The code behind it", Snippet: PerformanceSnippet }}
+   controls={<WorkbenchControls flight={flight} workbench={workbench} />}
+   demo={<WorkbenchDemo workbench={workbench} />}
+   demoActions={<GridZoom workbench={workbench} />}
+   demoLabel="Billion-address Grid workbench"
+   demoTitle={`Financial operations · ${SCALE_ROWS.toLocaleString()} × ${SCALE_COLUMNS.toLocaleString()}`}
+   eyebrow="Data and scale"
+   facts={[
+    { label: "Rows", value: SCALE_ROWS.toLocaleString() },
+    { label: "Columns", value: SCALE_COLUMNS.toLocaleString() },
+    { label: "Addresses", value: SCALE_LOGICAL_CELLS.toLocaleString() },
+   ]}
+   guide={{ href: "/docs/features/data/datasources/", label: "Read the datasource guide" }}
+   id="performance"
+   task={
+    <>
+     Fly through {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns
+     of financial operations, or go to any cell. Only the tiles you visit load.
+    </>
+   }
+   title="A billion cells. Within reach."
+  >
+   <div className="sw-sp-page">
+    <PagingSection workbench={workbench} />
+    <ResourcesSection workbench={workbench} />
+    <CrossingsSection workbench={workbench} />
+    <EvidenceSection workbench={workbench} />
+   </div>
+  </ShowcaseLayout>
+ );
 }
 
 const GRID_STATE_LABEL = {
-  ready: "Grid ready",
-  error: "Grid unavailable",
-  loading: "Loading Grid",
+ ready: "Grid ready",
+ error: "Grid unavailable",
+ loading: "Loading Grid",
 };
 
 /** The Grid's status and zoom, in the demo window bar. */
 function GridZoom({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const { gridState, zoom, handleZoom } = workbench;
-  const ready = gridState === "ready";
-  return (
-    <span className="sw-sp-window-actions">
-      <ShowcaseStatus tone={ready ? "ok" : gridState === "error" ? "error" : "neutral"}>
-        {GRID_STATE_LABEL[gridState]}
-      </ShowcaseStatus>
-      <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
-        <DemoButton
-          aria-label="Zoom out"
-          disabled={!ready || zoom <= 0.5}
-          onClick={() => handleZoom(zoom - 0.25)}
-          variant="quiet"
-        >
-          <Icon name="minus" />
-        </DemoButton>
-        <output aria-label="Current zoom" data-testid="scale-zoom-value">
-          {Math.round(zoom * 100)}%
-        </output>
-        <DemoButton
-          aria-label="Zoom in"
-          disabled={!ready || zoom >= 2}
-          onClick={() => handleZoom(zoom + 0.25)}
-          variant="quiet"
-        >
-          <Icon name="plus" />
-        </DemoButton>
-        <DemoButton disabled={!ready || zoom === 1} onClick={() => handleZoom(1)} variant="quiet">
-          Reset
-        </DemoButton>
-      </fieldset>
-    </span>
-  );
+ const { gridState, zoom, handleZoom } = workbench;
+ const ready = gridState === "ready";
+ return (
+  <span className="sw-sp-window-actions">
+   <ShowcaseStatus tone={ready ? "ok" : gridState === "error" ? "error" : "neutral"}>
+    {GRID_STATE_LABEL[gridState]}
+   </ShowcaseStatus>
+   <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
+    <DemoButton
+     aria-label="Zoom out"
+     disabled={!ready || zoom <= 0.5}
+     onClick={() => handleZoom(zoom - 0.25)}
+     variant="quiet"
+    >
+     <Icon name="minus" />
+    </DemoButton>
+    <output aria-label="Current zoom" data-testid="scale-zoom-value">
+     {Math.round(zoom * 100)}%
+    </output>
+    <DemoButton
+     aria-label="Zoom in"
+     disabled={!ready || zoom >= 2}
+     onClick={() => handleZoom(zoom + 0.25)}
+     variant="quiet"
+    >
+     <Icon name="plus" />
+    </DemoButton>
+    <DemoButton disabled={!ready || zoom === 1} onClick={() => handleZoom(1)} variant="quiet">
+     Reset
+    </DemoButton>
+   </fieldset>
+  </span>
+ );
 }
 
 /** The billion-address Grid, the sparse-edit watch and the status line. */
 function WorkbenchDemo({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const { hostRef, gridState, activeStorage, evictionWatch, status } = workbench;
-  return (
-    <div className="sw-sp-demo" data-state={gridState} id="million-rows">
-      {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
-      <div
-        aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
-        className="sw-sp-grid"
-        data-cache-bytes={activeStorage.cacheBytes}
-        data-chunk-rows={activeStorage.chunkRows}
-        data-testid="scale-grid"
-        ref={hostRef}
-        role="grid"
-      />
-      {evictionWatch && (
-        <p
-          className="sw-sp-eviction-watch"
-          data-clean-state={evictionWatch.cleanState}
-          data-testid="scale-eviction-watch"
-        >
-          <strong>
-            Edited {cellA1(evictionWatch.dirty.row, evictionWatch.dirty.col)} ={" "}
-            {evictionWatch.value}
-          </strong>
-          <span>
-            dirty owner {evictionWatch.dirtyState} · clean comparison{" "}
-            {cellA1(evictionWatch.clean.row, evictionWatch.clean.col)} {evictionWatch.cleanState}
-          </span>
-          {evictionWatch.cleanState === "unloaded" && (
-            <em>Clean tile evicted; sparse dirty value retained for revisit.</em>
-          )}
-        </p>
-      )}
-      <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
-        {status}
-      </p>
-    </div>
-  );
+ const { hostRef, gridState, activeStorage, evictionWatch, status } = workbench;
+ return (
+  <div className="sw-sp-demo" data-state={gridState} id="million-rows">
+   {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
+   <div
+    aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
+    className="sw-sp-grid"
+    data-cache-bytes={activeStorage.cacheBytes}
+    data-chunk-rows={activeStorage.chunkRows}
+    data-testid="scale-grid"
+    ref={hostRef}
+    role="grid"
+   />
+   {evictionWatch && (
+    <p
+     className="sw-sp-eviction-watch"
+     data-clean-state={evictionWatch.cleanState}
+     data-testid="scale-eviction-watch"
+    >
+     <strong>
+      Edited {cellA1(evictionWatch.dirty.row, evictionWatch.dirty.col)} ={" "}
+      {evictionWatch.value}
+     </strong>
+     <span>
+      dirty owner {evictionWatch.dirtyState} · clean comparison{" "}
+      {cellA1(evictionWatch.clean.row, evictionWatch.clean.col)} {evictionWatch.cleanState}
+     </span>
+     {evictionWatch.cleanState === "unloaded" && (
+      <em>Clean tile evicted; sparse dirty value retained for revisit.</em>
+     )}
+    </p>
+   )}
+   <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
+    {status}
+   </p>
+  </div>
+ );
 }
 
 /** The side panel: flights, exact jumps, the live window and the drawing path. */
 function WorkbenchControls({
-  flight,
-  workbench,
+ flight,
+ workbench,
 }: Readonly<{ flight: ScaleFlight; workbench: PerformanceWorkbench }>) {
-  const { gridState, telemetry, stats, firstRow, firstColumn } = workbench;
-  return (
-    <>
-      <ShowcaseControlGroup
-        title="Fly the Grid"
-        description="Each flight scrolls the real Grid with public API calls. Nothing is pre-rendered."
-      >
-        <FlightControls flight={flight} ready={gridState === "ready"} />
-        <FlightReadout
-          flight={flight}
-          origin={cellA1(firstRow, firstColumn)}
-          requests={telemetry.requests}
-          resident={{
-            bytes: stats.paged?.allocatedBytes ?? 0,
-            cells: stats.paged?.loadedCells ?? 0,
-          }}
-        />
-      </ShowcaseControlGroup>
-      <ShowcaseControlGroup title="Go to any cell">
-        <JumpControls workbench={workbench} />
-      </ShowcaseControlGroup>
-      <ShowcaseControlGroup
-        title="Where you are"
-        description="The whole sheet: lit tiles were loaded. Click the map to teleport."
-      >
-        <WindowNavigator workbench={workbench} />
-      </ShowcaseControlGroup>
-      <ShowcaseControlGroup title="Drawing and cache">
-        <DrawingControls workbench={workbench} />
-      </ShowcaseControlGroup>
-    </>
-  );
+ const { gridState, telemetry, stats, firstRow, firstColumn } = workbench;
+ return (
+  <>
+   <ShowcaseControlGroup
+    title="Fly the Grid"
+    description="Each flight scrolls the real Grid with public API calls. Nothing is pre-rendered."
+   >
+    <FlightControls flight={flight} ready={gridState === "ready"} />
+    <FlightReadout
+     flight={flight}
+     origin={cellA1(firstRow, firstColumn)}
+     requests={telemetry.requests}
+     resident={{
+      bytes: stats.paged?.allocatedBytes ?? 0,
+      cells: stats.paged?.loadedCells ?? 0,
+     }}
+    />
+   </ShowcaseControlGroup>
+   <ShowcaseControlGroup title="Go to any cell">
+    <JumpControls workbench={workbench} />
+   </ShowcaseControlGroup>
+   <ShowcaseControlGroup
+    title="Where you are"
+    description="The whole sheet: lit tiles were loaded. Click the map to teleport."
+   >
+    <WindowNavigator workbench={workbench} />
+   </ShowcaseControlGroup>
+   <ShowcaseControlGroup title="Drawing and cache">
+    <DrawingControls workbench={workbench} />
+   </ShowcaseControlGroup>
+  </>
+ );
 }
 
 /** The exact row and column form, and jumps to the start, middle, end or a random row. */
 function JumpControls({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const { gridState, jumpRow, setJumpRow, jumpColumn, setJumpColumn, handleJump, jumpTo } =
-    workbench;
-  const ready = gridState === "ready";
-  const { firstColumn } = workbench;
-  return (
-    <>
-      <form
-        className="sw-sp-jump"
-        onSubmit={(event) => {
-          event.preventDefault();
-          handleJump();
-        }}
-      >
-        <label htmlFor="scale-jump-row">
-          Row
-          <input
-            data-testid="scale-jump-row"
-            id="scale-jump-row"
-            inputMode="numeric"
-            max={SCALE_ROWS}
-            min={1}
-            onChange={(event) => setJumpRow(event.currentTarget.value)}
-            type="number"
-            value={jumpRow}
-          />
-        </label>
-        <label htmlFor="scale-jump-column">
-          Column
-          <input
-            data-testid="scale-jump-column"
-            id="scale-jump-column"
-            inputMode="numeric"
-            max={SCALE_COLUMNS}
-            min={1}
-            onChange={(event) => setJumpColumn(event.currentTarget.value)}
-            type="number"
-            value={jumpColumn}
-          />
-        </label>
-        <DemoButton data-testid="scale-jump" disabled={!ready} type="submit" variant="primary">
-          <Icon name="arrow-right" />
-          Jump to cell
-        </DemoButton>
-      </form>
-      <fieldset aria-label="Jump to a row" className="sw-sp-quick-jumps">
-        {[
-          { label: "Start", row: 0 },
-          { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
-          { label: "End", row: SCALE_ROWS - 1 },
-        ].map(({ label, row }) => (
-          <DemoButton
-            disabled={!ready}
-            key={label}
-            onClick={() => jumpTo(row, firstColumn, "landmark")}
-          >
-            {label}
-          </DemoButton>
-        ))}
-        <DemoButton
-          disabled={!ready}
-          onClick={() => jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")}
-        >
-          Random row
-        </DemoButton>
-      </fieldset>
-    </>
-  );
+ const { gridState, jumpRow, setJumpRow, jumpColumn, setJumpColumn, handleJump, jumpTo } =
+  workbench;
+ const ready = gridState === "ready";
+ const { firstColumn } = workbench;
+ return (
+  <>
+   <form
+    className="sw-sp-jump"
+    onSubmit={(event) => {
+     event.preventDefault();
+     handleJump();
+    }}
+   >
+    <label htmlFor="scale-jump-row">
+     Row
+     <input
+      data-testid="scale-jump-row"
+      id="scale-jump-row"
+      inputMode="numeric"
+      max={SCALE_ROWS}
+      min={1}
+      onChange={(event) => setJumpRow(event.currentTarget.value)}
+      type="number"
+      value={jumpRow}
+     />
+    </label>
+    <label htmlFor="scale-jump-column">
+     Column
+     <input
+      data-testid="scale-jump-column"
+      id="scale-jump-column"
+      inputMode="numeric"
+      max={SCALE_COLUMNS}
+      min={1}
+      onChange={(event) => setJumpColumn(event.currentTarget.value)}
+      type="number"
+      value={jumpColumn}
+     />
+    </label>
+    <DemoButton data-testid="scale-jump" disabled={!ready} type="submit" variant="primary">
+     <Icon name="arrow-right" />
+     Jump to cell
+    </DemoButton>
+   </form>
+   <fieldset aria-label="Jump to a share of the rows" className="sw-sp-quick-jumps">
+    {LANDMARKS.map((ratio) => (
+     <DemoButton
+      data-testid={`scale-landmark-${ratio * 100}`}
+      disabled={!ready}
+      key={ratio}
+      onClick={() => jumpTo(Math.round((SCALE_ROWS - 1) * ratio), firstColumn, "landmark")}
+     >
+      {ratio * 100}%
+     </DemoButton>
+    ))}
+    <DemoButton
+     disabled={!ready}
+     onClick={() => jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")}
+    >
+     Random
+    </DemoButton>
+   </fieldset>
+  </>
+ );
 }
 
 /** The address-space map, row and column sliders, and the live window readout. */
 function WindowNavigator({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const {
-    gridState,
-    jumpTo,
-    firstRow,
-    lastRow,
-    firstColumn,
-    lastColumn,
-    recentTiles,
-    selection,
-    windowA1,
-    selectedFormula,
-    telemetry,
-    residentTiles,
-    recentEvictions,
-    rendererState,
-    renderer,
-  } = workbench;
-  const ready = gridState === "ready";
-  return (
-    <>
-      <ScaleMinimap
-        onJump={(row, column) => jumpTo(row, column, "landmark")}
-        tiles={recentTiles}
-        window={{ firstRow, lastRow, firstColumn, lastColumn }}
-      />
-      <label className="sw-sp-slider">
-        <span>
-          Rows
-          <strong data-testid="scale-readable-rows">
-            {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
-          </strong>
+ const {
+  gridState,
+  jumpTo,
+  firstRow,
+  lastRow,
+  firstColumn,
+  lastColumn,
+  recentTiles,
+  selection,
+  windowA1,
+  selectedFormula,
+  telemetry,
+  residentTiles,
+  recentEvictions,
+  rendererState,
+  renderer,
+ } = workbench;
+ const ready = gridState === "ready";
+ return (
+  <>
+   <ScaleMinimap
+    onJump={(row, column) => jumpTo(row, column, "landmark")}
+    tiles={recentTiles}
+    window={{ firstRow, lastRow, firstColumn, lastColumn }}
+   />
+   <label className="sw-sp-slider">
+    <span>
+     Rows
+     <strong data-testid="scale-readable-rows">
+      {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
+     </strong>
+    </span>
+    <input
+     aria-label="Vertical sheet overview"
+     aria-valuetext={`Row ${firstRow + 1} of ${SCALE_ROWS}`}
+     data-testid="scale-overview"
+     disabled={!ready}
+     max={SCALE_ROWS - 1}
+     min={0}
+     onChange={(event) => jumpTo(Number(event.currentTarget.value), firstColumn, "overview")}
+     step={1}
+     type="range"
+     value={firstRow}
+    />
+   </label>
+   <label className="sw-sp-slider">
+    <span>
+     Columns
+     <strong>
+      {colToA1(firstColumn)}–{colToA1(lastColumn)} of {colToA1(SCALE_COLUMNS - 1)}
+     </strong>
+    </span>
+    <input
+     aria-label="Horizontal sheet overview"
+     aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
+     data-testid="scale-column-overview"
+     disabled={!ready}
+     max={SCALE_COLUMNS - 1}
+     min={0}
+     onChange={(event) =>
+      jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
+     }
+     step={1}
+     type="range"
+     value={firstColumn}
+    />
+   </label>
+   <ShowcaseReadout
+    items={[
+     { label: "Selected", value: <span data-testid="scale-current-a1">{selection}</span> },
+     {
+      label: "Window",
+      value: (
+       <>
+        <span data-testid="scale-window-a1">{windowA1}</span>
+        <span className="sw-sp-visually-hidden">
+         <span data-testid="scale-window-rows">
+          {firstRow + 1}–{lastRow + 1}
+         </span>
+         <span data-testid="scale-window-columns">
+          {colToA1(firstColumn)}–{colToA1(lastColumn)}
+         </span>
         </span>
-        <input
-          aria-label="Vertical sheet overview"
-          aria-valuetext={`Row ${firstRow + 1} of ${SCALE_ROWS}`}
-          data-testid="scale-overview"
-          disabled={!ready}
-          max={SCALE_ROWS - 1}
-          min={0}
-          onChange={(event) => jumpTo(Number(event.currentTarget.value), firstColumn, "overview")}
-          step={1}
-          type="range"
-          value={firstRow}
-        />
-      </label>
-      <label className="sw-sp-slider">
-        <span>
-          Columns
-          <strong>
-            {colToA1(firstColumn)}–{colToA1(lastColumn)} of {colToA1(SCALE_COLUMNS - 1)}
-          </strong>
-        </span>
-        <input
-          aria-label="Horizontal sheet overview"
-          aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
-          data-testid="scale-column-overview"
-          disabled={!ready}
-          max={SCALE_COLUMNS - 1}
-          min={0}
-          onChange={(event) =>
-            jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
-          }
-          step={1}
-          type="range"
-          value={firstColumn}
-        />
-      </label>
-      <ShowcaseReadout
-        items={[
-          { label: "Selected", value: <span data-testid="scale-current-a1">{selection}</span> },
-          {
-            label: "Window",
-            value: (
-              <>
-                <span data-testid="scale-window-a1">{windowA1}</span>
-                <span className="sw-sp-visually-hidden">
-                  <span data-testid="scale-window-rows">
-                    {firstRow + 1}–{lastRow + 1}
-                  </span>
-                  <span data-testid="scale-window-columns">
-                    {colToA1(firstColumn)}–{colToA1(lastColumn)}
-                  </span>
-                </span>
-              </>
-            ),
-          },
-          {
-            label: "Cell input",
-            value: (
-              <code data-testid="scale-selected-formula">{selectedFormula ?? "Literal value"}</code>
-            ),
-          },
-          {
-            label: "Requests / aborts",
-            value: `${telemetry.requests.toLocaleString()} / ${telemetry.aborted.toLocaleString()}`,
-          },
-          { label: "Resident tiles", value: `${residentTiles} live · ${recentEvictions} evicted` },
-          {
-            label: "Renderer",
-            value: (
-              <span data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</span>
-            ),
-          },
-        ]}
-      />
-    </>
-  );
+       </>
+      ),
+     },
+     {
+      label: "Cell input",
+      value: (
+       <code data-testid="scale-selected-formula">{selectedFormula ?? "Literal value"}</code>
+      ),
+     },
+     {
+      label: "Requests / aborts",
+      value: `${telemetry.requests.toLocaleString()} / ${telemetry.aborted.toLocaleString()}`,
+     },
+     { label: "Resident tiles", value: `${residentTiles} live · ${recentEvictions} evicted` },
+     {
+      label: "Renderer",
+      value: (
+       <span data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</span>
+      ),
+     },
+    ]}
+   />
+  </>
+ );
 }
 
 /** The renderer switch and the tight clean-cache ceiling. */
 function DrawingControls({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const {
-    renderer,
-    setRenderer,
-    rendererState,
-    gridState,
-    evictionStress,
-    setEvictionStress,
-    stressCeilingMiB,
-    defaultCeilingMiB,
-  } = workbench;
-  return (
-    <>
-      <details className="sw-sp-render-details">
-        <summary>
-          <span>Drawing path</span>
-          <strong>{rendererState?.active ?? renderer} renderer</strong>
-          <Icon name="chevron-down" />
-        </summary>
-        <fieldset className="sw-sp-render-switch">
-          <legend>Grid drawing path</legend>
-          <DemoButton
-            aria-pressed={renderer === "canvas"}
-            data-testid="scale-renderer-canvas"
-            onClick={() => setRenderer("canvas")}
-          >
-            Main canvas
-          </DemoButton>
-          <DemoButton
-            aria-pressed={renderer === "worker"}
-            data-testid="scale-renderer-worker"
-            onClick={() => setRenderer("worker")}
-          >
-            Worker canvas
-          </DemoButton>
-        </fieldset>
-        {rendererState && (
-          <p className="sw-sp-rendererstate" data-testid="scale-renderer-state">
-            Requested <strong>{rendererState.requested}</strong>; running{" "}
-            <strong>{rendererState.active}</strong>
-            {rendererState.fallback
-              ? ` — Worker construction failed, so Grid reported and used its main-canvas fallback: ${rendererState.fallback}`
-              : "."}
-          </p>
-        )}
-      </details>
-      <p className="sw-showcase__control-description" id="scale-stress-description">
-        A tight {stressCeilingMiB} MiB ceiling remounts the Grid so clean tiles evict early; sparse
-        edits survive. Now {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB.
-      </p>
-      <DemoButton
-        aria-describedby="scale-stress-description"
-        aria-pressed={evictionStress}
-        data-testid="scale-eviction-stress"
-        disabled={gridState === "loading"}
-        onClick={() => setEvictionStress((active) => !active)}
-      >
-        <Icon name="gauge" />
-        {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
-      </DemoButton>
-    </>
-  );
+ const {
+  renderer,
+  setRenderer,
+  rendererState,
+  gridState,
+  evictionStress,
+  setEvictionStress,
+  stressCeilingMiB,
+  defaultCeilingMiB,
+ } = workbench;
+ return (
+  <>
+   <details className="sw-sp-render-details">
+    <summary>
+     <span>Drawing path</span>
+     <strong>{rendererState?.active ?? renderer} renderer</strong>
+     <Icon name="chevron-down" />
+    </summary>
+    <fieldset className="sw-sp-render-switch">
+     <legend>Grid drawing path</legend>
+     <DemoButton
+      aria-pressed={renderer === "canvas"}
+      data-testid="scale-renderer-canvas"
+      onClick={() => setRenderer("canvas")}
+     >
+      Main canvas
+     </DemoButton>
+     <DemoButton
+      aria-pressed={renderer === "worker"}
+      data-testid="scale-renderer-worker"
+      onClick={() => setRenderer("worker")}
+     >
+      Worker canvas
+     </DemoButton>
+    </fieldset>
+    {rendererState && (
+     <p className="sw-sp-rendererstate" data-testid="scale-renderer-state">
+      Requested <strong>{rendererState.requested}</strong>; running{" "}
+      <strong>{rendererState.active}</strong>
+      {rendererState.fallback
+       ? ` — Worker construction failed, so Grid reported and used its main-canvas fallback: ${rendererState.fallback}`
+       : "."}
+     </p>
+    )}
+   </details>
+   <p className="sw-showcase__control-description" id="scale-stress-description">
+    A tight {stressCeilingMiB} MiB ceiling remounts the Grid so clean tiles evict early; sparse
+    edits survive. Now {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB.
+   </p>
+   <DemoButton
+    aria-describedby="scale-stress-description"
+    aria-pressed={evictionStress}
+    data-testid="scale-eviction-stress"
+    disabled={gridState === "loading"}
+    onClick={() => setEvictionStress((active) => !active)}
+   >
+    <Icon name="gauge" />
+    {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
+   </DemoButton>
+  </>
+ );
 }
 
 /** Datasource paging: tiles, residence and prefetch decisions. */
 function PagingSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const {
-    telemetry,
-    stats,
-    exportAttempt,
-    scan,
-    handleScan,
-    handleExport,
-    currentColumns,
-    averageRequestedColumns,
-    cachePercent,
-    cacheCeilingMiB,
-    recentTiles,
-    recentEvictions,
-  } = workbench;
+ const {
+  telemetry,
+  stats,
+  exportAttempt,
+  scan,
+  handleScan,
+  handleExport,
+  currentColumns,
+  averageRequestedColumns,
+  cachePercent,
+  cacheCeilingMiB,
+  recentTiles,
+  recentEvictions,
+ } = workbench;
 
-  return (
-    <section aria-labelledby="paging-title" className="sw-sp-section" id="paging">
-      <h2 className="sw-showcase__section-title" id="paging-title">
-        Only the columns on screen are loaded
-      </h2>
+ return (
+  <section aria-labelledby="paging-title" className="sw-sp-section" id="paging">
+   <h2 className="sw-showcase__section-title" id="paging-title">
+    Only the columns on screen are loaded
+   </h2>
+   <p>
+    Each request names the exact columns it needs, and the source returns only those, with
+    explicit <code>null</code> blanks. The source setting is{" "}
+    <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
+   </p>
+
+   <details className="sw-sp-diagnostics">
+    <summary>
+     <span className="sw-sp-disclosure-copy">
+      <strong>Inspect live requests, tile memory, and loading history</strong>
+      <small>Live source counters</small>
+     </span>
+     <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+      ›
+     </span>
+    </summary>
+    <dl className="sw-sp-stats" data-testid="scale-stats">
+     <div>
+      <dt>Requests / aborts</dt>
+      <dd data-testid="scale-requests">
+       {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
+      </dd>
+     </div>
+     <div>
+      <dt>Requested cells</dt>
+      <dd data-testid="scale-requested-cells">{telemetry.requestedCells.toLocaleString()}</dd>
+      <dd className="sw-sp-stat-context">
+       {formatBytes(telemetry.requestBytes, { kib: 1, mib: 1, gib: 2 })} request JSON
+      </dd>
+     </div>
+     <div>
+      <dt>Returned cells</dt>
+      <dd data-testid="scale-returned-cells">{telemetry.returnedCells.toLocaleString()}</dd>
+      <dd className="sw-sp-stat-context">
+       {formatBytes(telemetry.returnedBytes, { kib: 1, mib: 1, gib: 2 })} row JSON
+      </dd>
+     </div>
+     <div>
+      <dt>Columns / returned row</dt>
+      <dd data-testid="scale-column-amplification">{averageRequestedColumns.toFixed(2)}</dd>
+      <dd className="sw-sp-stat-context">current visible width {currentColumns}</dd>
+     </div>
+     <div>
+      <dt>Resident tile payload</dt>
+      <dd data-testid="scale-allocated">
+       {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
+      </dd>
+      <dd className="sw-sp-stat-context">
+       {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%{" "}
+       resident
+      </dd>
+     </div>
+     <div>
+      <dt>Dirty overlay</dt>
+      <dd data-testid="scale-dirty-cells">
+       {(stats.paged?.dirtyCells ?? 0).toLocaleString()} cells
+      </dd>
+      <dd className="sw-sp-stat-context">
+       {formatBytes(stats.paged?.dirtyAllocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
+       outside clean budget
+      </dd>
+     </div>
+    </dl>
+
+    <div className="sw-sp-cache-meter">
+     <span>Cache use</span>
+     {/* An ARIA meter keeps the same track geometry in every browser. */}
+     <div
+      aria-label="Resident tile cache use"
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={Math.round(cachePercent)}
+      className="sw-sp-cache-gauge"
+      role="meter"
+     >
+      <span style={{ width: `${Math.min(cachePercent, 100)}%` }} />
+     </div>
+     <strong>
+      {Math.round(cachePercent)}% of {cacheCeilingMiB.toLocaleString()} MiB
+     </strong>
+    </div>
+
+    <div className="sw-sp-last-tile" data-testid="scale-last-band">
+     <span>Last returned tile</span>
+     {telemetry.lastReturn ? (
+      <strong>
+       rows {telemetry.lastReturn.start + 1}–{telemetry.lastReturn.end} · columns{" "}
+       {columnBandsLabel(telemetry.lastReturn.columns)} ·{" "}
+       {telemetry.lastReturn.cells.toLocaleString()} cells ·{" "}
+       {formatBytes(telemetry.lastReturn.returnedBytes, { kib: 1, mib: 1, gib: 2 })} ·{" "}
+       {telemetry.lastReturn.latencyMs?.toFixed(1)} ms
+      </strong>
+     ) : (
+      <strong>Waiting for the first returned tile</strong>
+     )}
+    </div>
+
+    <div className="sw-sp-tile-list">
+     <div className="sw-sp-tile-list__head">
+      <h3>Recent tile map</h3>
+      <span data-testid="scale-recent-evictions">
+       {recentEvictions} evicted · public load state at each tile origin
+      </span>
+     </div>
+     {recentTiles.length === 0 ? (
+      <p>Move the Grid to populate this bounded request history.</p>
+     ) : (
+      <ol data-testid="scale-tile-list">
+       {recentTiles.slice(0, 10).map((tile) => (
+        <li data-state={tile.residence} key={tile.id}>
+         <span>{tile.residence}</span>
+         <strong>
+          {tile.start + 1}–{tile.end} / {columnBandsLabel(tile.columns)}
+         </strong>
+         <small>{tile.cells.toLocaleString()} cells</small>
+        </li>
+       ))}
+      </ol>
+     )}
+    </div>
+   </details>
+
+   <details className="sw-sp-debug-disclosure" data-testid="scale-global-details">
+    <summary>
+     <span className="sw-sp-disclosure-copy">
+      <strong>Try incomplete global operations</strong>
+      <small>SUM + full-sheet CSV</small>
+     </span>
+     <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+      ›
+     </span>
+    </summary>
+    <div className="sw-sp-console">
+     <div className="sw-sp-console__intro">
+      <h3>Whole-sheet answers need the whole sheet</h3>
       <p>
-        Each request names the exact columns it needs, and the source returns only those, with
-        explicit <code>null</code> blanks. The source setting is{" "}
-        <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
+       With only part of the sheet loaded, a whole-sheet SUM or CSV export cannot be correct.
+       These controls call the real APIs, which refuse with <code>IncompleteDataError</code>{" "}
+       and report how much is loaded.
       </p>
-
-      <details className="sw-sp-diagnostics">
-        <summary>
-          <span className="sw-sp-disclosure-copy">
-            <strong>Inspect live requests, tile memory, and loading history</strong>
-            <small>Live source counters</small>
-          </span>
-          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-            ›
-          </span>
-        </summary>
-        <dl className="sw-sp-stats" data-testid="scale-stats">
-          <div>
-            <dt>Requests / aborts</dt>
-            <dd data-testid="scale-requests">
-              {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
-            </dd>
-          </div>
-          <div>
-            <dt>Requested cells</dt>
-            <dd data-testid="scale-requested-cells">{telemetry.requestedCells.toLocaleString()}</dd>
-            <dd className="sw-sp-stat-context">
-              {formatBytes(telemetry.requestBytes, { kib: 1, mib: 1, gib: 2 })} request JSON
-            </dd>
-          </div>
-          <div>
-            <dt>Returned cells</dt>
-            <dd data-testid="scale-returned-cells">{telemetry.returnedCells.toLocaleString()}</dd>
-            <dd className="sw-sp-stat-context">
-              {formatBytes(telemetry.returnedBytes, { kib: 1, mib: 1, gib: 2 })} row JSON
-            </dd>
-          </div>
-          <div>
-            <dt>Columns / returned row</dt>
-            <dd data-testid="scale-column-amplification">{averageRequestedColumns.toFixed(2)}</dd>
-            <dd className="sw-sp-stat-context">current visible width {currentColumns}</dd>
-          </div>
-          <div>
-            <dt>Resident tile payload</dt>
-            <dd data-testid="scale-allocated">
-              {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
-            </dd>
-            <dd className="sw-sp-stat-context">
-              {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%{" "}
-              resident
-            </dd>
-          </div>
-          <div>
-            <dt>Dirty overlay</dt>
-            <dd data-testid="scale-dirty-cells">
-              {(stats.paged?.dirtyCells ?? 0).toLocaleString()} cells
-            </dd>
-            <dd className="sw-sp-stat-context">
-              {formatBytes(stats.paged?.dirtyAllocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
-              outside clean budget
-            </dd>
-          </div>
-        </dl>
-
-        <div className="sw-sp-cache-meter">
-          <span>Cache use</span>
-          {/* An ARIA meter keeps the same track geometry in every browser. */}
-          <div
-            aria-label="Resident tile cache use"
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={Math.round(cachePercent)}
-            className="sw-sp-cache-gauge"
-            role="meter"
-          >
-            <span style={{ width: `${Math.min(cachePercent, 100)}%` }} />
-          </div>
-          <strong>
-            {Math.round(cachePercent)}% of {cacheCeilingMiB.toLocaleString()} MiB
-          </strong>
-        </div>
-
-        <div className="sw-sp-last-tile" data-testid="scale-last-band">
-          <span>Last returned tile</span>
-          {telemetry.lastReturn ? (
-            <strong>
-              rows {telemetry.lastReturn.start + 1}–{telemetry.lastReturn.end} · columns{" "}
-              {columnBandsLabel(telemetry.lastReturn.columns)} ·{" "}
-              {telemetry.lastReturn.cells.toLocaleString()} cells ·{" "}
-              {formatBytes(telemetry.lastReturn.returnedBytes, { kib: 1, mib: 1, gib: 2 })} ·{" "}
-              {telemetry.lastReturn.latencyMs?.toFixed(1)} ms
-            </strong>
-          ) : (
-            <strong>Waiting for the first returned tile</strong>
-          )}
-        </div>
-
-        <div className="sw-sp-tile-list">
-          <div className="sw-sp-tile-list__head">
-            <h3>Recent tile map</h3>
-            <span data-testid="scale-recent-evictions">
-              {recentEvictions} evicted · public load state at each tile origin
-            </span>
-          </div>
-          {recentTiles.length === 0 ? (
-            <p>Move the Grid to populate this bounded request history.</p>
-          ) : (
-            <ol data-testid="scale-tile-list">
-              {recentTiles.slice(0, 10).map((tile) => (
-                <li data-state={tile.residence} key={tile.id}>
-                  <span>{tile.residence}</span>
-                  <strong>
-                    {tile.start + 1}–{tile.end} / {columnBandsLabel(tile.columns)}
-                  </strong>
-                  <small>{tile.cells.toLocaleString()} cells</small>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      </details>
-
-      <details className="sw-sp-debug-disclosure" data-testid="scale-global-details">
-        <summary>
-          <span className="sw-sp-disclosure-copy">
-            <strong>Try incomplete global operations</strong>
-            <small>SUM + full-sheet CSV</small>
-          </span>
-          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-            ›
-          </span>
-        </summary>
-        <div className="sw-sp-console">
-          <div className="sw-sp-console__intro">
-            <h3>Whole-sheet answers need the whole sheet</h3>
-            <p>
-              With only part of the sheet loaded, a whole-sheet SUM or CSV export cannot be correct.
-              These controls call the real APIs, which refuse with <code>IncompleteDataError</code>{" "}
-              and report how much is loaded.
-            </p>
-          </div>
-          <div className="sw-sp-actions">
-            <button data-testid="scale-scan-attempt" onClick={handleScan} type="button">
-              Try SUM over all rows
-            </button>
-            <button data-testid="scale-export-attempt" onClick={handleExport} type="button">
-              Try full-sheet CSV
-            </button>
-          </div>
-          {scan && (
-            <p
-              className="sw-sp-verdictline"
-              data-state={scan.ok ? "complete" : "incomplete"}
-              data-testid="scale-scan-report"
-            >
-              <span>{scan.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
-              {scan.ok
-                ? `${scan.op} = ${scan.value.toLocaleString()} in ${scan.durationMs.toFixed(1)} ms.`
-                : `${scan.op} stopped in ${scan.durationMs.toFixed(1)} ms: ${scan.loadedCells.toLocaleString()} of ${scan.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError: ${scan.message}`}
-            </p>
-          )}
-          {exportAttempt && (
-            <p
-              className="sw-sp-verdictline"
-              data-state={exportAttempt.ok ? "complete" : "incomplete"}
-              data-testid="scale-export-report"
-            >
-              <span>{exportAttempt.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
-              {exportAttempt.ok
-                ? `CSV completed at ${formatBytes(exportAttempt.bytes, { kib: 1, mib: 1, gib: 2 })}.`
-                : `${exportAttempt.loadedCells.toLocaleString()} of ${exportAttempt.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError prevented a partial file: ${exportAttempt.message}`}
-            </p>
-          )}
-          {stats.query?.status === "incomplete" && (
-            <p className="sw-sp-note" data-testid="scale-query-state">
-              Public query capability: incomplete — {stats.query.loadedCells.toLocaleString()} of{" "}
-              {stats.query.totalCells.toLocaleString()} logical cells loaded.
-            </p>
-          )}
-        </div>
-      </details>
-    </section>
-  );
+     </div>
+     <div className="sw-sp-actions">
+      <button data-testid="scale-scan-attempt" onClick={handleScan} type="button">
+       Try SUM over all rows
+      </button>
+      <button data-testid="scale-export-attempt" onClick={handleExport} type="button">
+       Try full-sheet CSV
+      </button>
+     </div>
+     {scan && (
+      <p
+       className="sw-sp-verdictline"
+       data-state={scan.ok ? "complete" : "incomplete"}
+       data-testid="scale-scan-report"
+      >
+       <span>{scan.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
+       {scan.ok
+        ? `${scan.op} = ${scan.value.toLocaleString()} in ${scan.durationMs.toFixed(1)} ms.`
+        : `${scan.op} stopped in ${scan.durationMs.toFixed(1)} ms: ${scan.loadedCells.toLocaleString()} of ${scan.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError: ${scan.message}`}
+      </p>
+     )}
+     {exportAttempt && (
+      <p
+       className="sw-sp-verdictline"
+       data-state={exportAttempt.ok ? "complete" : "incomplete"}
+       data-testid="scale-export-report"
+      >
+       <span>{exportAttempt.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
+       {exportAttempt.ok
+        ? `CSV completed at ${formatBytes(exportAttempt.bytes, { kib: 1, mib: 1, gib: 2 })}.`
+        : `${exportAttempt.loadedCells.toLocaleString()} of ${exportAttempt.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError prevented a partial file: ${exportAttempt.message}`}
+      </p>
+     )}
+     {stats.query?.status === "incomplete" && (
+      <p className="sw-sp-note" data-testid="scale-query-state">
+       Public query capability: incomplete — {stats.query.loadedCells.toLocaleString()} of{" "}
+       {stats.query.totalCells.toLocaleString()} logical cells loaded.
+      </p>
+     )}
+    </div>
+   </details>
+  </section>
+ );
 }
 
 /** Memory and resource reports for the loaded workbook. */
 function ResourcesSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const { stats, resourceOwners } = workbench;
+ const { stats, resourceOwners } = workbench;
 
-  return (
-    <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
-      <div className="sw-sp-resource-copy">
-        <h2 className="sw-showcase__section-title" id="resource-title">
-          Data size, allocated memory and WASM pages, apart
-        </h2>
-        <p>
-          The public resource report
-          <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
-            {stats.resource ? ` v${stats.resource.schemaVersion}` : " (loading report)"}
-          </span>{" "}
-          shows each separately. The page cache and the unsaved edits are counted on their own.
-        </p>
-      </div>
-      <div className="sw-sp-resource-panel">
-        <dl className="sw-sp-stats" data-testid="scale-resource-summary">
-          <div>
-            <dt>Data size</dt>
-            <dd data-testid="scale-resource-logical">
-              {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0, {
-                kib: 1,
-                mib: 1,
-                gib: 2,
-              })}
-            </dd>
-          </div>
-          <div>
-            <dt>Allocated memory</dt>
-            <dd data-testid="scale-resource-allocated">
-              {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0, {
-                kib: 1,
-                mib: 1,
-                gib: 2,
-              })}
-            </dd>
-          </div>
-          <div>
-            <dt>WASM pages</dt>
-            <dd data-testid="scale-resource-committed">
-              {stats.resource?.wasm.wasmCommittedBytes == null
-                ? "Unavailable"
-                : formatBytes(stats.resource.wasm.wasmCommittedBytes, {
-                    kib: 1,
-                    mib: 1,
-                    gib: 2,
-                  })}
-            </dd>
-          </div>
-        </dl>
-        <details className="sw-sp-debug-disclosure">
-          <summary>
-            <span className="sw-sp-disclosure-copy">
-              <strong>Inspect exclusive runtime owners</strong>
-              <small>{resourceOwners.length} active owners</small>
-            </span>
-            <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-              ›
-            </span>
-          </summary>
-          <div className="sw-sp-tablewrap">
-            <table className="sw-sp-table" data-testid="scale-resource-owners">
-              <caption>Largest exclusive live owners in this mounted Grid.</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Owner</th>
-                  <th className="sw-sp-table__num" scope="col">
-                    Logical
-                  </th>
-                  <th className="sw-sp-table__num" scope="col">
-                    Allocated
-                  </th>
-                  <th className="sw-sp-table__num" scope="col">
-                    Entries
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {resourceOwners.map((owner) => (
-                  <tr key={owner.owner}>
-                    <th scope="row">
-                      <code>{owner.owner}</code>
-                    </th>
-                    <td className="sw-sp-table__num" data-label="Logical">
-                      {formatBytes(owner.logicalBytes, { kib: 1, mib: 1, gib: 2 })}
-                    </td>
-                    <td className="sw-sp-table__num" data-label="Allocated">
-                      {formatBytes(owner.allocatedBytes, { kib: 1, mib: 1, gib: 2 })}
-                    </td>
-                    <td className="sw-sp-table__num" data-label="Entries">
-                      {owner.entries.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      </div>
-    </section>
-  );
+ return (
+  <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
+   <div className="sw-sp-resource-copy">
+    <h2 className="sw-showcase__section-title" id="resource-title">
+     Data size, allocated memory and WASM pages, apart
+    </h2>
+    <p>
+     The public resource report
+     <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
+      {stats.resource ? ` v${stats.resource.schemaVersion}` : " (loading report)"}
+     </span>{" "}
+     shows each separately. The page cache and the unsaved edits are counted on their own.
+    </p>
+   </div>
+   <div className="sw-sp-resource-panel">
+    <dl className="sw-sp-stats" data-testid="scale-resource-summary">
+     <div>
+      <dt>Data size</dt>
+      <dd data-testid="scale-resource-logical">
+       {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0, {
+        kib: 1,
+        mib: 1,
+        gib: 2,
+       })}
+      </dd>
+     </div>
+     <div>
+      <dt>Allocated memory</dt>
+      <dd data-testid="scale-resource-allocated">
+       {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0, {
+        kib: 1,
+        mib: 1,
+        gib: 2,
+       })}
+      </dd>
+     </div>
+     <div>
+      <dt>WASM pages</dt>
+      <dd data-testid="scale-resource-committed">
+       {stats.resource?.wasm.wasmCommittedBytes == null
+        ? "Unavailable"
+        : formatBytes(stats.resource.wasm.wasmCommittedBytes, {
+         kib: 1,
+         mib: 1,
+         gib: 2,
+        })}
+      </dd>
+     </div>
+    </dl>
+    <details className="sw-sp-debug-disclosure">
+     <summary>
+      <span className="sw-sp-disclosure-copy">
+       <strong>Inspect exclusive runtime owners</strong>
+       <small>{resourceOwners.length} active owners</small>
+      </span>
+      <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+       ›
+      </span>
+     </summary>
+     <div className="sw-sp-tablewrap">
+      <table className="sw-sp-table" data-testid="scale-resource-owners">
+       <caption>Largest exclusive live owners in this mounted Grid.</caption>
+       <thead>
+        <tr>
+         <th scope="col">Owner</th>
+         <th className="sw-sp-table__num" scope="col">
+          Logical
+         </th>
+         <th className="sw-sp-table__num" scope="col">
+          Allocated
+         </th>
+         <th className="sw-sp-table__num" scope="col">
+          Entries
+         </th>
+        </tr>
+       </thead>
+       <tbody>
+        {resourceOwners.map((owner) => (
+         <tr key={owner.owner}>
+          <th scope="row">
+           <code>{owner.owner}</code>
+          </th>
+          <td className="sw-sp-table__num" data-label="Logical">
+           {formatBytes(owner.logicalBytes, { kib: 1, mib: 1, gib: 2 })}
+          </td>
+          <td className="sw-sp-table__num" data-label="Allocated">
+           {formatBytes(owner.allocatedBytes, { kib: 1, mib: 1, gib: 2 })}
+          </td>
+          <td className="sw-sp-table__num" data-label="Entries">
+           {owner.entries.toLocaleString()}
+          </td>
+         </tr>
+        ))}
+       </tbody>
+      </table>
+     </div>
+    </details>
+   </div>
+  </section>
+ );
 }
 
 /** Engine calls: WASM boundary crossings per interaction. */
 function CrossingsSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const { resourceDelta, handleCrossings, changedResourceOwners, latestCrossing } = workbench;
+ const { resourceDelta, handleCrossings, changedResourceOwners, latestCrossing } = workbench;
 
-  return (
-    <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">
-      <h2 className="sw-showcase__section-title" id="crossing-title">
-        Every call into the engine is counted
-      </h2>
-      <p>
-        Each control commits a real 20,000-cell edit and reads the engine's public counters before
-        and after it.
-      </p>
-      <details className="sw-sp-debug-disclosure" data-testid="scale-crossing-details">
-        <summary>
-          <span className="sw-sp-disclosure-copy">
-            <strong>Run raw mutation diagnostics</strong>
-            <small>20,000-cell transactions</small>
-          </span>
-          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-            ›
-          </span>
-        </summary>
-        <div className="sw-sp-console">
-          <div className="sw-sp-actions">
-            <button
-              data-testid="scale-crossings-values"
-              onClick={() => handleCrossings("values")}
-              type="button"
-            >
-              Commit 20,000 values
-            </button>
-            <button
-              data-testid="scale-crossings-styles"
-              onClick={() => handleCrossings("styles")}
-              type="button"
-            >
-              Style 20,000 cells
-            </button>
-          </div>
-          {latestCrossing && (
-            <dl className="sw-sp-operation" data-testid="scale-crossings-latest">
-              <div>
-                <dt>Cells</dt>
-                <dd>{latestCrossing.cells.toLocaleString()}</dd>
-              </div>
-              <div>
-                <dt>JS↔WASM calls</dt>
-                <dd data-testid="scale-crossings-ffi">{latestCrossing.ffiCalls}</dd>
-              </div>
-              <div>
-                <dt>Largest array</dt>
-                <dd>{latestCrossing.maxTransferredArrayLength.toLocaleString()}</dd>
-              </div>
-              <div>
-                <dt>Measured time</dt>
-                <dd>{latestCrossing.durationMs.toFixed(1)} ms</dd>
-              </div>
-            </dl>
-          )}
-          {resourceDelta && (
-            <div className="sw-sp-resource-delta" data-testid="scale-resource-delta">
-              <h3>
-                Retained owner delta: {resourceDelta.from} → {resourceDelta.to}
-              </h3>
-              {changedResourceOwners.length === 0 ? (
-                <p>No retained owner changed; existing capacity was reused.</p>
-              ) : (
-                <ul>
-                  {changedResourceOwners.map((owner) => (
-                    <li key={owner.owner}>
-                      <code>{owner.owner}</code>: logical {formatByteDelta(owner.logicalBytes)},
-                      allocated {formatByteDelta(owner.allocatedBytes)}, entries{" "}
-                      {owner.entries > 0 ? "+" : ""}
-                      {owner.entries.toLocaleString()}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
-      </details>
-    </section>
-  );
+ return (
+  <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">
+   <h2 className="sw-showcase__section-title" id="crossing-title">
+    Every call into the engine is counted
+   </h2>
+   <p>
+    Each control commits a real 20,000-cell edit and reads the engine's public counters before
+    and after it.
+   </p>
+   <details className="sw-sp-debug-disclosure" data-testid="scale-crossing-details">
+    <summary>
+     <span className="sw-sp-disclosure-copy">
+      <strong>Run raw mutation diagnostics</strong>
+      <small>20,000-cell transactions</small>
+     </span>
+     <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+      ›
+     </span>
+    </summary>
+    <div className="sw-sp-console">
+     <div className="sw-sp-actions">
+      <button
+       data-testid="scale-crossings-values"
+       onClick={() => handleCrossings("values")}
+       type="button"
+      >
+       Commit 20,000 values
+      </button>
+      <button
+       data-testid="scale-crossings-styles"
+       onClick={() => handleCrossings("styles")}
+       type="button"
+      >
+       Style 20,000 cells
+      </button>
+     </div>
+     {latestCrossing && (
+      <dl className="sw-sp-operation" data-testid="scale-crossings-latest">
+       <div>
+        <dt>Cells</dt>
+        <dd>{latestCrossing.cells.toLocaleString()}</dd>
+       </div>
+       <div>
+        <dt>JS↔WASM calls</dt>
+        <dd data-testid="scale-crossings-ffi">{latestCrossing.ffiCalls}</dd>
+       </div>
+       <div>
+        <dt>Largest array</dt>
+        <dd>{latestCrossing.maxTransferredArrayLength.toLocaleString()}</dd>
+       </div>
+       <div>
+        <dt>Measured time</dt>
+        <dd>{latestCrossing.durationMs.toFixed(1)} ms</dd>
+       </div>
+      </dl>
+     )}
+     {resourceDelta && (
+      <div className="sw-sp-resource-delta" data-testid="scale-resource-delta">
+       <h3>
+        Retained owner delta: {resourceDelta.from} → {resourceDelta.to}
+       </h3>
+       {changedResourceOwners.length === 0 ? (
+        <p>No retained owner changed; existing capacity was reused.</p>
+       ) : (
+        <ul>
+         {changedResourceOwners.map((owner) => (
+          <li key={owner.owner}>
+           <code>{owner.owner}</code>: logical {formatByteDelta(owner.logicalBytes)},
+           allocated {formatByteDelta(owner.allocatedBytes)}, entries{" "}
+           {owner.entries > 0 ? "+" : ""}
+           {owner.entries.toLocaleString()}
+          </li>
+         ))}
+        </ul>
+       )}
+      </div>
+     )}
+    </div>
+   </details>
+  </section>
+ );
 }
 
 /** Recorded evidence and the challenge form. */
 function EvidenceSection({ workbench }: Readonly<{ workbench: PerformanceWorkbench }>) {
-  const { interactionWins } = workbench;
+ const { interactionWins } = workbench;
 
-  return (
-    <section aria-labelledby="evidence-title" className="sw-sp-section sw-sp-proof" id="evidence">
-      <div className="sw-sp-proof-heading">
-        <div>
-          <h2 className="sw-showcase__section-title" id="evidence-title">
-            The working set stays bounded as the address space grows
-          </h2>
-        </div>
-        <p>
-          Repeated measured runs, recorded by the benchmark suite: the Grid never needs a resident
-          billion-cell matrix.
-        </p>
+ return (
+  <section aria-labelledby="evidence-title" className="sw-sp-section sw-sp-proof" id="evidence">
+   <div className="sw-sp-proof-heading">
+    <div>
+     <h2 className="sw-showcase__section-title" id="evidence-title">
+      The working set stays bounded as the address space grows
+     </h2>
+    </div>
+    <p>
+     Repeated measured runs, recorded by the benchmark suite: the Grid never needs a resident
+     billion-cell matrix.
+    </p>
+   </div>
+
+   <div className="sw-sp-proof-layout">
+    {COMPARISON_EVIDENCE.available && (
+     <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
+      <header>
+       <p>Scenario median</p>
+       <strong>
+        {COMPARISON_EVIDENCE.sizes[COMPARISON_EVIDENCE.sizes.length - 1]?.medianRatio}×
+       </strong>
+       <span>at one million rows</span>
+      </header>
+      <div aria-hidden="true" className="sw-sp-scale-curve__axis">
+       <span />
+       <div>
+        {COMPARISON_LOG_TICKS.map((tick) => (
+         <span key={tick}>{tick.toLocaleString()}×</span>
+        ))}
+       </div>
+       <span>log₁₀</span>
       </div>
-
-      <div className="sw-sp-proof-layout">
-        {COMPARISON_EVIDENCE.available && (
-          <article className="sw-sp-scale-curve" data-testid="scale-evidence-compare">
-            <header>
-              <p>Scenario median</p>
-              <strong>
-                {COMPARISON_EVIDENCE.sizes[COMPARISON_EVIDENCE.sizes.length - 1]?.medianRatio}×
-              </strong>
-              <span>at one million rows</span>
-            </header>
-            <div aria-hidden="true" className="sw-sp-scale-curve__axis">
-              <span />
-              <div>
-                {COMPARISON_LOG_TICKS.map((tick) => (
-                  <span key={tick}>{tick.toLocaleString()}×</span>
-                ))}
-              </div>
-              <span>log₁₀</span>
-            </div>
-            <ol aria-label="Median comparison ratio by row count, logarithmic scale">
-              {COMPARISON_EVIDENCE.sizes.map((size) => (
-                <li key={size.size}>
-                  <span>{size.size.toLocaleString()}</span>
-                  <span className="sw-sp-scale-curve__track">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: `${comparisonLogPercent(size.medianRatio)}%`,
-                      }}
-                    />
-                  </span>
-                  <strong>{size.medianRatio.toFixed(1)}×</strong>
-                </li>
-              ))}
-            </ol>
-            <p>
-              Log₁₀ axis: 1× is the parity baseline; farther right means a larger measured ratio.
-              Exact ratios remain labeled. {COMPARISON_EVIDENCE.sizes.at(-1)?.comparedScenarios}{" "}
-              matched scenarios at the largest capture size.
-            </p>
-          </article>
-        )}
-
-        <div className="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
-          {interactionWins.map((win) => (
-            <article key={win.label}>
-              <span>{win.label}</span>
-              <div className="sw-sp-proof-wins__value">
-                <strong {...(win.testId ? { "data-testid": win.testId } : {})}>{win.value}</strong>
-                {win.delta && (
-                  <span className="sw-sp-evidence-delta" data-direction={win.delta.direction}>
-                    {win.delta.text}
-                  </span>
-                )}
-              </div>
-              <p>{win.note}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <details className="sw-sp-proof-sources">
-        <summary>
-          <span className="sw-sp-disclosure-copy">
-            <strong>Inspect sources and methodology</strong>
-            <small>3 committed evidence files</small>
-          </span>
-          <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-            ›
-          </span>
-        </summary>
-        <div className="sw-sp-proof-sources__body">
-          <section>
-            <p className="sw-sp-provenance" data-testid="scale-evidence-paged-provenance">
-              <code>{PAGED_EVIDENCE.source}</code>
-              <span>
-                {PAGED_EVIDENCE.protocol} · {PAGED_EVIDENCE.rows.toLocaleString()} rows ×{" "}
-                {PAGED_EVIDENCE.columns} columns · {PAGED_EVIDENCE.pageRows}-row pages
-              </span>
-            </p>
-            <dl className="sw-sp-proof-distribution" data-testid="scale-evidence-paged">
-              <div>
-                <dt>Startup</dt>
-                <dd>{PAGED_EVIDENCE.startup.medianMs.toFixed(2)} ms median</dd>
-                <dd>{PAGED_EVIDENCE.startup.p95Ms.toFixed(2)} ms p95</dd>
-              </div>
-              <div>
-                <dt>First page</dt>
-                <dd>{PAGED_EVIDENCE.firstPage.medianMs.toFixed(2)} ms median</dd>
-                <dd>{PAGED_EVIDENCE.firstPage.p95Ms.toFixed(2)} ms p95</dd>
-              </div>
-              <div>
-                <dt>Distant page</dt>
-                <dd>{PAGED_EVIDENCE.distantPage.medianMs.toFixed(2)} ms median</dd>
-                <dd>{PAGED_EVIDENCE.distantPage.p95Ms.toFixed(2)} ms p95</dd>
-              </div>
-              <div>
-                <dt>Peak allocated</dt>
-                <dd>
-                  {formatBytes(PAGED_EVIDENCE.peakAllocatedBytes, { kib: 1, mib: 1, gib: 2 })}
-                </dd>
-              </div>
-            </dl>
-          </section>
-          <section>
-            <p className="sw-sp-provenance" data-testid="scale-evidence-interaction-provenance">
-              <code>{INTERACTION_EVIDENCE.source}</code>
-              <span>
-                {INTERACTION_EVIDENCE.protocol} · {INTERACTION_EVIDENCE.capture.samples} samples ·{" "}
-                {INTERACTION_EVIDENCE.capture.browser} · commit{" "}
-                {INTERACTION_EVIDENCE.capture.commit.slice(0, 10)}
-              </span>
-            </p>
-          </section>
-          {COMPARISON_EVIDENCE.available && (
-            <section>
-              <p className="sw-sp-provenance" data-testid="scale-evidence-compare-provenance">
-                <code>{COMPARISON_EVIDENCE.source}</code>
-                <span>
-                  {COMPARISON_EVIDENCE.capture.browser} · {COMPARISON_EVIDENCE.capture.rounds}{" "}
-                  rounds · commit {COMPARISON_EVIDENCE.capture.commit.slice(0, 10)}
-                </span>
-              </p>
-            </section>
-          )}
-        </div>
-      </details>
-
-      <p className="sw-sp-note sw-sp-note--rule">
-        The live source adds a measured {PAGE_LATENCY_MS} ms delay after its first request so
-        loading remains observable. Live diagnostics and checked captures stay separate.
+      <ol aria-label="Median comparison ratio by row count, logarithmic scale">
+       {COMPARISON_EVIDENCE.sizes.map((size) => (
+        <li key={size.size}>
+         <span>{size.size.toLocaleString()}</span>
+         <span className="sw-sp-scale-curve__track">
+          <span
+           aria-hidden="true"
+           style={{
+            width: `${comparisonLogPercent(size.medianRatio)}%`,
+           }}
+          />
+         </span>
+         <strong>{size.medianRatio.toFixed(1)}×</strong>
+        </li>
+       ))}
+      </ol>
+      <p>
+       Log₁₀ axis: 1× is the parity baseline; farther right means a larger measured ratio.
+       Exact ratios remain labeled. {COMPARISON_EVIDENCE.sizes.at(-1)?.comparedScenarios}{" "}
+       matched scenarios at the largest capture size.
       </p>
-    </section>
-  );
+     </article>
+    )}
+
+    <div className="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
+     {interactionWins.map((win) => (
+      <article key={win.label}>
+       <span>{win.label}</span>
+       <div className="sw-sp-proof-wins__value">
+        <strong {...(win.testId ? { "data-testid": win.testId } : {})}>{win.value}</strong>
+        {win.delta && (
+         <span className="sw-sp-evidence-delta" data-direction={win.delta.direction}>
+          {win.delta.text}
+         </span>
+        )}
+       </div>
+       <p>{win.note}</p>
+      </article>
+     ))}
+    </div>
+   </div>
+
+   <details className="sw-sp-proof-sources">
+    <summary>
+     <span className="sw-sp-disclosure-copy">
+      <strong>Inspect sources and methodology</strong>
+      <small>3 committed evidence files</small>
+     </span>
+     <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+      ›
+     </span>
+    </summary>
+    <div className="sw-sp-proof-sources__body">
+     <section>
+      <p className="sw-sp-provenance" data-testid="scale-evidence-paged-provenance">
+       <code>{PAGED_EVIDENCE.source}</code>
+       <span>
+        {PAGED_EVIDENCE.protocol} · {PAGED_EVIDENCE.rows.toLocaleString()} rows ×{" "}
+        {PAGED_EVIDENCE.columns} columns · {PAGED_EVIDENCE.pageRows}-row pages
+       </span>
+      </p>
+      <dl className="sw-sp-proof-distribution" data-testid="scale-evidence-paged">
+       <div>
+        <dt>Startup</dt>
+        <dd>{PAGED_EVIDENCE.startup.medianMs.toFixed(2)} ms median</dd>
+        <dd>{PAGED_EVIDENCE.startup.p95Ms.toFixed(2)} ms p95</dd>
+       </div>
+       <div>
+        <dt>First page</dt>
+        <dd>{PAGED_EVIDENCE.firstPage.medianMs.toFixed(2)} ms median</dd>
+        <dd>{PAGED_EVIDENCE.firstPage.p95Ms.toFixed(2)} ms p95</dd>
+       </div>
+       <div>
+        <dt>Distant page</dt>
+        <dd>{PAGED_EVIDENCE.distantPage.medianMs.toFixed(2)} ms median</dd>
+        <dd>{PAGED_EVIDENCE.distantPage.p95Ms.toFixed(2)} ms p95</dd>
+       </div>
+       <div>
+        <dt>Peak allocated</dt>
+        <dd>
+         {formatBytes(PAGED_EVIDENCE.peakAllocatedBytes, { kib: 1, mib: 1, gib: 2 })}
+        </dd>
+       </div>
+      </dl>
+     </section>
+     <section>
+      <p className="sw-sp-provenance" data-testid="scale-evidence-interaction-provenance">
+       <code>{INTERACTION_EVIDENCE.source}</code>
+       <span>
+        {INTERACTION_EVIDENCE.protocol} · {INTERACTION_EVIDENCE.capture.samples} samples ·{" "}
+        {INTERACTION_EVIDENCE.capture.browser} · commit{" "}
+        {INTERACTION_EVIDENCE.capture.commit.slice(0, 10)}
+       </span>
+      </p>
+     </section>
+     {COMPARISON_EVIDENCE.available && (
+      <section>
+       <p className="sw-sp-provenance" data-testid="scale-evidence-compare-provenance">
+        <code>{COMPARISON_EVIDENCE.source}</code>
+        <span>
+         {COMPARISON_EVIDENCE.capture.browser} · {COMPARISON_EVIDENCE.capture.rounds}{" "}
+         rounds · commit {COMPARISON_EVIDENCE.capture.commit.slice(0, 10)}
+        </span>
+       </p>
+      </section>
+     )}
+    </div>
+   </details>
+
+   <p className="sw-sp-note sw-sp-note--rule">
+    The live source adds a measured {PAGE_LATENCY_MS} ms delay after its first request so
+    loading remains observable. Live diagnostics and checked captures stay separate.
+   </p>
+  </section>
+ );
 }

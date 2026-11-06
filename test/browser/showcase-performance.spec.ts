@@ -270,9 +270,9 @@ test("row and column navigators agree with the public window headers", async ({ 
   const rail = page.getByTestId("scale-overview");
   const railBox = await rail.boundingBox();
   if (!railBox) throw new Error("Overview rail has no physical bounds");
-  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height * 0.02);
+  await page.mouse.move(railBox.x + railBox.width * 0.02, railBox.y + railBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height * 0.55, {
+  await page.mouse.move(railBox.x + railBox.width * 0.55, railBox.y + railBox.height / 2, {
     steps: 14,
   });
   await page.mouse.up();
