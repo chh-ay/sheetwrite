@@ -1,18 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
-  CURRENT_RELEASE,
-  type DocsTabId,
   type DocumentNeighbours,
   documentNeighbours,
-  type NavigationItem,
-  type NavigationLocation,
-  type NavigationSection,
-  navigationBadge,
   nearestNavigationItem,
   tabForHref,
-  tabSections,
 } from "../lib/navigation.js";
 import type { OutlineItem } from "../lib/outline.js";
 import { editUrl, reportProblemUrl } from "../lib/page-links.js";
