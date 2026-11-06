@@ -211,7 +211,7 @@ impl RangeSnapshot {
                 .map(|(_, _, entry)| {
                     std::mem::size_of::<(u32, u32)>()
                         + if entry.is_formula() {
-                            entry.source.len()
+                            entry.source().len()
                         } else {
                             std::mem::size_of::<AbsCellKey>()
                         }
@@ -224,7 +224,7 @@ impl RangeSnapshot {
         self.formulas
             .iter()
             .filter(|(_, _, entry)| entry.is_formula())
-            .map(|(_, _, entry)| entry.source.clone())
+            .map(|(_, _, entry)| entry.source().into_owned())
             .collect()
     }
 }
@@ -1403,7 +1403,7 @@ impl CellStore {
             }
             let offset = ((row - r0) * cols + col - c0) as u32;
             if entry.is_formula() {
-                formulas.push((offset, entry.source.clone()));
+                formulas.push((offset, entry.source().into_owned()));
             } else if let Some(target) = entry.reference_target(sheet as u32) {
                 references.push((offset, target));
             }
@@ -1475,7 +1475,7 @@ impl CellStore {
                 };
                 if entry.is_formula() {
                     formula_offsets.push(offset as u32);
-                    formula_sources.push(entry.source.clone());
+                    formula_sources.push(entry.source().into_owned());
                 } else if let Some(target) = entry.reference_target(sheet as u32) {
                     reference_offsets.push(offset as u32);
                     reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
@@ -1642,10 +1642,13 @@ impl CellStore {
                 -1.0
             };
             let source = s.formulas.get(key, &self.formula_slots);
+            let text = source
+                .filter(|entry| entry.is_formula())
+                .map(FormulaEntry::source);
             let reference_target = source
                 .filter(|entry| entry.is_reference())
                 .and_then(|entry| entry.reference_target(sheet as u32));
-            let source_kind = if source.is_some_and(FormulaEntry::is_formula) {
+            let source_kind = if text.is_some() {
                 1
             } else if reference_target.is_some() {
                 2
@@ -1653,7 +1656,7 @@ impl CellStore {
                 0
             };
             let source_length = if source_kind == 1 {
-                source.map_or(0, |entry| entry.source.len())
+                text.as_ref().map_or(0, |text| text.len())
             } else if source_kind == 2 {
                 3
             } else {
@@ -1669,15 +1672,13 @@ impl CellStore {
                 f64::from(source_kind),
                 source_length as f64,
             ]);
-            if source_kind == 1 {
-                if let Some(entry) = source {
-                    for chunk in entry.source.as_bytes().chunks(4) {
-                        let mut word = 0u32;
-                        for (shift, byte) in chunk.iter().enumerate() {
-                            word |= u32::from(*byte) << (shift * 8);
-                        }
-                        cells.push(f64::from(word));
+            if let Some(text) = &text {
+                for chunk in text.as_bytes().chunks(4) {
+                    let mut word = 0u32;
+                    for (shift, byte) in chunk.iter().enumerate() {
+                        word |= u32::from(*byte) << (shift * 8);
                     }
+                    cells.push(f64::from(word));
                 }
             } else if let Some(target) = reference_target {
                 cells.extend_from_slice(&[
@@ -1781,7 +1782,7 @@ impl CellStore {
                 return false;
             };
             let source = if entry.is_formula() {
-                self.parse_formula_entry(&entry.source, sheet as u32, key.0, key.1)
+                self.parse_formula_entry(&entry.source(), sheet as u32, key.0, key.1)
             } else {
                 let Some(target) = entry.reference_target(sheet as u32) else {
                     return false;
@@ -2526,7 +2527,7 @@ impl CellStore {
             .get(sheet)?
             .formulas
             .get(key, &self.formula_slots)?;
-        entry.is_formula().then(|| entry.source.clone())
+        entry.is_formula().then(|| entry.source().into_owned())
     }
 
     #[wasm_bindgen(js_name = referenceTarget)]
@@ -3928,7 +3929,7 @@ impl CellStore {
                 .formulas
                 .iter(&self.formula_slots)
                 .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (key, entry.source.clone()))
+                .map(|(key, entry)| (key, entry.source().into_owned()))
                 .collect();
             let refreshed: Vec<_> = sources
                 .into_iter()

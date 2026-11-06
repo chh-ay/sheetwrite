@@ -1374,11 +1374,16 @@ fn lex_token_after<'a>(
             )?),
             true,
         )
-    } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
-        bytes[*index..]
-            .get(..literal.len())
-            .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
-    }) {
+    } else if let Some((literal, error)) = (c == b'#')
+        .then(|| {
+            ERROR_LITERALS.iter().find(|(literal, _)| {
+                bytes[*index..]
+                    .get(..literal.len())
+                    .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
+            })
+        })
+        .flatten()
+    {
         *index += literal.len();
         Tok::Error(*error)
     } else if c == b'[' {
@@ -1413,17 +1418,26 @@ fn lex_token_after<'a>(
     Ok(Some(tok))
 }
 
-/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`.
+/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`. ASCII
+/// bytes, which most names are, are read without decoding a character.
 fn ident_token<'a>(src: &'a str, index: &mut usize) -> Tok<'a> {
     let start = *index;
+    let bytes = src.as_bytes();
 
-    while *index < src.len() {
+    while let Some(&byte) = bytes.get(*index) {
+        if byte.is_ascii() {
+            if !(byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'_' | b'.' | b'\\')) {
+                break;
+            }
+            *index += 1;
+            continue;
+        }
+
         let ch = src[*index..].chars().next().expect("valid UTF-8 source");
-        if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
-            *index += ch.len_utf8();
-        } else {
+        if !ch.is_alphanumeric() {
             break;
         }
+        *index += ch.len_utf8();
     }
 
     Tok::Ident(Cow::Borrowed(&src[start..*index]), false)
