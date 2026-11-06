@@ -28,6 +28,7 @@
 //! The evaluator lives on `CellStore` (it needs cell access); this module is the
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
+use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;
 use crate::types::{FormulaError, Value};
 use std::{borrow::Cow, cmp::Ordering};
@@ -3030,7 +3031,7 @@ fn write_structured_ref(
 
 pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
-        Ast::Num(value) => out.push_str(&value.to_string()),
+        Ast::Num(value) => out.push_str(NumberText::of(*value).as_str()),
         Ast::Str(value) => write_text(value, out),
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
@@ -3114,7 +3115,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                     });
                 }
                 match value {
-                    Value::Number(number) => out.push_str(&number.to_string()),
+                    Value::Number(number) => out.push_str(NumberText::of(*number).as_str()),
                     Value::Text(text) => write_text(text, out),
                     Value::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
                     Value::Error(error) => out.push_str(error.sentinel()),

@@ -5,6 +5,7 @@
 // is one undo step. This module loads as its own chunk (#231).
 
 import { cellScalarToText } from "../cell-input.js";
+import { isDashboard } from "../dashboard.js";
 import { formatNumber } from "../number-format.js";
 import { pivotsAvailable } from "../panels/panel-loader.js";
 import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
@@ -29,6 +30,7 @@ import {
   movedBox,
   resizedBox,
 } from "./dashboard-layout.js";
+import { slicedPivots, slicerSelection } from "./slicer-filter.js";
 
 const NEEDS_FULL_ENGINE =
   "This item needs the full engine. Load @sheetwrite/formulas to compute it.";
@@ -72,6 +74,46 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   let mode: KeyboardMode | null = null;
   let message: string | null = null;
   let rendered = "";
+  // A read-only viewer's slicer selections: they filter this view only.
+  const overrides = new Map<string, CellScalar[] | null>();
+
+  // Slicers filter the dashboard pivots that the engine computes; the saved definitions keep theirs.
+  const engine = storeEngine(grid.store);
+  const filterPivots = (dashboards: readonly SheetId[]): void => {
+    engine?.setPivotView((owner) => {
+      if (!isDashboard(owner)) return undefined;
+      const workbook = grid.store.getWorkbook();
+      return slicedPivots(
+        owner,
+        workbook.sheets,
+        workbook.dataModel?.relationships ?? [],
+        overrides,
+      );
+    }, dashboards);
+  };
+  filterPivots(
+    grid.store
+      .getWorkbook()
+      .sheets.filter(isDashboard)
+      .map((candidate) => candidate.id),
+  );
+
+  /**
+   * A slicer's new selection: a saved, synced change in an editable grid,
+   * as Excel saves slicer state, or this view's own filter when read-only.
+   */
+  const chooseSlicer = (item: DashboardSlicerItem, next: CellScalar[] | undefined): void => {
+    if (!readOnly) {
+      const changed: DashboardSlicerItem = { ...item };
+      if (next === undefined) delete changed.selected;
+      else changed.selected = next;
+      commit(changed);
+      return;
+    }
+    overrides.set(item.id, next ?? null);
+    if (sheet !== null) filterPivots([sheet]);
+    refresh(true);
+  };
 
   const items = (): DashboardItem[] =>
     grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
@@ -213,7 +255,10 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const body = document.createElement("div");
     body.className = "sheetwrite-dashboard-item-body";
     if (item.kind === "pivot") renderPivot(body, grid, sheet ?? grid.getActiveSheet(), item);
-    else renderSlicer(body, grid, item, readOnly, commit);
+    else {
+      const kept = readOnly ? slicerSelection(item, overrides) : item.selected;
+      renderSlicer(body, grid, item, kept, (next) => chooseSlicer(item, next));
+    }
     element.appendChild(body);
 
     if (!readOnly) {
@@ -263,7 +308,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
         ? dashboardPivotResult(grid, owner, item.pivot)
         : slicerValues(grid, item),
     );
-    const signature = JSON.stringify([list, results, readOnly, mode, message]);
+    const signature = JSON.stringify([list, results, readOnly, mode, message, [...overrides]]);
     if (!force && signature === rendered) return;
     rendered = signature;
 
@@ -425,13 +470,14 @@ function slicerValues(grid: Grid, item: DashboardSlicerItem): CellScalar[] | nul
 /**
  * The values of a slicer as toggle buttons. A click keeps one value;
  * Ctrl or Cmd with a click adds or removes one; Clear keeps every value.
+ * `choose` receives the new selection: undefined keeps every value.
  */
 function renderSlicer(
   body: HTMLElement,
   grid: Grid,
   item: DashboardSlicerItem,
-  readOnly: boolean,
-  commit: (item: DashboardItem) => boolean,
+  kept: readonly CellScalar[] | undefined,
+  choose: (next: CellScalar[] | undefined) => void,
 ): void {
   const values = slicerValues(grid, item);
   if (values === null) {
@@ -439,22 +485,17 @@ function renderSlicer(
     return;
   }
 
-  const kept = item.selected;
   // Every value kept is no selection; a slicer always keeps at least one value, as in Excel.
   const select = (next: CellScalar[] | undefined): void => {
     if (next !== undefined && next.length === 0) return;
-    const all = next === undefined || next.length === values.length;
-    const changed: DashboardSlicerItem = { ...item };
-    if (all) delete changed.selected;
-    else changed.selected = next;
-    commit(changed);
+    choose(next === undefined || next.length === values.length ? undefined : next);
   };
 
   const clear = document.createElement("button");
   clear.type = "button";
   clear.className = "sheetwrite-dashboard-slicer-clear";
   clear.textContent = "Clear";
-  clear.disabled = readOnly || kept === undefined;
+  clear.disabled = kept === undefined;
   clear.addEventListener("click", () => select(undefined));
   body.appendChild(clear);
 
@@ -469,7 +510,6 @@ function renderSlicer(
     button.textContent = scalarLabel(value);
     const on = kept === undefined || kept.includes(value);
     button.setAttribute("aria-pressed", String(on));
-    button.disabled = readOnly;
     button.addEventListener("click", (event) => {
       if (!(event.ctrlKey || event.metaKey)) {
         select([value]);

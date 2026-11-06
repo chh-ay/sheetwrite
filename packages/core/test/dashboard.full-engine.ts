@@ -229,3 +229,62 @@ it("shows a value field's number format in the dashboard view", async () => {
   );
   expect(values).toEqual(["$4.00", "$2.00", "$6.00"]);
 });
+
+/** The dashboard Dash with a slicer on Orders[Region] beside its pivot; `readOnly` mounts a read-only grid. */
+async function withSlicer(readOnly = false) {
+  const input = snapshot();
+  const dash = input.sheets[1];
+  if (dash === undefined) throw new Error("the fixture has a dashboard");
+  dash.pivots = [byRegion(0)];
+  dash.dashboard = {
+    items: [
+      { id: "sales", box: { x: 0, y: 0, w: 6, h: 6 }, kind: "pivot", pivot: "on-dashboard" },
+      {
+        id: "region",
+        box: { x: 6, y: 0, w: 3, h: 6 },
+        kind: "slicer",
+        field: { table: "orders", column: "region" },
+      },
+    ],
+  };
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = createGridFromSnapshot(host, input, { readOnly });
+  grids.push(grid);
+  grid.setActiveSheet("dash");
+  await import("../src/dashboard/dashboard-view.js");
+  await Promise.resolve();
+  const press = (label: string) => {
+    const button = [
+      ...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value"),
+    ].find((candidate) => candidate.textContent === label);
+    if (button === undefined) throw new Error(`no slicer value ${label}`);
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  };
+  const body = () => dashboardPivotResult(grid, "dash", "on-dashboard")?.cells.slice(2);
+  return { grid, press, body };
+}
+
+it("filters the dashboard pivot by a slicer as a saved change, and undo clears it", async () => {
+  const { grid, press, body } = await withSlicer();
+  expect(body()).toEqual(["East", 4, "West", 2, "Total", 6]);
+
+  press("West");
+  expect(body()).toEqual(["West", 2, "Total", 2]);
+  expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items[1]).toMatchObject({
+    selected: ["West"],
+  });
+  // The saved pivot keeps its own definition.
+  expect(grid.getPivots("dash")[0]?.filters).toBeUndefined();
+
+  grid.undo();
+  expect(body()).toEqual(["East", 4, "West", 2, "Total", 6]);
+});
+
+it("filters only a read-only viewer's own view, without a document change", async () => {
+  const { grid, press, body } = await withSlicer(true);
+
+  press("East");
+  expect(body()).toEqual(["East", 4, "Total", 4]);
+  expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items[1]).not.toHaveProperty("selected");
+});
