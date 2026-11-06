@@ -200,6 +200,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     dependencies: ["coordinates"],
     exports: [
       "ChartAnchor",
+      "ChartCategoryLevel",
       "ChartChangeEvent",
       "ChartChangeListener",
       "ChartDefinition",

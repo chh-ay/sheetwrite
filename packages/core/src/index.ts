@@ -291,6 +291,7 @@ export type {
   CellVerticalAlign,
   ChangeEvent,
   ChartAnchor,
+  ChartCategoryLevel,
   ChartChangeEvent,
   ChartChangeListener,
   ChartDefinition,

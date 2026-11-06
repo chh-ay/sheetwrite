@@ -274,6 +274,33 @@ it("commits each chart kind, title and legend change as one setChart", async () 
   expect(grid.getCharts("s1")[0]).not.toHaveProperty("legend");
 });
 
+it("shows Multi-level category labels only when the categories have levels and commits each change", async () => {
+  const { grid, chartOps, host, press } = await insertedChart();
+  const box = host.querySelector<HTMLInputElement>('[data-focus-key="multi-level-labels"]');
+  const section = box?.closest(".sheetwrite-panel-section");
+  if (box === null || section === null || section === undefined) {
+    throw new Error("no Multi-level category labels box");
+  }
+  // A2:A3 is one column: one level, so Excel shows no such option.
+  expect(section.hasAttribute("hidden")).toBe(true);
+
+  const chart = grid.getCharts("s1")[0];
+  if (chart === undefined) throw new Error("no chart");
+  const twoColumns = chart.series.map((series) => ({ ...series, categories: range(1, 0, 2, 1) }));
+  expect(grid.setChart({ ...chart, series: twoColumns }, "s1").status).toBe("applied");
+  expect(section.hasAttribute("hidden")).toBe(false);
+  expect(box.checked).toBe(true);
+  chartOps.length = 0;
+
+  press(box);
+  expect(chartOps.map((entry) => entry.axes)).toEqual([{ multiLevelLabels: false }]);
+  press(box);
+  expect(chartOps).toHaveLength(2);
+  expect(grid.getCharts("s1")[0]).not.toHaveProperty("axes");
+  grid.undo();
+  expect(box.checked).toBe(false);
+});
+
 it("validates series ranges as A1 text and shows the error inline", async () => {
   const { grid, chartOps, host, key } = await insertedChart();
   chartOps.length = 0;

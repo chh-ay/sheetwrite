@@ -1,7 +1,7 @@
 /**
  * Writes the input files of the Excel checks for a model pivot (#229),
- * external links (#226), measures (#230) and dashboards (#231) to
- * test/fixtures/excel-checks/.
+ * external links (#226), measures (#230), dashboards (#231) and multi-level
+ * category labels (#501) to test/fixtures/excel-checks/.
  * Sheetwrite writes each file, through the same export a user runs, with the
  * full engine, so model pivots, measures and dashboards hold their values.
  *
@@ -378,6 +378,183 @@ function dashboardWorkbook(): Snapshot {
   };
 }
 
+/**
+ * Check 15: charts with two category levels. On Sales, a column chart and a
+ * bar chart with Multi-level Category Labels cleared over A2:B5, with blank
+ * cells where a region continues. On Report, a pivot of the Orders table by
+ * region, then segment, in compact layout with subtotals, and a column chart
+ * over it.
+ */
+function chartLevelsWorkbook(): Snapshot {
+  const sales = [
+    ["East", "Retail", 10],
+    [null, "Online", 7],
+    ["West", "Retail", 4],
+    [null, "Online", 11],
+  ] as const;
+  const orders = [
+    ["East", "Retail", 10],
+    ["East", "Online", 7],
+    ["West", "Retail", 4],
+    ["West", "Online", 11],
+    ["North", "Retail", 6],
+  ] as const;
+  const range = (sheet: string, r0: number, c0: number, r1: number, c1: number) => ({
+    sheet,
+    start: { row: r0, col: c0 },
+    end: { row: r1, col: c1 },
+  });
+  const chart = (id: string, kind: "column" | "bar", row: number) => ({
+    id,
+    kind,
+    title: kind === "column" ? "Amount by region and segment" : "One row of labels",
+    anchor: { row, col: 4, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+    series: [
+      {
+        nameRange: range("sales", 0, 2, 0, 2),
+        values: range("sales", 1, 2, 4, 2),
+        categories: range("sales", 1, 0, 4, 1),
+      },
+    ],
+  });
+  return {
+    schemaVersion: 1,
+    workbook: { activeSheet: "sales" },
+    sheets: [
+      {
+        id: "sales",
+        name: "Sales",
+        order: 0,
+        rowCount: 40,
+        columns: columns(12),
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: sales.length + 1,
+            colCount: 3,
+            cells: [
+              literal(0, 0, "Region"),
+              literal(0, 1, "Segment"),
+              literal(0, 2, "Amount"),
+              ...sales.flatMap((row, index) =>
+                row.flatMap((value, col) =>
+                  value === null ? [] : [literal(index + 1, col, value)],
+                ),
+              ),
+            ],
+          },
+        ],
+        charts: [
+          chart("levels", "column", 0),
+          { ...chart("one-row", "bar", 16), axes: { multiLevelLabels: false } },
+        ],
+      },
+      {
+        id: "orders",
+        name: "Orders",
+        order: 1,
+        rowCount: 20,
+        columns: columns(3),
+        tables: [
+          {
+            id: "orders-table",
+            name: "Orders",
+            range: range("orders", 0, 0, orders.length, 2),
+            columns: [
+              { id: "region", name: "Region" },
+              { id: "segment", name: "Segment" },
+              { id: "amount", name: "Amount" },
+            ],
+            headerRow: true,
+            totalsRow: false,
+          },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: orders.length + 1,
+            colCount: 3,
+            cells: [
+              literal(0, 0, "Region"),
+              literal(0, 1, "Segment"),
+              literal(0, 2, "Amount"),
+              ...orders.flatMap((row, index) =>
+                row.map((value, col) => literal(index + 1, col, value)),
+              ),
+            ],
+          },
+        ],
+      },
+      {
+        id: "report",
+        name: "Report",
+        order: 2,
+        rowCount: 40,
+        columns: columns(12),
+        cells: [],
+        pivots: [
+          {
+            id: "by-segment",
+            name: "Sales by segment",
+            source: { table: "orders-table" },
+            anchor: { row: 0, col: 0 },
+            rows: [0, 1],
+            columns: [],
+            values: [{ field: 2, aggregation: "SUM" }],
+          },
+        ],
+        charts: [
+          {
+            id: "pivot-chart",
+            kind: "column",
+            title: "Sales by segment",
+            anchor: { row: 0, col: 4, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+            series: [],
+            pivot: "by-segment",
+          },
+        ],
+      },
+      {
+        id: "board",
+        name: "Board",
+        order: 3,
+        kind: "dashboard",
+        rowCount: 0,
+        columns: [],
+        cells: [],
+        dashboard: {
+          items: [
+            { id: "chart-item", box: { x: 0, y: 0, w: 6, h: 12 }, kind: "chart", chart: "chart" },
+          ],
+        },
+        pivots: [
+          {
+            id: "board-pivot",
+            name: "Board sales",
+            source: { table: "orders-table" },
+            anchor: { row: 0, col: 0 },
+            rows: [0, 1],
+            columns: [],
+            values: [{ field: 2, aggregation: "SUM" }],
+          },
+        ],
+        charts: [
+          {
+            id: "chart",
+            kind: "column",
+            title: "Board sales",
+            anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+            series: [],
+            pivot: "board-pivot",
+          },
+        ],
+      },
+    ],
+  };
+}
+
 const warnings: Record<string, string[]> = {};
 
 /** Export `snapshot` through a full-engine grid, as **File › Export XLSX** does. */
@@ -409,6 +586,7 @@ await exportThroughGrid("Budget.xlsx", budgetWorkbook());
 await exportThroughGrid("measures-model-pivot.xlsx", measuresWorkbook(true));
 await exportThroughGrid("measures-only-model.xlsx", measuresWorkbook(false));
 await exportThroughGrid("dashboard-sheetwrite-export.xlsx", dashboardWorkbook());
+await exportThroughGrid("chart-levels-sheetwrite-export.xlsx", chartLevelsWorkbook());
 
 restoreCanvas();
 console.log(JSON.stringify(warnings, null, 2));

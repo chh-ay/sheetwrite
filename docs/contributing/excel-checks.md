@@ -1,6 +1,6 @@
 # Excel checks
 
-Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433), external links (#226), measures (#230) and dashboards (#231) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 7 and 10 to 14 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
+Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433), external links (#226), measures (#230), dashboards (#231) and multi-level category labels (#501) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 7, 10 to 15 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
 
 For each check, save the result file under the name given and attach it to the issue in a comment. A test then compares the file with Sheetwrite's result. When a result differs from the expected one, also write down what Excel showed.
 
@@ -20,6 +20,7 @@ For each check, save the result file under the name given and attach it to the i
 | 12 | #230 | `test/fixtures/excel-checks/measures-model-pivot.xlsx` | none; record what Excel shows |
 | 13 | #230 | `test/fixtures/excel-checks/measures-only-model.xlsx` | `measures-only-model-excel.xlsx` |
 | 14 | #231 | `test/fixtures/excel-checks/dashboard-sheetwrite-export.xlsx` | none; record what Excel shows |
+| 15 | #501 | `test/fixtures/excel-checks/chart-levels-sheetwrite-export.xlsx` | `chart-levels-excel.xlsx` |
 
 ## 1. Sort order (#353)
 
@@ -198,7 +199,7 @@ Expected: Excel opens and saves the file without a repair message. After import,
 
 ## 14. A dashboard in Excel (#231)
 
-Sheet `Dashboard` is a Sheetwrite dashboard: the model pivot `Revenue by region`, a `Region` slicer that keeps East, North and West, a KPI card of `Revenue`, and a PivotChart of `Revenue`. The export wrote it as a worksheet of the items' current values and a native column chart with literal data, and warned "Dashboard sheets were written as worksheets of their current values and charts; they are interactive only in Sheetwrite".
+Sheet `Dashboard` is a Sheetwrite dashboard: the model pivot `Revenue by region`, a `Region` slicer that keeps East, North and West, a KPI card of `Revenue`, and a PivotChart of `Revenue`. The export wrote it as a worksheet of the items' current values and a native column chart that reads the pivot item's cells, and warned "Dashboard sheets were written as worksheets of their current values and charts; they are interactive only in Sheetwrite".
 
 1. Open the file and select sheet `Dashboard`.
 2. Write down A1:D6, F1:F4 and H1:H2.
@@ -210,5 +211,27 @@ Expected:
 - A1 is `Revenue by region`. A3:D5 list East 180, 180, 27%; North 190, 190, 29%; West 190, 190, 29%. Row 6 is `Total` 560, 560, 85%. The share total is not 100% because `ALL` removes the slicer's region filter too, as in DAX.
 - F1 is `Region`, and F2:F4 list East, North and West.
 - H1 is `Revenue` and H2 is 560.
-- The chart draws three columns, East 180, North 190 and West 190, titled `Revenue by region`. Its data is literal, so Select Data shows no source range.
+- The chart draws three columns, East 180, North 190 and West 190, titled `Revenue by region`. Select Data shows the series `Revenue` with the values `='Dashboard'!$C$3:$C$5` and the axis labels `='Dashboard'!$A$3:$A$5`.
+
+## 15. Multi-level category labels (#501)
+
+Sheet `Sales` holds A1:C5: `Region`, `Segment`, `Amount`; East, Retail, 10; (blank), Online, 7; West, Retail, 4; (blank), Online, 11. Its column chart `Amount by region and segment` reads the categories A2:B5. Its bar chart `One row of labels` reads the same cells with **Format Axis › Labels › Multi-level Category Labels** cleared (`c:noMultiLvlLbl`). Sheet `Orders` holds the table `Orders`, and sheet `Report` holds the PivotTable `Sales by segment` by region, then segment, in compact layout with subtotals, and a PivotChart of it. Its categories are a `c:multiLvlStrRef` over the PivotTable's row labels A3:A9, with the leaf items and regions in its cache. Sheet `Board` is a dashboard with only a chart over a pivot, so no written cells hold the chart's points: its categories are a `c:multiLvlStrRef` with the formula `#REF!` and the labels in its cache.
+
+1. Open the file. Write down whether Excel shows a repair message.
+2. On `Sales`, write down the labels of each chart's category axis, row by row, and whether **Multi-level Category Labels** is checked in Format Axis for each chart.
+3. Select the column chart and open **Chart Design › Select Data**. Write down the **Horizontal (Category) Axis Labels**.
+4. Change A4 from `West` to `North`. Write down the column chart's outer labels.
+5. On `Report`, select the chart. Write down whether Excel shows the **PivotChart Analyze** tab, the chart's category labels row by row, and the column heights.
+6. Select **PivotChart Analyze › Refresh**. Write down the labels and heights again.
+7. On `Board`, write down the chart's category labels row by row, the column heights, and what Select Data shows for the axis labels.
+8. Save as `chart-levels-excel.xlsx`.
+
+Expected:
+
+- Excel opens the file without a repair message.
+- The column chart on `Sales` has two rows of labels: Retail, Online, Retail, Online on the first, and East and West once each on the second, centered under their two columns. Lines divide the categories and the two groups. Multi-level Category Labels is checked. Select Data shows `Sales!$A$2:$B$5` for the axis labels. After step 4, the outer labels are East and North.
+- The bar chart has one row of labels, `East Retail`, `Online`, `West Retail`, `Online`, and Multi-level Category Labels is cleared.
+- The chart on `Report` is a PivotChart: the PivotChart Analyze tab shows. It has Online, Retail, Retail, Online, Retail on the first row and East, North, West on the second; the columns are 7, 10, 6, 11, 4. No subtotal or grand total is a column. Refresh changes nothing.
+- The chart on `Board` draws the same labels and columns as the chart on `Report`, from its cache. Select Data shows `#REF!` for the axis labels.
+- After import, Sheetwrite has the two charts on `Sales` with the categories A2:B5, the bar chart with `axes.multiLevelLabels: false`, and the chart on `Report` over the pivot `by-segment`.
 
