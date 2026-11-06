@@ -1,11 +1,19 @@
 ```ts prelude="core" title="recalculation.ts"
-// Revenue formulas that all read the price-change cell G1, loaded as columnar data
-const rowCount = 100_000;
-const revenue = Array.from({ length: rowCount }, (_, row) => ({
-  kind: "formula" as const,
-  src: `=B${row + 1}*C${row + 1}*(1+$G$1)`,
-}));
-const grid = createGrid(host, { workbook, data: { rowCount, columns: { revenue } } });
+declare const data: ColumnarData; // SKU, price and units for 100,000 rows
+
+// The values mount with the grid; the revenue formulas, which all read the
+// price-change cell G1, follow in batches with a yield between them
+const grid = createGrid(host, { workbook, data });
+for (let start = 0; start < data.rowCount; start += 5_000) {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  grid.applyRemoteOperations(
+    Array.from({ length: 5_000 }, (_, offset) => ({
+      op: "set" as const,
+      addr: { sheet: "model", row: start + offset, col: 3 },
+      value: { kind: "formula" as const, src: `=B${start + offset + 1}*C${start + offset + 1}*(1+$G$1)` },
+    })),
+  );
+}
 
 // One edit, timed until a dependent total is readable, then until the next frame
 const started = performance.now();

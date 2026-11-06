@@ -2,7 +2,6 @@ import {
   colToA1,
   type CellScalar,
   type CellValue,
-  type ColumnarData,
   type DocumentOp,
   type Grid,
   type Workbook,
@@ -15,7 +14,8 @@ import { createListeners, mountShowcaseShell, requireApplied } from "./showcase-
 // read one price-change cell, and 1,000 XLOOKUP formulas that search the
 // 100,000 SKUs. The page edits a control cell through the public API and
 // measures, in this browser, how long the engine takes to recalculate and the
-// grid to paint.
+// grid to paint. The grid mounts empty, and the rows arrive in blocks with a
+// yield between them, so loading never blocks the page for long.
 
 export const MODEL_SHEET = "model";
 export const ROWS = 100_000;
@@ -28,6 +28,8 @@ export const RUN_HISTORY = 8;
 export const SERIES_LENGTH = 10;
 /** How far each "move the lookups" press shifts the first SKU looked up. */
 const LOOKUP_STEP = 7_000;
+/** Order rows set and calculated per load step: one short task each. */
+const LOAD_BATCH = 5_000;
 
 const SKU = (index: number) => `SKU-${String(index + 1).padStart(6, "0")}`;
 
@@ -58,35 +60,68 @@ export const VALUE_COL = columnIndex("value");
 /** The price-change cell every revenue formula reads, as an absolute reference. */
 export const PRICE_CHANGE_CELL = `$${letter("value")}$${CONTROLS.priceChange.row + 1}`;
 
-function modelData(): ColumnarData {
-  const sku: CellScalar[] = new Array(ROWS);
-  const price = new Float64Array(ROWS);
-  const units = new Float64Array(ROWS);
-  const revenue: CellValue[] = new Array(ROWS);
-  const lookup: (CellValue | null)[] = new Array(ROWS).fill(null);
-  const [skuCol, priceCol, unitsCol] = [letter("sku"), letter("price"), letter("units")];
-  const lookupStart = `$${letter("value")}$${CONTROLS.lookupStart.row + 1}`;
-  for (let index = 0; index < ROWS; index++) {
-    const line = index + 1;
-    sku[index] = SKU(index);
-    price[index] = 4 + ((index * 37) % 400) / 4;
-    units[index] = 1 + ((index * 13) % 40);
-    revenue[index] = {
-      kind: "formula",
-      src: `=${priceCol}${line}*${unitsCol}${line}*(1+${PRICE_CHANGE_CELL})`,
-    };
+/** The order columns, from SKU to Revenue, that each load block fills. */
+const ORDER_COLUMNS = ["sku", "price", "units", "revenue"] as const satisfies readonly ColumnKey[];
+
+type BlockOperation = Extract<DocumentOp, { op: "setBlock" }>;
+
+/**
+ * Rows `start` to `end` of the order columns as one packed block: the values
+ * row by row, and the revenue cell of each row as a formula.
+ */
+function orderBlock(start: number, end: number): BlockOperation {
+  const [priceCol, unitsCol] = [letter("price"), letter("units")];
+  const width = ORDER_COLUMNS.length;
+  const revenue = ORDER_COLUMNS.indexOf("revenue");
+  const values: CellScalar[] = new Array((end - start) * width).fill(null);
+  const formulas: [offset: number, source: string][] = [];
+  for (let row = start; row < end; row++) {
+    const offset = (row - start) * width;
+    const line = row + 1;
+    values[offset] = SKU(row);
+    values[offset + 1] = 4 + ((row * 37) % 400) / 4;
+    values[offset + 2] = 1 + ((row * 13) % 40);
+    formulas.push([
+      offset + revenue,
+      `=${priceCol}${line}*${unitsCol}${line}*(1+${PRICE_CHANGE_CELL})`,
+    ]);
   }
-  for (let index = 0; index < LOOKUPS; index++) {
-    lookup[index] = {
-      kind: "formula",
-      src: `=XLOOKUP("SKU-"&TEXT(${lookupStart}+${index},"000000"),$${skuCol}$1:$${skuCol}$${ROWS},$${priceCol}$1:$${priceCol}$${ROWS})`,
-    };
-  }
-  const empty = new Array(ROWS).fill(null);
   return {
-    rowCount: ROWS,
-    columns: { sku, price, units, revenue, lookup, control: empty, value: empty },
+    op: "setBlock",
+    range: {
+      sheet: MODEL_SHEET,
+      start: { row: start, col: columnIndex(ORDER_COLUMNS[0]) },
+      end: { row: end - 1, col: columnIndex("revenue") },
+    },
+    block: { rowCount: end - start, colCount: width, values, formulas },
   };
+}
+
+/** The 1,000 XLOOKUP formulas, as one packed block of the Looked up column. */
+function lookupBlock(): BlockOperation {
+  const [skuCol, priceCol] = [letter("sku"), letter("price")];
+  const lookupStart = `$${letter("value")}$${CONTROLS.lookupStart.row + 1}`;
+  const formulas: [offset: number, source: string][] = [];
+  for (let row = 0; row < LOOKUPS; row++) {
+    formulas.push([
+      row,
+      `=XLOOKUP("SKU-"&TEXT(${lookupStart}+${row},"000000"),$${skuCol}$1:$${skuCol}$${ROWS},$${priceCol}$1:$${priceCol}$${ROWS})`,
+    ]);
+  }
+  const col = columnIndex("lookup");
+  return {
+    op: "setBlock",
+    range: { sheet: MODEL_SHEET, start: { row: 0, col }, end: { row: LOOKUPS - 1, col } },
+    block: { rowCount: LOOKUPS, colCount: 1, values: new Array(LOOKUPS).fill(null), formulas },
+  };
+}
+
+/** The order rows `LOAD_BATCH` at a time, then the lookups. */
+function* modelBlocks(): Generator<BlockOperation> {
+  for (let start = 0; start < ROWS; start += LOAD_BATCH) {
+    yield orderBlock(start, Math.min(start + LOAD_BATCH, ROWS));
+  }
+  yield lookupBlock();
 }
 
 function controlOperations(): DocumentOp[] {
@@ -143,6 +178,8 @@ export interface MeasuredRun {
 export interface RecalculationSnapshot {
   /** Loading the engine, creating the grid with every row and calculating every formula once. */
   readonly firstCalculationMs: number | null;
+  /** Formulas set and calculated so far while the model loads. */
+  readonly loadedFormulas: number;
   readonly runs: readonly MeasuredRun[];
   readonly revenue: CellScalar;
   readonly lookupTotal: CellScalar;
@@ -165,6 +202,11 @@ function nextPaint(): Promise<void> {
   return promise;
 }
 
+/** Resolves in a new task, so input and paint run before the next load batch. */
+function nextTask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 /** The median of measured times, for a series. */
 export function median(values: readonly number[]): number {
   const sorted = [...values].sort((left, right) => left - right);
@@ -180,6 +222,7 @@ export function createRecalculationScenario(host: HTMLElement): RecalculationSce
   const listeners = createListeners();
   let grid: Grid | null = null;
   let dispose = () => {};
+  let loadedFormulas = 0;
   let firstCalculationMs: number | null = null;
   let runs: MeasuredRun[] = [];
   let nextRun = 1;
@@ -191,17 +234,28 @@ export function createRecalculationScenario(host: HTMLElement): RecalculationSce
     grid?.store.getCell({ sheet: MODEL_SHEET, row, col: VALUE_COL }).resolved ?? null;
 
   const ready = (async () => {
-    const data = modelData();
     const started = performance.now();
     const shell = await mountShowcaseShell(
       host,
-      { workbook: modelWorkbook(), data, presentation: "data-grid" },
+      { workbook: modelWorkbook(), presentation: "data-grid" },
       controller.signal,
     );
     if (!shell) return;
     grid = shell.grid;
+    dispose = () => shell.dispose();
     requireApplied(grid.applyRemoteOperations(controlOperations()), "The control cells");
-    read(CONTROLS.revenue.row);
+    // Each block is set, then calculated by reading the totals that depend on it.
+    for (const block of modelBlocks()) {
+      await nextTask();
+      if (controller.signal.aborted) return;
+      requireApplied(grid.applyRemoteOperations([block]), "The model rows");
+      read(CONTROLS.revenue.row);
+      read(CONTROLS.lookupTotal.row);
+      loadedFormulas += block.block.formulas?.length ?? 0;
+      listeners.notify();
+    }
+    // The two totals in the Value column are formulas too.
+    loadedFormulas += 2;
     firstCalculationMs = performance.now() - started;
     const stopChanges = grid.on("change", () => listeners.notify());
     dispose = () => {
@@ -263,9 +317,11 @@ export function createRecalculationScenario(host: HTMLElement): RecalculationSce
     subscribe: listeners.subscribe,
     snapshot: () => ({
       firstCalculationMs,
+      loadedFormulas,
       runs,
-      revenue: read(CONTROLS.revenue.row),
-      lookupTotal: read(CONTROLS.lookupTotal.row),
+      // While the formulas load, the totals are partial sums.
+      revenue: firstCalculationMs === null ? null : read(CONTROLS.revenue.row),
+      lookupTotal: firstCalculationMs === null ? null : read(CONTROLS.lookupTotal.row),
       running,
     }),
     changePrices: () => exclusive(changePrices),

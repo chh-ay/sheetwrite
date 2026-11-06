@@ -42,10 +42,22 @@ const RUN_LABEL: Readonly<Record<RunKind, string>> = {
 const latest = (runs: readonly MeasuredRun[], kind: RunKind) =>
   runs.find((run) => run.kind === kind);
 
-/** The recent runs as bars, scaled to the slowest one. */
-function RunBars({ runs }: { readonly runs: readonly MeasuredRun[] }) {
+/** The recent runs as bars, scaled to the slowest one; before the first, the load progress. */
+function RunBars({
+  runs,
+  snapshot,
+}: {
+  readonly runs: readonly MeasuredRun[];
+  readonly snapshot: RecalculationSnapshot | null;
+}) {
   if (runs.length === 0)
-    return <ShowcaseStatus tone="neutral">No edits measured yet</ShowcaseStatus>;
+    return (
+      <ShowcaseStatus tone="neutral">
+        {snapshot?.firstCalculationMs == null
+          ? `Calculating ${(snapshot?.loadedFormulas ?? 0).toLocaleString("en")} of ${FORMULA_COUNT.toLocaleString("en")} formulas…`
+          : "No edits measured yet"}
+      </ShowcaseStatus>
+    );
   const slowest = Math.max(...runs.map((run) => run.recalcMs + run.paintMs));
   return (
     <ol className="sw-feature-runs" data-testid="recalc-runs">
@@ -177,7 +189,7 @@ function RecalculationControls({
         description="Engine time, then the frame after it."
       >
         <EventOrder run={runs[0]} />
-        <RunBars runs={runs} />
+        <RunBars runs={runs} snapshot={snapshot} />
         <ActionError error={error} />
       </ShowcaseControlGroup>
     </>
