@@ -30,8 +30,16 @@
   cursor: pointer;
 }
 
+/* Documented symbols keep a faint dotted underline at rest, so a reader can
+   see where the docs are without pointing; every other hoverable symbol
+   shows its underline while the block is pointed at. */
+.expressive-code .sw-code-popover__trigger[data-hover-kind="documented"],
 .expressive-code:hover .sw-code-popover__trigger {
   text-decoration-color: var(--sw-border-strong);
+}
+
+.expressive-code:hover .sw-code-popover__trigger[data-hover-kind="documented"] {
+  text-decoration-color: var(--sw-field-edge);
 }
 
 @media (hover: none) {
