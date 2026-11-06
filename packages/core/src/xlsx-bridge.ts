@@ -3,20 +3,19 @@ import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import type { DashboardExport } from "./types/dashboard.js";
 import type { ColumnarData } from "./types/data.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type {
-  XlsxResourceLimits,
-  XlsxWorkbookExportContext,
-  XlsxWorkbookOptions,
+ XlsxResourceLimits,
+ XlsxWorkbookExportContext,
+ XlsxWorkbookOptions,
 } from "./types/xlsx.js";
 import {
-  xlsxTableExportBackend,
-  xlsxTableImportBackend,
-  xlsxWorkbookBackend,
+ xlsxTableExportBackend,
+ xlsxTableImportBackend,
+ xlsxWorkbookBackend,
 } from "./xlsx-backends.js";
 import { hasAdmittedXlsxSource } from "./xlsx-source.js";
 
@@ -25,61 +24,61 @@ import { hasAdmittedXlsxSource } from "./xlsx-source.js";
  * ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.
  */
 export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object.freeze({
-  // Bound caller input and the single returned byte array.
-  maxInputBytes: 32 * 1024 * 1024,
-  maxOutputBytes: 128 * 1024 * 1024,
-  // Bound archive fan-out and decompression, including zip-bomb ratios.
-  maxArchiveEntries: 1_024,
-  maxEntryUncompressedBytes: 64 * 1024 * 1024,
-  maxTotalUncompressedBytes: 256 * 1024 * 1024,
-  maxPreservedBytes: 64 * 1024 * 1024,
-  maxCompressionRatio: 100,
-  // SpreadsheetML worksheet compatibility dimensions.
-  maxSheets: 256,
-  maxRowsPerSheet: 1_048_576,
-  maxColumnsPerSheet: 16_384,
-  // Bound aggregate conversion collections.
-  maxCells: 1_000_000,
-  maxMerges: 100_000,
-  maxSharedStrings: 1_000_000,
-  maxStyles: 65_536,
-  // Bound each hand-parsed XML part independently.
-  maxXmlElements: 2_000_000,
-  maxXmlDepth: 64,
-  maxXmlAttributesPerElement: 128,
-  maxXmlTextBytes: 16 * 1024 * 1024,
+ // Bound caller input and the single returned byte array.
+ maxInputBytes: 32 * 1024 * 1024,
+ maxOutputBytes: 128 * 1024 * 1024,
+ // Bound archive fan-out and decompression, including zip-bomb ratios.
+ maxArchiveEntries: 1_024,
+ maxEntryUncompressedBytes: 64 * 1024 * 1024,
+ maxTotalUncompressedBytes: 256 * 1024 * 1024,
+ maxPreservedBytes: 64 * 1024 * 1024,
+ maxCompressionRatio: 100,
+ // SpreadsheetML worksheet compatibility dimensions.
+ maxSheets: 256,
+ maxRowsPerSheet: 1_048_576,
+ maxColumnsPerSheet: 16_384,
+ // Bound aggregate conversion collections.
+ maxCells: 1_000_000,
+ maxMerges: 100_000,
+ maxSharedStrings: 1_000_000,
+ maxStyles: 65_536,
+ // Bound each hand-parsed XML part independently.
+ maxXmlElements: 2_000_000,
+ maxXmlDepth: 64,
+ maxXmlAttributesPerElement: 128,
+ maxXmlTextBytes: 16 * 1024 * 1024,
 });
 
 /** Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data. */
 export class XlsxResourceError extends SheetwriteError {
-  override readonly name = "XlsxResourceError";
-  declare readonly code: "xlsx-resource-limit";
+ override readonly name = "XlsxResourceError";
+ declare readonly code: "xlsx-resource-limit";
 
-  constructor(
-    readonly resource: keyof XlsxResourceLimits,
-    readonly limit: number,
-    readonly actual: number,
-    operation: "import" | "export",
-  ) {
-    super(
-      "xlsx-resource-limit",
-      `xlsx-${operation}`,
-      `Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`,
-      { context: { format: "xlsx", resource, limit, actual } },
-    );
-  }
+ constructor(
+  readonly resource: keyof XlsxResourceLimits,
+  readonly limit: number,
+  readonly actual: number,
+  operation: "import" | "export",
+ ) {
+  super(
+   "xlsx-resource-limit",
+   `xlsx-${operation}`,
+   `Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`,
+   { context: { format: "xlsx", resource, limit, actual } },
+  );
+ }
 }
 
 function missingXlsxBackend(
-  functionName: string,
-  operation: "xlsx-import" | "xlsx-export",
+ functionName: string,
+ operation: "xlsx-import" | "xlsx-export",
 ): SheetwriteError {
-  return new SheetwriteError(
-    "optional-backend-unavailable",
-    operation,
-    `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsxAddon()] }) before calling ${functionName}.`,
-    { context: { backend: "xlsx", functionName }, retryable: false },
-  );
+ return new SheetwriteError(
+  "optional-backend-unavailable",
+  operation,
+  `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsxAddon()] }) before calling ${functionName}.`,
+  { context: { backend: "xlsx", functionName }, retryable: false },
+ );
 }
 
 /**
@@ -90,9 +89,9 @@ const MAX_BACKEND_NAME_LENGTH = 256;
 
 /** Which public XLSX call failed, through which registered backend. */
 interface XlsxCallSite {
-  readonly operation: "xlsx-import" | "xlsx-export";
-  readonly backend: string;
-  readonly functionName: string;
+ readonly operation: "xlsx-import" | "xlsx-export";
+ readonly backend: string;
+ readonly functionName: string;
 }
 
 /**
@@ -100,20 +99,20 @@ interface XlsxCallSite {
  * caller's signal fired, the result is `signal.reason`, unwrapped.
  */
 function xlsxCallFailure(
-  error: unknown,
-  signal: AbortSignal | undefined,
-  site: XlsxCallSite,
+ error: unknown,
+ signal: AbortSignal | undefined,
+ site: XlsxCallSite,
 ): unknown {
-  if (signal?.aborted) return signal.reason;
-  return normalizeSheetwriteError(
-    error,
-    site.operation === "xlsx-export" ? "export-failed" : "xlsx-import-failed",
-    site.operation,
-    {
-      backend: site.backend.slice(0, MAX_BACKEND_NAME_LENGTH),
-      functionName: site.functionName,
-    },
-  );
+ if (signal?.aborted) return signal.reason;
+ return normalizeSheetwriteError(
+  error,
+  site.operation === "xlsx-export" ? "export-failed" : "xlsx-import-failed",
+  site.operation,
+  {
+   backend: site.backend.slice(0, MAX_BACKEND_NAME_LENGTH),
+   functionName: site.functionName,
+  },
+ );
 }
 
 /**
@@ -133,39 +132,39 @@ function xlsxCallFailure(
  * @see fromXlsxTable
  */
 export async function toXlsxTable(
-  workbook: Workbook,
-  store: Store,
-  options?: XlsxWorkbookOptions,
+ workbook: Workbook,
+ store: Store,
+ options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  const backend = xlsxTableExportBackend();
-  if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
-  try {
-    options?.signal?.throwIfAborted();
-    return await backend.toXlsxTable(workbook, store, options);
-  } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-export",
-      backend: backend.name,
-      functionName: "toXlsxTable",
-    });
-  }
+ const backend = xlsxTableExportBackend();
+ if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
+ try {
+  options?.signal?.throwIfAborted();
+  return await backend.toXlsxTable(workbook, store, options);
+ } catch (error) {
+  throw xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-export",
+   backend: backend.name,
+   functionName: "toXlsxTable",
+  });
+ }
 }
 
 /** Stream table XLSX bytes without materializing the finished archive. */
 export function toXlsxTableStream(
-  workbook: Workbook,
-  store: Store,
-  options?: XlsxWorkbookOptions,
+ workbook: Workbook,
+ store: Store,
+ options?: XlsxWorkbookOptions,
 ): ReadableStream<Uint8Array> {
-  const backend = xlsxTableExportBackend();
-  if (!backend?.toXlsxTableStream) throw missingXlsxBackend("toXlsxTableStream", "xlsx-export");
-  return readableBytes(backend.toXlsxTableStream(workbook, store, options), (error) =>
-    xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-export",
-      backend: backend.name,
-      functionName: "toXlsxTableStream",
-    }),
-  );
+ const backend = xlsxTableExportBackend();
+ if (!backend?.toXlsxTableStream) throw missingXlsxBackend("toXlsxTableStream", "xlsx-export");
+ return readableBytes(backend.toXlsxTableStream(workbook, store, options), (error) =>
+  xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-export",
+   backend: backend.name,
+   functionName: "toXlsxTableStream",
+  }),
+ );
 }
 
 /**
@@ -187,26 +186,26 @@ export function toXlsxTableStream(
  * @see toXlsxTable
  */
 export async function fromXlsxTable(
-  data: ArrayBuffer | Uint8Array,
-  options?: XlsxWorkbookOptions,
+ data: ArrayBuffer | Uint8Array,
+ options?: XlsxWorkbookOptions,
 ): Promise<ColumnarData> {
-  const backend = xlsxTableImportBackend();
-  if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
-  try {
-    options?.signal?.throwIfAborted();
-    return await backend.fromXlsxTable(data, options);
-  } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-import",
-      backend: backend.name,
-      functionName: "fromXlsxTable",
-    });
-  }
+ const backend = xlsxTableImportBackend();
+ if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
+ try {
+  options?.signal?.throwIfAborted();
+  return await backend.fromXlsxTable(data, options);
+ } catch (error) {
+  throw xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-import",
+   backend: backend.name,
+   functionName: "fromXlsxTable",
+  });
+ }
 }
 
 /** Whether workbook import can be offered without loading an optional backend. */
 export function hasXlsxWorkbookBackend(): boolean {
-  return xlsxWorkbookBackend() !== null;
+ return xlsxWorkbookBackend() !== null;
 }
 
 /**
@@ -216,34 +215,34 @@ export function hasXlsxWorkbookBackend(): boolean {
  * look-alike objects and plain snapshots take the backend's fingerprint check.
  */
 function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">): {
-  snapshot: WorkbookSnapshot;
-  context: XlsxWorkbookExportContext;
-  /** The store with an engine that built the snapshot, if any. */
-  store?: SheetwriteStore;
+ snapshot: WorkbookSnapshot;
+ context: XlsxWorkbookExportContext;
+ /** The store with an engine that built the snapshot, if any. */
+ store?: SheetwriteStore;
 } {
-  if ("schemaVersion" in input) return { snapshot: input, context: {} };
-  const store = "store" in input ? input.store : input;
-  if (!(store instanceof SheetwriteStore) || storeEngine(store) === null) {
-    return { snapshot: input.exportSnapshot(), context: {} };
-  }
+ if ("schemaVersion" in input) return { snapshot: input, context: {} };
+ const store = "store" in input ? input.store : input;
+ if (!(store instanceof SheetwriteStore) || storeEngine(store) === null) {
+  return { snapshot: input.exportSnapshot(), context: {} };
+ }
 
-  const snapshot = SheetwriteStore.prototype.exportSnapshot.call(store);
-  // A Grid may show a different tab than the store's stored active sheet.
-  const activeSheet: unknown =
-    "getActiveSheet" in input && typeof input.getActiveSheet === "function"
-      ? input.getActiveSheet()
-      : undefined;
-  const switched =
-    typeof activeSheet === "string" &&
-    activeSheet !== snapshot.workbook.activeSheet &&
-    snapshot.sheets.some((sheet) => sheet.id === activeSheet);
-  return {
-    snapshot: switched
-      ? { ...snapshot, workbook: { ...snapshot.workbook, activeSheet } }
-      : snapshot,
-    context: { sourceTracked: hasAdmittedXlsxSource(store) },
-    store,
-  };
+ const snapshot = SheetwriteStore.prototype.exportSnapshot.call(store);
+ // A Grid may show a different tab than the store's stored active sheet.
+ const activeSheet: unknown =
+  "getActiveSheet" in input && typeof input.getActiveSheet === "function"
+   ? input.getActiveSheet()
+   : undefined;
+ const switched =
+  typeof activeSheet === "string" &&
+  activeSheet !== snapshot.workbook.activeSheet &&
+  snapshot.sheets.some((sheet) => sheet.id === activeSheet);
+ return {
+  snapshot: switched
+   ? { ...snapshot, workbook: { ...snapshot.workbook, activeSheet } }
+   : snapshot,
+  context: { sourceTracked: hasAdmittedXlsxSource(store) },
+  store,
+ };
 }
 
 /**
@@ -252,21 +251,21 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
  * The module loads only for a workbook with a pivot or a dashboard.
  */
 async function withEngineContent(
-  source: ReturnType<typeof workbookSnapshotOf>,
+ source: ReturnType<typeof workbookSnapshotOf>,
 ): Promise<XlsxWorkbookExportContext> {
-  const store = source.store;
-  if (store === undefined) return source.context;
-  const sheets = source.snapshot.sheets;
-  const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
-  const dashboards = sheets.some(isDashboard);
-  if (!pivots && !dashboards) return source.context;
-  const { dashboardExports, worksheetPivotExports } =
-    await import("./dashboard/dashboard-export.js");
-  return {
-    ...source.context,
-    ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
-    ...(dashboards ? { dashboards: dashboardExports(store) } : {}),
-  };
+ const store = source.store;
+ if (store === undefined) return source.context;
+ const sheets = source.snapshot.sheets;
+ const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
+ const dashboards = sheets.some(isDashboard);
+ if (!pivots && !dashboards) return source.context;
+ const { dashboardExports, worksheetPivotExports } =
+  await import("./dashboard/dashboard-export.js");
+ return {
+  ...source.context,
+  ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
+  ...(dashboards ? { dashboards: dashboardExports(store) } : {}),
+ };
 }
 
 /**
@@ -286,69 +285,69 @@ async function withEngineContent(
  * @see fromXlsxWorkbook
  */
 export async function toXlsxWorkbook(
-  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
-  options?: XlsxWorkbookOptions,
+ input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
+ options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  const backend = xlsxWorkbookBackend();
-  if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
-  try {
-    // Checked before the snapshot is built, which is the largest step on this side.
-    options?.signal?.throwIfAborted();
-    const source = workbookSnapshotOf(input);
-    return await backend.toXlsxWorkbook(source.snapshot, options, await withEngineContent(source));
-  } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-export",
-      backend: backend.name,
-      functionName: "toXlsxWorkbook",
-    });
-  }
+ const backend = xlsxWorkbookBackend();
+ if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
+ try {
+  // Checked before the snapshot is built, which is the largest step on this side.
+  options?.signal?.throwIfAborted();
+  const source = workbookSnapshotOf(input);
+  return await backend.toXlsxWorkbook(source.snapshot, options, await withEngineContent(source));
+ } catch (error) {
+  throw xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-export",
+   backend: backend.name,
+   functionName: "toXlsxWorkbook",
+  });
+ }
 }
 
 /** Stream formula-preserving workbook XLSX with backpressure and cancellation. */
 export function toXlsxWorkbookStream(
-  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
-  options?: XlsxWorkbookOptions,
+ input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
+ options?: XlsxWorkbookOptions,
 ): ReadableStream<Uint8Array> {
-  const backend = xlsxWorkbookBackend();
-  if (!backend?.toXlsxWorkbookStream)
-    throw missingXlsxBackend("toXlsxWorkbookStream", "xlsx-export");
-  const source = workbookSnapshotOf(input);
-  const stream = backend.toXlsxWorkbookStream.bind(backend);
-  async function* chunks(): AsyncGenerator<Uint8Array> {
-    yield* stream(source.snapshot, options, await withEngineContent(source));
-  }
-  return readableBytes(chunks(), (error) =>
-    xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-export",
-      backend: backend.name,
-      functionName: "toXlsxWorkbookStream",
-    }),
-  );
+ const backend = xlsxWorkbookBackend();
+ if (!backend?.toXlsxWorkbookStream)
+  throw missingXlsxBackend("toXlsxWorkbookStream", "xlsx-export");
+ const source = workbookSnapshotOf(input);
+ const stream = backend.toXlsxWorkbookStream.bind(backend);
+ async function* chunks(): AsyncGenerator<Uint8Array> {
+  yield* stream(source.snapshot, options, await withEngineContent(source));
+ }
+ return readableBytes(chunks(), (error) =>
+  xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-export",
+   backend: backend.name,
+   functionName: "toXlsxWorkbookStream",
+  }),
+ );
 }
 
 /** Import a File/Blob. The built-in backend reads it without buffering the compressed workbook. */
 export async function fromXlsxWorkbookFile(
-  file: Blob,
-  options?: XlsxWorkbookOptions,
+ file: Blob,
+ options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  const backend = xlsxWorkbookBackend();
-  if (!backend) throw missingXlsxBackend("fromXlsxWorkbookFile", "xlsx-import");
-  try {
-    options?.signal?.throwIfAborted();
-    if (backend.fromXlsxWorkbookFile) return await backend.fromXlsxWorkbookFile(file, options);
+ const backend = xlsxWorkbookBackend();
+ if (!backend) throw missingXlsxBackend("fromXlsxWorkbookFile", "xlsx-import");
+ try {
+  options?.signal?.throwIfAborted();
+  if (backend.fromXlsxWorkbookFile) return await backend.fromXlsxWorkbookFile(file, options);
 
-    // Custom workbook backends may only implement the required byte-array reader.
-    const bytes = await file.arrayBuffer();
-    options?.signal?.throwIfAborted();
-    return await backend.fromXlsxWorkbook(bytes, options);
-  } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-import",
-      backend: backend.name,
-      functionName: "fromXlsxWorkbookFile",
-    });
-  }
+  // Custom workbook backends may only implement the required byte-array reader.
+  const bytes = await file.arrayBuffer();
+  options?.signal?.throwIfAborted();
+  return await backend.fromXlsxWorkbook(bytes, options);
+ } catch (error) {
+  throw xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-import",
+   backend: backend.name,
+   functionName: "fromXlsxWorkbookFile",
+  });
+ }
 }
 
 /**
@@ -368,19 +367,19 @@ export async function fromXlsxWorkbookFile(
  * @see toXlsxWorkbook
  */
 export async function fromXlsxWorkbook(
-  data: ArrayBuffer | Uint8Array,
-  options?: XlsxWorkbookOptions,
+ data: ArrayBuffer | Uint8Array,
+ options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  const backend = xlsxWorkbookBackend();
-  if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
-  try {
-    options?.signal?.throwIfAborted();
-    return await backend.fromXlsxWorkbook(data, options);
-  } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
-      operation: "xlsx-import",
-      backend: backend.name,
-      functionName: "fromXlsxWorkbook",
-    });
-  }
+ const backend = xlsxWorkbookBackend();
+ if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
+ try {
+  options?.signal?.throwIfAborted();
+  return await backend.fromXlsxWorkbook(data, options);
+ } catch (error) {
+  throw xlsxCallFailure(error, options?.signal, {
+   operation: "xlsx-import",
+   backend: backend.name,
+   functionName: "fromXlsxWorkbook",
+  });
+ }
 }
