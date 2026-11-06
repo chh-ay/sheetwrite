@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
+import { Icon } from "../components/Icon.js";
 import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
@@ -231,7 +232,10 @@ function FeatureCards() {
             </span>
             <strong>{feature.label}</strong>
             <span className="sw-features__summary">{feature.summary}</span>
-            <span className="sw-features__cta">Open the live example →</span>
+            <span className="sw-features__cta">
+              Open the live example
+              <Icon name="arrow-right" />
+            </span>
           </Link>
         </li>
       ))}
@@ -315,7 +319,10 @@ function Landing() {
                 </div>
               ) : null}
             </dl>
-            <a href="#benchmarks">How we measured →</a>
+            <a href="#benchmarks">
+              How we measured
+              <Icon name="arrow-right" />
+            </a>
           </section>
         ) : null}
 
@@ -334,7 +341,8 @@ function Landing() {
             to="/docs/$/"
             params={{ _splat: "concepts/runtime-ownership" }}
           >
-            Read the runtime-ownership model →
+            Read the runtime-ownership model
+            <Icon name="arrow-right" />
           </Link>
         </section>
 
@@ -344,7 +352,10 @@ function Landing() {
             <h2 id="landing-features">Real workbooks, not a table with formulas on top.</h2>
             <p>
               Every card opens a live example that runs the real engine in your browser.{" "}
-              <Link to="/showcases/">See all showcases →</Link>
+              <Link to="/showcases/">
+                See all showcases
+                <Icon name="arrow-right" />
+              </Link>
             </p>
           </header>
           <FeatureCards />
@@ -371,7 +382,8 @@ function Landing() {
               apply live option changes, and destroy on unmount.
             </p>
             <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "start/first-grid" }}>
-              Build your first grid →
+              Build your first grid
+              <Icon name="arrow-right" />
             </Link>
           </header>
           <CodeTabs />
@@ -444,7 +456,8 @@ function Landing() {
                 ))}
               </ul>
               <Link to={releaseHref(LATEST_HIGHLIGHTED_RELEASE.version)}>
-                Read what is new and the upgrade checklist →
+                Read what is new and the upgrade checklist
+                <Icon name="arrow-right" />
               </Link>
             </aside>
           ) : null}
@@ -471,7 +484,8 @@ function Landing() {
             </p>
           )}
           <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "performance" }}>
-            See the full method and every result →
+            See the full method and every result
+            <Icon name="arrow-right" />
           </Link>
         </section>
 
