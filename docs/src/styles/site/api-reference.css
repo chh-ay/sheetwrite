@@ -435,7 +435,7 @@
 /* The name never shrinks below its own width (the summary text wraps
    instead), but a pathologically long identifier still breaks rather than
    widening the page. */
-.sw-prose .api-member summary code {
+.sw-prose .api-member summary > code {
   flex: 0 0 auto;
   max-width: 100%;
   border: 0;
@@ -446,7 +446,7 @@
   overflow-wrap: anywhere;
 }
 
-.api-member[open] > summary code {
+.api-member[open] > summary > code {
   color: var(--sw-accent-strong);
 }
 
@@ -457,12 +457,14 @@
   line-height: 1.45;
 }
 
+/* Parameter and property names in a summary: the prose inline-code chip, at
+   the summary's size and weight. */
 .sw-prose .api-member-summary code {
-  border: 0;
-  padding: 0;
-  background: transparent;
+  border-radius: var(--sw-radius-sm);
+  padding: 0.08em 0.32em;
   color: var(--sw-fg);
-  font-size: var(--sw-text-eyebrow);
+  background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  font: var(--sw-weight-regular) 0.92em var(--sw-font-mono);
 }
 
 /* An aliased union prints as the alias name beside the member name; the chip

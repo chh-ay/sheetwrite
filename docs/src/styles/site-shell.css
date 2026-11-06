@@ -550,7 +550,7 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-docs .api-member[open] > summary {
   border-radius: 0;
 }
-.sw-docs .api-member summary code {
+.sw-docs .api-member summary > code {
   font-size: var(--sw-text-small);
 }
 .sw-docs .api-member .expressive-code {
