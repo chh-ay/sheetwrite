@@ -109,6 +109,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Frameworks",
     tab: "guides",
+    href: "/docs/frameworks/",
     items: [
       { label: "Vanilla", href: "/docs/frameworks/vanilla/", icon: "code" },
       { label: "React", href: "/docs/frameworks/react/", icon: "code" },
@@ -140,6 +141,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Features",
     tab: "guides",
+    href: "/docs/features/",
     items: [
       {
         label: "Grid",
