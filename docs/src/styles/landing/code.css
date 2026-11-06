@@ -155,8 +155,8 @@
 }
 
 .sw-lp-engines__choices article {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: var(--sw-space-2);
   padding: var(--sw-space-6);
   border: 1px solid var(--sw-border);
@@ -189,8 +189,8 @@
 
 /* The setup snippet, highlighted at build time, sits at the card's foot. */
 .sw-lp-engines__choices article .expressive-code {
-  align-self: end;
-  margin-top: var(--sw-space-1-5);
+  margin-top: auto;
+  padding-top: var(--sw-space-1-5);
   font-size: var(--sw-text-small);
 }
 
