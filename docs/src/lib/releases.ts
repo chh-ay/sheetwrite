@@ -146,6 +146,41 @@ function releaseContext(activeHref: string | undefined): ReleaseContext | undefi
   };
 }
 
+/**
+ * What the site's pages show of the registry, resolved when the docs are
+ * generated (`generated/release-facts.json`): the header version, the
+ * latest-release card, the landing's highlights and the sidebar's release
+ * links. Pages read these strings, so the registry and its helpers stay out
+ * of the browser bundles.
+ */
+function releaseFacts() {
+  return {
+    releasesHref: RELEASES_HREF,
+    latest: {
+      version: LATEST_RELEASE.version,
+      date: LATEST_RELEASE.date,
+      dateLabel: releaseDate(LATEST_RELEASE),
+      summary: LATEST_RELEASE.summary,
+      href: releaseHref(LATEST_RELEASE.version),
+    },
+    highlighted:
+      LATEST_HIGHLIGHTED_RELEASE === undefined
+        ? null
+        : {
+            minor: minorVersion(LATEST_HIGHLIGHTED_RELEASE.version),
+            highlights: LATEST_HIGHLIGHTED_RELEASE.highlights,
+            href: releaseHref(LATEST_HIGHLIGHTED_RELEASE.version),
+          },
+    links: [
+      { label: "All releases", href: RELEASES_HREF },
+      ...RELEASES.map((release) => ({
+        label: releaseLabel(release),
+        href: releaseHref(release.version),
+      })),
+    ],
+  };
+}
+
 export {
   LATEST_HIGHLIGHTED_RELEASE,
   LATEST_RELEASE,
@@ -154,6 +189,7 @@ export {
   minorVersion,
   releaseContext,
   releaseDate,
+  releaseFacts,
   releaseHref,
   releaseLabel,
   type PublishedRelease,

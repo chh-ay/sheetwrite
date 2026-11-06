@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { releaseFacts } from "../docs/src/lib/releases.js";
 import { entrySlug } from "./docs-paths.js";
 import { type ExpectedFile, generatedDataRoot, stableJson } from "./docs-shared.js";
 import { type FormulaReferencePage, formulaFamilyNavigation } from "./formula-docs.js";
@@ -7,8 +8,9 @@ import { headingAnchors } from "./markdown-anchors.js";
 import type { PublicApiManifest } from "./public-api.js";
 
 /**
- * The generated JSON that `docs/src/lib/navigation.ts` and
- * `docs/src/lib/moved-headings.ts` import. The docs generator and checker load
+ * The generated JSON that `docs/src/lib/navigation.ts`,
+ * `docs/src/lib/moved-headings.ts` and the release links in the site's
+ * header, sidebar and landing import. The docs generator and checker load
  * those modules, so `scripts/docs-cli.ts` writes these files before it loads
  * them. Nothing here may import the site's navigation or moved-page modules.
  */
@@ -71,5 +73,6 @@ export function siteDataFiles(
       path: join(generatedDataRoot, "formula-nav.json"),
       content: stableJson(formulaFamilyNavigation(formulaPages)),
     },
+    { path: join(generatedDataRoot, "release-facts.json"), content: stableJson(releaseFacts()) },
   ];
 }

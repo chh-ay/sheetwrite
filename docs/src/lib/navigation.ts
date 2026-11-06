@@ -1,7 +1,7 @@
 import apiNav from "../generated/api-nav.json" with { type: "json" };
 // Formula family pages; formula-nav.json is emitted by docs:generate.
 import formulaNav from "../generated/formula-nav.json" with { type: "json" };
-import { RELEASES, RELEASES_HREF, minorVersion, releaseHref, releaseLabel } from "./releases.js";
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 
 interface NavigationEntry {
   label: string;
@@ -299,13 +299,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
   {
     label: "Release notes",
-    items: [
-      { label: "All releases", href: RELEASES_HREF },
-      ...RELEASES.map((release) => ({
-        label: releaseLabel(release),
-        href: releaseHref(release.version),
-      })),
-    ],
+    items: releaseFacts.links,
   },
 ];
 
@@ -342,6 +336,11 @@ const READING_ORDER: readonly NavigationPage[] = navigationPages(
 );
 
 export type NavigationBadge = "new" | "updated";
+
+/** The major and minor version; patch releases share the same feature set. */
+function minorVersion(version: string): string {
+  return version.replace(/\.\d+$/, "");
+}
 
 /**
  * Badge for an entry in the given release. A group shows the strongest badge

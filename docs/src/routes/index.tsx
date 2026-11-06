@@ -14,13 +14,8 @@ import { SiteTopbar } from "../components/SiteTopbar.js";
 // Named imports, so only these three numbers ship in the page bundle.
 import { localPassed, regressions, totalTests } from "../generated/compatibility-summary.json";
 import landingBench from "../generated/landing-bench.json";
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import { opensFreshDocument } from "../lib/navigation.js";
-import {
-  LATEST_HIGHLIGHTED_RELEASE,
-  LATEST_RELEASE,
-  minorVersion,
-  releaseHref,
-} from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
 
 import landingStylesheet from "../styles/landing.css?url";
@@ -456,15 +451,15 @@ function Landing() {
               </pre>
             </article>
           </div>
-          {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
+          {releaseFacts.highlighted !== null ? (
             <aside aria-labelledby="landing-new" className="sw-lp-new">
-              <h3 id="landing-new">New in {minorVersion(LATEST_HIGHLIGHTED_RELEASE.version)}</h3>
+              <h3 id="landing-new">New in {releaseFacts.highlighted.minor}</h3>
               <ul>
-                {LATEST_HIGHLIGHTED_RELEASE.highlights.map((highlight) => (
+                {releaseFacts.highlighted.highlights.map((highlight) => (
                   <li key={highlight}>{highlight}</li>
                 ))}
               </ul>
-              <Link to={releaseHref(LATEST_HIGHLIGHTED_RELEASE.version)}>
+              <Link to={releaseFacts.highlighted.href}>
                 Read what is new and the upgrade checklist
                 <Icon name="arrow-right" />
               </Link>
@@ -536,7 +531,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
                 First grid
               </Link>
-              <Link to={releaseHref(LATEST_RELEASE.version)}>What's new</Link>
+              <Link to={releaseFacts.latest.href}>What's new</Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Frameworks</p>

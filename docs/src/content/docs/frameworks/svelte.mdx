@@ -77,8 +77,14 @@ which inputs update in place and which reset.
 When the surrounding SvelteKit route renders on the server, use a client-only
 boundary.
 
-<div class="sw-next-links">
-<a href="/svelte/"><span>Example</span><strong>Run the Svelte example</strong></a>
-<a href="/docs/frameworks/lifecycle/"><span>Lifecycle</span><strong>Updates and resets</strong></a>
-<a href="/docs/api/svelte/"><span>Reference</span><strong><code>@sheetwrite/svelte</code> API</strong></a>
-</div>
+<CardGroup cols={3}>
+  <Card title="Run the Svelte example" icon="framework-svelte" href="/svelte/">
+    The Svelte setup in a running app.
+  </Card>
+  <Card title="Updates and resets" icon="lifecycle" href="/docs/frameworks/lifecycle/">
+    When the adapter creates, updates and destroys the grid.
+  </Card>
+  <Card title="@sheetwrite/svelte API" icon="tab-api" href="/docs/api/svelte/">
+    Every export of `@sheetwrite/svelte`.
+  </Card>
+</CardGroup>

@@ -1,0 +1,71 @@
+/* Update: the dated entries of the releases page (lib/content-components.ts). Loaded only by pages that use it. */
+
+/* ── Update: a dated changelog entry; the date column stays in view ───── */
+.sw-update {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: var(--sw-space-8);
+  padding: var(--sw-space-8) 0;
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-update__meta {
+  position: sticky;
+  top: calc(var(--sw-header-height) + var(--sw-space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sw-space-2);
+  align-self: start;
+  align-items: flex-start;
+}
+
+.sw-update__date {
+  padding: var(--sw-space-1) var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.2 var(--sw-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .sw-update__version {
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1.2 var(--sw-font-mono);
+  text-decoration: none;
+}
+
+.sw-prose .sw-update__version:hover {
+  color: var(--sw-accent-strong);
+  text-decoration: underline;
+}
+
+.sw-update__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1);
+}
+
+.sw-docs .sw-prose .sw-update__title {
+  margin: 0 0 var(--sw-space-3);
+  padding-top: 0;
+  font-size: var(--sw-text-h3);
+  line-height: var(--sw-leading-heading);
+}
+
+.sw-update__body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 48rem) {
+  .sw-update {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sw-space-3);
+  }
+
+  .sw-update__meta {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
