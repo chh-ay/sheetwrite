@@ -118,6 +118,8 @@ pub(super) fn enter_runtime_formula(key: AbsCellKey) {
 
 /// A formula pulled through a runtime read joins the active component only if
 /// its evaluation reads a member back. Ordinary upstream formulas stay cached.
+/// Only iterating passes call it, so it stays out of the read path.
+#[inline(never)]
 pub(super) fn record_iteration_read(key: AbsCellKey) {
     BACK_EDGES.with(|state| {
         let mut state = state.borrow_mut();
@@ -209,17 +211,11 @@ impl CellStore {
         limits: IterationLimits,
         evaluate_readers: bool,
     ) {
+        // Only the walk's `#CYCLE!` results wait in the pulled list here.
         let mut cyclic_ids = FormulaBits::default();
-        let mut pulled = results.take_pulled();
-        for (id, result) in pulled.drain(..) {
-            if result == Value::Error(FormulaError::Cycle) {
-                cyclic_ids.insert(id);
-            } else {
-                self.store_formula_result(id, result);
-                results.settle(id);
-            }
+        while let Some((id, _)) = results.pop_pulled() {
+            cyclic_ids.insert(id);
         }
-        results.restore_pulled(pulled);
         // Selection order, as the memo listed them.
         let cyclic: Vec<AbsCellKey> = affected
             .ids()
@@ -238,8 +234,7 @@ impl CellStore {
             } else if circular {
                 for &key in members {
                     if let Some(id) = self.formula_id(key) {
-                        self.store_formula_result(id, Value::Error(FormulaError::Cycle));
-                        results.settle(id);
+                        self.settle_result(id, Value::Error(FormulaError::Cycle), results);
                     }
                 }
             } else if evaluate_readers {
@@ -277,8 +272,7 @@ impl CellStore {
         for &key in &members {
             if let Some(id) = self.formula_id(key) {
                 let start = self.starting_value(key);
-                self.store_formula_result(id, start);
-                results.settle(id);
+                self.settle_result(id, start, results);
             }
         }
 
@@ -292,13 +286,14 @@ impl CellStore {
                     let mut pass = EvalPass { affected, results };
                     self.eval_formula_body(id, &mut pass, 0)
                 };
-                if let Some(current) = self.pass_result(id, results) {
-                    converged &= !limits.moved(&current, &next);
-                }
-                results.unsettle(id);
+                let (row, col) = key.local();
+                let current = {
+                    let mut pass = EvalPass { affected, results };
+                    self.eval_at(key.sheet as usize, row as usize, col as usize, &mut pass, 0)
+                };
+                converged &= !limits.moved(&current, &next);
                 self.flush_pulled(results);
-                self.store_formula_result(id, next);
-                results.settle(id);
+                self.settle_result(id, next, results);
             }
             BACK_EDGES.with(|state| {
                 if let Some(active) = state

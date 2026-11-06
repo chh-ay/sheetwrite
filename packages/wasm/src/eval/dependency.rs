@@ -1316,15 +1316,11 @@ fn seed_depth_errors(
         // Roots in column-major order: the walk finishes each formula after
         // the formulas it reads, which is the order the pass evaluates.
         for node in 0..walk.formulas.len() {
+            let id = walk.formulas[node].1;
             if let Err(error) = walk.depth(node) {
                 found_cycle |= error == FormulaError::Cycle;
-            }
-        }
-        for node in 0..walk.formulas.len() {
-            let id = walk.formulas[node].1;
-            if let Some(NodeDepth::Done(Err(error))) = walk.formula_states.get(node).copied() {
                 if !preserve_results || !results.has(id) {
-                    results.pull(id, Value::Error(error));
+                    results.seeded.push((id, error));
                 }
             }
         }
@@ -1888,11 +1884,11 @@ mod tests {
             &mut memo,
         );
         assert!(matches!(
-            memo.pulled(store.formula_id(left).expect("left formula")),
+            memo.seeded_result(store.formula_id(left).expect("left formula")).as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
         assert!(matches!(
-            memo.pulled(store.formula_id(right).expect("right formula")),
+            memo.seeded_result(store.formula_id(right).expect("right formula")).as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
     }
@@ -2191,22 +2187,22 @@ mod tests {
             &index,
             &mut memo,
         );
-        assert_eq!(memo.pulled_len(), ROWS + 1);
+        assert_eq!(memo.seeded.len(), ROWS + 1);
         assert!(matches!(
-            memo.pulled(
+            memo.seeded_result(
                 store
                     .formula_id(AbsCellKey::new(sheet, 0, 0))
                     .expect("formula")
-            ),
+            ).as_ref(),
             Some(Value::Error(FormulaError::Cycle))
         ));
         for row in 0..ROWS {
             assert!(matches!(
-                memo.pulled(
+                memo.seeded_result(
                     store
                         .formula_id(AbsCellKey::new(sheet, row as u32, 1))
                         .expect("formula")
-                ),
+                ).as_ref(),
                 Some(Value::Error(FormulaError::Cycle))
             ));
         }
@@ -2246,16 +2242,16 @@ mod tests {
                         &index,
                         &mut memo,
                     );
-                    assert_eq!(memo.pulled_len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
+                    assert_eq!(memo.seeded.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
                     for row in 0..CHAIN_ROWS {
                         let key = AbsCellKey::new(sheet, row as u32, 0);
                         if row < FORMULA_RECURSION_LIMIT {
                             assert!(memo
-                                .pulled(store.formula_id(key).expect("formula"))
+                                .seeded_result(store.formula_id(key).expect("formula"))
                                 .is_none());
                         } else {
                             assert!(matches!(
-                                memo.pulled(store.formula_id(key).expect("formula")),
+                                memo.seeded_result(store.formula_id(key).expect("formula")).as_ref(),
                                 Some(Value::Error(FormulaError::Num))
                             ));
                         }
@@ -2271,9 +2267,9 @@ mod tests {
                         &index,
                         &mut memo,
                     );
-                    assert_eq!(memo.pulled_len(), CHAIN_ROWS);
+                    assert_eq!(memo.seeded.len(), CHAIN_ROWS);
                     assert!(affected.keys(&store.formula_slots).all(|key| matches!(
-                        memo.pulled(store.formula_id(key).expect("formula")),
+                        memo.seeded_result(store.formula_id(key).expect("formula")).as_ref(),
                         Some(Value::Error(FormulaError::Cycle))
                     )));
                 }

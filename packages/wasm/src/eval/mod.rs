@@ -868,7 +868,6 @@ impl CellStore {
             return;
         }
 
-        memo.prepare();
 
         let found_cycle = self.graph.index().is_some_and(|index| {
             seed_dependency_depth_errors(
@@ -900,10 +899,10 @@ impl CellStore {
             return;
         }
 
+        self.flush_seeded(&mut memo);
         if let Some(limits) = self.iteration.as_deref().copied().filter(|_| found_cycle) {
             self.settle_circular_references(&affected, &mut memo, limits, false);
         }
-        self.flush_seeded(&mut memo);
 
         let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
@@ -1358,75 +1357,43 @@ impl CellStore {
         }
     }
 
-    /// This pass's result for `id`: a pulled result not yet written, or the
-    /// value written to its cell.
-    pub(crate) fn pass_result(
-        &self,
-        id: FormulaId,
-        results: &FormulaResults,
-    ) -> Option<EvalResult> {
-        if let Some(result) = results.pulled(id) {
-            return Some(result.clone());
-        }
-        if !results.is_settled(id) {
-            return None;
-        }
-        self.stored_formula_value(id)
-    }
-
-    /// The value a formula's cell holds, as a clean formula is read.
-    fn stored_formula_value(&self, id: FormulaId) -> Option<EvalResult> {
-        let key = self.formula_slots.location(id)?;
-        let sheet = self.sheets.get(key.sheet as usize)?;
-        let (row, col) = key.local();
-        if !sheet.cells.contains_cell(row as usize, col as usize) {
-            return Some(Value::Error(FormulaError::Ref));
-        }
-        let index = sheet.cells.idx(row as usize, col as usize);
-        Some(cached_formula_value(
-            sheet,
-            &self.strings,
-            index,
-            formula_error_with_entry(sheet, key.local(), self.formula_slots.get(id)),
-        ))
-    }
-
-    /// Writes the pulled results to storage and marks them settled.
+    /// Writes the pulled results to storage and marks them settled. Most
+    /// formulas pull nothing, so the check stays inline and the loop does not.
+    #[inline]
     pub(super) fn flush_pulled(&mut self, results: &mut FormulaResults) {
-        if !results.has_pulled() {
-            return;
+        if results.has_pulled() {
+            self.write_pulled(results);
         }
-        let mut pulled = results.take_pulled();
-        for (id, result) in pulled.drain(..) {
-            self.store_formula_result(id, result);
-            results.settle(id);
+    }
+
+    #[inline(never)]
+    fn write_pulled(&mut self, results: &mut FormulaResults) {
+        while let Some((id, result)) = results.pop_pulled() {
+            self.settle_result(id, result, results);
         }
-        results.restore_pulled(pulled);
     }
 
     /// Writes the errors the depth walk seeded. With iteration on, `#CYCLE!`
-    /// results wait: the component pass replaces them and starts from the
-    /// values the cells held before this pass.
-    #[inline(never)]
+    /// results wait in the pulled list: the component pass replaces them and
+    /// starts from the values the cells held before this pass.
     fn flush_seeded(&mut self, results: &mut FormulaResults) {
-        if self.iteration.is_none() {
-            self.flush_pulled(results);
-            return;
+        if !results.seeded.is_empty() {
+            self.write_seeded(results);
         }
-        let mut pulled = results.take_pulled();
-        let mut kept = Vec::new();
-        for (id, result) in pulled.drain(..) {
-            if result == Value::Error(FormulaError::Cycle) {
-                kept.push((id, result));
+    }
+
+    #[inline(never)]
+    fn write_seeded(&mut self, results: &mut FormulaResults) {
+        let mut seeded = std::mem::take(&mut results.seeded);
+        let iterating = self.iteration.is_some();
+        for (id, error) in seeded.drain(..) {
+            if iterating && error == FormulaError::Cycle {
+                results.pull(id, Value::Error(error));
             } else {
-                self.store_formula_result(id, result);
-                results.settle(id);
+                self.settle_result(id, Value::Error(error), results);
             }
         }
-        results.restore_pulled(pulled);
-        for (id, result) in kept {
-            results.pull(id, result);
-        }
+        results.seeded = seeded;
     }
 
     /// Evaluates every selected formula once, each after the formulas it
@@ -1437,6 +1404,7 @@ impl CellStore {
         results: &mut FormulaResults,
         found_cycle: bool,
     ) {
+        self.flush_seeded(results);
         match self.iteration.as_deref().copied() {
             Some(limits) if found_cycle => {
                 self.settle_circular_references(affected, results, limits, true)
@@ -1480,15 +1448,20 @@ impl CellStore {
             pass.results.visiting.insert(id);
             let result = self.eval_formula_body(id, &mut pass, 0);
             pass.results.visiting.remove(id);
-            self.store_formula_result(id, result);
-            results.settle(id);
+            self.settle_result(id, result, results);
         }
         self.flush_pulled(results);
     }
 
-    // One out-of-line copy serves every writer; the call is small next to
-    // the evaluation it follows.
+    /// Writes `id`'s result and marks it settled for this pass. One
+    /// out-of-line copy serves every writer; the call is small next to the
+    /// evaluation it follows.
     #[inline(never)]
+    pub(super) fn settle_result(&mut self, id: FormulaId, result: EvalResult, results: &mut FormulaResults) {
+        self.store_formula_result(id, result);
+        results.settle(id);
+    }
+
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
         // A pass already owns the id; only liveness needs checking at write-back.
         if self.formula_slots.get(id).is_none() {
@@ -1572,10 +1545,13 @@ impl CellStore {
             if let Some(id) = s.formulas.id(key) {
                 // A settled formula's result is already in its cell, read as
                 // a clean formula is; iteration still records the read.
-                if pass.affected.contains(id)
-                    && !(pass.results.is_settled(id) && self.iteration.is_none())
-                {
-                    return self.eval_formula_id(id, pass, depth + 1);
+                if pass.affected.contains(id) {
+                    if !pass.results.is_settled(id) {
+                        return self.eval_formula_id(id, pass, depth + 1);
+                    }
+                    if self.iteration.is_some() {
+                        iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
+                    }
                 }
 
                 return cached_formula_value(
@@ -1607,11 +1583,15 @@ impl CellStore {
         let Some(key) = self.formula_slots.location(id) else {
             return Value::Error(FormulaError::Ref);
         };
-        if let Some(result) = self.pass_result(id, pass.results) {
+        if pass.results.is_settled(id) {
+            let (row, col) = key.local();
+            return self.eval_at(key.sheet as usize, row as usize, col as usize, pass, depth);
+        }
+        if let Some(result) = pass.results.pulled(id) {
             if self.iteration.is_some() {
                 iteration::record_iteration_read(key);
             }
-            return result;
+            return result.clone();
         }
         if !pass.results.visiting.insert(id) {
             return self.back_edge_value(key);

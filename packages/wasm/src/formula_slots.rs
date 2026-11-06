@@ -5,6 +5,9 @@ use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, For
 
 const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
+/// Pass order entries kept between passes: 16 KB, enough for the formulas
+/// a typical edit reaches, so those passes allocate no order list.
+const RETAINED_ORDER_CAPACITY: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
 
@@ -580,6 +583,8 @@ pub(crate) struct FormulaResults {
     pulled_bits: FormulaBits,
     /// Formulas in dependency order, from the depth walk.
     pub(crate) order: Vec<FormulaId>,
+    /// Depth and cycle errors the walk found, written before evaluation.
+    pub(crate) seeded: Vec<(FormulaId, FormulaError)>,
     /// Whether the depth walk ran and `order` lists the pass.
     pub(crate) ordered: bool,
     work: FormulaWork,
@@ -661,11 +666,6 @@ impl FormulaResults {
         std::mem::take(&mut self.work)
     }
 
-    /// Starts a pass with no settled or pulled formulas.
-    pub(crate) fn prepare(&mut self) {
-        self.clear();
-    }
-
     /// Whether this pass has a result for `id`, stored or pulled.
     #[inline]
     pub(crate) fn has(&self, id: FormulaId) -> bool {
@@ -718,7 +718,9 @@ impl FormulaResults {
             .map(|(_, value)| value)
     }
 
-    /// Keeps `id`'s result until the pass writes it to storage.
+    /// Keeps `id`'s result until the pass writes it to storage. Only runtime
+    /// pulls, iteration and spill anchors use it, so it stays out of line.
+    #[inline(never)]
     pub(crate) fn pull(&mut self, id: FormulaId, value: EvalResult) {
         self.settled.remove(id);
         if self.pulled_bits.insert(id) {
@@ -728,26 +730,14 @@ impl FormulaResults {
         }
     }
 
-    /// Hands the waiting results to the pass to write; give the list back
-    /// with [`Self::restore_pulled`] to keep its capacity.
-    pub(crate) fn take_pulled(&mut self) -> Vec<(FormulaId, EvalResult)> {
-        // Every pulled bit belongs to an entry: a long list clears all words
-        // at once, a short one only its own.
-        if self.pulled.len() > BITS_PER_WORD {
-            self.pulled_bits.clear_all();
-        } else {
-            for &(id, _) in &self.pulled {
-                self.pulled_bits.remove(id);
-            }
-        }
-        std::mem::take(&mut self.pulled)
-    }
-
-    pub(crate) fn restore_pulled(&mut self, mut pulled: Vec<(FormulaId, EvalResult)>) {
-        pulled.clear();
+    /// The oldest waiting result, which the pass writes next.
+    pub(crate) fn pop_pulled(&mut self) -> Option<(FormulaId, EvalResult)> {
         if self.pulled.is_empty() {
-            self.pulled = pulled;
+            return None;
         }
+        let (id, value) = self.pulled.swap_remove(0);
+        self.pulled_bits.remove(id);
+        Some((id, value))
     }
 
     /// Whether any result waits to be written.
@@ -756,9 +746,13 @@ impl FormulaResults {
         !self.pulled.is_empty()
     }
 
+    /// The error the depth walk seeded for `id`, as its pass result.
     #[cfg(test)]
-    pub(crate) fn pulled_len(&self) -> usize {
-        self.pulled.len()
+    pub(crate) fn seeded_result(&self, id: FormulaId) -> Option<EvalResult> {
+        self.seeded
+            .iter()
+            .find(|&&(seeded, _)| seeded == id)
+            .map(|&(_, error)| crate::types::Value::Error(error))
     }
 
     /// The shared sum of `range` when it was the last range shared.
@@ -845,6 +839,7 @@ impl FormulaResults {
     /// Clears this pass's pulled results and any bits left set. A finished
     /// pass has already cleared its own settled bits, so a small edit does
     /// not touch every word.
+    #[inline(never)]
     pub(crate) fn clear(&mut self) {
         for &(id, _) in &self.pulled {
             self.pulled_bits.remove(id);
@@ -854,6 +849,7 @@ impl FormulaResults {
         self.visiting.clear_all();
         self.pulled_bits.clear_all();
         self.order.clear();
+        self.seeded.clear();
         self.ordered = false;
         self.range_sums.sums.clear();
         self.range_sums.last = None;
@@ -877,8 +873,12 @@ impl FormulaResults {
         if self.pulled.capacity() > SLOT_PAGE_LEN {
             self.pulled = Vec::new();
         }
-        if self.order.capacity() > SLOT_PAGE_LEN {
+        // A medium pass reuses its order list; a wide one must not pin it.
+        if self.order.capacity() > RETAINED_ORDER_CAPACITY {
             self.order = Vec::new();
+        }
+        if self.seeded.capacity() > SLOT_PAGE_LEN {
+            self.seeded = Vec::new();
         }
         if self.range_sums.sums.capacity() > SLOT_PAGE_LEN {
             self.range_sums.sums = Vec::new();
@@ -897,6 +897,7 @@ impl FormulaResults {
         self.pulled_bits.add_memory_stats(formulas);
         formulas.add_vec::<(FormulaId, EvalResult)>(self.pulled.len(), self.pulled.capacity());
         formulas.add_vec::<FormulaId>(self.order.len(), self.order.capacity());
+        formulas.add_vec::<(FormulaId, FormulaError)>(self.seeded.len(), self.seeded.capacity());
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
