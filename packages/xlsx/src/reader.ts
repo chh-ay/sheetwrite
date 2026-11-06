@@ -41,6 +41,7 @@ import {
 import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { readCharts } from "./chart-read.js";
 import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";
+import { linkedFormula, readExternalLinks } from "./external-links.js";
 import {
   columnWidthCharacters,
   columnWidthPixels,
@@ -1468,13 +1469,18 @@ async function parseSheet(
           });
           value = formulaText ? { kind: "literal", value: `=${formulaText}` } : null;
         } else if (formulaContainsExternalReference(formulaText)) {
-          emitWarning(rowContext, {
-            code: "external-formula",
-            message: "External-data formula was neutralized as inert text",
-            sheet: reference.name,
-            cell: addressText,
-          });
-          value = { kind: "literal", value: `=${formulaText}` };
+          const linked = linkedFormula(formulaText, context.externalBooks);
+          if (linked === undefined) {
+            emitWarning(rowContext, {
+              code: "external-formula",
+              message: "External-data formula was neutralized as inert text",
+              sheet: reference.name,
+              cell: addressText,
+            });
+            value = { kind: "literal", value: `=${formulaText}` };
+          } else {
+            value = { kind: "formula", src: `=${linked}` };
+          }
         } else {
           value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
         }
@@ -2219,17 +2225,27 @@ export async function readWorkbook(
   const themePart = workbookRelationships.find(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
+  // Before the sheets, whose formulas name the links by index.
+  const externalLinks = await readExternalLinks(
+    packageFile,
+    workbookRoot,
+    workbookRelationships,
+    context,
+  );
+  context.externalBooks = externalLinks.books;
+  const readLinkParts = new Set(externalLinks.parts.values());
   for (const relationship of workbookRelationships) {
+    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
     if (
       relationship.external ||
       ["worksheet", "styles", "sharedStrings", "theme"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
       ) ||
-      isRetainedRelationship("workbook", relationship.type)
+      (isRetainedRelationship("workbook", relationship.type) &&
+        (!externalLink || readLinkParts.has(relationship.target)))
     ) {
       continue;
     }
-    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
     emitWarning(context, {
       code: externalLink ? "external-relationship" : "unsupported-feature",
       message: externalLink
@@ -2695,6 +2711,7 @@ export async function readWorkbook(
       ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
       ...(calculation ? { calculation } : {}),
       ...(dataModel?.relationships.length ? { dataModel: structuredClone(dataModel) } : {}),
+      ...(externalLinks.links.length ? { externalLinks: externalLinks.links } : {}),
     },
     sheets,
   };
@@ -2728,6 +2745,7 @@ export async function readWorkbook(
       context,
       new Set([...modelledPivotParts, ...chartParts.modelled]),
       chartParts.replacements,
+      externalLinks.parts,
     );
   // The Power Query module loads only for workbooks that can hold queries:
   // saved definitions in the hidden metadata, or a customXml item.

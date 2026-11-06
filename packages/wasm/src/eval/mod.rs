@@ -85,6 +85,8 @@ use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+#[cfg(feature = "analysis")]
+pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};

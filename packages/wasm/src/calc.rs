@@ -1222,23 +1222,48 @@ fn quoted_token(
     }
 }
 
-/// Whether spaces between `previous` and `rest` are the intersection operator:
-/// they follow a token that can end a reference and precede one that can start
-/// one. Spaces around other operators, after separators and before `)` stay
-/// insignificant. A name followed by spaces and `(` is a function call, not
-/// an intersection between a named range and a parenthesized reference.
-/// `#REF!` is a reference operand too: a deleted operand serializes as it, and
-/// the formula must parse back to the same intersection.
-fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {
+/// What the last token means for spaces after it: they can be the
+/// intersection operator only after a token that can end a reference.
+#[derive(Clone, Copy)]
+pub(crate) enum ReferenceEdge {
+    /// Not a reference end: a separator, an operator or the start.
+    None,
+    /// A name: a reference end unless `(` follows, which makes it a call.
+    Name,
+    /// `)`, a table reference, a spill `#` or `#REF!`.
+    Reference,
+}
+
+impl ReferenceEdge {
+    /// `#REF!` is a reference operand too: a deleted operand serializes as
+    /// it, and the formula must parse back to the same intersection.
+    pub(crate) fn after(previous: Option<&Tok<'_>>) -> Self {
+        match previous {
+            Some(Tok::Ident(..)) => Self::Name,
+            Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => {
+                Self::Reference
+            }
+            _ => Self::None,
+        }
+    }
+}
+
+/// Whether spaces between a token with `edge` and `rest` are the
+/// intersection operator: they follow a token that can end a reference and
+/// precede one that can start one. Spaces around other operators, after
+/// separators and before `)` stay insignificant. A name followed by spaces
+/// and `(` is a function call, not an intersection between a named range and
+/// a parenthesized reference.
+fn separates_references(edge: ReferenceEdge, rest: &str) -> bool {
     const DELETED_REFERENCE: &str = "#REF!";
 
     let Some(next) = rest.chars().next() else {
         return false;
     };
-    let ends_reference = match previous {
-        Some(Tok::Ident(..)) => next != '(',
-        Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => true,
-        _ => false,
+    let ends_reference = match edge {
+        ReferenceEdge::Name => next != '(',
+        ReferenceEdge::Reference => true,
+        ReferenceEdge::None => false,
     };
     let starts_reference = next.is_alphabetic()
         || matches!(next, '$' | '_' | '\\' | '\'' | '(')
@@ -1246,26 +1271,6 @@ fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {
             .get(..DELETED_REFERENCE.len())
             .is_some_and(|text| text.eq_ignore_ascii_case(DELETED_REFERENCE));
     ends_reference && starts_reference
-}
-
-/// The tokens of one formula and what the parser may need to look for.
-struct Tokens<'a> {
-    toks: Vec<Tok<'a>>,
-    /// At least one intersection operator.
-    intersections: bool,
-    /// At least one `!`, which every 3-D reference has.
-    sheet_qualifiers: bool,
-}
-
-impl<'a> Tokens<'a> {
-    fn push(&mut self, tok: Tok<'a>) {
-        match tok {
-            Tok::Intersect => self.intersections = true,
-            Tok::Bang => self.sheet_qualifiers = true,
-            _ => {}
-        }
-        self.toks.push(tok);
-    }
 }
 
 /// Reads the number at `*index`: digits with one optional decimal point, then
@@ -1303,23 +1308,6 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
         .ok_or_else(|| format!("{number} is not a valid number."))
 }
 
-fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
-    let mut tokens = Tokens {
-        toks: Vec::new(),
-        intersections: false,
-        sheet_qualifiers: false,
-    };
-    let mut index = 0;
-
-    while index < src.len() {
-        if let Some(tok) = lex_token(src, &mut index, tokens.toks.last())? {
-            tokens.push(tok);
-        }
-    }
-
-    Ok(tokens)
-}
-
 /// The token of one ASCII punctuation byte, or `None` for any other byte.
 fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
     Some(match byte {
@@ -1339,8 +1327,8 @@ fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
 
 /// Reads the token at `*index` and moves `*index` past it. Whitespace gives
 /// `Ok(None)`, except where it is the intersection operator after `previous`.
-/// The parser's `tokenize` and every other reader of formula text lex with
-/// this one step, so they cannot disagree about where a token ends. After an
+/// The parser's cursor and every other reader of formula text lex with this
+/// one step, so they cannot disagree about where a token ends. After an
 /// error, `*index` is past the bad text when its end is known: an open quote
 /// or bracket runs to the end of `src`; an unknown character is not consumed.
 #[inline(always)]
@@ -1349,6 +1337,16 @@ pub(crate) fn lex_token<'a>(
     index: &mut usize,
     previous: Option<&Tok<'a>>,
 ) -> Result<Option<Tok<'a>>, String> {
+    lex_token_after(src, index, ReferenceEdge::after(previous))
+}
+
+/// [`lex_token`] after a token with `edge`.
+#[inline(always)]
+fn lex_token_after<'a>(
+    src: &'a str,
+    index: &mut usize,
+    edge: ReferenceEdge,
+) -> Result<Option<Tok<'a>>, String> {
     let bytes = src.as_bytes();
     let c = bytes[*index];
 
@@ -1356,7 +1354,7 @@ pub(crate) fn lex_token<'a>(
         while bytes.get(*index).is_some_and(u8::is_ascii_whitespace) {
             *index += 1;
         }
-        if !separates_references(previous, &src[*index..]) {
+        if !separates_references(edge, &src[*index..]) {
             return Ok(None);
         }
         Tok::Intersect
@@ -1505,19 +1503,177 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
     }))
 }
 
+/// Most tokens the parser looks ahead of the next one: `Sheet1:Sheet3!`
+/// is recognized from its first name. A power of two, so the ring wraps
+/// with a mask.
+const LOOKAHEAD: usize = 4;
+
+/// The parser's tokens, lexed on demand from the formula text, or read from
+/// formula help's token list. Lexing stops at the first lex error, which the
+/// parse reports in place of any parse error, as a separate tokenizing step
+/// would.
+struct Cursor<'a> {
+    src: &'a str,
+    index: usize,
+    /// Formula help's tokens; `None` when lexing `src`.
+    tokens: Option<std::vec::IntoIter<Tok<'a>>>,
+    edge: ReferenceEdge,
+    ahead: [Option<Tok<'a>>; LOOKAHEAD],
+    ahead_start: usize,
+    ahead_len: usize,
+    /// Tokens the parser has read.
+    consumed: usize,
+    lex_error: Option<String>,
+}
+
+impl<'a> Cursor<'a> {
+    fn over_text(src: &'a str) -> Self {
+        Self {
+            src,
+            index: 0,
+            tokens: None,
+            edge: ReferenceEdge::None,
+            ahead: [None, None, None, None],
+            ahead_start: 0,
+            ahead_len: 0,
+            consumed: 0,
+            lex_error: None,
+        }
+    }
+
+    fn over_tokens(tokens: Vec<Tok<'a>>) -> Self {
+        Self {
+            tokens: Some(tokens.into_iter()),
+            ..Self::over_text("")
+        }
+    }
+
+    fn lex_next(&mut self) -> Option<Tok<'a>> {
+        if let Some(tokens) = &mut self.tokens {
+            return tokens.next();
+        }
+
+        if self.lex_error.is_some() {
+            return None;
+        }
+
+        while self.index < self.src.len() {
+            match lex_token_after(self.src, &mut self.index, self.edge) {
+                Ok(Some(tok)) => {
+                    self.edge = ReferenceEdge::after(Some(&tok));
+                    return Some(tok);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.lex_error = Some(error);
+                    return None;
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Whether `count` tokens are ahead, lexing them when needed. Out of
+    /// line so each peek and read inlines only the buffered case.
+    #[inline(never)]
+    fn fill(&mut self, count: usize) -> bool {
+        while self.ahead_len < count {
+            let Some(tok) = self.lex_next() else {
+                return false;
+            };
+            self.ahead[(self.ahead_start + self.ahead_len) & (LOOKAHEAD - 1)] = Some(tok);
+            self.ahead_len += 1;
+        }
+
+        true
+    }
+
+    #[inline(never)]
+    fn peek_at(&mut self, offset: usize) -> Option<&Tok<'a>> {
+        if self.ahead_len <= offset && !self.fill(offset + 1) {
+            return None;
+        }
+
+        self.ahead[(self.ahead_start + offset) & (LOOKAHEAD - 1)].as_ref()
+    }
+
+    /// Out of line: the parser reads tokens at many sites, and one copy of
+    /// the ring step keeps the parser small.
+    #[inline(never)]
+    fn next(&mut self) -> Option<Tok<'a>> {
+        if self.ahead_len == 0 && !self.fill(1) {
+            return None;
+        }
+
+        let tok = self.ahead[self.ahead_start].take();
+        self.ahead_start = (self.ahead_start + 1) & (LOOKAHEAD - 1);
+        self.ahead_len -= 1;
+        self.consumed += 1;
+        tok
+    }
+
+    /// The first lex error of the text, lexing whatever the parser left.
+    fn lex_error(&mut self) -> Option<String> {
+        while self.lex_error.is_none() && self.lex_next().is_some() {}
+        self.lex_error.take()
+    }
+}
+
+/// Which resolution steps a parsed formula needs: each is set when the
+/// formula holds a node that the step rewrites, so ingest skips the others.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ParseFeatures {
+    /// A sheet-qualified cell, range or 3-D reference.
+    pub(crate) sheet_refs: bool,
+    /// A bare name or an unknown function, which may name a defined name.
+    pub(crate) names: bool,
+    /// A table reference.
+    pub(crate) table_refs: bool,
+}
+
+/// Binary operator levels, loosest first. A comparison does not chain.
+const COMPARISON: u8 = 1;
+const CONCATENATION: u8 = 2;
+const ADDITION: u8 = 3;
+const MULTIPLICATION: u8 = 4;
+const POWER: u8 = 5;
+
+#[derive(Clone, Copy)]
+enum BinaryOperator {
+    Cmp(CmpOp),
+    Op(Op),
+}
+
+/// The level and operator of a binary operator token.
+#[inline]
+fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
+    Some(match tok {
+        Tok::Cmp(op) => (COMPARISON, BinaryOperator::Cmp(*op)),
+        Tok::Op('&') => (CONCATENATION, BinaryOperator::Op(Op::Concat)),
+        Tok::Op('+') => (ADDITION, BinaryOperator::Op(Op::Add)),
+        Tok::Op('-') => (ADDITION, BinaryOperator::Op(Op::Sub)),
+        Tok::Op('*') => (MULTIPLICATION, BinaryOperator::Op(Op::Mul)),
+        Tok::Op('/') => (MULTIPLICATION, BinaryOperator::Op(Op::Div)),
+        Tok::Op('^') => (POWER, BinaryOperator::Op(Op::Pow)),
+        _ => return None,
+    })
+}
+
 struct Parser<'a> {
-    toks: std::vec::IntoIter<Tok<'a>>,
-    intersections: bool,
-    sheet_qualifiers: bool,
+    cursor: Cursor<'a>,
+    features: ParseFeatures,
 }
 
 impl<'a> Parser<'a> {
-    fn peek(&self) -> Option<&Tok<'a>> {
-        self.toks.as_slice().first()
+    #[inline]
+    fn peek(&mut self) -> Option<&Tok<'a>> {
+        self.cursor.peek_at(0)
     }
 
+    #[inline]
     fn next(&mut self) -> Option<Tok<'a>> {
-        self.toks.next()
+        self.cursor.next()
     }
 
     /// The `)` that closes a call or a group. A missing `)` at the end and a
@@ -1544,70 +1700,37 @@ impl<'a> Parser<'a> {
 
     fn expr_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
-
-        let left = self.concat_at(depth)?;
-        if let Some(Tok::Cmp(op)) = self.peek() {
-            let op = *op;
-            let _ = self.next();
-            let right = self.concat_at(depth)?;
-            return Ok(Ast::Cmp(op, Box::new(left), Box::new(right)));
-        }
-        Ok(left)
+        self.binary_at(COMPARISON, depth)
     }
 
-    fn concat_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut left = self.additive_at(depth)?;
-        while self.peek() == Some(&Tok::Op('&')) {
-            let _ = self.next();
-            let right = self.additive_at(depth)?;
-            left = Ast::Bin(Op::Concat, Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    fn additive_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut left = self.term_at(depth)?;
-        while let Some(Tok::Op(c @ ('+' | '-'))) = self.peek() {
-            let op = if *c == '+' { Op::Add } else { Op::Sub };
-            let _ = self.next();
-            let right = self.term_at(depth)?;
-            left = Ast::Bin(op, Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    fn term_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut left = self.power_at(depth)?;
-        while let Some(Tok::Op(c @ ('*' | '/'))) = self.peek() {
-            let op = if *c == '*' { Op::Mul } else { Op::Div };
-            let _ = self.next();
-            let right = self.power_at(depth)?;
-            left = Ast::Bin(op, Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    fn power_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
+    /// Operands joined by binary operators of level `min_level` or tighter.
+    /// Each level is left-associative; a comparison takes one right operand
+    /// and ends the expression.
+    fn binary_at(&mut self, min_level: u8, depth: usize) -> Result<Ast, String> {
         let mut left = self.postfix_at(depth)?;
-        while self.peek() == Some(&Tok::Op('^')) {
+
+        while let Some((level, operator)) = self.peek().and_then(binary_operator) {
+            if level < min_level {
+                break;
+            }
+
             let _ = self.next();
-            let right = self.postfix_at(depth)?;
-            left = Ast::Bin(Op::Pow, Box::new(left), Box::new(right));
+            let right = Box::new(self.binary_at(level + 1, depth)?);
+            let left_operand = Box::new(left);
+            left = match operator {
+                BinaryOperator::Cmp(op) => Ast::Cmp(op, left_operand, right),
+                BinaryOperator::Op(op) => Ast::Bin(op, left_operand, right),
+            };
+
+            if level == COMPARISON {
+                break;
+            }
         }
+
         Ok(left)
     }
 
     fn postfix_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
         let mut value = self.unary_at(depth)?;
         #[cfg(feature = "analysis")]
         while self.peek() == Some(&Tok::LParen) {
@@ -1627,6 +1750,7 @@ impl<'a> Parser<'a> {
                 }
             }
             self.close_paren()?;
+            self.features.names = true;
             value = Ast::UnknownFunc("$LAMBDA_CALL".into(), args);
         }
         while self.peek() == Some(&Tok::Op('%')) {
@@ -1649,12 +1773,7 @@ impl<'a> Parser<'a> {
                 Ast::Pos(inner)
             });
         }
-        // Intersection binds tighter than every operator except `:`. A
-        // formula without the operator keeps the plain call, which the
-        // plain parse path measures faster than a call plus a peek.
-        if !self.intersections {
-            return self.primary_at(depth);
-        }
+        // Intersection binds tighter than every operator except `:`.
         let value = self.primary_at(depth)?;
         if self.peek() == Some(&Tok::Intersect) {
             return self.intersection_at(value, depth);
@@ -1773,18 +1892,20 @@ impl<'a> Parser<'a> {
         Ok(value)
     }
 
+    fn structured_ref(&mut self, raw: String, table_name: Option<String>) -> Result<Ast, String> {
+        self.features.table_refs = true;
+        parse_structured_ref(raw, table_name)
+    }
+
     /// A `[...]` that starts an operand. Before `Sheet1!`, it is the workbook
     /// of an external reference (`[Budget.xlsx]Annual!C10`), kept as a sheet
     /// reference whose name holds the workbook. Otherwise it is a table
     /// reference of the current table.
     fn structured_or_external_at(&mut self, raw: String) -> Result<Ast, String> {
-        let names_sheet = self.sheet_qualifiers
-            && matches!(
-                self.toks.as_slice().get(..2),
-                Some([Tok::Ident(_, false), Tok::Bang])
-            );
+        let names_sheet = matches!(self.cursor.peek_at(0), Some(Tok::Ident(_, false)))
+            && matches!(self.cursor.peek_at(1), Some(Tok::Bang));
         if !names_sheet {
-            return parse_structured_ref(raw, None);
+            return self.structured_ref(raw, None);
         }
 
         let Some(Tok::Ident(sheet, _)) = self.next() else {
@@ -1796,78 +1917,91 @@ impl<'a> Parser<'a> {
 
     fn ident_at(&mut self, name: Cow<'a, str>, quoted: bool, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
-        if let Some(Tok::Structured(_)) = self.peek() {
-            let Some(Tok::Structured(raw)) = self.next() else {
-                unreachable!("peeked structured token");
-            };
-            return parse_structured_ref(raw, Some(name.into_owned()));
-        }
-
-        if self.sheet_qualifiers
-            && self.peek() == Some(&Tok::Colon)
-            && matches!(
-                self.toks.as_slice().get(1..3),
-                Some([Tok::Ident(..), Tok::Bang])
-            )
-        {
-            let _ = self.next();
-            let Some(Tok::Ident(last, last_quoted)) = self.next() else {
-                unreachable!("peeked 3-D reference end");
-            };
-            let _ = self.next();
-            // Excel quotes a span as a whole, so either quoted end quotes both.
-            return self.sheet_span_at(name.into_owned(), last.into_owned(), quoted || last_quoted);
-        }
-
-        if let Some(Tok::Bang) = self.peek() {
-            let _ = self.next();
-            return self.sheet_ref_at(name.into_owned(), quoted);
-        }
-
-        if let Some(Tok::LParen) = self.peek() {
-            let _ = self.next();
-            let func = lookup_func(name.as_ref());
-            let mut args = Vec::new();
-            if self.peek() != Some(&Tok::RParen) {
-                loop {
-                    if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
-                        args.push(Ast::Missing);
-                    } else {
-                        args.push(self.expr_at(depth + 1)?);
-                    }
-                    match self.peek() {
-                        Some(Tok::Comma) => {
-                            let _ = self.next();
-                        }
-                        _ => break,
-                    }
-                }
+        match self.peek() {
+            Some(Tok::Structured(_)) => {
+                let Some(Tok::Structured(raw)) = self.next() else {
+                    unreachable!("peeked structured token");
+                };
+                return self.structured_ref(raw, Some(name.into_owned()));
             }
-            self.close_paren()?;
-            Ok(match func {
-                Some(func) => Ast::Func(func, args),
-                None => Ast::UnknownFunc(name.into_owned(), args),
-            })
-        } else {
-            if name.eq_ignore_ascii_case("TRUE") {
-                return Ok(Ast::Bool(true));
-            }
-            if name.eq_ignore_ascii_case("FALSE") {
-                return Ok(Ast::Bool(false));
-            }
-
-            if self.peek() == Some(&Tok::Colon) {
-                if let Some(start) = AreaEnd::of_name(name.as_ref()) {
+            Some(Tok::Colon) => {
+                let spans_sheets = matches!(self.cursor.peek_at(1), Some(Tok::Ident(..)))
+                    && matches!(self.cursor.peek_at(2), Some(Tok::Bang));
+                if spans_sheets {
                     let _ = self.next();
-                    let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
-                    return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
+                    let Some(Tok::Ident(last, last_quoted)) = self.next() else {
+                        unreachable!("peeked 3-D reference end");
+                    };
+                    let _ = self.next();
+                    // Excel quotes a span as a whole, so either quoted end quotes both.
+                    return self.sheet_span_at(
+                        name.into_owned(),
+                        last.into_owned(),
+                        quoted || last_quoted,
+                    );
                 }
             }
-            match parse_a1(name.as_ref()) {
-                Some((row, col, flags)) => Ok(self.spill_suffix(Ast::Cell(row, col, flags))),
-                None => Ok(Ast::Name(name.into_owned())),
+            Some(Tok::Bang) => {
+                let _ = self.next();
+                return self.sheet_ref_at(name.into_owned(), quoted);
+            }
+            Some(Tok::LParen) => {
+                let _ = self.next();
+                return self.call_at(name, depth);
+            }
+            _ => {}
+        }
+
+        if name.eq_ignore_ascii_case("TRUE") {
+            return Ok(Ast::Bool(true));
+        }
+        if name.eq_ignore_ascii_case("FALSE") {
+            return Ok(Ast::Bool(false));
+        }
+
+        if self.peek() == Some(&Tok::Colon) {
+            if let Some(start) = AreaEnd::of_name(name.as_ref()) {
+                let _ = self.next();
+                let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
+                return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
             }
         }
+        match parse_a1(name.as_ref()) {
+            Some((row, col, flags)) => Ok(self.spill_suffix(Ast::Cell(row, col, flags))),
+            None => {
+                self.features.names = true;
+                Ok(Ast::Name(name.into_owned()))
+            }
+        }
+    }
+
+    /// The arguments of a call to `name` after its `(`.
+    fn call_at(&mut self, name: Cow<'a, str>, depth: usize) -> Result<Ast, String> {
+        let func = lookup_func(name.as_ref());
+        let mut args = Vec::new();
+        if self.peek() != Some(&Tok::RParen) {
+            loop {
+                if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
+                    args.push(Ast::Missing);
+                } else {
+                    args.push(self.expr_at(depth + 1)?);
+                }
+                match self.peek() {
+                    Some(Tok::Comma) => {
+                        let _ = self.next();
+                    }
+                    _ => break,
+                }
+            }
+        }
+        self.close_paren()?;
+        Ok(match func {
+            Some(func) => Ast::Func(func, args),
+            None => {
+                self.features.names = true;
+                Ast::UnknownFunc(name.into_owned(), args)
+            }
+        })
     }
 
     fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
@@ -1880,6 +2014,7 @@ impl<'a> Parser<'a> {
             }
         }
 
+        self.features.sheet_refs = true;
         let start = self.area_end("!")?;
         let qualifier = UnresolvedSheetRef {
             name: sheet_name.clone(),
@@ -1906,6 +2041,7 @@ impl<'a> Parser<'a> {
     /// to sheet `last`.
     #[cold]
     fn sheet_span_at(&mut self, first: String, last: String, quoted: bool) -> Result<Ast, String> {
+        self.features.sheet_refs = true;
         let start = self.area_end("!")?;
         let (cell, (row_start, col_start, row_end, col_end, range_flags)) =
             if self.peek() == Some(&Tok::Colon) {
@@ -2018,18 +2154,35 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
 
 /// Parse a formula source (with or without a leading `=`) into an AST.
 pub fn parse(src: &str) -> Result<Ast, String> {
+    parse_with_features(src).map(|(ast, _)| ast)
+}
+
+/// [`parse`], with the resolution steps the formula needs.
+pub(crate) fn parse_with_features(src: &str) -> Result<(Ast, ParseFeatures), String> {
     let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
-    let tokens = tokenize(trimmed)?;
     let mut parser = Parser {
-        toks: tokens.toks.into_iter(),
-        intersections: tokens.intersections,
-        sheet_qualifiers: tokens.sheet_qualifiers,
+        cursor: Cursor::over_text(trimmed),
+        features: ParseFeatures::default(),
     };
-    let ast = parser.expr()?;
-    if let Some(tok) = parser.peek() {
-        return Err(trailing_token_error(tok));
+
+    let parsed = parser.expr();
+    let trailing = match parsed {
+        Ok(_) => parser.peek().map(trailing_token_error),
+        Err(_) => None,
+    };
+
+    // Text that does not lex fails the formula wherever it is, before any
+    // parse error.
+    if let Some(error) = parser.cursor.lex_error() {
+        return Err(error);
     }
-    Ok(ast)
+
+    let ast = parsed?;
+    if let Some(error) = trailing {
+        return Err(error);
+    }
+
+    Ok((ast, parser.features))
 }
 
 /// The first error of the parser in `toks`, which end with [`Tok::End`], and
@@ -2038,15 +2191,13 @@ pub fn parse(src: &str) -> Result<Ast, String> {
 /// formula. This is the parse of `parse` on tokens from formula help's
 /// tolerant lexer, so formula help reports exactly what the parser rejects.
 pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
-    let total = toks.len();
     let mut parser = Parser {
-        intersections: toks.contains(&Tok::Intersect),
-        sheet_qualifiers: toks.contains(&Tok::Bang),
-        toks: toks.into_iter(),
+        cursor: Cursor::over_tokens(toks),
+        features: ParseFeatures::default(),
     };
 
     let result = parser.expr();
-    let read = total - parser.toks.len();
+    let read = parser.cursor.consumed;
     match result {
         Ok(_) => match parser.peek() {
             None | Some(Tok::End) => None,

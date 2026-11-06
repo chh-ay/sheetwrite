@@ -22,21 +22,59 @@ const ROW_TOTALS: u32 = 1;
 const COLUMN_TOTALS: u32 = 1 << 1;
 
 /// Measures as `(id, name, formula)`, in pivot value order.
-const MEASURES: [(&str, &str, &str); 6] = [
+const MEASURES: [(&str, &str, &str); 12] = [
     ("credit", "Credit", "=SUM(customers[credit])"),
     ("count", "Customers", "=COUNTA(customers[id])"),
     ("share", "Share", "=SUM(orders[amount])/[Credit]"),
     ("loop-a", "Loop A", "=[Loop B]+1"),
     ("loop-b", "Loop B", "=[loop a]+1"),
     ("unknown", "Unknown", "=[Nothing]"),
+    (
+        "north",
+        "North Amount",
+        "=CALCULATE(SUM(orders[amount]), customers[region]=\"North\")",
+    ),
+    (
+        "region-share",
+        "Region Share",
+        "=SUM(orders[amount])/CALCULATE(SUM(orders[amount]), ALL(customers[region]))",
+    ),
+    (
+        "late-credit",
+        "Late Credit",
+        "=calculate([Credit], orders[month]>=3)",
+    ),
+    (
+        "big",
+        "Big Orders",
+        "=CALCULATE(COUNTA(orders[amount]), 10<orders[amount], ALL(orders[month]))",
+    ),
+    (
+        "nested",
+        "Nested",
+        "=CALCULATE(CALCULATE(SUM(orders[amount])))",
+    ),
+    (
+        "column-filter",
+        "Column Filter",
+        "=CALCULATE(SUM(orders[amount]), orders[amount]>orders[month])",
+    ),
 ];
 const CREDIT: usize = 0;
 const COUNT: usize = 1;
 const SHARE: usize = 2;
 const LOOP: usize = 3;
 const UNKNOWN: usize = 5;
+const NORTH: usize = 6;
+const REGION_SHARE: usize = 7;
+const LATE_CREDIT: usize = 8;
+const BIG: usize = 9;
+const NESTED: usize = 10;
+const COLUMN_FILTER: usize = 11;
+/// Orders above this amount count as big.
+const BIG_AMOUNT: f64 = 10.0;
 /// Pivot values: every measure except `Loop B`.
-const VALUES: [usize; 5] = [0, 1, 2, 3, 5];
+const VALUES: [usize; 11] = [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11];
 
 struct Customer {
     id: String,
@@ -65,7 +103,7 @@ impl Fixture {
         let mut store = CellStore::new();
         let orders_sheet = store.add_sheet(3, ORDERS + 1);
         let customers_sheet = store.add_sheet(3, 11);
-        let output = store.add_sheet(40, 40);
+        let output = store.add_sheet(64, 40);
         let regions = [
             "North", "South", "East", "North", "", "South", "East", "North", "South", "",
         ];
@@ -222,27 +260,59 @@ impl Fixture {
             .filter(|customer| in_region(customer.region))
             .collect();
         let credit: f64 = visible.iter().map(|customer| customer.credit).sum();
+        let in_month = |order: &Order| *month == total || Value::Number(order.month) == *month;
+        let amounts = |keep: &dyn Fn(&Order) -> bool| -> Vec<f64> {
+            self.orders
+                .iter()
+                .filter(|order| keep(order))
+                .map(|order| order.amount)
+                .collect()
+        };
+        let in_cell = |order: &Order| {
+            KEPT_MONTHS.contains(&order.month)
+                && in_month(order)
+                && in_region(self.region_of(&order.customer))
+        };
         match measure {
-            CREDIT => Value::Number(credit),
+            CREDIT | LATE_CREDIT => Value::Number(credit),
             COUNT => Value::Number(visible.len() as f64),
             SHARE => {
-                let amounts: Vec<f64> = self
-                    .orders
-                    .iter()
-                    .filter(|order| {
-                        KEPT_MONTHS.contains(&order.month)
-                            && (*month == total || Value::Number(order.month) == *month)
-                            && in_region(self.region_of(&order.customer))
-                    })
-                    .map(|order| order.amount)
-                    .collect();
+                let amounts = amounts(&in_cell);
                 if amounts.is_empty() {
                     Value::Blank
                 } else {
                     Value::Number(amounts.iter().sum::<f64>() / credit)
                 }
             }
-            LOOP => Value::Error(FormulaError::Value),
+            // The region comparison replaces the region label and filter.
+            NORTH => {
+                let north = amounts(&|order| {
+                    KEPT_MONTHS.contains(&order.month)
+                        && in_month(order)
+                        && self.region_of(&order.customer) == "North"
+                });
+                Value::Number(north.iter().sum())
+            }
+            // ALL removes the region label and filter, so every order of
+            // the cell's months counts, also those without a customer.
+            REGION_SHARE => {
+                let cell = amounts(&in_cell);
+                let months =
+                    amounts(&|order| KEPT_MONTHS.contains(&order.month) && in_month(order));
+                if cell.is_empty() {
+                    Value::Blank
+                } else {
+                    Value::Number(cell.iter().sum::<f64>() / months.iter().sum::<f64>())
+                }
+            }
+            // ALL removes the month label and filter.
+            BIG => {
+                let big = amounts(&|order| {
+                    order.amount > BIG_AMOUNT && in_region(self.region_of(&order.customer))
+                });
+                Value::Number(big.len() as f64)
+            }
+            LOOP | NESTED | COLUMN_FILTER => Value::Error(FormulaError::Value),
             UNKNOWN => Value::Error(FormulaError::Ref),
             _ => unreachable!("no other measure is a pivot value"),
         }

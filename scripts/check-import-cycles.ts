@@ -113,6 +113,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "TableRelationship",
     ],
   },
+  "external-link": {
+    source: "packages/core/src/types/external-link.ts",
+    dependencies: [],
+    exports: ["ExternalLink", "ExternalLinkCell", "ExternalLinkSheet", "ExternalLinkValue"],
+  },
   dashboard: {
     source: "packages/core/src/types/dashboard.ts",
     dependencies: ["cell", "chart", "coordinates", "data-model"],
@@ -211,6 +216,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "coordinates",
       "dashboard",
       "data-model",
+      "external-link",
       "pivot",
       "query",
       "table",

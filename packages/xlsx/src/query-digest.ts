@@ -1,4 +1,4 @@
-import type { SavedQuery } from "@sheetwrite/core";
+import type { ExternalLink, SavedQuery } from "@sheetwrite/core";
 
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 
@@ -43,6 +43,11 @@ export function textDigest(text: string): string {
 /** Fingerprint of `workbook.queries`; retained query parts are valid only while it matches. */
 export function queriesDigest(queries: readonly SavedQuery[] | undefined): string {
   return textDigest(JSON.stringify(canonical(queries ?? [])));
+}
+
+/** Fingerprint of one external link; its retained part is valid only while a link matches it. */
+export function externalLinkDigest(link: ExternalLink): string {
+  return textDigest(JSON.stringify(canonical(link)));
 }
 
 export function queryWarning(context: XlsxCodecContext, message: string, part?: string): void {
