@@ -68,11 +68,7 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
     section !== name ? undefined : pathname === href ? ("page" as const) : ("true" as const);
 
   return (
-    <header
-      className="sw-header"
-      data-has-search={search !== undefined}
-      data-menu-open={menuOpen}
-    >
+    <header className="sw-header" data-has-search={search !== undefined} data-menu-open={menuOpen}>
       <Link aria-label="Sheetwrite home" className="sw-header__brand" to="/">
         <BrandMark />
         <span>Sheetwrite</span>
