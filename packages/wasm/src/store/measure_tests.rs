@@ -487,16 +487,16 @@ const CALCULATE_MEASURES: [&str; 5] = [
 const CALCULATE_REMOVED: [&[usize]; 5] =
     [&[REGION], &[SEGMENT], &[QUARTER, REGION], &[SEGMENT], &[]];
 
-/// Rows passing the report filter whose fields equal the labels at every
-/// level of the paths except the `removed` fields, until a total or blank
-/// label ends a path.
+/// Rows passing the report filter, unless `removed` holds its field, whose
+/// fields equal the labels at every level of the paths except the
+/// `removed` fields, until a total or blank label ends a path.
 fn select_without(
     data: &[Order],
     paths: [(&[usize], &[Value]); 2],
     removed: &[usize],
 ) -> Vec<usize> {
     (0..ROWS)
-        .filter(|&row| KEPT_CHANNELS.contains(&data[row].channel))
+        .filter(|&row| removed.contains(&CHANNEL) || KEPT_CHANNELS.contains(&data[row].channel))
         .filter(|&row| {
             paths.iter().all(|(fields, labels)| {
                 fields
@@ -576,4 +576,55 @@ fn calculate_removes_axis_field_filters() {
             }
         }
     }
+}
+
+/// Errors inside `CALCULATE` reach the enclosing expression, so `IFERROR`
+/// and `ISERROR` see them as in a cell formula: the error row of the base
+/// table, which `ALL` of the channel brings back, and a division by zero.
+const CALCULATE_ERROR_MEASURES: [&str; 5] = [
+    "=CALCULATE(SUM(orders[amount]), ALL(orders[channel]))",
+    "=IFERROR(CALCULATE(SUM(orders[amount]), ALL(orders[channel])), -1)",
+    "=ISERROR(CALCULATE(SUM(orders[amount]), ALL(orders[channel])))",
+    "=IFERROR(CALCULATE(SUM(orders[qty])/0, ALL(orders[region])), -2)",
+    "=ISERROR(CALCULATE(SUM(orders[qty])/0, ALL(orders[region])))",
+];
+
+#[test]
+fn errors_inside_calculate_reach_iferror_and_iserror() {
+    let (rows, columns, flags): (&[usize], &[usize], u32) =
+        (&[REGION], &[QUARTER], ROW_TOTALS | COLUMN_TOTALS);
+    let mut fixture = MeasureFixture::new(23);
+    fixture.set_measures(&CALCULATE_ERROR_MEASURES);
+    fixture.install(rows, columns, flags);
+    let mut errors = 0;
+
+    for cell in fixture.measure_cells(rows, columns, flags) {
+        let paths: [(&[usize], &[Value]); 2] =
+            [(rows, &cell.row_labels), (columns, &cell.col_labels)];
+        let context = select_without(&fixture.data, paths, &[CHANNEL]);
+        let amount_error = context.contains(&ERROR_ROW);
+        let amount: f64 = context
+            .iter()
+            .filter_map(|&row| match fixture.data[row].amount {
+                Amount::Number(number) => Some(number),
+                _ => None,
+            })
+            .sum();
+        let expected = match (cell.slot, amount_error) {
+            (0, true) => Value::Error(FormulaError::DivZero),
+            (0, false) => Value::Number(amount),
+            (1, true) => Value::Number(-1.0),
+            (1, false) => Value::Number(amount),
+            (2, error) => Value::Bool(error),
+            (3, _) => Value::Number(-2.0),
+            _ => Value::Bool(true),
+        };
+        errors += usize::from(amount_error && cell.slot == 0);
+        assert_eq!(
+            cell.actual, expected,
+            "measure {} at {:?}",
+            cell.slot, cell.at
+        );
+    }
+    assert!(errors > 0, "some cells see the error row");
 }

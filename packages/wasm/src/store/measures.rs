@@ -562,9 +562,8 @@ impl CellStore {
     /// (0 for the measure's own, `k + 1` for calculation `k`), binding each
     /// of its column names to the settled values of its table's rows in the
     /// cell (`rows_of(table)`), as LAMBDA binds parameters. The measure's
-    /// own expression also reads the `calculated` values; an error among
-    /// them is the measure's value. A measure returns one value, so an
-    /// array result is `#VALUE!`.
+    /// own expression also reads the `calculated` values. A measure returns
+    /// one value, so an array result is `#VALUE!`.
     #[inline(never)]
     fn measure_family<'r>(
         &self,
@@ -581,10 +580,14 @@ impl CellStore {
             }
         }
         for (calculation, value) in measure.calculations.iter().zip(calculated) {
-            let value = match value {
-                Value::Error(error) => return Value::Error(*error),
-                Value::Blank => Ast::Missing,
-                value => literal(value),
+            // A blank or an error is a one-cell matrix; INDEX reads it as one
+            // value, so the expression around it, IFERROR included, sees it
+            // as it would the CALCULATE itself.
+            let value = match literal(value) {
+                matrix @ Ast::BoundMatrix { .. } => {
+                    Ast::Func(Func::Index, vec![matrix, Ast::Num(1.0), Ast::Num(1.0)])
+                }
+                value => value,
             };
             bindings.push((&calculation.name, value));
         }
