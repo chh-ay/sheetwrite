@@ -48,7 +48,7 @@ interface DocsShellProps {
   outline?: readonly OutlineItem[];
   /**
    * Include the outline: on the right on wide screens, a collapsible row above
-   * the article on narrow ones. The task-oriented overview omits it.
+   * the article on narrow ones. Error and not-found pages omit it.
    */
   reserveOutline?: boolean;
   title: string;
@@ -350,7 +350,7 @@ export function DocsShell({
 
   return (
     <div
-      className={`sw-docs${activeHref === "/docs/" ? " sw-docs--overview" : ""}${kind === undefined ? "" : " sw-docs--api"}`}
+      className={`sw-docs${kind === undefined ? "" : " sw-docs--api"}`}
     >
       <a className="sw-skip-link" href="#main-content">
         Skip to content
