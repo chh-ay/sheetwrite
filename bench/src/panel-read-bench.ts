@@ -1,6 +1,7 @@
 // Panel reads of a large source range: the pivot field list (distinct values
-// of a filter field) and Insert › Chart (category and header inference).
-// The output records each result so two runs can be compared for equality.
+// of a filter field), dashboard slicer values and Insert › Chart (category and
+// header inference). The output records each result so two runs can be
+// compared for equality.
 
 import "./dom-setup.js";
 import { createHash } from "node:crypto";
@@ -13,8 +14,10 @@ import {
   createGrid,
   initSheetwrite,
   type Column,
+  type DashboardSlicerItem,
   type PivotDefinition,
 } from "../../packages/core/src/index.js";
+import { slicerValuesOf } from "../../packages/core/src/dashboard/dashboard-engine.js";
 import { insertChart } from "../../packages/core/src/panels/panel-controller.js";
 import { pivotPanel } from "../../packages/core/src/panels/pivot-panel.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
@@ -67,10 +70,27 @@ const pivot: PivotDefinition = {
   values: [],
   filters: [{ field: 0, values: groups }],
 };
+const table = {
+  id: "panel-table",
+  name: "PanelTable",
+  range,
+  columns: [
+    { id: "region", name: "Region" },
+    { id: "amount", name: "Amount" },
+  ],
+  headerRow: true,
+  totalsRow: false,
+};
+const slicer: DashboardSlicerItem = {
+  id: "panel-slicer",
+  box: { x: 0, y: 0, w: 2, h: 4 },
+  kind: "slicer",
+  field: { table: table.id, column: "region" },
+};
 const grid = createGrid(host, {
   workbook: {
     activeSheet: SHEET,
-    sheets: [{ id: SHEET, name: "Source", rowCount: ROW_COUNT, columns }],
+    sheets: [{ id: SHEET, name: "Source", rowCount: ROW_COUNT, columns, tables: [table] }],
   },
   data: { rowCount: ROW_COUNT, columns: { region: labels, amount: amounts } },
   config: { toolbar: false, find: false, contextMenu: false },
@@ -104,6 +124,14 @@ try {
     };
   });
 
+  let slicerValues = "";
+  const slicerMs = measure(() => {
+    const values = slicerValuesOf(grid.store, slicer);
+    return () => {
+      slicerValues = JSON.stringify(values);
+    };
+  });
+
   grid.setSelection({ kind: "range", range });
   let chartDefinition = "";
   const chartMs = measure(() => {
@@ -131,8 +159,9 @@ try {
         groups: GROUP_COUNT,
         warmups: WARMUPS,
         samples: SAMPLES,
-        results: { pivotPanelDigest, chartDefinition },
+        results: { pivotPanelDigest, slicerValues, chartDefinition },
         pivotPanelMs: summarize(pivotMs),
+        slicerValuesMs: summarize(slicerMs),
         insertChartMs: summarize(chartMs),
       },
       null,
