@@ -168,6 +168,12 @@
   }
 }
 
+/* On a phone the dashboard keeps cards wide enough for their values and
+   scrolls sideways, instead of shrinking twelve columns to the screen. */
+.sw-feature-grid .sheetwrite-dashboard-grid {
+  min-width: 40rem;
+}
+
 /* Rows of the side-panel lists answer the pointer like the readout rows. */
 :is(.sw-feature-changes, .sw-feature-runs) > li {
   border-radius: var(--sw-radius-xs);
