@@ -99,6 +99,27 @@ fn a_row_or_column_edit_changes_only_the_moved_references() {
     );
 }
 
+/// Each edit rewrites the tree; the text, and FORMULATEXT, show every edit
+/// made before they are read.
+#[test]
+fn several_edits_before_a_read_all_reach_the_text() {
+    let (mut store, sales, summary) = two_sheets();
+    enter(&mut store, summary, &["=(Sales!B2 + 1) * 2"]);
+    store.set_formula(summary, 0, 1, "=FORMULATEXT(A1)", 0);
+
+    assert!(store.rename_sheet(sales, "sales", "North"));
+    assert!(store.add_rows(sales, 0, 1));
+    assert!(store.remove_cols(sales, 0, 1));
+    store.recompute(summary);
+
+    let expected = "=(North!A3 + 1) * 2";
+    assert_eq!(texts(&store, summary, 0, 1), [expected]);
+    assert_eq!(
+        store.get_cell(summary, 0, 1).string().as_deref(),
+        Some(expected)
+    );
+}
+
 #[test]
 fn a_deleted_reference_becomes_ref_error_and_the_rest_stays() {
     let (mut store, sales, _) = two_sheets();
