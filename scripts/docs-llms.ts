@@ -501,10 +501,9 @@ function convertDocumentBody(body: string): string {
 
 function convertProseLine(line: string): string {
   if (isMdxImport(line)) return "";
-  const tabItem = /^\s*<TabItem\s+label="([^"]*)">\s*$/.exec(line);
-  if (tabItem !== null) return `**${tabItem[1]}**`;
-  if (/^\s*<\/?Tabs\b[^>]*>\s*$/.test(line)) return "";
-  if (/^\s*<\/?TabItem\b[^>]*>\s*$/.test(line)) return "";
+  const tab = /^\s*<Tab\s+title="([^"]*)">\s*$/.exec(line);
+  if (tab !== null) return `**${tab[1]}**`;
+  if (/^\s*<\/?(?:Tabs|Tab)\b[^>]*>\s*$/.test(line)) return "";
   if (/^\s*<\/?[A-Z][A-Za-z0-9]*(\s[^>]*)?\/?>\s*$/.test(line)) return "";
   return plainText(absolutizeMarkdownLinks(convertInlineHtml(line)));
 }
