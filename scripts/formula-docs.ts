@@ -124,6 +124,27 @@ function parseSignatureProfiles(value: unknown): Record<string, SignatureProfile
   );
 }
 
+/** One argument as a call shows it: `[name]` when optional. */
+function argumentHtml(argument: FormulaArgument): string {
+  const name = `<span class="sw-code-property">${html(argument.name)}</span>`;
+  return argument.required
+    ? name
+    : `<span class="sw-code-punctuation">[</span>${name}<span class="sw-code-punctuation">]</span>`;
+}
+
+/**
+ * A function's call syntax from its signature profile, coloured with the
+ * site's code roles: `SUMSQ(value, …)`, `ROUND(number, digits)`. Optional
+ * arguments are bracketed; arguments that repeat end the list with `, …`.
+ */
+function formulaSyntaxHtml(name: string, signature: SignatureProfile | undefined): string {
+  const parts = (signature?.arguments ?? []).map(argumentHtml);
+  const repeats = signature?.arguments.some((argument) => argument.repeat !== "once") ?? false;
+  if (repeats) parts.push("…");
+  const comma = '<span class="sw-code-punctuation">, </span>';
+  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span><span class="sw-code-punctuation">(</span>${parts.join(comma)}<span class="sw-code-punctuation">)</span></code>`;
+}
+
 function parseFunctions(value: unknown): FormulaRecord[] {
   if (!Array.isArray(value)) throw new Error("functions must be an array");
   return value.map((entry, index): FormulaRecord => {
@@ -427,7 +448,7 @@ export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaRefe
       "",
       '<section class="sw-formula-family">',
       "",
-      '<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
+      '<table class="sw-formula-table"><thead><tr><th>Function and syntax</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
       ...family.functions.map((formula) => {
         const names = [formula.canonical, ...formula.aliases];
         const aliases = formula.aliases.map((name) => `<code>${html(name)}</code>`).join(", ");
@@ -453,7 +474,8 @@ export function renderFormulaFunctionPages(inventoryValue: unknown): FormulaRefe
               `<a href="#${prefix}-${anchor(id)}">${label}: <code>${html(id)}</code></a>`,
           )
           .join("<br />");
-        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td><code>${html(formula.canonical)}</code>${aliases ? `<small>${aliases}</small>` : ""}</td><td><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
+        const syntax = formulaSyntaxHtml(formula.canonical, signatures[formula.signature]);
+        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}</td><td data-label="Engine"><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td data-label="Contract"><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
       }),
       "</tbody></table>",
       "",

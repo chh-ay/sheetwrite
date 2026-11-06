@@ -83,4 +83,27 @@ describe("code enhancements", () => {
       restoreResizeObserver();
     }
   });
+
+  it("moves the block's one Tab stop with the arrow keys", () => {
+    const page = document.createElement("article");
+    page.innerHTML = `
+      <div class="expressive-code"><pre><code><span class="sw-code-popover__trigger" tabindex="0">grid</span>.<span class="sw-code-popover__trigger" tabindex="-1">undo</span>(<a class="sw-code-ref" href="/docs/api/core/grid/" tabindex="-1">Grid</a>)</code></pre></div>`;
+    document.body.append(page);
+    const [first, second, third] = page.querySelectorAll<HTMLElement>(
+      ".sw-code-popover__trigger, .sw-code-ref",
+    );
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error("The block has three symbols");
+    }
+    uninstall = initializeCodeEnhancements();
+    first.focus();
+
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(document.activeElement === second).toBe(true);
+    expect([first.tabIndex, second.tabIndex, third.tabIndex]).toEqual([-1, 0, -1]);
+
+    second.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+    expect(document.activeElement === third).toBe(true);
+    expect([first.tabIndex, second.tabIndex, third.tabIndex]).toEqual([-1, -1, 0]);
+  });
 });

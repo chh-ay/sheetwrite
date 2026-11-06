@@ -4,6 +4,8 @@
  *
  * - A code block wider than its column becomes a focusable region, so a
  *   keyboard can scroll it.
+ * - A code block is one Tab stop: arrow keys move focus between its symbols
+ *   and the block remembers the last one (see `roving-code-focus.ts`).
  * - Code hover popovers load on demand: their runtime and Floating UI stay out
  *   of the first load. They load at the first idle moment after the page is
  *   hydrated, or as soon as the pointer or keyboard focus reaches a code
@@ -12,14 +14,63 @@
  */
 
 import type * as CodePopovers from "./code-popovers.js";
+import { CODE_SYMBOL_CLASSES } from "./roving-code-focus.js";
 
 const CODE_BLOCK_SELECTOR = ".expressive-code pre";
 const CODE_FRAME_SELECTOR = ".expressive-code";
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
+const CODE_SYMBOL_SELECTOR = CODE_SYMBOL_CLASSES.map((name) => `.${name}`).join(", ");
 /** The latest the popover runtime loads when the browser never goes idle. */
 const IDLE_LOAD_TIMEOUT_MS = 2000;
 
 let uninstallEnhancements: (() => void) | null = null;
+
+/** Makes `symbol` its block's one Tab stop. */
+function moveTabStop(symbols: readonly HTMLElement[], symbol: HTMLElement): void {
+  for (const other of symbols) other.tabIndex = other === symbol ? 0 : -1;
+}
+
+function codeSymbolsOf(block: Element): HTMLElement[] {
+  return [...block.querySelectorAll<HTMLElement>(CODE_SYMBOL_SELECTOR)];
+}
+
+/** The symbol an arrow key moves to: next/previous, first/last, or none. */
+function arrowTarget(key: string, symbols: readonly HTMLElement[], index: number) {
+  if (key === "ArrowRight" || key === "ArrowDown") return symbols[index + 1];
+  if (key === "ArrowLeft" || key === "ArrowUp") return symbols[index - 1];
+  if (key === "Home") return symbols[0];
+  if (key === "End") return symbols.at(-1);
+  return undefined;
+}
+
+function handleSymbolKeyDown(event: KeyboardEvent): void {
+  if (!(event.target instanceof HTMLElement) || !event.target.matches(CODE_SYMBOL_SELECTOR)) return;
+  const block = event.target.closest("pre");
+  if (block === null) return;
+  const symbols = codeSymbolsOf(block);
+  const next = arrowTarget(event.key, symbols, symbols.indexOf(event.target));
+  if (next === undefined) return;
+  event.preventDefault();
+  moveTabStop(symbols, next);
+  next.focus();
+}
+
+/** A symbol focused by pointer becomes the block's Tab stop, so Tab resumes there. */
+function handleSymbolFocus(event: FocusEvent): void {
+  if (!(event.target instanceof HTMLElement) || !event.target.matches(CODE_SYMBOL_SELECTOR)) return;
+  const block = event.target.closest("pre");
+  if (block !== null && event.target.tabIndex !== 0)
+    moveTabStop(codeSymbolsOf(block), event.target);
+}
+
+function installRovingCodeFocus(): () => void {
+  document.addEventListener("keydown", handleSymbolKeyDown);
+  document.addEventListener("focusin", handleSymbolFocus);
+  return () => {
+    document.removeEventListener("keydown", handleSymbolKeyDown);
+    document.removeEventListener("focusin", handleSymbolFocus);
+  };
+}
 
 /** A code block that scrolls sideways is a focusable region, so keyboards can scroll it. */
 function synchronizeCodeBlockFocus(pre: HTMLPreElement): void {
@@ -167,9 +218,11 @@ function installPopoversOnDemand(): () => void {
 export function initializeCodeEnhancements(): () => void {
   if (uninstallEnhancements !== null) return () => {};
   const uninstallCodeBlockFocus = installCodeBlockFocus();
+  const uninstallRoving = installRovingCodeFocus();
   const uninstallPopovers = installPopoversOnDemand();
   uninstallEnhancements = () => {
     uninstallPopovers();
+    uninstallRoving();
     uninstallCodeBlockFocus();
     uninstallEnhancements = null;
   };

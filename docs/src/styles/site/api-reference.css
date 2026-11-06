@@ -3,7 +3,6 @@
    disclosures, so the generic frame border/radius/margins must lose the
    cascade here. Generated markup must never widen the document; long
    identifiers wrap or scroll locally. */
-.api-pagehead,
 .api-metadata,
 .api-member-list,
 .api-member,
@@ -71,37 +70,6 @@
   border-color: color-mix(in srgb, var(--api-kind-color) 32%, var(--sw-border));
   color: color-mix(in srgb, var(--api-kind-color) 72%, var(--sw-fg));
   background: color-mix(in srgb, var(--api-kind-color) 8%, var(--sw-surface-2));
-}
-
-/* Symbol pages open with one quiet row: back link left, kind chip right. */
-.api-pagehead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sw-space-3);
-  margin-bottom: var(--sw-space-6);
-}
-
-.sw-prose .api-backlink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sw-space-1-5);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
-  font-weight: var(--sw-weight-medium);
-  text-decoration: none;
-}
-
-.sw-prose .api-backlink::before {
-  content: "";
-  width: var(--sw-icon-sm);
-  height: var(--sw-icon-sm);
-  background: currentColor;
-  mask: var(--sw-icon-mask-arrow-left) center / contain no-repeat;
-}
-
-.sw-prose .api-backlink:hover {
-  color: var(--sw-accent-strong);
 }
 
 .api-metadata {
@@ -371,16 +339,17 @@
 
 .api-member summary::before,
 .api-declaration summary::before {
-  content: "";
+  /* A zero-width character gives the marker a text baseline: it lines up
+     with the member name's baseline, and the chevron is centred in its
+     line box, on the first line of a row that wraps. */
+  content: "\200b";
   flex: none;
-  /* Centred on the first line of the row, which may wrap. */
-  align-self: flex-start;
   width: var(--sw-icon-sm);
-  height: var(--sw-icon-sm);
-  margin-top: calc((1lh - var(--sw-icon-sm)) / 2);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
   background: currentColor;
   color: var(--sw-fg-muted);
-  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  mask: var(--sw-icon-mask-chevron-right) center / var(--sw-icon-sm) var(--sw-icon-sm) no-repeat;
   transition:
     transform var(--sw-motion-fast) var(--sw-motion-standard),
     color var(--sw-motion-fast) var(--sw-motion-standard);
@@ -628,10 +597,6 @@
 }
 
 @media (max-width: 30rem) {
-  .api-pagehead {
-    flex-wrap: wrap;
-  }
-
   .api-metadata div {
     grid-template-columns: 1fr;
     gap: var(--sw-space-0-5);

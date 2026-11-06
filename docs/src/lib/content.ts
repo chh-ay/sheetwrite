@@ -9,6 +9,8 @@ import type { ReactNode } from "react";
 export interface DocumentFrontmatter {
   title: string;
   description: string;
+  /** Declaration kind of a generated API symbol page (`interface`, `function`, …). */
+  kind?: string;
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -67,6 +69,7 @@ export async function documentForSplat(
   return {
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
+    kind: module.frontmatter?.kind,
   };
 }
 

@@ -733,8 +733,9 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
 }
 
 /**
- * Member rows plus an anchor index for long lists. Members start collapsed;
- * explicit fragment navigation reveals its target through the docs shell.
+ * The Members section: its heading, an anchor index for long lists, then the
+ * member rows. Members start collapsed; explicit fragment navigation reveals
+ * its target through the docs shell.
  */
 function renderMembers(
   pkg: ApiPackage,
@@ -743,7 +744,7 @@ function renderMembers(
   members: readonly DeclarationMember[],
   routes: DocumentationLinkRoutes,
   aliases: ReadonlyMap<string, UnionAlias>,
-): { index: string; list: string } {
+): string {
   const searchTargets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
       (target) =>
@@ -815,23 +816,26 @@ function renderMembers(
       "</details>",
     ].join("\n");
   });
-  return {
-    index:
-      members.length <= MEMBER_INDEX_MINIMUM
-        ? ""
-        : [
-            '<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>',
-            ...indexLinks,
-            "</nav>",
-          ].join("\n"),
-    list: [
-      `## Members <span class="api-count" data-pagefind-ignore>${members.length}</span>`,
-      "",
-      '<div class="api-member-list">',
-      ...rows,
-      "</div>",
-    ].join("\n"),
-  };
+  // Overloads share one entry in the index and in the count.
+  const memberCount = new Set(members.map((member) => member.name)).size;
+  const index =
+    members.length <= MEMBER_INDEX_MINIMUM
+      ? []
+      : [
+          '<nav class="api-member-index" aria-labelledby="api-member-index-label" data-pagefind-ignore>',
+          '<span class="api-member-index__label" id="api-member-index-label">Jump to a member</span>',
+          ...indexLinks,
+          "</nav>",
+          "",
+        ];
+  return [
+    `## Members <span class="api-count" data-pagefind-ignore>${memberCount}</span>`,
+    "",
+    ...index,
+    '<div class="api-member-list">',
+    ...rows,
+    "</div>",
+  ].join("\n");
 }
 
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
@@ -854,9 +858,8 @@ export async function renderSymbolPage(
   const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
   const body = [
-    frontmatter(`${item.name} | ${label}`, description).trimEnd(),
+    frontmatter(`${item.name} | ${label}`, description, item.kind).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
-    `<div class="api-pagehead"><a class="api-backlink" href="/docs/api/${entrySlug(pkg.name, entry.subpath)}/">${html(label)}</a><span class="api-status" data-kind="${item.kind}">${item.kind}</span></div>`,
     "",
     summary,
     "",
@@ -866,9 +869,7 @@ export async function renderSymbolPage(
     "",
   ];
   if (shape.members.length > 0) {
-    const members = renderMembers(pkg, entry, item, shape.members, routes, aliases);
-    if (members.index.length > 0) body.push(members.index, "");
-    body.push(members.list, "");
+    body.push(renderMembers(pkg, entry, item, shape.members, routes, aliases), "");
   }
 
   // A variants section earns its space only for structured unions; scalar

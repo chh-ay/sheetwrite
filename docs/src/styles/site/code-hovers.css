@@ -92,29 +92,18 @@
   scrollbar-width: thin;
 }
 
-/* The signature uses the site code theme. Expressive Code renders each token
-   with both theme colours: `--0` light, `--1` dark. */
+/* The signature uses the site code theme: tokens carry the `sw-code-<role>`
+   classes from components.css, which read the theme's colour tokens. */
 .sw-code-popover__signature {
   display: block;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  overflow-x: auto;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
   background: var(--sw-code-bg);
   color: var(--sw-code-fg);
   font: var(--sw-weight-regular) var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
   tab-size: 2;
   white-space: pre;
-}
-
-.sw-code-popover__signature span[style] {
-  color: var(--0);
-}
-
-:root[data-theme="dark"] .sw-code-popover__signature span[style] {
-  color: var(--1);
-}
-
-.sw-code-popover__signature {
-  padding: var(--sw-space-3) var(--sw-space-4);
-  overflow-x: auto;
-  border-bottom: var(--sw-border-width) solid var(--sw-border);
 }
 
 .sw-code-popover__signature--narrow {
@@ -135,20 +124,25 @@
 
 .sw-code-popover__tags {
   display: grid;
-  gap: var(--sw-space-2);
+  gap: var(--sw-space-1-5);
   color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
 }
 
 .sw-code-popover__docs + .sw-code-popover__tags {
   padding-top: 0;
 }
 
+/* Tag labels and the "See also" lead-in read as body text, one weight up. */
 .sw-code-popover__tag-name {
   margin-inline-end: var(--sw-space-1-5);
+  color: var(--sw-fg);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-code-popover__separator {
+  margin-inline: var(--sw-space-2);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
 }
 
 .sw-code-popover__tag-link {

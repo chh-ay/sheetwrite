@@ -38,6 +38,8 @@ interface DocsShellProps {
   activeHref?: string;
   children: ReactNode;
   description: string;
+  /** Declaration kind of an API symbol page, shown as a chip beside the title. */
+  kind?: string;
   /**
    * Include a collapsible outline above the article on narrow screens.
    * The task-oriented overview omits it.
@@ -100,7 +102,11 @@ function LatestReleaseCard({
 
 const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
 
-/** New/Updated marker for the latest release; text, so screen readers announce it. */
+/**
+ * New/Updated marker for a page changed in the latest release; text, so
+ * screen readers announce it. Only page links carry it: a group marker would
+ * repeat its pages' markers on a collapsed row.
+ */
 function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
   const badge = navigationBadge(item, LATEST_RELEASE.version);
   if (badge === undefined) return null;
@@ -159,7 +165,6 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
       <details className="sw-nav-subgroup" key={`${item.label}:${open}`} open={open}>
         <summary>
           <span>{item.label}</span>
-          <NavigationBadgeLabel item={item} />
           <Icon className="sw-disclosure-icon" name="chevron-right" />
         </summary>
         <div>
@@ -196,7 +201,6 @@ function NavigationSections({
         >
           <summary>
             <span>{section.label}</span>
-            <NavigationBadgeLabel item={section} />
             <Icon className="sw-disclosure-icon" name="chevron-right" />
           </summary>
           <div>
@@ -341,6 +345,7 @@ export function DocsShell({
   activeHref,
   children,
   description,
+  kind,
   reserveOutline,
   title,
 }: Readonly<DocsShellProps>) {
@@ -415,6 +420,11 @@ export function DocsShell({
           <Breadcrumbs trail={breadcrumbsFor(activeHref, titleMain ?? title)} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
+            {kind === undefined ? null : (
+              <span className="api-status" data-kind={kind} data-pagefind-ignore>
+                {kind}
+              </span>
+            )}
             {titlePackage ? (
               <code className="sw-title-package" data-pagefind-ignore>
                 {titlePackage}

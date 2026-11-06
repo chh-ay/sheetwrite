@@ -10,10 +10,21 @@
  * keyboard focus open the same panel, which is the trigger's accessible
  * description (`aria-describedby`) while it is shown.
  */
-import { autoUpdate, computePosition, flip, offset, shift, size } from "@floating-ui/dom";
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  type Placement,
+  shift,
+  size,
+  type VirtualElement,
+} from "@floating-ui/dom";
 
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
 const STORE_SELECTOR = "template.sw-code-popover-store";
+/** One code line; a wrapped line is one element over several visual rows. */
+const LINE_SELECTOR = ".ec-line";
 /** The sticky site header; panels never open underneath it. */
 const HEADER_SELECTOR = ".sw-header";
 /** Marks the trigger whose panel is open. */
@@ -141,14 +152,62 @@ function viewportPadding(): { top: number; right: number; bottom: number; left: 
   };
 }
 
-async function positionPopover(trigger: HTMLElement, panel: HTMLElement): Promise<void> {
+/**
+ * The anchor box: the trigger's horizontal extent over its whole code line
+ * (all visual rows of a wrapped line), so the panel opens clear of the line
+ * instead of over the characters right below the trigger.
+ */
+function lineAnchor(trigger: HTMLElement): VirtualElement {
+  const line = trigger.closest(LINE_SELECTOR) ?? trigger;
+  return {
+    contextElement: trigger,
+    getBoundingClientRect() {
+      const { left, width } = trigger.getBoundingClientRect();
+      const { top, height } = line.getBoundingClientRect();
+      return {
+        x: left,
+        y: top,
+        left,
+        top,
+        width,
+        height,
+        right: left + width,
+        bottom: top + height,
+      };
+    },
+  };
+}
+
+/**
+ * Below the line, unless the symbol's other mentions sit only below it: then
+ * above, so the highlighted mentions stay visible. With mentions on both
+ * sides, the side with fewer of them.
+ */
+function preferredPlacement(trigger: HTMLElement, related: readonly HTMLElement[]): Placement {
+  const line = (trigger.closest(LINE_SELECTOR) ?? trigger).getBoundingClientRect();
+  let above = 0;
+  let below = 0;
+  for (const mention of related) {
+    const { top } = mention.getBoundingClientRect();
+    if (top >= line.bottom) below += 1;
+    else if (top < line.top) above += 1;
+  }
+  return below > above ? "top-start" : "bottom-start";
+}
+
+async function positionPopover(
+  anchor: VirtualElement,
+  panel: HTMLElement,
+  placement: Placement,
+): Promise<void> {
   const padding = viewportPadding();
-  const { x, y, placement } = await computePosition(trigger, panel, {
+  const opposite: Placement = placement === "top-start" ? "bottom-start" : "top-start";
+  const result = await computePosition(anchor, panel, {
     strategy: "fixed",
-    placement: "bottom-start",
+    placement,
     middleware: [
       offset(PANEL_OFFSET_PX),
-      flip({ padding, fallbackPlacements: ["top-start", "bottom-end", "top-end"] }),
+      flip({ padding, fallbackPlacements: [opposite, "bottom-end", "top-end"] }),
       shift({ padding }),
       size({
         padding,
@@ -161,8 +220,8 @@ async function positionPopover(trigger: HTMLElement, panel: HTMLElement): Promis
       }),
     ],
   });
-  panel.dataset.placement = placement;
-  Object.assign(panel.style, { left: `${x}px`, top: `${y}px` });
+  panel.dataset.placement = result.placement;
+  Object.assign(panel.style, { left: `${result.x}px`, top: `${result.y}px` });
 }
 
 /** Opens the panel of `trigger`, closing any other open panel. */
@@ -184,14 +243,15 @@ export function openCodePopover(trigger: HTMLElement): void {
     if (!trigger.isConnected) closePopover();
   });
   detachWatcher.observe(document.body, { childList: true, subtree: true });
-  activePopover = {
-    trigger,
+  const anchor = lineAnchor(trigger);
+  const placement = preferredPlacement(trigger, related);
+  // Positions synchronously in microtasks, so the first painted frame is placed.
+  const stopPositioning = autoUpdate(
+    anchor,
     panel,
-    related,
-    // Positions synchronously in microtasks, so the first painted frame is placed.
-    stopPositioning: autoUpdate(trigger, panel, () => void positionPopover(trigger, panel)),
-    detachWatcher,
-  };
+    () => void positionPopover(anchor, panel, placement),
+  );
+  activePopover = { trigger, panel, related, stopPositioning, detachWatcher };
 }
 
 function handlePointerOver(event: PointerEvent): void {

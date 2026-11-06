@@ -23,6 +23,7 @@ import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
+import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
@@ -455,6 +456,7 @@ export default defineConfig({
           hydrateFormulaReference,
           visualizeReleaseResults,
           dedupeCodePopovers,
+          rovingCodeFocus,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,
           markResponsiveCodeBlocks,

@@ -72,12 +72,10 @@
 }
 .sw-release-card__badge {
   border-radius: var(--sw-radius-pill);
-  padding: var(--sw-space-0-5) var(--sw-space-2);
-  color: var(--sw-accent-ink);
-  background: var(--sw-accent);
-  font: var(--sw-weight-bold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
+  padding: 0 var(--sw-space-1-5);
+  background: var(--sw-accent-soft);
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
 }
 .sw-release-card strong {
   color: var(--sw-fg-strong);
@@ -211,21 +209,15 @@ details[open] > summary > .sw-disclosure-icon {
   margin: var(--sw-space-0-5) 0 var(--sw-space-1) var(--sw-space-4);
   border-left: var(--sw-border-width) solid var(--sw-border);
 }
+/* One quiet badge for pages changed in the latest release: tinted, never a
+   solid fill, so it never outweighs the current page's highlight. */
 .sw-nav-badge {
   flex: 0 0 auto;
   border-radius: var(--sw-radius-pill);
   padding: 0 var(--sw-space-1-5);
-  font: var(--sw-weight-bold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
-}
-.sw-nav-badge[data-badge="new"] {
-  color: var(--sw-accent-ink);
-  background: var(--sw-accent);
-}
-.sw-nav-badge[data-badge="updated"] {
+  background: var(--sw-accent-soft);
   color: var(--sw-accent-strong);
-  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
 }
 .sw-sidebar__nav section {
   border-top: 1px solid var(--sw-border);
@@ -346,11 +338,12 @@ details[open] > summary > .sw-disclosure-icon {
     var(--sw-font-display);
   letter-spacing: var(--sw-tracking-heading);
 }
+/* Bold, with a section's worth of space above, so an h3 stands clear of the
+   bold lead-ins of the list items under it. */
 .sw-docs .sw-prose h3 {
-  margin: var(--sw-space-10) 0 var(--sw-space-3);
+  margin: var(--sw-space-12) 0 var(--sw-space-3);
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-h3) / var(--sw-leading-heading)
-    var(--sw-font-display);
+  font: var(--sw-weight-bold) var(--sw-text-h3) / var(--sw-leading-heading) var(--sw-font-display);
   letter-spacing: var(--sw-tracking-heading);
 }
 .sw-docs .sw-prose h4 {
@@ -392,14 +385,14 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-toc {
   display: none;
 }
+/* The outline's label is set like the sidebar's section rows: body face,
+   one weight up, no second (mono, uppercase) label style. */
 .sw-toc__label {
   display: block;
-  margin-bottom: var(--sw-space-3);
+  margin-bottom: var(--sw-space-2);
   padding-left: var(--sw-space-4);
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: var(--sw-tracking-eyebrow);
-  text-transform: uppercase;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
 }
 .sw-toc ul,
 .sw-toc-inline ul {
@@ -460,6 +453,7 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-toc-inline .sw-toc__label {
   display: inline;
   margin: 0;
+  padding: 0;
 }
 .sw-toc-inline ul {
   margin-top: var(--sw-space-3);
@@ -528,21 +522,26 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-prose h3[hidden] {
   display: none;
 }
-.sw-docs .api-pagehead {
-  padding-bottom: var(--sw-space-3);
-}
 .sw-docs .api-metadata {
   margin: var(--sw-space-4) 0 var(--sw-space-6);
   font-size: var(--sw-text-caption);
 }
 /* Member names read as a scannable index in columns, not as a wall of chips. */
+/* The index sits under the Members heading: a labelled grid of names. */
 .sw-docs .api-member-index {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
   gap: var(--sw-space-0-5) var(--sw-space-5);
+  margin: 0 0 var(--sw-space-6);
   padding: 0;
   border: 0;
   background: transparent;
+}
+.sw-docs .api-member-index__label {
+  grid-column: 1 / -1;
+  margin-bottom: var(--sw-space-1);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
 }
 .sw-docs .api-member-index a {
   overflow: hidden;

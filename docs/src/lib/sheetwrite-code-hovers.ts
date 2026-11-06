@@ -11,6 +11,8 @@ import { ExpressiveCode } from "expressive-code";
 import { format } from "prettier";
 import { svelte2tsx } from "svelte2tsx";
 
+import { CODE_ROLES, type CodeRole } from "./code-roles.js";
+import { themeTokens, tokenColour } from "./design-tokens.js";
 import { hashIdentifier } from "./hash-identifier.js";
 import {
   injectHoverPrelude,
@@ -292,6 +294,60 @@ function capPreviewLines(formatted: string, maxLines: number): string {
   return [...kept, `  // … ${remaining} more lines — see the API reference`, "}"].join("\n");
 }
 
+/** Light-theme token colour -> syntax role; each role's colour is unique. */
+let roleByColour: ReadonlyMap<string, CodeRole> | undefined;
+
+function codeRoleOf(colour: string): CodeRole | undefined {
+  if (roleByColour === undefined) {
+    const tokens = themeTokens("light");
+    roleByColour = new Map(
+      CODE_ROLES.map((role) => [tokenColour(tokens, `--sw-code-${role}`), role]),
+    );
+  }
+  return roleByColour.get(colour.toLowerCase());
+}
+
+const LIGHT_COLOUR = /--0:\s*(#[0-9a-fA-F]{3,8})/;
+
+/**
+ * Highlighted tokens as role classes (`sw-code-keyword`) instead of the
+ * per-span `--0`/`--1` colour properties Expressive Code writes. A panel can
+ * hold a few hundred token spans; custom properties on every one made the
+ * browser build a separate style for each when the panel first opened.
+ * Plain-text tokens lose their span altogether.
+ */
+function withRoleClasses(nodes: readonly ElementContent[]): ElementContent[] {
+  const output: ElementContent[] = [];
+  const pushText = (value: string): void => {
+    const last = output.at(-1);
+    if (last?.type === "text") last.value += value;
+    else output.push({ type: "text", value });
+  };
+  for (const node of nodes) {
+    if (node.type === "text") {
+      pushText(node.value);
+      continue;
+    }
+    if (node.type !== "element") continue;
+    const colour = LIGHT_COLOUR.exec(String(node.properties.style ?? ""))?.[1];
+    const children = withRoleClasses(node.children);
+    if (colour === undefined) {
+      output.push({ ...node, children });
+      continue;
+    }
+    const role = codeRoleOf(colour);
+    if (role === undefined) {
+      for (const child of children) {
+        if (child.type === "text") pushText(child.value);
+        else output.push(child);
+      }
+      continue;
+    }
+    output.push(h(`span.sw-code-${role}`, children));
+  }
+  return output;
+}
+
 function codeLineContents(ast: Element): ElementContent[] {
   const lines = selectAll(".ec-line > .code", ast);
   const output: ElementContent[] = [];
@@ -301,7 +357,7 @@ function codeLineContents(ast: Element): ElementContent[] {
       line.children.length === 1 &&
       line.children[0]?.type === "text" &&
       line.children[0].value === "\n";
-    output.push(h("span.sw-code-popover__line", placeholder ? [] : line.children));
+    output.push(h("span.sw-code-popover__line", placeholder ? [] : withRoleClasses(line.children)));
     if (index < lines.length - 1) output.push({ type: "text", value: "\n" });
   }
   return output;
@@ -499,11 +555,9 @@ function tagValueContents(value: string): ElementContent[] {
 const TAG_LABELS: Readonly<Record<string, string>> = {
   defaultValue: "Default",
   deprecated: "Deprecated",
-  example: "Example",
   param: "Parameter",
   remarks: "Remarks",
   returns: "Returns",
-  see: "See also",
   throws: "Throws",
 };
 
@@ -517,17 +571,13 @@ function tagLabel(name: string): Element {
  * large panel one long style task. Symbol pages hold them under "Examples";
  * a member route already points at the member row that holds its own.
  */
-function exampleLinkTag(referenceRoute: string): Element {
-  const href = referenceRoute.includes("#") ? referenceRoute : `${referenceRoute}#examples`;
-  return h("span.sw-code-popover__tag", [
-    tagLabel("example"),
-    h("a.sw-code-popover__tag-link", { href }, "Show example"),
-  ]);
+function exampleHref(referenceRoute: string): string {
+  return referenceRoute.includes("#") ? referenceRoute : `${referenceRoute}#examples`;
 }
 
-/** Every `@see` of a symbol on one row: a label, then the targets separated by commas. */
-function seeAlsoTag(values: readonly string[], rendered: RenderedHover): Element {
-  const targets = values.flatMap((value, index): ElementContent[] => [
+/** `@see` targets separated by commas, each linked when it names a page. */
+function seeAlsoTargets(values: readonly string[], rendered: RenderedHover): ElementContent[] {
+  return values.flatMap((value, index): ElementContent[] => [
     ...(index > 0 ? [{ type: "text" as const, value: ", " }] : []),
     ...(rendered.seeRoutes?.has(value)
       ? [
@@ -539,10 +589,31 @@ function seeAlsoTag(values: readonly string[], rendered: RenderedHover): Element
         ]
       : tagValueContents(value)),
   ]);
-  return h("span.sw-code-popover__tag", [tagLabel("see"), ...targets]);
 }
 
-/** Other tags in source order, then one "See also" row and the example link. */
+/** The panel's one link line: "See also Grid, GridOptions · Example". */
+function linksLine(seeAlso: readonly string[], rendered: RenderedHover, hasExample: boolean) {
+  const example =
+    hasExample && rendered.referenceRoute !== undefined
+      ? h("a.sw-code-popover__tag-link", { href: exampleHref(rendered.referenceRoute) }, "Example")
+      : undefined;
+  if (seeAlso.length === 0 && example === undefined) return undefined;
+  const parts: ElementContent[] = [];
+  if (seeAlso.length > 0) {
+    parts.push(
+      h("span.sw-code-popover__tag-name", "See also"),
+      ...seeAlsoTargets(seeAlso, rendered),
+    );
+  }
+  if (example !== undefined) {
+    if (parts.length > 0)
+      parts.push(h("span.sw-code-popover__separator", { ariaHidden: "true" }, "·"));
+    parts.push(example);
+  }
+  return h("span.sw-code-popover__tag.sw-code-popover__links", parts);
+}
+
+/** Other tags in source order, then the link line. */
 function panelTags(rendered: RenderedHover): Element[] {
   const seeAlso: string[] = [];
   const tags: Element[] = [];
@@ -553,10 +624,8 @@ function panelTags(rendered: RenderedHover): Element[] {
     else
       tags.push(h("span.sw-code-popover__tag", [tagLabel(name), ...tagValueContents(value ?? "")]));
   }
-  if (seeAlso.length > 0) tags.push(seeAlsoTag(seeAlso, rendered));
-  if (hasExample && rendered.referenceRoute !== undefined) {
-    tags.push(exampleLinkTag(rendered.referenceRoute));
-  }
+  const links = linksLine(seeAlso, rendered, hasExample);
+  if (links !== undefined) tags.push(links);
   return tags;
 }
 
@@ -623,7 +692,10 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
         h(
           isLink ? "a.sw-code-popover__trigger" : "span.sw-code-popover__trigger",
           {
-            ...(isLink ? { href: referenceRoute } : { tabIndex: 0 }),
+            ...(isLink ? { href: referenceRoute } : {}),
+            // One Tab stop per code block: `rovingCodeFocus` gives the block's
+            // first trigger tabindex 0; arrow keys move between the others.
+            tabIndex: -1,
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
             dataHoverKind: kind,
@@ -850,16 +922,22 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           if (!accessibleSignature) continue;
           // Import aliases and self-restating declarations waste the reader's hover.
           if (/^import\s/.test(accessibleSignature)) continue;
-          const memberReference = memberDocsFor(hover.target, accessibleSignature, members);
+          // DOM and standard-library names (`document`, `style.height`) are
+          // never Sheetwrite APIs, even when a Sheetwrite member shares the name.
+          const isLibrarySymbol = hover.origin === "lib";
+          const memberReference = isLibrarySymbol
+            ? undefined
+            : memberDocsFor(hover.target, accessibleSignature, members);
           const hasDetails =
             Boolean(hover.docs ?? memberReference?.docs) || (hover.tags?.length ?? 0) > 0;
           if (!hasDetails) {
             const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
             if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
           }
-          const referenceRoute =
-            referenceRouteForHover(hover.target, accessibleSignature, routes) ??
-            memberReference?.route;
+          const referenceRoute = isLibrarySymbol
+            ? undefined
+            : (referenceRouteForHover(hover.target, accessibleSignature, routes) ??
+              memberReference?.route);
           const [wideSignature, narrowSignature] = await Promise.all([
             formatSignature(accessibleSignature, 68),
             formatSignature(accessibleSignature, 34),

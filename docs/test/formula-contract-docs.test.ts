@@ -38,7 +38,7 @@ describe("generated formula documentation contract", () => {
     const families = pages.filter((page) => page.route !== "reference/formula-functions.md");
     for (const formula of inventory.functions) {
       const holders = families.filter((page) =>
-        page.content.includes(`<td><code>${formula.canonical}</code>`),
+        page.content.includes(`<span class="sw-code-function">${formula.canonical}</span>`),
       );
       expect(holders.map((page) => page.route)).toHaveLength(1);
     }

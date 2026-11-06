@@ -93,26 +93,48 @@ export function useDocumentOutline(): readonly OutlineItem[] {
   return items;
 }
 
-/** Highlight for the entry the reader is currently inside. */
+/**
+ * Where a section counts as being read: just below the sticky header. The
+ * current entry is the last one whose heading is above this line.
+ */
+const READING_LINE_PX = 96;
+
+/** The id of the last outline target above the reading line, or the first one. */
+function currentSectionId(targets: readonly HTMLElement[]): string {
+  let current = targets[0]?.id ?? "";
+  for (const target of targets) {
+    if (target.getBoundingClientRect().top > READING_LINE_PX) break;
+    current = target.id;
+  }
+  return current;
+}
+
+/**
+ * The entry the reader is inside. Read from scroll position once per frame,
+ * so a long section keeps its entry marked while its heading is far above.
+ */
 function useActiveHeading(items: readonly OutlineItem[]): string {
   const [active, setActive] = useState("");
 
   useEffect(() => {
-    setActive("");
-    if (items.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive(entry.target.id);
-        }
-      },
-      { rootMargin: "-80px 0px -66%" },
-    );
-    for (const item of items) {
-      const target = document.getElementById(item.id);
-      if (target !== null) observer.observe(target);
-    }
-    return () => observer.disconnect();
+    const targets = items
+      .map((item) => document.getElementById(item.id))
+      .filter((target) => target !== null);
+    setActive(currentSectionId(targets));
+    if (targets.length === 0) return;
+    let frame = 0;
+    const update = (): void => {
+      frame = 0;
+      setActive(currentSectionId(targets));
+    };
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      cancelAnimationFrame(frame);
+    };
   }, [items]);
 
   return active;
@@ -162,8 +184,8 @@ export function InlineTableOfContents({ items }: Readonly<{ items: readonly Outl
   return (
     <details className="sw-toc-inline" data-pagefind-ignore>
       <summary>
-        <Icon className="sw-disclosure-icon" name="chevron-right" />
         <span className="sw-toc__label">On this page</span>
+        <Icon className="sw-disclosure-icon" name="chevron-right" />
       </summary>
       {items.length < MIN_OUTLINE_ENTRIES ? null : <OutlineLinks items={items} />}
     </details>
