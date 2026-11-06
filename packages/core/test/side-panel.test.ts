@@ -353,6 +353,20 @@ it("opens once when chart activation repeats while the panel chunk loads", async
   expect(panel()?.contains(document.activeElement)).toBe(true);
 });
 
+it("inserts nothing when the grid is destroyed while the panel chunk loads", async () => {
+  const { grid, chartOps, control, openTab, press, selectRange } = await setup();
+  openTab("Insert");
+  selectRange(0, 0, 2, 2);
+
+  press(control("Chart"));
+  const loading = loadPanels(grid);
+  grid.destroy();
+
+  // The grid's abort reason: command runners treat it as cancellation.
+  await expect(loading).rejects.toMatchObject({ name: "AbortError" });
+  expect(chartOps).toEqual([]);
+});
+
 it("opens the Chart panel on Enter on a chart, but not on selection alone", async () => {
   const { grid, host, panel, key } = await insertedChart();
   grid.openPanel(null);

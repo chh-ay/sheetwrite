@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "protocol": "sheetwrite-pivot-v1",
+  "mode": "full",
+  "meta": {
+    "commit": "e2f59ab7b65c30c4d20546386c9fe7c073f70697",
+    "dirty": false,
+    "timestamp": "2026-11-06T00:06:55.398Z",
+    "machine": "Chhayy-2.local",
+    "cpu": "Apple M5 Pro",
+    "memoryMax": "6G"
+  },
+  "sourceRows": 100000,
+  "rowFields": 3,
+  "columnFields": 1,
+  "valueFields": 2,
+  "buildMs": {
+    "median": 20.218833000000018,
+    "p95": 24.287996200000066,
+    "mean": 20.96768333333336,
+    "stddev": 1.540343898688265,
+    "min": 19.840875000000096,
+    "max": 25.219958000000133,
+    "iters": 15
+  },
+  "editMs": {
+    "median": 0.001005000000000109,
+    "p95": 0.001737213000000337,
+    "mean": 0.0011343913333334967,
+    "stddev": 0.0004092555822283127,
+    "min": 0.0008816699999988487,
+    "max": 0.002560000000000855,
+    "iters": 15
+  },
+  "speedup": 20118.24179104261,
+  "donorKeyEditMs": {
+    "median": 0.0016762500000004365,
+    "p95": 0.0035934990000008604,
+    "mean": 0.0020271393333336314,
+    "stddev": 0.0007340406016334535,
+    "min": 0.0016320900000005168,
+    "max": 0.0040770800000007055,
+    "iters": 15
+  },
+  "donorKeyEditSpeedup": 12061.943624157944,
+  "maxBuildMs": {
+    "median": 50.644000000000005,
+    "p95": 61.209824799999964,
+    "mean": 51.562158133333334,
+    "stddev": 4.10946789231108,
+    "min": 48.15666600000009,
+    "max": 61.55416600000001,
+    "iters": 15
+  },
+  "maxExtremeEditMs": {
+    "median": 0.0014854100000002291,
+    "p95": 0.0016473749999996697,
+    "mean": 0.0014943053333333106,
+    "stddev": 0.00008783835713895492,
+    "min": 0.001327920000001086,
+    "max": 0.001667499999999791,
+    "iters": 15
+  },
+  "maxExtremeEditSpeedup": 34094.29046525349,
+  "targetSpeedup": 100,
+  "meetsTarget": true,
+  "retainedBytesBeforePivot": 9466121,
+  "retainedBytesWithPivot": 14245202,
+  "retainedBytesPerPivot": 4779081,
+  "status": [
+    0,
+    0,
+    0,
+    1113,
+    23,
+    2,
+    1
+  ]
+}

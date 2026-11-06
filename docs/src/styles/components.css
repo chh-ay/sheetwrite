@@ -277,6 +277,17 @@ body {
   color: var(--sw-danger);
 }
 
+.sw-badge[data-tone="violet"] {
+  background: var(--sw-violet-soft);
+  color: var(--sw-violet);
+}
+
+.sw-badge[data-size="sm"] {
+  padding: 0 var(--sw-space-1-5);
+  font-size: var(--sw-text-eyebrow);
+  line-height: 1.5;
+}
+
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 .sw-card {
   display: grid;
@@ -317,20 +328,21 @@ a.sw-card:hover {
   line-height: var(--sw-leading-body);
 }
 
-/* ── Callouts: note, tip, warning, danger ───────────────────────────────── */
+/* ── Callouts: Note, Info, Tip, Check, Warning, Danger ─────────────────────
+   A tinted, rounded box with the tone's icon beside
+   the text, and a title line only when the page gives one. */
 .sw-callout {
   --sw-callout-tone: var(--sw-info);
   --sw-icon-accent: var(--sw-callout-tone);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--sw-space-1) var(--sw-space-3);
-  align-items: center;
-  margin: var(--sw-space-6) 0;
-  padding: var(--sw-space-4) var(--sw-space-5);
+  gap: var(--sw-space-3);
+  align-items: start;
+  margin: var(--sw-space-5) 0;
+  padding: var(--sw-space-3) var(--sw-space-4);
   border: var(--sw-border-width) solid
-    color-mix(in srgb, var(--sw-callout-tone) 30%, var(--sw-border));
-  border-left: var(--sw-space-1) solid var(--sw-callout-tone);
-  border-radius: var(--sw-radius-md);
+    color-mix(in srgb, var(--sw-callout-tone) 32%, var(--sw-border));
+  border-radius: var(--sw-radius-xl);
   background: color-mix(in srgb, var(--sw-callout-tone) 7%, var(--sw-surface-1));
   color: var(--sw-fg);
 }
@@ -347,18 +359,21 @@ a.sw-card:hover {
   --sw-callout-tone: var(--sw-danger);
 }
 
+/* The icon sits on the first line of text. */
 .sw-callout > .sw-icon {
+  margin-top: calc((var(--sw-leading-body) * 1em - var(--sw-icon-md)) / 2);
   color: var(--sw-callout-tone);
+  font-size: var(--sw-text-body);
 }
 
 .sw-callout .sw-callout__title {
-  margin: 0;
+  margin: 0 0 var(--sw-space-1);
   color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-body) var(--sw-font-body);
 }
 
 .sw-callout .sw-callout__body {
-  grid-column: 2;
+  min-width: 0;
   font-size: var(--sw-text-body);
   line-height: var(--sw-leading-body);
 }

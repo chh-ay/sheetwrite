@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { Icon } from "../components/Icon.js";
@@ -14,13 +15,8 @@ import { SiteTopbar } from "../components/SiteTopbar.js";
 // Named imports, so only these three numbers ship in the page bundle.
 import { localPassed, regressions, totalTests } from "../generated/compatibility-summary.json";
 import landingBench from "../generated/landing-bench.json";
+import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import { opensFreshDocument } from "../lib/navigation.js";
-import {
-  LATEST_HIGHLIGHTED_RELEASE,
-  LATEST_RELEASE,
-  minorVersion,
-  releaseHref,
-} from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
 
 import landingStylesheet from "../styles/landing.css?url";
@@ -151,69 +147,14 @@ const SAMPLE_ROWS = [
   ["Folder", 9],
 ] as const;
 
-function fmtRows(rows: number): string {
-  return rows >= 1_000_000 ? `${rows / 1_000_000}M` : `${rows / 1_000}k`;
-}
+/** The story sits below the fold: its markup is in the prerendered page, its small component loads later. */
+const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
 
-/** Shared log scale across every ratio bar: ×1 is parity (zero width). */
-function ratioWidth(ratio: number, scaleMax: number): string {
-  const domain = Math.log10(scaleMax);
-  const pct = (Math.log10(Math.max(ratio, 1)) / domain) * 100;
-  return `${Math.min(100, Math.max(pct, 3)).toFixed(1)}%`;
-}
-
-function BenchmarkBars({ evidence }: Readonly<{ evidence: LandingEvidence }>) {
-  const { ref } = useScenePlayback<HTMLDivElement>();
-  const scaleMax = Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) * 1.25;
+function BenchmarkBars() {
   return (
-    <div
-      className="sw-bench"
-      ref={ref}
-      data-scale="logarithmic"
-      data-scale-min={1}
-      data-scale-max={scaleMax}
-    >
-      <ul className="sw-bench__bars">
-        {evidence.sizes.map((entry) => (
-          <li key={entry.size}>
-            <span className="sw-bench__size">{fmtRows(entry.size)} rows</span>
-            <span aria-hidden="true" className="sw-bench__track">
-              <i style={{ width: ratioWidth(entry.medianRatio, scaleMax) }} />
-            </span>
-            <strong>{entry.medianRatio}×</strong>
-            <span className="sw-bench__detail">
-              median of {entry.comparedScenarios} interactions
-              {entry.handsontableIncomplete > 0
-                ? ` · Handsontable did not finish ${entry.handsontableIncomplete}`
-                : ""}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="sw-bench__scale">
-        Bar length uses a log scale from 1× (as fast as Handsontable) to {scaleMax.toFixed(0)}×.
-      </p>
-      <dl className="sw-bench__capture">
-        <div>
-          <dt>Browser</dt>
-          <dd>{evidence.capture.browser}</dd>
-        </div>
-        <div>
-          <dt>Rounds</dt>
-          <dd>{evidence.capture.rounds} counterbalanced</dd>
-        </div>
-        <div>
-          <dt>Commit</dt>
-          <dd>
-            <code>{evidence.capture.commit.slice(0, 7)}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Captured</dt>
-          <dd>{evidence.capture.timestamp.slice(0, 10)}</dd>
-        </div>
-      </dl>
-    </div>
+    <Suspense fallback={null}>
+      <SpeedupBars />
+    </Suspense>
   );
 }
 
@@ -248,7 +189,11 @@ function Landing() {
   const bench = landingBench as LandingBenchData;
   const evidence: LandingEvidence | undefined =
     bench.available && bench.sizes && bench.heroStats && bench.capture
-      ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
+      ? {
+          sizes: bench.sizes,
+          heroStats: bench.heroStats,
+          capture: bench.capture,
+        }
       : undefined;
   const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
   const { downloads } = bench;
@@ -296,12 +241,12 @@ function Landing() {
             <dl>
               <div>
                 <dt>{evidence.heroStats.millionRowMedianMs} ms</dt>
-                <dd>median interaction at 1,000,000 rows</dd>
+                <dd>median interaction at 1,000,000 rows, Linux x86-64</dd>
               </div>
               {millionRow ? (
                 <div>
                   <dt>{millionRow.medianRatio}×</dt>
-                  <dd>median speed against Handsontable, same capture</dd>
+                  <dd>faster than Handsontable at 1,000,000 rows, same Linux capture</dd>
                 </div>
               ) : null}
               <div>
@@ -456,15 +401,15 @@ function Landing() {
               </pre>
             </article>
           </div>
-          {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
+          {releaseFacts.highlighted !== null ? (
             <aside aria-labelledby="landing-new" className="sw-lp-new">
-              <h3 id="landing-new">New in {minorVersion(LATEST_HIGHLIGHTED_RELEASE.version)}</h3>
+              <h3 id="landing-new">New in {releaseFacts.highlighted.minor}</h3>
               <ul>
-                {LATEST_HIGHLIGHTED_RELEASE.highlights.map((highlight) => (
+                {releaseFacts.highlighted.highlights.map((highlight) => (
                   <li key={highlight}>{highlight}</li>
                 ))}
               </ul>
-              <Link to={releaseHref(LATEST_HIGHLIGHTED_RELEASE.version)}>
+              <Link to={releaseFacts.highlighted.href}>
                 Read what is new and the upgrade checklist
                 <Icon name="arrow-right" />
               </Link>
@@ -477,14 +422,14 @@ function Landing() {
             <p className="sw-lp-eyebrow">Results you can check</p>
             <h2 id="landing-bench">Measured, not promised.</h2>
             <p>
-              Median interaction ratios against Handsontable
-              {evidence ? ` ${evidence.capture.engineVersions.handsontable}` : ""} in one saved
-              browser capture. Every interaction must return the correct result; failed runs stay
-              failed.
+              How many times faster Sheetwrite is than Handsontable
+              {evidence ? ` ${evidence.capture.engineVersions.handsontable}` : ""} in saved browser
+              captures, on each machine. Every interaction must return the correct result; failed
+              runs stay failed.
             </p>
           </header>
           {evidence ? (
-            <BenchmarkBars evidence={evidence} />
+            <BenchmarkBars />
           ) : (
             <p className="sw-lp-note">
               No saved benchmark results are available yet. Run{" "}
@@ -536,7 +481,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
                 First grid
               </Link>
-              <Link to={releaseHref(LATEST_RELEASE.version)}>What's new</Link>
+              <Link to={releaseFacts.latest.href}>What's new</Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Frameworks</p>

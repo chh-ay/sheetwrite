@@ -31,7 +31,7 @@ grid.setPivot({
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="A full-engine grid with a pivot of four orders"
+```ts compile runnable title="A full-engine grid with a pivot of four orders"
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 

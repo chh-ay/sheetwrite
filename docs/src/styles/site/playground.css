@@ -1,0 +1,308 @@
+/* Runnable examples. Before "Try it" a runnable code block is the page's own
+   code block with a button under it (components/RunnableCode.tsx); after it,
+   the playground (playground/Playground.tsx) shows the code in an editor,
+   then the example's live result and console output. Selectors that meet
+   prose rules (paragraphs, lists, inline code) start at `.sw-playground`, so
+   they outrank `.sw-prose` inside an article. */
+.sw-runnable__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-3);
+  margin-top: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-playground {
+  margin-block: var(--sw-space-6);
+  overflow: hidden;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+/* The bar is as tall with or without its buttons, so the loading placeholder
+   and the playground line up. */
+.sw-playground__bar {
+  display: flex;
+  min-height: calc(
+    var(--sw-control-height) - var(--sw-space-2) + 2 * var(--sw-space-2) + var(--sw-border-width)
+  );
+  box-sizing: border-box;
+  align-items: center;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-2) var(--sw-space-3) var(--sw-space-2) var(--sw-space-5);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-playground__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The text area lies over the highlighted code in one grid cell; both use the
+   same font, padding, line height and wrapping rules, so long lines break at
+   the same place in both layers and the caret sits on the coloured text. */
+.sw-playground__editor {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--sw-code-bg);
+  font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
+}
+
+/* The editor's bottom edge; on the editor, so it spans the panel whatever the hint's width. */
+.sw-playground__editor,
+.sw-playground__pending {
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-playground__editor:focus-within {
+  box-shadow: inset 0 0 0 var(--sw-focus-ring-width) var(--sw-focus-ring);
+}
+
+.sw-playground__editor > pre,
+.sw-playground__editor > textarea {
+  grid-area: 1 / 1;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--sw-space-4) var(--sw-space-5);
+  border: 0;
+  font: inherit;
+  letter-spacing: normal;
+  tab-size: 2;
+  /* No hanging indent: a text area cannot indent the rows of each line it
+     wraps, so both layers wrap rows at the left edge to stay aligned. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.sw-playground__editor > pre {
+  overflow: hidden;
+  background: none;
+  color: var(--sw-code-fg);
+  pointer-events: none;
+}
+
+.sw-playground__editor > pre > code {
+  display: block;
+  padding: 0;
+  background: none;
+  font: inherit;
+}
+
+/* One source line; an empty line keeps the text area's line height. */
+.sw-playground__line {
+  display: block;
+  min-height: 1lh;
+}
+
+/* The line an error points at, across the editor's padding, on every row it wraps to. */
+.sw-playground__line[data-error] {
+  margin-inline: calc(-1 * var(--sw-space-5));
+  padding-inline: var(--sw-space-5);
+  background: var(--sw-danger-soft);
+}
+
+.sw-playground__editor > textarea {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  outline: none;
+  resize: none;
+  background: transparent;
+  caret-color: var(--sw-code-fg);
+  color: transparent;
+}
+
+.sw-playground__editor > textarea::selection {
+  background: color-mix(in srgb, var(--sw-accent) 28%, transparent);
+  color: transparent;
+}
+
+.sw-playground .sw-playground__hint {
+  margin: 0;
+  padding: var(--sw-space-2) var(--sw-space-5);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-playground__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sw-space-3);
+  padding: var(--sw-space-3) var(--sw-space-5);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-danger-soft);
+  color: var(--sw-fg-strong);
+}
+
+.sw-playground__error > .sw-icon {
+  flex: none;
+  margin-top: var(--sw-space-0-5);
+  color: var(--sw-danger);
+}
+
+.sw-playground .sw-playground__error > p {
+  flex: 1;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-playground__result {
+  padding: var(--sw-space-3) var(--sw-space-5) var(--sw-space-5);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+/* The status has a fixed box beside the label, so its text can change from
+   "Running…" to the result without moving anything. */
+.sw-playground .sw-playground__label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-4);
+  max-width: none;
+  margin: 0 0 var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-playground__label > span:first-child {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+/* Start-aligned, so the text does not move as it changes. */
+.sw-playground__label > [role="status"] {
+  text-align: start;
+}
+
+/* On a phone the longest status takes two rows; the box keeps both from the start. */
+@media (max-width: 40rem) {
+  .sw-playground__label > [role="status"] {
+    min-height: 2lh;
+  }
+}
+
+/* The frame's height when the example sets no host height (see playground/layout.ts). */
+.sw-playground__frame {
+  display: block;
+  width: 100%;
+  height: 20rem;
+  border: 0;
+  background: transparent;
+}
+
+.sw-playground .sw-playground__console {
+  max-height: 16rem;
+  margin: var(--sw-space-3) 0 0;
+  padding: var(--sw-space-2) var(--sw-space-4);
+  overflow: auto;
+  list-style: none;
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-code-bg);
+  font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
+}
+
+.sw-playground .sw-playground__console > li {
+  max-width: none;
+  margin: 0;
+  padding-block: var(--sw-space-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sw-playground .sw-playground__console > li + li {
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-playground .sw-playground__console > li[data-level="warn"] {
+  color: var(--sw-warning);
+}
+
+.sw-playground .sw-playground__console > li[data-level="error"] {
+  color: var(--sw-danger);
+}
+
+/* Console values are code already; they take no inline code tint. */
+.sw-playground .sw-playground__console code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+/* While the editor loads, the page's code block stands in for it, without its
+   own frame and title, so the panel opens at its final size. A code block in
+   a closed "Full setup" disclosure shows without the disclosure. */
+.sw-playground__pending .expressive-code,
+.sw-prose .sw-playground__pending .expressive-code {
+  margin: 0;
+}
+
+.sw-prose .sw-playground__pending .expressive-code figure.frame {
+  border: 0;
+  border-radius: 0;
+}
+
+.sw-prose .sw-playground__pending .expressive-code figure.frame > figcaption.header,
+.sw-prose .sw-playground__pending .expressive-code .copy,
+.sw-prose .sw-playground__pending details > :not(.expressive-code) {
+  display: none;
+}
+
+.sw-playground__pending details::details-content {
+  content-visibility: visible;
+}
+
+.sw-prose .sw-playground__pending .expressive-code pre {
+  background: var(--sw-code-bg);
+}
+
+/* The panel's text spans the panel: no prose measure on its paragraphs and list items. */
+.sw-docs .sw-prose .sw-playground :is(p, li) {
+  max-width: none;
+}
+
+/* Code shows what is typed, as in the page's code blocks (components.css):
+   no ligatures in either editor layer, so `=>` and `===` look the same before
+   and after Try it, and the caret stays on its character. */
+.sw-playground .sw-playground__editor :is(pre, textarea, code, span),
+.sw-playground .sw-playground__console code {
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "calt" 0,
+    "liga" 0;
+}
+
+/* The placeholder's code wraps as the editor does (rows start at the left
+   edge, breaking anywhere), so the panel keeps its height when the editor
+   replaces it. */
+:root .sw-playground__pending .expressive-code .ec-line {
+  --ecIndent: 0ch;
+}
+
+/* The editor's own padding on both sides; the code block keeps room for its
+   copy button on the right, which would make its rows shorter. */
+:root .sw-prose .sw-playground__pending .expressive-code .ec-line .code {
+  padding-inline: var(--sw-space-5);
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* A line's leading spaces may end a row in the editor's text area, so they
+   may in the placeholder too (the code block keeps them on the first row). */
+:root .sw-prose .sw-playground__pending .expressive-code pre.wrap .ec-line .code span.indent {
+  white-space: pre-wrap;
+}

@@ -167,6 +167,7 @@ export const UNIT_TEST_PATHS = [
   "scripts/release-github.test.ts",
   "scripts/docs.test.ts",
   "scripts/docs-llms.test.ts",
+  "scripts/docs-feed.test.ts",
   "bench/test",
   "docs/test",
 ] as const;

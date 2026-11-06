@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "bun ../scripts/docs-cli.ts generate && bun --bun vite dev",
     "build": "bun ../scripts/docs-cli.ts check && bun run build:site",
-    "build:site": "bun ../scripts/docs-cli.ts generate && node node_modules/vite/bin/vite.js build && bun ../scripts/normalize-sitemap.ts && bunx pagefind --site dist/client",
+    "build:site": "bun ../scripts/docs-cli.ts generate && node node_modules/vite/bin/vite.js build && bun src/figures/og-images.ts && bun ../scripts/normalize-sitemap.ts && bunx pagefind --site dist/client",
     "preview": "bun --bun vite preview",
+    "figures": "bun src/figures/capture.ts",
     "typecheck": "bun ../scripts/docs-cli.ts generate && node ../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -31,14 +32,18 @@
     "@vercel/speed-insights": "^2.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "sucrase": "^3.35.1",
     "svelte": "5.57.1",
     "vue": "^3.5.43"
   },
   "devDependencies": {
     "@expressive-code/core": "0.44.0",
+    "@fontsource/bricolage-grotesque": "^5.3.0",
+    "@fontsource/instrument-sans": "^5.3.0",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@mdx-js/mdx": "3.1.1",
     "@mdx-js/rollup": "3.1.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@sveltejs/vite-plugin-svelte": "7.2.0",
     "@tailwindcss/vite": "^4.3.2",
     "@types/mdx": "2.0.14",

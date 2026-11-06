@@ -26,6 +26,7 @@ function DocsOverview() {
     <DocsShell
       activeHref="/docs/"
       description="Everything you need to build a spreadsheet your application controls."
+      sourcePath="docs/src/routes/docs.index.tsx"
       title="Build with Sheetwrite"
     >
       <div className="sw-doc-home">

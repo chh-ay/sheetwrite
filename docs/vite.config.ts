@@ -18,20 +18,26 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
 
-import type { IconName } from "./src/icons/icon-names.ts";
 import { inlineIcon } from "./src/icons/inline-icon.ts";
 import { codeHangingIndent } from "./src/lib/code-indent.ts";
 import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
+import { CALLOUTS, callout, contentComponents } from "./src/lib/content-components.ts";
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
 import { formulaTables } from "./src/lib/formula-tables.ts";
+import { markGeneratedPages } from "./src/lib/generated-content.ts";
 import { renderGridResults } from "./src/lib/grid-result.ts";
 import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
 import { exportOutline } from "./src/lib/outline.ts";
+import { renderPerfBars } from "./src/lib/perf-bars.ts";
+import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
+import { perfFigureMarkup } from "./src/lib/perf-figure-markup.ts";
 import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
+import { runnableCodeBlocks } from "./src/lib/runnable-code.ts";
 import { renderSectionCards } from "./src/lib/section-cards.ts";
 import { SITE_URL } from "./src/lib/seo.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
+import { speedStoryMarkup } from "./src/lib/speed-story-markup.ts";
 
 interface HastNode {
   type: string;
@@ -64,7 +70,8 @@ function installCommandsAsTerminals() {
             ? INSTALL_COMMAND.exec(textOf(code).trim())
             : null;
         if (match?.[1] === undefined) {
-          visit(child);
+          // A CodeGroup already spells out each package manager.
+          if (!isCodeGroup(child)) visit(child);
           return child;
         }
         return {
@@ -79,37 +86,39 @@ function installCommandsAsTerminals() {
   };
 }
 
-/** A callout tone: its title and its icon in the Sheetwrite sprite. */
-interface CalloutTone {
-  readonly tone: string;
-  readonly title: string;
-  readonly icon: IconName;
+/** A `<CodeGroup>`, which contentComponents has already turned into code tabs. */
+function isCodeGroup(node: HastNode): boolean {
+  return (
+    node.name === "Tabs" &&
+    node.attributes?.some(
+      (attribute) => attribute.name === "variant" && attribute.value === "code",
+    ) === true
+  );
 }
 
-/** GitHub alert markers and the callout each becomes. */
-const ALERT_CALLOUTS: Readonly<Record<string, CalloutTone>> = {
-  NOTE: { tone: "note", title: "Note", icon: "info" },
-  IMPORTANT: { tone: "note", title: "Important", icon: "info" },
-  TIP: { tone: "tip", title: "Tip", icon: "tip" },
-  WARNING: { tone: "warning", title: "Warning", icon: "warning" },
-  CAUTION: { tone: "danger", title: "Caution", icon: "danger" },
-};
+/** GitHub alert markers and the callout component each becomes. */
+const ALERT_CALLOUTS = {
+  NOTE: CALLOUTS.Note,
+  IMPORTANT: CALLOUTS.Info,
+  TIP: CALLOUTS.Tip,
+  WARNING: CALLOUTS.Warning,
+  CAUTION: CALLOUTS.Danger,
+} as const;
 const ALERT_MARKER = /^\s*\[!(NOTE|IMPORTANT|TIP|WARNING|CAUTION)\]\s*/;
 
 /**
  * A Markdown alert (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, `> [!CAUTION]`)
- * becomes a static callout with the site's icon and tone, so callouts are
- * written in plain Markdown and add no JavaScript to the page. The icon markup
- * is parsed by rehype-raw later in the pipeline.
+ * becomes the same static callout as `<Note>`, `<Tip>`, `<Warning>` and
+ * `<Danger>`, so `.md` pages have callouts too and add no JavaScript.
  */
 function markdownAlertsAsCallouts() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.children === undefined) return;
       node.children = node.children.map((child) => {
-        const callout = child.tagName === "blockquote" ? alertCallout(child) : undefined;
-        visit(callout ?? child);
-        return callout ?? child;
+        const found = child.tagName === "blockquote" ? alertCallout(child) : undefined;
+        visit(found ?? child);
+        return found ?? child;
       });
     };
     visit(tree);
@@ -121,36 +130,19 @@ function alertCallout(blockquote: HastNode): HastNode | undefined {
   const firstParagraph = children.find((child) => child.type === "element");
   const firstText = firstParagraph?.tagName === "p" ? firstParagraph.children?.[0] : undefined;
   const marker = firstText?.type === "text" ? ALERT_MARKER.exec(firstText.value ?? "") : null;
-  const callout = marker?.[1] === undefined ? undefined : ALERT_CALLOUTS[marker[1]];
-  if (firstParagraph === undefined || firstText === undefined || marker === null || !callout) {
+  const tone =
+    marker?.[1] === undefined
+      ? undefined
+      : ALERT_CALLOUTS[marker[1] as keyof typeof ALERT_CALLOUTS];
+  if (firstParagraph === undefined || firstText === undefined || tone === undefined) {
     return undefined;
   }
-  firstText.value = (firstText.value ?? "").slice(marker[0].length);
+  firstText.value = (firstText.value ?? "").slice(marker?.[0].length ?? 0);
   const body =
     textOf(firstParagraph).trim().length === 0
       ? children.filter((child) => child !== firstParagraph)
       : children;
-  const icon = inlineIcon(callout.icon, "md");
-  return {
-    type: "element",
-    tagName: "aside",
-    properties: { className: ["sw-callout"], dataTone: callout.tone, ariaLabel: callout.title },
-    children: [
-      { type: "raw", value: icon },
-      {
-        type: "element",
-        tagName: "p",
-        properties: { className: ["sw-callout__title"] },
-        children: [{ type: "text", value: callout.title }],
-      },
-      {
-        type: "element",
-        tagName: "div",
-        properties: { className: ["sw-callout__body"] },
-        children: body,
-      },
-    ],
-  };
+  return callout(tone, body);
 }
 
 /**
@@ -175,42 +167,66 @@ function hydrateFormulaReference() {
   };
 }
 
-/** Draw release reductions from the displayed value, so labels and bars cannot drift. */
-function visualizeReleaseResults() {
+/**
+ * A Performance page's `<PerfFigure name>` becomes the figure component; the
+ * figure is static HTML outside the page (see perf-figure-markup.ts).
+ */
+function hydratePerfFigure() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
-      const delta =
-        node.tagName === "li"
-          ? node.children?.find((child) =>
-              String(child.properties?.className ?? "")
-                .split(/[ ,]+/)
-                .includes("sw-results__delta"),
-            )
-          : undefined;
-      if (delta !== undefined) {
-        const label = textOf(delta).trim();
-        const percent = /^(\d+(?:\.\d+)?)(?:–(\d+(?:\.\d+)?))?% (?:faster|less)$/.exec(label);
-        const ratio = /^([\d,]+(?:\.\d+)?)× faster$/.exec(label);
-        const low = percent
-          ? Number(percent[1])
-          : ratio
-            ? (1 - 1 / Number(ratio[1]?.replaceAll(",", ""))) * 100
-            : undefined;
-        const high = percent ? Number(percent[2] ?? percent[1]) : low;
-        if (low !== undefined && high !== undefined) {
-          node.children?.push({
-            type: "element",
-            tagName: "span",
-            properties: {
-              className: ["sw-results__bar"],
-              ariaHidden: "true",
-              style: `--result-min:${low}%;--result-max:${high}%`,
-            },
-            children: [],
-          });
-        }
+      if (node.tagName === "perffigure") {
+        node.type = "mdxJsxFlowElement";
+        node.name = "PerfFigure";
+        node.attributes = [
+          { type: "mdxJsxAttribute", name: "name", value: String(node.properties?.name ?? "") },
+        ];
+        delete node.tagName;
+        delete node.properties;
       }
       node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
+/**
+ * A checked radio or checkbox in Markdown HTML starts checked but stays the
+ * reader's to change: React would treat `checked` as a controlled value and
+ * undo every click, so the markup's `checked` becomes `defaultChecked`.
+ */
+function uncontrolledCheckedInputs() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (node.tagName === "input" && node.properties?.checked === true) {
+        const { checked: _checked, ...properties } = node.properties;
+        node.properties = { ...properties, defaultChecked: true };
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
+/**
+ * Release-note comparisons (`<perf-compare>` blocks) become the shared
+ * performance bars before raw HTML is parsed, so release notes and the
+ * Performance pages draw the same figure.
+ */
+function renderPerfCompares() {
+  return (tree: HastNode): void => {
+    let figures = 0;
+    const visit = (node: HastNode): void => {
+      for (const child of node.children ?? []) {
+        if (child.type === "raw" && isPerfCompare(child.value ?? "")) {
+          figures += 1;
+          child.value = renderPerfBars(
+            parsePerfCompare(child.value ?? "", `perf-compare-${figures}`),
+            (name) => inlineIcon(name),
+          );
+        } else {
+          visit(child);
+        }
+      }
     };
     visit(tree);
   };
@@ -435,13 +451,31 @@ export default defineConfig({
   build: {
     cssCodeSplit: false,
   },
+  // Module workers (core's renderer worker) and the playground runtime
+  // (src/playground/run-example.ts) are ES bundles: the runtime loads the
+  // packages an example imports as separate chunks, only in its frame.
+  worker: {
+    format: "es",
+  },
   plugins: [
     {
       ...mdx({
-        remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm],
+        remarkPlugins: [
+          remarkFrontmatter,
+          [
+            markGeneratedPages,
+            { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
+          ],
+          remarkMdxFrontmatter,
+          remarkGfm,
+        ],
         rehypePlugins: [
+          // First: Steps, Cards, callouts and the figures become static HTML, and
+          // CodeGroup becomes Tabs, before fences are highlighted.
+          contentComponents,
           installCommandsAsTerminals,
           markdownAlertsAsCallouts,
+          runnableCodeBlocks,
           [
             rehypeExpressiveCode,
             {
@@ -454,15 +488,17 @@ export default defineConfig({
               }),
             },
           ],
+          renderPerfCompares,
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          uncontrolledCheckedInputs,
           renderGridResults,
           [
             renderSectionCards,
             { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
           ],
           hydrateFormulaReference,
-          visualizeReleaseResults,
+          hydratePerfFigure,
           dedupeCodePopovers,
           rovingCodeFocus,
           // Prerendered heading ids: fragment links must resolve before hydration.
@@ -478,6 +514,8 @@ export default defineConfig({
     },
     expressiveCodeAssets(),
     formulaTables(),
+    speedStoryMarkup(),
+    perfFigureMarkup(),
     tailwindcss(),
     tanstackStart({
       pages: [

@@ -20,6 +20,7 @@ import type {
   openDataModelPanel,
   openEditLinksPanel,
   openExplainPanel,
+  openHistoryPanel,
   openKpiPanel,
   openMeasurePanel,
   openNamePanel,
@@ -40,6 +41,7 @@ interface PanelController {
   openDataModelPanel: typeof openDataModelPanel;
   openEditLinksPanel: typeof openEditLinksPanel;
   openExplainPanel: typeof openExplainPanel;
+  openHistoryPanel: typeof openHistoryPanel;
   openKpiPanel: typeof openKpiPanel;
   openMeasurePanel: typeof openMeasurePanel;
   openNamePanel: typeof openNamePanel;
@@ -94,7 +96,10 @@ export function pivotsAvailable(grid: Grid): boolean {
 
 /**
  * The panel controller, loaded once per page and attached once per grid. A
- * failed load is not cached, so the next use tries again.
+ * failed load is not cached, so the next use tries again. When the grid is
+ * destroyed before the load finishes, the promise rejects with the grid's
+ * abort reason, so no caller works on a freed store; command runners treat
+ * the `AbortError` as cancellation.
  */
 export function loadPanels(grid: Grid): Promise<PanelController> {
   const state = stateOf(grid);
@@ -111,15 +116,19 @@ export function loadPanels(grid: Grid): Promise<PanelController> {
       throw error;
     },
   );
-  return state.loading;
+  return state.loading.then((controller) => {
+    state.lifetime.signal.throwIfAborted();
+    return controller;
+  });
 }
 
 /**
  * Run `open` with the controller: now when it is loaded, else once it loads.
  * Asks that arrive during the load replace each other, so a burst of
- * triggers opens one panel, the latest.
+ * triggers opens one panel, the latest. Once the grid is destroyed, a load
+ * that finishes opens nothing.
  */
-function requestPanel(grid: Grid, open: (controller: PanelController) => void): void {
+export function requestPanel(grid: Grid, open: (controller: PanelController) => void): void {
   const state = stateOf(grid);
   if (state.controller !== null) {
     open(state.controller);

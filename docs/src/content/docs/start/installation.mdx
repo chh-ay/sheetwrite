@@ -3,12 +3,10 @@ title: Installation
 description: Install Sheetwrite for Vanilla, React, Vue, or Svelte and initialize its WebAssembly runtime.
 ---
 
-import { TabItem, Tabs } from "../../../components/Tabs";
-
 Choose a framework in the header once. Every framework-aware example uses that preference, including the quick starts below and the lifecycle guide.
 
-<Tabs syncKey="sheetwrite-framework">
-  <TabItem label="Vanilla">
+<Tabs sync="framework" label="Framework">
+  <Tab title="Vanilla">
 
 ```sh verify
 npm install @sheetwrite/core
@@ -24,8 +22,8 @@ const grid = createGrid(document.querySelector("#grid")!, { workbook, data });
 
 The host owns initialization and must destroy the returned `Grid` when its DOM lifetime ends.
 
-  </TabItem>
-  <TabItem label="React">
+  </Tab>
+  <Tab title="React">
 
 ```sh verify
 npm install @sheetwrite/react
@@ -42,8 +40,8 @@ export function Workbook() {
 
 The adapter initializes WASM after client mount. Use a client component boundary in server-rendered React hosts.
 
-  </TabItem>
-  <TabItem label="Vue">
+  </Tab>
+  <Tab title="Vue">
 
 ```sh verify
 npm install @sheetwrite/vue
@@ -62,8 +60,8 @@ import "@sheetwrite/vue/styles.css";
 
 The adapter initializes WASM after client mount. Use a client-only boundary in Nuxt and other server-rendered Vue hosts.
 
-  </TabItem>
-  <TabItem label="Svelte">
+  </Tab>
+  <Tab title="Svelte">
 
 ```sh verify
 npm install @sheetwrite/svelte
@@ -80,7 +78,7 @@ npm install @sheetwrite/svelte
 
 The adapter initializes WASM after client mount. Use a client-only boundary when a SvelteKit route renders on the server.
 
-  </TabItem>
+  </Tab>
 </Tabs>
 
 ## Server-rendered host boundaries
