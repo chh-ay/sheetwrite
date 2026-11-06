@@ -84,6 +84,8 @@ mod move_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod named_formula_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod number_search_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod permute_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod sort_order_tests;

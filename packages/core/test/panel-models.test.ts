@@ -12,6 +12,7 @@ import {
   selectionRange,
   withPivotValue,
 } from "../src/panels/chart-model.js";
+import { measuresByTable, nextMeasureId } from "../src/panels/measure-panel.js";
 import {
   defaultAggregation,
   pivotSourceFor,
@@ -21,6 +22,7 @@ import {
   shiftField,
   sourceDataRange,
   type FieldFacts,
+  withMeasureValue,
 } from "../src/panels/pivot-model.js";
 import { formatRangeText, parseRangeText } from "../src/panels/range-text.js";
 import type { CellScalar, PivotDefinition, Range, WorkbookTable } from "../src/types.js";
@@ -210,6 +212,67 @@ describe("values of a chart over a pivot", () => {
         ["A / V1", [2], ["0.0"]],
         ["B / V1", [4], ["0.0"]],
       ],
+    );
+  });
+});
+
+describe("measures in the field list and the Measures panel", () => {
+  const orders: WorkbookTable = {
+    id: "orders",
+    name: "Orders",
+    range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
+    columns: [
+      { id: "region", name: "Region" },
+      { id: "amount", name: "Amount" },
+    ],
+    headerRow: true,
+    totalsRow: false,
+  };
+  const pivot: PivotDefinition = {
+    id: "p1",
+    name: "P1",
+    source: { table: "orders" },
+    anchor: { row: 0, col: 4 },
+    rows: [0],
+    columns: [],
+    values: [{ field: 1, aggregation: "SUM" }],
+  };
+
+  it("adds a measure as the last value, turning a table source into a model source", () => {
+    const next = withMeasureValue(pivot, [orders], "total");
+    expect(next?.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "region" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    });
+    expect(next?.values).toEqual([{ field: 1, aggregation: "SUM" }, { measure: "total" }]);
+    expect(next && withMeasureValue(next, [orders], "total")).toBeNull();
+    const range = {
+      ...pivot,
+      source: { range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } } },
+    };
+    expect(withMeasureValue(range, [orders], "total")).toBeNull();
+  });
+
+  it("groups measures by home table, with measures of a removed table last", () => {
+    const measure = (id: string, table: string) => ({ id, name: id, table, formula: "=1" });
+    const customers = { ...orders, id: "customers", name: "Customers" };
+    expect(
+      measuresByTable(
+        [measure("a", "customers"), measure("b", "gone"), measure("c", "orders")],
+        [orders, customers],
+      ).map(([table, own]) => [table?.id ?? null, own.map((entry) => entry.id)]),
+    ).toEqual([
+      ["orders", ["c"]],
+      ["customers", ["a"]],
+      [null, ["b"]],
+    ]);
+    expect(nextMeasureId([measure("measure-1", "orders"), measure("measure-3", "orders")])).toBe(
+      "measure-2",
     );
   });
 });
