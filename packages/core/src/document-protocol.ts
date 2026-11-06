@@ -22,6 +22,7 @@ import {
   validateRelationshipShape,
 } from "./data-model.js";
 import { SheetwriteError } from "./errors.js";
+import { validateExternalLinksShape } from "./external-link.js";
 import {
   cloneCellHyperlink,
   isSafeExternalHyperlink,
@@ -2778,6 +2779,14 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
     }
 
+    const externalLink = ownValue(graph, "externalLink");
+    if (
+      externalLink !== undefined &&
+      (typeof externalLink !== "string" || !/^[0-9a-f]{16}$/.test(externalLink))
+    ) {
+      invalid(errors, `${graphPath}.externalLink`, "externalLink must be a 64-bit hex digest");
+    }
+
     const unsupportedPath = `${graphPath}.unsupportedQueries`;
     const unsupported = ownValue(graph, "unsupportedQueries");
     const kept = unsupported === undefined ? [] : arrayAt(unsupported, unsupportedPath, errors);
@@ -2969,6 +2978,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const queries = ownValue(workbook, "queries");
     if (queries !== undefined) {
       validateSavedQueriesShape(queries, "workbook.queries", errors);
+    }
+
+    const externalLinks = ownValue(workbook, "externalLinks");
+    if (externalLinks !== undefined) {
+      validateExternalLinksShape(externalLinks, "workbook.externalLinks", errors);
     }
   }
 

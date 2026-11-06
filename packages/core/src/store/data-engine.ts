@@ -44,6 +44,7 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorContext,
 } from "../errors.js";
+import { installExternalLinks } from "../external-link.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -820,6 +821,9 @@ export class StoreDataEngine {
       this.syncSpillBlockers(sheet);
       this.view.queueHiddenRows(sheet.id);
     }
+
+    // Before any formula is loaded, so formulas find the links they read.
+    installExternalLinks(this.wasm, workbook.externalLinks ?? []);
 
     // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
     this.view.flushHiddenRows();
