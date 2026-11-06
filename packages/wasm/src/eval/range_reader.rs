@@ -16,6 +16,14 @@ use crate::types::{
     RANGE_CELL_LIMIT,
 };
 
+/// The bits the literal kinds use: every literal kind is at most this value,
+/// and every other kind (a formula, or a calculated slot) sets a higher bit.
+const LITERAL_KIND_BITS: u8 = 0b11;
+const _: () = assert!(
+    KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL == LITERAL_KIND_BITS
+        && KIND_FORMULA & !LITERAL_KIND_BITS != 0
+);
+
 #[cfg(test)]
 thread_local! {
     /// Tests turn literal-column reads off to compare the kernels that use
@@ -133,11 +141,10 @@ impl<'a> RangeReader<'a> {
             let (kinds, payloads) = column.raw_slices();
             let kinds = kinds.get(rows.clone())?;
 
-            // A raw empty kind without the calculated bit is a plain blank.
-            if !kinds
-                .iter()
-                .all(|&kind| matches!(kind, KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL))
-            {
+            // Literal kinds are 0..=3 (a raw empty kind without the calculated
+            // bit is a plain blank). Any other kind sets a higher bit, so one
+            // OR over the column decides it without a branch per cell.
+            if kinds.iter().fold(0, |any, &kind| any | kind) & !LITERAL_KIND_BITS != 0 {
                 return None;
             }
 

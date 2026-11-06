@@ -107,7 +107,66 @@ impl<'c> CellTest<'c> {
             _ => self.blank,
         }
     }
+
+    /// The answers for a finite number below, equal to and above the
+    /// criterion's operand; with no comparison all three are the same answer
+    /// and the operand is unused.
+    fn number_answers(&self) -> (f64, [bool; 3]) {
+        match self.number {
+            NumberTest::Compare(op, operand) => {
+                let answers = match op {
+                    CmpOp::Eq => [false, true, false],
+                    CmpOp::Ne => [true, false, true],
+                    CmpOp::Lt => [true, false, false],
+                    CmpOp::Le => [true, true, false],
+                    CmpOp::Gt => [false, false, true],
+                    CmpOp::Ge => [false, true, true],
+                };
+                (operand, answers)
+            }
+            NumberTest::Always(answer) => (0.0, [answer; 3]),
+        }
+    }
+
+    /// Matches one column into `mask`, one bit per row. The first criterion
+    /// writes every word; later ones clear the bits of rows they reject and
+    /// skip words with no row left. A finite number against a finite operand
+    /// is below, equal to or above it, so its answer is one select of three,
+    /// without a branch per comparison operator.
+    fn mask_column(
+        &self,
+        strings: &StringStorage,
+        (kinds, payloads): (&[u8], &[u64]),
+        mask: &mut [u64],
+        first: bool,
+    ) {
+        let (operand, [below, equal, above]) = self.number_answers();
+        let chunks = kinds.chunks(MASK_ROWS).zip(payloads.chunks(MASK_ROWS));
+        for (word, (kinds, payloads)) in mask.iter_mut().zip(chunks) {
+            if !first && *word == 0 {
+                continue;
+            }
+
+            let mut bits = 0;
+            for (bit, (&kind, &payload)) in kinds.iter().zip(payloads).enumerate() {
+                let number = payload_num(payload);
+                let matched = if kind == KIND_NUMBER && number.is_finite() {
+                    (number < operand && below)
+                        | (number == operand && equal)
+                        | (number > operand && above)
+                } else {
+                    self.matches(strings, kind, payload)
+                };
+                bits |= u64::from(matched) << bit;
+            }
+
+            *word = if first { bits } else { *word & bits };
+        }
+    }
 }
+
+/// Rows per word of a match mask.
+const MASK_ROWS: usize = u64::BITS as usize;
 
 /// The value the sum and extreme folds see for a literal cell. They skip
 /// text, so a text cell reads as blank instead of copying its string.
@@ -157,6 +216,19 @@ impl CellStore {
                 .map(|(range, criterion)| (range, CellTest::new(criterion))),
         );
 
+        // One column per range is the common shape: match whole columns into
+        // a row mask, then fold the matched rows in row order, as below.
+        if cols == 1 {
+            let columns: Option<Vec<_>> = tests
+                .iter()
+                .map(|(range, test)| Some((column_rows(range, rows)?, test)))
+                .collect();
+            let values = values.map(|values| column_rows(values, rows));
+            if let (Some(columns), None | Some(Some(_))) = (columns, values) {
+                return self.literal_criteria_column_family(fold, values.flatten(), &columns, rows);
+            }
+        }
+
         let mut count = 0.0;
         let mut sums = IfSum::new();
         let mut extremes = IfExtreme::new(matches!(fold, CriteriaFold::Extreme { maximum: true }));
@@ -200,6 +272,74 @@ impl CellStore {
             CriteriaFold::Extreme { .. } => extremes.finish(),
         }
     }
+
+    /// [`Self::literal_criteria_family`] for single-column ranges: each
+    /// criterion masks its whole column, and the fold reads only the matched
+    /// rows, lowest first, so sums add in the same order.
+    #[inline(never)]
+    fn literal_criteria_column_family(
+        &self,
+        fold: CriteriaFold,
+        values: Option<(&[u8], &[u64])>,
+        criteria: &[((&[u8], &[u64]), &CellTest<'_>)],
+        rows: usize,
+    ) -> EvalResult {
+        let strings = &self.strings;
+        let words = rows.div_ceil(MASK_ROWS);
+        let mut mask = Vec::new();
+        if mask.try_reserve_exact(words).is_err() {
+            return Value::Error(FormulaError::Num);
+        }
+        mask.resize(words, 0);
+
+        for (index, &(column, test)) in criteria.iter().enumerate() {
+            test.mask_column(strings, column, &mut mask, index == 0);
+        }
+
+        if let CriteriaFold::Count = fold {
+            let count: u64 = mask.iter().map(|word| u64::from(word.count_ones())).sum();
+            return Value::number(count as f64);
+        }
+
+        let mut sums = IfSum::new();
+        let mut extremes = IfExtreme::new(matches!(fold, CriteriaFold::Extreme { maximum: true }));
+        for (word, &bits) in mask.iter().enumerate() {
+            let mut bits = bits;
+            while bits != 0 {
+                let row = word * MASK_ROWS + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+
+                let Some((kinds, payloads)) = values else {
+                    return Value::Error(FormulaError::Value);
+                };
+                let (kind, payload) = (kinds[row], payloads[row]);
+                let number = payload_num(payload);
+                let folded = match fold {
+                    CriteriaFold::Sum { .. } if kind == KIND_NUMBER && number.is_finite() => {
+                        sums.add_number(number);
+                        Ok(())
+                    }
+                    CriteriaFold::Sum { .. } => sums.add(&folded_value(strings, kind, payload)),
+                    _ => extremes.add(&folded_value(strings, kind, payload)),
+                };
+
+                if let Err(error) = folded {
+                    return Value::Error(error);
+                }
+            }
+        }
+
+        match fold {
+            CriteriaFold::Sum { average } => sums.finish(average),
+            _ => extremes.finish(),
+        }
+    }
+}
+
+/// The first column of `columns` cut to `rows` rows, when it has them.
+fn column_rows<'a>(columns: &LiteralColumns<'a>, rows: usize) -> Option<(&'a [u8], &'a [u64])> {
+    let &(kinds, payloads) = columns.columns.first()?;
+    Some((kinds.get(..rows)?, payloads.get(..rows)?))
 }
 
 #[cfg(test)]
@@ -342,5 +482,56 @@ mod tests {
         store.recompute(sheet);
 
         assert_eq!(KERNEL_CALLS.with(std::cell::Cell::get), 0);
+    }
+
+    /// Columns longer than one mask word, where later criteria skip words
+    /// the first one emptied, give the cell-by-cell walk's results.
+    #[test]
+    fn long_columns_match_the_cell_by_cell_walk() {
+        const LONG: usize = 300;
+        let sources = [
+            format!("=COUNTIF(A1:A{LONG},\">=150\")"),
+            format!("=COUNTIFS(A1:A{LONG},\"<64\",B1:B{LONG},\"<>b\")"),
+            format!("=SUMIFS(C1:C{LONG},A1:A{LONG},\">200\",B1:B{LONG},\"a*\")"),
+            format!("=SUMIF(A1:A{LONG},\"<>7\",C1:C{LONG})"),
+            format!("=AVERAGEIFS(C1:C{LONG},A1:A{LONG},\">=0\",B1:B{LONG},TRUE)"),
+            format!("=MAXIFS(C1:C{LONG},A1:A{LONG},\"<128\")"),
+            format!("=MINIFS(C1:C{LONG},B1:B{LONG},\"\")"),
+        ];
+        let results = |literal_columns: bool| {
+            LITERAL_COLUMNS_OFF.with(|off| off.set(!literal_columns));
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(4, LONG);
+            for row in 0..LONG {
+                store.set_number(sheet, row, 0, row as f64, 0);
+                match row % 5 {
+                    0 => store.set_string(sheet, row, 1, "abc", 0),
+                    1 => store.set_string(sheet, row, 1, "b", 0),
+                    2 => store.set_bool(sheet, row, 1, row % 2 == 0, 0),
+                    3 => {}
+                    _ => store.set_number(sheet, row, 1, 1.0, 0),
+                }
+                if row % 7 != 0 {
+                    store.set_number(sheet, row, 2, (row % 13) as f64 * 0.1, 0);
+                }
+            }
+            for (index, source) in sources.iter().enumerate() {
+                store.set_formula(sheet, index, 3, source, 0);
+            }
+            store.recompute(sheet);
+            LITERAL_COLUMNS_OFF.with(|off| off.set(false));
+            (0..sources.len())
+                .map(|index| {
+                    let cell = store.get_cell(sheet, index, 3);
+                    (cell.kind(), cell.num().to_bits(), cell.string())
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let walked = results(false);
+        let scanned = results(true);
+        for ((source, walked), scanned) in sources.iter().zip(&walked).zip(&scanned) {
+            assert_eq!(walked, scanned, "{source}");
+        }
     }
 }
