@@ -2014,8 +2014,8 @@ impl<'a> Parser<'a> {
     fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
         // Sheet names cannot contain `:`, so a quoted name with one is the
         // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`. The `:` of a
-        // drive in the path of another workbook is not.
-        if quoted && !names_workbook(&sheet_name) {
+        // drive in the path of another workbook or file is not.
+        if quoted && !is_external_sheet(&sheet_name) && !sheet_name.contains(['\\', '/']) {
             if let Some((first, last)) = sheet_name.split_once(':') {
                 return self.sheet_span_at(first.to_string(), last.to_string(), true);
             }
@@ -2197,26 +2197,10 @@ pub(crate) fn external_name_key(text: &str) -> Option<String> {
 
 /// Whether the text before `!` names another workbook: a sheet of it
 /// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
-/// `C:\Reports\Budget.xlsx`).
+/// `C:\Reports\Budget.xlsx`). A file name has an extension, and a path
+/// has a folder; Excel sheet names hold neither `\\` nor `/`.
 fn names_workbook(qualifier: &str) -> bool {
-    const LONGEST_EXTENSION: usize = 4;
-
-    let Some((_, extension)) = qualifier.rsplit_once('.') else {
-        return is_external_sheet(qualifier);
-    };
-    let mut lower = [0u8; LONGEST_EXTENSION];
-    let fits = extension.len() <= LONGEST_EXTENSION;
-    if fits {
-        for (slot, byte) in lower.iter_mut().zip(extension.bytes()) {
-            *slot = byte.to_ascii_lowercase();
-        }
-    }
-    let is_book = fits
-        && matches!(
-            &lower[..extension.len()],
-            b"xlsx" | b"xlsm" | b"xlsb" | b"xls" | b"xlam" | b"ods"
-        );
-    is_book || is_external_sheet(qualifier)
+    is_external_sheet(qualifier) || qualifier.contains(['.', '\\', '/'])
 }
 
 /// Whether a sheet reference names a sheet of another workbook:
