@@ -68,6 +68,24 @@ export interface NavigationSection {
   items: readonly NavigationItem[];
 }
 
+/** Each API package's icon, by package name. */
+const API_PACKAGE_ICONS: Readonly<Record<string, IconName>> = {
+  "@sheetwrite/charts": "chart",
+  "@sheetwrite/core": "sheet",
+  "@sheetwrite/formulas": "formula",
+  "@sheetwrite/queries": "database",
+  "@sheetwrite/react": "framework-react",
+  "@sheetwrite/svelte": "framework-svelte",
+  "@sheetwrite/vue": "framework-vue",
+  "@sheetwrite/wasm": "bolt",
+  "@sheetwrite/xlsx": "file",
+};
+
+/** An API package's icon; a package without its own reads as code. */
+function apiPackageIcon(name: string): IconName {
+  return API_PACKAGE_ICONS[name] ?? "code";
+}
+
 /** Each formula family page's icon, by the family's route slug. */
 const FORMULA_FAMILY_ICONS: Readonly<Record<string, IconName>> = {
   array: "spill",
@@ -478,8 +496,8 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: API_PACKAGES_LABEL,
     tab: "api",
     items: [
-      { label: "All entry points", href: "/docs/api/", icon: "layers" },
-      ...apiNav.map((entry) => ({ ...entry, icon: "package" as const })),
+      { label: "All entry points", href: "/docs/api/", icon: "package" },
+      ...apiNav.map((entry) => ({ ...entry, icon: apiPackageIcon(entry.label) })),
     ],
   },
   {
