@@ -494,13 +494,9 @@ details[open] > summary > .sw-disclosure-icon {
   border-color: var(--sw-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 15%, transparent);
 }
-.sw-symbol-filter__field svg {
-  width: 1.1rem;
-  height: 1.1rem;
+.sw-symbol-filter__field .sw-icon {
   flex: none;
-  fill: none;
-  stroke: var(--sw-fg-muted);
-  stroke-width: 1.7;
+  color: var(--sw-fg-muted);
 }
 .sw-symbol-filter__field input {
   min-width: 0;

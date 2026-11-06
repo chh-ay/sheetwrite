@@ -1208,7 +1208,12 @@ export function renderEntryPage(
           ? "Testing-only public entry point"
           : "CSS or binary asset entry point";
   const body = [
-    frontmatter(label, `API reference for ${label}.`).trimEnd(),
+    frontmatter(
+      label,
+      `API reference for ${label}.`,
+      undefined,
+      entry.kind === "asset" ? undefined : entry.exports.length,
+    ).trimEnd(),
     `<span class="api-status" data-status="${entry.classification}">${entry.classification}</span>`,
     "",
     `**${status}.** Import this entry point as \`${label}\`.`,

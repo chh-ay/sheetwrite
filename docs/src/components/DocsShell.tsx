@@ -46,6 +46,8 @@ interface DocsShellProps {
    * the article on narrow ones. Error and not-found pages omit it.
    */
   reserveOutline?: boolean;
+  /** An API entry point's exported symbol count, so its filter renders on the server. */
+  symbolCount?: number;
   title: string;
 }
 
@@ -266,6 +268,7 @@ export function DocsShell({
   kind,
   outline: buildOutline,
   reserveOutline,
+  symbolCount,
   title,
 }: Readonly<DocsShellProps>) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
@@ -372,7 +375,7 @@ export function DocsShell({
             </p>
           )}
         </header>
-        <ApiSymbolFilter />
+        <ApiSymbolFilter symbolCount={symbolCount} />
         {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}
         <article
           className={`sw-prose${activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}

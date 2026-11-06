@@ -169,7 +169,7 @@ a {
    moves nothing around it. */
 .sw-search-button kbd {
   flex: none;
-  min-width: 3.25rem;
+  width: 3.75rem;
   text-align: center;
   border: 1px solid var(--sw-border);
   border-radius: var(--sw-radius-xs);

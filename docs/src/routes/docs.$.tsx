@@ -41,6 +41,7 @@ export const Route = createFileRoute("/docs/$")({
         description: "This page has a new address.",
         kind: undefined,
         outline: [],
+        symbols: undefined,
         stylesheets: [],
         moved: href,
         movedTo: moved.to,
@@ -56,6 +57,7 @@ export const Route = createFileRoute("/docs/$")({
       description: document.description,
       kind: document.kind,
       outline: document.outline ?? [],
+      symbols: document.symbols,
       stylesheets: document.stylesheets,
       moved: undefined,
       movedTo: undefined,
@@ -170,6 +172,7 @@ function DocumentRoute() {
       kind={metadata.kind}
       outline={metadata.outline}
       reserveOutline
+      symbolCount={metadata.symbols}
       title={metadata.title}
     >
       {/* The loader has loaded the article, so the server renders it in full;

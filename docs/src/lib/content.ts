@@ -9,6 +9,8 @@ export interface DocumentFrontmatter {
   kind?: string;
   /** The page's outline, collected at build time; see lib/outline.ts. */
   outline?: readonly OutlineItem[];
+  /** An API entry point's exported symbol count, for its symbol filter. */
+  symbols?: number;
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -89,6 +91,7 @@ export async function documentForSplat(
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
+    symbols: module.frontmatter?.symbols,
     stylesheets: module.stylesheets ?? [],
   };
 }
