@@ -5,9 +5,10 @@
  * - A code block wider than its column becomes a focusable region, so a
  *   keyboard can scroll it.
  * - Code hover popovers load on demand: their runtime and Floating UI stay out
- *   of the first load. They load when the browser is idle, or as soon as the
- *   pointer or keyboard focus reaches a code block, whichever comes first. A
- *   trigger hovered or focused before they are ready opens once they are.
+ *   of the first load. They load at the first idle moment after the page is
+ *   hydrated, or as soon as the pointer or keyboard focus reaches a code
+ *   block, whichever comes first. A trigger hovered or focused before they
+ *   are ready opens once they are.
  */
 
 import type * as CodePopovers from "./code-popovers.js";
@@ -82,8 +83,33 @@ function whenIdle(task: () => void): () => void {
 }
 
 /**
- * Loads the popover runtime on the first approach to a code block or when
- * the browser is idle, then leaves every later event to its own listeners.
+ * Runs `task` at the first idle moment after the page marks itself hydrated
+ * (`html[data-hydrated]`), so the popover runtime never competes with the
+ * page's own content for the network or the main thread. Returns the cancel.
+ */
+function whenHydratedAndIdle(task: () => void): () => void {
+  let cancelIdle: () => void = () => {};
+  const root = document.documentElement;
+  const watcher = new MutationObserver(() => {
+    if (root.dataset.hydrated === undefined) return;
+    watcher.disconnect();
+    cancelIdle = whenIdle(task);
+  });
+  if (root.dataset.hydrated === undefined) {
+    watcher.observe(root, { attributes: true, attributeFilter: ["data-hydrated"] });
+  } else {
+    cancelIdle = whenIdle(task);
+  }
+  return () => {
+    watcher.disconnect();
+    cancelIdle();
+  };
+}
+
+/**
+ * Loads the popover runtime on the first approach to a code block or once
+ * the hydrated page is idle, then leaves every later event to its own
+ * listeners.
  */
 function installPopoversOnDemand(): () => void {
   let isStopped = false;
@@ -125,7 +151,7 @@ function installPopoversOnDemand(): () => void {
 
   document.addEventListener("pointerover", handleApproach);
   document.addEventListener("focusin", handleApproach);
-  cancelIdleLoad = whenIdle(() => void load());
+  cancelIdleLoad = whenHydratedAndIdle(() => void load());
 
   return () => {
     isStopped = true;
