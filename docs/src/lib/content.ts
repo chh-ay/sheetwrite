@@ -46,7 +46,7 @@ function hrefFromSource(source: string): string {
   const relative = source
     .replace(/^\.\.\/content\/docs\//, "")
     .replace(/\.(?:md|mdx)$/, "")
-    .replace(/\/index$/, "");
+    .replace(/(^|\/)index$/, "");
   return `/docs/${relative}/`.replace(/\/+/g, "/");
 }
 
