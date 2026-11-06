@@ -3,7 +3,6 @@ import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-
 import type { ColumnarData } from "./types/data.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -203,7 +202,6 @@ export async function fromXlsxTable(
     });
   }
 }
-
 
 /** Whether workbook import can be offered without loading an optional backend. */
 export function hasXlsxWorkbookBackend(): boolean {
