@@ -33,6 +33,7 @@ import {
   showFormulaExplanation,
   showNameManager,
 } from "../panels/panel-loader.js";
+import { selectedPivot } from "../panels/selected-pivot.js";
 import { queryCommandsOf, queryRefreshRunning, toggleQueryRefresh } from "../query-commands.js";
 import { selectionCell } from "../selection.js";
 import { storeEngine } from "../store/engine-registry.js";
@@ -333,7 +334,7 @@ const insertChartOf =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
 
-/** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard pivot. */
+/** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard or worksheet pivot. */
 const insertPivotChartOf =
   (kind: ChartKind) =>
   async (grid: Grid): Promise<boolean> =>
@@ -354,6 +355,9 @@ function activeSheetIsDashboard(grid: Grid): boolean {
 /** Data › Data Tools opens the data model panel; the panel code loads on first use. */
 const openDataModel = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openDataModelPanel(grid);
+
+const openMeasures = async (grid: Grid): Promise<void> =>
+  (await loadPanels(grid)).openMeasurePanel(grid);
 
 /** The data model needs workbook tables: one to manage, two to relate. */
 function workbookTableCount(grid: Grid): number {
@@ -377,7 +381,10 @@ const chart: RibbonMenuSpec = {
   items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insertChartOf(kind) })),
 };
 
-/** Excel's PivotChart: on a dashboard with a pivot, a chart over that pivot. */
+/**
+ * Excel's PivotChart: on a dashboard with a pivot, or with the active cell in
+ * a worksheet pivot, a chart over that pivot.
+ */
 const pivotChart: RibbonMenuSpec = {
   kind: "menu",
   id: "pivotChart",
@@ -391,7 +398,7 @@ const pivotChart: RibbonMenuSpec = {
     icon,
     run: insertPivotChartOf(kind),
   })),
-  available: (grid) => activeSheetIsDashboard(grid),
+  available: (grid) => activeSheetIsDashboard(grid) || selectedPivot(grid) !== null,
 };
 
 function outline(group: boolean): (grid: Grid) => void {
@@ -849,6 +856,16 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             ),
             available: queriesConnected,
           },
+          {
+            ...button(
+              "Edit Links",
+              "editLinks",
+              (grid) => void loadPanels(grid).then((panels) => panels.openEditLinksPanel(grid)),
+              "view",
+            ),
+            // As in Excel, the command shows only for a workbook with links.
+            available: (grid) => (grid.store.getWorkbook().externalLinks?.length ?? 0) > 0,
+          },
         ],
       },
       {
@@ -890,6 +907,11 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           {
             ...button("Relationships", "relationships", openDataModel, "view", { large: true }),
             available: (grid) => workbookTableCount(grid) > 1,
+          },
+          {
+            ...button("Measures", "measure", openMeasures, "view", { large: true }),
+            description: "Manage Measures",
+            available: (grid) => workbookTableCount(grid) > 0,
           },
         ],
       },

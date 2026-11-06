@@ -132,7 +132,7 @@ The dashboard view applies the slicers, so they filter once a dashboard has been
 
 ## PivotCharts
 
-**Insert › Charts › PivotChart** shows on a dashboard. It adds a chart of the chosen type over the focused pivot item, or else the first pivot, and an item that shows the chart in the next free place, in one undo step. Removing the item removes its chart too.
+**Insert › Charts › PivotChart** shows on a dashboard. It adds a chart of the chosen type over the focused pivot item, or else the first pivot, and an item that shows the chart in the next free place, in one undo step. Removing the item removes its chart too. On a worksheet, the command charts the pivot that holds the active cell; see [Charts over pivots](/docs/features/analysis/charts/#charts-over-pivots).
 
 The chart is a `ChartDefinition` with `pivot` set to the ID of a pivot on the same dashboard, and an empty `series` list. As in Excel, the row items are the categories and each value field, for each column item, is one series. Subtotals and grand totals are not points. The slicers filter the chart as they filter its pivot, and the chart follows each recalculation. Charts need `@sheetwrite/charts`: without it, the item says so.
 

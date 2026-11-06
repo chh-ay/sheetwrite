@@ -100,7 +100,7 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Data Model** and **Relationships** (Data › Data Tools) open the [data model](/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
 
-**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
+**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. On a worksheet, **PivotChart** shows while the active cell is in a pivot and [charts that pivot](/docs/features/analysis/charts/#charts-over-pivots). Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
 
 **Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
 
@@ -121,9 +121,9 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 | Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
 | Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) |
 | Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)); also refreshes external links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
+| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
 | Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
+| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)); shows only for a workbook with links |
 | Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
 | Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
 | Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures ([#230](https://github.com/chh-ay/sheetwrite/issues/230)) |

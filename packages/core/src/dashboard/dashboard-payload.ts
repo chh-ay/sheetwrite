@@ -3,6 +3,9 @@
 // the slicer's table through relationships, as an Excel slicer filters the
 // PivotTables connected to it (#231). The result is what the engine computes;
 // the saved pivot definitions do not change.
+//
+// A worksheet adds one hidden copy of each pivot that a chart reads, so the
+// chart plots the pivot's leaf items without its totals (#487).
 
 import { baseTable, relatedTables, withModelField } from "../panels/pivot-model.js";
 import type { CellScalar } from "../types/cell.js";
@@ -114,10 +117,31 @@ function dataPivot(
 }
 
 /**
- * The hidden pivot that charts `item`: its chart's pivot, as the slicers
- * filter it, without subtotals or totals and with one label column per row
- * field, as an Excel PivotChart leaves totals out.
+ * Column of the anchor of the first chart copy of a worksheet pivot; each
+ * next copy takes the next column. The columns are right of the last column
+ * of every sheet, and deleting columns never brings them inside, so the
+ * engine computes the copies without placing them in cells. Row and column
+ * edits move every copy alike, so their anchors never meet.
  */
+const UNPLACED_COL = 2 ** 30;
+
+/**
+ * The copy of `pivot` that a chart reads: without subtotals or totals and
+ * with one label column per row field, as an Excel PivotChart leaves totals
+ * out.
+ */
+function chartCopy(pivot: PivotDefinition, id: string): PivotDefinition {
+  return {
+    ...pivot,
+    id,
+    layout: "tabular",
+    subtotals: false,
+    rowTotals: false,
+    columnTotals: false,
+  };
+}
+
+/** The hidden pivot that charts `item`: its chart's pivot, as the slicers filter it. */
 function chartPivot(
   item: DashboardChartItem,
   sheet: Sheet,
@@ -126,14 +150,7 @@ function chartPivot(
   const chart = sheet.charts?.find((candidate) => candidate.id === item.chart);
   const pivot = pivots.find((candidate) => candidate.id === chart?.pivot);
   if (pivot === undefined) return null;
-  return {
-    ...pivot,
-    id: `chart-data-${item.id}`,
-    layout: "tabular",
-    subtotals: false,
-    rowTotals: false,
-    columnTotals: false,
-  };
+  return chartCopy(pivot, `chart-data-${item.id}`);
 }
 
 /**
@@ -170,11 +187,11 @@ function kpiPivot(
   );
 }
 
-/** What the engine computes for a dashboard, and where its hidden pivots are. */
-export interface DashboardPayload {
+/** What the engine computes for a sheet, and where its hidden pivots are. */
+export interface PivotViewPayload {
   /** The sheet's pivots in their order, then the hidden pivots. */
   readonly pivots: PivotDefinition[];
-  /** Payload index of each item's hidden pivot, by item ID. */
+  /** Payload index of each hidden pivot, by the ID of the item or chart that reads it. */
   readonly hidden: ReadonlyMap<string, number>;
 }
 
@@ -190,7 +207,7 @@ export function dashboardPayload(
   sheets: readonly Sheet[],
   model: DataModel | undefined,
   overrides: SlicerOverrides,
-): DashboardPayload | undefined {
+): PivotViewPayload | undefined {
   const slicers = slicersOf(sheet, overrides);
   const items = sheet.dashboard?.items ?? [];
   const charts = items.filter((item): item is DashboardChartItem => item.kind === "chart");
@@ -221,4 +238,31 @@ export function dashboardPayload(
   for (const item of charts) add(item.id, chartPivot(item, sheet, pivots));
   for (const item of kpis) add(item.id, kpiPivot(item, model, slicers, tables));
   return { pivots: all, hidden };
+}
+
+/**
+ * The definitions the engine computes for the pivots of worksheet `sheet`:
+ * its pivots in their order, then one copy of each pivot that a chart reads,
+ * which the engine computes without placing it in cells. Charts over the
+ * same pivot share its copy. Undefined when no chart reads a pivot.
+ */
+export function worksheetPayload(sheet: Sheet): PivotViewPayload | undefined {
+  const pivots = sheet.pivots ?? [];
+  const copies = new Map<string, number>();
+  const hidden = new Map<string, number>();
+  const all = [...pivots];
+  for (const chart of sheet.charts ?? []) {
+    const pivot = pivots.find((candidate) => candidate.id === chart.pivot);
+    if (pivot === undefined) continue;
+
+    let index = copies.get(pivot.id);
+    if (index === undefined) {
+      index = all.length;
+      const copy = chartCopy(pivot, `chart-data-${pivot.id}`);
+      all.push({ ...copy, anchor: { row: 0, col: UNPLACED_COL + copies.size } });
+      copies.set(pivot.id, index);
+    }
+    hidden.set(chart.id, index);
+  }
+  return hidden.size === 0 ? undefined : { pivots: all, hidden };
 }

@@ -6,7 +6,7 @@ use super::matrix::{optional_ast, range_from_ast};
 use super::{address_text, current_formula_origin, EvalPass};
 use crate::calc::{sheet_name_key, Ast, Func};
 use crate::store::CellStore;
-use crate::types::{cell_key, AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{cell_key, AbsCellKey, EvalResult, FormulaEntry, FormulaError, Value};
 
 /// Excel returns `#N/A` from FORMULATEXT for formulas longer than its
 /// formula-length limit, in characters.
@@ -116,14 +116,14 @@ impl CellStore {
         let source = cell_key(cell.row as usize, cell.col as usize)
             .and_then(|key| data.formulas.get(key, &self.formula_slots))
             .filter(|entry| entry.is_formula())
-            .map(|entry| entry.source.as_str());
+            .map(FormulaEntry::source);
         if func == Func::IsFormula {
             return Ok(Value::Bool(source.is_some()));
         }
 
         match source {
             Some(source) if source.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
-                Ok(Value::text(source))
+                Ok(Value::text(&*source))
             }
             _ => Err(FormulaError::Na),
         }

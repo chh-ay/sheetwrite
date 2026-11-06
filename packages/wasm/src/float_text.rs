@@ -178,6 +178,13 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
         return Digits::new(integer, exponent + 1, exponent as i32);
     }
 
+    let binary = Binary::of(number);
+    if number >= f64::MIN_POSITIVE {
+        if let Some(digits) = shortest_from_one_scaling(&binary) {
+            return digits;
+        }
+    }
+
     // Around a normal number the gap between doubles is under a quarter of a
     // 15-digit step, so a shorter form that reads back is the 15-digit one
     // without its trailing zeros. A subnormal number has fewer significant
@@ -187,19 +194,96 @@ pub(crate) fn shortest_digits(number: f64) -> Digits {
     } else {
         1
     };
-    let binary = Binary::of(number);
     let mut exponent = binary.exponent_guess();
     for count in first_count..=MAX_DIGITS {
         let scaled = Scaled::of(&binary, count, exponent);
         exponent = scaled.exponent;
-        let round_up = match (scaled.below_fits, scaled.above_fits) {
-            (true, true) => scaled.half != Ordering::Less,
-            (below, above) if below || above => above,
-            _ => continue,
-        };
-        return Digits::new(scaled.digits + u64::from(round_up), count, scaled.exponent);
+        if let Some(round_up) = shortest_round_up(scaled.half, scaled.below_fits, scaled.above_fits)
+        {
+            return Digits::new(scaled.digits + u64::from(round_up), count, scaled.exponent);
+        }
     }
     unreachable!("17 significant digits read back as every double")
+}
+
+/// Whether the shortest form at one digit count rounds the truncated digits
+/// up: when both candidates read back, the closer one, halfway rounding up;
+/// `None` when neither reads back.
+fn shortest_round_up(half: Ordering, below_fits: bool, above_fits: bool) -> Option<bool> {
+    match (below_fits, above_fits) {
+        (true, true) => Some(half != Ordering::Less),
+        (below, above) if below || above => Some(above),
+        _ => None,
+    }
+}
+
+/// The shortest digits of a normal number from a single scaling to 17
+/// digits, when that scaling has a power-of-two denominator and fits 128
+/// bits (numbers from about `1e-11` to `1e16`). The 15- and 16-digit
+/// candidates are the 17 digits without their last two or one digits, and
+/// every distance is measured on the same scale, so the number is scaled
+/// once instead of once per digit count. `None` leaves the number to the
+/// per-count search.
+fn shortest_from_one_scaling(binary: &Binary) -> Option<Digits> {
+    let mut exponent = binary.exponent_guess();
+    let (numerator, gap, twos_down) = loop {
+        let powers = Powers::of(binary, MAX_DIGITS as i32 - 1 - exponent);
+        if powers.fives_down != 0 {
+            return None;
+        }
+        let fives = u128::from(five_power(powers.fives_up)?);
+        let numerator = shifted(fives * u128::from(binary.mantissa), powers.twos_up)?;
+        // The denominator `2^twos_down` keeps the same headroom.
+        shifted(1, powers.twos_down)?;
+        match digit_count_order(numerator >> powers.twos_down, MAX_DIGITS) {
+            Ordering::Greater => exponent += 1,
+            Ordering::Less => exponent -= 1,
+            Ordering::Equal => {
+                break (numerator, shifted(fives, powers.twos_up)?, powers.twos_down)
+            }
+        }
+    };
+
+    // On a scale of twice the denominator, the number is `twice`, half the
+    // gap to either neighbour is `gap`, and one unit of the last kept digit
+    // is `10^dropped` such steps.
+    let twice = numerator << 1;
+    let seventeen = (numerator >> twos_down) as u64;
+    for dropped in (0..=MAX_DIGITS - EXCEL_DIGITS).rev() {
+        let step = 10u64.pow(dropped);
+        let below = seventeen / step;
+        let unit = u128::from(step) << (twos_down + 1);
+        let below_distance = twice - (u128::from(below * step) << (twos_down + 1));
+        let above_distance = unit - below_distance;
+        let half = below_distance.cmp(&(unit >> 1));
+        let lower_reach = if binary.narrow_below {
+            below_distance << 1
+        } else {
+            below_distance
+        };
+        let below_fits = fits(lower_reach.cmp(&gap), binary.inclusive);
+        let above_fits = fits(above_distance.cmp(&gap), binary.inclusive);
+        if let Some(round_up) = shortest_round_up(half, below_fits, above_fits) {
+            return Some(Digits::new(
+                below + u64::from(round_up),
+                MAX_DIGITS - dropped,
+                exponent,
+            ));
+        }
+    }
+    None
+}
+
+/// Whether `digits` has too many (`Greater`) or too few (`Less`) digits for
+/// `count`.
+fn digit_count_order(digits: u128, count: u32) -> Ordering {
+    if digits >= u128::from(10u64.pow(count)) {
+        Ordering::Greater
+    } else if digits < u128::from(10u64.pow(count - 1)) {
+        Ordering::Less
+    } else {
+        Ordering::Equal
+    }
 }
 
 /// Text of a number as `f64::to_string` writes it: plain decimal notation
@@ -377,19 +461,19 @@ impl Scaled {
         loop {
             let places = count as i32 - 1 - exponent;
             let (digits, comparisons) = scale(binary, places);
-            if digits >= u128::from(10u64.pow(count)) {
-                exponent += 1;
-            } else if digits < u128::from(10u64.pow(count - 1)) {
-                exponent -= 1;
-            } else {
-                let [half, below, above] = comparisons;
-                return Self {
-                    digits: digits as u64,
-                    exponent,
-                    half,
-                    below_fits: fits(below, binary.inclusive),
-                    above_fits: fits(above, binary.inclusive),
-                };
+            match digit_count_order(digits, count) {
+                Ordering::Greater => exponent += 1,
+                Ordering::Less => exponent -= 1,
+                Ordering::Equal => {
+                    let [half, below, above] = comparisons;
+                    return Self {
+                        digits: digits as u64,
+                        exponent,
+                        half,
+                        below_fits: fits(below, binary.inclusive),
+                        above_fits: fits(above, binary.inclusive),
+                    };
+                }
             }
         }
     }

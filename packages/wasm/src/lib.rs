@@ -76,9 +76,15 @@ mod formula_rewrite_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_syntax_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod formula_text_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod move_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod number_search_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod permute_tests;
 #[cfg(all(test, feature = "formula-engine"))]

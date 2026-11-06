@@ -121,6 +121,23 @@ describe("renderChartSvg", () => {
     ]);
   });
 
+  // Excel's value axis is linked to the source format of the first series,
+  // so a General first series keeps General ticks even when a later series
+  // is a percentage.
+  it("labels value ticks with the first series' format, also when it is General", () => {
+    const svg = render(
+      chartView("column", [
+        seriesView("Sum of Amount", [180, 95]),
+        seriesView("Share", [0.27, 0.15], { numberFormats: ["0%", "0%"] }),
+      ]),
+    );
+
+    const ticks = texts(svg, ".sheetwrite-chart-value-axis text");
+    expect(ticks.length).toBeGreaterThan(1);
+    expect(ticks.filter((tick) => tick.includes("%"))).toEqual([]);
+    expect(ticks.at(-1)).toBe("200");
+  });
+
   it("formats date categories with their format", () => {
     const svg = render(
       chartView("column", [
