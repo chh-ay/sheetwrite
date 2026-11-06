@@ -541,3 +541,33 @@ export function rebaseMovedRange(
     end: { ...range.end, [key]: span[1] },
   };
 }
+
+/**
+ * Whether the rows or columns of `range` stay next to each other after the
+ * move, so no other row or column lands between them. Excel refuses a move
+ * that would split a table this way.
+ */
+export function staysWholeAfterMove(
+  range: Range,
+  axis: SheetAxis,
+  move: {
+    readonly sheet: SheetId;
+    readonly from: number;
+    readonly count: number;
+    readonly to: number;
+  },
+): boolean {
+  if (range.sheet !== move.sheet) return true;
+
+  const key = axis === "row" ? "row" : "col";
+  const start = Math.min(range.start[key], range.end[key]);
+  const end = Math.max(range.start[key], range.end[key]);
+  let low = Number.POSITIVE_INFINITY;
+  let high = Number.NEGATIVE_INFINITY;
+  for (let index = start; index <= end; index++) {
+    const moved = moveIndex(index, move.from, move.count, move.to);
+    low = Math.min(low, moved);
+    high = Math.max(high, moved);
+  }
+  return high - low === end - start;
+}

@@ -330,15 +330,13 @@ impl CellStore {
                     &mut sources,
                 );
             }
-            let written = self.replace_range_sources(
+            if !self.write_moved_column(
                 block.sheet,
                 (block.start_row, col),
-                (block.rows, 1),
                 revision,
                 sources,
-                |row, _| slots[row],
-            );
-            if !written {
+                &slots,
+            ) {
                 return false;
             }
         }
@@ -356,9 +354,10 @@ impl CellStore {
         revision: Option<u64>,
     ) -> bool {
         let rows = self.sheets[sheet].cells.row_count();
-        let mut slots = Vec::with_capacity(rows * order.len());
-        let mut sources = HashMap::new();
+        let mut columns = Vec::with_capacity(order.len());
         for (target, &source) in order.iter().enumerate() {
+            let mut slots = Vec::with_capacity(rows);
+            let mut sources = HashMap::new();
             for row in 0..rows {
                 self.read_moved_cell(
                     sheet,
@@ -368,15 +367,31 @@ impl CellStore {
                     &mut sources,
                 );
             }
+            columns.push((slots, sources));
         }
-        self.replace_range_sources(
-            sheet,
-            (0, start),
-            (rows, order.len()),
-            revision,
-            sources,
-            |row, col| slots[col * rows + row],
-        )
+
+        columns
+            .into_iter()
+            .enumerate()
+            .all(|(offset, (slots, sources))| {
+                self.write_moved_column(sheet, (0, start + offset), revision, sources, &slots)
+            })
+    }
+
+    /// Write the moved cells of one column from `top`: `slots` holds their
+    /// storage and `sources` their formulas. One writer serves row and column
+    /// moves, so the block writer is compiled once for them.
+    fn write_moved_column(
+        &mut self,
+        sheet: usize,
+        top: (usize, usize),
+        revision: Option<u64>,
+        sources: MovedSources,
+        slots: &[(u8, u64, u32)],
+    ) -> bool {
+        self.replace_range_sources(sheet, top, (slots.len(), 1), revision, sources, |row, _| {
+            slots[row]
+        })
     }
 
     /// Read the cell at the first address that moves to the second: its

@@ -201,6 +201,7 @@ import {
   remapSpan,
   type SheetAxis,
   sameMerge,
+  staysWholeAfterMove,
   uniqueColumnKeys,
   validMerge,
   validProtectedRanges,
@@ -3900,6 +3901,10 @@ export class StoreDataEngine {
     }
 
     if (patch.from === patch.to) return true;
+
+    if (!(sheet.tables ?? []).every((table) => staysWholeAfterMove(table.range, axis, patch))) {
+      return false;
+    }
 
     const moveAt = moveRemap(patch.from, patch.count, patch.to);
     const merges = sheet.merges
