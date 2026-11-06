@@ -31,7 +31,6 @@
     "docs:prepare-deployment": "bun scripts/prepare-docs-deployment.ts",
     "check:cycles": "bun scripts/check-import-cycles.ts",
     "audit:js": "bun scripts/dependency-audit.ts",
-    "audit:engine-calls": "bun scripts/audit-engine-calls.ts",
     "browser:install": "playwright install --with-deps chromium firefox webkit",
     "build:wasm": "bun run --filter '@sheetwrite/wasm' build",
     "build:formulas": "bun run --filter '@sheetwrite/formulas' build",
