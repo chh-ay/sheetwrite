@@ -22,10 +22,10 @@ import {
   releaseHref,
 } from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
-import { DocsSearch } from "./DocsSearch.js";
-import { Icon } from "./Icon.js";
 import { BrandMark } from "./BrandMark.js";
+import { DocsSearch } from "./DocsSearch.js";
 import { DocsTopbar } from "./DocsTopbar.js";
+import { Icon } from "./Icon.js";
 import { PackageCommand } from "./PackageCommand.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
 
@@ -395,9 +395,7 @@ export function DocsShell({
             )}
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
-          {titlePackage === undefined ? (
-            <p className="sw-document__lead">{description}</p>
-          ) : null}
+          {titlePackage === undefined ? <p className="sw-document__lead">{description}</p> : null}
           {actions === undefined ? null : (
             <div className="sw-document__actions" data-pagefind-ignore>
               {actions}

@@ -47,7 +47,12 @@ export interface DocsTab {
 export const DOCS_TABS: readonly DocsTab[] = [
   { id: "guides", label: "Guides", href: "/docs/", icon: "book" },
   { id: "api", label: "API Reference", href: "/docs/api/", icon: "code" },
-  { id: "formulas", label: "Formulas", href: "/docs/reference/formula-functions/", icon: "formula" },
+  {
+    id: "formulas",
+    label: "Formulas",
+    href: "/docs/reference/formula-functions/",
+    icon: "formula",
+  },
   { id: "changelog", label: "Changelog", href: RELEASES_HREF, icon: "history" },
   { id: "showcases", label: "Showcases", href: "/showcases/", icon: "play" },
 ];
@@ -353,7 +358,12 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         icon: "code",
         added: RELEASE,
       },
-      { label: "Excel in Vue", href: "/docs/tutorials/excel-in-vue/", icon: "code", added: RELEASE },
+      {
+        label: "Excel in Vue",
+        href: "/docs/tutorials/excel-in-vue/",
+        icon: "code",
+        added: RELEASE,
+      },
       {
         label: "Excel in Svelte",
         href: "/docs/tutorials/excel-in-svelte/",
