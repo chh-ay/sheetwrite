@@ -38,8 +38,10 @@ const NAVIGATION_DIALOG_ID = "sw-docs-navigation";
 
 interface DocsShellProps {
   activeHref?: string;
-  /** Page actions (copy, edit, report) under the lead. */
-  actions?: ReactNode;
+  /** The page's source on GitHub, for "Edit on GitHub". */
+  editUrl?: string;
+  /** A new GitHub issue about the page, for "Report a problem". */
+  issueUrl?: string;
   children: ReactNode;
   description: string;
   /** Declaration kind of an API symbol page, shown as a chip beside the title. */
@@ -304,9 +306,10 @@ function eyebrowFor(activeHref: string | undefined, titlePackage: string | undef
 
 export function DocsShell({
   activeHref,
-  actions,
   children,
   description,
+  editUrl,
+  issueUrl,
   kind,
   outline: buildOutline,
   reserveOutline,
@@ -400,10 +403,21 @@ export function DocsShell({
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
           {titlePackage === undefined ? <p className="sw-document__lead">{description}</p> : null}
-          {actions === undefined ? null : (
-            <div className="sw-document__actions" data-pagefind-ignore>
-              {actions}
-            </div>
+          {editUrl === undefined && issueUrl === undefined ? null : (
+            <p className="sw-page-actions" data-pagefind-ignore>
+              {editUrl === undefined ? null : (
+                <a className="sw-button" data-size="sm" href={editUrl}>
+                  <Icon name="edit" />
+                  Edit on GitHub
+                </a>
+              )}
+              {issueUrl === undefined ? null : (
+                <a className="sw-button" data-size="sm" href={issueUrl}>
+                  <Icon name="flag" />
+                  Report a problem
+                </a>
+              )}
+            </p>
           )}
           {release === undefined ? null : (
             <>

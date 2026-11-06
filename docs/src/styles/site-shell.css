@@ -289,7 +289,7 @@ details[open] > summary > .sw-disclosure-icon {
   color: var(--sw-accent-strong);
   font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
 }
-.sw-document__actions {
+.sw-page-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
