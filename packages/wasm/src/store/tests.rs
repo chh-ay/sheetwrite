@@ -766,7 +766,11 @@ fn assert_copy_matches_placed(store: &CellStore, output: usize) {
     assert_eq!(status[STATUS_STRIDE + STATUS_ERROR], 0, "the copy computes");
 
     let copy = store.pivot_output(output, 1);
-    let layout: Vec<usize> = copy.layout().into_iter().map(|count| count as usize).collect();
+    let layout: Vec<usize> = copy
+        .layout()
+        .into_iter()
+        .map(|count| count as usize)
+        .collect();
     let (rows, cols, header_rows, label_cols) = (layout[0], layout[1], layout[2], layout[3]);
     // Two regions by three quarters.
     assert_eq!((rows - header_rows, cols - label_cols), (2, 3));
