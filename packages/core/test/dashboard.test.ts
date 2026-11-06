@@ -16,6 +16,7 @@ import {
 } from "../src/index.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
+import { keepXlsxSlots } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -239,7 +240,8 @@ describe("dashboard rebase", () => {
 describe("dashboard XLSX export", () => {
   it("passes the slicer selection, and pivot captions without values, from the default engine", async () => {
     const grid = mount();
-    // A backend that keeps what core passes to it.
+    // A backend that keeps what core passes to it, in place of any installed one.
+    const restoreXlsxSlots = keepXlsxSlots();
     let passed: readonly DashboardExport[] | undefined;
     setXlsxWorkbookBackend({
       name: "capture",
@@ -254,7 +256,7 @@ describe("dashboard XLSX export", () => {
     try {
       await toXlsxWorkbook(grid);
     } finally {
-      setXlsxWorkbookBackend(null);
+      restoreXlsxSlots();
     }
 
     // The default engine computes no dashboard pivot, so the pivot item has only its name.

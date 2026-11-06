@@ -151,10 +151,6 @@
     {
       "path": "packages/wasm/src/lib.rs",
       "reason": "Module wiring only; behavior is covered through crate contract tests"
-    },
-    {
-      "path": "packages/xlsx/src/register.ts",
-      "reason": "The one-line entrypoint is covered through the explicit registration contract"
     }
   ]
 }

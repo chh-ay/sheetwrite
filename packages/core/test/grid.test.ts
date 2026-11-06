@@ -26,7 +26,7 @@ import type {
   XlsxTableExportBackend,
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -67,12 +67,17 @@ function makeFakeStore(
 
 let restoreStubs: () => void;
 
+/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
+let restoreXlsxSlots = keepXlsxSlots();
+
 beforeEach(() => {
   restoreStubs = installCanvasTestStubs();
+  restoreXlsxSlots = keepXlsxSlots();
 });
 
 afterEach(() => {
   restoreStubs();
+  restoreXlsxSlots();
 });
 
 function mountHost(): HTMLDivElement {
@@ -1101,7 +1106,7 @@ describe("Grid.setMinColumns", () => {
       },
     };
 
-    setXlsxTableExportBackend(null as never);
+    setXlsxTableExportBackend(null);
     await expect(grid.exportXlsx("missing.xlsx")).rejects.toMatchObject({
       code: "optional-backend-unavailable",
       operation: "xlsx-export",
@@ -1117,7 +1122,6 @@ describe("Grid.setMinColumns", () => {
       expect(receivedStore).toBe(store);
       expect(actionErrors).toEqual([]);
     } finally {
-      setXlsxTableExportBackend(null as never);
       grid.destroy();
     }
   });
@@ -1166,7 +1170,6 @@ describe("Grid.setMinColumns", () => {
       grid.setActiveSheet("inactive");
       await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(IncompleteDataError);
     } finally {
-      setXlsxTableExportBackend(null as never);
       grid.destroy();
       store.dispose();
     }

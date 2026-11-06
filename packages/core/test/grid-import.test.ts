@@ -7,7 +7,7 @@ import { SyncCoordinator } from "../src/sync.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, WorkbookSnapshot } from "../src/types.js";
 import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
-import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { elementAdded, keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const IMPORTED: WorkbookSnapshot = {
   schemaVersion: 1,
@@ -35,11 +35,14 @@ const IMPORTED: WorkbookSnapshot = {
 let grid: Grid;
 let host: HTMLDivElement;
 let restore: () => void;
+/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
+let restoreXlsxSlots: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
+  restoreXlsxSlots = keepXlsxSlots();
   restore = installCanvasTestStubs();
   host = document.createElement("div");
   document.body.append(host);
@@ -49,7 +52,7 @@ afterEach(() => {
   grid.destroy();
   host.remove();
   restore();
-  setXlsxWorkbookBackend(null);
+  restoreXlsxSlots();
 });
 
 it.each(["new", "s1"])(

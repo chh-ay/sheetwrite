@@ -123,7 +123,6 @@ const packageSpecs: PackageSpec[] = [
     extraFiles: [
       "dist/addon.d.ts",
       "dist/addon.js",
-      "dist/codec.d.ts",
       "dist/codec.js",
       "dist/table-export.d.ts",
       "dist/table-export.js",

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import {
   DelimitedTextOptionsError,
@@ -15,6 +15,16 @@ import {
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
 } from "../src/xlsx-slots.js";
+import { keepXlsxSlots } from "./fixtures.js";
+
+/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
+let restoreXlsxSlots = keepXlsxSlots();
+beforeEach(() => {
+  restoreXlsxSlots = keepXlsxSlots();
+});
+afterEach(() => {
+  restoreXlsxSlots();
+});
 import {
   fromXlsxTable,
   fromXlsxWorkbook,
@@ -106,11 +116,6 @@ async function drain(stream: ReadableStream<Uint8Array>): Promise<void> {
   for await (const _chunk of stream);
 }
 
-function resetXlsxBackends(): void {
-  setXlsxTableExportBackend(null as never);
-  setXlsxTableImportBackend(null as never);
-  setXlsxWorkbookBackend(null as never);
-}
 
 describe("delimited-text abort", () => {
   it("parsing rejects with the reason before the scan and once per chunk of records", async () => {
@@ -234,7 +239,6 @@ describe("XLSX call abort", () => {
       }
       expect(calls).toBe(xlsxCalls.length);
     } finally {
-      resetXlsxBackends();
       source.dispose();
     }
   });
@@ -250,7 +254,6 @@ describe("XLSX call abort", () => {
       },
     });
 
-    try {
       const failure = await toXlsxWorkbook(snapshot).then(
         () => undefined,
         (error: unknown) => error,
@@ -262,8 +265,5 @@ describe("XLSX call abort", () => {
       expect(new TextEncoder().encode(backend).byteLength).toBeLessThanOrEqual(
         MAX_ERROR_TEXT_BYTES,
       );
-    } finally {
-      resetXlsxBackends();
-    }
   });
 });

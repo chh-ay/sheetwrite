@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { parseDateInput } from "../src/date-serial.js";
 import {
@@ -30,6 +30,16 @@ import {
   toXlsxWorkbook,
   XlsxResourceError,
 } from "../src/xlsx-bridge.js";
+import { keepXlsxSlots } from "./fixtures.js";
+
+/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
+let restoreXlsxSlots = keepXlsxSlots();
+beforeEach(() => {
+  restoreXlsxSlots = keepXlsxSlots();
+});
+afterEach(() => {
+  restoreXlsxSlots();
+});
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -80,9 +90,9 @@ describe("export", () => {
 
   it("reports missing optional XLSX backends through stable error fields", async () => {
     const store = new SheetwriteStore(workbook());
-    setXlsxTableExportBackend(null as never);
-    setXlsxTableImportBackend(null as never);
-    setXlsxWorkbookBackend(null as never);
+    setXlsxTableExportBackend(null);
+    setXlsxTableImportBackend(null);
+    setXlsxWorkbookBackend(null);
 
     await expect(toXlsxTable(store.getWorkbook(), store)).rejects.toMatchObject({
       code: "optional-backend-unavailable",
