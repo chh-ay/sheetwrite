@@ -368,11 +368,17 @@
   }
 }
 
-/* Beside the miniature, the app card's copy and link sit together in the
+/* Beside the preview, the app card's copy and link sit together in the
    middle of the pane rather than spreading to its edges. */
 .sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-launch__body {
   grid-template-rows: auto;
   align-content: center;
+}
+
+/* The preview fills its pane, however tall the row beside it is. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-preview {
+  height: 100%;
+  aspect-ratio: auto;
 }
 
 @media (hover: hover) {
@@ -404,6 +410,11 @@
   .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+  }
+
+  .sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-preview {
+    height: auto;
+    aspect-ratio: 8 / 5;
   }
 }
 
