@@ -11,7 +11,9 @@
 }
 
 .sw-lp-hero h1 {
-  max-width: 20ch;
+  /* em, not ch: a ch follows the loaded font, so the measure (and the line
+     breaks) would change when the web font replaces its fallback. */
+  max-width: 11em;
   margin: 0;
   color: var(--sw-fg-strong);
   font: var(--sw-weight-bold) var(--sw-text-display) / 1.03 var(--sw-font-display);

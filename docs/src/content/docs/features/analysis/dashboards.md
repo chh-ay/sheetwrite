@@ -136,6 +136,8 @@ The dashboard view applies the slicers, so they filter once a dashboard has been
 
 The chart is a `ChartDefinition` with `pivot` set to the ID of a pivot on the same dashboard, and an empty `series` list. As in Excel, the row items are the categories and each value field, for each column item, is one series. Subtotals and grand totals are not points. The slicers filter the chart as they filter its pivot, and the chart follows each recalculation. Charts need `@sheetwrite/charts`: without it, the item says so.
 
+A chart plots every value field of its pivot unless `pivotValues` lists the ones to plot, by position in the pivot's `values`. In the Chart panel, the **Values** section lists the pivot's value fields with measures next to fields, as the Field List picks a PivotChart's values in Excel; each change is one undo step, and at least one value stays plotted. A measure point is the pivot's measure cell for the same items, computed in the filter context of that point, so the chart keeps no values of its own.
+
 ## KPI cards
 
 **Insert › Dashboard › KPI Card** shows on a dashboard when the data model has a measure. It opens a list of the measures and adds a card for the chosen one in the next free place.

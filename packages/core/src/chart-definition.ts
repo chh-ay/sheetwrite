@@ -38,7 +38,17 @@ export const CHART_KIND_LABELS: Readonly<Record<ChartKind, string>> = {
 };
 
 const LEGEND_POSITIONS: ReadonlySet<unknown> = new Set(["none", "top", "right", "bottom", "left"]);
-const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "series", "pivot"]);
+const CHART_KEYS = new Set([
+  "id",
+  "kind",
+  "title",
+  "axes",
+  "legend",
+  "anchor",
+  "series",
+  "pivot",
+  "pivotValues",
+]);
 const AXES_KEYS = new Set(["xTitle", "yTitle"]);
 const ANCHOR_KEYS = new Set(["row", "col", "offsetX", "offsetY", "width", "height"]);
 const SERIES_KEYS = new Set(["name", "nameRange", "values", "categories"]);
@@ -160,6 +170,28 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
 }
 
 /**
+ * A copy of the value-field positions a chart over a pivot plots: one to
+ * `MAX_CHART_SERIES` distinct whole numbers below `MAX_CHART_SERIES`, or
+ * null when `value` is not one.
+ */
+function sanitizePivotValues(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CHART_SERIES) return null;
+  const positions: number[] = [];
+  for (const position of value) {
+    if (
+      !Number.isInteger(position) ||
+      position < 0 ||
+      position >= MAX_CHART_SERIES ||
+      positions.includes(position)
+    ) {
+      return null;
+    }
+    positions.push(position);
+  }
+  return positions;
+}
+
+/**
  * Validate one untrusted chart definition and return an independent plain copy,
  * or null when any field is missing, unknown, mistyped, or above its bound.
  * Range-to-workbook bounds are checked separately by `chartFitsSheets`.
@@ -182,7 +214,13 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
 
     const anchor = sanitizeAnchor(chart.anchor);
     const axes = chart.axes === undefined ? undefined : sanitizeAxes(chart.axes);
-    if (!anchor || axes === null) return null;
+    // Value positions only mean something for a chart over a pivot.
+    const pivotValues =
+      chart.pivotValues === undefined || chart.pivot === undefined
+        ? undefined
+        : sanitizePivotValues(chart.pivotValues);
+    if (!anchor || axes === null || pivotValues === null) return null;
+    if (chart.pivotValues !== undefined && chart.pivot === undefined) return null;
 
     const series: ChartSeries[] = [];
     for (const entry of chart.series) {
@@ -198,6 +236,7 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       ...(axes !== undefined ? { axes } : {}),
       ...(chart.legend !== undefined ? { legend: chart.legend } : {}),
       ...(chart.pivot !== undefined ? { pivot: chart.pivot } : {}),
+      ...(pivotValues !== undefined ? { pivotValues } : {}),
       anchor,
       series,
     };

@@ -37,6 +37,7 @@ import {
   validWorkbookTableXmlElement,
   withXlsxFormulaEngine,
 } from "@sheetwrite/core";
+import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { readCharts } from "./chart-read.js";
@@ -50,11 +51,7 @@ import {
   META_MARKER,
   META_STEM,
 } from "./format.js";
-import {
-  convertFormulaSources,
-  formulaContainsExternalReference,
-  workbookFormulaSources,
-} from "./formula.js";
+import { convertFormulaSources, workbookFormulaSources } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import { readPivots } from "./pivot.js";
 import { capturePreserved, isRetainedRelationship } from "./preservation.js";

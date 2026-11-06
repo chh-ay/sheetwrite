@@ -135,6 +135,19 @@ References to other workbooks use Excel's forms: `[Budget.xlsx]Annual!C10`, `[Bu
 
 The saved values are `workbook.externalLinks` in a snapshot: for each linked workbook, its file name (`book`), where it is (`target`), and the saved cells of each sheet. `validateWorkbookSnapshot` checks only the shape of the links; the store checks each saved cell when it loads, and fails the load with `invalid-snapshot` for a cell outside the sheet limits or a value that formulas cannot hold. XLSX import reads them from Excel's external link parts, and formulas that read a link stay live. XLSX export writes an unchanged link part back byte for byte, writes a changed link from its saved values, and adds a link without values for a workbook that a formula names but the workbook has no link for. Formulas that name a defined name of another workbook (`[1]!Total`) are still kept as text.
 
+The link commands load from `@sheetwrite/core/external-links`. `updateExternalLinks(grid, resolve)` asks your resolver for the current values of each linked workbook, as Excel's **Update Values** does. The resolver receives the book name, its target and the sheet names. It returns the sheets with their cells, or `null` when the workbook is not available:
+
+```ts prelude="core" partial="requires a mounted grid" title="Partial example"
+import { updateExternalLinks } from "@sheetwrite/core/external-links";
+
+const updates = await updateExternalLinks(grid, async ({ target }) => {
+  const response = await fetch(`/api/workbook-values?target=${encodeURIComponent(target)}`);
+  return response.ok ? await response.json() : null;
+});
+```
+
+`changeExternalLinkSource(grid, book, { book, target })` points the formulas at another workbook, as **Change Source** does. `breakExternalLinks(grid, books)` replaces them with their values and removes the links, as **Break Link** does. Each command is one undoable change, which syncs to collaborators. Excel clears Undo after **Update Values** and **Break Link**; Sheetwrite keeps them undoable, and an undo restores the links and the formulas.
+
 Named ranges are document operations and snapshot metadata:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"

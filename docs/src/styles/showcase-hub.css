@@ -34,22 +34,17 @@
   padding: clamp(var(--sw-space-6), 3vh, var(--sw-space-8)) 0 var(--sw-space-12);
 }
 
-.sw-hub :is(a, button, summary):focus-visible {
-  border-radius: var(--sw-radius-xs);
-  outline: 0.125rem solid var(--sw-accent);
-  outline-offset: var(--sw-space-1);
-}
-
-/* A short opening, then straight into the gallery. */
+/* A short opening, then straight into the gallery. The title spans the
+   content width, so it stays on one line at desktop and tablet widths; the
+   lede keeps a reading measure. */
 .sw-hub__hero {
-  max-width: 46rem;
   padding-block: clamp(var(--sw-space-8), 5vw, var(--sw-space-16)) var(--sw-space-2);
 }
 
 .sw-hub__eyebrow {
   margin: 0 0 var(--sw-space-3);
   color: var(--sw-accent-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-body);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -63,6 +58,7 @@
 }
 
 .sw-hub__lede {
+  max-width: 46rem;
   margin: var(--sw-space-4) 0 0;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-h4);
@@ -263,7 +259,7 @@
 
 .sw-hub-launch__meta {
   color: var(--sw-hub-accent-ink);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -613,8 +609,9 @@
 .sw-hub-sync__seq::before {
   margin-right: var(--sw-space-1);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1 var(--sw-font-mono);
   content: "seq";
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -930,6 +927,14 @@
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   /* At least the other previews' height; taller when the copy wraps. */
   grid-template-rows: minmax(12rem, auto);
+}
+
+/* Desktop, every card shown: the app card takes two thirds beside Analysis,
+   so the nine cards after them fill three rows of thirds with no orphan. */
+@media (min-width: 80rem) {
+  .sw-hub-scenes[data-group="all"] > li[data-owner="spreadsheet"] {
+    grid-column: span 8;
+  }
 }
 
 /* Miniature ribbon: a tab row, labeled groups, then a formula bar. */

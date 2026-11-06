@@ -1,9 +1,10 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { LATEST_RELEASE, RELEASES_HREF } from "../lib/releases.js";
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { BrandMark } from "./BrandMark.js";
+import { Icon } from "./Icon.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";
@@ -24,7 +25,11 @@ interface SiteTopbarProps {
   readonly active?: CapabilityOwnerId | "showcases";
   /** The documentation search control, on documentation pages. */
   readonly search?: ReactNode;
-  /** Controls after the theme toggle, such as the documentation menu button. */
+  /**
+   * Controls after the theme toggle, such as the documentation menu button.
+   * A page that brings its own menu holds the site links there on phones;
+   * other pages get the site menu button.
+   */
   readonly trailing?: ReactNode;
 }
 
@@ -40,23 +45,35 @@ function currentSection(pathname: string, active: SiteTopbarProps["active"]): Se
 /**
  * The one site header: brand, Docs, Showcases, Releases, GitHub and the theme
  * toggle, on every page. Documentation pages add their search and menu button
- * through the `search` and `trailing` slots.
+ * through the `search` and `trailing` slots. On phones the header is one row;
+ * the site links open from the menu button.
  */
 export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
   const pathname = useLocation({ select: (location) => location.pathname });
   const section = currentSection(pathname, active);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // A link in the menu navigates; the next page starts with the menu closed.
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
   // The landing pages of each section are the destination; deeper pages are
   // inside the section.
   const marker = (name: Exclude<Section, undefined>, href: string) =>
     section !== name ? undefined : pathname === href ? ("page" as const) : ("true" as const);
 
   return (
-    <header className="sw-header" data-has-search={search !== undefined}>
+    <header className="sw-header" data-has-search={search !== undefined} data-menu-open={menuOpen}>
       <Link aria-label="Sheetwrite home" className="sw-header__brand" to="/">
         <BrandMark />
         <span>Sheetwrite</span>
       </Link>
-      <nav aria-label="Site" className="sw-header__nav">
+      <nav aria-label="Site" className="sw-header__nav" id="site-nav">
         <Link activeOptions={EXACT} aria-current={marker("docs", "/docs/")} to="/docs/">
           Docs
         </Link>
@@ -75,6 +92,9 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
           Releases
           <span className="sw-header__version">v{LATEST_RELEASE.version}</span>
         </Link>
+        <a className="sw-header__nav-github" href={REPOSITORY_URL}>
+          GitHub
+        </a>
       </nav>
       {search !== undefined && <div className="sw-header__search">{search}</div>}
       <div className="sw-header__actions">
@@ -82,7 +102,18 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
           GitHub
         </a>
         <ThemeToggle />
-        {trailing}
+        {trailing ?? (
+          <button
+            aria-controls="site-nav"
+            aria-expanded={menuOpen}
+            aria-label="Site menu"
+            className="sw-icon-button sw-header__menu"
+            onClick={() => setMenuOpen((open) => !open)}
+            type="button"
+          >
+            <Icon name={menuOpen ? "close" : "menu"} />
+          </button>
+        )}
       </div>
     </header>
   );
