@@ -13,16 +13,8 @@ use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
-    RANGE_CELL_LIMIT,
+    LITERAL_KIND_BITS, RANGE_CELL_LIMIT,
 };
-
-/// The bits the literal kinds use: every literal kind is at most this value,
-/// and every other kind (a formula, or a calculated slot) sets a higher bit.
-const LITERAL_KIND_BITS: u8 = 0b11;
-const _: () = assert!(
-    KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL == LITERAL_KIND_BITS
-        && KIND_FORMULA & !LITERAL_KIND_BITS != 0
-);
 
 #[cfg(test)]
 thread_local! {
