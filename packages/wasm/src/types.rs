@@ -391,8 +391,10 @@ fn ast_contains_spill_ref(ast: &Ast) -> bool {
     }
 }
 
-fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
-    if !ast_contains_let(ast) {
+/// The reads and volatility of `ast`; `contains_let` is
+/// [`ast_contains_let`] of it, which the caller may need too.
+fn formula_metadata(ast: &Ast, formula_sheet: u32, contains_let: bool) -> (ReadSet, bool) {
+    if !contains_let {
         return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
     }
     let expanded = expand_let_reachable_ast(ast).ok();
@@ -507,7 +509,8 @@ impl FormulaEntry {
             };
         }
 
-        let (reads, volatile) = formula_metadata(&ast, sheet);
+        let contains_let = ast_contains_let(&ast);
+        let (reads, volatile) = formula_metadata(&ast, sheet, contains_let);
 
         let mut entry = Self {
             flags: 0,
@@ -522,7 +525,7 @@ impl FormulaEntry {
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
         // The flags and reads above come from the tree as written; resolving
         // LET names afterwards changes how it evaluates, not what it reads.
-        if !entry.has_spill_refs() && ast_contains_let(&ast) {
+        if contains_let && !entry.has_spill_refs() {
             crate::eval::resolve_let_names(&mut ast);
         }
         entry.ast = Some(ast);
@@ -634,7 +637,7 @@ impl FormulaEntry {
             return false;
         }
 
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
         self.reads = reads;
 
         // A plain reference has no source text: its tree is the target.
@@ -708,7 +711,7 @@ impl FormulaEntry {
 
         // A relinked reference writes the same text, so the source stays as
         // the user wrote it instead of being written again from the tree.
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
         self.reads = reads;
         self.set_volatile(volatile);
         true

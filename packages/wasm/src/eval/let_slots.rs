@@ -199,10 +199,11 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
 /// - an expanded LET opens its own slots on top of the stack and drops them
 ///   when it ends ([`LetFrame::open_expanded`]);
 /// - the outermost resolved LET of a formula opens the slots that all the
-///   resolved LETs of that formula share ([`LetFrame::open_resolved`]). Every
-///   formula evaluation starts without them ([`LetFrame::begin_formula`]), so a
-///   formula that another formula's LET reads opens slots above the reader's
-///   and drops them before the reader continues.
+///   resolved LETs of that formula share, and restores the enclosing
+///   formula's base when it ends ([`LetFrame::open_resolved`]). So a formula
+///   that another formula's LET reads opens slots above the reader's and
+///   drops them before the reader continues, and a formula without a LET
+///   costs the frame nothing.
 ///
 /// # Safety of the binding references
 ///
@@ -228,20 +229,17 @@ pub(crate) struct LetFrame {
     expanded_base: usize,
 }
 
+/// Which resolved slots a LET opened: its own, above those of the formula
+/// that was being evaluated, or none because it shares its enclosing LET's.
+pub(crate) enum ResolvedScope {
+    Outermost {
+        /// The resolved base of the formula that was being evaluated.
+        enclosing: Option<usize>,
+    },
+    Nested,
+}
+
 impl LetFrame {
-    /// Starts the evaluation of a formula, which opens its own resolved slots.
-    /// Returns the enclosing formula's base for [`LetFrame::end_formula`].
-    #[inline]
-    pub(crate) fn begin_formula(&mut self) -> Option<usize> {
-        self.resolved_base.take()
-    }
-
-    /// Ends the evaluation of a formula and returns to the enclosing one.
-    #[inline]
-    pub(crate) fn end_formula(&mut self, enclosing: Option<usize>) {
-        self.resolved_base = enclosing;
-    }
-
     /// Opens `slots` empty slots for an expanded LET. Returns the enclosing
     /// expanded LET's base for [`LetFrame::close_expanded`].
     pub(crate) fn open_expanded(&mut self, slots: u32) -> usize {
@@ -274,22 +272,26 @@ impl LetFrame {
         }
     }
 
-    /// Opens the resolved slots of the formula being evaluated, unless one of
-    /// its LETs already has. Returns whether this call opened them.
-    pub(crate) fn open_resolved(&mut self) -> bool {
-        if self.resolved_base.is_some() {
-            return false;
+    /// Opens the resolved slots of a LET whose first binding has
+    /// `first_slot`. Only a formula's outermost resolved LET numbers its
+    /// first binding zero; it opens slots above any in use. A nested LET's
+    /// slots follow its enclosing LET's, so it shares the open ones. Returns
+    /// what [`LetFrame::close_resolved`] restores.
+    pub(crate) fn open_resolved(&mut self, first_slot: u32) -> ResolvedScope {
+        if first_slot != 0 {
+            return ResolvedScope::Nested;
         }
-        self.resolved_base = Some(self.values.len());
-        true
+        let enclosing = self.resolved_base.replace(self.values.len());
+        ResolvedScope::Outermost { enclosing }
     }
 
-    /// Drops the formula's resolved slots when the LET that opened them ends.
-    pub(crate) fn close_resolved(&mut self, opened: bool) {
-        if !opened {
+    /// Drops the formula's resolved slots when the LET that opened them ends,
+    /// and returns to the slots of the formula that was being evaluated.
+    pub(crate) fn close_resolved(&mut self, scope: ResolvedScope) {
+        let ResolvedScope::Outermost { enclosing } = scope else {
             return;
-        }
-        if let Some(base) = self.resolved_base.take() {
+        };
+        if let Some(base) = std::mem::replace(&mut self.resolved_base, enclosing) {
             self.truncate(base);
         }
     }

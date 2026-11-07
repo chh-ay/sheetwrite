@@ -1645,10 +1645,7 @@ impl CellStore {
                             self.eval_ast(&resolved, sheet, pass, depth + 1)
                         }
                     } else {
-                        let enclosing = pass.results.let_frame.begin_formula();
-                        let value = self.eval_ast(ast, sheet, pass, depth + 1);
-                        pass.results.let_frame.end_formula(enclosing);
-                        value
+                        self.eval_ast(ast, sheet, pass, depth + 1)
                     }
                 }
                 None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
@@ -1828,7 +1825,11 @@ impl CellStore {
         let Some((result, bindings)) = args.split_last() else {
             return Value::Error(FormulaError::Value);
         };
-        let opened = pass.results.let_frame.open_resolved();
+        let first_slot = match bindings.first() {
+            Some(Ast::LetName { slot, .. }) => *slot,
+            _ => return Value::Error(FormulaError::Value),
+        };
+        let opened = pass.results.let_frame.open_resolved(first_slot);
         for pair in bindings.chunks(2) {
             if let [Ast::LetName { slot, .. }, expression] = pair {
                 pass.results.let_frame.bind(*slot, expression);
