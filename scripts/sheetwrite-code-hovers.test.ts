@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { parseNativeHover } from "../docs/src/lib/native-quick-info.js";
 import {
   collectFenceHovers,
   isHighQualityHover,
@@ -9,6 +10,37 @@ import {
   SheetwriteTypeEngine,
   type SheetwriteTypeHover,
 } from "../docs/src/lib/sheetwrite-type-engine.js";
+
+describe("TypeScript 7.1 hover parsing", () => {
+  it("splits a language-server hover into signature, summary and 5.9-shaped tags", () => {
+    const markdown = [
+      "```typescript",
+      "function persist(event: ChangeEvent): void",
+      "```",
+      "Persist one change. See [createGrid](file:///repo/packages/core/src/grid.ts#491,17-491,27).",
+      "",
+      "*@param* `event` — the change",
+      "",
+      "*@see* — [Grid](file:///repo/packages/core/src/grid.ts#10,18-10,22)",
+      "",
+      "*@example*",
+      "```tsx",
+      "persist(event)",
+      "```",
+      "",
+    ].join("\n");
+
+    expect(parseNativeHover(markdown)).toEqual({
+      text: "function persist(event: ChangeEvent): void",
+      docs: "Persist one change. See {@link createGrid}.",
+      tags: [
+        ["param", "event the change"],
+        ["see", "{@link Grid}"],
+        ["example", "persist(event)"],
+      ],
+    });
+  });
+});
 
 describe("Sheetwrite type engine", () => {
   it("owns TypeScript quick info with workspace module resolution", () => {

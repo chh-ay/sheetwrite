@@ -187,8 +187,9 @@ class LanguageServerConnection {
   }
 
   async shutdown(): Promise<void> {
-    await this.request("shutdown", null);
-    this.notify("exit", null);
+    // The server rejects `params: null` here; JSON.stringify drops `undefined`.
+    await this.request("shutdown", undefined);
+    this.notify("exit", undefined);
   }
 
   private request(method: string, params: unknown): Promise<unknown> {
