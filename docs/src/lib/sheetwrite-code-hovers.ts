@@ -1,3 +1,6 @@
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
 import {
   type AnnotationRenderOptions,
   definePlugin,
@@ -412,17 +415,61 @@ async function svelteScriptDocumentation(
   return documentation;
 }
 
+interface SvelteCode {
+  code: string;
+  map: string;
+}
+
+/** Sources waiting for the next codegen process; see `svelteCode`. */
+let svelteQueue: { source: string; resolve(code: SvelteCode): void; reject(error: Error): void }[] =
+  [];
+
+/**
+ * TypeScript for a Svelte sample, from svelte2tsx in a short-lived child process
+ * (`svelte-codegen.mjs`). Samples requested in the same turn of the event loop share one
+ * process, so a cold `docs:check` starts it once.
+ */
+function svelteCode(source: string): Promise<SvelteCode> {
+  return new Promise((resolve, reject) => {
+    svelteQueue.push({ source, resolve, reject });
+    if (svelteQueue.length > 1) return;
+    setTimeout(() => {
+      const batch = svelteQueue;
+      svelteQueue = [];
+      const script = fileURLToPath(new URL("./svelte-codegen.mjs", import.meta.url));
+      const child = spawn(process.execPath, [script], { stdio: ["pipe", "pipe", "inherit"] });
+      let output = "";
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        output += chunk;
+      });
+      child.on("error", (error) => {
+        for (const item of batch) item.reject(error);
+      });
+      child.on("close", (code) => {
+        if (code !== 0) {
+          const failure = new Error(`Svelte codegen exited with code ${code}`);
+          for (const item of batch) item.reject(failure);
+          return;
+        }
+        const results = JSON.parse(output) as ({ error: string } | SvelteCode)[];
+        for (const [index, item] of batch.entries()) {
+          const result = results[index];
+          if (!result) item.reject(new Error("Svelte codegen returned no result"));
+          else if ("error" in result) item.reject(new Error(result.error));
+          else item.resolve(result);
+        }
+      });
+      child.stdin.end(JSON.stringify(batch.map((item) => item.source)));
+    }, 0);
+  });
+}
+
 async function svelteSourceHovers(
   source: string,
   analyzer: SheetwriteTypeEngine,
 ): Promise<SheetwriteTypeHover[]> {
-  // Loaded on a cache miss only: svelte2tsx pulls in TypeScript 5.9 (about 64 MiB).
-  const { svelte2tsx } = await import("svelte2tsx");
-  const transformed = svelte2tsx(source, {
-    filename: "Component.svelte",
-    isTsFile: true,
-    mode: "ts",
-  });
+  const transformed = await svelteCode(source);
   const sourceMap = new TraceMap(JSON.parse(transformed.map.toString()));
   const sourceLines = source.split("\n");
   const lineOffsets = lineStartOffsets(source);
