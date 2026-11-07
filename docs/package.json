@@ -51,7 +51,6 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "6.0.3",
     "@vitejs/plugin-vue": "6.0.8",
-    "@vue/language-core": "3.3.7",
     "expressive-code": "0.44.0",
     "pagefind": "1.5.2",
     "prettier": "3.9.5",

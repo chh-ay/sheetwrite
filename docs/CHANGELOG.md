@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Generate code-sample hovers with TypeScript 7.1 (beta) instead of TypeScript 5.9: one language server answers every sample, Vue samples go through the Vue content mapper, and svelte2tsx runs in a short-lived child process. The hover pass never runs `npm` or reaches the network, and nothing is cached between runs. The cold hover pass drops from about 22 s to about 1.7 s and peak memory from about 1.3 GB to about 450 MB (Linux).
 - Keep the engine out of the script every page loads. The performance and interoperability showcases move to their own modules, and the router entry no longer imports `@sheetwrite/core`. The docs route loads its page index and the formula filter only where they're used. First-load JS drops 49–64% gzip on the landing page, the showcase hub, the docs overview, guides and formula family pages.
 - Add "Try it" to runnable examples: the example runs in an editor and a live grid on the page, loaded only after the click, with inline errors and a reset. The first grid guide and five feature pages have runnable examples.
 - Add "Edit on GitHub" and "Report a problem" to each docs page head, and a changelog RSS feed at `/changelog/rss.xml`.
