@@ -166,6 +166,42 @@ describe("pointer input: mouse parity", () => {
     outside.remove();
   });
 
+  it("keeps a date column's serial when its editor commits unchanged", () => {
+    const workbook = makeWorkbook(10);
+    const column = workbook.sheets[0]!.columns[1]!;
+    column.type = "date";
+    column.numberFormat = "yyyy-mm-dd";
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const cell = { sheet: "s1", row: 0, col: 1 };
+    store.applyTransaction({
+      patches: [{ op: "set", addr: cell, value: { kind: "literal", value: 45_351 } }],
+    });
+
+    grid.beginEdit(0, 1);
+    const editor = host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+    if (!editor) throw new Error("cell editor missing");
+    expect(editor.value).toBe("2024-02-29");
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell(cell).resolved).toBe(45_351);
+
+    grid.beginEdit(0, 1, "45352.5");
+    host
+      .querySelector("textarea.sheetwrite-editor")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell(cell).resolved).toBe(45_352.5);
+
+    grid.beginEdit(0, 1);
+    const timed = host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+    expect(timed?.value).toBe("2024-03-01 12:00");
+    timed?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell(cell).resolved).toBe(45_352.5);
+
+    grid.destroy();
+    store.dispose();
+  });
+
   it("drag on a column boundary commits a width patch", () => {
     const { store, scroller, workbook } = makeGrid();
     const boundaryX = DEFAULT_THEME.rowHeaderWidth + (workbook.sheets[0]?.columns[0]?.width ?? 0);
@@ -607,43 +643,4 @@ describe("keyboard whole-axis selection", () => {
     const { grid, host } = makeGrid();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 1 } });
 
-    const event = new KeyboardEvent("keydown", {
-      key: " ",
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    });
-    host.dispatchEvent(event);
-
-    expect(event.defaultPrevented).toBe(true);
-    expect(grid.getSelection()).toEqual({ kind: "column", sheet: "s1", col: 1 });
-    grid.destroy();
-  });
-});
-
-describe("pointer input: header resize hit-testing", () => {
-  it("skips the leading edge of the first visible column and still grabs its trailing edge", () => {
-    const { grid, store, scroller, workbook } = makeGrid();
-    const sheet = workbook.sheets[0];
-    if (!sheet) throw new Error("expected fixture sheet");
-
-    // Hidden column 0 disappears from the band list, so column 1 opens the view.
-    grid.hideColumns([0]);
-    grid.refresh();
-
-    scroller.dispatchEvent(
-      pointer("pointermove", { clientX: DEFAULT_THEME.rowHeaderWidth + 2, clientY: 10 }),
-    );
-    expect(scroller.style.cursor).toBe("");
-
-    const boundaryX = DEFAULT_THEME.rowHeaderWidth + (sheet.columns[1]?.width ?? 0);
-    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX - 1, clientY: 10 }));
-    expect(scroller.style.cursor).toBe("col-resize");
-
-    scroller.dispatchEvent(pointer("pointerdown", { clientX: boundaryX - 1, clientY: 10 }));
-    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX + 29, clientY: 10 }));
-    scroller.dispatchEvent(pointer("pointerup", { clientX: boundaryX + 29, clientY: 10 }));
-    expect(store.getWorkbook().sheets[0]?.columns[1]?.width).toBe(150);
-    grid.destroy();
-  });
-});
+    const event = new Keyboard
