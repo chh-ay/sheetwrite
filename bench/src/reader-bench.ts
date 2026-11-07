@@ -127,6 +127,7 @@ export const READER_CASE_NAMES = [
   "getWindow 1000x8",
   "getWindow 40x8 cond rules",
   "getWindow 1000x8 cond rules",
+  "getWindow 1000x8 formula rule",
   "getWindowRows 40x8 sorted",
   "getWindowRows 1000x8 sorted",
   "aggregate SUM A",
