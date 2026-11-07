@@ -17,6 +17,19 @@ const DOUBLING_SLOT_LIMIT: usize = 4096;
 // One membership word of ids per page bounds moves of occupied entry storage.
 const SLOT_PAGE_LEN: usize = BITS_PER_WORD;
 
+/// Most words of settled-cell bits one pass holds over all sheets: 65,536
+/// words, 512 KB, one bit for each of 4,194,304 cell indexes. A formula
+/// settled in a cell past that leaves no bit, so a read of it looks the
+/// formula up as before. Tests use a small cap to reach that fallback.
+#[cfg(not(test))]
+const SETTLED_CELL_WORD_LIMIT: usize = 1 << 16;
+#[cfg(test)]
+const SETTLED_CELL_WORD_LIMIT: usize = 4;
+
+/// Settled-cell words a pass workspace keeps for the next pass, 32 KB. A
+/// wider pass releases its words, so they never add retained memory.
+const RETAINED_SETTLED_CELL_WORDS: usize = 4096;
+
 /// The location capacity after `len` slots fill it. Every capacity is a step
 /// of one eighth from the last, so a large store keeps the same bounded
 /// slack. A small store takes several steps at once, until its capacity at
@@ -611,6 +624,8 @@ pub(crate) struct FormulaResults {
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
     lookups: crate::eval::LookupStates,
+    /// The cells whose formulas this pass settled, for reads without a lookup.
+    settled_cells: SettledCells,
     /// Boxed, so the pass workspace the store keeps between passes grows by
     /// one pointer, not by the whole table.
     #[cfg(feature = "analysis")]
@@ -679,6 +694,108 @@ impl RangeSums {
     }
 }
 
+/// The cells whose formulas this pass has settled: one bit per cell index of
+/// each sheet, in the order the sheet's storage indexes its cells. A read of
+/// a formula cell whose bit is set takes the result from the cell without
+/// looking the formula up in the sheet's formula index.
+///
+/// The pass turns the bits on only when a settled result is final for the
+/// rest of the pass: a pass without iteration and without dynamic arrays,
+/// where no settled formula is evaluated again. A missing bit is always safe;
+/// the read then looks the formula up as before. Every bit is cleared when
+/// the pass ends.
+#[derive(Default)]
+struct SettledCells {
+    /// Whether this pass records settled cells.
+    active: bool,
+    /// The words of each sheet, by sheet index.
+    sheets: Vec<Vec<u64>>,
+    /// Words allocated over all sheets, at most [`SETTLED_CELL_WORD_LIMIT`].
+    words: usize,
+    /// The sheet and word of every word this pass made non-zero, so clearing
+    /// touches only those words.
+    touched: Vec<(u32, u32)>,
+}
+
+impl SettledCells {
+    /// Records that the formula at cell `index` of `sheet` is settled. Past
+    /// the word cap the cell gets no bit.
+    fn insert(&mut self, sheet: usize, index: usize) {
+        if !self.active {
+            return;
+        }
+
+        let word = index / BITS_PER_WORD;
+        if self.sheets.len() <= sheet {
+            self.sheets.resize_with(sheet + 1, Vec::new);
+        }
+        let Some(words) = self.sheets.get_mut(sheet) else {
+            return;
+        };
+
+        if words.len() <= word {
+            let added = word + 1 - words.len();
+            if self.words + added > SETTLED_CELL_WORD_LIMIT {
+                return;
+            }
+            self.words += added;
+            words.resize(word + 1, 0);
+        }
+
+        let Some(bits) = words.get_mut(word) else {
+            return;
+        };
+        if *bits == 0 {
+            self.touched.push((sheet as u32, word as u32));
+        }
+        *bits |= 1u64 << (index % BITS_PER_WORD);
+    }
+
+    /// Whether the formula at cell `index` of `sheet` is settled in this pass.
+    #[inline]
+    fn contains(&self, sheet: usize, index: usize) -> bool {
+        self.sheets
+            .get(sheet)
+            .and_then(|words| words.get(index / BITS_PER_WORD))
+            .is_some_and(|bits| bits & (1u64 << (index % BITS_PER_WORD)) != 0)
+    }
+
+    /// Clears every bit this pass set and stops recording.
+    fn clear(&mut self) {
+        for &(sheet, word) in &self.touched {
+            if let Some(bits) = self
+                .sheets
+                .get_mut(sheet as usize)
+                .and_then(|words| words.get_mut(word as usize))
+            {
+                *bits = 0;
+            }
+        }
+        self.touched.clear();
+        self.active = false;
+    }
+
+    /// Drops the words of a wide pass and a long touched list, so the next
+    /// pass starts small.
+    fn release_wide(&mut self) {
+        if self.words > RETAINED_SETTLED_CELL_WORDS {
+            self.sheets = Vec::new();
+            self.words = 0;
+        }
+        if self.touched.capacity() > SLOT_PAGE_LEN {
+            self.touched = Vec::new();
+        }
+    }
+
+    fn add_memory_stats(&self, stats: &mut crate::memory::MemoryOwnerStats) {
+        stats.add_vec::<Vec<u64>>(self.sheets.len(), self.sheets.capacity());
+        for words in &self.sheets {
+            stats.add_vec::<u64>(words.len(), words.capacity());
+        }
+        stats.add_vec::<(u32, u32)>(self.touched.len(), self.touched.capacity());
+    }
+}
+
 impl FormulaResults {
     /// Reuse cleared work storage, never values from a previous pass.
     pub(crate) fn take_work(&mut self) -> FormulaWork {
@@ -701,6 +818,38 @@ impl FormulaResults {
     #[inline]
     pub(crate) fn settle(&mut self, id: FormulaId) {
         self.settled.insert(id);
+    }
+
+    /// Starts recording settled cells for this pass. Call it only when no
+    /// settled formula is evaluated again before the pass ends.
+    pub(crate) fn record_settled_cells(&mut self) {
+        self.settled_cells.active = true;
+    }
+
+    /// Records that the formula at cell `index` of `sheet` is settled.
+    #[inline]
+    pub(crate) fn settle_cell(&mut self, sheet: usize, index: usize) {
+        if self.settled_cells.active {
+            self.settled_cells.insert(sheet, index);
+        }
+    }
+
+    /// Whether the formula at cell `index` of `sheet` is settled in this pass
+    /// and its result is in the cell.
+    #[inline]
+    pub(crate) fn cell_settled(&self, sheet: usize, index: usize) -> bool {
+        self.settled_cells.contains(sheet, index)
+    }
+
+    /// Settled-cell bits still set; zero between passes.
+    #[cfg(test)]
+    pub(crate) fn settled_cell_bits(&self) -> u32 {
+        self.settled_cells
+            .sheets
+            .iter()
+            .flatten()
+            .map(|bits| bits.count_ones())
+            .sum()
     }
 
     /// Forgets `id`'s result for this pass, so it is evaluated again.
@@ -873,6 +1022,7 @@ impl FormulaResults {
         self.range_sums.sums.clear();
         self.range_sums.last = None;
         self.lookups.clear();
+        self.settled_cells.clear();
         #[cfg(feature = "analysis")]
         {
             self.regexes = None;
@@ -903,6 +1053,7 @@ impl FormulaResults {
             self.range_sums.sums = Vec::new();
         }
         self.lookups.release();
+        self.settled_cells.release_wide();
 
         // Reuse primary pass storage, never formula values or selected ids.
         work.clear();
@@ -920,6 +1071,7 @@ impl FormulaResults {
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
+        self.settled_cells.add_memory_stats(formulas);
         formulas.add_vec::<u32>(
             self.range_sums.slots.len(),
             self.range_sums.slots.capacity(),

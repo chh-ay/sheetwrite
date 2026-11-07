@@ -6218,3 +6218,76 @@ mod aggregate_storage_parity {
         assert_dense_matches_paged("=SEQUENCE(3)", [10.0, 2.5, 1.0, 4.0, 4.0]);
     }
 }
+
+/// The settled-cell bits used by this test.
+fn settled_cell_bits(store: &CellStore) -> u32 {
+    store
+        .formula_results
+        .as_ref()
+        .map_or(0, |results| results.settled_cell_bits())
+}
+
+/// Reads of settled formula cells take the cell bit up to the cap (256 cell
+/// indexes in tests: columns A and B and most of C of a 100-row sheet) and the
+/// formula-index lookup past it, with the same values. The bits are cleared
+/// when each pass ends.
+#[test]
+fn settled_formula_reads_match_the_lookup_past_the_cell_bit_cap() {
+    const ROWS: usize = 100;
+    const COLUMNS: usize = 5;
+    let letters = ["A", "B", "C", "D", "E"];
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(COLUMNS, ROWS);
+    for (col, letter) in letters.iter().enumerate() {
+        store.set_number(sheet, 0, col, col as f64, 0);
+        for row in 1..ROWS {
+            store.set_formula(sheet, row, col, &format!("={letter}{row}+1"), 0);
+        }
+    }
+    crate::eval::SETTLED_CELL_READS.with(|count| count.set(0));
+    store.recompute(sheet);
+
+    for col in 0..COLUMNS {
+        for row in 1..ROWS {
+            assert_eq!(number(&store, sheet, row, col), (col + row) as f64);
+        }
+    }
+    let first_pass_reads = crate::eval::SETTLED_CELL_READS.with(std::cell::Cell::get);
+    assert!(first_pass_reads > 0, "the cell bits served some reads");
+    assert!(
+        first_pass_reads < COLUMNS * (ROWS - 2),
+        "reads past the cap used the lookup"
+    );
+    assert_eq!(settled_cell_bits(&store), 0);
+
+    for col in 0..COLUMNS {
+        store.set_number(sheet, 0, col, 10.0 * col as f64, 0);
+    }
+    store.recompute(sheet);
+    for col in 0..COLUMNS {
+        for row in 1..ROWS {
+            assert_eq!(number(&store, sheet, row, col), (10 * col + row) as f64);
+        }
+    }
+    assert_eq!(settled_cell_bits(&store), 0);
+}
+
+/// Errors and cycles read through settled cells keep their values.
+#[test]
+fn settled_formula_reads_keep_errors_and_cycles() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_formula(sheet, 0, 0, "=1/0", 0);
+    store.set_formula(sheet, 1, 0, "=A1+1", 0);
+    store.set_formula(sheet, 2, 0, "=A4+1", 0);
+    store.set_formula(sheet, 3, 0, "=A3+1", 0);
+    store.set_formula(sheet, 0, 1, "=A2*2", 0);
+    store.set_formula(sheet, 1, 1, "=A3*2", 0);
+    store.recompute(sheet);
+
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("#DIV/0!"));
+    assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#CYCLE!"));
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("#DIV/0!"));
+    assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("#CYCLE!"));
+    assert_eq!(settled_cell_bits(&store), 0);
+}

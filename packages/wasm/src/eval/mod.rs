@@ -113,6 +113,9 @@ thread_local! {
     /// Formula evaluations on this thread. Tests read it to count how often a
     /// formula ran, which no value can show.
     pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Reads of settled formula cells that skipped the formula-index lookup.
+    /// Tests read it to tell the cell-bit path from the lookup.
+    pub(crate) static SETTLED_CELL_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Runs `evaluate` with one empty slot per binding of a LET expansion and
@@ -894,6 +897,17 @@ impl CellStore {
             if self.independent_pass() {
                 self.evaluate_independent_pass(&affected, &mut memo);
             } else {
+                // Without iteration or dynamic arrays a settled formula is not
+                // evaluated again, so its readers can read its cell directly.
+                if self.iteration.is_none()
+                    && self
+                        .graph
+                        .index()
+                        .is_some_and(|index| index.has_formula_dependencies())
+                {
+                    memo.record_settled_cells();
+                }
+
                 self.evaluate_selected(&affected, &mut memo, found_cycle);
             }
 
@@ -1468,32 +1482,34 @@ impl CellStore {
         result: EvalResult,
         results: &mut FormulaResults,
     ) {
-        self.store_formula_result(id, result);
+        if let Some((sheet, index)) = self.store_formula_result(id, result) {
+            results.settle_cell(sheet, index);
+        }
         results.settle(id);
     }
 
-    fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
+    /// Writes `id`'s result to its cell and returns the sheet and cell index
+    /// written, or `None` when the formula or its cell is gone.
+    fn store_formula_result(
+        &mut self,
+        id: FormulaId,
+        result: EvalResult,
+    ) -> Option<(usize, usize)> {
         // A pass already owns the id; only liveness needs checking at write-back.
-        if self.formula_slots.get(id).is_none() {
-            return;
-        }
+        self.formula_slots.get(id)?;
 
-        let Some(key) = self.formula_slots.location(id) else {
-            return;
-        };
+        let key = self.formula_slots.location(id)?;
 
         let interned = match &result {
             Value::Text(text) => Some(self.intern(text)),
             _ => None,
         };
         let sheet = key.sheet as usize;
-        let Some(data) = self.sheets.get_mut(sheet) else {
-            return;
-        };
+        let data = self.sheets.get_mut(sheet)?;
 
         let (row, col) = key.local();
         if !data.cells.contains_cell(row as usize, col as usize) {
-            return;
+            return None;
         }
 
         let index = data.cells.idx(row as usize, col as usize);
@@ -1510,6 +1526,7 @@ impl CellStore {
             data.cells.set_derived(index, kind, payload),
             "calculated overlay allocation failed"
         );
+        Some((sheet, index))
     }
 
     pub(crate) fn eval_at(
@@ -1551,6 +1568,14 @@ impl CellStore {
             return literal_cell_value(&self.strings, kind, payload);
         }
 
+        // A formula this pass already settled is read from its cell without
+        // looking it up in the sheet's formula index.
+        if pass.results.cell_settled(sheet, i) {
+            #[cfg(test)]
+            SETTLED_CELL_READS.with(|count| count.set(count.get() + 1));
+            return self.settled_cell_value(s, i);
+        }
+
         if let Some(key) = cell_key(row, col) {
             if let Some(id) = s.formulas.id(key) {
                 // A settled formula's result is already in its cell, read as
@@ -1562,15 +1587,7 @@ impl CellStore {
                     if self.iteration.is_some() {
                         iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
                     }
-                    // This pass wrote the whole result, errors included, to
-                    // the calculated slot, so no source-error lookup is needed.
-                    return match s.cells.calculated_cell_at(i) {
-                        Some((KIND_FORMULA, payload)) => Value::Error(
-                            FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref),
-                        ),
-                        Some((kind, payload)) => literal_cell_value(&self.strings, kind, payload),
-                        None => Value::number(s.cells.num_at(i)),
-                    };
+                    return self.settled_cell_value(s, i);
                 }
 
                 return cached_formula_value(
@@ -1587,6 +1604,20 @@ impl CellStore {
 
         // A `KIND_FORMULA` cell without a formula entry keeps its last number.
         Value::number(s.cells.num_at(i))
+    }
+
+    /// The value of a formula cell this pass has settled. The pass wrote the
+    /// whole result, errors included, to the calculated slot, so no
+    /// source-error lookup is needed.
+    #[inline]
+    fn settled_cell_value(&self, sheet: &SheetData, index: usize) -> EvalResult {
+        match sheet.cells.calculated_cell_at(index) {
+            Some((KIND_FORMULA, payload)) => {
+                Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref))
+            }
+            Some((kind, payload)) => literal_cell_value(&self.strings, kind, payload),
+            None => Value::number(sheet.cells.num_at(index)),
+        }
     }
 
     /// Evaluate a selected id without repeating its address-index lookup.
