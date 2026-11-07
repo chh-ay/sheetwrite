@@ -18,6 +18,9 @@ const PAGES = globSync("**/*.{md,mdx}", { cwd: CONTENT_ROOT }).map((source) => {
   return page.length === 0 ? "/docs/" : `/docs/${page}/`;
 });
 
+/** The showcase pages (src/routes/showcases.*.tsx), each prerendered like a docs page. */
+const SHOWCASE_PAGES = ["/showcases/", "/showcases/spreadsheet/", "/showcases/analysis/"];
+
 /**
  * The browsers the site's CSS is compiled for (Lightning CSS prefixes and
  * lowers only what these need): Vite's default build target,
@@ -131,6 +134,7 @@ export default defineConfig({
       pages: [
         { path: "/" },
         ...PAGES.map((path) => ({ path })),
+        ...SHOWCASE_PAGES.map((path) => ({ path })),
         // Static hosts serve /404.html for every URL without a page; the
         // deployment fallback supplies the 404 status for unknown URLs.
         { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },

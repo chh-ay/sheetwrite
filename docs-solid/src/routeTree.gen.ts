@@ -13,6 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as R404RouteImport } from './routes/404'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
+import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
+import { Route as ShowcasesAnalysisRouteImport } from './routes/showcases.analysis'
+import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,39 +37,88 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
   path: '/docs/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
+  id: '/showcases/',
+  path: '/showcases/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesAnalysisRoute = ShowcasesAnalysisRouteImport.update({
+  id: '/showcases/analysis',
+  path: '/showcases/analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesSpreadsheetRoute = ShowcasesSpreadsheetRouteImport.update({
+  id: '/showcases/spreadsheet',
+  path: '/showcases/spreadsheet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
+  '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/docs/': typeof DocsIndexRoute
+  '/showcases/': typeof ShowcasesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
+  '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/docs': typeof DocsIndexRoute
+  '/showcases': typeof ShowcasesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/docs/$': typeof DocsSplatRoute
+  '/showcases/analysis': typeof ShowcasesAnalysisRoute
+  '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/docs/': typeof DocsIndexRoute
+  '/showcases/': typeof ShowcasesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/404' | '/docs/$' | '/docs/'
+  fullPaths:
+    | '/'
+    | '/404'
+    | '/docs/$'
+    | '/showcases/analysis'
+    | '/showcases/spreadsheet'
+    | '/docs/'
+    | '/showcases/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/404' | '/docs/$' | '/docs'
-  id: '__root__' | '/' | '/404' | '/docs/$' | '/docs/'
+  to:
+    | '/'
+    | '/404'
+    | '/docs/$'
+    | '/showcases/analysis'
+    | '/showcases/spreadsheet'
+    | '/docs'
+    | '/showcases'
+  id:
+    | '__root__'
+    | '/'
+    | '/404'
+    | '/docs/$'
+    | '/showcases/analysis'
+    | '/showcases/spreadsheet'
+    | '/docs/'
+    | '/showcases/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R404Route: typeof R404Route
   DocsSplatRoute: typeof DocsSplatRoute
+  ShowcasesAnalysisRoute: typeof ShowcasesAnalysisRoute
+  ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
   DocsIndexRoute: typeof DocsIndexRoute
+  ShowcasesIndexRoute: typeof ShowcasesIndexRoute
 }
 
 declare module '@tanstack/solid-router' {
@@ -99,6 +151,27 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof DocsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/': {
+      id: '/showcases/'
+      path: '/showcases'
+      fullPath: '/showcases/'
+      preLoaderRoute: typeof ShowcasesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/analysis': {
+      id: '/showcases/analysis'
+      path: '/showcases/analysis'
+      fullPath: '/showcases/analysis'
+      preLoaderRoute: typeof ShowcasesAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/spreadsheet': {
+      id: '/showcases/spreadsheet'
+      path: '/showcases/spreadsheet'
+      fullPath: '/showcases/spreadsheet'
+      preLoaderRoute: typeof ShowcasesSpreadsheetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -106,7 +179,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R404Route: R404Route,
   DocsSplatRoute: DocsSplatRoute,
+  ShowcasesAnalysisRoute: ShowcasesAnalysisRoute,
+  ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
   DocsIndexRoute: DocsIndexRoute,
+  ShowcasesIndexRoute: ShowcasesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

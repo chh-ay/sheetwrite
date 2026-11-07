@@ -1,0 +1,447 @@
+/* Route-owned gallery. Static previews do not mount a Grid or runtime. */
+
+.sw-hub-frame {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
+}
+
+/* A quiet blueprint grid that fades out under the gallery. */
+.sw-hub-frame::before {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 56rem;
+  background:
+    linear-gradient(var(--sw-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sw-grid-line) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+  content: "";
+  mask-image: radial-gradient(
+    ellipse 80% 70% at 50% 0%,
+    var(--sw-mask-opaque) 30%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.sw-hub {
+  width: calc(100% - 2 * var(--sw-page-inset));
+  max-width: 96rem;
+  margin-inline: auto;
+  padding: clamp(var(--sw-space-6), 3vh, var(--sw-space-8)) 0 var(--sw-space-12);
+}
+
+/* A short opening, then straight into the gallery. The title spans the
+   content width, so it stays on one line at desktop and tablet widths; the
+   lede keeps a reading measure. */
+.sw-hub__hero {
+  padding-block: clamp(var(--sw-space-8), 5vw, var(--sw-space-16)) var(--sw-space-2);
+}
+
+.sw-hub__eyebrow {
+  margin: 0 0 var(--sw-space-3);
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.sw-hub__hero h1 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-display) / 1.05 var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-display);
+  text-wrap: balance;
+}
+
+.sw-hub__lede {
+  max-width: 46rem;
+  margin: var(--sw-space-4) 0 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-h4);
+  line-height: 1.6;
+}
+
+.sw-hub__scenes {
+  margin-top: clamp(var(--sw-space-8), 3vw, var(--sw-space-10));
+}
+
+.sw-hub__group + .sw-hub__group {
+  margin-top: clamp(var(--sw-space-10), 5vw, var(--sw-space-16));
+}
+
+.sw-hub__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  align-items: baseline;
+  margin-bottom: var(--sw-space-4);
+  padding-bottom: var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-hub__group-head h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1.3 var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-display);
+}
+
+.sw-hub__group-head p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-hub__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sw-hub__toolbar {
+  display: flex;
+  gap: var(--sw-space-3);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin: 0 0 var(--sw-space-5);
+}
+
+.sw-hub__filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sw-hub__filters legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.sw-hub__filters button {
+  min-height: 2.75rem;
+  padding-inline: var(--sw-space-3);
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.3 var(--sw-font-body);
+  cursor: pointer;
+  transition:
+    border-color var(--sw-motion-fast) var(--sw-motion-decelerate),
+    background-color var(--sw-motion-fast) var(--sw-motion-decelerate),
+    color var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-hub__filters button:hover {
+  border-color: var(--sw-accent);
+  color: var(--sw-fg-strong);
+}
+
+.sw-hub__filters button[aria-pressed="true"] {
+  border-color: var(--sw-accent);
+  background: var(--sw-accent);
+  color: var(--sw-accent-ink);
+}
+
+.sw-hub__filter-status {
+  flex: none;
+  margin: 0 0 0 var(--sw-space-1);
+  padding-left: var(--sw-space-3);
+  border-left: 1px solid var(--sw-border);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.3 var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Desktop: capability cards in thirds (nine make three full rows) and the
+   four adapters in a row of four. Tablets use pairs; small screens stack. */
+.sw-hub-scenes {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: var(--sw-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-hub-scenes > li {
+  min-width: 0;
+  display: flex;
+  grid-column: span 4;
+}
+
+.sw-hub-scenes > li[data-kind="framework"] {
+  grid-column: span 3;
+}
+
+.sw-hub-launch.sw-hub-launch--framework {
+  grid-template-rows: 8.5rem 1fr;
+}
+
+.sw-hub-launch {
+  --sw-hub-accent: var(--sw-accent);
+  --sw-hub-accent-ink: color-mix(in srgb, var(--sw-hub-accent) 72%, var(--sw-fg-strong));
+
+  display: grid;
+  height: 100%;
+  width: 100%;
+  grid-template-rows: auto 1fr;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  /* The preview paints its own background; clip it to the rounded corners. */
+  overflow: clip;
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  text-decoration: none;
+  transition:
+    border-color var(--sw-motion-fast) var(--sw-motion-decelerate),
+    box-shadow var(--sw-motion-fast) var(--sw-motion-decelerate),
+    translate var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+.sw-hub-launch[data-owner="performance"],
+.sw-hub-launch[data-owner="vanilla"] {
+  --sw-hub-accent: var(--sw-warning);
+}
+
+.sw-hub-launch[data-owner="interoperability"],
+.sw-hub-launch[data-owner="react"] {
+  --sw-hub-accent: var(--sw-fw-react);
+}
+
+.sw-hub-launch[data-owner="collaboration"] {
+  --sw-hub-accent: var(--sw-danger);
+}
+
+.sw-hub-launch[data-owner="recalculation"] {
+  --sw-hub-accent: var(--sw-code-keyword);
+}
+
+.sw-hub-launch[data-owner="vue"] {
+  --sw-hub-accent: var(--sw-fw-vue);
+}
+
+.sw-hub-launch[data-owner="svelte"] {
+  --sw-hub-accent: var(--sw-fw-svelte);
+}
+
+.sw-hub-launch__body {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto auto 1fr auto;
+  gap: var(--sw-space-3);
+  padding: clamp(var(--sw-space-5), 2vw, var(--sw-space-8));
+  border-top: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
+  background: var(--sw-surface-1);
+}
+
+.sw-hub-launch__meta {
+  color: var(--sw-hub-accent-ink);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.sw-hub-launch__body > strong {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1.25 var(--sw-font-display);
+}
+
+.sw-hub-launch__summary {
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-regular) var(--sw-text-small) / 1.6 var(--sw-font-body);
+}
+
+.sw-hub__owner-count {
+  display: flex;
+  gap: var(--sw-space-1-5);
+  align-items: center;
+  margin-top: var(--sw-space-2);
+  padding-top: var(--sw-space-4);
+  border-top: 1px solid var(--sw-border);
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.4 var(--sw-font-body);
+}
+
+.sw-hub__owner-count .sw-icon {
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-hub-launch:is(:hover, :focus-visible) .sw-hub__owner-count .sw-icon {
+  transform: translateX(var(--sw-space-0-5));
+}
+
+/* A capability card leads with its live demo, captured in the site theme by
+   scripts/docs-showcase-previews.ts. Both images are in the card; the page
+   theme shows one. */
+.sw-hub-preview {
+  display: block;
+  aspect-ratio: 8 / 5;
+  overflow: hidden;
+  background: var(--sw-surface-0);
+}
+
+.sw-hub-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+
+:root[data-theme="dark"] .sw-hub-preview [data-preview-theme="light"],
+:root:not([data-theme="dark"]) .sw-hub-preview [data-preview-theme="dark"] {
+  display: none;
+}
+
+.sw-hub-framework-scene {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-5);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
+}
+.sw-hub-framework-scene code {
+  display: block;
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.55 var(--sw-font-mono);
+  text-wrap: balance;
+}
+
+.sw-hub-framework-scene__import {
+  color: var(--sw-fg);
+}
+
+.sw-hub-framework-scene__import span {
+  white-space: nowrap;
+}
+
+.sw-hub-framework-scene__import i {
+  color: var(--sw-hub-accent-ink);
+  font-style: normal;
+}
+
+.sw-hub-framework-scene__import em {
+  color: var(--sw-accent-strong);
+  font-style: normal;
+}
+
+.sw-hub-framework-scene__mount {
+  color: var(--sw-hub-accent-ink);
+  font-weight: var(--sw-weight-semibold);
+}
+
+/* The app showcase leads the hub at full width: preview beside the copy. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] {
+  grid-column: 1 / -1;
+}
+
+.sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  /* At least the other previews' height; taller when the copy wraps. */
+  grid-template-rows: minmax(12rem, auto);
+}
+
+/* Desktop, every card shown: the app card takes two thirds beside Analysis,
+   so the nine cards after them fill three rows of thirds with no orphan. */
+@media (min-width: 80rem) {
+  .sw-hub-scenes[data-group="all"] > li[data-owner="spreadsheet"] {
+    grid-column: span 8;
+  }
+}
+
+/* Beside the preview, the app card's copy and link sit together in the
+   middle of the pane rather than spreading to its edges. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-launch__body {
+  grid-template-rows: auto;
+  align-content: center;
+}
+
+/* The preview fills its pane, however tall the row beside it is. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-preview {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+@media (hover: hover) {
+  .sw-hub-launch:hover {
+    border-color: var(--sw-hub-accent);
+    box-shadow: var(--sw-shadow-lg);
+    translate: 0 calc(var(--sw-space-1) * -1);
+  }
+}
+
+@media (max-width: 79.999rem) {
+  .sw-hub-scenes > li,
+  .sw-hub-scenes > li[data-kind="framework"] {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 63.999rem) {
+  /* The count drops to its own line once the chips fill the row. */
+  .sw-hub__filter-status {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 51.999rem) {
+  .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-preview {
+    height: auto;
+    aspect-ratio: 8 / 5;
+  }
+}
+
+@media (max-width: 39.999rem) {
+  .sw-hub {
+    padding-top: var(--sw-space-4);
+  }
+
+  .sw-hub-scenes > li,
+  .sw-hub-scenes > li[data-kind="framework"],
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"] {
+    grid-column: 1 / -1;
+  }
+
+  .sw-hub__toolbar {
+    align-items: start;
+    gap: var(--sw-space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-hub-launch,
+  .sw-hub__filters button {
+    transition: none;
+  }
+
+  .sw-hub-launch:hover {
+    translate: none;
+  }
+}
