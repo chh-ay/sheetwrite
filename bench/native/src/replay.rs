@@ -1,7 +1,7 @@
 //! Replay formula gate workloads natively.
 //!
 //! ```sh
-//! formula-replay [--filter <text>]... [--min-ms <ms>] [--warmup <n>] [--counters] <trace>...
+//! formula-replay [--filter <text>]... [--min-ms <ms>] [--warmup <n>] [--counters] [--sample-each-run] <trace>...
 //! ```
 //!
 //! Each trace comes from `bun bench/src/formula-bench.ts --trace <dir>` and holds
@@ -17,7 +17,10 @@
 //! rebuilt fixtures with runs of 5 ms or more toggle sampling around each run.
 //! Edit fixtures sample the whole timed loop (their untimed restore repeats the
 //! edit in reverse), and so do shorter rebuilt fixtures, whose setup samples
-//! (parse and source writes) the phase split then leaves out.
+//! (parse and source writes) the phase split then leaves out. With
+//! `--sample-each-run`, every fixture toggles sampling around each run, so a
+//! profile holds only the timed calls; short runs then spend most of their wall
+//! time waiting for perf, so pair it with a small sample period.
 //!
 //! Output is one tab-separated line per workload: key, timed runs, mean ns per
 //! run, then per-run hardware counters (`--counters`, Linux) and heap
@@ -514,6 +517,8 @@ struct Options {
     minimum_ms: f64,
     warmup: usize,
     counters: bool,
+    /// Toggle perf sampling around every timed run, whatever its length.
+    sample_each_run: bool,
     traces: Vec<String>,
 }
 
@@ -523,6 +528,7 @@ fn parse_options() -> Result<Options, String> {
         minimum_ms: 50.0,
         warmup: 3,
         counters: false,
+        sample_each_run: false,
         traces: Vec::new(),
     };
     let mut arguments = std::env::args().skip(1);
@@ -547,6 +553,7 @@ fn parse_options() -> Result<Options, String> {
                     .map_err(|error| format!("--warmup: {error}"))?;
             }
             "--counters" => options.counters = true,
+            "--sample-each-run" => options.sample_each_run = true,
             _ => options.traces.push(argument),
         }
     }
@@ -610,10 +617,11 @@ fn replay(
     let mut counter_totals = vec![0u64; COUNTER_NAMES.len()];
     let mut allocations = (0u64, 0u64);
 
-    // A perf toggle costs about a millisecond, so only runs well above that
-    // toggle sampling; shorter rebuilt fixtures sample their setup too, and
-    // the phase split drops its parse and source-write samples.
-    let sample_each_run = !workload.restores && warmup_ns >= PER_RUN_SAMPLING_NS;
+    // A perf toggle costs about a millisecond, so by default only runs well
+    // above that toggle sampling; shorter rebuilt fixtures sample their setup
+    // too, and the phase split drops its parse and source-write samples.
+    let sample_each_run = options.sample_each_run
+        || (!workload.restores && warmup_ns >= PER_RUN_SAMPLING_NS);
 
     if let Some(perf) = perf.as_mut().filter(|_| !sample_each_run) {
         perf.send("enable\n");
