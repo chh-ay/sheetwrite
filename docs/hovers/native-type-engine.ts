@@ -338,11 +338,12 @@ class LanguageServer {
     });
   }
 
-  removeProject(directory: string): void {
+  /** Deletes a project directory and tells the server that its tsconfig and `files` are gone. */
+  removeProject(directory: string, files: readonly string[] = []): void {
     const file = join(directory, "tsconfig.json");
     rmSync(directory, { recursive: true, force: true });
     this.notify("workspace/didChangeWatchedFiles", {
-      changes: [{ uri: pathToFileURL(file).href, type: 3 }],
+      changes: [file, ...files].map((path) => ({ uri: pathToFileURL(path).href, type: 3 })),
     });
   }
 
@@ -653,11 +654,17 @@ export class NativeTypeEngine {
     const parser = await this.parserSession(server);
     const files = samples.map((sample) => this.sampleFile(sample, project));
     const directory = `${this.projectDirectory}/${project}`;
+    // The samples are written next to the batch tsconfig instead of opened one by one:
+    // the server handled each `didOpen` before any request after it (5.8 s of a pass on
+    // the Mac), while files on disk load with the project in one step. One sample is
+    // still opened: an open file keeps the batch project as the default project for the
+    // declaration files it reaches, instead of the packages' own tsconfig projects.
+    mkdirSync(directory, { recursive: true });
+    for (const [index, sample] of samples.entries())
+      writeFileSync(files[index] ?? "", sample.source);
     server.writeProject(directory, this.projectConfig(files));
-    for (const [index, sample] of samples.entries()) {
-      const file = files[index] ?? "";
-      server.open(pathToFileURL(file).href, languageId(file), sample.source);
-    }
+    const anchor = pathToFileURL(files[0] ?? "").href;
+    server.open(anchor, languageId(files[0] ?? ""), samples[0]?.source ?? "");
     // Hovers at declarations outside the samples make the server look up those files'
     // projects, which in the middle of checking 64 samples cost 14 s of server CPU. They
     // wait until every sample of the batch has its own answers.
@@ -686,9 +693,8 @@ export class NativeTypeEngine {
         }
       }),
     );
-    // Closed samples leave the program, so the server holds only samples in flight.
-    for (const file of files) server.close(pathToFileURL(file).href);
-    server.removeProject(directory);
+    server.close(anchor);
+    server.removeProject(directory, files);
   }
 
   /**
