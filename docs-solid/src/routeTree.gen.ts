@@ -11,6 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as R404RouteImport } from './routes/404'
+import { Route as ReactRouteImport } from './routes/react'
+import { Route as SvelteRouteImport } from './routes/svelte'
+import { Route as VanillaRouteImport } from './routes/vanilla'
+import { Route as VueRouteImport } from './routes/vue'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
@@ -41,6 +45,26 @@ const IndexRoute = IndexRouteImport.update({
 const R404Route = R404RouteImport.update({
   id: '/404',
   path: '/404',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReactRoute = ReactRouteImport.update({
+  id: '/react',
+  path: '/react',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SvelteRoute = SvelteRouteImport.update({
+  id: '/svelte',
+  path: '/svelte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VanillaRoute = VanillaRouteImport.update({
+  id: '/vanilla',
+  path: '/vanilla',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VueRoute = VueRouteImport.update({
+  id: '/vue',
+  path: '/vue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
@@ -153,6 +177,10 @@ const TestIslandsRoute = TestIslandsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/react': typeof ReactRoute
+  '/svelte': typeof SvelteRoute
+  '/vanilla': typeof VanillaRoute
+  '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
@@ -178,6 +206,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/react': typeof ReactRoute
+  '/svelte': typeof SvelteRoute
+  '/vanilla': typeof VanillaRoute
+  '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
@@ -204,6 +236,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/react': typeof ReactRoute
+  '/svelte': typeof SvelteRoute
+  '/vanilla': typeof VanillaRoute
+  '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
@@ -231,6 +267,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/404'
+    | '/react'
+    | '/svelte'
+    | '/vanilla'
+    | '/vue'
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/collaboration'
@@ -256,6 +296,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/404'
+    | '/react'
+    | '/svelte'
+    | '/vanilla'
+    | '/vue'
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/collaboration'
@@ -281,6 +325,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/404'
+    | '/react'
+    | '/svelte'
+    | '/vanilla'
+    | '/vue'
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/collaboration'
@@ -307,6 +355,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R404Route: typeof R404Route
+  ReactRoute: typeof ReactRoute
+  SvelteRoute: typeof SvelteRoute
+  VanillaRoute: typeof VanillaRoute
+  VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
   ShowcasesAnalysisRoute: typeof ShowcasesAnalysisRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
@@ -344,6 +396,34 @@ declare module '@tanstack/solid-router' {
       path: '/404'
       fullPath: '/404'
       preLoaderRoute: typeof R404RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/react': {
+      id: '/react'
+      path: '/react'
+      fullPath: '/react'
+      preLoaderRoute: typeof ReactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/svelte': {
+      id: '/svelte'
+      path: '/svelte'
+      fullPath: '/svelte'
+      preLoaderRoute: typeof SvelteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vanilla': {
+      id: '/vanilla'
+      path: '/vanilla'
+      fullPath: '/vanilla'
+      preLoaderRoute: typeof VanillaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vue': {
+      id: '/vue'
+      path: '/vue'
+      fullPath: '/vue'
+      preLoaderRoute: typeof VueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/': {
@@ -499,6 +579,10 @@ declare module '@tanstack/solid-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R404Route: R404Route,
+  ReactRoute: ReactRoute,
+  SvelteRoute: SvelteRoute,
+  VanillaRoute: VanillaRoute,
+  VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
   ShowcasesAnalysisRoute: ShowcasesAnalysisRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,

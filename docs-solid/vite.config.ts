@@ -42,6 +42,8 @@ const SHOWCASE_PAGES = [
     "queries",
     "version-history",
   ].map((id) => `/showcases/${id}/`),
+  // The framework workbenches (src/routes/{vanilla,react,vue,svelte}.tsx).
+  ...["vanilla", "react", "vue", "svelte"].map((framework) => `/${framework}/`),
 ];
 
 /**

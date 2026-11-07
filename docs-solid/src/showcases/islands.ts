@@ -175,6 +175,34 @@ export const SHOWCASE_ISLANDS = {
         withProps(VersionHistoryStage),
       ),
   },
+  "workbench-vanilla": {
+    source: "src/showcases/frameworks/vanilla/VanillaWorkbench.tsx",
+    load: () =>
+      import("./frameworks/vanilla/VanillaWorkbench.js").then(({ VanillaWorkbench }) =>
+        withProps(VanillaWorkbench),
+      ),
+  },
+  "workbench-react": {
+    source: "src/showcases/frameworks/FrameworkMount.tsx",
+    load: () =>
+      import("./frameworks/FrameworkMount.js").then(({ ReactWorkbenchIsland }) =>
+        withProps(ReactWorkbenchIsland),
+      ),
+  },
+  "workbench-vue": {
+    source: "src/showcases/frameworks/FrameworkMount.tsx",
+    load: () =>
+      import("./frameworks/FrameworkMount.js").then(({ VueWorkbenchIsland }) =>
+        withProps(VueWorkbenchIsland),
+      ),
+  },
+  "workbench-svelte": {
+    source: "src/showcases/frameworks/FrameworkMount.tsx",
+    load: () =>
+      import("./frameworks/FrameworkMount.js").then(({ SvelteWorkbenchIsland }) =>
+        withProps(SvelteWorkbenchIsland),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 /** The showcase pages' islands; islands/Island.tsx adds these names to every island name. */
