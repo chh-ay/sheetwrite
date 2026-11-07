@@ -369,7 +369,7 @@ impl CellStore {
                     Ok(expanded) => expanded,
                     Err(error) => return Some(Err(error)),
                 };
-                let enclosing = pass.results.let_frame.open_expanded(slots);
+                let enclosing = pass.results.let_frame_mut().open_expanded(slots);
                 let expanded = self.resolve_let_runtime_refs(
                     args,
                     expanded,
@@ -379,7 +379,7 @@ impl CellStore {
                     RewriteScope::Root,
                 );
                 let matrix = self.eval_dynamic_array(&expanded, sheet, pass, depth + 1);
-                pass.results.let_frame.close_expanded(enclosing);
+                pass.results.let_frame_mut().close_expanded(enclosing);
                 return matrix;
             }
             Ast::Func(Func::Filter, args) => self.eval_filter(args, sheet, pass, depth + 1),
@@ -510,7 +510,9 @@ impl CellStore {
             Ast::LetName { slot, .. } => {
                 // SAFETY: a resolved name is evaluated only inside its LET,
                 // which has bound the slot and is still being evaluated.
-                if let Some(binding) = unsafe { pass.results.let_frame.binding(*slot) } {
+                let frame = pass.results.let_frame.as_deref();
+                let binding = frame.and_then(|frame| unsafe { frame.binding(*slot) });
+                if let Some(binding) = binding {
                     return self.matrix_shape(binding, formula_sheet, pass);
                 }
             }

@@ -1721,17 +1721,23 @@ impl CellStore {
             Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {
                 Value::Error(FormulaError::Ref)
             }
-            Ast::LetSlot { slot, expression } => match pass.results.let_frame.expanded_value(*slot)
-            {
-                Some(value) => value,
-                None => {
-                    let value = self.eval_ast(expression, sheet, pass, depth);
-                    pass.results
-                        .let_frame
-                        .remember_expanded(*slot, value.clone());
-                    value
+            Ast::LetSlot { slot, expression } => {
+                let known = pass
+                    .results
+                    .let_frame
+                    .as_deref()
+                    .and_then(|frame| frame.expanded_value(*slot));
+                match known {
+                    Some(value) => value,
+                    None => {
+                        let value = self.eval_ast(expression, sheet, pass, depth);
+                        if let Some(frame) = pass.results.let_frame.as_deref_mut() {
+                            frame.remember_expanded(*slot, value.clone());
+                        }
+                        value
+                    }
                 }
-            },
+            }
             Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
             Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
@@ -1829,14 +1835,15 @@ impl CellStore {
             Some(Ast::LetName { slot, .. }) => *slot,
             _ => return Value::Error(FormulaError::Value),
         };
-        let opened = pass.results.let_frame.open_resolved(first_slot);
+        let frame = pass.results.let_frame_mut();
+        let opened = frame.open_resolved(first_slot);
         for pair in bindings.chunks(2) {
             if let [Ast::LetName { slot, .. }, expression] = pair {
-                pass.results.let_frame.bind(*slot, expression);
+                frame.bind(*slot, expression);
             }
         }
         let value = self.eval_ast(result, sheet, pass, depth + 1);
-        pass.results.let_frame.close_resolved(opened);
+        pass.results.let_frame_mut().close_resolved(opened);
         value
     }
 
@@ -1850,18 +1857,21 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        if let Some(value) = pass.results.let_frame.resolved_value(slot) {
+        let Some(frame) = pass.results.let_frame.as_deref() else {
+            return Value::Error(FormulaError::Name);
+        };
+        if let Some(value) = frame.resolved_value(slot) {
             return value;
         }
         // SAFETY: a resolved name occurs only inside its LET, which binds the
         // slot before evaluating anything in it and is still being evaluated.
-        let Some(expression) = (unsafe { pass.results.let_frame.binding(slot) }) else {
+        let Some(expression) = (unsafe { frame.binding(slot) }) else {
             return Value::Error(FormulaError::Name);
         };
         let value = self.eval_ast(expression, sheet, pass, depth);
-        pass.results
-            .let_frame
-            .remember_resolved(slot, value.clone());
+        if let Some(frame) = pass.results.let_frame.as_deref_mut() {
+            frame.remember_resolved(slot, value.clone());
+        }
         value
     }
 
@@ -1933,7 +1943,7 @@ impl CellStore {
             }
             return match expand_let_ast(args) {
                 Ok((expanded, slots)) => {
-                    let enclosing = pass.results.let_frame.open_expanded(slots);
+                    let enclosing = pass.results.let_frame_mut().open_expanded(slots);
                     let expanded = self.resolve_let_runtime_refs(
                         args,
                         expanded,
@@ -1943,7 +1953,7 @@ impl CellStore {
                         RewriteScope::Nested,
                     );
                     let value = self.eval_ast(&expanded, sheet, pass, depth + 1);
-                    pass.results.let_frame.close_expanded(enclosing);
+                    pass.results.let_frame_mut().close_expanded(enclosing);
                     value
                 }
                 Err(error) => Value::Error(error),

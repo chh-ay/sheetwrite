@@ -215,7 +215,7 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
 ///   changed or dropped while a pointer into it exists;
 /// - [`LetFrame::close_resolved`] drops the pointers of a formula's LETs when
 ///   its outermost resolved LET ends, and the pass clears the frame at its
-///   end, so no pointer outlives the evaluation that stored it;
+///   end by dropping it, so no pointer outlives the evaluation that stored it;
 /// - only [`LetFrame::binding`] reads them, for a slot of the formula being
 ///   evaluated.
 #[derive(Default)]
@@ -346,30 +346,9 @@ impl LetFrame {
         self.bindings.truncate(len);
     }
 
-    /// Ends a pass: no slot or binding outlives it.
-    pub(crate) fn clear(&mut self) {
-        self.truncate(0);
-        self.resolved_base = None;
-        self.expanded_base = 0;
-    }
-
-    /// Releases the storage of a pass that used many slots.
-    pub(crate) fn release_wide(&mut self, retained: usize) {
-        if self.values.capacity() > retained {
-            self.values = Vec::new();
-            self.bindings = Vec::new();
-        }
-    }
-
     pub(crate) fn add_memory_stats(&self, stats: &mut MemoryOwnerStats) {
         stats.add_vec::<Option<EvalResult>>(self.values.len(), self.values.capacity());
         stats.add_vec::<*const Ast>(self.bindings.len(), self.bindings.capacity());
-    }
-
-    /// Whether no slot is held; true between passes.
-    #[cfg(test)]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.values.is_empty() && self.bindings.is_empty() && self.resolved_base.is_none()
     }
 }
 
@@ -523,7 +502,7 @@ mod tests {
         assert!(store
             .formula_results
             .as_ref()
-            .is_none_or(|results| results.let_frame.is_empty()));
+            .is_none_or(|results| results.let_frame.is_none()));
         RESOLVE_LET_NAMES.with(|cell| cell.set(true));
         seen
     }

@@ -611,8 +611,10 @@ pub(crate) struct FormulaResults {
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
     lookups: crate::eval::LookupStates,
-    /// LET slot values and resolved bindings for this pass.
-    pub(crate) let_frame: crate::eval::LetFrame,
+    /// LET slot values and resolved bindings for this pass. Created by the
+    /// pass's first LET and dropped with the pass, so the workspace the store
+    /// keeps between passes holds no slots.
+    pub(crate) let_frame: Option<Box<crate::eval::LetFrame>>,
     /// Boxed, so the pass workspace the store keeps between passes grows by
     /// one pointer, not by the whole table.
     #[cfg(feature = "analysis")]
@@ -857,6 +859,11 @@ impl FormulaResults {
         std::mem::swap(&mut self.regexes, &mut other.regexes);
     }
 
+    /// The LET slot frame of this pass, created on first use.
+    pub(crate) fn let_frame_mut(&mut self) -> &mut crate::eval::LetFrame {
+        self.let_frame.get_or_insert_with(Box::default)
+    }
+
     /// Clears this pass's pulled results and any bits left set. A finished
     /// pass has already cleared its own settled bits, so a small edit does
     /// not touch every word.
@@ -875,7 +882,7 @@ impl FormulaResults {
         self.range_sums.sums.clear();
         self.range_sums.last = None;
         self.lookups.clear();
-        self.let_frame.clear();
+        self.let_frame = None;
         #[cfg(feature = "analysis")]
         {
             self.regexes = None;
@@ -906,7 +913,6 @@ impl FormulaResults {
             self.range_sums.sums = Vec::new();
         }
         self.lookups.release();
-        self.let_frame.release_wide(SLOT_PAGE_LEN);
 
         // Reuse primary pass storage, never formula values or selected ids.
         work.clear();
@@ -924,7 +930,9 @@ impl FormulaResults {
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
-        self.let_frame.add_memory_stats(formulas);
+        if let Some(frame) = &self.let_frame {
+            frame.add_memory_stats(formulas);
+        }
         formulas.add_vec::<u32>(
             self.range_sums.slots.len(),
             self.range_sums.slots.capacity(),
