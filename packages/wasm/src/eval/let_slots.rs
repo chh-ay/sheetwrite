@@ -502,7 +502,7 @@ mod tests {
         assert!(store
             .formula_results
             .as_ref()
-            .is_none_or(|results| results.let_frame.is_none()));
+            .is_none_or(|results| results.let_frame().is_none()));
         RESOLVE_LET_NAMES.with(|cell| cell.set(true));
         seen
     }

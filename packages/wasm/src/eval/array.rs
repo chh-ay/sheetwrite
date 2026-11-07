@@ -510,7 +510,7 @@ impl CellStore {
             Ast::LetName { slot, .. } => {
                 // SAFETY: a resolved name is evaluated only inside its LET,
                 // which has bound the slot and is still being evaluated.
-                let frame = pass.results.let_frame.as_deref();
+                let frame = pass.results.let_frame();
                 let binding = frame.and_then(|frame| unsafe { frame.binding(*slot) });
                 if let Some(binding) = binding {
                     return self.matrix_shape(binding, formula_sheet, pass);

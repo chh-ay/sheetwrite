@@ -1724,14 +1724,13 @@ impl CellStore {
             Ast::LetSlot { slot, expression } => {
                 let known = pass
                     .results
-                    .let_frame
-                    .as_deref()
+                    .let_frame()
                     .and_then(|frame| frame.expanded_value(*slot));
                 match known {
                     Some(value) => value,
                     None => {
                         let value = self.eval_ast(expression, sheet, pass, depth);
-                        if let Some(frame) = pass.results.let_frame.as_deref_mut() {
+                        if let Some(frame) = pass.results.existing_let_frame_mut() {
                             frame.remember_expanded(*slot, value.clone());
                         }
                         value
@@ -1857,7 +1856,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        let Some(frame) = pass.results.let_frame.as_deref() else {
+        let Some(frame) = pass.results.let_frame() else {
             return Value::Error(FormulaError::Name);
         };
         if let Some(value) = frame.resolved_value(slot) {
@@ -1869,7 +1868,7 @@ impl CellStore {
             return Value::Error(FormulaError::Name);
         };
         let value = self.eval_ast(expression, sheet, pass, depth);
-        if let Some(frame) = pass.results.let_frame.as_deref_mut() {
+        if let Some(frame) = pass.results.existing_let_frame_mut() {
             frame.remember_resolved(slot, value.clone());
         }
         value
