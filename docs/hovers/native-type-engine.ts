@@ -10,25 +10,14 @@
  *   (`moduleDetection: "force"` keeps samples from sharing globals). Samples
  *   requested in the same turn of the event loop are opened together and all
  *   their requests are sent at once; the server answers them in parallel.
- * - Results are cached on disk by sample content. The cache key also covers
- *   the compiler version and settings, this engine's code, `bun.lock` and every
- *   source file the `paths` mapping can reach, so any change to Sheetwrite's
- *   types, a dependency or the settings rebuilds every sample.
+ * - Nothing is kept between runs: every pass asks the server again, so results
+ *   always follow the current Sheetwrite types, dependencies and settings.
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { type Node, ScriptKind } from "typescript/ast";
@@ -48,7 +37,7 @@ import type {
 import { type NativeQuickInfo, parseNativeHover } from "./native-quick-info.js";
 
 export interface NativeTypeEngineOptions {
-  /** Where the language server and API run; sample resolution and caches do not depend on it. */
+  /** Where the language server and API run; sample resolution does not depend on it. */
   cwd: string;
   /** Identifiers that never get a hover (compiler-generated names). */
   internalIdentifier: RegExp;
@@ -150,23 +139,6 @@ const HOVERS_DIRECTORY = dirname(fileURLToPath(import.meta.url));
  * tsconfig stops there, so opening them never loads the docs or package projects above.
  */
 const PROJECT_DIRECTORY = join(HOVERS_DIRECTORY, "node_modules/.sheetwrite-hover");
-/** The Sheetwrite packages samples import, as the docs package installs them. */
-const SHEETWRITE_PACKAGES = join(HOVERS_DIRECTORY, "../node_modules/@sheetwrite");
-const LOCKFILE = join(HOVERS_DIRECTORY, "../../bun.lock");
-const CACHE_FILE = join(HOVERS_DIRECTORY, "node_modules/.cache/sheetwrite-hovers.jsonl");
-/** Files that can carry types; every file of every Sheetwrite package samples import is hashed. */
-const TYPED_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
-/** Never read by samples: Rust build output and installed packages. */
-const UNHASHED_DIRECTORIES = new Set(["node_modules", "target", ".git"]);
-/** Code whose changes change hovers for unchanged sample text. */
-const ENGINE_FILES = [
-  join(HOVERS_DIRECTORY, "native-type-engine.ts"),
-  join(HOVERS_DIRECTORY, "native-quick-info.ts"),
-  join(HOVERS_DIRECTORY, "package.json"),
-  join(HOVERS_DIRECTORY, "../src/lib/sheetwrite-type-engine.ts"),
-  join(HOVERS_DIRECTORY, "../src/lib/sheetwrite-code-hovers.ts"),
-  join(HOVERS_DIRECTORY, "../src/lib/hover-preludes.ts"),
-];
 /**
  * A property of the object literal itself: no declaring type before the name, and not
  * optional, which only a property of the contextual type can be.
@@ -462,47 +434,16 @@ class LanguageServer {
   }
 }
 
-/** Sample results by content key, appended as JSON lines under one header line holding the global key. */
-class HoverCache {
-  private readonly entries = new Map<string, SheetwriteTypeHover[]>();
-
-  constructor(
-    private readonly path: string,
-    private readonly globalKey: string,
-  ) {
-    const lines = existsSync(path) ? readFileSync(path, "utf8").split("\n") : [];
-    if (lines[0] !== globalKey) {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, `${globalKey}\n`);
-      return;
-    }
-    for (const line of lines.slice(1)) {
-      // A line cut short by an interrupted run is simply analyzed again.
-      if (!line.endsWith("]}")) continue;
-      const { key, hovers } = JSON.parse(line) as { key: string; hovers: SheetwriteTypeHover[] };
-      this.entries.set(key, hovers);
-    }
-  }
-
-  get(key: string): SheetwriteTypeHover[] | undefined {
-    return this.entries.get(key);
-  }
-
-  set(key: string, hovers: SheetwriteTypeHover[]): void {
-    this.entries.set(key, hovers);
-    appendFileSync(this.path, `${JSON.stringify({ key, hovers })}\n`);
-  }
-}
-
 export class NativeTypeEngine {
   private readonly projectDirectory: string;
   private readonly inFlight = new Map<string, Promise<SheetwriteTypeHover[]>>();
   /**
    * Hovers at declarations outside the samples (libraries, Sheetwrite's declarations),
-   * which do not change during a session; many samples ask about the same ones.
+   * JSDoc summaries by declaration file and line, and declaration file lines. Many
+   * samples of a batch ask about the same declarations, so each is asked or read once
+   * per batch; `drain` clears them after every batch.
    */
   private readonly declarationHovers = new Map<string, Promise<NativeQuickInfo | undefined>>();
-  /** JSDoc summaries by declaration file and line, and declaration files by path, per session. */
   private readonly declarationDocs = new Map<string, string>();
   private readonly declarationFiles = new Map<string, string[]>();
   /** Names each batch's project directory. */
@@ -511,11 +452,11 @@ export class NativeTypeEngine {
   private readonly declaredHovers = new WeakSet<SheetwriteTypeHover>();
   private queue: Sample[] = [];
   private flushScheduled = false;
-  private session: Promise<{ server: LanguageServer; cache: HoverCache }> | undefined;
+  private session: Promise<LanguageServer> | undefined;
   /** The API session holds the process open, so it closes once no batch has run for a moment. */
   private parser: Promise<API<boolean>> | undefined;
   private parserIdle: NodeJS.Timeout | undefined;
-  /** Cache misses waiting for a batch, and the loop that runs batches while any wait. */
+  /** Samples waiting for a batch, and the loop that runs batches while any wait. */
   private readonly pending: Sample[] = [];
   private worker: Promise<void> | undefined;
   /** The server's own directory, which holds its built-in `lib.*.d.ts` files. */
@@ -550,28 +491,10 @@ export class NativeTypeEngine {
     });
   }
 
-  /**
-   * Hovers a caller derives from TypeScript output (Vue and Svelte samples), cached on
-   * disk under `key` with the same invalidation as every sample, so a warm run neither
-   * generates code nor asks the server.
-   */
-  async remember(
-    key: string,
-    compute: () => Promise<SheetwriteTypeHover[]>,
-  ): Promise<SheetwriteTypeHover[]> {
-    const { cache } = await this.start();
-    const cacheKey = hash("derived", key);
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
-    const hovers = await compute();
-    cache.set(cacheKey, hovers);
-    return hovers;
-  }
-
   async dispose(): Promise<void> {
     await this.closeParser();
     if (!this.session) return;
-    const { server } = await this.session;
+    const server = await this.session;
     this.session = undefined;
     await server.shutdown();
   }
@@ -615,41 +538,14 @@ export class NativeTypeEngine {
     });
   }
 
-  /** Everything that changes hover results for unchanged sample text. */
-  private async globalKey(): Promise<string> {
-    const parts: string[] = [
-      readFileSync(createRequire(import.meta.url).resolve("typescript/package.json"), "utf8"),
-      this.projectConfig([]),
-      serverExecutable(),
-      readFileSync(LOCKFILE, "utf8"),
-      ...[...(this.options.fsMap ?? [])].flat(),
-    ];
-    for (const file of ENGINE_FILES) parts.push(readFileSync(file, "utf8"));
-    const packages = SHEETWRITE_PACKAGES;
-    const roots = (await readdir(packages)).map((name) => realpathSync(join(packages, name)));
-    const files = new Set<string>();
-    const visit = async (directory: string): Promise<void> => {
-      for (const entry of await readdir(directory, { withFileTypes: true })) {
-        const path = join(directory, entry.name);
-        if (entry.isDirectory()) {
-          if (!UNHASHED_DIRECTORIES.has(entry.name)) await visit(path);
-        } else if (TYPED_EXTENSIONS.has(extname(entry.name))) files.add(path);
-      }
-    };
-    for (const root of roots) await visit(root);
-    for (const file of [...files].sort()) parts.push(file, await readFile(file, "utf8"));
-    return hash(...parts);
-  }
-
-  private start(): Promise<{ server: LanguageServer; cache: HoverCache }> {
+  private start(): Promise<LanguageServer> {
     this.session ??= (async () => {
-      const cache = new HoverCache(CACHE_FILE, await this.globalKey());
       const server = new LanguageServer(serverExecutable());
       await server.initialize(this.options.cwd);
       for (const [fileName, text] of this.options.fsMap ?? []) {
         server.open(pathToFileURL(fileName).href, languageId(fileName), text);
       }
-      return { server, cache };
+      return server;
     })();
     return this.session;
   }
@@ -657,7 +553,7 @@ export class NativeTypeEngine {
   /**
    * Identifier discovery parses with the language server's own process, over the API
    * socket it opens on request, instead of starting a second TypeScript process. A server
-   * without that request (tsrs) gets a separate API process, as before.
+   * without that request gets a separate API process.
    */
   private parserSession(server: LanguageServer): Promise<API<boolean>> {
     clearTimeout(this.parserIdle);
@@ -673,9 +569,10 @@ export class NativeTypeEngine {
     this.queue = [];
     this.flushScheduled = false;
     try {
-      const { server, cache } = await this.start();
+      const server = await this.start();
       for (const sample of batch) {
-        const known = cache.get(sample.key) ?? this.inFlight.get(sample.key);
+        // The same sample text requested again while it is still being analyzed.
+        const known = this.inFlight.get(sample.key);
         if (known) {
           Promise.resolve(known).then(sample.resolve, sample.reject);
           continue;
@@ -686,7 +583,7 @@ export class NativeTypeEngine {
         this.inFlight.set(sample.key, result);
         result.then(sample.resolve, sample.reject);
       }
-      this.worker ??= this.drain(server, cache);
+      this.worker ??= this.drain(server);
     } catch (error) {
       const failure = error instanceof Error ? error : new Error(String(error));
       for (const sample of batch) sample.reject(failure);
@@ -698,16 +595,20 @@ export class NativeTypeEngine {
    * that arrive while a batch runs (Svelte samples, after their codegen) join the next
    * batch; a second batch alongside the first held 1.1 GB and was no faster.
    */
-  private async drain(server: LanguageServer, cache: HoverCache): Promise<void> {
+  private async drain(server: LanguageServer): Promise<void> {
     try {
       while (this.pending.length > 0) {
         const samples = this.pending.splice(0, SAMPLES_PER_PROJECT);
         try {
           // A fresh directory per batch: its tsconfig is new, so no change needs announcing.
-          await this.analyzeTogether(server, cache, samples, `batch-${this.batches++}`);
+          await this.analyzeTogether(server, samples, `batch-${this.batches++}`);
         } catch (error) {
           const failure = error instanceof Error ? error : new Error(String(error));
           for (const sample of samples) sample.reject(failure);
+        } finally {
+          this.declarationHovers.clear();
+          this.declarationDocs.clear();
+          this.declarationFiles.clear();
         }
       }
     } finally {
@@ -721,7 +622,6 @@ export class NativeTypeEngine {
   /** One project holds the samples while the server answers all their requests in parallel. */
   private async analyzeTogether(
     server: LanguageServer,
-    cache: HoverCache,
     samples: readonly Sample[],
     project: string,
   ): Promise<void> {
@@ -753,7 +653,6 @@ export class NativeTypeEngine {
             lookups,
           });
           const hovers = await this.recheckGenericOwners(server, sample, shared);
-          cache.set(sample.key, hovers);
           sample.resolve(hovers);
         } catch (error) {
           sample.reject(error instanceof Error ? error : new Error(String(error)));

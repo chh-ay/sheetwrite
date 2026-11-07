@@ -560,17 +560,14 @@ export async function collectFenceHovers(
   preludeName?: string,
 ): Promise<SheetwriteTypeHover[]> {
   if (language === "svelte") {
-    // Svelte hovers are kept by source, so a warm run never loads svelte2tsx.
-    return analyzer.remember(`svelte\0${preludeName ?? ""}\0${code}`, async () => {
-      if (preludeName === undefined) return mapSvelteHovers(code, analyzer);
-      const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));
-      const mapped = remapThroughInjection(
-        await svelteSourceHovers(injection.analysisSource, analyzer),
-        injection,
-        code,
-      );
-      return analyzer.resolveFrameworkTypes(mapped, code);
-    });
+    if (preludeName === undefined) return mapSvelteHovers(code, analyzer);
+    const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));
+    const mapped = remapThroughInjection(
+      await svelteSourceHovers(injection.analysisSource, analyzer),
+      injection,
+      code,
+    );
+    return analyzer.resolveFrameworkTypes(mapped, code);
   }
   if (preludeName === undefined) return analyzer.analyze(code, language);
   const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));

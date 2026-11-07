@@ -73,14 +73,6 @@ export class SheetwriteTypeEngine {
       .then((hovers) => this.resolveFrameworkTypes(hovers, source));
   }
 
-  /** Hovers derived from generated code (Svelte samples), cached by `key` like every sample. */
-  remember(
-    key: string,
-    compute: () => Promise<SheetwriteTypeHover[]>,
-  ): Promise<SheetwriteTypeHover[]> {
-    return this.native.remember(key, compute);
-  }
-
   /** Stops the TypeScript 7.1 processes; without it they stop once the process is idle. */
   dispose(): Promise<void> {
     return this.native.dispose();
