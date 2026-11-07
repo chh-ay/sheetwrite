@@ -21,6 +21,7 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   writeFileSync,
@@ -440,6 +441,7 @@ export class NativeTypeEngine {
   /** JSDoc summaries by declaration file and line, and declaration files by path, per session. */
   private readonly declarationDocs = new Map<string, string>();
   private readonly declarationFiles = new Map<string, string[]>();
+  private paths: Record<string, string[]> | undefined;
   private queue: Sample[] = [];
   private flushScheduled = false;
   private session: Promise<{ server: LanguageServer; cache: HoverCache }> | undefined;
@@ -528,6 +530,7 @@ export class NativeTypeEngine {
         lib: ["ES2022", "DOM", "DOM.Iterable"],
         // TypeScript 7 loads no `@types` packages by default; 5.9 loaded all of them.
         types: ["*"],
+        paths: this.sheetwritePaths(),
         allowJs: true,
         skipLibCheck: true,
         strict: true,
@@ -541,6 +544,29 @@ export class NativeTypeEngine {
     });
   }
 
+  /**
+   * `@sheetwrite/*` entry points straight to their declaration files, as each package's
+   * `exports` declares them: the server skips the node_modules walk and package.json
+   * reads for every import of every sample.
+   */
+  private sheetwritePaths(): Record<string, string[]> {
+    if (this.paths) return this.paths;
+    const packages = join(this.options.cwd, SHEETWRITE_PACKAGES);
+    const paths: Record<string, string[]> = {};
+    for (const name of readdirSync(packages).sort()) {
+      const directory = realpathSync(join(packages, name));
+      const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as {
+        exports?: Record<string, { types?: string } | string>;
+      };
+      for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+        const types = typeof target === "string" ? undefined : target.types;
+        if (!types || subpath.includes("*")) continue;
+        paths[`@sheetwrite/${name}${subpath.slice(1)}`] = [join(directory, types)];
+      }
+    }
+    this.paths = paths;
+    return paths;
+  }
   /** Everything that changes hover results for unchanged sample text. */
   private async globalKey(): Promise<string> {
     const parts: string[] = [
