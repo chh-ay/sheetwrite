@@ -27,7 +27,8 @@ export interface NativeQuickInfo {
 
 /** Hovers on positions with several projections are joined by this rule. */
 const PROJECTION_SEPARATOR = "\n\n---\n\n";
-const SIGNATURE_FENCE = /^(`{3,})typescript\n([\s\S]*?)\n\1\n/;
+// Projections are joined after trimming, so the closing fence may end the text.
+const SIGNATURE_FENCE = /^(`{3,})typescript\n([\s\S]*?)\n\1(?:\n|$)/;
 const TAG_START = /\n\n\*@([^*\s]+)\*/g;
 const DASH_PREFIX = /^ — /;
 const QUOTED_NAME = /^ `([^`]+)`/;

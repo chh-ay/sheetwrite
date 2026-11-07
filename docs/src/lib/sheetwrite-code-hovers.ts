@@ -396,35 +396,40 @@ export function isHighQualityHover(hover: SheetwriteTypeHover, language = "ts"):
   return hover.origin === "lib" || !LOW_QUALITY_HOVER.test(resolvedQuickInfo(hover, language));
 }
 
-function svelteScriptDocumentation(
+async function svelteScriptDocumentation(
   source: string,
   analyzer: SheetwriteTypeEngine,
-): ReadonlyMap<string, string> {
+): Promise<ReadonlyMap<string, string>> {
   const scripts = [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1]?.trim() ?? "")
     .filter(Boolean);
   if (scripts.length === 0) return new Map();
 
   const documentation = new Map<string, string>();
-  for (const node of analyzer.analyze(scripts.join("\n"), "ts", "svelte")) {
+  for (const node of await analyzer.analyze(scripts.join("\n"), "ts")) {
     if (node.type !== "hover" || !node.docs?.trim() || documentation.has(node.target)) continue;
     documentation.set(node.target, node.docs);
   }
   return documentation;
 }
 
-function svelteSourceHovers(source: string, analyzer: SheetwriteTypeEngine): SheetwriteTypeHover[] {
+async function svelteSourceHovers(
+  source: string,
+  analyzer: SheetwriteTypeEngine,
+): Promise<SheetwriteTypeHover[]> {
   const transformed = svelte2tsx(source, {
     filename: "Component.svelte",
     isTsFile: true,
     mode: "ts",
   });
   const sourceMap = new TraceMap(JSON.parse(transformed.map.toString()));
-  const scriptDocumentation = svelteScriptDocumentation(source, analyzer);
   const sourceLines = source.split("\n");
   const lineOffsets = lineStartOffsets(source);
 
-  const result = analyzer.analyze(transformed.code, "tsx", "svelte");
+  const [scriptDocumentation, result] = await Promise.all([
+    svelteScriptDocumentation(source, analyzer),
+    analyzer.analyze(transformed.code, "tsx"),
+  ]);
   const hovers: SheetwriteTypeHover[] = [];
   for (const node of result) {
     const original = originalPositionFor(sourceMap, {
@@ -452,8 +457,11 @@ function svelteSourceHovers(source: string, analyzer: SheetwriteTypeEngine): She
   return hovers;
 }
 
-function mapSvelteHovers(source: string, analyzer: SheetwriteTypeEngine): SheetwriteTypeHover[] {
-  return analyzer.resolveFrameworkTypes(svelteSourceHovers(source, analyzer), source);
+async function mapSvelteHovers(
+  source: string,
+  analyzer: SheetwriteTypeEngine,
+): Promise<SheetwriteTypeHover[]> {
+  return analyzer.resolveFrameworkTypes(await svelteSourceHovers(source, analyzer), source);
 }
 
 function remapThroughInjection(
@@ -486,12 +494,13 @@ function remapThroughInjection(
   return remapped;
 }
 
-export function collectFenceHovers(
+/** Samples requested together are analyzed together: await many calls at once. */
+export async function collectFenceHovers(
   code: string,
   language: "ts" | "tsx" | "vue" | "svelte",
   analyzer: SheetwriteTypeEngine,
   preludeName?: string,
-): SheetwriteTypeHover[] {
+): Promise<SheetwriteTypeHover[]> {
   if (preludeName === undefined) {
     return language === "svelte"
       ? mapSvelteHovers(code, analyzer)
@@ -500,14 +509,14 @@ export function collectFenceHovers(
   const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));
   if (language === "svelte") {
     const mapped = remapThroughInjection(
-      svelteSourceHovers(injection.analysisSource, analyzer),
+      await svelteSourceHovers(injection.analysisSource, analyzer),
       injection,
       code,
     );
     return analyzer.resolveFrameworkTypes(mapped, code);
   }
   return remapThroughInjection(
-    analyzer.analyze(injection.analysisSource, language),
+    await analyzer.analyze(injection.analysisSource, language),
     injection,
     code,
   );
@@ -908,11 +917,13 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
         if (options.shouldTransform && !options.shouldTransform(codeBlock)) return;
 
         signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
-        const hovers = collectFenceHovers(
-          codeBlock.code,
-          codeBlock.language as "ts" | "tsx" | "vue" | "svelte",
-          analyzer,
-          codeBlock.metaOptions.getString("prelude"),
+        const hovers = (
+          await collectFenceHovers(
+            codeBlock.code,
+            codeBlock.language as "ts" | "tsx" | "vue" | "svelte",
+            analyzer,
+            codeBlock.metaOptions.getString("prelude"),
+          )
         ).filter((hover) => isHighQualityHover(hover, codeBlock.language));
 
         await resolveManifest();
