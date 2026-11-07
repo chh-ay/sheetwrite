@@ -290,7 +290,13 @@ class LanguageServer {
       rootUri: pathToFileURL(rootDirectory).href,
       // Lets the server start the Vue content mapper the sample projects configure. Pushed
       // diagnostics would check opened samples in the background, beside the hover requests.
-      initializationOptions: { runExternalCode: true, disablePushDiagnostics: true },
+      // Type acquisition is off for every project, inferred ones included: it ran
+      // `npm install` whenever a hover opened a file outside the sample projects.
+      initializationOptions: {
+        runExternalCode: true,
+        disablePushDiagnostics: true,
+        userPreferences: { tsserver: { automaticTypeAcquisition: { enabled: false } } },
+      },
       capabilities: {
         general: { positionEncodings: ["utf-16"] },
         // The server then reads `workspace/didChangeWatchedFiles`, which `writeProject` sends.
@@ -578,6 +584,7 @@ export class NativeTypeEngine {
       contentMappers: [
         { package: "@vue/content-mapper", extensions: [".vue"], options: { target: 3.5 } },
       ],
+      typeAcquisition: { enable: false },
       files: files.map((file) => basename(file)),
     });
   }
