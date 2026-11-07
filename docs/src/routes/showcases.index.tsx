@@ -26,6 +26,13 @@ const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]))
 const SCENE_ORDER = [
   "spreadsheet",
   "analysis",
+  "data-model",
+  "dashboards",
+  "queries",
+  "sort",
+  "functions",
+  "recalculation",
+  "version-history",
   "performance",
   "formulas",
   "collaboration",
@@ -33,7 +40,6 @@ const SCENE_ORDER = [
   "host-rows",
   "interoperability",
   "formatting",
-  "engine",
   "data-tools",
 ] as const satisfies readonly CapabilityOwnerId[];
 
@@ -49,11 +55,18 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   interoperability: "XLSX and delimited exchange with fixture-backed fidelity warnings.",
   formatting: "A styled budget, mixed number formats, and a live XLSX fidelity check.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
-  engine: "A paged forecast with every public engine event traced beside it.",
   "data-tools": "Filter and organize dispatch orders; exercise validation and protection.",
   spreadsheet:
     "An Excel-style ribbon, formula bar and sheet tabs around one grid. Narrow it and watch the groups fold.",
   analysis: "A pivot table and a live chart over two years of orders. Edit an order and both move.",
+  sort: "Sort the cells in place as Excel does, or only the view, and see which formulas follow.",
+  queries: "Saved queries shape a CSV feed into tables. Refresh, change a step, refresh again.",
+  "data-model": "Relate tables, pivot by a related column with a measure, then break a key.",
+  dashboards: "KPI cards, a PivotChart and a pivot that one slicer filters together.",
+  "version-history": "Edit with a teammate, compare versions by author, and restore a range.",
+  functions: "Engineering, financial, statistics, lookup and regex functions, calculated live.",
+  recalculation:
+    "Edit a cell that a sheet full of formulas reads, and move its lookups, timed in your browser.",
 };
 
 /** Real import and mount line per first-party adapter. */
@@ -96,12 +109,20 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
-  if (owner.id === "formulas" || owner.id === "engine" || owner.id === "analysis")
+  if (
+    owner.id === "formulas" ||
+    owner.id === "functions" ||
+    owner.id === "recalculation" ||
+    owner.id === "analysis" ||
+    owner.id === "data-model" ||
+    owner.id === "dashboards"
+  ) {
     return "formulas";
+  }
   if (owner.id === "interoperability" || owner.id === "formatting" || owner.id === "spreadsheet") {
     return "workbook";
   }
-  if (owner.id === "collaboration") return "collaboration";
+  if (owner.id === "collaboration" || owner.id === "version-history") return "collaboration";
   return "data";
 }
 

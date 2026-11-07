@@ -159,7 +159,7 @@ impl CellStore {
         Ok(entry)
     }
 
-    fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
+    pub(crate) fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
         let mut input = Reader::new(bytes, STORE_TAG)?;
 
         let mut store = Self::new();

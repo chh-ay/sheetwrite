@@ -10,8 +10,7 @@ use std::cmp::Ordering;
 
 use crate::cells::payload_num;
 use crate::types::{
-    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_NUMBER,
-    KIND_STRING,
+    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER, KIND_STRING,
 };
 
 use super::criteria::WildcardPattern;
@@ -303,6 +302,12 @@ fn exact_match(
         }
     }
 
+    if let (ListView::Storage { .. }, Entry::Number(number)) = (list, key) {
+        if number.is_finite() {
+            return storage_number_scan(list, number, search_reverse);
+        }
+    }
+
     let equal = |position: usize| -> Result<bool, FormulaError> {
         Ok(compare(list.entry(position), key)? == Ordering::Equal)
     };
@@ -314,6 +319,69 @@ fn exact_match(
         }
     } else {
         for position in 0..list.len() {
+            if equal(position)? {
+                return Ok(Some(position));
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// [`exact_match`]'s plain scan for a finite number key over storage, read
+/// from the kind bytes without building an entry per cell. It gives the
+/// plain scan's answers and errors in the same order: a non-finite number is
+/// `#NUM!` and text missing from the pool `#REF!` where the scan reaches
+/// them, other text and logical values never equal a number, and a blank
+/// equals zero.
+#[inline(never)]
+fn storage_number_scan(
+    list: &ListView<'_>,
+    key: f64,
+    search_reverse: bool,
+) -> Result<Option<usize>, FormulaError> {
+    let &ListView::Storage {
+        kinds,
+        payloads,
+        strings,
+        first,
+        step,
+        len,
+    } = list
+    else {
+        return Ok(None);
+    };
+    let blank_matches = key == 0.0;
+    let equal = |position: usize| -> Result<bool, FormulaError> {
+        let index = first + position * step;
+        let payload = payloads[index];
+        match kinds[index] {
+            KIND_NUMBER => {
+                let number = payload_num(payload);
+                if !number.is_finite() {
+                    return Err(FormulaError::Num);
+                }
+                Ok(number == key)
+            }
+            KIND_STRING => {
+                let id = crate::cells::payload_str_id(payload);
+                match string_from_pool_ref(strings, id) {
+                    Some(_) => Ok(false),
+                    None => Err(FormulaError::Ref),
+                }
+            }
+            KIND_BOOL => Ok(false),
+            _ => Ok(blank_matches),
+        }
+    };
+
+    if search_reverse {
+        for position in (0..len).rev() {
+            if equal(position)? {
+                return Ok(Some(position));
+            }
+        }
+    } else {
+        for position in 0..len {
             if equal(position)? {
                 return Ok(Some(position));
             }
@@ -807,7 +875,7 @@ use super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 use super::{bool_from_value, lookup_modes, EvalPass};
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{CellRange, EvalResult, FORMULA_RECURSION_LIMIT};
+use crate::types::{CellRange, EvalResult, FORMULA_RECURSION_LIMIT, LITERAL_KIND_BITS};
 
 /// A lookup argument: a range read in place, or the values of anything else.
 enum LookupArg {
@@ -1162,18 +1230,31 @@ impl CellStore {
             .ok_or(FormulaError::Num)?;
         for col in col_start..=col_end {
             let column = data.cells.idx(row_start, col);
+            let Some(column_kinds) = kinds.get(column..column + rows) else {
+                return Ok(None);
+            };
+
+            // One pass without a branch per cell: the literal kinds only use
+            // the low two bits, and text sets bit 1 without bit 0.
+            let (any_kind, any_text) = column_kinds.iter().fold((0, 0), |(any, text), &kind| {
+                (any | kind, text | u8::from(kind == KIND_STRING))
+            });
+            if any_kind & !LITERAL_KIND_BITS != 0 {
+                return Ok(None);
+            }
+            if any_text == 0 {
+                continue;
+            }
+
             for index in column..column + rows {
-                match kinds[index] {
-                    KIND_EMPTY | KIND_NUMBER | KIND_BOOL => {}
-                    KIND_STRING => {
-                        let id = crate::cells::payload_str_id(payloads[index]);
-                        if let Some(text) = string_from_pool_ref(&self.strings, id) {
-                            payload_bytes = payload_bytes
-                                .checked_add(text.len())
-                                .ok_or(FormulaError::Num)?;
-                        }
-                    }
-                    _ => return Ok(None),
+                if kinds[index] != KIND_STRING {
+                    continue;
+                }
+                let id = crate::cells::payload_str_id(payloads[index]);
+                if let Some(text) = string_from_pool_ref(&self.strings, id) {
+                    payload_bytes = payload_bytes
+                        .checked_add(text.len())
+                        .ok_or(FormulaError::Num)?;
                 }
             }
         }

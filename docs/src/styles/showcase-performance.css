@@ -969,101 +969,19 @@
   align-items: stretch;
 }
 
-.sw-sp-scale-curve,
 .sw-sp-proof-wins article {
   border: var(--sw-sp-line) solid var(--sw-border);
   background: color-mix(in srgb, var(--sw-surface-2) 72%, transparent);
 }
 
+/* The comparison is the shared speed story; it brings its own frame. */
 .sw-sp-scale-curve {
-  display: flex;
-  min-height: 22rem;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: clamp(var(--sw-space-5), 3vw, var(--sw-space-8));
-  border-color: color-mix(in srgb, var(--sw-accent-strong) 42%, var(--sw-border));
-  border-radius: var(--sw-radius-lg);
-  background: color-mix(in srgb, var(--sw-accent) 6%, var(--sw-surface-1));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sw-accent) 20%, transparent);
+  min-width: 0;
 }
 
-.sw-sp-scale-curve header {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
-  gap: 0 var(--sw-sp-space-3);
-}
-
-.sw-sp-scale-curve header p,
-.sw-sp-scale-curve header span,
-.sw-sp-scale-curve > p {
-  margin: 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
-}
-
-.sw-sp-scale-curve header strong {
-  grid-row: span 2;
-  color: var(--sw-accent-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-display) / 0.9 var(--sw-font-display);
-  letter-spacing: var(--sw-tracking-display);
-}
-
-.sw-sp-scale-curve__axis {
-  display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr) 4rem;
-  align-items: center;
-  gap: var(--sw-sp-space-3);
-  margin-top: var(--sw-sp-space-5);
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) var(--sw-font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.sw-sp-scale-curve__axis > div {
-  display: flex;
-  justify-content: space-between;
-}
-
-.sw-sp-scale-curve__axis > span:last-child {
-  text-align: right;
-}
-.sw-sp-scale-curve ol {
-  display: grid;
-  gap: var(--sw-sp-space-3);
-  margin: var(--sw-sp-space-2) 0 var(--sw-sp-space-5);
-  padding: 0;
-  list-style: none;
-}
-
-.sw-sp-scale-curve li {
-  display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr) 4rem;
-  align-items: center;
-  gap: var(--sw-sp-space-3);
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-medium) var(--sw-text-caption) var(--sw-font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.sw-sp-scale-curve li strong {
-  color: var(--sw-fg-strong);
-  text-align: right;
-}
-
-.sw-sp-scale-curve__track {
-  height: 0.5rem;
-  overflow: hidden;
-  border-radius: var(--sw-radius-pill);
-  background: var(--sw-surface-0);
-}
-
-.sw-sp-scale-curve__track > span {
-  display: block;
+.sw-sp-scale-curve .speed-story {
   height: 100%;
-  min-width: 0.35rem;
-  border-radius: inherit;
-  background: var(--sw-accent-strong);
+  margin: 0;
 }
 
 .sw-sp-proof-wins {

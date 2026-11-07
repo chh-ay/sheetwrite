@@ -188,7 +188,7 @@ const grid = createGrid(host, {
 
 The ribbon and the toolbar load with `import()` as their own chunk, only when a grid asks for one. A grid without chrome does not download it.
 
-- The grid reserves the chrome's height while the chunk loads, so nothing moves when it arrives.
+- The grid reserves the chrome's height while the chunk loads, so nothing moves when it arrives. For the ribbon that is the compact or the full height its `mode` and the host's width choose.
 - A chunk that arrives after the chrome was rebuilt, or after the grid was destroyed, is dropped.
 - If the chunk fails to load, the grid gives the space back and shows no chrome. The load error is still reported as an unhandled promise rejection; the host cannot catch it.
 

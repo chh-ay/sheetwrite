@@ -7,6 +7,8 @@ import { siteUrl } from "./playwright.config.js";
 declare global {
   interface Window {
     __sheetwriteSpreadsheetGrid?: Grid;
+    /** Class names of shell elements Chromium reported as shifted. */
+    __sheetwriteShellShifts?: string[];
   }
 }
 
@@ -108,6 +110,36 @@ test("the ribbon follows the site theme and the page fits a phone", async ({ pag
     ).toBe(true);
   }
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
+});
+
+test("on a phone the ribbon arrives at its compact height, so nothing in the shell moves", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Chromium reports every shift with the elements that moved.
+  await page.addInitScript(() => {
+    interface LayoutShift extends PerformanceEntry {
+      readonly sources: readonly { readonly node: Node | null }[];
+    }
+    const moved: string[] = [];
+    window.__sheetwriteShellShifts = moved;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as LayoutShift[]) {
+        for (const { node } of entry.sources) {
+          const element = node instanceof Element ? node : (node?.parentElement ?? null);
+          if (element?.closest(".sheetwrite-shell")) moved.push(element.className);
+        }
+      }
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+  await open(page);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  await expect(ribbon).toHaveAttribute("data-mode", "compact");
+  // Shifts are reported after the frame that paints them.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  expect(await page.evaluate(() => window.__sheetwriteShellShifts)).toEqual([]);
 });
 
 test("at 320 px the tabs scroll beside the layout buttons instead of under them @portability", async ({

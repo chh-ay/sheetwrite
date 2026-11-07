@@ -21,7 +21,7 @@ createGrid(host, {
 
 For this result, the workbook columns are `label`, `quantity`, `price`, and `total`, in that order. The host endpoint returns `[{ "label": "Notebook", "quantity": 3, "price": 8 }, { "label": "Pen", "quantity": 5, "price": 2 }]`. The adapter below supplies the formula and bold currency style for each total; D1 evaluates `=B1*C1`.
 
-**Try it live:** [Engine showcase](/showcases/engine/) — jump between rows and inspect the datasource request and arrival events. Its datasource is local to the page, not a remote server.
+**Try it live:** [Performance showcase](/showcases/performance/) — move through a paged datasource of a million rows and watch which pages it requests and keeps. Its datasource is local to the page, not a remote server.
 
 Start with the host and initialization in [Your first grid](/docs/start/first-grid/), replacing eager `data` with `datasource`. A `DataSource` loads cancellable pages for the visible window, so the grid does not need the whole sheet in memory. The HTTP endpoint and its backing data remain your responsibility.
 

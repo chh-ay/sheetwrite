@@ -36,7 +36,7 @@ grid.setChart({
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="A grid with three months of revenue and a line chart"
+```ts compile runnable title="A grid with three months of revenue and a line chart"
 import { chartsAddon } from "@sheetwrite/charts";
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
@@ -53,6 +53,8 @@ const workbook: Workbook = {
   sheets: [{ id: "s", name: "Sales", rowCount: 4, columns: [
     { key: "month", header: "Month", width: 96, type: "text" },
     { key: "revenue", header: "Revenue", width: 96, type: "number" },
+    // The chart floats over columns D to H, so the sheet must have them.
+    ...["c", "d", "e", "f", "g", "h"].map((key) => ({ key, header: "", width: 96, type: "text" as const })),
   ] }],
 };
 const grid = createGrid(host, {
