@@ -10,6 +10,7 @@
     "packages/*",
     "examples/*",
     "docs",
+    "docs-solid",
     "docs/hovers",
     "bench"
   ],

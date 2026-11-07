@@ -1,8 +1,7 @@
 import type { ExpressiveCodeTheme } from "@expressive-code/core";
 import { nodeTypes } from "@mdx-js/mdx";
-import mdx from "@mdx-js/rollup";
+import mdx, { type Options as MdxOptions } from "@mdx-js/rollup";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import vue from "@vitejs/plugin-vue";
@@ -416,7 +415,7 @@ const OWNED_BY_SITE_MODULE = "tabindex-js-module";
  *   on a client-side navigation, and React reports it as an error. The
  *   modules observe the document, so one run serves every later page.
  */
-function expressiveCodeAssets(): Plugin {
+export function expressiveCodeAssets(): Plugin {
   return {
     name: "sheetwrite:expressive-code-assets",
     resolveId(id) {
@@ -444,6 +443,53 @@ function expressiveCodeAssets(): Plugin {
   };
 }
 
+/** The docs Markdown pipeline; the Solid prototype (docs-solid/) compiles the same pages. */
+export const DOCS_MDX_OPTIONS = {
+  remarkPlugins: [
+    remarkFrontmatter,
+    [markGeneratedPages, { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname }],
+    remarkMdxFrontmatter,
+    remarkGfm,
+  ],
+  rehypePlugins: [
+    // First: Steps, Cards, callouts and the figures become static HTML, and
+    // CodeGroup becomes Tabs, before fences are highlighted.
+    contentComponents,
+    installCommandsAsTerminals,
+    markdownAlertsAsCallouts,
+    runnableCodeBlocks,
+    [
+      rehypeExpressiveCode,
+      {
+        ...expressiveCodeOptions,
+        customCreateRenderer: async () => ({
+          ...(await sharedExpressiveCodeRenderer()),
+          baseStyles: "",
+          themeStyles: "",
+          jsModules: [],
+        }),
+      },
+    ],
+    renderPerfCompares,
+    // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
+    [rehypeRaw, { passThrough: nodeTypes }],
+    uncontrolledCheckedInputs,
+    renderGridResults,
+    [renderSectionCards, { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname }],
+    hydrateFormulaReference,
+    hydratePerfFigure,
+    dedupeCodePopovers,
+    rovingCodeFocus,
+    // Prerendered heading ids: fragment links must resolve before hydration.
+    rehypeSlug,
+    // After the ids exist: the server render shows the outline from these.
+    exportOutline,
+    markResponsiveCodeBlocks,
+    wrapProseTables,
+    markShortInlineCode,
+  ],
+} satisfies MdxOptions;
+
 export default defineConfig({
   // Keep one document-wide stylesheet. TanStack route transitions otherwise
   // swap route CSS links after the next route has painted, producing a visible
@@ -459,64 +505,13 @@ export default defineConfig({
   },
   plugins: [
     {
-      ...mdx({
-        remarkPlugins: [
-          remarkFrontmatter,
-          [
-            markGeneratedPages,
-            { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
-          ],
-          remarkMdxFrontmatter,
-          remarkGfm,
-        ],
-        rehypePlugins: [
-          // First: Steps, Cards, callouts and the figures become static HTML, and
-          // CodeGroup becomes Tabs, before fences are highlighted.
-          contentComponents,
-          installCommandsAsTerminals,
-          markdownAlertsAsCallouts,
-          runnableCodeBlocks,
-          [
-            rehypeExpressiveCode,
-            {
-              ...expressiveCodeOptions,
-              customCreateRenderer: async () => ({
-                ...(await sharedExpressiveCodeRenderer()),
-                baseStyles: "",
-                themeStyles: "",
-                jsModules: [],
-              }),
-            },
-          ],
-          renderPerfCompares,
-          // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
-          [rehypeRaw, { passThrough: nodeTypes }],
-          uncontrolledCheckedInputs,
-          renderGridResults,
-          [
-            renderSectionCards,
-            { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname },
-          ],
-          hydrateFormulaReference,
-          hydratePerfFigure,
-          dedupeCodePopovers,
-          rovingCodeFocus,
-          // Prerendered heading ids: fragment links must resolve before hydration.
-          rehypeSlug,
-          // After the ids exist: the server render shows the outline from these.
-          exportOutline,
-          markResponsiveCodeBlocks,
-          wrapProseTables,
-          markShortInlineCode,
-        ],
-      }),
+      ...mdx(DOCS_MDX_OPTIONS),
       enforce: "pre",
     },
     expressiveCodeAssets(),
     formulaTables(),
     speedStoryMarkup(),
     perfFigureMarkup(),
-    tailwindcss(),
     tanstackStart({
       pages: [
         { path: "/" },

@@ -1,13 +1,4 @@
-@import "tailwindcss";
-
-/* Tailwind skips gitignored files when it looks for class names, and the
-   generated pages and data are gitignored, so name them here. */
-@source "../generated";
-@source "../content/docs/api";
-@source "../content/docs/performance";
-@source "../content/docs/reference";
-@source "../../public/llms.txt";
-@source "../../public/llms-full.txt";
+@import "./reset.css";
 
 /*
  * The site's design tokens. Every page, showcase and component reads these;

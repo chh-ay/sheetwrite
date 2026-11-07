@@ -770,13 +770,14 @@ html:has(.sw-nav-dialog[open]) {
     padding-top: var(--sw-space-6);
   }
   /* The bar's icon buttons keep their size but take a 44px touch target,
-     the height of the tab row's targets. */
+     the height of the tab row's targets. The inset is measured from the
+     padding box, so it also reaches over the buttons' 1px border. */
   .sw-docs-bar :is(.sw-search-button, .sw-icon-button) {
     position: relative;
   }
   .sw-docs-bar :is(.sw-search-button, .sw-icon-button)::after {
     position: absolute;
-    inset: calc((44px - var(--sw-control-height)) / -2);
+    inset: calc((44px - var(--sw-control-height)) / -2 - 1px);
     content: "";
   }
   .sw-doc-pager,
@@ -820,4 +821,65 @@ html:has(.sw-nav-dialog[open]) {
 .sw-route-fallback__actions button:focus-visible {
   outline: 2px solid var(--sw-accent);
   outline-offset: 2px;
+}
+
+/* Phone touch targets: every control takes at least 44 × 44 px. Buttons and
+   links that keep their smaller look get the rest as an invisible, centred
+   area (it never moves the layout); fields, rows and tabs grow instead,
+   because a neighbour sits too close for an area to spread into. */
+@media (max-width: 42rem) {
+  :is(
+    .sw-page-actions .sw-button,
+    .sw-runnable__actions .sw-button,
+    .sw-terminal__copy,
+    .sw-document__colophon a
+  ) {
+    position: relative;
+  }
+  :is(
+    .sw-page-actions .sw-button,
+    .sw-runnable__actions .sw-button,
+    .sw-terminal__copy,
+    .sw-document__colophon a
+  )::after {
+    position: absolute;
+    top: min(0px, calc(50% - 22px));
+    right: min(0px, calc(50% - 22px));
+    bottom: min(0px, calc(50% - 22px));
+    left: min(0px, calc(50% - 22px));
+    content: "";
+  }
+  /* Code blocks' copy buttons draw their frame and icon with both pseudo-elements. */
+  .sw-prose .expressive-code .copy button {
+    width: 44px;
+    height: 44px;
+  }
+  .sw-terminal__tabs button {
+    min-width: 44px;
+  }
+  .sw-toc-inline > summary {
+    min-height: 44px;
+  }
+  /* Article disclosures (signature profiles, accordions): text centred where
+     the browser can centre a block's content, at the top elsewhere. */
+  .sw-prose details > summary {
+    min-height: 44px;
+    align-content: center;
+  }
+  /* One line each (they never wrap); the line height keeps their disclosure marker. */
+  .sw-prose .sw-formula-table summary {
+    line-height: 44px;
+  }
+  .sw-formula-filter input,
+  .sw-formula-filter__engine .sw-demo-select__trigger {
+    min-height: 44px;
+  }
+  /* The field draws the border; the input inside it takes the field's full height. */
+  .sw-symbol-filter__field {
+    min-height: 46px;
+    padding-block: 0;
+  }
+  .sw-symbol-filter__field input {
+    align-self: stretch;
+  }
 }
