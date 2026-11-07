@@ -84,6 +84,8 @@ export interface CompatibilityResults {
     readonly reviewedResults: number;
     readonly missingReviewedResults: number;
     readonly unsupported: number;
+    /** Why the unsupported checks are not counted: one entry per reason. */
+    readonly unsupportedReasons: readonly CompatibilityUnsupportedReason[];
     readonly warningChecks: number;
     readonly knownDifferences: number;
     readonly regressions: number;
@@ -152,6 +154,31 @@ function uniqueIndex<Value>(values: Value[], value: Value): number {
   if (existing >= 0) return existing;
   values.push(value);
   return values.length - 1;
+}
+
+export interface CompatibilityUnsupportedReason {
+  /** The checked evidence text the checks give as their reason. */
+  readonly reason: string;
+  readonly tests: number;
+  /** The functions, operators or operations those checks exercise. */
+  readonly subjects: readonly string[];
+}
+
+/** The unsupported checks grouped by the reason their evidence gives. */
+function unsupportedReasons(cases: readonly ConformanceCase[]): CompatibilityUnsupportedReason[] {
+  const groups = new Map<string, { tests: number; subjects: Set<string> }>();
+  for (const entry of cases) {
+    if (entry.unsupported !== true) continue;
+    const group = groups.get(entry.evidence.oracle) ?? { tests: 0, subjects: new Set<string>() };
+    group.tests += 1;
+    group.subjects.add(entry.subject?.name ?? operationLabel(entry));
+    groups.set(entry.evidence.oracle, group);
+  }
+  return [...groups].map(([reason, group]) => ({
+    reason,
+    tests: group.tests,
+    subjects: [...group.subjects],
+  }));
 }
 
 export function buildCompatibilityResults({
@@ -314,6 +341,7 @@ export function buildCompatibilityResults({
       reviewedResults: offline.reviewed,
       missingReviewedResults: offline.deferred,
       unsupported: offline.unsupported.length,
+      unsupportedReasons: unsupportedReasons(corpus.cases),
       warningChecks: allCases.filter((entry) => entry.statusTags.includes("warning")).length,
       knownDifferences: allCases.filter((entry) => entry.statusTags.includes("known-difference"))
         .length,
