@@ -4,9 +4,9 @@ import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
 /** Spreadsheet display text for a resolved scalar. */
 export function cellScalarToText(value: CellScalar): string {
-  if (value === null) return "";
-  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-  return String(value);
+ if (value === null) return "";
+ if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+ return String(value);
 }
 
 /**
@@ -15,9 +15,30 @@ export function cellScalarToText(value: CellScalar): string {
  * Measuring code uses this so widths match what the canvas draws.
  */
 export function cellDisplayText(value: CellScalar, numberFormat?: string, locale?: string): string {
-  return typeof value === "number"
-    ? formatNumber(value, numberFormat, locale)
-    : cellScalarToText(value);
+ return typeof value === "number"
+  ? formatNumber(value, numberFormat, locale)
+  : cellScalarToText(value);
+}
+
+/** Date codes tried for a date cell's edit text, finest last. */
+const DATE_EDIT_CODES = ["yyyy-mm-dd", "yyyy-mm-dd hh:mm", "yyyy-mm-dd hh:mm:ss"] as const;
+
+/**
+ * The text the cell editor opens with for a resolved scalar. In a `date` column a
+ * number opens as the first `yyyy-mm-dd`, `yyyy-mm-dd hh:mm` or
+ * `yyyy-mm-dd hh:mm:ss` text that {@link parseDateInput} reads back as exactly
+ * that serial, so committing the editor unchanged keeps the value. Any other value,
+ * or a serial no such text reproduces, opens as {@link cellScalarToText}.
+ */
+export function cellEditText(value: CellScalar, type: CellFormat): string {
+ if (type !== "date" || typeof value !== "number") return cellScalarToText(value);
+
+ for (const code of DATE_EDIT_CODES) {
+  const text = formatNumber(value, code);
+  if (parseDateInput(text) === value) return text;
+ }
+
+ return cellScalarToText(value);
 }
 
 /**
@@ -26,7 +47,8 @@ export function cellDisplayText(value: CellScalar, numberFormat?: string, locale
  *
  * - blank (after trimming) clears the cell to a `null` literal;
  * - text longer than one character beginning with `=` becomes a formula;
- * - in a `number` column a finite numeric string becomes a number literal;
+ * - in a `number`, `currency` or `date` column a finite numeric string becomes a
+ *   number literal (in a `date` column, that number is the date serial);
  * - in a `date` column a recognized date string ({@link parseDateInput}) becomes
  *   its serial-number literal;
  * - in a `currency` column a currency string ({@link parseCurrencyInput}) becomes
@@ -38,42 +60,42 @@ export function cellDisplayText(value: CellScalar, numberFormat?: string, locale
  */
 
 export function parseCellInput(raw: string, type: CellFormat): CellValue {
-  const trimmed = raw.trim();
+ const trimmed = raw.trim();
 
-  if (trimmed === "") {
-    return { kind: "literal", value: null };
+ if (trimmed === "") {
+  return { kind: "literal", value: null };
+ }
+
+ if (trimmed.length > 1 && trimmed.startsWith("=")) {
+  return { kind: "formula", src: trimmed };
+ }
+
+ if (/^(TRUE|FALSE)$/i.test(trimmed)) {
+  return { kind: "literal", value: trimmed.toUpperCase() === "TRUE" };
+ }
+
+ if (type === "number" || type === "currency" || type === "date") {
+  const parsed = Number(trimmed);
+  if (Number.isFinite(parsed)) {
+   return { kind: "literal", value: parsed };
   }
+ }
 
-  if (trimmed.length > 1 && trimmed.startsWith("=")) {
-    return { kind: "formula", src: trimmed };
+ if (type === "date") {
+  const serial = parseDateInput(trimmed);
+  if (serial !== null) {
+   return { kind: "literal", value: serial };
   }
+ }
 
-  if (/^(TRUE|FALSE)$/i.test(trimmed)) {
-    return { kind: "literal", value: trimmed.toUpperCase() === "TRUE" };
+ if (type === "currency") {
+  const amount = parseCurrencyInput(trimmed);
+  if (amount !== null) {
+   return { kind: "literal", value: amount };
   }
+ }
 
-  if (type === "number" || type === "currency") {
-    const parsed = Number(trimmed);
-    if (Number.isFinite(parsed)) {
-      return { kind: "literal", value: parsed };
-    }
-  }
-
-  if (type === "date") {
-    const serial = parseDateInput(trimmed);
-    if (serial !== null) {
-      return { kind: "literal", value: serial };
-    }
-  }
-
-  if (type === "currency") {
-    const amount = parseCurrencyInput(trimmed);
-    if (amount !== null) {
-      return { kind: "literal", value: amount };
-    }
-  }
-
-  return { kind: "literal", value: raw };
+ return { kind: "literal", value: raw };
 }
 
 /** Spreadsheet booleans; ASCII-only, matching the interactive input rule. */
@@ -87,30 +109,30 @@ const EQUALS_CODE_UNIT = 0x3d;
  * date serial so delimited export/import preserves numeric dates.
  */
 export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar {
-  // Imports call this once per field, so the rules are applied directly here
-  // instead of building a `CellValue` through `parseCellInput` and trimming twice.
-  const trimmed = raw.trim();
+ // Imports call this once per field, so the rules are applied directly here
+ // instead of building a `CellValue` through `parseCellInput` and trimming twice.
+ const trimmed = raw.trim();
 
-  if (trimmed === "") return null;
-  // Interactive entry turns this into a formula; imports keep the raw text.
-  if (trimmed.length > 1 && trimmed.charCodeAt(0) === EQUALS_CODE_UNIT) return raw;
+ if (trimmed === "") return null;
+ // Interactive entry turns this into a formula; imports keep the raw text.
+ if (trimmed.length > 1 && trimmed.charCodeAt(0) === EQUALS_CODE_UNIT) return raw;
 
-  if ((trimmed.length === 4 || trimmed.length === 5) && BOOLEAN_TEXT.test(trimmed)) {
-    return trimmed.toUpperCase() === "TRUE";
-  }
-  if (type === "number" || type === "currency" || type === "date") {
-    const parsed = Number(trimmed);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  if (type === "date") {
-    const serial = parseDateInput(trimmed);
-    if (serial !== null) return serial;
-  }
-  if (type === "currency") {
-    const amount = parseCurrencyInput(trimmed);
-    if (amount !== null) return amount;
-  }
-  return raw;
+ if ((trimmed.length === 4 || trimmed.length === 5) && BOOLEAN_TEXT.test(trimmed)) {
+  return trimmed.toUpperCase() === "TRUE";
+ }
+ if (type === "number" || type === "currency" || type === "date") {
+  const parsed = Number(trimmed);
+  if (Number.isFinite(parsed)) return parsed;
+ }
+ if (type === "date") {
+  const serial = parseDateInput(trimmed);
+  if (serial !== null) return serial;
+ }
+ if (type === "currency") {
+  const amount = parseCurrencyInput(trimmed);
+  if (amount !== null) return amount;
+ }
+ return raw;
 }
 
 /**
@@ -121,16 +143,16 @@ export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar
  * renderer uses.
  */
 export function parseCurrencyInput(raw: string): number | null {
-  let body = raw.replace(/[$€£¥¤,\s]/g, "");
-  if (body === "") return null;
+ let body = raw.replace(/[$€£¥¤,\s]/g, "");
+ if (body === "") return null;
 
-  let sign = 1;
-  if (body.startsWith("(") && body.endsWith(")")) {
-    sign = -1;
-    body = body.slice(1, -1);
-  }
-  if (body === "") return null;
+ let sign = 1;
+ if (body.startsWith("(") && body.endsWith(")")) {
+  sign = -1;
+  body = body.slice(1, -1);
+ }
+ if (body === "") return null;
 
-  const parsed = Number(body);
-  return Number.isFinite(parsed) ? sign * parsed : null;
+ const parsed = Number(body);
+ return Number.isFinite(parsed) ? sign * parsed : null;
 }
