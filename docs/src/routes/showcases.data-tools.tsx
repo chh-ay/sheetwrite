@@ -10,8 +10,8 @@ const DataToolsShowcase = lazy(() => import("../showcases/DataToolsShowcase.js")
 export const Route = createFileRoute("/showcases/data-tools")({
   head: () => ({
     meta: pageMeta(
-      "Data tools — Sheetwrite",
-      "Sort, filter and organize 4,800 dispatch orders. Exercise validation, protected ranges, row grouping and visibility with live Grid event receipts.",
+      "Data tools — Sheetwrite showcases",
+      "Filter and organize 4,800 dispatch orders. Exercise validation, protected ranges, row grouping and visibility with live Grid event receipts.",
     ),
     links: [{ rel: "stylesheet", href: stylesheet }],
   }),

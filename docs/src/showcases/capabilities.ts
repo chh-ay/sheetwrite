@@ -189,7 +189,7 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     href: "/showcases/data-tools/",
     routeFile: "docs/src/routes/showcases.data-tools.tsx",
     responsibility:
-      "Dispatch operations: multi-key sort, composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
+      "Dispatch operations: composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
     kind: "capability",
   },
   {
@@ -591,7 +591,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     area: "modeling",
     primary: "data-tools",
     interaction:
-      "Compose multi-key sort and two column filters; collapse groups, hide/unhide rows and columns, then inspect mutation receipts for reject, warn and role-gated edits.",
+      "Compose two column filters; collapse groups, hide/unhide rows and columns, then inspect mutation receipts for reject, warn and role-gated edits.",
     scope: "browser",
     accessibility:
       "Native labeled controls, visible row counts, stored-value receipts and an accessible event log.",

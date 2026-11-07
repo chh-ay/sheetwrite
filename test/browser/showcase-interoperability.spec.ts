@@ -79,21 +79,25 @@ async function chooseFilter(page: Page, testId: string, label: string): Promise<
   await expect(summary).toBeFocused();
 }
 
-async function openDisclosure(page: Page, testId: string): Promise<void> {
-  const disclosure = page.getByTestId(testId);
-  if ((await disclosure.getAttribute("open")) === null) {
-    await disclosure.locator(":scope > summary").click();
-  }
-  await expect(disclosure).toHaveAttribute("open", "");
+/** Open a lab through its card; one lab is open at a time, below the cards. */
+async function openLab(page: Page, lab: string): Promise<void> {
+  const card = page.getByTestId(`interop-lab-${lab}`);
+  if ((await card.getAttribute("aria-expanded")) !== "true") await card.click();
+  await expect(card).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#interop-lab-panel")).toBeVisible();
 }
 
 test("@portability compatibility results expose every truthful state from checked data", async ({
   page,
+  browserName,
 }) => {
+  // WebKit on macOS moves Tab between form controls only, as Safari does by
+  // default; Option-Tab reaches every focusable element, buttons included.
+  const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
   const errors = collectErrors(page);
   await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
   await expect(page.locator("select")).toHaveCount(0);
-  const exampleButtons = page.locator(".sw-si-results .sw-si-compat__records button");
+  const exampleButtons = page.locator(".sw-si-results .sw-si-compat__records th button");
   await expect(exampleButtons).toHaveCount(20);
   const firstExample = await exampleButtons.first().textContent();
   const examplePage = page.getByTestId("compatibility-example-page");
@@ -234,21 +238,21 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(page.getByTestId("compatibility-results-empty")).toContainText(
     "No reviewed regressions are recorded",
   );
-  await expect(page.locator(".sw-si-results .sw-si-compat__records button")).toHaveCount(0);
+  await expect(page.locator(".sw-si-results .sw-si-compat__records th button")).toHaveCount(0);
 
   // Function/feature filtering and case selection work through the keyboard.
   await chooseFilter(page, "compatibility-status-filter", "All result states");
   const featureFilter = page.getByTestId("compatibility-feature-filter");
   await chooseFilter(page, "compatibility-feature-filter", "Function · ABS");
-  const absResults = page.locator(".sw-si-results .sw-si-compat__records button");
+  const absResults = page.locator(".sw-si-results .sw-si-compat__records th button");
   await expect(absResults).toHaveCount(1);
   await expect(absResults.first()).toContainText("ABS");
   await featureFilter.focus();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tab);
   await expect(page.getByTestId("compatibility-behavior-filter")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tab);
   await expect(page.getByTestId("compatibility-status-filter")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tab);
   await expect(absResults.first()).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(detail).toContainText("ABS");
@@ -344,7 +348,7 @@ test("@portability File import opens the native picker from the keyboard and rep
   await bootInterop(page);
 
   // The showcase registers its optional backend on its first XLSX action.
-  await openDisclosure(page, "interop-fixtures-disclosure");
+  await openLab(page, "fixtures");
   await page.getByTestId("fixture-libreoffice-rich-load").click();
 
   // The label updates before React mounts the new grid; configure only the live workbook.
@@ -412,7 +416,7 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  await openDisclosure(page, "interop-fixtures-disclosure");
+  await openLab(page, "fixtures");
   const load = page.locator('[data-testid="fixture-libreoffice-rich-load"]');
   await expect(load).toBeEnabled({ timeout: 20_000 });
   await load.click();
@@ -438,7 +442,7 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
 
   const fixture = fixtureManifest.positive.find((entry) => entry.file === "libreoffice-rich.xlsx");
   if (!fixture) throw new Error("The fixture manifest must include the imported workbook");
-  await openDisclosure(page, "interop-warnings-disclosure");
+  await openLab(page, "warnings");
   const warnings = page.locator('[data-testid="interop-warnings"]');
   await expect(warnings).toBeVisible();
   await expect(warnings).toContainText(fixture.file);
@@ -458,7 +462,7 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  await openDisclosure(page, "interop-limits-disclosure");
+  await openLab(page, "security");
   await page.getByTestId("interop-injection-load").click();
   await expect(page.getByTestId("interop-status")).toContainText("Loaded: Security lab");
   await page.getByTestId("interop-injection-export").click();
@@ -497,11 +501,51 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
   expect(errors.console).toEqual([]);
 });
 
+test("lab cards open one lab at a time from the keyboard and carry each lab's result", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await bootInterop(page);
+  const panel = page.locator("#interop-lab-panel");
+  await expect(panel).toBeHidden();
+
+  const security = page.getByTestId("interop-lab-security");
+  await expect(security).toContainText(
+    `${HOSTILE_FIXTURE_IDS.length} attack packages, not run yet`,
+  );
+  await security.focus();
+  await page.keyboard.press("Enter");
+  await expect(security).toHaveAttribute("aria-expanded", "true");
+  await page.getByTestId("interop-hostile-run").click();
+  await expect(security).toContainText(
+    `${HOSTILE_FIXTURE_IDS.length} attack packages, ${HOSTILE_FIXTURE_IDS.length} rejected`,
+    { timeout: 20_000 },
+  );
+
+  // Opening another lab closes the first.
+  const runtime = page.getByTestId("interop-lab-runtime");
+  await runtime.click();
+  await expect(security).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("interop-isolation")).toBeVisible();
+  await page.getByRole("button", { name: "Close Runtime boundary" }).click();
+  await expect(panel).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLab(page, "vault");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("CSV and TSV export and pasted CSV rebuild the live workbench", async ({ page }) => {
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  await openDisclosure(page, "interop-delimited-disclosure");
+  await openLab(page, "delimited");
 
   await page.click('[data-testid="interop-csv-export"]');
   await expect(page.locator('[data-testid="interop-csv-output"]')).toBeVisible();

@@ -5,19 +5,29 @@ import {
   type GridConfig,
   type ProtectionResolver,
   type RowBridgeProjection,
+  type Theme,
 } from "@sheetwrite/core";
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
+import { Icon } from "../components/Icon.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { CapabilityHero } from "./CapabilityHero.js";
 import { applyHostProjection, type HostEntity } from "./host-rows-store.js";
+import {
+  ShowcaseControlGroup,
+  ShowcaseLayout,
+  ShowcaseReadout,
+  ShowcaseSection,
+} from "./layout/ShowcaseLayout.js";
 import { revenueAccountName } from "./revenue.js";
 import { siteGridTheme } from "./site-grid-theme.js";
+import HostRowsSnippet from "./snippets/host-rows.mdx";
+import { DemoButton } from "./ui/DemoButton.js";
 
 const LEAD_IMPORT_ROWS = 10_000;
+/** Accounts the host store starts with. */
+const ACCOUNT_ROWS = 48;
 const HOST_PREVIEW_ROWS = 120;
 /** One Grid commit accepts at most 10,000 operations, so cells load in batches. */
 const LEAD_LOAD_BATCH_ROWS = 1_800;
@@ -46,14 +56,14 @@ const SERVER_NORMALIZED_OPERATIONS: DocumentOp[] = [
   },
 ];
 
-// Widths sum to 1,080 px so every column is visible beside the page gutters
-// at desktop widths; a clipped last column reads as a broken layout.
+// Widths sum to 880 px so every column is visible in the demo beside the side
+// panel at desktop widths; a clipped last column reads as a broken layout.
 const columns = [
-  { key: "name" as const, title: "Account", width: 340 },
-  { key: "amount" as const, title: "ARR · USD", type: "number" as const, width: 170 },
-  { key: "region" as const, title: "Region", width: 150 },
-  { key: "owner" as const, title: "Owner", width: 200 },
-  { key: "stage" as const, title: "Stage", width: 220 },
+  { key: "name" as const, title: "Account", width: 280 },
+  { key: "amount" as const, title: "ARR · USD", type: "number" as const, width: 130 },
+  { key: "region" as const, title: "Region", width: 110 },
+  { key: "owner" as const, title: "Owner", width: 170 },
+  { key: "stage" as const, title: "Stage", width: 190 },
 ];
 const owners = ["Ada Chen", "Lin Patel", "Maya Reyes", "Noah Ellis"];
 const regions = ["North", "South", "West", "East"];
@@ -69,7 +79,7 @@ const accountNames = [
   "Cobalt Grove",
 ];
 const industries = ["Logistics", "Health", "Works", "Energy", "Foods", "Systems"];
-const initialRows: HostEntity[] = Array.from({ length: 48 }, (_, index) => ({
+const initialRows: HostEntity[] = Array.from({ length: ACCOUNT_ROWS }, (_, index) => ({
   id: `account-${String(index + 1).padStart(3, "0")}`,
   name: `${accountNames[index % accountNames.length]} ${industries[Math.floor(index / accountNames.length)]}`,
   amount:
@@ -137,8 +147,9 @@ export default function HostRowsShowcase() {
   );
 
   // The grid paints with resolved colors, so it re-reads the site tokens when
-  // the page theme changes.
-  const applySiteTheme = () => grid.current?.replaceTheme({ ...siteGridTheme(), rowHeight: 36 });
+  // the page theme changes. The theme is a prop, so a re-render keeps it.
+  const [theme, setTheme] = useState<Partial<Theme>>({ rowHeight: 36 });
+  const applySiteTheme = () => setTheme({ ...siteGridTheme(), rowHeight: 36 });
   useEffect(() => observeSiteTheme(applySiteTheme), []);
 
   // A changed protection resolver makes the adapter rebuild the Grid from its
@@ -259,126 +270,114 @@ export default function HostRowsShowcase() {
     active.scrollToCell({ sheet: "sheet1", row: startRow, col: 0 });
   };
 
+  const sortByAmount = () => grid.current?.setViewSort([{ col: 1, ascending: false }]);
+  const rejectNextEdit = () => {
+    denyNext.current = true;
+    grid.current?.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "sheet1", row: 0, col: 1 },
+          value: { kind: "literal", value: 999 },
+        },
+      ],
+    });
+  };
+
   return (
-    <div className="host-rows-frame">
-      <SiteTopbar active="showcases" />
-      <main className="host-rows-showcase" data-testid="host-rows-showcase">
-        <CapabilityHero
-          eyebrow="CAPABILITY / HOST-OWNED ROWS"
-          title="Move the view. Keep the account."
-          description="Your app owns the account store. Sort, filter, and edit the Grid. Every delta still names the same account ID."
-          facts={[
-            { label: "Accounts", value: "48 + 10,000 leads" },
-            { label: "Coverage", value: "4 regions" },
-            { label: "Identity", value: "Stable account IDs" },
-            { label: "Write policy", value: "Host decides" },
-          ]}
-        />
-        <section className="host-row-stage" aria-label="Live CRM workbook">
-          <header className="host-row-stage__bar">
-            <div>
-              <p>Fast row ID checks</p>
-              <h2>Import the leads. Keep every ID unique.</h2>
-            </div>
-            <button
-              className="host-row-primary"
-              type="button"
+    <ShowcaseLayout
+      code={{ title: "The code behind it", Snippet: HostRowsSnippet }}
+      controls={
+        <>
+          <ShowcaseControlGroup
+            title="Import leads"
+            description="Each lead gets a stable ID from the row bridge; the insert is one commit."
+          >
+            <DemoButton
+              data-testid="host-import-leads"
               disabled={!ready || importResult !== null}
               onClick={importLeads}
-              data-testid="host-import-leads"
+              variant="primary"
             >
-              {importResult ? "10,000 leads imported" : "Import 10,000 leads"}
-            </button>
-            <output aria-live="polite" data-testid="host-arr-total">
-              <strong>{money.format(arr)}</strong>
-              <span>{entities.size} accounts · host-owned ARR</span>
-            </output>
-            <output
-              className="host-row-import-time"
-              aria-live="polite"
-              data-testid="host-import-timing"
-            >
-              <strong data-empty={!importResult}>
-                {importResult ? `${importResult.insertMs.toFixed(1)} ms` : "Not run"}
-              </strong>
-              <span>
-                {importResult
-                  ? `ID checks + row insertion · cell load ${importResult.loadMs.toFixed(0)} ms in ${importResult.batches} commits`
-                  : "Lead import time. Measured in this browser when you import."}
-              </span>
-            </output>
-          </header>
-          <div className="host-row-actions">
-            <fieldset className="host-row-actions__group">
-              <legend>Host changes</legend>
-              <button
-                type="button"
-                disabled={!ready || !entities.has("account-001")}
-                onClick={remoteUpdate}
-              >
-                Remote update
-              </button>
-              <button type="button" disabled={!ready} onClick={() => grid.current?.insertRows(1)}>
-                Insert row
-              </button>
-              <button type="button" disabled={!ready} onClick={() => grid.current?.removeRows(1)}>
-                Delete row
-              </button>
-            </fieldset>
-            <fieldset className="host-row-actions__group">
-              <legend>View only</legend>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => grid.current?.setViewSort([{ col: 1, ascending: false }])}
-              >
-                Sort amount
-              </button>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => grid.current?.filterBy(2, "North")}
-              >
-                Filter North
-              </button>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => grid.current?.setColumnFilter(2, null)}
-              >
-                Clear filter
-              </button>
-            </fieldset>
-            <fieldset className="host-row-actions__group">
-              <legend>Write policy</legend>
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => {
-                  denyNext.current = true;
-                  grid.current?.applyTransaction({
-                    patches: [
-                      {
-                        op: "set",
-                        addr: { sheet: "sheet1", row: 0, col: 1 },
-                        value: { kind: "literal", value: 999 },
-                      },
-                    ],
-                  });
-                }}
-              >
-                Reject next edit
-              </button>
-              <button type="button" disabled={!ready} onClick={transformedAccept}>
-                Transformed accept
-              </button>
-            </fieldset>
-          </div>
+              <Icon name="upload" />
+              {importResult
+                ? `${LEAD_IMPORT_ROWS.toLocaleString("en")} leads imported`
+                : `Import ${LEAD_IMPORT_ROWS.toLocaleString("en")} leads`}
+            </DemoButton>
+            <ShowcaseReadout
+              items={[
+                {
+                  label: "Host-owned ARR",
+                  value: (
+                    <output aria-live="polite" data-testid="host-arr-total">
+                      <strong>{money.format(arr)}</strong>
+                    </output>
+                  ),
+                },
+                { label: "Accounts", value: entities.size.toLocaleString("en") },
+                {
+                  label: "Import time",
+                  value: (
+                    <output aria-live="polite" data-testid="host-import-timing">
+                      {importResult
+                        ? `${importResult.insertMs.toFixed(1)} ms · ${importResult.batches} commits`
+                        : "Not run"}
+                    </output>
+                  ),
+                },
+              ]}
+            />
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup title="Host changes">
+            <DemoButton disabled={!ready || !entities.has("account-001")} onClick={remoteUpdate}>
+              <Icon name="refresh" />
+              Remote update
+            </DemoButton>
+            <DemoButton disabled={!ready} onClick={() => grid.current?.insertRows(1)}>
+              <Icon name="plus" />
+              Insert row
+            </DemoButton>
+            <DemoButton disabled={!ready} onClick={() => grid.current?.removeRows(1)}>
+              <Icon name="minus" />
+              Delete row
+            </DemoButton>
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup
+            title="View only"
+            description="Sort and filter change the view, never the account store."
+          >
+            <DemoButton disabled={!ready} onClick={sortByAmount}>
+              <Icon name="sort-desc" />
+              Sort view by amount
+            </DemoButton>
+            <DemoButton disabled={!ready} onClick={() => grid.current?.filterBy(2, "North")}>
+              <Icon name="filter" />
+              Filter North
+            </DemoButton>
+            <DemoButton disabled={!ready} onClick={() => grid.current?.setColumnFilter(2, null)}>
+              <Icon name="close" />
+              Clear filter
+            </DemoButton>
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup title="Write policy">
+            <DemoButton disabled={!ready} onClick={rejectNextEdit}>
+              <Icon name="shield" />
+              Reject next edit
+            </DemoButton>
+            <DemoButton disabled={!ready} onClick={transformedAccept}>
+              <Icon name="check" />
+              Transformed accept
+            </DemoButton>
+          </ShowcaseControlGroup>
+        </>
+      }
+      demo={
+        <div className="host-rows-showcase" data-testid="host-rows-showcase">
           <SheetwriteGrid
             {...input}
             ref={grid}
             presentation="data-grid"
-            theme={{ rowHeight: 36 }}
+            theme={theme}
             rowBridge={bridge}
             config={GRID_CONFIG}
             onReady={() => {
@@ -400,84 +399,109 @@ export default function HostRowsShowcase() {
             protectionResolver={protectionResolver}
             height={428}
           />
-          <p className="host-row-stage__note">
-            Each imported lead gets a stable ID from the row bridge. The insert is one commit; the
-            50,000 cell values load in bounded batches, because one Grid transaction accepts 10,000
-            operations. Sort and filter change only the view.
-          </p>
-        </section>
-        <section className="host-row-proof" aria-label="Host-owned state">
-          <div className="host-row-panel">
-            <header>
-              <div>
-                <p>App state · not a Grid copy</p>
-                <h2>Account store</h2>
-              </div>
-              <span data-testid="host-record-count">
-                {entities.size.toLocaleString()} records
-                {entities.size > HOST_PREVIEW_ROWS
-                  ? ` · first ${HOST_PREVIEW_ROWS.toLocaleString()} shown`
-                  : ""}
-              </span>
-            </header>
-            <div className="host-row-table-scroll">
-              <table data-testid="host-entity-list">
-                <thead>
-                  <tr>
-                    <th>Account / ID</th>
-                    <th>ARR</th>
-                    <th>Owner / region</th>
-                    <th>Stage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...entities.values()].slice(0, HOST_PREVIEW_ROWS).map((row) => (
-                    <tr key={row.id} data-account-id={row.id}>
-                      <td>
-                        <strong>{row.name}</strong>
-                        <code>{row.id}</code>
-                      </td>
-                      <td>{money.format(row.amount)}</td>
-                      <td>
-                        {row.owner}
-                        <small>{row.region}</small>
-                      </td>
-                      <td>
-                        <span className="host-row-stage-pill" data-stage={row.stage}>
-                          {row.stage}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="host-row-panel host-row-events">
-            <header>
-              <div>
-                <p>Transaction boundary</p>
-                <h2>Delta log</h2>
-              </div>
-              <span>{log.length} recent</span>
-            </header>
-            <ol data-testid="host-delta-log" aria-live="polite">
-              {log.map((entry) => (
-                <li key={entry.id} data-status={entry.status}>
-                  <strong>{entry.status}</strong>
-                  <span>{entry.text}</span>
-                </li>
+          <HostState entities={entities} log={log} />
+        </div>
+      }
+      demoLabel="Live CRM workbook"
+      demoTitle="Accounts"
+      eyebrow="Data"
+      facts={[
+        { label: "Accounts", value: ACCOUNT_ROWS.toLocaleString("en") },
+        { label: "Leads to import", value: LEAD_IMPORT_ROWS.toLocaleString("en") },
+        { label: "Identity", value: "Stable account IDs" },
+      ]}
+      guide={{
+        href: "/docs/features/data/host-owned-rows/",
+        label: "Read the host-owned rows guide",
+      }}
+      id="host-rows"
+      task="Your app owns the account store. Sort the view, filter and edit the grid, then import thousands of leads: every delta still names the same account ID."
+      title="Move the view. Keep the account."
+    >
+      <ShowcaseSection id="host-rows-loading" title="How the import loads">
+        <p>
+          The insert of {LEAD_IMPORT_ROWS.toLocaleString("en")} rows is one commit. Their{" "}
+          {(LEAD_IMPORT_ROWS * columns.length).toLocaleString("en")} cell values load in batches of{" "}
+          {LEAD_LOAD_BATCH_ROWS.toLocaleString("en")} rows, because one Grid transaction accepts a
+          bounded number of operations.
+        </p>
+      </ShowcaseSection>
+    </ShowcaseLayout>
+  );
+}
+
+type DeltaLogEntry = { id: number; status: string; text: string };
+
+/** The app's own state beside the Grid: the account store and the deltas it received. */
+function HostState({
+  entities,
+  log,
+}: Readonly<{ entities: ReadonlyMap<string, HostEntity>; log: readonly DeltaLogEntry[] }>) {
+  return (
+    <section className="host-row-proof" aria-label="Host-owned state">
+      <div className="host-row-panel">
+        <header>
+          <h2>Account store</h2>
+          <span data-testid="host-record-count">
+            {entities.size.toLocaleString()} records
+            {entities.size > HOST_PREVIEW_ROWS
+              ? ` · first ${HOST_PREVIEW_ROWS.toLocaleString()} shown`
+              : ""}
+          </span>
+        </header>
+        <div className="host-row-table-scroll">
+          <table data-testid="host-entity-list">
+            <thead>
+              <tr>
+                <th>Account / ID</th>
+                <th>ARR</th>
+                <th>Owner / region</th>
+                <th>Stage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...entities.values()].slice(0, HOST_PREVIEW_ROWS).map((row) => (
+                <tr key={row.id} data-account-id={row.id}>
+                  <td>
+                    <strong>{row.name}</strong>
+                    <code>{row.id}</code>
+                  </td>
+                  <td>{money.format(row.amount)}</td>
+                  <td>
+                    {row.owner}
+                    <small>{row.region}</small>
+                  </td>
+                  <td>
+                    <span className="host-row-stage-pill" data-stage={row.stage}>
+                      {row.stage}
+                    </span>
+                  </td>
+                </tr>
               ))}
-            </ol>
-            {log.length === 0 ? (
-              <p className="host-row-empty">
-                Run a renewal update, edit an ARR cell, or reject a write. Its account delta appears
-                here.
-              </p>
-            ) : null}
-          </div>
-        </section>
-      </main>
-    </div>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="host-row-panel host-row-events">
+        <header>
+          <h2>Delta log</h2>
+          <span>{log.length} recent</span>
+        </header>
+        <ol data-testid="host-delta-log" aria-live="polite">
+          {log.map((entry) => (
+            <li key={entry.id} data-status={entry.status}>
+              <strong>{entry.status}</strong>
+              <span>{entry.text}</span>
+            </li>
+          ))}
+        </ol>
+        {log.length === 0 ? (
+          <p className="host-row-empty">
+            Run a remote update, edit an ARR cell, or reject a write. Its account delta appears
+            here.
+          </p>
+        ) : null}
+      </div>
+    </section>
   );
 }

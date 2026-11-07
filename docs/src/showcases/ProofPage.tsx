@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
-import { SiteTopbar } from "../components/SiteTopbar.js";
-import { CapabilityHero } from "./CapabilityHero.js";
+import { type ShowcaseCode, ShowcaseLayout, ShowcaseSection } from "./layout/ShowcaseLayout.js";
 
 export interface ProofFact {
   label: string;
@@ -20,146 +19,136 @@ export interface BoundaryRow {
   detail: string;
 }
 
-interface ProofPageProps {
+/** The text of a protocol showcase page, which its route owns. */
+export interface ProofPageContent {
   boundary: readonly BoundaryRow[];
   /** The named contract that crosses the ownership boundary (e.g. PersistenceAdapter). */
   boundaryContract: string;
   boundaryLede: string;
-  children: ReactNode;
   description: string;
   eyebrow: string;
   facts: readonly ProofFact[];
   guideHref: string;
   guideLabel: string;
-  prompt: string;
   slug: "database" | "collaboration";
-  sourcePath: string;
   title: string;
   verification: readonly VerificationPoint[];
 }
 
+interface ProofPageProps {
+  content: ProofPageContent;
+  code: ShowcaseCode;
+  /** The workbook or app the demo shows, named in its window bar. */
+  demoTitle: string;
+  /** Small controls of the demo window, such as its status. */
+  demoActions?: ReactNode;
+  demo: ReactNode;
+  controls: ReactNode;
+  /** Sections after the code, before the proof points and the ownership map. */
+  children?: ReactNode;
+}
+
 /**
- * Shared shell for the capability showcase routes (database, collaboration).
- * Framework showcases keep their own `ShowcasePage`; these pages demonstrate
- * one protocol capability instead of one adapter, so the hero leads with the
- * contract and every page ends with an explicit host-ownership boundary map.
+ * The layout of the protocol showcases (database, collaboration): the shared
+ * showcase layout, then what the scenario proves and an explicit map of what
+ * Sheetwrite ships and what the host owns.
  */
 export function ProofPage({
-  boundary,
-  boundaryContract,
-  boundaryLede,
+  content,
+  code,
+  demoTitle,
+  demoActions,
+  demo,
+  controls,
   children,
-  description,
-  eyebrow,
-  facts,
-  guideHref,
-  guideLabel,
-  prompt,
-  slug,
-  sourcePath,
-  title,
-  verification,
 }: Readonly<ProofPageProps>) {
-  const sheetwriteRows = boundary.filter((row) => row.owner === "sheetwrite");
-  const hostRows = boundary.filter((row) => row.owner === "host");
+  const { slug, boundary } = content;
   return (
-    <div className="sw-showcase-frame">
-      <SiteTopbar />
-      <main className="sw-proofs-page" data-proof={slug}>
-        <CapabilityHero description={description} eyebrow={eyebrow} facts={facts} title={title} />
+    <ShowcaseLayout
+      code={code}
+      controls={controls}
+      demo={demo}
+      demoActions={demoActions}
+      demoLabel={`${content.title} live scenario`}
+      demoTitle={demoTitle}
+      eyebrow={content.eyebrow}
+      facts={content.facts}
+      guide={{ href: content.guideHref, label: content.guideLabel }}
+      id={slug}
+      task={content.description}
+      title={content.title}
+    >
+      {children}
+      <ShowcaseSection id={`${slug}-proof-points`} title="What the scenario proves">
+        <ol className="sw-proofs-points">
+          {content.verification.map((item) => (
+            <li key={item.title}>
+              <strong>{item.title}</strong>
+              <span>{item.detail}</span>
+            </li>
+          ))}
+        </ol>
+      </ShowcaseSection>
+      <section
+        aria-labelledby={`${slug}-boundary`}
+        className="sw-showcase__section sw-prose sw-proofs-boundary"
+        data-testid="proof-boundary"
+      >
+        <h2 className="sw-showcase__section-title" id={`${slug}-boundary`}>
+          What Sheetwrite provides, and what your host owns
+        </h2>
+        <p>{content.boundaryLede}</p>
+        <div className="sw-proofs-boundary__map">
+          <BoundaryLane
+            label="Sheetwrite-owned responsibilities"
+            lane="sheetwrite"
+            note="ships in the library"
+            owner="Sheetwrite"
+            rows={boundary.filter((row) => row.owner === "sheetwrite")}
+          />
+          <p className="sw-proofs-boundary__contract">
+            <code>{content.boundaryContract}</code>
+          </p>
+          <BoundaryLane
+            label="Host-owned responsibilities"
+            lane="host"
+            note="you implement and deploy"
+            owner="Your host"
+            rows={boundary.filter((row) => row.owner === "host")}
+          />
+        </div>
+      </section>
+    </ShowcaseLayout>
+  );
+}
 
-        <section aria-label={`${title} live scenario`} className="sw-proofs-page__stage">
-          <div className="sw-proofs-page__viewport">{children}</div>
-          <footer className="sw-proofs-page__prompt">
-            <strong>Try it</strong>
-            <span>{prompt}</span>
-          </footer>
-        </section>
-
-        <section aria-labelledby={`${slug}-proof-points`} className="sw-proofs-page__points">
-          <header>
-            <p className="sw-proofs-page__eyebrow">VERIFIED IN THIS SCENARIO</p>
-            <h2 id={`${slug}-proof-points`}>Every behavior above is the public contract.</h2>
-          </header>
-          <ol>
-            {verification.map((item, index) => (
-              <li key={item.title}>
-                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section
-          aria-labelledby={`${slug}-boundary`}
-          className="sw-proofs-page__boundary"
-          data-testid="proof-boundary"
-        >
-          <header>
-            <p className="sw-proofs-page__eyebrow">OWNERSHIP BOUNDARY</p>
-            <h2 id={`${slug}-boundary`}>What Sheetwrite provides, and what your host owns.</h2>
-            <p>{boundaryLede}</p>
-          </header>
-          <div className="sw-proofs-page__boundary-map">
-            <section
-              aria-label="Sheetwrite-owned responsibilities"
-              className="sw-proofs-page__lane"
-              data-lane="sheetwrite"
-            >
-              <header className="sw-proofs-page__lane-head">
-                <span className="sw-proofs-page__owner-badge">Sheetwrite</span>
-                <span className="sw-proofs-page__lane-note">ships in the library</span>
-              </header>
-              <ul>
-                {sheetwriteRows.map((row) => (
-                  <li data-owner={row.owner} key={row.concern}>
-                    <strong>{row.concern}</strong>
-                    <p>{row.detail}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <p className="sw-proofs-page__lane-joint">
-              <span>{boundaryContract}</span>
-            </p>
-            <section
-              aria-label="Host-owned responsibilities"
-              className="sw-proofs-page__lane"
-              data-lane="host"
-            >
-              <header className="sw-proofs-page__lane-head">
-                <span className="sw-proofs-page__owner-badge">Your host</span>
-                <span className="sw-proofs-page__lane-note">you implement and deploy</span>
-              </header>
-              <ul>
-                {hostRows.map((row) => (
-                  <li data-owner={row.owner} key={row.concern}>
-                    <strong>{row.concern}</strong>
-                    <p>{row.detail}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        </section>
-
-        <footer className="sw-proofs-page__footer">
-          <div>
-            <span>CONTINUE BUILDING</span>
-            <strong>Wire the same contracts into your backend.</strong>
-          </div>
-          <nav aria-label="Showcase resources">
-            <a href={guideHref}>{guideLabel}</a>
-            <a href={`https://github.com/chh-ay/sheetwrite/blob/develop/${sourcePath}`}>
-              View source
-            </a>
-          </nav>
-        </footer>
-      </main>
-    </div>
+function BoundaryLane({
+  label,
+  lane,
+  note,
+  owner,
+  rows,
+}: Readonly<{
+  label: string;
+  lane: BoundaryRow["owner"];
+  note: string;
+  owner: string;
+  rows: readonly BoundaryRow[];
+}>) {
+  return (
+    <section aria-label={label} className="sw-proofs-boundary__lane" data-lane={lane}>
+      <header>
+        <strong>{owner}</strong>
+        <span>{note}</span>
+      </header>
+      <ul>
+        {rows.map((row) => (
+          <li data-owner={row.owner} key={row.concern}>
+            <strong>{row.concern}</strong>
+            <span>{row.detail}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

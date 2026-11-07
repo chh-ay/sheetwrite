@@ -64,15 +64,16 @@ const REVENUE_FORMAT = "$#,##0";
 /** Summary columns: the pivot's labels, four regions and the total, then room for the chart. */
 const SUMMARY_COLUMNS = 16;
 const SUMMARY_ROWS = 40;
-const SUMMARY_LABEL_WIDTH = 104;
-const SUMMARY_VALUE_WIDTH = 96;
+const SUMMARY_LABEL_WIDTH = 88;
+const SUMMARY_VALUE_WIDTH = 84;
 
 /**
- * The chart sits one column right of the pivot. 560 px shows 24 months clearly
- * and still fits beside the pivot in the workspace at a 1440 px window.
+ * The chart starts 12 px right of the pivot's last column. 400 px shows 24
+ * months and, with the pivot, fits the workspace beside the side panel at a
+ * 1280 px window.
  */
-const CHART_GAP_COLUMNS = 1;
-const CHART_WIDTH = 560;
+const CHART_GAP_PX = 12;
+const CHART_WIDTH = 400;
 const CHART_HEIGHT = 340;
 
 /** The orders as the grid's columnar data, with the header row first. */
@@ -186,8 +187,8 @@ export function revenueChart(pivot: PivotDefinition, result: PivotResultView): C
     legend: "bottom",
     anchor: {
       row: anchor.row,
-      col: anchor.col + result.cols + CHART_GAP_COLUMNS,
-      offsetX: 0,
+      col: anchor.col + result.cols,
+      offsetX: CHART_GAP_PX,
       offsetY: 0,
       width: CHART_WIDTH,
       height: CHART_HEIGHT,

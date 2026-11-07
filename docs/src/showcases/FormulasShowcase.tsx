@@ -1,14 +1,13 @@
 import { cellA1, createGrid, type DocumentOp, type Grid } from "@sheetwrite/core";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { HighlightedCode } from "../components/HighlightedCode.js";
-import { SiteTopbar } from "../components/SiteTopbar.js";
+import { Icon } from "../components/Icon.js";
 import { functionCount } from "../generated/formula-summary.json";
 import { errorText } from "../lib/errors.js";
 import { initFullEngine, whenStylesReady } from "../lib/full-engine.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { CapabilityHero } from "./CapabilityHero.js";
+import { ShowcaseControlGroup, ShowcaseLayout, ShowcaseSection } from "./layout/ShowcaseLayout.js";
 import {
   ANALYSIS_SHEET_ID,
   apacPromotionOps,
@@ -24,6 +23,7 @@ import {
   PLAYGROUND_EXAMPLE,
 } from "./scenarios/formulas.js";
 import FormulasSetupSnippet from "./snippets/formulas-setup.mdx";
+import { DemoButton } from "./ui/DemoButton.js";
 
 import "@sheetwrite/core/styles.css";
 
@@ -237,66 +237,32 @@ export default function FormulasShowcase() {
       ? describeResult(gridRef.current, panel.row, panel.col)
       : "—";
 
-  return (
-    <div className="sw-fx-frame">
-      <SiteTopbar active="formulas" />
-      <main className="sw-fx-page" id="main-content">
-        <CapabilityHero
-          description={
-            <>
-              {FORMULA_PANELS.length} live formulas summarize {ORDER_ROWS.toLocaleString()} orders:
-              group and pivot tables, statistics and distributions, a regression, finance and
-              working days, a database query, LAMBDA helpers, and regex. Change the data and every
-              answer recalculates.
-            </>
-          }
-          eyebrow="CAPABILITY / FORMULAS"
-          facts={[
-            {
-              label: "Function names",
-              value: functionCount.toLocaleString(),
-            },
-            { label: "Orders", value: ORDER_ROWS.toLocaleString() },
-            { label: "Live panels", value: `${FORMULA_PANELS.length} formulas` },
-            { label: "Engine", value: "@sheetwrite/formulas" },
-          ]}
-          title="Ask the data. Watch the answer spill."
-        />
+  const ready = state === "ready";
+  const sheets = [
+    { id: ANALYSIS_SHEET_ID, label: "Analysis" },
+    { id: ORDERS_SHEET_ID, label: `Orders · ${ORDER_ROWS.toLocaleString()} rows` },
+  ];
 
-        <section aria-label="Live formula workbook" className="sw-fx-stage" data-state={state}>
-          <header className="sw-fx-bar">
-            <div className="sw-fx-bar__title">
-              <p>Live analysis workbook</p>
-              <h2>One edit. Every answer follows.</h2>
-            </div>
-            <div className="sw-fx-bar__actions">
-              <button
-                aria-pressed={promotionRestore !== null}
-                data-testid="formulas-promotion"
-                disabled={state !== "ready"}
-                onClick={togglePromotion}
-                type="button"
-              >
-                {promotionRestore ? "Undo the APAC promotion" : "Run an APAC promotion: +20% units"}
-              </button>
-              <fieldset className="sw-fx-sheets" aria-label="Sheet">
-                {[
-                  { id: ANALYSIS_SHEET_ID, label: "Analysis" },
-                  { id: ORDERS_SHEET_ID, label: `Orders · ${ORDER_ROWS.toLocaleString()} rows` },
-                ].map((sheet) => (
-                  <button
-                    aria-pressed={activeSheet === sheet.id}
-                    disabled={state !== "ready"}
-                    key={sheet.id}
-                    onClick={() => switchSheet(sheet.id)}
-                    type="button"
-                  >
-                    {sheet.label}
-                  </button>
-                ))}
-              </fieldset>
-            </div>
-            <output aria-live="polite" className="sw-fx-bar__recalc" data-testid="formulas-recalc">
+  return (
+    <ShowcaseLayout
+      code={{ title: "Select the full engine", Snippet: FormulasSetupSnippet }}
+      controls={
+        <>
+          <ShowcaseControlGroup
+            title="Change the data"
+            description="One transaction rewrites every APAC order; every answer follows."
+          >
+            <DemoButton
+              aria-pressed={promotionRestore !== null}
+              data-testid="formulas-promotion"
+              disabled={!ready}
+              onClick={togglePromotion}
+              variant="primary"
+            >
+              <Icon name={promotionRestore ? "undo" : "bolt"} />
+              {promotionRestore ? "Undo the APAC promotion" : "Run an APAC promotion: +20% units"}
+            </DemoButton>
+            <output aria-live="polite" className="sw-fx-recalc" data-testid="formulas-recalc">
               {state === "error" ? (
                 <span>The engine did not start: {error}</span>
               ) : recalc ? (
@@ -311,37 +277,28 @@ export default function FormulasShowcase() {
                 <span>Loading the full formula engine…</span>
               )}
             </output>
-          </header>
-
-          <nav aria-label="Formula recipes" className="sw-fx-recipes">
-            <ol>
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup
+            title="Formula recipes"
+            description="Jump to a formula and read it."
+          >
+            <ol aria-label="Formula recipes" className="sw-fx-recipes">
               {FORMULA_PANELS.map((candidate) => (
                 <li key={candidate.id}>
-                  <button
+                  <DemoButton
                     aria-pressed={candidate.id === selected}
+                    data-size="sm"
                     data-testid={`formulas-recipe-${candidate.id}`}
-                    disabled={state !== "ready"}
+                    disabled={!ready}
                     onClick={() => showPanel(candidate)}
-                    type="button"
+                    variant="quiet"
                   >
-                    <span>{cellA1(candidate.row, candidate.col)}</span>
+                    <code>{cellA1(candidate.row, candidate.col)}</code>
                     {candidate.title}
-                  </button>
+                  </DemoButton>
                 </li>
               ))}
             </ol>
-          </nav>
-
-          {/* Sheetwrite upgrades this host into an ARIA grid. */}
-          <div
-            aria-label="Sales analysis workbook"
-            className="sw-fx-grid"
-            data-testid="formulas-grid"
-            ref={hostRef}
-            role="grid"
-          />
-
-          <div className="sw-fx-footer">
             <article className="sw-fx-detail" data-testid="formulas-detail">
               <p className="sw-fx-detail__kicker">
                 {cellA1(panel.row, panel.col)} · {panel.families.join(" · ")} · first value{" "}
@@ -351,7 +308,10 @@ export default function FormulasShowcase() {
               <p>{panel.explanation}</p>
               <HighlightedCode code={panel.formula} language="formula" />
             </article>
-
+          </ShowcaseControlGroup>
+          <ShowcaseControlGroup
+            title={`Try your own formula in ${cellA1(PLAYGROUND.row, PLAYGROUND.col)}`}
+          >
             <form
               className="sw-fx-try"
               onSubmit={(event) => {
@@ -359,54 +319,85 @@ export default function FormulasShowcase() {
                 runDraft();
               }}
             >
-              <label htmlFor="formulas-draft">
-                Try your own formula in {cellA1(PLAYGROUND.row, PLAYGROUND.col)}
-              </label>
-              <div>
-                <input
-                  autoComplete="off"
-                  data-testid="formulas-draft"
-                  id="formulas-draft"
-                  onChange={(event) => setDraft(event.currentTarget.value)}
-                  spellCheck={false}
-                  value={draft}
-                />
-                <button data-testid="formulas-run" disabled={state !== "ready"} type="submit">
-                  Calculate
-                </button>
-              </div>
+              <input
+                aria-label="Formula"
+                autoComplete="off"
+                data-testid="formulas-draft"
+                onChange={(event) => setDraft(event.currentTarget.value)}
+                spellCheck={false}
+                value={draft}
+              />
+              <DemoButton data-testid="formulas-run" disabled={!ready} type="submit">
+                <Icon name="function" />
+                Calculate
+              </DemoButton>
               <output aria-live="polite" data-testid="formulas-draft-result">
                 {playground
                   ? `${playground.result} · ${playground.ms.toFixed(1)} ms`
                   : "Orders columns A–H: month, region, product, channel, units, price, revenue, order code."}
               </output>
             </form>
-          </div>
-        </section>
-
-        <section aria-labelledby="formulas-engine-title" className="sw-fx-engine">
-          <div>
-            <p className="sw-fx-engine__kicker">Two engines, one API</p>
-            <h2 id="formulas-engine-title">Choose the formula engine your app needs.</h2>
-            <p>
-              <code>@sheetwrite/wasm</code> is the default engine. <code>@sheetwrite/formulas</code>{" "}
-              is the same engine with the full function set. Select it once, before you create a
-              Grid. Everything else stays the same.
-            </p>
-            <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
-              See every supported function →
-            </Link>
-          </div>
-          <div className="sw-fx-engine__code">
-            <FormulasSetupSnippet />
-          </div>
-          <ul aria-label="Families on this page" className="sw-fx-engine__families">
-            {families.map((family) => (
-              <li key={family}>{family}</li>
-            ))}
-          </ul>
-        </section>
-      </main>
-    </div>
+          </ShowcaseControlGroup>
+        </>
+      }
+      demo={
+        <div
+          aria-label="Sales analysis workbook"
+          className="sw-showcase__grid"
+          data-state={state}
+          data-testid="formulas-grid"
+          ref={hostRef}
+          role="grid"
+        />
+      }
+      demoActions={
+        <div aria-label="Sheet" className="sw-fx-sheets" role="group">
+          {sheets.map((sheet) => (
+            <DemoButton
+              aria-pressed={activeSheet === sheet.id}
+              data-size="sm"
+              disabled={!ready}
+              key={sheet.id}
+              onClick={() => switchSheet(sheet.id)}
+              variant="quiet"
+            >
+              {sheet.label}
+            </DemoButton>
+          ))}
+        </div>
+      }
+      demoLabel="Live formula workbook"
+      demoTitle="Sales analysis.xlsx"
+      eyebrow="Formulas"
+      facts={[
+        { label: "Function names", value: functionCount.toLocaleString() },
+        { label: "Orders", value: ORDER_ROWS.toLocaleString() },
+        { label: "Live formulas", value: FORMULA_PANELS.length.toLocaleString() },
+      ]}
+      guide={{ href: "/docs/reference/formula-functions/", label: "See every supported function" }}
+      id="formulas"
+      task={
+        <>
+          {FORMULA_PANELS.length} live formulas summarize {ORDER_ROWS.toLocaleString()} orders:
+          grouping, statistics, a regression, finance, a database query, LAMBDA helpers and regex.
+          Change the data and every answer recalculates.
+        </>
+      }
+      title="Ask the data. Watch the answer spill."
+    >
+      <ShowcaseSection id="formulas-engines" title="Two engines, one API">
+        <p>
+          <code>@sheetwrite/wasm</code> is the default engine. <code>@sheetwrite/formulas</code> is
+          the same engine with the full function set. Select it once, before you create a grid. The
+          function families 0.7.0 adds are on the{" "}
+          <a href="/showcases/functions/">functions showcase</a>.
+        </p>
+        <ul aria-label="Families on this page" className="sw-fx-families">
+          {families.map((family) => (
+            <li key={family}>{family}</li>
+          ))}
+        </ul>
+      </ShowcaseSection>
+    </ShowcaseLayout>
   );
 }

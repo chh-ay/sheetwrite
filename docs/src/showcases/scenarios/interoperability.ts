@@ -24,6 +24,7 @@ import type {
 import {
   fromCsv,
   fromXlsxWorkbook,
+  isSheetwriteError,
   parseCsv,
   toCsv,
   toTsv,
@@ -991,13 +992,30 @@ export function importDelimitedText(text: string): DelimitedImport {
 export interface RejectionReport {
   rejected: boolean;
   errorName: string | null;
+  /** The `SheetwriteError` code, such as `resource-limit`. */
+  code: string | null;
+  /** The resource limit the input hit, such as `maxCells`, when the error names one. */
+  limit: string | null;
   message: string | null;
 }
 
+/** What a completed import reports: nothing was rejected. */
+const NOT_REJECTED: RejectionReport = {
+  rejected: false,
+  errorName: null,
+  code: null,
+  limit: null,
+  message: null,
+};
+
 function rejectionReport(error: unknown): RejectionReport {
+  const typed = isSheetwriteError(error) ? error : null;
+  const resource = typed?.context?.resource;
   return {
     rejected: true,
     errorName: error instanceof Error ? error.name : typeof error,
+    code: typed?.code ?? null,
+    limit: typeof resource === "string" ? resource : null,
     message: errorText(error),
   };
 }
@@ -1010,7 +1028,7 @@ export async function expectRejection(
   await installXlsx();
   try {
     await fromXlsxWorkbook(bytes, options);
-    return { rejected: false, errorName: null, message: null };
+    return NOT_REJECTED;
   } catch (error) {
     return rejectionReport(error);
   }
@@ -1029,7 +1047,7 @@ export function delimitedCeilingDemo(): RejectionReport {
   const big = [wide, ...Array.from({ length: 100 }, () => wide)].join("\n");
   try {
     parseCsv(big, { resourceLimits: { maxCells: 1_000 } });
-    return { rejected: false, errorName: null, message: null };
+    return NOT_REJECTED;
   } catch (error) {
     return rejectionReport(error);
   }
