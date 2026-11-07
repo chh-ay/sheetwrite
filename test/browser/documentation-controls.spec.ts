@@ -204,20 +204,32 @@ for (const activation of ["Enter", "Space", "ArrowDown", "click"] as const) {
   test(`the formula engine filter opens once on ${activation} made before its code arrives @portability`, async ({
     page,
   }) => {
+    await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
+    await waitForHydration(page);
     let release = (): void => undefined;
     const released = new Promise<void>((resolve) => {
       release = resolve;
     });
-    // Hold the filter's code until the reader has acted; a site that loads it with the page never asks.
-    await page.route(/\/assets\/FormulaReference-[^/]+\.js$/, async (route) => {
+    // Hold any code the filter fetches from now until the reader has acted. A
+    // page that loaded the filter with the rest of the page fetches none.
+    await page.route(/\/assets\/[^/]+\.js$/, async (route) => {
       await released;
       await route.continue();
     });
-    await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
-    await waitForHydration(page);
     const field = page.getByRole("combobox", { name: "Available in" });
     await expect(field).toHaveText("Either engine");
-    const before = await field.boundingBox();
+    // In page coordinates: focusing or opening the field may scroll the page.
+    const placement = () =>
+      field.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return {
+          x: box.x + window.scrollX,
+          y: box.y + window.scrollY,
+          width: box.width,
+          height: box.height,
+        };
+      });
+    const before = await placement();
 
     if (activation === "click") {
       await field.click();
@@ -238,7 +250,7 @@ for (const activation of ["Enter", "Space", "ArrowDown", "click"] as const) {
     await page.keyboard.press("Escape");
     await expect(list).toBeHidden();
     // The server-rendered field and the hydrated one are the same size and place.
-    expect(await field.boundingBox()).toEqual(before);
+    expect(await placement()).toEqual(before);
   });
 }
 
