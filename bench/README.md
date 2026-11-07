@@ -263,6 +263,15 @@ formula: ROUND 4,512 against 1,083, concatenation 4,596 against 1,405, OFFSET
 5,193 against 917, INDIRECT 10,137 against 917. Their ratio limits are the 1.2
 default until same-engine pairs calibrate them.
 
+`let-calls` (10K and 100K) is `let-many` with function calls as bindings:
+even rows `=LET(x,ROUND(A1*$C$1,2),x+x+x)`, odd rows
+`=LET(x,SUM(A2*$C$1,1),y,ROUND(x/3,2),z,y*x,x+y+z)`. The other LET rows bind
+a function call in one formula only, where LET's own cost does not show.
+Measured natively before LETs resolved function-call bindings to slots, a
+100K recalculation of these formulas ran 1,398 M instructions, against 489 M
+once they did. Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when

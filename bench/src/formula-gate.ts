@@ -92,6 +92,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=offset-many;size=100000": 1.2,
   "workload=indirect-many;size=10000": 1.2,
   "workload=indirect-many;size=100000": 1.2,
+  "workload=let-calls;size=10000": 1.2,
+  "workload=let-calls;size=100000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
   "workload=spill-sequence-admission;size=100000": 1.15,

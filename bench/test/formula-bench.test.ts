@@ -280,6 +280,7 @@ describe("formula regression gate", () => {
       "concat-many",
       "offset-many",
       "indirect-many",
+      "let-calls",
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
