@@ -507,7 +507,9 @@
   text-transform: none;
 }
 
-.api-consumer-list {
+/* Qualified by the prose, so it outranks the prose list's indent: the chips
+   start where their label does. */
+.sw-prose .api-consumer-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sw-space-1-5) var(--sw-space-2);

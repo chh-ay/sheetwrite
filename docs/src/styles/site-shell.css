@@ -770,13 +770,14 @@ html:has(.sw-nav-dialog[open]) {
     padding-top: var(--sw-space-6);
   }
   /* The bar's icon buttons keep their size but take a 44px touch target,
-     the height of the tab row's targets. */
+     the height of the tab row's targets. The inset is measured from the
+     padding box, so it also reaches over the buttons' 1px border. */
   .sw-docs-bar :is(.sw-search-button, .sw-icon-button) {
     position: relative;
   }
   .sw-docs-bar :is(.sw-search-button, .sw-icon-button)::after {
     position: absolute;
-    inset: calc((44px - var(--sw-control-height)) / -2);
+    inset: calc((44px - var(--sw-control-height)) / -2 - 1px);
     content: "";
   }
   .sw-doc-pager,
