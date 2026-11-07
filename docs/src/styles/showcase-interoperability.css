@@ -2114,4 +2114,777 @@
   }
 }
 
-/* Run state beside the exchange headline: text, not colour alone. */
+/* ── Evidence and labs (interop-labs/) ─────────────────────────────────────
+   A card per lab; the open lab's panel sits below the cards. */
+.sw-si-labs {
+  display: grid;
+  gap: var(--sw-space-4);
+  min-width: 0;
+  /* As text on page surfaces, danger mixes toward the theme's strong foreground. */
+  --sw-si-danger: color-mix(in srgb, var(--sw-danger) 68%, var(--sw-fg-strong));
+}
+
+.sw-si-labs__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sw-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-si-lab-card {
+  display: grid;
+  grid-template-areas:
+    "icon title chevron"
+    "summary summary summary"
+    "figure figure figure";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sw-space-2) var(--sw-space-3);
+  align-content: start;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--sw-space-4) var(--sw-space-5);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--sw-motion-fast) var(--sw-motion-standard),
+    box-shadow var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.sw-si-lab-card:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  box-shadow: var(--sw-shadow-sm);
+}
+
+.sw-si-lab-card:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+.sw-si-lab-card[aria-expanded="true"] {
+  border-color: var(--sw-accent);
+  background: color-mix(in srgb, var(--sw-accent) 6%, var(--sw-surface-1));
+}
+
+.sw-si-lab-card__icon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-accent-soft);
+  color: var(--sw-accent-strong);
+  --sw-icon-accent: var(--sw-accent-strong);
+}
+
+.sw-si-lab-card > .sw-si-lab-card__icon {
+  grid-area: icon;
+}
+
+.sw-si-lab-card__title {
+  grid-area: title;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.4 var(--sw-font-display);
+}
+
+.sw-si-lab-card__summary {
+  grid-area: summary;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-si-lab-card__figure {
+  grid-area: figure;
+  align-self: end;
+  padding-top: var(--sw-space-2);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-si-lab-card__chevron {
+  grid-area: chevron;
+  color: var(--sw-fg-muted);
+  transition: rotate var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.sw-si-lab-card[aria-expanded="true"] .sw-si-lab-card__chevron {
+  rotate: 180deg;
+}
+
+.sw-si-lab-panel {
+  min-width: 0;
+  padding: var(--sw-space-5) var(--sw-space-6);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow-sm);
+  scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-4));
+}
+
+.sw-si-lab-panel__head {
+  display: flex;
+  gap: var(--sw-space-3);
+  align-items: center;
+  margin-bottom: var(--sw-space-4);
+}
+
+.sw-si-lab-panel__head h3 {
+  flex: 1;
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / var(--sw-leading-heading)
+    var(--sw-font-display);
+}
+
+.sw-si-lab-body {
+  display: grid;
+  gap: var(--sw-space-4);
+  min-width: 0;
+}
+
+.sw-si-lab-body__lede {
+  max-width: var(--sw-measure-lead);
+  margin: 0;
+  color: var(--sw-fg-muted);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-si-lab-body__title {
+  margin: var(--sw-space-4) 0 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / var(--sw-leading-ui) var(--sw-font-display);
+}
+
+.sw-si-lab-body__note {
+  margin: calc(var(--sw-space-2) * -1) 0 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-si-lab-body h4 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-si-lab-body .sw-callout {
+  margin: 0;
+}
+
+.sw-si-muted {
+  color: var(--sw-fg-muted);
+}
+
+/* A value with a copy button, such as a SHA-256 digest. */
+.sw-si-copy {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--sw-space-1);
+  align-items: center;
+}
+
+.sw-si-copy code {
+  min-width: 0;
+  color: var(--sw-fg);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-si-copy__button {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: var(--sw-border-width) solid transparent;
+  border-radius: var(--sw-radius-sm);
+  background: transparent;
+  color: var(--sw-fg-muted);
+  cursor: pointer;
+}
+
+.sw-si-copy__button:hover {
+  border-color: var(--sw-border);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+}
+
+.sw-si-copy__button:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 1px;
+}
+
+.sw-si-copy__status:empty {
+  display: none;
+}
+
+.sw-si-copy__status {
+  color: var(--sw-accent-strong);
+  font-size: var(--sw-text-caption);
+}
+
+/* Lab tables: one quiet frame, a tinted header row and rules between rows. */
+.sw-si-labs .sw-si-tablewrap {
+  margin: 0;
+  overflow: auto;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-si-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-si-table caption:not(.sw-visually-hidden) {
+  padding: var(--sw-space-3) var(--sw-space-4);
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+  text-align: start;
+}
+
+.sw-si-table :is(th, td) {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+  color: var(--sw-fg);
+  font-weight: var(--sw-weight-regular);
+  text-align: start;
+  vertical-align: top;
+}
+
+.sw-si-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+  white-space: nowrap;
+}
+
+.sw-si-table tbody th {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-si-table code {
+  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+}
+
+.sw-si-table .sw-si-value code {
+  font-size: var(--sw-text-small);
+}
+
+.sw-si-table .sw-si-value span {
+  font-size: var(--sw-text-eyebrow);
+}
+
+/* Evidence vault: stat cards, then a table with the selected case beside it. */
+.sw-si-vault__summary {
+  display: grid;
+  gap: var(--sw-space-3);
+}
+
+.sw-si-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--sw-space-2);
+  margin: 0;
+}
+
+.sw-si-stats > div {
+  display: grid;
+  gap: var(--sw-space-1);
+  align-content: start;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.sw-si-stats dt {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-stats dd {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h3) / 1.2 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-si-stats > div[data-tone="accent"] dd {
+  color: var(--sw-accent-strong);
+}
+
+.sw-si-stats > div > span {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-vault__checksum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1) var(--sw-space-3);
+  align-items: center;
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-labs .sw-si-compat__filters {
+  margin: 0;
+}
+
+/* Lab actions sit in one row of buttons at their own width. */
+.sw-si-labs .sw-si-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  margin: 0;
+}
+
+.sw-si-labs .sw-si-actions > .sw-button {
+  width: auto;
+}
+
+.sw-si-labs .sw-si-compat {
+  grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 1fr);
+  overflow: hidden;
+}
+
+.sw-si-vault__table tbody th {
+  min-width: 12rem;
+}
+
+.sw-si-labs .sw-si-compat__tags i {
+  white-space: nowrap;
+}
+
+.sw-si-labs .sw-si-compat > .sw-si-tablewrap {
+  max-height: 40rem;
+  border: 0;
+  border-right: var(--sw-border-width) solid var(--sw-border);
+  border-radius: 0;
+}
+
+.sw-si-labs .sw-si-compat__records {
+  display: table-row-group;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  border-right: 0;
+}
+
+.sw-si-labs .sw-si-compat__records tr:first-child :is(th, td) {
+  border-top: 0;
+}
+
+.sw-si-labs .sw-si-compat__records button {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.sw-si-labs .sw-si-compat__records button:hover {
+  background: none;
+}
+
+.sw-si-labs .sw-si-compat__records button > span {
+  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-si-labs .sw-si-compat__records tr:hover {
+  background: var(--sw-surface-2);
+}
+
+.sw-si-labs .sw-si-compat__records tr[data-selected] {
+  background: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-1));
+  box-shadow: inset 3px 0 0 var(--sw-accent);
+}
+
+.sw-si-labs .sw-si-compat__records button[aria-pressed="true"] {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.sw-si-labs tr[data-status="supported"] .sw-si-compat__record-status {
+  color: var(--sw-accent-strong);
+}
+
+.sw-si-labs
+  tr:is([data-status="partial"], [data-status="roundtrip-only"], [data-status="warning"])
+  .sw-si-compat__record-status {
+  color: var(--sw-state-requested);
+}
+
+.sw-si-labs tr[data-status="unsupported"] .sw-si-compat__record-status {
+  color: var(--sw-si-danger);
+}
+
+.sw-si-labs .sw-si-compat__record-status {
+  display: inline-block;
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-pill);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.5 var(--sw-font-body);
+  white-space: nowrap;
+}
+
+/* Source library: a card per fixture, then the producing applications. */
+.sw-si-fixture-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  gap: var(--sw-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-si-fixture-card {
+  display: grid;
+  gap: var(--sw-space-3);
+  align-content: start;
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.sw-si-fixture-card[data-state="mismatch"] {
+  border-color: color-mix(in srgb, var(--sw-danger) 45%, var(--sw-border));
+}
+
+.sw-si-fixture-card header,
+.sw-si-fixture-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sw-si-fixture-card__producer {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-fixture-card__file {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-si-fixture-card__facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-1) var(--sw-space-3);
+  margin: 0;
+}
+
+.sw-si-fixture-card__facts > div {
+  display: contents;
+}
+
+.sw-si-fixture-card__facts dt {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.75rem;
+}
+
+.sw-si-fixture-card__facts dd {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--sw-text-small);
+  line-height: 1.75rem;
+}
+
+.sw-si-labs .sw-si-chips {
+  grid-area: auto;
+}
+
+.sw-si-fixture-card__note,
+.sw-si-fixture-card__load {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-fixture-card__load[data-state="failed"] {
+  color: var(--sw-si-danger);
+}
+
+/* Operation evidence: the operation, its codes, then one row per warning. */
+.sw-si-warnings__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-4);
+  align-items: center;
+  margin-bottom: var(--sw-space-3);
+  color: var(--sw-fg-strong);
+}
+
+.sw-si-warnings__codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-labs .sw-si-warncode {
+  color: var(--sw-state-requested);
+}
+
+/* Delimited-text lab: CSV in beside the text out. */
+.sw-si-delimited {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sw-space-4);
+  align-items: start;
+}
+
+.sw-si-delimited__pane {
+  display: grid;
+  gap: var(--sw-space-3);
+  min-width: 0;
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.sw-si-delimited__input {
+  display: grid;
+  gap: var(--sw-space-1);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-delimited__input textarea,
+.sw-si-delimited__text {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--sw-space-3);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / 1.6 var(--sw-font-mono);
+}
+
+.sw-si-delimited__input textarea {
+  resize: vertical;
+}
+
+.sw-si-delimited__input textarea:focus-visible,
+.sw-si-delimited__text:focus-visible {
+  border-color: var(--sw-accent);
+  outline: 2px solid color-mix(in srgb, var(--sw-accent) 35%, transparent);
+}
+
+.sw-si-delimited__text {
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre;
+}
+
+.sw-si-delimited__line {
+  display: block;
+  margin: 0 calc(var(--sw-space-3) * -1);
+  padding: 0 var(--sw-space-3);
+}
+
+.sw-si-delimited__line[data-neutralized] {
+  background: color-mix(in srgb, var(--sw-warning) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--sw-warning);
+}
+
+.sw-si-delimited__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  align-items: center;
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+/* Security lab: attack rows, their typed errors, then the injection probe. */
+.sw-si-labs .sw-si-verdict {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1-5);
+  align-items: center;
+  padding: 0;
+  background: none;
+}
+
+.sw-si-verdict__name {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-labs .sw-si-errdetail {
+  margin: var(--sw-space-1) 0 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-si-attacks tr:is([data-state="accepted"], [data-state="fail"]) {
+  background: color-mix(in srgb, var(--sw-danger) 8%, transparent);
+}
+
+.sw-si-probe {
+  display: grid;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.sw-si-probe p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-si-probe__proof code {
+  color: var(--sw-fg-strong);
+}
+
+/* Runtime boundary: the codec handoff as three steps, then core's error. */
+.sw-si-handoff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--sw-space-2);
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-si-handoff__step {
+  display: grid;
+  gap: var(--sw-space-2);
+  align-content: start;
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+}
+
+.sw-si-handoff__step strong {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.4 var(--sw-font-display);
+}
+
+.sw-si-handoff__step code {
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-si-handoff__step span:last-child {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-si-handoff__arrow {
+  display: flex;
+  align-items: center;
+  color: var(--sw-fg-muted);
+}
+
+.sw-si-boundary {
+  display: grid;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+}
+
+.sw-si-boundary p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-si-boundary__error {
+  margin: var(--sw-space-2) 0 0;
+  padding: var(--sw-space-3);
+  border-radius: var(--sw-radius-md);
+  background: color-mix(in srgb, var(--sw-danger) 8%, var(--sw-surface-1));
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.6 var(--sw-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Tablets: two cards a row, the selected case below its table. */
+@media (max-width: 71.99rem) {
+  .sw-si-labs__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-si-labs .sw-si-compat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-si-labs .sw-si-compat > .sw-si-tablewrap {
+    max-height: 28rem;
+    border-right: 0;
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+  }
+}
+
+/* Narrow: one card a row, panes and handoff steps stacked. */
+@media (max-width: 51.99rem) {
+  .sw-si-delimited {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-si-handoff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-si-handoff__arrow {
+    justify-content: center;
+    rotate: 90deg;
+  }
+}
+
+@media (max-width: 39.99rem) {
+  .sw-si-labs__cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-si-lab-panel {
+    padding: var(--sw-space-4);
+  }
+}
