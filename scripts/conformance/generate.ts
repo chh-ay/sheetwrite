@@ -853,20 +853,14 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
         kind: "property",
         basis: "documented-semantics",
         oracle:
-          "The raw serial is preserved while the local formatter uses its documented date fallback.",
+          "Excel's 1900 date system counts the fictional 29 February 1900 as serial 60, and the formatter shows it as that day.",
       },
       tolerance: { kind: "exact" },
       inputs: [],
       formula: "=60+0",
       numberFormat: "yyyy-mm-dd",
       target: "B1",
-      expected: { type: "number", value: 60, displayedText: "1900-02-28" },
-      knownDivergence: {
-        reason:
-          "Excel's synthetic serial 60 displays as 1900-02-29; Sheetwrite preserves the raw serial and uses the documented JavaScript-date fallback 1900-02-28.",
-        producers: ["excel-desktop", "excel-web"],
-        alternate: { type: "number", value: 60, displayedText: "1900-02-29" },
-      },
+      expected: { type: "number", value: 60, displayedText: "1900-02-29" },
       observations: [],
     }),
     formulaCanary({

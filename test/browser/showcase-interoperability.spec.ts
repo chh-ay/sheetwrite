@@ -183,15 +183,13 @@ test("@portability compatibility results expose every truthful state from checke
   // truthful comparison boundary rather than inventing a numeric tolerance.
   await expect(page.getByTestId("compatibility-tolerance")).toHaveText("Exact type and value");
 
-  // Excel-specific behavior exists, but no reviewed Excel result is attached.
+  // Excel-specific behavior: serial 60 shows Excel's 29 February 1900, so the check
+  // passes locally with no known difference, and no reviewed Excel result is attached.
   await chooseFilter(page, "compatibility-behavior-filter", "Excel-specific behavior");
   await expect(detail).toHaveAttribute("data-behavior", "excel");
-  await expect(detail).toHaveAttribute("data-status", /known-difference/u);
-  await expect(page.getByTestId("known-difference")).toContainText("1900-02-29");
-  await expect(page.getByTestId("known-difference")).toContainText("Microsoft Excel desktop");
-  await expect(page.getByTestId("known-difference")).not.toContainText(
-    "Microsoft Excel for the web",
-  );
+  await expect(detail).toHaveAttribute("data-status", /local-pass/u);
+  await expect(detail).not.toHaveAttribute("data-status", /known-difference/u);
+  await expect(page.getByTestId("known-difference")).toHaveCount(0);
   await expect(page.getByTestId("app-result-excel-desktop")).toContainText("Result unavailable");
 
   // The separate checked feature boundary records the Google-only scope and
@@ -211,11 +209,12 @@ test("@portability compatibility results expose every truthful state from checke
   const unsupportedBadges = inventoryDetail.locator(".sw-si-compat__mode > span");
   await expect(unsupportedBadges).toHaveCount(1);
   await expect(unsupportedBadges).toHaveText("Unsupported · not claimed");
-  // Known difference.
+  // Known difference is a tested empty state: no check differs from Excel.
   await chooseFilter(page, "compatibility-behavior-filter", "All behavior scopes");
   await chooseFilter(page, "compatibility-status-filter", "Known difference");
-  await expect(detail).toHaveAttribute("data-status", /known-difference/u);
-  await expect(page.getByTestId("known-difference")).toBeVisible();
+  await expect(page.getByTestId("compatibility-results-empty")).toContainText(
+    "No known differences from Excel are recorded",
+  );
 
   // Explicit unsupported nonclaim.
   await chooseFilter(page, "compatibility-status-filter", "Unsupported / not claimed");

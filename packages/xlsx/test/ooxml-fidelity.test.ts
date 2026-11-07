@@ -4,6 +4,7 @@ import {
   type CalculationSettings,
   type DataValidationComparison,
   dateToSerial,
+  formatNumber,
   type WorkbookSnapshot,
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
@@ -413,6 +414,14 @@ describe("raw spec-authored OOXML fidelity", () => {
       rawWorkbook(sheet(body), { styles }),
     );
     expect(excel.sheets[0]!.cells[0]!.cells[1]!.value).toEqual({ kind: "literal", value: 60 });
+
+    // The 1904 workbook's serials 0 and 60 import as 1900-system serials 1462 and 1522 and
+    // show as real 1904 dates: the 1904 system has no fictional day. Only the 1900
+    // workbook's serial 60 shows as 29 February 1900.
+    expect(formatNumber(1462, "yyyy-mm-dd dddd")).toBe("1904-01-01 Friday");
+    expect(formatNumber(1522, "yyyy-mm-dd dddd")).toBe("1904-03-01 Tuesday");
+    expect(formatNumber(1521, "yyyy-mm-dd")).toBe("1904-02-29");
+    expect(formatNumber(60, "yyyy-mm-dd dddd")).toBe("1900-02-29 Wednesday");
   });
 
   it("maps validation defaults, policies, whole semantics, and multiple ranges without broadening", async () => {
