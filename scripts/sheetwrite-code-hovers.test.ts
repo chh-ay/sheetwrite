@@ -35,8 +35,8 @@ describe("TypeScript 7.1 hover parsing", () => {
       docs: "Persist one change. See {@link createGrid}.",
       tags: [
         ["param", "event the change"],
-        ["see", "{@link Grid}"],
-        ["example", "persist(event)"],
+        ["see", "Grid"],
+        ["example", "```tsx\npersist(event)\n```"],
       ],
     });
   });
