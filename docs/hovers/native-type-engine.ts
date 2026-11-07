@@ -34,6 +34,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { type Node, ScriptKind } from "typescript/ast";
 import {
   isIdentifier,
+  isJsxAttribute,
   isObjectLiteralExpression,
   isPropertyAssignment,
   isShorthandPropertyAssignment,
@@ -76,6 +77,8 @@ export interface NativeIdentifier {
   character: number;
   /** The name of a property in an object literal (`name: value` or `name`). */
   propertyName: boolean;
+  /** The name of a JSX attribute (`height` in `<Grid height={400} />`). */
+  jsxAttribute: boolean;
 }
 
 export interface IdentifierSelection {
@@ -268,7 +271,11 @@ class LanguageServer {
   private buffered = Buffer.alloc(0);
 
   constructor(executable: string) {
-    this.child = spawn(executable, ["--lsp", "--stdio"], { stdio: ["pipe", "pipe", "inherit"] });
+    this.child = spawn(executable, ["--lsp", "--stdio"], {
+      stdio: ["pipe", "pipe", "inherit"],
+      // Collecting at 75% heap growth instead of 100% kept the same time with less memory.
+      env: { ...process.env, GOGC: process.env.GOGC ?? "75" },
+    });
     this.child.stdout?.on("data", (chunk: Buffer) => this.receive(chunk));
     this.child.on("exit", (code: number | null) => {
       const failure = new Error(`TypeScript 7.1 language server exited with code ${code}`);
@@ -472,6 +479,8 @@ export class NativeTypeEngine {
   private readonly declarationFiles = new Map<string, string[]>();
   /** Names each batch's project directory. */
   private batches = 0;
+  /** Hovers taken from their declaration; the isolated recheck leaves them as they are. */
+  private readonly declaredHovers = new WeakSet<SheetwriteTypeHover>();
   private queue: Sample[] = [];
   private flushScheduled = false;
   private session: Promise<{ server: LanguageServer; cache: HoverCache }> | undefined;
@@ -714,6 +723,7 @@ export class NativeTypeEngine {
     hovers: SheetwriteTypeHover[],
   ): Promise<SheetwriteTypeHover[]> {
     const suspects = hovers.filter((hover) => {
+      if (this.declaredHovers.has(hover)) return false;
       const owner = GENERIC_MEMBER_OWNER.exec(hover.text);
       return owner?.[1] !== undefined && TYPE_PARAMETER_ARGUMENT.test(owner[1]);
     });
@@ -801,8 +811,18 @@ export class NativeTypeEngine {
     const hovers = await Promise.all(
       answers.map(async ({ identifier, definitions, ...answer }) => {
         let { quickInfo } = answer;
+        let declared = false;
         if (identifier.propertyName && LITERAL_PROPERTY.test(quickInfo.text)) {
           quickInfo = (await this.declaredProperty(server, definitions, file)) ?? quickInfo;
+        } else if (identifier.jsxAttribute) {
+          // A JSX attribute of a generic component got the instantiated or the declared
+          // owner depending on checking order; the declaration's own hover is the same in
+          // every run, and it is what 5.9 showed.
+          const declaration = await this.declaredProperty(server, definitions, file);
+          if (declaration) {
+            quickInfo = { ...declaration, docs: declaration.docs || quickInfo.docs };
+            declared = true;
+          }
         }
         if (!quickInfo.docs) {
           const docs = this.mergedDeclarationDocs(definitions, file);
@@ -819,7 +839,9 @@ export class NativeTypeEngine {
           line: identifier.line,
           character: identifier.character,
         };
-        return this.hover(quickInfo, position, origin);
+        const hover = this.hover(quickInfo, position, origin);
+        if (declared) this.declaredHovers.add(hover);
+        return hover;
       }),
     );
     return hovers;
@@ -932,6 +954,7 @@ export class NativeTypeEngine {
         start,
         end: start + text.length,
         propertyName: false,
+        jsxAttribute: false,
         ...positionAt(starts, start),
       });
     }
@@ -955,6 +978,7 @@ export class NativeTypeEngine {
       const starts = lineStarts(source);
       const identifiers: NativeIdentifier[] = [];
       const propertyNames = new Set<Node>();
+      const jsxAttributeNames = new Set<Node>();
       const visit = (node: Node, parent?: Node): void => {
         if (
           (isPropertyAssignment(node) || isShorthandPropertyAssignment(node)) &&
@@ -963,6 +987,7 @@ export class NativeTypeEngine {
         ) {
           propertyNames.add(node.name);
         }
+        if (isJsxAttribute(node)) jsxAttributeNames.add(node.name);
         if (isIdentifier(node) && !this.options.internalIdentifier.test(node.text)) {
           const start = offset + node.getStart(sourceFile);
           identifiers.push({
@@ -970,6 +995,7 @@ export class NativeTypeEngine {
             start,
             end: offset + node.end,
             propertyName: propertyNames.has(node),
+            jsxAttribute: jsxAttributeNames.has(node),
             ...positionAt(starts, start),
           });
         }
