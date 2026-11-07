@@ -77,6 +77,35 @@ describe("formatNumber", () => {
     expect(serialToDate(60).toISOString()).toBe("1900-02-28T00:00:00.000Z");
   });
 
+  it("shows serial 60 as Excel's 29 February 1900 in every date code", () => {
+    expect(formatNumber(59, "yyyy-mm-dd")).toBe("1900-02-28");
+    expect(formatNumber(60, "yyyy-mm-dd")).toBe("1900-02-29");
+    expect(formatNumber(61, "yyyy-mm-dd")).toBe("1900-03-01");
+    expect(formatNumber(60, "d mmm yyyy")).toBe("29 Feb 1900");
+    expect(formatNumber(60, "dd/mm/yy")).toBe("29/02/00");
+    expect(formatNumber(60, "mmmm")).toBe("February");
+    expect(formatNumber(60, "dddd")).toBe("Wednesday");
+    expect(formatNumber(60, "ddd d")).toBe("Wed 29");
+    expect(formatNumber(61, "dddd")).toBe("Thursday");
+    expect(formatNumber(60.75, "yyyy-mm-dd hh:mm")).toBe("1900-02-29 18:00");
+    expect(formatNumber(1, "yyyy-mm-dd")).toBe("1900-01-01");
+    expect(formatNumber(45_351, "d mmmm yyyy")).toBe("29 February 2024");
+  });
+
+  it("reads 29 February 1900 back as serial 60", () => {
+    expect(parseDateInput("1900-02-29")).toBe(60);
+    expect(parseDateInput("1900-02-29 18:00")).toBe(60.75);
+    expect(parseDateInput("02/29/1900")).toBe(60);
+    expect(parseDateInput("29/02/1900")).toBe(60);
+    expect(parseDateInput("1900-02-28")).toBe(59);
+    expect(parseDateInput("1900-03-01")).toBe(61);
+    expect(parseDateInput(formatNumber(60, "yyyy-mm-dd"))).toBe(60);
+
+    for (const invalid of ["1900-02-30", "1899-02-29", "1901-02-29", "1900-02-29 24:00"]) {
+      expect(parseDateInput(invalid), invalid).toBeNull();
+    }
+  });
+
   it("parses supported UTC calendar forms and rejects ambiguous invalid components", () => {
     const leapDay = dateToSerial(new Date(Date.UTC(2024, 1, 29)));
     expect(parseDateInput(" 2024-02-29 ")).toBe(leapDay);

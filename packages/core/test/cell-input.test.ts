@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cellScalarToText, parseCellInput } from "../src/cell-input.js";
+import { cellDisplayText, cellScalarToText, parseCellInput } from "../src/cell-input.js";
 
 describe("parseCellInput", () => {
   it("keeps cross-sheet links as formulas", () => {
@@ -37,6 +37,15 @@ describe("parseCellInput", () => {
     expect(parseCellInput("USD 12", "currency")).toEqual({
       kind: "literal",
       value: "USD 12",
+    });
+  });
+
+  it("keeps serial 60 through the editor and through its displayed date", () => {
+    expect(cellDisplayText(60, "yyyy-mm-dd")).toBe("1900-02-29");
+    expect(parseCellInput(cellScalarToText(60), "number")).toEqual({ kind: "literal", value: 60 });
+    expect(parseCellInput(cellDisplayText(60, "yyyy-mm-dd"), "date")).toEqual({
+      kind: "literal",
+      value: 60,
     });
   });
 });
