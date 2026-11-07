@@ -23,7 +23,7 @@ import { createRequire } from "node:module";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { type Node, ScriptKind } from "typescript-7.1/ast";
+import { type Node, ScriptKind, SyntaxKind } from "typescript-7.1/ast";
 import { isIdentifier } from "typescript-7.1/ast/is";
 import { API } from "typescript-7.1/async";
 
@@ -65,9 +65,22 @@ interface PendingRequest {
   reject(error: Error): void;
 }
 
+interface LspPosition {
+  line: number;
+  character: number;
+}
+
 interface LspLocation {
   uri?: string;
   targetUri?: string;
+  range?: { start: LspPosition };
+  targetSelectionRange?: { start: LspPosition };
+}
+
+interface Definition {
+  file: string;
+  uri: string;
+  position: LspPosition;
 }
 
 /** Long enough to span the gaps between code blocks in a site build. */
@@ -86,6 +99,17 @@ const TYPED_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", 
 /** Build output that never feeds the `paths` sources (Rust targets, installed packages). */
 const UNHASHED_DIRECTORIES = new Set(["node_modules", "target", ".git"]);
 const ENGINE_FILES = ["src/lib/native-type-engine.ts", "src/lib/native-quick-info.ts"];
+/**
+ * A property of the object literal itself: no declaring type before the name, and not
+ * optional, which only a property of the contextual type can be.
+ */
+const LITERAL_PROPERTY = /^\(property\) (?:"[^"]+"|[\w$]+): /;
+/**
+ * A property hover that names its declaring type (`Column.header`). Without one, the
+ * declaration sits in a generic or inline type and its hover shows unfilled type
+ * parameters (`props: Props`), which says less than the literal's own type.
+ */
+const OWNED_PROPERTY = /^\(property\) [\w$]+(?:<[^>]*>)?\.[\w$]+\??: /;
 
 function normalizedPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/\/{2,}/g, "/");
@@ -210,10 +234,7 @@ class LanguageServer {
     return hover?.contents?.value;
   }
 
-  async definitionFiles(
-    uri: string,
-    position: { line: number; character: number },
-  ): Promise<string[]> {
+  async definitions(uri: string, position: LspPosition): Promise<Definition[]> {
     const result = (await this.request("textDocument/definition", {
       textDocument: { uri },
       position,
@@ -221,7 +242,8 @@ class LanguageServer {
     const locations = result === null ? [] : Array.isArray(result) ? result : [result];
     return locations.flatMap((location) => {
       const target = location.targetUri ?? location.uri;
-      return target ? [fileURLToPath(target)] : [];
+      const start = location.targetSelectionRange?.start ?? location.range?.start;
+      return target && start ? [{ file: fileURLToPath(target), uri: target, position: start }] : [];
     });
   }
 
@@ -529,10 +551,22 @@ export class NativeTypeEngine {
     const answers = await Promise.all(
       identifiers.map(async (identifier) => {
         const markdown = await server.hover(uri, identifier);
-        const quickInfo = markdown ? parseNativeHover(markdown) : undefined;
+        let quickInfo = markdown ? parseNativeHover(markdown) : undefined;
         if (!quickInfo?.text) return undefined;
-        const definitions = await server.definitionFiles(uri, identifier);
-        return { identifier, quickInfo, origin: hoverOrigin(definitions, file) };
+        const definitions = await server.definitions(uri, identifier);
+        if (identifier.propertyName && LITERAL_PROPERTY.test(quickInfo.text)) {
+          const declared = await this.declaredProperty(server, definitions, file);
+          // A quoted name (`"workbook": workbook`) is an attribute name that 5.9 never
+          // hovered; it gets a hover only when it leads to a declared property.
+          if (identifier.propertyName === "quoted" && !declared) return undefined;
+          quickInfo = declared ?? quickInfo;
+        }
+        if (!quickInfo.docs) {
+          const docs = await this.mergedDeclarationDocs(server, definitions, file);
+          if (docs) quickInfo = { ...quickInfo, docs };
+        }
+        const files = definitions.map((definition) => definition.file);
+        return { identifier, quickInfo, origin: hoverOrigin(files, file) };
       }),
     );
     const hovers: SheetwriteTypeHover[] = [];
@@ -557,6 +591,48 @@ export class NativeTypeEngine {
     }
     return hovers;
   }
+  /**
+   * 5.9 answered a property name in an object literal with the property it fills, as
+   * declared in the contextual type (`Column.header` and its docs); 7.1 often answers
+   * with the literal's own property (`header: string`, no docs). The definition still
+   * points at the declared property, so its hover is used when it names the declaring type.
+   */
+  private async declaredProperty(
+    server: LanguageServer,
+    definitions: readonly Definition[],
+    sampleFile: string,
+  ) {
+    const declared = definitions.filter(
+      (definition) => normalizedPath(definition.file) !== sampleFile,
+    );
+    if (declared.length !== 1 || !declared[0]) return undefined;
+    const markdown = await server.hover(declared[0].uri, declared[0].position);
+    const quickInfo = markdown ? parseNativeHover(markdown) : undefined;
+    return quickInfo && OWNED_PROPERTY.test(quickInfo.text) ? quickInfo : undefined;
+  }
+
+  /**
+   * 5.9 joined the docs of every declaration of a symbol; 7.1 shows none when the
+   * declaration it reads has none, as for `AbortController`, whose value (`declare var`)
+   * is undocumented and whose interface carries the docs. The first other declaration
+   * with docs supplies them.
+   */
+  private async mergedDeclarationDocs(
+    server: LanguageServer,
+    definitions: readonly Definition[],
+    sampleFile: string,
+  ): Promise<string | undefined> {
+    const declarations = definitions.filter(
+      (definition) => normalizedPath(definition.file) !== sampleFile,
+    );
+    if (declarations.length < 2) return undefined;
+    for (const declaration of declarations) {
+      const markdown = await server.hover(declaration.uri, declaration.position);
+      const docs = markdown ? parseNativeHover(markdown)?.docs : undefined;
+      if (docs) return docs;
+    }
+    return undefined;
+  }
 
   private async identifiers(parser: API, file: string, sample: Sample) {
     const lease = await parser.createSourceFile(file, sample.source, {
@@ -571,13 +647,41 @@ export class NativeTypeEngine {
         end: number;
         line: number;
         character: number;
+        /** The name of a property in an object literal (`name: value`, `name`, `"name": value`). */
+        propertyName?: "plain" | "quoted";
       }[] = [];
-      const visit = (node: Node): void => {
+      const propertyNames = new Set<Node>();
+      const visit = (node: Node, parent?: Node): void => {
+        if (
+          (node.kind === SyntaxKind.PropertyAssignment ||
+            node.kind === SyntaxKind.ShorthandPropertyAssignment) &&
+          parent?.kind === SyntaxKind.ObjectLiteralExpression
+        ) {
+          const { name } = node as Node & { name: Node };
+          propertyNames.add(name);
+        }
         if (isIdentifier(node) && !this.options.internalIdentifier.test(node.text)) {
           const start = node.getStart(sourceFile);
-          identifiers.push({ text: node.text, start, end: node.end, ...positionAt(starts, start) });
+          identifiers.push({
+            text: node.text,
+            start,
+            end: node.end,
+            ...(propertyNames.has(node) ? { propertyName: "plain" as const } : {}),
+            ...positionAt(starts, start),
+          });
+        } else if (node.kind === SyntaxKind.StringLiteral && propertyNames.has(node)) {
+          // svelte2tsx writes component props as `"workbook": workbook`.
+          const { text } = node as Node & { text: string };
+          const start = node.getStart(sourceFile) + 1;
+          identifiers.push({
+            text,
+            start,
+            end: start + text.length,
+            propertyName: "quoted",
+            ...positionAt(starts, start),
+          });
         }
-        node.forEachChild(visit);
+        node.forEachChild((child) => visit(child, node));
       };
       visit(sourceFile);
       return identifiers;
