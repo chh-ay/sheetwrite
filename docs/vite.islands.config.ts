@@ -10,19 +10,20 @@ const SKIPPED_STYLESHEET = "\0sheetwrite-islands-skipped-stylesheet";
 /**
  * The site build already linked one stylesheet with every style in the head
  * (`cssCodeSplit: false`), islands' styles included; the islands bundle must
- * not load them a second time.
+ * not load them a second time. `?url` imports stay: Try it's runtime hands
+ * the engine's stylesheet URL to its frame.
  */
 function skipStylesheets(): Plugin {
-  return {
-    name: "sheetwrite:islands-skip-stylesheets",
-    enforce: "pre",
-    resolveId(source) {
-      return /\.css(?:\?|$)/.test(source) ? SKIPPED_STYLESHEET : undefined;
-    },
-    load(id) {
-      return id === SKIPPED_STYLESHEET ? "export {};" : undefined;
-    },
-  };
+ return {
+  name: "sheetwrite:islands-skip-stylesheets",
+  enforce: "pre",
+  resolveId(source) {
+   return /\.css$/.test(source) ? SKIPPED_STYLESHEET : undefined;
+  },
+  load(id) {
+   return id === SKIPPED_STYLESHEET ? "export {};" : undefined;
+  },
+ };
 }
 
 /**
@@ -31,13 +32,15 @@ function skipStylesheets(): Plugin {
  * from every docs page in place of the router app.
  */
 export default defineConfig({
-  // The site build already copied public/.
-  publicDir: false,
-  build: {
-    outDir: "dist/client",
-    emptyOutDir: false,
-    manifest: ISLANDS_MANIFEST,
-    rollupOptions: { input: { islands: ISLANDS_ENTRY } },
-  },
-  plugins: [skipStylesheets(), expressiveCodeAssets(), formulaTables(), viteReact()],
+ // The site build already copied public/.
+ publicDir: false,
+ // As the site build: Try it's runtime is an ES worker bundle that loads packages as chunks.
+ worker: { format: "es" },
+ build: {
+  outDir: "dist/client",
+  emptyOutDir: false,
+  manifest: ISLANDS_MANIFEST,
+  rollupOptions: { input: { islands: ISLANDS_ENTRY } },
+ },
+ plugins: [skipStylesheets(), expressiveCodeAssets(), formulaTables(), viteReact()],
 });
