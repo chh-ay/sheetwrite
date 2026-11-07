@@ -51,6 +51,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "6.0.3",
     "@vitejs/plugin-vue": "6.0.8",
+    "@vue/content-mapper": "4.0.0-alpha.3",
     "@vue/language-core": "3.3.7",
     "expressive-code": "0.44.0",
     "pagefind": "1.5.2",
@@ -64,6 +65,7 @@
     "svelte2tsx": "0.7.58",
     "tailwindcss": "^4.3.2",
     "tinyglobby": "0.2.17",
+    "tsrs": "0.20.1-ts7.1.0-beta",
     "typescript": "5.9.3",
     "typescript-7.1": "npm:typescript@7.1.0-beta",
     "vite": "8.1.6"
