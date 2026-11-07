@@ -1,7 +1,9 @@
 import mdx from "@mdx-js/rollup";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
+import react from "@vitejs/plugin-react";
 import { globSync } from "tinyglobby";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type PluginOption } from "vite";
 import solid from "vite-plugin-solid";
 
 import { formulaTables } from "../docs/src/lib/formula-tables.ts";
@@ -41,6 +43,28 @@ const SHOWCASE_PAGES = [
     "version-history",
   ].map((id) => `/showcases/${id}/`),
 ];
+
+/**
+ * The React workbench (/react/) and its React-only modules. The /react/ and
+ * /svelte/ pages demonstrate @sheetwrite/react and @sheetwrite/svelte, so their
+ * workbenches stay written in React and Svelte: these files compile as React
+ * (never as Solid), `.svelte` files compile with Svelte, and each runtime loads
+ * only in its page's island (src/showcases/frameworks/FrameworkMount.tsx).
+ */
+export const REACT_WORKBENCH_FILES = [
+  "showcases/ReactWorkbench.tsx",
+  "showcases/ui/DemoButton.tsx",
+  "showcases/ui/DemoRadioGroup.tsx",
+  "showcases/ui/DemoRenderingMode.tsx",
+  "showcases/ui/DemoSelect.tsx",
+  "components/Icon.tsx",
+  "lib/use-action.tsx",
+].map((file) => `${DOCS_SOURCE}${file}`);
+
+/** The compilers of the React and Svelte workbenches; both configs use them. */
+export function frameworkWorkbenches(): PluginOption[] {
+  return [react({ include: REACT_WORKBENCH_FILES }), svelte()];
+}
 
 /**
  * The browsers the site's CSS is compiled for (Lightning CSS prefixes and
@@ -169,6 +193,7 @@ export default defineConfig({
         autoSubfolderIndex: true,
       },
     }),
-    solid({ ssr: true, extensions: [".md", ".mdx"] }),
+    solid({ ssr: true, extensions: [".md", ".mdx"], exclude: REACT_WORKBENCH_FILES }),
+    ...frameworkWorkbenches(),
   ],
 });

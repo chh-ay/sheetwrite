@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 
 import { expressiveCodeAssets } from "../docs/vite.config.ts";
-import { CSS_OPTIONS } from "./vite.config.ts";
+import { CSS_OPTIONS, frameworkWorkbenches, REACT_WORKBENCH_FILES } from "./vite.config.ts";
 
 const DOCS_SOURCE = new URL("../docs/src/", import.meta.url).pathname;
 
@@ -26,5 +26,9 @@ export default defineConfig({
     rollupOptions: { input: { islands: "src/islands/client.tsx" } },
   },
   // `ssr: true` compiles hydratable templates: islands claim the server's nodes instead of recreating them.
-  plugins: [expressiveCodeAssets(), solid({ ssr: true })],
+  plugins: [
+    expressiveCodeAssets(),
+    solid({ ssr: true, exclude: REACT_WORKBENCH_FILES }),
+    ...frameworkWorkbenches(),
+  ],
 });
