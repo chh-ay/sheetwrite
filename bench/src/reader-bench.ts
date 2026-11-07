@@ -571,6 +571,11 @@ class FixtureWriter {
 const MAIN_FIXTURE =
   "100k x 8: A num, B 5k labels, C num/text/bool/blank, D =A*2, E num w/ 3 gaps, F-H num";
 const COND_FIXTURE = `${MAIN_FIXTURE}; 4 conditional rules (A>${COND_A_THRESHOLD}, B="item-17", C contains "x1", =D1>A1*3)`;
+/**
+ * One formula rule over every column, so each visible cell evaluates it. The
+ * other conditional sheet has one formula rule among four, on one column.
+ */
+const FORMULA_RULE_FIXTURE = `${MAIN_FIXTURE}; 1 formula rule over A:H (=$A1>${COND_A_THRESHOLD})`;
 const RANGE_FIXTURE =
   "100k x 6 (A-D as main); 8 formulas over ~100k-row ranges; edit A/B/C last row + recompute";
 
@@ -696,6 +701,16 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     Uint8Array.of(0, 0, 0, 0),
   );
 
+  const formulaRuleSheet = fixtures.dataSheet(MAIN_COLUMNS);
+  store.setConditionalRules(
+    formulaRuleSheet,
+    Uint8Array.of(COND_FORMULA),
+    Uint32Array.of(0, COLUMN_A, lastRow, MAIN_COLUMNS - 1),
+    Float64Array.of(0),
+    [`=$A1>${COND_A_THRESHOLD}`],
+    Uint8Array.of(0),
+  );
+
   // Range scenarios build their sheets last, after the main and conditional sheets.
   const rangeCases = RANGE_FORMULAS.map(({ name, formula }): ReaderCase => ({
     name,
@@ -726,6 +741,7 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     });
   const windowReader = reader("window", MAIN_FIXTURE);
   const conditionalWindowReader = reader("window", COND_FIXTURE);
+  const formulaRuleWindowReader = reader("window", FORMULA_RULE_FIXTURE);
   const queryReader = reader("query", MAIN_FIXTURE);
   const cellsReader = reader("cells", MAIN_FIXTURE);
   const windowOf = (sheet: number, iteration: number, rows: number, sink: ResultSink): void =>
@@ -742,6 +758,9 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     ),
     conditionalWindowReader("getWindow 1000x8 cond rules", (i, sink) =>
       windowOf(conditionalSheet, i, LARGE_WINDOW_ROWS, sink),
+    ),
+    formulaRuleWindowReader("getWindow 1000x8 formula rule", (i, sink) =>
+      windowOf(formulaRuleSheet, i, LARGE_WINDOW_ROWS, sink),
     ),
     windowReader("getWindowRows 40x8 sorted", (_, sink) =>
       consumeWindow(store.getWindowRows(mainSheet, sortedViewportRows, allColumns), sink),
