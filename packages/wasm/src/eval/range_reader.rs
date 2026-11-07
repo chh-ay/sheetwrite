@@ -12,8 +12,7 @@ use super::{EvalPass, LiteralSources};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
-    LITERAL_KIND_BITS, RANGE_CELL_LIMIT,
+    CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, LITERAL_KIND_BITS, RANGE_CELL_LIMIT,
 };
 
 #[cfg(test)]
