@@ -101,8 +101,19 @@ interface CheckedValue {
   readonly error?: string;
 }
 
-/** A checked result as a reader sees it in a cell; structured results keep their JSON. */
-function ExpectedValue({ result, testId }: { result: CheckedValue; testId?: string }) {
+/**
+ * A checked result as a reader sees it in a cell; structured results keep
+ * their JSON, or show only their type where a table row has no room for it.
+ */
+function ExpectedValue({
+  result,
+  testId,
+  compact = false,
+}: {
+  result: CheckedValue;
+  testId?: string;
+  compact?: boolean;
+}) {
   const scalar =
     result.type === "number" || result.type === "string" || result.type === "boolean"
       ? result.type === "boolean"
@@ -120,6 +131,13 @@ function ExpectedValue({ result, testId }: { result: CheckedValue; testId?: stri
       <p className="sw-si-value" data-testid={testId} data-type={result.type}>
         <code>{scalar}</code>
         <span>{result.type}</span>
+      </p>
+    );
+  }
+  if (compact) {
+    return (
+      <p className="sw-si-value" data-type={result.type}>
+        <span>{result.type} result</span>
       </p>
     );
   }
@@ -196,7 +214,7 @@ const SUPPORTED_TESTS = TEST_SET.totalTests - TEST_SET.unsupported;
 export const VAULT_SUMMARY = `${TEST_SET.localPassed.toLocaleString("en")} of ${SUPPORTED_TESTS.toLocaleString("en")} supported tests pass`;
 
 /** Leading hex digits a table row shows; the copy button copies the full digest. */
-const DIGEST_SHOWN = 12;
+const DIGEST_SHOWN = 8;
 
 /** The test set at a glance: its pass rate, its parts and its checksum. */
 function VaultSummary() {
@@ -286,7 +304,7 @@ function ResultRow({
         </button>
       </th>
       <td>
-        <ExpectedValue result={entry.expected} />
+        <ExpectedValue compact result={entry.expected} />
       </td>
       <td>
         <span className="sw-si-compat__tags">

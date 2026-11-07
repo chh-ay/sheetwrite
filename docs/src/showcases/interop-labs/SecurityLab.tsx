@@ -1,5 +1,6 @@
 // The Security lab: hostile packages and over-limit inputs run through the
-// real import path, one row each with the attack, the typed error and the limit hit.
+// real import path, one row each with the attack, the typed error and the
+// resource limit it hit.
 
 import { pendingProps } from "../../lib/use-action.js";
 import type { InteroperabilityWorkbench } from "../InteroperabilityShowcase.js";
@@ -10,6 +11,17 @@ import {
   INTEROP_INJECTION_TEXT,
   type RejectionReport,
 } from "../scenarios/interoperability.js";
+import { CopyValue } from "./CopyValue.js";
+
+/** Decimals with three or more places, and integers of four or more digits. */
+const RAW_NUMBER = /\b\d+\.\d{3,}\b|\b\d{4,}\b/gu;
+
+/** An error message with its numbers grouped and rounded for reading; the copy keeps the raw text. */
+function readableMessage(message: string): string {
+  return message.replace(RAW_NUMBER, (number) =>
+    Number(number).toLocaleString("en", { maximumFractionDigits: 1 }),
+  );
+}
 
 interface AttackRow {
   readonly id: string;
@@ -43,6 +55,11 @@ function Verdict({ report }: Readonly<{ report: RejectionReport | null | undefin
       </span>
       <code>{report.code ?? report.errorName}</code>
       <span className="sw-si-verdict__name">{report.errorName}</span>
+      {report.limit && (
+        <span className="sw-si-verdict__limit">
+          at <code>{report.limit}</code>
+        </span>
+      )}
     </span>
   );
 }
@@ -59,7 +76,6 @@ function AttackTable({ rows }: Readonly<{ rows: readonly AttackRow[] }>) {
             <th scope="col">Input</th>
             <th scope="col">Attack</th>
             <th scope="col">Typed rejection</th>
-            <th scope="col">Limit hit</th>
           </tr>
         </thead>
         <tbody>
@@ -71,9 +87,16 @@ function AttackTable({ rows }: Readonly<{ rows: readonly AttackRow[] }>) {
               <td>{row.attack}</td>
               <td>
                 <Verdict report={row.report} />
-                {row.report?.message && <p className="sw-si-errdetail">{row.report.message}</p>}
+                {row.report?.message && (
+                  <p className="sw-si-errdetail">
+                    <CopyValue
+                      label={`the error message for ${row.input}`}
+                      shown={readableMessage(row.report.message)}
+                      value={row.report.message}
+                    />
+                  </p>
+                )}
               </td>
-              <td>{row.report?.limit ? <code>{row.report.limit}</code> : "—"}</td>
             </tr>
           ))}
         </tbody>

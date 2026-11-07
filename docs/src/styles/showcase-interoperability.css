@@ -2743,9 +2743,18 @@
   background: none;
 }
 
-.sw-si-verdict__name {
+.sw-si-verdict__name,
+.sw-si-verdict__limit {
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-caption);
+}
+
+.sw-si-verdict__limit code {
+  color: var(--sw-fg-strong);
+}
+
+.sw-si-labs .sw-si-errdetail .sw-si-copy code {
+  color: var(--sw-fg-muted);
 }
 
 .sw-si-labs .sw-si-errdetail {
