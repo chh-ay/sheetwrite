@@ -129,8 +129,6 @@ const PARSER_IDLE_MS = 1000;
  * server about 150 MiB smaller; 32 or fewer get slower as the program is rebuilt more often.
  */
 const SAMPLES_PER_PROJECT = 64;
-/** Shared projects in flight at once; see `flush`. */
-const PROJECTS_IN_FLIGHT = 2;
 /**
  * In a program shared by many samples the 7.1 server sometimes prints a member's
  * declared owner instead of the instantiated one (`Array<T>.length` for
@@ -607,23 +605,11 @@ export class NativeTypeEngine {
         this.inFlight.set(sample.key, result);
         result.then(sample.resolve, sample.reject);
       }
-      // Two batches at a time: the server builds the next batch's program while it
-      // answers the current one, and only two programs are held at once.
-      const batches: Sample[][] = [];
+      // One batch at a time: two in flight held 1.1 GB and were no faster.
       for (let index = 0; index < misses.length; index += SAMPLES_PER_PROJECT) {
-        batches.push(misses.slice(index, index + SAMPLES_PER_PROJECT));
+        const samples = misses.slice(index, index + SAMPLES_PER_PROJECT);
+        await this.analyzeTogether(server, cache, samples, "shared");
       }
-      let next = 0;
-      const analyzeBatches = async (project: string): Promise<void> => {
-        for (let samples = batches[next++]; samples; samples = batches[next++]) {
-          await this.analyzeTogether(server, cache, samples, project);
-        }
-      };
-      await Promise.all(
-        Array.from({ length: Math.min(PROJECTS_IN_FLIGHT, batches.length) }, (_, index) =>
-          analyzeBatches(`shared-${index}`),
-        ),
-      );
     } catch (error) {
       const failure = error instanceof Error ? error : new Error(String(error));
       for (const sample of batch) sample.reject(failure);
