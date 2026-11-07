@@ -189,16 +189,23 @@ function hash(...parts: readonly string[]): string {
   return digest.digest("hex");
 }
 
-/** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
+/**
+ * Where a hovered symbol's definitions live; drives the docs hover-quality gate.
+ * `libraryDirectory` holds the server's built-in `lib.*.d.ts` files, which count as lib
+ * wherever the server is installed.
+ */
 function hoverOrigin(
   definitionFiles: readonly string[],
   sampleFile: string,
+  libraryDirectory: string,
 ): SheetwriteHoverOrigin | undefined {
   let origin: SheetwriteHoverOrigin | undefined;
   for (const definitionFile of definitionFiles) {
     const file = normalizedPath(definitionFile);
     if (file === sampleFile) return "snippet";
-    if (!file.includes("/node_modules/")) return "workspace";
+    if (!file.includes("/node_modules/") && !file.startsWith(libraryDirectory)) {
+      return "workspace";
+    }
     origin = "lib";
   }
   return origin;
@@ -502,6 +509,8 @@ export class NativeTypeEngine {
   private parser: API | undefined;
   private parserIdle: NodeJS.Timeout | undefined;
   private activeFlushes = 0;
+  /** The server's own directory, which holds its built-in `lib.*.d.ts` files. */
+  private readonly libraryDirectory = `${normalizedPath(dirname(realpathSync(serverExecutable())))}/`;
 
   constructor(private readonly options: NativeTypeEngineOptions) {
     this.projectDirectory = normalizedPath(PROJECT_DIRECTORY);
@@ -847,6 +856,7 @@ export class NativeTypeEngine {
         const origin = hoverOrigin(
           definitions.map((definition) => definition.file),
           file,
+          this.libraryDirectory,
         );
         const position = {
           start: identifier.start,
