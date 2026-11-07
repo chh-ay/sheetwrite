@@ -1,7 +1,9 @@
 import mdx from "@mdx-js/rollup";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
+import react from "@vitejs/plugin-react";
 import { globSync } from "tinyglobby";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type PluginOption } from "vite";
 import solid from "vite-plugin-solid";
 
 import { formulaTables } from "../docs/src/lib/formula-tables.ts";
@@ -17,6 +19,61 @@ const PAGES = globSync("**/*.{md,mdx}", { cwd: CONTENT_ROOT }).map((source) => {
   const page = source.replace(/\.(?:md|mdx)$/, "").replace(/(?:^|\/)index$/, "");
   return page.length === 0 ? "/docs/" : `/docs/${page}/`;
 });
+
+/**
+ * The fixture pages for the browser tests (src/routes/test.*.tsx) are
+ * prerendered only when SHEETWRITE_DOCS_FIXTURES=1 (`bun run build:test`), so
+ * the published site has none.
+ */
+const BUILD_FIXTURES = process.env.SHEETWRITE_DOCS_FIXTURES === "1";
+
+/** The showcase pages (src/routes/showcases.*.tsx), each prerendered like a docs page. */
+const SHOWCASE_PAGES = [
+  "/showcases/",
+  ...[
+    "spreadsheet",
+    "analysis",
+    "data-tools",
+    "formulas",
+    "formatting",
+    "host-rows",
+    "performance",
+    "database",
+    "collaboration",
+    "interoperability",
+    "sort",
+    "functions",
+    "recalculation",
+    "data-model",
+    "dashboards",
+    "queries",
+    "version-history",
+  ].map((id) => `/showcases/${id}/`),
+  // The framework workbenches (src/routes/{vanilla,react,vue,svelte}.tsx).
+  ...["vanilla", "react", "vue", "svelte"].map((framework) => `/${framework}/`),
+];
+
+/**
+ * The React workbench (/react/) and its React-only modules. The /react/ and
+ * /svelte/ pages demonstrate @sheetwrite/react and @sheetwrite/svelte, so their
+ * workbenches stay written in React and Svelte: these files compile as React
+ * (never as Solid), `.svelte` files compile with Svelte, and each runtime loads
+ * only in its page's island (src/showcases/frameworks/FrameworkMount.tsx).
+ */
+export const REACT_WORKBENCH_FILES = [
+  "showcases/ReactWorkbench.tsx",
+  "showcases/ui/DemoButton.tsx",
+  "showcases/ui/DemoRadioGroup.tsx",
+  "showcases/ui/DemoRenderingMode.tsx",
+  "showcases/ui/DemoSelect.tsx",
+  "components/Icon.tsx",
+  "lib/use-action.tsx",
+].map((file) => `${DOCS_SOURCE}${file}`);
+
+/** The compilers of the React and Svelte workbenches; both configs use them. */
+export function frameworkWorkbenches(): PluginOption[] {
+  return [react({ include: REACT_WORKBENCH_FILES }), svelte()];
+}
 
 /**
  * The browsers the site's CSS is compiled for (Lightning CSS prefixes and
@@ -131,6 +188,7 @@ export default defineConfig({
       pages: [
         { path: "/" },
         ...PAGES.map((path) => ({ path })),
+        ...SHOWCASE_PAGES.map((path) => ({ path })),
         // Static hosts serve /404.html for every URL without a page; the
         // deployment fallback supplies the 404 status for unknown URLs.
         { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },
@@ -140,8 +198,11 @@ export default defineConfig({
         crawlLinks: false,
         failOnError: true,
         autoSubfolderIndex: true,
+        // Every static route is discovered; the fixtures only in a test build.
+        filter: (page) => BUILD_FIXTURES || !page.path.startsWith("/test/"),
       },
     }),
-    solid({ ssr: true, extensions: [".md", ".mdx"] }),
+    solid({ ssr: true, extensions: [".md", ".mdx"], exclude: REACT_WORKBENCH_FILES }),
+    ...frameworkWorkbenches(),
   ],
 });

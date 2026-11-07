@@ -22,7 +22,7 @@ import {
   type HistoryVersion,
 } from "@sheetwrite/core/history";
 
-import type { LiveScenario } from "../use-live-scenario.js";
+import type { LiveScenario } from "./live-scenario.js";
 import { createListeners, mountShowcaseShell, requireApplied } from "./showcase-shell.js";
 
 // The version history showcase: one budget document behind an in-memory

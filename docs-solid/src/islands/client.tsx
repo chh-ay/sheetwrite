@@ -16,11 +16,12 @@ import { hydrate } from "solid-js/web";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import { installDocsShell } from "../lib/shell.js";
-import type { IslandName } from "./Island.js";
+import { SHOWCASE_ISLANDS, type ShowcaseIsland } from "../showcases/islands.js";
+import type { CoreIslandName, IslandName } from "./Island.js";
 import type { StaticRunnableCodeProps, StaticTabsProps } from "./StaticMarkup.js";
 
 /** An island's root, from the props the server serialised for it and its own markup. */
-type IslandRender = (island: HTMLElement, props: object) => JSX.Element;
+export type IslandRender = (island: HTMLElement, props: object) => JSX.Element;
 
 function withProps<Props extends object>(component: Component<Props>): IslandRender {
   // The server wrote these props from the same component's props (Island.tsx).
@@ -28,7 +29,9 @@ function withProps<Props extends object>(component: Component<Props>): IslandRen
 }
 
 /** Each island's code loads only on the pages that hold it; page-scripts.ts preloads it there. */
-const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
+const CORE_ISLANDS: Readonly<Record<CoreIslandName, () => Promise<IslandRender>>> = {
+  "activation-fixture": () =>
+    import("./ActivationFixture.js").then(({ ActivationFixture }) => withProps(ActivationFixture)),
   "package-command": () =>
     import("../components/PackageCommand.js").then(({ PackageCommand }) =>
       withProps(PackageCommand),
@@ -77,6 +80,13 @@ const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
         (island) =>
           createComponent(CodeTabs, { panels: markupOf(island) }),
     ),
+};
+
+const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
+  ...CORE_ISLANDS,
+  ...(Object.fromEntries(
+    Object.entries<ShowcaseIsland>(SHOWCASE_ISLANDS).map(([name, island]) => [name, island.load]),
+  ) as Record<keyof typeof SHOWCASE_ISLANDS, () => Promise<IslandRender>>),
 };
 
 function isIslandName(name: string | undefined): name is IslandName {
@@ -139,6 +149,45 @@ function isTextEntry(target: EventTarget | null): boolean {
     !["button", "checkbox", "color", "file", "image", "radio", "range", "reset", "submit"].includes(
       target.type,
     )
+  );
+}
+
+/** Elements the browser clicks when they have focus and the reader presses Space. */
+const CLICKED_BY_SPACE = [
+  "button",
+  "summary",
+  'input[type="checkbox"]',
+  'input[type="radio"]',
+  'input[type="submit"]',
+  'input[type="button"]',
+  'input[type="reset"]',
+  'input[type="image"]',
+].join(", ");
+
+/** Elements the browser clicks when they have focus and the reader presses Enter. */
+const CLICKED_BY_ENTER = [
+  "button",
+  "summary",
+  "a[href]",
+  'input[type="submit"]',
+  'input[type="button"]',
+  'input[type="reset"]',
+  'input[type="image"]',
+].join(", ");
+
+/**
+ * Enter or Space on an element the browser activates itself. The browser
+ * turns the key into a trusted click, which is held and replayed like a
+ * pointer's; a replayed key is untrusted and would never click. An element
+ * that only has a button role gets no click from the browser: its own key
+ * handler acts, so its keys are held and replayed as usual.
+ */
+function isNativeActivationKey(event: Event): boolean {
+  return (
+    event instanceof KeyboardEvent &&
+    event.target instanceof Element &&
+    ((event.key === " " && event.target.matches(CLICKED_BY_SPACE)) ||
+      (event.key === "Enter" && event.target.matches(CLICKED_BY_ENTER)))
   );
 }
 
@@ -207,27 +256,33 @@ function hydrateOnInteraction(island: HTMLElement): void {
     void fetchCode();
   };
   const activate = (event: Event): void => {
-    if (isPassThroughKey(event)) return;
+    if (isPassThroughKey(event) || isNativeActivationKey(event)) return;
     if (!isTextEntry(event.target)) {
       // Pointer presses keep their default, so a touch still produces its
       // click (and focuses what it presses); clicks and keys are held whole.
-      if (!(event instanceof PointerEvent)) event.preventDefault();
+      // Chromium dispatches clicks as PointerEvents, so the test is the type.
+      if (event.type !== "pointerdown" && event.type !== "pointerup") event.preventDefault();
       event.stopImmediatePropagation();
       held.push(event);
     }
     if (hydrating) return;
     hydrating = true;
     fetchCode().then(
-      (render) => {
-        for (const type of PREFETCH_EVENTS) island.removeEventListener(type, prefetch);
-        for (const type of ACTIVATION_EVENTS) island.removeEventListener(type, activate, true);
-        hydrateWith(island, render);
-        for (const event of held) {
-          // The init dictionary reads key, button, pointerType and coordinates off the original.
-          const replay = new (event.constructor as typeof Event)(event.type, event);
-          event.target?.dispatchEvent(replay);
-        }
-      },
+      (render) =>
+        // Code already fetched resolves while the first event is still being
+        // dispatched: a canceled click on a checkbox restores its state only
+        // after that. Hydrating and replaying in a later task keeps the
+        // replayed click from being undone; events until then are held too.
+        setTimeout(() => {
+          for (const type of PREFETCH_EVENTS) island.removeEventListener(type, prefetch);
+          for (const type of ACTIVATION_EVENTS) island.removeEventListener(type, activate, true);
+          hydrateWith(island, render);
+          for (const event of held) {
+            // The init dictionary reads key, button, pointerType and coordinates off the original.
+            const replay = new (event.constructor as typeof Event)(event.type, event);
+            event.target?.dispatchEvent(replay);
+          }
+        }),
       (error: unknown) => console.error(`Docs island "${island.dataset.island}" failed:`, error),
     );
   };
