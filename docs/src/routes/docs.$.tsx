@@ -4,13 +4,27 @@ import { lazy, Suspense, useEffect } from "react";
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
 import { PackageCommand } from "../components/PackageCommand.js";
-import { type DocumentComponents, documentComponentForSplat } from "../lib/content.js";
+import * as IslandContent from "../islands/content.js";
+import { IslandsContext } from "../islands/Island.js";
+import {
+  type DocumentComponents,
+  documentComponentForSplat,
+  loadedDocumentComponent,
+} from "../lib/content.js";
 import { normalizeDocumentHref } from "../lib/document-href.js";
 import { forwardedHeading } from "../lib/moved-headings.js";
 import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
+
+/**
+ * Production docs pages ship as static HTML: the islands client
+ * (islands/client.tsx) hydrates the interactive parts and nothing else, and
+ * links between pages load the next document. The dev server keeps hydrating
+ * the whole page with the router.
+ */
+const STATIC_DOCS = import.meta.env.PROD;
 
 /** Figures appear on Performance pages only, so their component loads with them. */
 const PerfFigure = lazy(() => import("../components/PerfFigure.js"));
@@ -29,7 +43,32 @@ const DOCUMENT_COMPONENTS: DocumentComponents = {
   PerfFigure,
 };
 
+/** On a static page the browser navigates, and the widgets are islands. */
+const STATIC_DOCUMENT_COMPONENTS: DocumentComponents = {
+  a: IslandContent.StaticLink,
+  FormulaReference: IslandContent.FormulaReference,
+  PackageCommand: IslandContent.PackageCommand,
+  // Static markup: the figure needs no client code.
+  PerfFigure,
+};
+
+/**
+ * Prefetch a docs page when a reader hovers or presses its link, so the
+ * document load that replaced client-side navigation starts early.
+ */
+const SPECULATION_RULES = JSON.stringify({
+  prefetch: [{ where: { href_matches: "/docs/*" }, eagerness: "moderate" }],
+});
+
 export const Route = createFileRoute("/docs/$")({
+  // A static page has no router: a client-side navigation from a router page
+  // (the landing page, the docs overview) loads the document instead.
+  beforeLoad: ({ location, preload }) => {
+    if (!STATIC_DOCS || preload || typeof window === "undefined") return;
+    window.location.assign(location.href);
+    // The browser is leaving; the route never renders here.
+    return Promise.withResolvers<never>().promise;
+  },
   loader: async ({ params }) => {
     const href = normalizeDocumentHref(params._splat);
     const moved = MOVED_PAGES[href];
@@ -87,7 +126,10 @@ export const Route = createFileRoute("/docs/$")({
         ...pageImageMeta(loaderData.href, title),
       ],
       links: loaderData.stylesheets.map((href) => ({ rel: "stylesheet", href })),
-      scripts: [{ type: "application/ld+json", children: structuredData }],
+      scripts: [
+        { type: "application/ld+json", children: structuredData },
+        ...(STATIC_DOCS ? [{ type: "speculationrules", children: SPECULATION_RULES }] : []),
+      ],
     };
   },
   component: DocumentRoute,
@@ -147,10 +189,10 @@ function DocumentRoute() {
     revealAnchoredMember();
   }, [href, activeHref]);
   const metadata = Route.useLoaderData();
-  const Content = documentComponentForSplat(params._splat);
   if (metadata.moved !== undefined) return <MovedDocument from={metadata.moved} />;
+  if (STATIC_DOCS) return <StaticDocument activeHref={activeHref} splat={params._splat} />;
+  const Content = documentComponentForSplat(params._splat);
   if (Content === undefined) return <DocumentNotFound />;
-
   return (
     <DocsShell
       activeHref={activeHref}
@@ -173,6 +215,33 @@ function DocumentRoute() {
         <DocumentReady key={activeHref} />
       </Suspense>
     </DocsShell>
+  );
+}
+
+/**
+ * The production page: the article and the shell are static HTML, each
+ * widget an island. The article renders synchronously from the module the
+ * loader loaded, because an island renders as its own root and cannot wait
+ * for a lazy article.
+ */
+function StaticDocument({ activeHref, splat }: Readonly<{ activeHref: string; splat?: string }>) {
+  const metadata = Route.useLoaderData();
+  const Content = loadedDocumentComponent(splat);
+  if (Content === undefined) return <DocumentNotFound />;
+  return (
+    <IslandsContext value>
+      <DocsShell
+        activeHref={activeHref}
+        description={metadata.description}
+        kind={metadata.kind}
+        outline={metadata.outline}
+        reserveOutline
+        sourcePath={metadata.sourcePath}
+        title={metadata.title}
+      >
+        <Content components={STATIC_DOCUMENT_COMPONENTS} />
+      </DocsShell>
+    </IslandsContext>
   );
 }
 

@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import releaseFacts from "../generated/release-facts.json" with { type: "json" };
+import { Island } from "../islands/Island.js";
+import { installNavigationDrawer, NAVIGATION_DIALOG_ID } from "../lib/navigation-drawer.js";
 import {
   breadcrumbsFor,
   type Crumb,
@@ -15,18 +17,14 @@ import {
 } from "../lib/navigation.js";
 import type { OutlineItem } from "../lib/outline.js";
 import { editUrl, reportProblemUrl } from "../lib/page-links.js";
-import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
+import { ApiSymbolFilter, listsExportedSymbols } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { Icon } from "./Icon.js";
 import { SiteTopbar } from "./SiteTopbar.js";
-import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
+import { OutlineInline, OutlineRail } from "./TableOfContents.js";
 
-/**
- * Keep the sidebar only when it fits beside the reading panel; smaller
- * viewports use the same navigation in a modal drawer.
- */
-const RAIL_VIEWPORT_QUERY = "(min-width: 64rem)";
-const NAVIGATION_DIALOG_ID = "sw-docs-navigation";
+/** The outline of a page without one; one constant, so the outline effects see a stable value. */
+const NO_OUTLINE: readonly OutlineItem[] = [];
 
 interface DocsShellProps {
   activeHref?: string;
@@ -72,17 +70,13 @@ function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
  * The newest release leads the navigation: a reader who upgrades should not
  * have to open a collapsed group to find what changed.
  */
-function LatestReleaseCard({
-  activeHref,
-  onNavigate,
-}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
+function LatestReleaseCard({ activeHref }: Readonly<{ activeHref?: string }>) {
   const { href, date, dateLabel, version, summary } = releaseFacts.latest;
 
   return (
     <Link
       aria-current={activeHref === href ? "page" : undefined}
       className="sw-release-card"
-      onClick={onNavigate}
       to={href}
     >
       <span className="sw-release-card__meta">
@@ -119,7 +113,6 @@ function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
 interface NavigationEntriesProps {
   items: readonly NavigationItem[];
   current: NavigationLocation | undefined;
-  onNavigate?: () => void;
 }
 
 /**
@@ -127,7 +120,7 @@ interface NavigationEntriesProps {
  * current page is inside it; its own page, if any, is the first link inside,
  * because a link in the toggle row would also toggle the group.
  */
-function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEntriesProps>) {
+function NavigationEntries({ items, current }: Readonly<NavigationEntriesProps>) {
   return items.map((item) => {
     if (item.items === undefined) {
       return (
@@ -135,7 +128,6 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
           activeOptions={{ exact: true }}
           aria-current={current?.href === item.href ? "page" : undefined}
           key={item.href}
-          onClick={onNavigate}
           to={item.href}
         >
           <span>{item.label}</span>
@@ -166,11 +158,7 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
           <Icon className="sw-disclosure-icon" name="chevron-right" />
         </summary>
         <div>
-          <NavigationEntries
-            current={current}
-            items={[...ownPage, ...item.items]}
-            onNavigate={onNavigate}
-          />
+          <NavigationEntries current={current} items={[...ownPage, ...item.items]} />
         </div>
       </details>
     );
@@ -179,18 +167,14 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
 
 /**
  * The section list itself, shared by the sidebar and the drawer so the two can
- * never advertise different documentation. `onNavigate` lets the drawer close
- * once a reader has picked a destination.
+ * never advertise different documentation.
  */
-function NavigationSections({
-  activeHref,
-  onNavigate,
-}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
+function NavigationSections({ activeHref }: Readonly<{ activeHref?: string }>) {
   const current = nearestNavigationItem(activeHref);
 
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
-      <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
+      <LatestReleaseCard activeHref={activeHref} />
       {DOCS_NAVIGATION.map((section) => (
         <details
           className="sw-nav-group"
@@ -210,17 +194,16 @@ function NavigationSections({
                   ? section.items
                   : [{ label: "Overview", href: section.href }, ...section.items]
               }
-              onNavigate={onNavigate}
             />
           </div>
         </details>
       ))}
       <section>
         <h2>Explore Sheetwrite</h2>
-        <Link activeOptions={{ exact: true }} onClick={onNavigate} to="/">
+        <Link activeOptions={{ exact: true }} to="/">
           Home
         </Link>
-        <Link activeOptions={{ exact: true }} onClick={onNavigate} to="/showcases/">
+        <Link activeOptions={{ exact: true }} to="/showcases/">
           Showcases
         </Link>
         <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
@@ -239,50 +222,25 @@ function NavigationSections({
   );
 }
 
-interface NavigationDrawerProps {
-  activeHref?: string;
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  /** Asks the modal to close; Escape and the browser's own close report via onClosed. */
-  onDismiss: () => void;
-  onClosed: () => void;
-}
-
 /**
- * The section list for viewports without room for the sidebar. A modal dialog
- * brings the focus trap, Escape handling, backdrop, and focus restore with it;
- * the header button only opens it.
+ * The section list for viewports without room for the sidebar, as a modal
+ * dialog; lib/navigation-drawer.ts opens and closes it.
  */
-function NavigationDrawer({
-  activeHref,
-  dialogRef,
-  onDismiss,
-  onClosed,
-}: Readonly<NavigationDrawerProps>) {
+function NavigationDrawer({ activeHref }: Readonly<{ activeHref?: string }>) {
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
-    <dialog
-      aria-label="Documentation"
-      className="sw-nav-dialog"
-      id={NAVIGATION_DIALOG_ID}
-      onClick={(event) => {
-        // Only the backdrop targets the dialog itself: its children fill it.
-        if (event.target === event.currentTarget) onDismiss();
-      }}
-      onClose={onClosed}
-      ref={dialogRef}
-    >
+    <dialog aria-label="Documentation" className="sw-nav-dialog" id={NAVIGATION_DIALOG_ID}>
       <div className="sw-nav-dialog__head">
         <span className="sw-nav-dialog__title">Documentation</span>
         <button
           aria-label="Close documentation menu"
           className="sw-icon-button"
-          onClick={onDismiss}
+          data-close-navigation=""
           type="button"
         >
           <Icon name="close" size="md" />
         </button>
       </div>
-      <NavigationSections activeHref={activeHref} onNavigate={onDismiss} />
+      <NavigationSections activeHref={activeHref} />
     </dialog>
   );
 }
@@ -321,7 +279,7 @@ export function DocsShell({
   children,
   description,
   kind,
-  outline: buildOutline,
+  outline: buildOutline = NO_OUTLINE,
   reserveOutline,
   sourcePath,
   title,
@@ -330,35 +288,11 @@ export function DocsShell({
   // better as a chip than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
 
-  const outline = useDocumentOutline(buildOutline);
+  const pathname = activeHref ?? "";
   const neighbours = documentNeighbours(activeHref);
 
-  const navigationDialog = useRef<HTMLDialogElement>(null);
-  const [navigationOpen, setNavigationOpen] = useState(false);
-
-  // A drawer left open while the viewport grows would sit on top of the rail.
-  useEffect(() => {
-    const rail = window.matchMedia(RAIL_VIEWPORT_QUERY);
-    const closeWhenRailFits = (event: MediaQueryListEvent) => {
-      if (event.matches) navigationDialog.current?.close();
-    };
-    rail.addEventListener("change", closeWhenRailFits);
-    return () => rail.removeEventListener("change", closeWhenRailFits);
-  }, []);
-
-  const openNavigation = () => {
-    const dialog = navigationDialog.current;
-    if (dialog === null) return;
-
-    dialog.showModal();
-    setNavigationOpen(true);
-    // The current page can sit far down a long section list.
-    requestAnimationFrame(() => {
-      dialog
-        .querySelector<HTMLElement>('a[aria-current="page"]')
-        ?.scrollIntoView({ block: "nearest" });
-    });
-  };
+  // Static docs pages run the same installer from the islands client.
+  useEffect(installNavigationDrawer, []);
 
   return (
     <div className={`sw-docs${activeHref === "/docs/" ? " sw-docs--overview" : ""}`}>
@@ -366,14 +300,13 @@ export function DocsShell({
         Skip to content
       </a>
       <SiteTopbar
-        search={<DocsSearch />}
+        search={<Island component={DocsSearch} name="search" props={{}} />}
         trailing={
           <button
             aria-controls={NAVIGATION_DIALOG_ID}
-            aria-expanded={navigationOpen}
+            aria-expanded={false}
             aria-haspopup="dialog"
             className="sw-icon-button sw-nav-toggle"
-            onClick={openNavigation}
             type="button"
           >
             <Icon name="menu" size="md" />
@@ -424,14 +357,28 @@ export function DocsShell({
             </p>
           ) : null}
         </header>
-        <ApiSymbolFilter />
-        {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}
+        {listsExportedSymbols(pathname) ? (
+          <Island component={ApiSymbolFilter} name="api-filter" props={{ pathname }} />
+        ) : null}
+        {reserveOutline === true ? (
+          <Island
+            component={OutlineInline}
+            name="outline-inline"
+            props={{ initial: buildOutline, pathname }}
+          />
+        ) : null}
         <article
           className={`sw-prose${activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}
         >
           {children}
         </article>
-        {reserveOutline === true ? <TableOfContents items={outline} /> : null}
+        {reserveOutline === true ? (
+          <Island
+            component={OutlineRail}
+            name="outline-rail"
+            props={{ initial: buildOutline, pathname }}
+          />
+        ) : null}
         <footer className="sw-document__footer" data-pagefind-ignore>
           <DocumentPager {...neighbours} />
           <div className="sw-document__colophon">
@@ -440,12 +387,7 @@ export function DocsShell({
           </div>
         </footer>
       </main>
-      <NavigationDrawer
-        activeHref={activeHref}
-        dialogRef={navigationDialog}
-        onClosed={() => setNavigationOpen(false)}
-        onDismiss={() => navigationDialog.current?.close()}
-      />
+      <NavigationDrawer activeHref={activeHref} />
     </div>
   );
 }

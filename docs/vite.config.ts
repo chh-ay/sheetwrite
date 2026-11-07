@@ -416,7 +416,7 @@ const OWNED_BY_SITE_MODULE = "tabindex-js-module";
  *   on a client-side navigation, and React reports it as an error. The
  *   modules observe the document, so one run serves every later page.
  */
-function expressiveCodeAssets(): Plugin {
+export function expressiveCodeAssets(): Plugin {
   return {
     name: "sheetwrite:expressive-code-assets",
     resolveId(id) {

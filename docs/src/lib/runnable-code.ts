@@ -35,8 +35,11 @@ interface RunnableHastNode {
 
 const RUNNABLE_META = /(?:^|\s)runnable(?:\s|$)/;
 const COMPONENT = "RunnableCode";
-/** Vite resolves a leading `/` from the docs root, in the client and the server build. */
-const COMPONENT_MODULE = "/src/components/RunnableCode.tsx";
+/**
+ * Vite resolves a leading `/` from the docs root, in the client and the server
+ * build. The islands module renders it as an island on static docs pages.
+ */
+const COMPONENT_MODULE = "/src/islands/content.tsx";
 
 /** Whether a fence asks for a "Try it" button. */
 export function isRunnableMeta(meta: string | null | undefined): boolean {

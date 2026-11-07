@@ -24,8 +24,11 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  /** A formula family's table and filter, loaded with its page; see FormulaReference.tsx. */
-  FormulaReference?: LazyExoticComponent<ComponentType<{ family: string }>>;
+  /**
+   * A formula family's table and filter: loaded with its page on the router
+   * site, an island on static pages; see FormulaReference.tsx.
+   */
+  FormulaReference?: ComponentType<{ family: string }>;
   /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
   PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
 }
@@ -72,12 +75,16 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
   }),
 );
 
+/** Modules `documentForSplat` has loaded, by page: the static docs render reads them synchronously. */
+const LOADED_MODULES = new Map<string, DocumentModule>();
 export async function documentForSplat(
   splat: string | undefined,
 ): Promise<DocumentRecord | undefined> {
-  const source = DOCUMENT_SOURCES.get(normalizeDocumentHref(splat));
+  const href = normalizeDocumentHref(splat);
+  const source = DOCUMENT_SOURCES.get(href);
   if (source === undefined) return undefined;
   const module = await source.load();
+  LOADED_MODULES.set(href, module);
   return {
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
@@ -92,4 +99,13 @@ export function documentComponentForSplat(
   splat: string | undefined,
 ): LazyExoticComponent<DocumentComponent> | undefined {
   return DOCUMENT_SOURCES.get(normalizeDocumentHref(splat))?.component;
+}
+
+/**
+ * The page's compiled component once its loader ran `documentForSplat`, for a
+ * render that must not suspend: the static docs page renders its islands as
+ * separate roots, which cannot wait for a lazy article.
+ */
+export function loadedDocumentComponent(splat: string | undefined): DocumentComponent | undefined {
+  return LOADED_MODULES.get(normalizeDocumentHref(splat))?.default;
 }

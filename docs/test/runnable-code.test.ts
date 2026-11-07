@@ -40,7 +40,7 @@ it("wraps runnable fences and imports the component once", () => {
 
   const [esm, wrapper, unchanged, details] = tree.children ?? [];
   expect(esm?.type).toBe("mdxjsEsm");
-  expect(esm?.value).toBe('import { RunnableCode } from "/src/components/RunnableCode.tsx";');
+  expect(esm?.value).toBe('import { RunnableCode } from "/src/islands/content.tsx";');
   expect(esm?.data?.estree).toBeDefined();
   expect(wrapper).toEqual({
     type: "mdxJsxFlowElement",
