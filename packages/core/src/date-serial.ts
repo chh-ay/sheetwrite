@@ -9,6 +9,8 @@
 // after that cutoff receive one extra serial day. A JavaScript Date cannot hold
 // 1900-02-29, so `serialToDate(60)` returns 1900-02-28; the renderer replaces
 // its day of the month with 29 and input parsing maps 1900-02-29 to serial 60.
+// Excel's weekdays count every serial, the fictional day included, so weekday
+// names come from `serialToWeekdayDate` instead.
 //
 // Calendar construction and access use UTC (`Date.UTC` / `getUTC*`) so host
 // timezone offsets never shift calendar dates.
@@ -44,6 +46,17 @@ export function dateToSerial(date: Date): number {
 export function serialToDate(serial: number): Date {
   const realSerial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
   return new Date(EPOCH_MS + realSerial * MS_PER_DAY);
+}
+
+/**
+ * Return a UTC `Date` whose weekday is Excel's weekday for a serial. Excel counts
+ * weekdays through its fictional 29 February 1900 (serial 1 is a Sunday), so the
+ * serial maps to days since 1899-12-31 with no leap-day correction. For serials
+ * before 60 the weekday is one day earlier than the real date's; for serial 60
+ * and later it is the real date's. Only the weekday of the result is meaningful.
+ */
+export function serialToWeekdayDate(serial: number): Date {
+  return new Date(EPOCH_MS + (serial - 1) * MS_PER_DAY);
 }
 
 /**
