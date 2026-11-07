@@ -32,6 +32,7 @@ const TAG_START = /\n\n\*@([^*\s]+)\*/g;
 const DASH_PREFIX = /^ — /;
 const QUOTED_NAME = /^ `([^`]+)`/;
 const DECLARATION_LINK = /\[(`?)([^\]]*?)\1\]\(file:\/\/[^)\s]*\)/g;
+const URL_LINK = /\[([^\]]*)\]\((https?:\/\/[^)\s]*)\)/g;
 
 function declarationLinks(text: string, format: "link" | "name"): string {
   return text.replace(DECLARATION_LINK, (_, quote: string, label: string) => {
@@ -51,7 +52,12 @@ function tagText(name: string, body: string): string | undefined {
   }
   rest = rest.replace(DASH_PREFIX, "").replace(/^ /, "");
   const text = [prefix, rest].filter(Boolean).join(" ");
-  return declarationLinks(text, name === "see" ? "name" : "link") || undefined;
+  if (name !== "see") return declarationLinks(text, "link") || undefined;
+  // `@see {@link https://…}` keeps its tag syntax in 5.9; prose links only occur in summaries.
+  const urls = text.replace(URL_LINK, (_, label: string, url: string) =>
+    label === url ? `{@link ${url}}` : `{@link ${url} ${label}}`,
+  );
+  return declarationLinks(urls, "name") || undefined;
 }
 
 export function parseNativeHover(markdown: string): NativeQuickInfo | undefined {
