@@ -7,6 +7,7 @@ import { ReactWorkbenchIsland } from "../showcases/frameworks/FrameworkMount.js"
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
+import demoSelectStylesheet from "@docs/styles/demo-select.css?url";
 import reactWorkbenchStylesheet from "@docs/styles/react-workbench.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
@@ -21,6 +22,8 @@ export const Route = createFileRoute("/react")({
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
+      // The workbench's Base UI selects (docs/src/showcases/ui/DemoSelect.tsx).
+      { rel: "stylesheet", href: demoSelectStylesheet },
       { rel: "stylesheet", href: reactWorkbenchStylesheet },
     ],
   }),
