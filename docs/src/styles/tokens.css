@@ -60,13 +60,10 @@
     U+A720-A7FF;
 }
 
-/* Body text: optional, not swap. The face is preloaded, so most first views
-   get it; when it misses the first paint, that page view keeps the tuned
-   fallback instead of re-wrapping its text. */
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 400 700;
   src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
     format("woff2-variations");
@@ -78,7 +75,7 @@
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
   font-weight: 400 700;
   src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-ext-wght-normal.woff2")
     format("woff2-variations");
