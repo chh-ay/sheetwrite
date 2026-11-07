@@ -166,6 +166,42 @@ describe("pointer input: mouse parity", () => {
     outside.remove();
   });
 
+  it("keeps a date column's serial when its editor commits unchanged", () => {
+    const workbook = makeWorkbook(10);
+    const column = workbook.sheets[0]!.columns[1]!;
+    column.type = "date";
+    column.numberFormat = "yyyy-mm-dd";
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const cell = { sheet: "s1", row: 0, col: 1 };
+    store.applyTransaction({
+      patches: [{ op: "set", addr: cell, value: { kind: "literal", value: 45_351 } }],
+    });
+
+    grid.beginEdit(0, 1);
+    const editor = host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+    if (!editor) throw new Error("cell editor missing");
+    expect(editor.value).toBe("2024-02-29");
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell(cell).resolved).toBe(45_351);
+
+    grid.beginEdit(0, 1, "45352.5");
+    host
+      .querySelector("textarea.sheetwrite-editor")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell(cell).resolved).toBe(45_352.5);
+
+    grid.beginEdit(0, 1);
+    const timed = host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+    expect(timed?.value).toBe("2024-03-01 12:00");
+    timed?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell(cell).resolved).toBe(45_352.5);
+
+    grid.destroy();
+    store.dispose();
+  });
+
   it("drag on a column boundary commits a width patch", () => {
     const { store, scroller, workbook } = makeGrid();
     const boundaryX = DEFAULT_THEME.rowHeaderWidth + (workbook.sheets[0]?.columns[0]?.width ?? 0);

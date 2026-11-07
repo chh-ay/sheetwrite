@@ -92,6 +92,21 @@ describe("formatNumber", () => {
     expect(formatNumber(45_351, "d mmmm yyyy")).toBe("29 February 2024");
   });
 
+  it("names weekdays before 1 March 1900 as Excel and WEEKDAY count them", () => {
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    for (let serial = 1; serial <= 70; serial++) {
+      const weekday = weekdays[(serial - 1) % 7]!;
+      expect(formatNumber(serial, "dddd"), String(serial)).toBe(weekday);
+      expect(formatNumber(serial, "ddd"), String(serial)).toBe(weekday.slice(0, 3));
+    }
+
+    expect(formatNumber(1, "yyyy-mm-dd dddd")).toBe("1900-01-01 Sunday");
+    expect(formatNumber(59, "yyyy-mm-dd ddd")).toBe("1900-02-28 Tue");
+    expect(formatNumber(59.5, "dddd hh:mm")).toBe("Tuesday 12:00");
+    expect(formatNumber(61, "yyyy-mm-dd dddd")).toBe("1900-03-01 Thursday");
+    expect(formatNumber(45_351, "dddd")).toBe("Thursday");
+  });
+
   it("reads 29 February 1900 back as serial 60", () => {
     expect(parseDateInput("1900-02-29")).toBe(60);
     expect(parseDateInput("1900-02-29 18:00")).toBe(60.75);
