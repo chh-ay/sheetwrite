@@ -30,6 +30,7 @@ const SHOWCASE_PAGES = [
     "host-rows",
     "performance",
     "database",
+    "collaboration",
   ].map((id) => `/showcases/${id}/`),
 ];
 

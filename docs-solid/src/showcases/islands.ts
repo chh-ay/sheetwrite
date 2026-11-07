@@ -91,6 +91,20 @@ export const SHOWCASE_ISLANDS = {
     load: () =>
       import("./database/DatabaseLab.js").then(({ DatabaseLab }) => withProps(DatabaseLab)),
   },
+  "showcase-collaboration": {
+    source: "src/showcases/collaboration/CollaborationStage.tsx",
+    load: () =>
+      import("./collaboration/CollaborationStage.js").then(({ CollaborationStage }) =>
+        withProps(CollaborationStage),
+      ),
+  },
+  "showcase-collaboration-faults": {
+    source: "src/showcases/collaboration/CollaborationFaults.tsx",
+    load: () =>
+      import("./collaboration/CollaborationFaults.js").then(({ CollaborationFaults }) =>
+        withProps(CollaborationFaults),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 /** The showcase pages' islands; islands/Island.tsx adds these names to every island name. */
