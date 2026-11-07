@@ -37,6 +37,11 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* In the formula filter the field takes the filter's text, like the search field beside it. */
+  .sw-formula-filter__engine .sw-select__trigger {
+    font: inherit;
+  }
+
   .sw-select__trigger:hover,
   .sw-select__trigger[aria-expanded="true"],
   .sw-select__trigger:focus-visible {

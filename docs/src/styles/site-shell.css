@@ -870,7 +870,8 @@ html:has(.sw-nav-dialog[open]) {
   .sw-prose .sw-formula-table summary {
     line-height: 44px;
   }
-  .sw-formula-filter input {
+  .sw-formula-filter input,
+  .sw-formula-filter__engine .sw-demo-select__trigger {
     min-height: 44px;
   }
   /* The field draws the border; the input inside it takes the field's full height. */
