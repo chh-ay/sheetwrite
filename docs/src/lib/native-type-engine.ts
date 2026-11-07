@@ -103,7 +103,7 @@ const ENGINE_FILES = ["src/lib/native-type-engine.ts", "src/lib/native-quick-inf
  * A property of the object literal itself: no declaring type before the name, and not
  * optional, which only a property of the contextual type can be.
  */
-const LITERAL_PROPERTY = /^\(property\) (?:"[^"]+"|[\w$]+): /;
+const LITERAL_PROPERTY = /^\(property\) [\w$]+: /;
 /**
  * A property hover that names its declaring type (`Column.header`). Without one, the
  * declaration sits in a generic or inline type and its hover shows unfilled type
@@ -555,11 +555,7 @@ export class NativeTypeEngine {
         if (!quickInfo?.text) return undefined;
         const definitions = await server.definitions(uri, identifier);
         if (identifier.propertyName && LITERAL_PROPERTY.test(quickInfo.text)) {
-          const declared = await this.declaredProperty(server, definitions, file);
-          // A quoted name (`"workbook": workbook`) is an attribute name that 5.9 never
-          // hovered; it gets a hover only when it leads to a declared property.
-          if (identifier.propertyName === "quoted" && !declared) return undefined;
-          quickInfo = declared ?? quickInfo;
+          quickInfo = (await this.declaredProperty(server, definitions, file)) ?? quickInfo;
         }
         if (!quickInfo.docs) {
           const docs = await this.mergedDeclarationDocs(server, definitions, file);
@@ -647,8 +643,8 @@ export class NativeTypeEngine {
         end: number;
         line: number;
         character: number;
-        /** The name of a property in an object literal (`name: value`, `name`, `"name": value`). */
-        propertyName?: "plain" | "quoted";
+        /** The name of a property in an object literal (`name: value` or `name`). */
+        propertyName: boolean;
       }[] = [];
       const propertyNames = new Set<Node>();
       const visit = (node: Node, parent?: Node): void => {
@@ -666,18 +662,7 @@ export class NativeTypeEngine {
             text: node.text,
             start,
             end: node.end,
-            ...(propertyNames.has(node) ? { propertyName: "plain" as const } : {}),
-            ...positionAt(starts, start),
-          });
-        } else if (node.kind === SyntaxKind.StringLiteral && propertyNames.has(node)) {
-          // svelte2tsx writes component props as `"workbook": workbook`.
-          const { text } = node as Node & { text: string };
-          const start = node.getStart(sourceFile) + 1;
-          identifiers.push({
-            text,
-            start,
-            end: start + text.length,
-            propertyName: "quoted",
+            propertyName: propertyNames.has(node),
             ...positionAt(starts, start),
           });
         }
