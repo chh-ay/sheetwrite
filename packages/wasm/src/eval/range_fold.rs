@@ -191,6 +191,21 @@ impl CellStore {
         let (kinds, payloads) = sources.raw();
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
+
+        // A single column is one contiguous run of storage: fold it as a
+        // slice when it holds only numbers and empty cells.
+        if cols == 1 {
+            let start = data.cells.idx(row_start, col_start);
+            let column = kinds
+                .get(start..start + rows)
+                .zip(payloads.get(start..start + rows));
+            if let Some(result) =
+                column.and_then(|(kinds, payloads)| fold.push_number_column(kinds, payloads))
+            {
+                return result.map(|()| true);
+            }
+        }
+
         let mut literal_only = true;
         for row in row_start..row_start + rows {
             for col in col_start..col_start + cols {
@@ -338,5 +353,47 @@ mod tests {
         store.recompute(sheet);
         let expected = (0..100).fold(0.0, |sum, row| sum + if row == 50 { 1.0 } else { 0.1 });
         assert_eq!(store.get_cell(sheet, 99, 1).num(), expected);
+    }
+
+    /// A column of numbers and empty cells folds as one slice and gives the
+    /// same results, limit and errors as reading it cell by cell.
+    #[test]
+    fn number_columns_fold_every_reduction() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 200);
+        let mut expected_sum = 0.0;
+        for row in 0..200 {
+            if row % 3 != 0 {
+                let value = row as f64 * 0.1 - 7.0;
+                store.set_number(sheet, row, 0, value, 0);
+                expected_sum += value;
+            }
+        }
+        store.set_number(sheet, 5, 1, f64::INFINITY, 0);
+        let sources = [
+            "=SUM(A1:A200)",
+            "=AVERAGE(A1:A200)",
+            "=MIN(A1:A200)",
+            "=MAX(A1:A200)",
+            "=COUNT(A1:A200)",
+            "=COUNTA(A1:A200)",
+            "=SUM(B1:B10)",
+        ];
+        for (row, source) in sources.iter().enumerate() {
+            store.set_formula(sheet, row, 3, source, 0);
+        }
+        store.recompute(sheet);
+
+        let number = |row| store.get_cell(sheet, row, 3).num();
+        assert_eq!(number(0), expected_sum);
+        assert_eq!(number(1), expected_sum / 133.0);
+        assert_eq!(number(2), 0.1 - 7.0);
+        assert_eq!(number(3), 199.0 * 0.1 - 7.0);
+        assert_eq!(number(4), 133.0);
+        assert_eq!(number(5), 133.0);
+        assert_eq!(
+            store.get_cell(sheet, 6, 3).string().as_deref(),
+            Some("#NUM!")
+        );
     }
 }
