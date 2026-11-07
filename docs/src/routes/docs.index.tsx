@@ -15,7 +15,8 @@ const overview = Object.values(
   import.meta.glob<DocumentModule>("../content/docs/index.mdx", { eager: true }),
 )[0]!;
 const Overview = overview.default;
-if (overview.frontmatter === undefined) throw new Error("content/docs/index.mdx has no frontmatter");
+if (overview.frontmatter === undefined)
+  throw new Error("content/docs/index.mdx has no frontmatter");
 const frontmatter = overview.frontmatter;
 const stylesheets = overview.stylesheets ?? [];
 
