@@ -1,3 +1,6 @@
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 import {
   CompilerOptionsResolver,
   createLanguage,
@@ -7,6 +10,9 @@ import {
 } from "@vue/language-core";
 import ts from "typescript";
 
+import { NativeHoverClient } from "./native-hover-client.js";
+import type { NativeHoverDocument } from "./native-hover-worker.js";
+import { parseNativeHover } from "./native-quick-info.js";
 import { lineStartOffsets as lineOffsets } from "./source-offsets.js";
 
 /** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
@@ -78,12 +84,12 @@ function tagText(parts: readonly ts.SymbolDisplayPart[] | undefined): string | u
 }
 
 function hoverOrigin(
-  definitions: readonly ts.DefinitionInfo[],
+  definitionFiles: readonly string[],
   virtualFileName: string,
 ): SheetwriteHoverOrigin | undefined {
   let origin: SheetwriteHoverOrigin | undefined;
-  for (const definition of definitions) {
-    const file = normalizedPath(definition.fileName);
+  for (const definitionFile of definitionFiles) {
+    const file = normalizedPath(definitionFile);
     if (file === virtualFileName) return "snippet";
     if (!file.includes("/node_modules/")) return "workspace";
     origin = "lib";
@@ -132,6 +138,9 @@ export class SheetwriteTypeEngine {
   private readonly virtualSources = new Map<string, VirtualSource>();
   private readonly languageService: ts.LanguageService;
   private projectVersion = 0;
+  /** TypeScript 7.1, created on the first `ts` or `tsx` sample. */
+  private nativeServer: NativeHoverClient | undefined;
+  private nativeOpenUri: string | undefined;
 
   constructor(private readonly options: SheetwriteTypeEngineOptions) {
     this.compilerOptions = {
@@ -198,9 +207,24 @@ export class SheetwriteTypeEngine {
     this.languageService = ts.createLanguageService(host, ts.createDocumentRegistry());
   }
 
-  analyze(source: string, language: "ts" | "tsx" | "vue"): SheetwriteTypeHover[] {
+  /**
+   * `ts` and `tsx` samples go through TypeScript 7.1. Vue samples, and TypeScript that
+   * svelte2tsx generated (`origin: "svelte"`), stay on the 5.9 language service: their
+   * mapping code is written against the 5.9 compiler API.
+   */
+  analyze(
+    source: string,
+    language: "ts" | "tsx" | "vue",
+    origin?: "svelte",
+  ): SheetwriteTypeHover[] {
     if (language === "vue") return this.analyzeVue(source);
-    return this.analyzeTypeScript(source, language);
+    if (origin === "svelte") return this.analyzeTypeScript(source, language);
+    return this.analyzeNative(source, language);
+  }
+
+  dispose(): void {
+    this.nativeServer?.dispose();
+    this.nativeServer = undefined;
   }
 
   private readFile(fileName: string): string | undefined {
@@ -234,7 +258,10 @@ export class SheetwriteTypeEngine {
             ?.map((tag) => [tag.name, tagText(tag.text)] as [string, string | undefined])
             .filter(([, value]) => !value || !INTERNAL_TAG_TEXT.test(value));
           const definitions = this.languageService.getDefinitionAtPosition(fileName, start) ?? [];
-          const origin = hoverOrigin(definitions, fileName);
+          const origin = hoverOrigin(
+            definitions.map((definition) => definition.fileName),
+            fileName,
+          );
           hovers.push({
             type: "hover",
             text,
@@ -252,6 +279,101 @@ export class SheetwriteTypeEngine {
       ts.forEachChild(node, visit);
     };
     visit(sourceFile);
+    return hovers;
+  }
+
+  private nativeProjectDirectory(): string {
+    return normalizedPath(`${this.options.cwd}/.sheetwrite-hover`);
+  }
+
+  /**
+   * The same compiler options as the 5.9 language service, as a tsconfig the language
+   * server reads from memory. TypeScript 7 has no `baseUrl`, so `paths` are absolute, and
+   * its `types` default is empty, so `"*"` keeps loading every visible `@types` package.
+   */
+  private nativeProjectConfig(): string {
+    const paths = Object.fromEntries(
+      Object.entries(this.compilerOptions.paths ?? {}).map(([specifier, targets]) => [
+        specifier,
+        targets.map((target) => resolve(this.options.cwd, target)),
+      ]),
+    );
+    return JSON.stringify({
+      compilerOptions: {
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "bundler",
+        jsx: "react-jsx",
+        jsxImportSource: "react",
+        lib: ["ES2022", "DOM", "DOM.Iterable"],
+        types: ["*"],
+        paths,
+        allowJs: true,
+        skipLibCheck: true,
+        strict: true,
+        noImplicitAny: false,
+      },
+      files: ["hover.ts", "hover.tsx"],
+    });
+  }
+
+  private nativeClient(): NativeHoverClient {
+    if (this.nativeServer) return this.nativeServer;
+    const documents: NativeHoverDocument[] = [
+      {
+        uri: pathToFileURL(`${this.nativeProjectDirectory()}/tsconfig.json`).href,
+        languageId: "json",
+        text: this.nativeProjectConfig(),
+      },
+      ...[...(this.options.fsMap ?? [])].map(([fileName, text]) => ({
+        uri: pathToFileURL(fileName).href,
+        languageId: fileName.endsWith(".tsx") ? "typescriptreact" : "typescript",
+        text,
+      })),
+    ];
+    this.nativeServer = new NativeHoverClient(this.options.cwd, INTERNAL_IDENTIFIER, documents);
+    return this.nativeServer;
+  }
+
+  private analyzeNative(source: string, language: "ts" | "tsx"): SheetwriteTypeHover[] {
+    const fileName = `${this.nativeProjectDirectory()}/hover.${language}`;
+    const uri = pathToFileURL(fileName).href;
+    const client = this.nativeClient();
+    // Only one sample is in the program at a time, as with the 5.9 language service.
+    if (this.nativeOpenUri !== undefined && this.nativeOpenUri !== uri) {
+      client.close([this.nativeOpenUri]);
+    }
+    this.nativeOpenUri = uri;
+
+    const answer = client.analyze(fileName, {
+      uri,
+      languageId: language === "tsx" ? "typescriptreact" : "typescript",
+      text: source,
+    });
+
+    const hovers: SheetwriteTypeHover[] = [];
+    for (const [index, identifier] of answer.identifiers.entries()) {
+      const markdown = answer.hovers[index];
+      const quickInfo = markdown ? parseNativeHover(markdown) : undefined;
+      if (!quickInfo?.text) continue;
+      const tags = quickInfo.tags.filter(([, value]) => !value || !INTERNAL_TAG_TEXT.test(value));
+      const definitionFiles = (answer.definitions[index] ?? []).map((definition) =>
+        fileURLToPath(definition),
+      );
+      const origin = hoverOrigin(definitionFiles, normalizedPath(fileName));
+      hovers.push({
+        type: "hover",
+        text: quickInfo.text,
+        ...(quickInfo.docs ? { docs: quickInfo.docs } : {}),
+        ...(tags.length ? { tags } : {}),
+        ...(origin ? { origin } : {}),
+        start: identifier.start,
+        length: identifier.end - identifier.start,
+        target: identifier.text,
+        line: identifier.line,
+        character: identifier.character,
+      });
+    }
     return hovers;
   }
 

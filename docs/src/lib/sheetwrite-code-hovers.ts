@@ -406,7 +406,7 @@ function svelteScriptDocumentation(
   if (scripts.length === 0) return new Map();
 
   const documentation = new Map<string, string>();
-  for (const node of analyzer.analyze(scripts.join("\n"), "ts")) {
+  for (const node of analyzer.analyze(scripts.join("\n"), "ts", "svelte")) {
     if (node.type !== "hover" || !node.docs?.trim() || documentation.has(node.target)) continue;
     documentation.set(node.target, node.docs);
   }
@@ -424,7 +424,7 @@ function svelteSourceHovers(source: string, analyzer: SheetwriteTypeEngine): She
   const sourceLines = source.split("\n");
   const lineOffsets = lineStartOffsets(source);
 
-  const result = analyzer.analyze(transformed.code, "tsx");
+  const result = analyzer.analyze(transformed.code, "tsx", "svelte");
   const hovers: SheetwriteTypeHover[] = [];
   for (const node of result) {
     const original = originalPositionFor(sourceMap, {
