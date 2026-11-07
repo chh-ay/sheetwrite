@@ -47,7 +47,7 @@ mod value;
 mod wildcard;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 
 use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
@@ -98,7 +98,10 @@ const LET_BINDING_LIMIT: usize = 126;
 const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
 thread_local! {
-    static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
+    /// The cell whose formula is being evaluated. Each evaluation sets it and
+    /// its guard restores the enclosing value, so nested evaluations keep a
+    /// stack on the native stack without a heap list.
+    static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
     /// Values of the LET bindings of the evaluation in progress, indexed by
     /// the slots of its expanded expression. Empty while no LET is running,
     /// which leaves a slot use to evaluate its expression directly.
@@ -134,26 +137,29 @@ fn remember_let_slot(slot: u32, value: EvalResult) {
     });
 }
 
-struct FormulaOriginGuard;
+/// Sets the formula origin for one evaluation and restores the enclosing
+/// origin when dropped.
+struct FormulaOriginGuard {
+    enclosing: Option<(u32, u32)>,
+}
 
 impl FormulaOriginGuard {
     fn push(origin: (u32, u32)) -> Self {
-        FORMULA_ORIGINS.with(|origins| origins.borrow_mut().push(origin));
-        Self
+        let enclosing = FORMULA_ORIGIN.with(|current| current.replace(Some(origin)));
+        Self { enclosing }
     }
 }
 
 impl Drop for FormulaOriginGuard {
     fn drop(&mut self) {
-        FORMULA_ORIGINS.with(|origins| {
-            origins.borrow_mut().pop();
-        });
+        let enclosing = self.enclosing;
+        FORMULA_ORIGIN.with(|current| current.set(enclosing));
     }
 }
 
 /// The cell whose formula is being evaluated, or nothing outside a formula.
 pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
-    FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
+    FORMULA_ORIGIN.with(Cell::get)
 }
 
 /// State shared by every evaluation in one recompute pass: the formulas the
