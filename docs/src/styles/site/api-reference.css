@@ -501,6 +501,11 @@
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
+/* The identifier keeps its case inside the uppercase label. */
+.api-consumers-label code {
+  letter-spacing: normal;
+  text-transform: none;
+}
 
 .api-consumer-list {
   display: flex;
@@ -716,4 +721,98 @@
 .sw-prose .api-member[data-revealed] {
   border-color: color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
   background: color-mix(in srgb, var(--sw-accent) 4%, var(--sw-surface-1));
+}
+
+/* Reference fields: parameters and the return value, one row each. */
+.sw-prose .api-fields {
+  display: grid;
+  margin: var(--sw-space-4) 0 var(--sw-space-8);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+.sw-prose .api-field {
+  padding: var(--sw-space-4) 0;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+.sw-prose .api-field__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sw-space-1) var(--sw-space-3);
+}
+.sw-prose .api-field__name {
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-mono);
+}
+.sw-prose .api-field__type {
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+/* A return value has no name: its type leads the row. */
+.sw-prose .api-field__type:first-child {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
+}
+.sw-prose .api-field__type a {
+  color: var(--sw-accent-strong);
+  text-decoration: none;
+}
+.sw-prose .api-field__type a:hover {
+  text-decoration: underline;
+}
+.sw-prose .api-field__marker {
+  border-radius: var(--sw-radius-pill);
+  padding: 0 var(--sw-space-2);
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
+}
+.sw-prose .api-field__doc {
+  margin: var(--sw-space-2) 0 0;
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+}
+
+/* The example aside: right after the summary on narrow screens; on wide ones
+   a sticky column beside the summary and the rest of the reference. */
+.sw-docs .sw-prose .api-layout__aside > h2 {
+  margin-top: var(--sw-space-10);
+}
+@media (min-width: 88rem) {
+  .sw-prose .api-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 26rem;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "summary aside"
+      "body aside";
+    column-gap: var(--sw-space-12);
+    align-items: start;
+  }
+  .sw-prose .api-layout__summary {
+    grid-area: summary;
+    min-width: 0;
+  }
+  .sw-prose .api-layout__body {
+    grid-area: body;
+    min-width: 0;
+  }
+  .sw-prose .api-layout__aside {
+    grid-area: aside;
+    position: sticky;
+    top: calc(var(--sw-header-height) + var(--sw-space-6));
+    max-height: calc(100vh - var(--sw-header-height) - var(--sw-space-12));
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .sw-docs .sw-prose .api-layout__aside > h2 {
+    margin-top: 0;
+    color: var(--sw-fg-muted);
+    font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+  }
 }

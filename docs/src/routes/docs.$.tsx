@@ -1,25 +1,29 @@
 import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, use, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
+import { DocumentReady } from "../components/DocumentReady.js";
 import { PackageCommand } from "../components/PackageCommand.js";
-import { type DocumentComponents, documentComponentForSplat } from "../lib/content.js";
+import { type DocumentComponents, hasDocument, useDocumentComponent } from "../lib/content.js";
 import { normalizeDocumentHref } from "../lib/document-href.js";
-import { forwardedHeading } from "../lib/moved-headings.js";
-import { MOVED_PAGES, movedPageTarget } from "../lib/moved-pages.js";
+import {
+  FORMULA_FAMILY_PAGE,
+  loadedFormulaReference,
+  loadFormulaReference,
+} from "../lib/formula-reference-module.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
 
+/** The formula reference, from its module once loaded (see lib/formula-reference-module.ts). */
+function FormulaReference(props: Readonly<{ family: string }>) {
+  const { FormulaReference: Reference } = loadedFormulaReference() ?? use(loadFormulaReference());
+  return <Reference {...props} />;
+}
+
 /** Figures appear on Performance pages only, so their component loads with them. */
 const PerfFigure = lazy(() => import("../components/PerfFigure.js"));
-/** The family filter appears on formula family pages only; it brings the select with it. */
-const FormulaReference = lazy(() =>
-  import("../components/FormulaReference.js").then((module) => ({
-    default: module.FormulaReference,
-  })),
-);
 
 /** Documentation content renders its site links through the router. */
 const DOCUMENT_COMPONENTS: DocumentComponents = {
@@ -32,6 +36,8 @@ const DOCUMENT_COMPONENTS: DocumentComponents = {
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
     const href = normalizeDocumentHref(params._splat);
+    // The moved-page table loads with the loader, not with every page's script.
+    const { MOVED_PAGES } = await import("../lib/moved-pages.js");
     const moved = MOVED_PAGES[href];
     if (moved !== undefined) {
       return {
@@ -39,12 +45,15 @@ export const Route = createFileRoute("/docs/$")({
         description: "This page has a new address.",
         kind: undefined,
         outline: [],
+        symbols: undefined,
         sourcePath: undefined,
         stylesheets: [],
         moved: href,
+        movedTo: moved.to,
         href,
       };
     }
+    if (FORMULA_FAMILY_PAGE.test(href)) await loadFormulaReference();
     // Dynamic import: the docs page index ships with docs routes, not every page.
     const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
@@ -54,9 +63,11 @@ export const Route = createFileRoute("/docs/$")({
       description: document.description,
       kind: document.kind,
       outline: document.outline ?? [],
+      symbols: document.symbols,
       sourcePath: document.sourcePath,
       stylesheets: document.stylesheets,
       moved: undefined,
+      movedTo: undefined,
       href,
     };
   },
@@ -101,10 +112,12 @@ export const Route = createFileRoute("/docs/$")({
  * fragment to the page that holds that heading now. The page has no
  * `data-pagefind-body`, so search never lists it.
  */
-function MovedDocument({ from }: Readonly<{ from: string }>) {
-  const target = MOVED_PAGES[from]?.to ?? "/docs/";
+function MovedDocument({ from, target }: Readonly<{ from: string; target: string }>) {
   useEffect(() => {
-    window.location.replace(movedPageTarget(from, window.location.hash) ?? target);
+    const hash = window.location.hash;
+    void import("../lib/moved-pages.js").then(({ movedPageTarget }) => {
+      window.location.replace(movedPageTarget(from, hash) ?? target);
+    });
   }, [from, target]);
   return (
     <main className="sw-document" id="main-content">
@@ -117,20 +130,6 @@ function MovedDocument({ from }: Readonly<{ from: string }>) {
   );
 }
 
-/**
- * Marks the docs page ready for interaction. In an article it runs inside the
- * content boundary, so it fires after the lazy MDX controls hydrate.
- */
-function DocumentReady() {
-  useEffect(() => {
-    document.documentElement.dataset.hydrated = "true";
-    return () => {
-      delete document.documentElement.dataset.hydrated;
-    };
-  }, []);
-  return null;
-}
-
 function DocumentRoute() {
   const params = Route.useParams();
   const activeHref = normalizeDocumentHref(params._splat);
@@ -138,18 +137,26 @@ function DocumentRoute() {
   const href = useLocation({ select: (location) => location.href });
   useEffect(() => {
     void href;
+    const hash = window.location.hash;
+    if (hash === "") return;
     // An old URL redirects here with its old #fragment; send that heading on.
-    const forwarded = forwardedHeading(activeHref, window.location.hash);
-    if (forwarded !== undefined) {
-      window.location.replace(forwarded);
-      return;
-    }
-    revealAnchoredMember();
+    // The table of moved headings loads only for a URL with a fragment.
+    let current = true;
+    void import("../lib/moved-headings.js").then(({ forwardedHeading }) => {
+      if (!current) return;
+      const forwarded = forwardedHeading(activeHref, hash);
+      if (forwarded !== undefined) window.location.replace(forwarded);
+      else revealAnchoredMember();
+    });
+    return () => {
+      current = false;
+    };
   }, [href, activeHref]);
   const metadata = Route.useLoaderData();
-  const Content = documentComponentForSplat(params._splat);
-  if (metadata.moved !== undefined) return <MovedDocument from={metadata.moved} />;
-  if (Content === undefined) return <DocumentNotFound />;
+  if (metadata.moved !== undefined) {
+    return <MovedDocument from={metadata.moved} target={metadata.movedTo ?? "/docs/"} />;
+  }
+  if (!hasDocument(params._splat)) return <DocumentNotFound />;
 
   return (
     <DocsShell
@@ -158,22 +165,24 @@ function DocumentRoute() {
       kind={metadata.kind}
       outline={metadata.outline}
       reserveOutline
+      symbolCount={metadata.symbols}
       sourcePath={metadata.sourcePath}
       title={metadata.title}
     >
-      {/* Prerendered HTML can still hold this placeholder; search must not quote it. */}
-      <Suspense
-        fallback={
-          <p className="sw-document-loading" data-pagefind-ignore="">
-            Loading documentation…
-          </p>
-        }
-      >
-        <Content components={DOCUMENT_COMPONENTS} />
+      {/* The loader has loaded the article, so the server renders it in full;
+          hydration keeps that article on screen while the module loads. */}
+      <Suspense fallback={null}>
+        <DocumentArticle splat={params._splat} />
         <DocumentReady key={activeHref} />
       </Suspense>
     </DocsShell>
   );
+}
+
+/** The page's article: its compiled document with the site's components. */
+function DocumentArticle({ splat }: Readonly<{ splat: string | undefined }>) {
+  const Content = useDocumentComponent(splat);
+  return Content === undefined ? null : <Content components={DOCUMENT_COMPONENTS} />;
 }
 
 function DocumentNotFound() {

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import type { AnchorHTMLAttributes } from "react";
 
-import { opensFreshDocument } from "../lib/navigation.js";
+import { opensFreshDocument } from "../lib/site-links.js";
 
 /** Files served as-is: the router has no page for them. */
 const STATIC_FILE = /\.(?:txt|xml|json|xlsx|csv|png|svg|webp|wasm)$/;

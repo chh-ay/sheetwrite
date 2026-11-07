@@ -1,245 +1,67 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
+import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
-import { Icon } from "../components/Icon.js";
-import { pageMeta } from "../lib/seo.js";
+import { DocumentReady } from "../components/DocumentReady.js";
+import type { DocumentModule } from "../lib/content.js";
+import { breadcrumbsFor } from "../lib/navigation.js";
+import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
 
+/**
+ * The overview page module, bundled with this route. An eager glob rather than
+ * a named import: a page that uses no rare component has no `stylesheets` export.
+ */
+const overview = Object.values(
+  import.meta.glob<DocumentModule>("../content/docs/index.mdx", { eager: true }),
+)[0]!;
+const Overview = overview.default;
+if (overview.frontmatter === undefined)
+  throw new Error("content/docs/index.mdx has no frontmatter");
+const frontmatter = overview.frontmatter;
+const stylesheets = overview.stylesheets ?? [];
+
+const OVERVIEW_HREF = "/docs/";
+const OVERVIEW_SOURCE = "docs/src/content/docs/index.mdx";
+
+/**
+ * The documentation overview. Its own route imports the one page it shows, so
+ * the index of every documentation page does not load with it.
+ */
 export const Route = createFileRoute("/docs/")({
   head: () => ({
-    meta: pageMeta(
-      "Sheetwrite documentation",
-      "Get started with Sheetwrite, choose a framework, browse the API, or give your AI agent the complete reference.",
-    ),
+    meta: [
+      ...pageMeta(pageTitle(frontmatter.title), frontmatter.description),
+      { property: "og:type", content: "article" },
+      ...pageImageMeta(OVERVIEW_HREF, frontmatter.title),
+    ],
+    links: stylesheets.map((href) => ({ rel: "stylesheet", href })),
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: documentStructuredData({
+          title: frontmatter.title,
+          description: frontmatter.description,
+          href: OVERVIEW_HREF,
+          trail: breadcrumbsFor(OVERVIEW_HREF, frontmatter.title),
+        }),
+      },
+    ],
   }),
   component: DocsOverview,
 });
 
-const frameworks = [
-  { name: "Vanilla", slug: "vanilla", package: "core", detail: "Own the grid lifecycle directly." },
-  { name: "React", slug: "react", package: "react", detail: "Components, refs, and callbacks." },
-  { name: "Vue", slug: "vue", package: "vue", detail: "Props, events, and exposed state." },
-  { name: "Svelte", slug: "svelte", package: "svelte", detail: "Bindings and callback props." },
-];
-
 function DocsOverview() {
   return (
     <DocsShell
-      activeHref="/docs/"
-      description="Everything you need to build a spreadsheet your application controls."
-      sourcePath="docs/src/routes/docs.index.tsx"
-      title="Build with Sheetwrite"
+      activeHref={OVERVIEW_HREF}
+      description={frontmatter.description}
+      outline={frontmatter.outline}
+      reserveOutline
+      sourcePath={OVERVIEW_SOURCE}
+      title={frontmatter.title}
     >
-      <div className="sw-doc-home">
-        <section className="sw-doc-start">
-          <div>
-            <span className="sw-doc-eyebrow">Start here</span>
-            <h2>Your first grid, from install to edit.</h2>
-            <p>
-              Choose a package, mount a workbook, and listen for changes. Start with the setup guide
-              for your framework.
-            </p>
-            <Link
-              className="sw-doc-primary"
-              to="/docs/$/"
-              params={{ _splat: "start/installation" }}
-            >
-              Install Sheetwrite <Icon name="arrow-right" />
-            </Link>
-            <Link
-              className="sw-doc-secondary"
-              to="/docs/$/"
-              params={{ _splat: "start/first-grid" }}
-            >
-              Read the quickstart
-            </Link>
-          </div>
-          <ol className="sw-doc-steps">
-            <li>
-              <span>01</span>
-              <div>
-                <strong>Install</strong>
-                <small>Package, styles, and runtime</small>
-              </div>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <strong>Mount</strong>
-                <small>Your framework, your lifecycle</small>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <strong>Build</strong>
-                <small>Data, editing, and persistence</small>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <section aria-labelledby="new-in-release">
-          <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.6.1</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }}>
-              Read the release notes <Icon name="arrow-right" />
-            </Link>
-          </div>
-          <div className="sw-doc-destinations">
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }} hash="data-grid-edits">
-              <span className="sw-doc-eyebrow">Performance</span>
-              <strong>
-                Four slowdowns fixed <Icon name="arrow-right" />
-              </strong>
-              <span>Faster data-grid edits, paged scrolling, text lookups and XLSX rejects.</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.0" }} hash="charts">
-              <span className="sw-doc-eyebrow">0.6.0</span>
-              <strong>
-                Charts and pivot tables <Icon name="arrow-right" />
-              </strong>
-              <span>
-                Charts that follow their cell ranges, and pivot tables that the full engine
-                calculates.
-              </span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.6.1" }} hash="upgrade-checklist">
-              <span className="sw-doc-eyebrow">Upgrade</span>
-              <strong>
-                Upgrade checklist <Icon name="arrow-right" />
-              </strong>
-              <span>Update every package together.</span>
-            </Link>
-          </div>
-        </section>
-
-        <section aria-labelledby="choose-framework">
-          <div className="sw-doc-section-head">
-            <h2 id="choose-framework">Choose your framework</h2>
-            <Link to="/docs/$/" params={{ _splat: "frameworks/lifecycle" }}>
-              Compare lifecycles <Icon name="arrow-right" />
-            </Link>
-          </div>
-          <div className="sw-doc-frameworks">
-            {frameworks.map((framework) => (
-              <a href={`/docs/frameworks/${framework.slug}/`} key={framework.slug}>
-                <strong>
-                  {framework.name}
-                  <span aria-hidden="true">↗</span>
-                </strong>
-                <code>@sheetwrite/{framework.package}</code>
-                <span>{framework.detail}</span>
-              </a>
-            ))}
-          </div>
-        </section>
-
-        <section aria-labelledby="find-answer">
-          <div className="sw-doc-section-head">
-            <h2 id="find-answer">Find what you need</h2>
-          </div>
-          <div className="sw-doc-destinations">
-            <Link to="/docs/$/" params={{ _splat: "api" }}>
-              <span className="sw-doc-eyebrow">Reference</span>
-              <strong>
-                Explore the API <Icon name="arrow-right" />
-              </strong>
-              <span>Browse packages, filter exports, and inspect exact TypeScript signatures.</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "concepts/runtime-ownership" }}>
-              <span className="sw-doc-eyebrow">Concepts</span>
-              <strong>
-                Understand ownership <Icon name="arrow-right" />
-              </strong>
-              <span>
-                Know what belongs to your application, the adapter, the grid, and the engine.
-              </span>
-            </Link>
-            <Link to="/showcases/">
-              <span className="sw-doc-eyebrow">Live examples</span>
-              <strong>
-                See it in action <Icon name="arrow-right" />
-              </strong>
-              <span>
-                Try real workbooks, framework integrations, and capability demonstrations.
-              </span>
-            </Link>
-          </div>
-        </section>
-
-        <section aria-labelledby="build-features">
-          <div className="sw-doc-section-head">
-            <h2 id="build-features">Build a feature</h2>
-          </div>
-          <div className="sw-doc-recipes">
-            <Link to="/docs/$/" params={{ _splat: "features/grid/options-and-presentation" }}>
-              <strong>Configure a grid</strong>
-              <span>Options, shell, and rendering</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/grid/selection-and-keyboard" }}>
-              <strong>Editing & interaction</strong>
-              <span>Selection, clipboard, and validation</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/data/data-operations" }}>
-              <strong>Connect your data</strong>
-              <span>Rows, transactions, and datasources</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/formulas/authoring-and-references" }}>
-              <strong>Work with formulas</strong>
-              <span>Expressions, references, and functions</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/formulas/analysis-formulas" }}>
-              <strong>Analyze data</strong>
-              <span>Group, pivot, forecast, and clean text</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/data/host-owned-rows" }}>
-              <strong>Use your own row store</strong>
-              <span>Host-owned rows and entity IDs</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/data/persistence" }}>
-              <strong>Save & recover</strong>
-              <span>Snapshots, pending work, and large undo</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/collaboration" }}>
-              <strong>Collaborate</strong>
-              <span>Ordered commits, offline work, and rebase</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "features/formatting/styles" }}>
-              <strong>Style the grid</strong>
-              <span>Themes, cell styles, and number formats</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "import-export/xlsx-export" }}>
-              <strong>Import & export</strong>
-              <span>XLSX, CSV, and workbook interchange</span>
-            </Link>
-          </div>
-        </section>
-
-        <section className="sw-doc-agent" aria-labelledby="agent-context">
-          <div>
-            <span className="sw-doc-eyebrow">For AI-assisted development</span>
-            <h2 id="agent-context">Give your agent the same reference.</h2>
-            <p>
-              A plain-text index and a single-file reference with every authored guide and public
-              API declaration. Generated from the same sources as this site.
-            </p>
-          </div>
-          <div className="sw-doc-agent__links">
-            <a href="/llms.txt">
-              <code>llms.txt</code>
-              <span>
-                Start with the index <Icon name="arrow-right" />
-              </span>
-            </a>
-            <a href="/llms-full.txt">
-              <code>llms-full.txt</code>
-              <span>
-                Read the full reference <Icon name="arrow-right" />
-              </span>
-            </a>
-          </div>
-        </section>
-      </div>
+      <Overview components={{ a: ContentLink }} />
+      <DocumentReady />
     </DocsShell>
   );
 }

@@ -41,94 +41,133 @@
   font-size: var(--sw-text-eyebrow);
   font-weight: var(--sw-weight-semibold);
 }
-/* The newest release opens the sidebar, above the section groups. */
-.sw-sidebar__nav a.sw-release-card {
+/* Layout: a full-height sidebar beside one column that holds the top bar and
+   the page. Below 64rem the sidebar moves into the menu drawer. */
+.sw-docs {
   display: grid;
-  gap: var(--sw-space-1);
-  margin: 0 0 var(--sw-space-4);
-  padding: var(--sw-space-3) var(--sw-space-4);
-  border: var(--sw-border-width) solid color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
-  border-radius: var(--sw-radius-lg);
-  color: var(--sw-fg-muted);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--sw-accent) 12%, transparent), transparent 70%),
-    var(--sw-surface-1);
-  text-decoration: none;
-  transition: border-color var(--sw-motion-fast) var(--sw-motion-standard);
-}
-.sw-sidebar__nav a.sw-release-card:hover {
-  border-color: var(--sw-accent);
-  color: var(--sw-fg-muted);
-}
-.sw-sidebar__nav a.sw-release-card[aria-current="page"] {
-  border-color: var(--sw-accent);
-  font-weight: inherit;
-}
-.sw-release-card__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-  font-size: var(--sw-text-eyebrow);
-}
-.sw-release-card__badge {
-  border-radius: var(--sw-radius-pill);
-  padding: 0 var(--sw-space-1-5);
-  background: var(--sw-accent-soft);
-  color: var(--sw-accent-strong);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
-}
-.sw-release-card strong {
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-heading)
-    var(--sw-font-display);
-}
-.sw-release-card__summary {
-  font-size: var(--sw-text-caption);
-  line-height: var(--sw-leading-ui);
-}
-.sw-release-card__more {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sw-space-1);
-  margin-top: var(--sw-space-0-5);
-  color: var(--sw-accent-strong);
-  font-size: var(--sw-text-caption);
-  font-weight: var(--sw-weight-semibold);
-}
-.sw-nav-toggle {
-  display: none;
+  grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
 }
 
 .sw-sidebar {
-  position: fixed;
-  z-index: 10;
-  inset: var(--sw-header-height) auto 0 0;
-  width: var(--sw-sidebar-width);
-  /* The gutter is reserved even before the list overflows, so expanding a
-     group never narrows the column and reflows its text. The right padding
-     is trimmed by the thin scrollbar's width to keep the same text column. */
-  padding: var(--sw-space-8) var(--sw-space-2) var(--sw-space-8) var(--sw-space-5);
-  border-right: 1px solid var(--sw-border);
+  position: sticky;
+  top: 0;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border-right: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-0);
   overflow-y: auto;
+  /* The gutter is reserved even before the list overflows, so opening a
+     group never narrows the column and reflows its text. */
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
+/* The brand row lines up with the top bar beside it. */
+.sw-sidebar__brand {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+  min-height: var(--sw-header-height);
+  padding: 0 var(--sw-space-5);
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-0);
+  font: var(--sw-weight-bold) var(--sw-text-body) / 1 var(--sw-font-display);
+  text-decoration: none;
+}
+.sw-sidebar > .sw-sidebar__nav {
+  padding: var(--sw-space-4) var(--sw-space-3) var(--sw-space-10);
+}
 .sw-sidebar__nav {
+  display: grid;
+  gap: var(--sw-space-8);
+}
+/* A section: a small label over its pages. */
+.sw-nav-section {
   display: grid;
   gap: var(--sw-space-0-5);
 }
-/* Disclosure rows (sidebar groups, the inline outline): no native marker; a
+/* Labels sit below the page rows in weight and colour: the pages lead. */
+.sw-nav-section__label {
+  margin: 0 0 var(--sw-space-2);
+  padding-inline: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+/* Page rows and group rows: icon, label, then a badge or chevron. */
+/* Rows of 34 px; the icon sits in a fixed column so every label starts on
+   the same line. */
+.sw-sidebar__nav a,
+.sw-nav-subgroup > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-3);
+  min-height: 2.125rem;
+  padding: var(--sw-space-1) var(--sw-space-3);
+  border-radius: var(--sw-radius-md);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+  text-decoration: none;
+  transition:
+    color var(--sw-motion-fast) var(--sw-motion-standard),
+    background-color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+/* At rest every glyph is one muted colour, accent marks included; the accent
+   returns on hover and on the current page. */
+.sw-sidebar__nav a > .sw-icon,
+.sw-nav-subgroup > summary > .sw-icon:first-child {
+  --sw-icon-accent: currentColor;
+  flex: none;
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  color: var(--sw-fg-muted);
+}
+.sw-sidebar__nav a:is(:hover, :focus-visible) > .sw-icon,
+.sw-nav-subgroup > summary:is(:hover, :focus-visible) > .sw-icon:first-child {
+  --sw-icon-accent: var(--sw-accent);
+}
+.sw-sidebar__nav a > span:first-of-type,
+.sw-nav-subgroup > summary > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sw-sidebar__nav a:hover,
+.sw-nav-subgroup > summary:hover {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-2);
+}
+/* The current page: a rounded accent highlight, icon included. */
+.sw-sidebar__nav a[aria-current="page"] {
+  color: var(--sw-accent-strong);
+  background: var(--sw-accent-soft);
+  font-weight: var(--sw-weight-semibold);
+}
+.sw-sidebar__nav a[aria-current="page"] > .sw-icon {
+  --sw-icon-accent: var(--sw-accent-strong);
+  color: var(--sw-accent-strong);
+}
+/* Disclosure rows (nested groups, the inline outline): no native marker; a
    chevron from the sprite turns down when the row is open. */
-.sw-nav-group > summary,
 .sw-nav-subgroup > summary,
+.sw-toc-inline > summary {
+  cursor: pointer;
+  list-style: none;
+}
 .sw-toc-inline > summary {
   display: flex;
   align-items: center;
   gap: var(--sw-space-2);
-  cursor: pointer;
-  list-style: none;
 }
-.sw-nav-group > summary::-webkit-details-marker,
 .sw-nav-subgroup > summary::-webkit-details-marker,
 .sw-toc-inline > summary::-webkit-details-marker {
   display: none;
@@ -140,77 +179,15 @@
 details[open] > summary > .sw-disclosure-icon {
   transform: rotate(90deg);
 }
-.sw-nav-group > summary {
-  min-height: var(--sw-control-height);
-  padding: var(--sw-space-1-5) var(--sw-space-2);
-  border-radius: var(--sw-radius-sm);
-  color: var(--sw-fg-strong);
-  font-family: var(--sw-font-display);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-semibold);
-  transition: background-color var(--sw-motion-fast) var(--sw-motion-standard);
-}
-.sw-nav-group > summary:hover,
-.sw-nav-subgroup > summary:hover {
-  background: var(--sw-surface-2);
-}
-/* A tree line ties the pages to their group; the current page owns a short
-   accent segment of that line. */
-.sw-nav-group > div {
-  margin: var(--sw-space-1) 0 var(--sw-space-3) var(--sw-space-2);
-  border-left: var(--sw-border-width) solid var(--sw-border);
-}
-.sw-sidebar__nav a {
-  display: block;
-  margin-left: calc(var(--sw-border-width) * -1);
-  padding: var(--sw-space-1-5) var(--sw-space-3) var(--sw-space-1-5) var(--sw-space-4);
-  border-left: var(--sw-focus-ring-width) solid transparent;
-  border-radius: 0 var(--sw-radius-sm) var(--sw-radius-sm) 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-  line-height: var(--sw-leading-ui);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-  transition:
-    color var(--sw-motion-fast) var(--sw-motion-standard),
-    border-color var(--sw-motion-fast) var(--sw-motion-standard),
-    background-color var(--sw-motion-fast) var(--sw-motion-standard);
-}
-.sw-sidebar__nav a:hover {
-  border-left-color: var(--sw-border-strong);
-  color: var(--sw-fg-strong);
-}
-.sw-sidebar__nav a[aria-current="page"] {
-  border-left-color: var(--sw-accent);
-  color: var(--sw-fg-strong);
-  background: var(--sw-accent-soft);
-  font-weight: var(--sw-weight-semibold);
-}
-/* Page links carry an optional badge on the right edge. */
-.sw-sidebar__nav .sw-nav-group a {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-}
-.sw-sidebar__nav .sw-nav-group a > span:first-child,
-.sw-nav-group summary > span:first-child {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-/* A nested group reads as a quieter folder inside its section: same tree line,
-   one step in, label in the page-link weight. */
-.sw-nav-subgroup > summary {
-  padding: var(--sw-space-1-5) var(--sw-space-2) var(--sw-space-1-5) var(--sw-space-4);
-  border-radius: 0 var(--sw-radius-sm) var(--sw-radius-sm) 0;
-  color: var(--sw-fg);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-medium);
-}
+/* A group's pages sit one step in, on a quiet tree line. */
 .sw-nav-subgroup > div {
-  margin: var(--sw-space-0-5) 0 var(--sw-space-1) var(--sw-space-4);
+  display: grid;
+  gap: var(--sw-space-0-5);
+  margin: var(--sw-space-0-5) 0 var(--sw-space-1) calc(var(--sw-space-2) + var(--sw-icon-sm) / 2);
+  padding-left: var(--sw-space-2);
   border-left: var(--sw-border-width) solid var(--sw-border);
 }
-/* One quiet badge for pages changed in the latest release: tinted, never a
+/* One quiet badge for pages new in the current release: tinted, never a
    solid fill, so it never outweighs the current page's highlight. */
 .sw-nav-badge {
   flex: 0 0 auto;
@@ -220,75 +197,126 @@ details[open] > summary > .sw-disclosure-icon {
   color: var(--sw-accent-strong);
   font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
 }
-.sw-sidebar__nav section {
-  border-top: 1px solid var(--sw-border);
-  margin-top: var(--sw-space-4);
-  padding-top: var(--sw-space-4);
+
+/* The top bar over the reading column: tabs left; search, GitHub, theme and
+   (narrow screens) the menu right. */
+.sw-docs-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  /* First in the source, so the tabs and search come before the sidebar in
+     the tab order; placed over the reading column. */
+  grid-row: 1;
+  grid-column: 2;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--sw-space-6);
+  min-height: var(--sw-header-height);
+  padding: 0 var(--sw-page-gutter);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
+  backdrop-filter: blur(12px);
 }
-.sw-sidebar__nav section a {
-  margin-left: 0;
-  border-left: 0;
-  border-radius: var(--sw-radius-sm);
-  padding-left: var(--sw-space-2);
+.sw-docs-bar__brand {
+  display: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-body) / 1 var(--sw-font-display);
+  text-decoration: none;
 }
-.sw-sidebar__nav section a:hover {
+.sw-docs-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sw-space-1);
+  min-width: 0;
+}
+.sw-docs-tabs a {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+  padding: 0 var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1 var(--sw-font-body);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+.sw-docs-tabs a:hover {
+  color: var(--sw-fg-strong);
+}
+/* The active tab: strong text over an accent underline on the bar's edge. */
+.sw-docs-tabs a[aria-current] {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+.sw-docs-tabs a[aria-current]::after {
+  content: "";
+  position: absolute;
+  right: var(--sw-space-3);
+  bottom: calc(var(--sw-border-width) * -1);
+  left: var(--sw-space-3);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--sw-accent);
+}
+.sw-docs-tabs a[aria-current] > .sw-icon {
+  color: var(--sw-accent-strong);
+}
+.sw-docs-bar__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-2);
+}
+/* Fixed widths, so the web font swapping in moves nothing in the bar. */
+.sw-docs-bar .sw-search-button {
+  width: 13.5rem;
+}
+.sw-docs-bar__link {
+  display: inline-block;
+  min-width: 4.25rem;
+  text-align: center;
+  padding: var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-small) / 1 var(--sw-font-body);
+  text-decoration: none;
+}
+.sw-docs-bar__link:hover {
+  color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
 }
-.sw-sidebar__nav h2 {
-  margin: 0 0 var(--sw-space-1-5);
-  padding-inline: var(--sw-space-2);
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-display);
+.sw-nav-toggle {
+  display: none;
 }
 
 /* The reading column keeps the content width and centers in the space right
    of the sidebar; wide screens add the outline as a second column. */
 .sw-document {
+  grid-row: 2;
+  grid-column: 2;
   display: grid;
-  grid-template-columns: minmax(0, var(--sw-content-width));
+  /* A fixed track, not one sized to its content: while the page is still
+     arriving, a column sized to the content parsed so far would widen as
+     longer lines arrive and move everything in it. */
+  grid-template-columns: min(100%, var(--sw-content-width));
   justify-content: center;
   align-content: start;
   min-width: 0;
-  margin-left: var(--sw-sidebar-width);
-  padding: var(--sw-space-12) var(--sw-page-gutter) var(--sw-space-16);
+  padding: var(--sw-space-10) var(--sw-page-gutter) var(--sw-space-16);
 }
 .sw-document__header {
   margin-bottom: var(--sw-space-10);
-  padding-bottom: var(--sw-space-8);
-  border-bottom: 1px solid var(--sw-border);
 }
-.sw-breadcrumb ol {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sw-space-2);
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--sw-space-6);
-}
-.sw-breadcrumb li {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-  min-width: 0;
-}
-.sw-breadcrumb li + li::before {
-  content: "/";
-  color: var(--sw-fg-muted);
-}
-.sw-breadcrumb a,
-.sw-breadcrumb span {
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-.sw-breadcrumb a:hover {
+/* The page's group, in the accent colour above the title. */
+.sw-document__eyebrow {
+  margin: 0 0 var(--sw-space-2);
   color: var(--sw-accent-strong);
-  text-decoration: underline;
-}
-.sw-breadcrumb span[aria-current="page"] {
-  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
 }
 .sw-document__header h1 {
   display: flex;
@@ -305,22 +333,12 @@ details[open] > summary > .sw-disclosure-icon {
   min-width: 0;
 }
 /* The page's one-sentence summary: the lead under the title. */
-.sw-document__header > span {
-  display: block;
+.sw-document__lead {
   max-width: var(--sw-measure-lead);
-  margin-top: var(--sw-space-4);
+  margin: var(--sw-space-3) 0 0;
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-lead);
   line-height: var(--sw-leading-body);
-}
-.sw-title-package {
-  border: var(--sw-border-width) solid var(--sw-border);
-  border-radius: var(--sw-radius-sm);
-  padding: var(--sw-space-1) var(--sw-space-2);
-  color: var(--sw-fg-muted);
-  background: var(--sw-surface-2);
-  font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: 0;
 }
 /* Reading hierarchy, every level in the display face: h2 sections with room
    above, h3 subsections, h4 labels. */
@@ -483,13 +501,9 @@ details[open] > summary > .sw-disclosure-icon {
   border-color: var(--sw-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 15%, transparent);
 }
-.sw-symbol-filter__field svg {
-  width: 1.1rem;
-  height: 1.1rem;
+.sw-symbol-filter__field .sw-icon {
   flex: none;
-  fill: none;
-  stroke: var(--sw-fg-muted);
-  stroke-width: 1.7;
+  color: var(--sw-fg-muted);
 }
 .sw-symbol-filter__field input {
   min-width: 0;
@@ -604,236 +618,6 @@ details[open] > summary > .sw-disclosure-icon {
   text-align: right;
 }
 
-.sw-docs--overview .sw-document__header {
-  margin-bottom: var(--sw-space-6);
-}
-.sw-doc-home {
-  display: grid;
-  gap: var(--sw-space-8);
-}
-.sw-doc-home .sw-doc-eyebrow {
-  display: block;
-  color: var(--sw-accent-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.4 var(--sw-font-body);
-}
-.sw-doc-home .sw-doc-start {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(12rem, 1fr);
-  gap: var(--sw-space-8);
-  align-items: center;
-  border: 1px solid color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
-  border-radius: var(--sw-radius-lg);
-  padding: var(--sw-space-8);
-  background: color-mix(in srgb, var(--sw-accent-soft) 45%, var(--sw-surface-0));
-}
-.sw-docs .sw-doc-start h2 {
-  margin: var(--sw-space-2) 0;
-  padding: 0;
-  max-width: 22rem;
-  font-size: var(--sw-text-h2);
-}
-.sw-doc-home .sw-doc-start p {
-  margin: var(--sw-space-3) 0 var(--sw-space-5);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-}
-.sw-doc-home .sw-doc-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sw-space-5);
-  padding: var(--sw-space-3) var(--sw-space-4);
-  border-radius: var(--sw-radius-md);
-  background: var(--sw-accent);
-  color: var(--sw-accent-ink);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-semibold);
-  text-decoration: none;
-}
-.sw-doc-primary:hover {
-  filter: brightness(1.08);
-}
-.sw-doc-home .sw-doc-secondary {
-  display: inline-block;
-  margin: var(--sw-space-3) 0 0 var(--sw-space-4);
-  color: var(--sw-fg-strong);
-  font-size: var(--sw-text-caption);
-}
-.sw-doc-home .sw-doc-steps {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.sw-doc-home .sw-doc-steps li {
-  display: flex;
-  align-items: center;
-  gap: var(--sw-space-4);
-  padding: var(--sw-space-4) 0;
-  margin: 0;
-  border-bottom: 1px solid var(--sw-border);
-}
-.sw-doc-home .sw-doc-steps li:last-child {
-  border-bottom: 0;
-}
-.sw-doc-steps li > span {
-  display: grid;
-  place-items: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  border: 1px solid var(--sw-border-strong);
-  border-radius: 50%;
-  color: var(--sw-accent-strong);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) var(--sw-font-mono);
-}
-.sw-doc-steps strong,
-.sw-doc-steps small {
-  display: block;
-}
-.sw-doc-steps strong {
-  font-size: var(--sw-text-small);
-}
-.sw-doc-steps small {
-  font-size: var(--sw-text-eyebrow);
-  color: var(--sw-fg-muted);
-}
-.sw-doc-section-head {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--sw-space-3);
-  margin-bottom: var(--sw-space-4);
-}
-.sw-docs .sw-doc-section-head h2 {
-  margin: 0;
-  padding: 0;
-  font-size: var(--sw-text-lead);
-}
-.sw-doc-section-head > a {
-  font-size: var(--sw-text-caption);
-  text-decoration: none;
-}
-.sw-doc-frameworks {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--sw-space-3);
-}
-.sw-doc-frameworks > a,
-.sw-doc-destinations > a {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sw-space-2);
-  padding: var(--sw-space-4);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-lg);
-  background: var(--sw-surface-0);
-  text-decoration: none;
-}
-.sw-doc-frameworks > a:hover,
-.sw-doc-destinations > a:hover {
-  border-color: var(--sw-accent);
-  background: var(--sw-surface-2);
-}
-.sw-doc-frameworks strong {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--sw-text-body);
-}
-.sw-doc-frameworks strong > span {
-  color: var(--sw-fg-muted);
-}
-.sw-docs .sw-doc-frameworks code {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: var(--sw-text-eyebrow);
-  color: var(--sw-accent-strong);
-}
-.sw-doc-frameworks a > span {
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-eyebrow);
-  line-height: 1.5;
-}
-.sw-doc-destinations {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sw-space-3);
-}
-.sw-doc-destinations strong {
-  font-size: var(--sw-text-body);
-  line-height: 1.5;
-}
-.sw-doc-destinations a > span:last-child {
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
-  line-height: 1.6;
-}
-.sw-doc-recipes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: var(--sw-space-8);
-}
-.sw-doc-recipes a {
-  display: grid;
-  gap: var(--sw-space-0-5);
-  padding: var(--sw-space-3) 0;
-  border-bottom: 1px solid var(--sw-border);
-  text-decoration: none;
-}
-.sw-doc-recipes strong {
-  font-size: var(--sw-text-small);
-}
-.sw-doc-recipes span {
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
-}
-.sw-doc-recipes a:hover strong {
-  color: var(--sw-accent-strong);
-}
-.sw-doc-agent {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 14rem;
-  gap: var(--sw-space-6);
-  align-items: center;
-  padding: var(--sw-space-6);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-lg);
-  background: var(--sw-surface-2);
-}
-.sw-docs .sw-doc-agent h2 {
-  margin: var(--sw-space-2) 0;
-  padding: 0;
-  font-size: var(--sw-text-h3);
-}
-.sw-doc-home .sw-doc-agent p {
-  margin: 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-small);
-}
-.sw-doc-agent__links {
-  display: grid;
-  gap: var(--sw-space-3);
-}
-.sw-doc-agent__links a {
-  display: grid;
-  gap: var(--sw-space-1);
-  padding: var(--sw-space-3);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-  background: var(--sw-surface-1);
-  text-decoration: none;
-}
-.sw-docs .sw-doc-agent__links code {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--sw-accent-strong);
-  font-size: var(--sw-text-small);
-}
-.sw-doc-agent__links span {
-  font-size: var(--sw-text-eyebrow);
-  color: var(--sw-fg-muted);
-}
-
 .sw-nav-dialog {
   width: min(22rem, calc(100vw - 3rem));
   max-width: none;
@@ -877,9 +661,20 @@ html:has(.sw-nav-dialog[open]) {
   padding: var(--sw-space-4);
 }
 
+/* Symbol pages: a wider reading column that holds the reference and its
+   example aside; the aside takes the outline's place on the right. */
+.sw-docs--api {
+  --sw-content-width: 76rem;
+}
+.sw-docs--api .sw-toc {
+  display: none;
+}
+
 @media (min-width: 88rem) {
-  .sw-docs:not(.sw-docs--overview) .sw-document {
-    grid-template-columns: minmax(0, var(--sw-content-width)) var(--sw-docs-outline-width);
+  .sw-docs:not(.sw-docs--api) .sw-document {
+    grid-template-columns:
+      min(100% - var(--sw-docs-outline-width) - var(--sw-space-16), var(--sw-content-width))
+      var(--sw-docs-outline-width);
     column-gap: var(--sw-space-16);
   }
   .sw-document > :not(.sw-toc) {
@@ -903,33 +698,53 @@ html:has(.sw-nav-dialog[open]) {
     display: none;
   }
 }
-@media (max-width: 75rem) {
-  .sw-doc-frameworks {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .sw-doc-destinations {
-    grid-template-columns: 1fr;
-  }
-  .sw-doc-start,
-  .sw-doc-agent {
-    grid-template-columns: 1fr;
-  }
-}
 @media (max-width: 63.999rem) {
+  /* Anchors land below the two-row bar: the brand row and the tab row. */
+  html:has(.sw-docs) {
+    --sw-header-height: calc(var(--sw-header-height-compact) + var(--sw-docs-tab-row-height));
+  }
+  .sw-docs {
+    --sw-docs-tab-row-height: 2.75rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
   .sw-sidebar {
+    display: none;
+  }
+  .sw-docs-bar {
+    grid-column: 1;
+    flex-wrap: wrap;
+    gap: 0 var(--sw-space-4);
+    min-height: 0;
+  }
+  .sw-docs-bar__brand {
+    display: flex;
+    min-height: var(--sw-header-height-compact);
+  }
+  /* The tabs take their own row under the brand and scroll sideways. */
+  .sw-docs-tabs {
+    order: 3;
+    flex: 1 0 100%;
+    height: var(--sw-docs-tab-row-height);
+    margin-inline: calc(var(--sw-page-gutter) * -1);
+    padding-inline: calc(var(--sw-page-gutter) - var(--sw-space-3));
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sw-docs-tabs::-webkit-scrollbar {
     display: none;
   }
   .sw-nav-toggle {
     display: inline-grid;
   }
   .sw-document {
-    margin-left: 0;
+    grid-column: 1;
     padding: var(--sw-space-8) var(--sw-page-gutter) var(--sw-space-12);
   }
 }
-@media (max-width: 42rem) {
-  /* Phones: the search control is an icon button beside the brand; its
-     label stays as the accessible name. */
+/* The search control as its icon; its label stays as the accessible name.
+   Phones use it beside the brand; between the sidebar's breakpoint and a wide
+   screen it keeps the tabs their room, and GitHub leaves the bar. */
+@media (min-width: 64rem) and (max-width: 79.999rem), (max-width: 42rem) {
   .sw-docs .sw-search-button {
     width: var(--sw-control-height);
     height: var(--sw-control-height);
@@ -944,35 +759,26 @@ html:has(.sw-nav-dialog[open]) {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-  .sw-docs .sw-search-button kbd {
+  .sw-docs .sw-search-button kbd,
+  .sw-docs-bar__link {
     display: none;
   }
+}
+
+@media (max-width: 42rem) {
   .sw-document {
     padding-top: var(--sw-space-6);
   }
-  .sw-breadcrumb ol {
-    margin-bottom: var(--sw-space-4);
+  /* The bar's icon buttons keep their size but take a 44px touch target,
+     the height of the tab row's targets. */
+  .sw-docs-bar :is(.sw-search-button, .sw-icon-button) {
+    position: relative;
   }
-  .sw-doc-home .sw-doc-start {
-    grid-template-columns: 1fr;
-    gap: var(--sw-space-5);
-    padding: var(--sw-space-5);
+  .sw-docs-bar :is(.sw-search-button, .sw-icon-button)::after {
+    position: absolute;
+    inset: calc((44px - var(--sw-control-height)) / -2);
+    content: "";
   }
-  .sw-doc-start .sw-doc-steps {
-    display: none;
-  }
-  .sw-docs .sw-doc-start h2 {
-    font-size: var(--sw-text-h2);
-  }
-  .sw-doc-home .sw-doc-secondary {
-    margin-left: 0;
-    display: block;
-  }
-  .sw-doc-home .sw-doc-agent {
-    grid-template-columns: 1fr;
-    padding: var(--sw-space-5);
-  }
-  .sw-doc-recipes,
   .sw-doc-pager,
   .sw-docs .api-symbol-grid {
     grid-template-columns: 1fr;

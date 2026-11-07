@@ -1,6 +1,8 @@
 import { useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { Icon } from "./Icon.js";
+
 interface SymbolCard {
   element: HTMLElement;
   /** Lower-cased name plus summary, so one query matches either. */
@@ -57,7 +59,16 @@ function statusFor(query: string, matches: number, total: number): string {
  * anchors, the outline, and the Pagefind index keep pointing at the same
  * elements, and the disclosure rows below stay the generator's markup.
  */
-export function ApiSymbolFilter(): ReactNode {
+export function ApiSymbolFilter({
+  symbolCount,
+}: Readonly<{
+  /**
+   * The page's exported symbol count from its frontmatter: the filter renders
+   * from it on the server and until the cards are collected, so it never
+   * appears late and moves the article.
+   */
+  symbolCount?: number;
+}>): ReactNode {
   const pathname = useLocation({ select: (location) => location.pathname });
   const [groups, setGroups] = useState<readonly SymbolGroup[]>([]);
   const [query, setQuery] = useState("");
@@ -88,7 +99,8 @@ export function ApiSymbolFilter(): ReactNode {
     return () => mutations.disconnect();
   }, [pathname]);
 
-  const total = groups.reduce((count, group) => count + group.cards.length, 0);
+  const collected = groups.reduce((count, group) => count + group.cards.length, 0);
+  const total = groups.length > 0 ? collected : (symbolCount ?? 0);
   const filterable = total >= MINIMUM_FILTERABLE_CARDS;
   const trimmedQuery = query.trim();
 
@@ -118,10 +130,7 @@ export function ApiSymbolFilter(): ReactNode {
         Filter exported symbols
       </label>
       <div className="sw-symbol-filter__field">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="6" />
-          <path d="m16 16 5 5" />
-        </svg>
+        <Icon name="search" />
         <input
           aria-describedby={statusId}
           autoComplete="off"

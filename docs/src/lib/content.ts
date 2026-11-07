@@ -2,7 +2,7 @@ import {
   type AnchorHTMLAttributes,
   type ComponentType,
   type LazyExoticComponent,
-  lazy,
+  use,
 } from "react";
 
 import { normalizeDocumentHref } from "./document-href.js";
@@ -15,6 +15,8 @@ export interface DocumentFrontmatter {
   kind?: string;
   /** The page's outline, collected at build time; see lib/outline.ts. */
   outline?: readonly OutlineItem[];
+  /** An API entry point's exported symbol count, for its symbol filter. */
+  symbols?: number;
   /** Set on pages the docs generator writes; see `markGeneratedPages` in lib/generated-content.ts. */
   generated?: boolean;
 }
@@ -24,8 +26,8 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  /** A formula family's table and filter, loaded with its page; see FormulaReference.tsx. */
-  FormulaReference?: LazyExoticComponent<ComponentType<{ family: string }>>;
+  /** A formula family's table and filter, loaded with its page; see lib/formula-reference-module.ts. */
+  FormulaReference?: ComponentType<{ family: string }>;
   /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
   PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
 }
@@ -40,7 +42,6 @@ export interface DocumentModule {
 }
 
 interface DocumentSource {
-  component: LazyExoticComponent<DocumentComponent>;
   fallbackTitle: string;
   load: () => Promise<DocumentModule>;
   /** The glob key, `../content/docs/<page>.md`, relative to `docs/src/lib`. */
@@ -59,7 +60,7 @@ function hrefFromSource(source: string): string {
   const relative = source
     .replace(/^\.\.\/content\/docs\//, "")
     .replace(/\.(?:md|mdx)$/, "")
-    .replace(/\/index$/, "");
+    .replace(/(^|\/)index$/, "");
   return `/docs/${relative}/`.replace(/\/+/g, "/");
 }
 
@@ -68,28 +69,60 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     const href = hrefFromSource(source);
     const fallbackTitle =
       href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite";
-    return [href, { component: lazy(load), fallbackTitle, load, key: source }];
+    return [href, { fallbackTitle, key: source, load }];
   }),
 );
+
+/** Document modules already loaded, by href: they render without suspending. */
+const loadedModules = new Map<string, DocumentModule>();
+/** One load per document, shared by the route loader and the page render. */
+const moduleLoads = new Map<string, Promise<DocumentModule>>();
+
+function loadModule(href: string, source: DocumentSource): Promise<DocumentModule> {
+  let load = moduleLoads.get(href);
+  if (load === undefined) {
+    load = source.load().then((module) => {
+      loadedModules.set(href, module);
+      return module;
+    });
+    moduleLoads.set(href, load);
+  }
+  return load;
+}
 
 export async function documentForSplat(
   splat: string | undefined,
 ): Promise<DocumentRecord | undefined> {
-  const source = DOCUMENT_SOURCES.get(normalizeDocumentHref(splat));
+  const href = normalizeDocumentHref(splat);
+  const source = DOCUMENT_SOURCES.get(href);
   if (source === undefined) return undefined;
-  const module = await source.load();
+  const module = await loadModule(href, source);
   return {
     title: module.frontmatter?.title ?? source.fallbackTitle,
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
+    symbols: module.frontmatter?.symbols,
     sourcePath: module.frontmatter?.generated ? undefined : source.key.replace("..", "docs/src"),
     stylesheets: module.stylesheets ?? [],
   };
 }
 
-export function documentComponentForSplat(
-  splat: string | undefined,
-): LazyExoticComponent<DocumentComponent> | undefined {
-  return DOCUMENT_SOURCES.get(normalizeDocumentHref(splat))?.component;
+/** Whether a documentation page exists at the splat. */
+export function hasDocument(splat: string | undefined): boolean {
+  return DOCUMENT_SOURCES.has(normalizeDocumentHref(splat));
+}
+
+/**
+ * The page's compiled document, read while rendering. The route loader has
+ * already loaded it on the server and on client navigations, so the article
+ * renders in the same pass and the prerendered page holds it in full. Only
+ * the first render after a page load waits for the module, while hydration
+ * keeps the server's article on screen.
+ */
+export function useDocumentComponent(splat: string | undefined): DocumentComponent | undefined {
+  const href = normalizeDocumentHref(splat);
+  const source = DOCUMENT_SOURCES.get(href);
+  if (source === undefined) return undefined;
+  return (loadedModules.get(href) ?? use(loadModule(href, source))).default;
 }

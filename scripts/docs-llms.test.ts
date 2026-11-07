@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { NavigationSection } from "../docs/src/lib/navigation.js";
 import {
   expectedLlmsFiles,
   inNavigationOrder,
@@ -15,6 +16,7 @@ describe("llms reading order", () => {
     const sections = [
       {
         label: "Features",
+        tab: "guides",
         items: [
           {
             label: "Grid",
@@ -25,8 +27,12 @@ describe("llms reading order", () => {
           },
         ],
       },
-      { label: "Reference", items: [{ label: "Events", href: "/docs/reference/events/" }] },
-    ];
+      {
+        label: "Reference",
+        tab: "api",
+        items: [{ label: "Events", href: "/docs/reference/events/" }],
+      },
+    ] satisfies readonly NavigationSection[];
     const documents = [
       { route: "/docs/reference/events/" },
       { route: "/docs/zeta/" },
