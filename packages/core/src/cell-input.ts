@@ -20,13 +20,35 @@ export function cellDisplayText(value: CellScalar, numberFormat?: string, locale
     : cellScalarToText(value);
 }
 
+/** Date codes tried for a date cell's edit text, finest last. */
+const DATE_EDIT_CODES = ["yyyy-mm-dd", "yyyy-mm-dd hh:mm", "yyyy-mm-dd hh:mm:ss"] as const;
+
+/**
+ * The text the cell editor opens with for a resolved scalar. In a `date` column a
+ * number opens as the first `yyyy-mm-dd`, `yyyy-mm-dd hh:mm` or
+ * `yyyy-mm-dd hh:mm:ss` text that {@link parseDateInput} reads back as exactly
+ * that serial, so committing the editor unchanged keeps the value. Any other value,
+ * or a serial no such text reproduces, opens as {@link cellScalarToText}.
+ */
+export function cellEditText(value: CellScalar, type: CellFormat): string {
+  if (type !== "date" || typeof value !== "number") return cellScalarToText(value);
+
+  for (const code of DATE_EDIT_CODES) {
+    const text = formatNumber(value, code);
+    if (parseDateInput(text) === value) return text;
+  }
+
+  return cellScalarToText(value);
+}
+
 /**
  * Coerce raw text input into a {@link CellValue}, following spreadsheet
  * input-bar conventions:
  *
  * - blank (after trimming) clears the cell to a `null` literal;
  * - text longer than one character beginning with `=` becomes a formula;
- * - in a `number` column a finite numeric string becomes a number literal;
+ * - in a `number`, `currency` or `date` column a finite numeric string becomes a
+ *   number literal (in a `date` column, that number is the date serial);
  * - in a `date` column a recognized date string ({@link parseDateInput}) becomes
  *   its serial-number literal;
  * - in a `currency` column a currency string ({@link parseCurrencyInput}) becomes
@@ -52,7 +74,7 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
     return { kind: "literal", value: trimmed.toUpperCase() === "TRUE" };
   }
 
-  if (type === "number" || type === "currency") {
+  if (type === "number" || type === "currency" || type === "date") {
     const parsed = Number(trimmed);
     if (Number.isFinite(parsed)) {
       return { kind: "literal", value: parsed };
