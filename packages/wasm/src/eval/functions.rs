@@ -3,10 +3,15 @@
 use std::mem::MaybeUninit;
 
 use crate::calc::Func;
-use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
+use crate::cells::payload_num;
+use crate::types::{EvalResult, FormulaError, Value, KIND_EMPTY, KIND_NUMBER, RANGE_CELL_LIMIT};
 
 use super::value::{aggregate_number, bool_from_value, number_from_value, text_from_value};
 use super::{date, financial, math, statistics, text};
+
+// The column fold tells empty and number kinds apart from the rest by their
+// bits alone.
+const _: () = assert!(KIND_EMPTY == 0 && KIND_NUMBER == 1);
 
 pub(super) const MAX_FUNCTION_ARGS: usize = 254;
 
@@ -524,6 +529,56 @@ impl ReductionFold {
         }
         self.cells += 1;
         Ok(())
+    }
+
+    /// Folds a column of numbers and empty cells in row order, as
+    /// [`Self::push_number`] and [`Self::push_blank`] would cell by cell.
+    /// Returns `None`, having folded nothing, when a cell holds anything else
+    /// or the column would pass the cell limit; the caller then reads it cell
+    /// by cell. The running sum stays one accumulator, so it adds in the same
+    /// order and rounds the same.
+    pub(super) fn push_number_column(
+        &mut self,
+        kinds: &[u8],
+        payloads: &[u64],
+    ) -> Option<Result<(), FormulaError>> {
+        let cells = kinds.len() as u64;
+        // An OR over the kind bytes is one pass without a branch per cell;
+        // only empty (0) and number (1) kinds leave no other bit set.
+        let any_kind = kinds.iter().fold(0, |any, &kind| any | kind);
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT || any_kind & !KIND_NUMBER != 0 {
+            return None;
+        }
+
+        let counts_only = matches!(self.kind, ReductionKind::Count | ReductionKind::CountA);
+        let mut count = self.count;
+        let mut sum = self.sum;
+        let mut min = self.min;
+        let mut max = self.max;
+        for (&kind, &payload) in kinds.iter().zip(payloads) {
+            if kind != KIND_NUMBER {
+                continue;
+            }
+
+            let number = payload_num(payload);
+            if !number.is_finite() {
+                return Some(Err(FormulaError::Num));
+            }
+
+            count += 1;
+            if !counts_only {
+                sum += number;
+                min = min.min(number);
+                max = max.max(number);
+            }
+        }
+
+        self.cells += cells;
+        self.count = count;
+        self.sum = sum;
+        self.min = min;
+        self.max = max;
+        Some(Ok(()))
     }
 
     /// Fails like the accumulator does before it reads `cells` more values:

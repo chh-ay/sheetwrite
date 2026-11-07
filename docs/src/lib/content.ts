@@ -5,6 +5,7 @@ import {
   use,
 } from "react";
 
+import { normalizeDocumentHref } from "./document-href.js";
 import type { OutlineItem } from "./outline.js";
 
 export interface DocumentFrontmatter {
@@ -25,7 +26,7 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  /** A formula family's table and filter; see FormulaReference.tsx. */
+  /** A formula family's table and filter, loaded with its page; see lib/formula-reference-module.ts. */
   FormulaReference?: ComponentType<{ family: string }>;
   /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
   PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
@@ -71,11 +72,6 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     return [href, { fallbackTitle, key: source, load }];
   }),
 );
-
-export function normalizeDocumentHref(splat: string | undefined): string {
-  const path = splat?.replace(/^\/+|\/+$/g, "") ?? "";
-  return `/docs/${path}${path.length === 0 ? "" : "/"}`;
-}
 
 /** Document modules already loaded, by href: they render without suspending. */
 const loadedModules = new Map<string, DocumentModule>();

@@ -1,0 +1,25 @@
+```ts prelude="collaboration" title="version-history.ts"
+import { MemoryPersistenceAdapter } from "@sheetwrite/core";
+import { historyAddon, HistoryArchive, MemoryHistoryStorage } from "@sheetwrite/core/history";
+
+// The authority journals every committed change, with its author, into the archive
+const archive = await HistoryArchive.open({ documentId, storage: new MemoryHistoryStorage() });
+await archive.initialize(snapshot, Date.now());
+const authority = new MemoryPersistenceAdapter(snapshot);
+authority.recordHistory(documentId, archive);
+
+// Review › Version History and Save Version in the ribbon
+await initSheetwrite({ addons: [historyAddon()] });
+createGrid(host, {
+  workbook,
+  addons: { history: { archive, authorId: "you", sync: () => sync } },
+});
+
+// Name the committed head, compare it with the current document, restore a range
+const approved = await archive.saveVersion("Budget approved", "sam", Date.now());
+const page = await archive.diffVersions({ from: approved.id, to: "head" });
+await archive.restoreVersion(grid, approved.id, {
+  kind: "range",
+  range: { sheet: "budget", start: { row: 1, col: 4 }, end: { row: 8, col: 5 } },
+}, { sync });
+```

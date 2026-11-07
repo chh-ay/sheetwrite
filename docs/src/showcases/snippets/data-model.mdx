@@ -1,0 +1,51 @@
+```ts prelude="core" title="data-model.ts"
+import { SheetwriteStore } from "@sheetwrite/core";
+
+// Orders (many) → Products (one) by stable IDs, and a measure: one undo step
+grid.applyTransaction({
+  patches: [
+    {
+      op: "setRelationship",
+      relationship: {
+        id: "orders-products",
+        from: { table: "orders", column: "product" },
+        to: { table: "products", column: "id" },
+      },
+    },
+    {
+      op: "setMeasure",
+      measure: {
+        id: "average-order",
+        name: "Average order",
+        table: "orders",
+        formula: "=SUM(Orders[Amount])/COUNT(Orders[Amount])",
+      },
+    },
+  ],
+});
+
+// A pivot over the model: rows from Products, values from Orders and the measure
+grid.setPivot(
+  {
+    id: "revenue-by-group",
+    name: "Revenue by group",
+    source: {
+      model: {
+        table: "orders",
+        fields: [
+          { table: "products", column: "category" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    },
+    anchor: { row: 0, col: 0 },
+    rows: [0],
+    columns: [],
+    values: [{ field: 1, aggregation: "SUM", name: "Revenue" }, { measure: "average-order" }],
+  },
+  "report",
+);
+
+// Whether the keys resolve now: ok (with a count of unmatched keys), duplicateKey, …
+if (grid.store instanceof SheetwriteStore) grid.store.getRelationshipStatus("orders-products");
+```

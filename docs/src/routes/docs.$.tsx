@@ -4,12 +4,8 @@ import { lazy, Suspense, use, useEffect } from "react";
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
 import { PackageCommand } from "../components/PackageCommand.js";
-import {
-  type DocumentComponents,
-  hasDocument,
-  normalizeDocumentHref,
-  useDocumentComponent,
-} from "../lib/content.js";
+import { type DocumentComponents, hasDocument, useDocumentComponent } from "../lib/content.js";
+import { normalizeDocumentHref } from "../lib/document-href.js";
 import {
   FORMULA_FAMILY_PAGE,
   loadedFormulaReference,

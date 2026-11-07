@@ -5,11 +5,12 @@ import { join, relative, sep } from "node:path";
 
 import { GENERATED_CONTENT_DIRECTORIES } from "../docs/src/lib/generated-content.js";
 import { MOVED_HEADINGS } from "../docs/src/lib/moved-headings.js";
-import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
 import {
   collectCapabilityIssues,
   collectMissingCapabilityFiles,
+  collectMovedShowcaseIssues,
 } from "../docs/src/showcases/capability-validation.js";
 import {
   collectCompatibilityIssues,
@@ -734,6 +735,7 @@ export async function verifyDocs(analysis: PublicApiAnalysis): Promise<string> {
     ...collectMissingCapabilityFiles(CAPABILITY_INVENTORY, CAPABILITY_OWNERS, (path) =>
       existsSync(join(repositoryRoot, path)),
     ),
+    ...collectMovedShowcaseIssues(MOVED_SHOWCASES, CAPABILITY_OWNERS),
   );
   if (failures.length > 0) throw new Error(failures.join("\n"));
   return "Documentation contract check passed";
