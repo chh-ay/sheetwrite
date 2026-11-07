@@ -515,7 +515,9 @@ export class NativeTypeEngine {
   /** The API session holds the process open, so it closes once no batch has run for a moment. */
   private parser: Promise<API<boolean>> | undefined;
   private parserIdle: NodeJS.Timeout | undefined;
-  private activeFlushes = 0;
+  /** Cache misses waiting for a batch, and the loop that runs batches while any wait. */
+  private readonly pending: Sample[] = [];
+  private worker: Promise<void> | undefined;
   /** The server's own directory, which holds its built-in `lib.*.d.ts` files. */
   private readonly libraryDirectory = `${normalizedPath(dirname(realpathSync(serverExecutable())))}/`;
 
@@ -670,10 +672,8 @@ export class NativeTypeEngine {
     const batch = this.queue;
     this.queue = [];
     this.flushScheduled = false;
-    this.activeFlushes += 1;
     try {
       const { server, cache } = await this.start();
-      const misses: Sample[] = [];
       for (const sample of batch) {
         const known = cache.get(sample.key) ?? this.inFlight.get(sample.key);
         if (known) {
@@ -681,23 +681,38 @@ export class NativeTypeEngine {
           continue;
         }
         const result = new Promise<SheetwriteTypeHover[]>((resolveHovers, reject) => {
-          misses.push({ ...sample, resolve: resolveHovers, reject });
+          this.pending.push({ ...sample, resolve: resolveHovers, reject });
         });
         this.inFlight.set(sample.key, result);
         result.then(sample.resolve, sample.reject);
       }
-      // One batch at a time: two in flight held 1.1 GB and were no faster.
-      for (let index = 0; index < misses.length; index += SAMPLES_PER_PROJECT) {
-        const samples = misses.slice(index, index + SAMPLES_PER_PROJECT);
-        // A fresh directory per batch: its tsconfig is new, so no change needs announcing.
-        await this.analyzeTogether(server, cache, samples, `batch-${this.batches++}`);
-      }
+      this.worker ??= this.drain(server, cache);
     } catch (error) {
       const failure = error instanceof Error ? error : new Error(String(error));
       for (const sample of batch) sample.reject(failure);
+    }
+  }
+
+  /**
+   * The only place batches run, one after another until no sample is waiting. Samples
+   * that arrive while a batch runs (Svelte samples, after their codegen) join the next
+   * batch; a second batch alongside the first held 1.1 GB and was no faster.
+   */
+  private async drain(server: LanguageServer, cache: HoverCache): Promise<void> {
+    try {
+      while (this.pending.length > 0) {
+        const samples = this.pending.splice(0, SAMPLES_PER_PROJECT);
+        try {
+          // A fresh directory per batch: its tsconfig is new, so no change needs announcing.
+          await this.analyzeTogether(server, cache, samples, `batch-${this.batches++}`);
+        } catch (error) {
+          const failure = error instanceof Error ? error : new Error(String(error));
+          for (const sample of samples) sample.reject(failure);
+        }
+      }
     } finally {
-      this.activeFlushes -= 1;
-      if (this.activeFlushes === 0 && !this.flushScheduled && this.parser) {
+      this.worker = undefined;
+      if (this.parser) {
         this.parserIdle = setTimeout(() => void this.closeParser(), PARSER_IDLE_MS);
       }
     }
