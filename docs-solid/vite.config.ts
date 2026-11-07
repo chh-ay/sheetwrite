@@ -21,9 +21,16 @@ const PAGES = globSync("**/*.{md,mdx}", { cwd: CONTENT_ROOT }).map((source) => {
 /** The showcase pages (src/routes/showcases.*.tsx), each prerendered like a docs page. */
 const SHOWCASE_PAGES = [
   "/showcases/",
-  ...["spreadsheet", "analysis", "data-tools", "formulas", "formatting", "host-rows"].map(
-    (id) => `/showcases/${id}/`,
-  ),
+  ...[
+    "spreadsheet",
+    "analysis",
+    "data-tools",
+    "formulas",
+    "formatting",
+    "host-rows",
+    "performance",
+    "database",
+  ].map((id) => `/showcases/${id}/`),
 ];
 
 /**

@@ -16,9 +16,11 @@ import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as ShowcasesAnalysisRouteImport } from './routes/showcases.analysis'
 import { Route as ShowcasesDataToolsRouteImport } from './routes/showcases.data-tools'
+import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
 import { Route as ShowcasesFormattingRouteImport } from './routes/showcases.formatting'
 import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formulas'
 import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
+import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
 import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
 
 const IndexRoute = IndexRouteImport.update({
@@ -56,6 +58,11 @@ const ShowcasesDataToolsRoute = ShowcasesDataToolsRouteImport.update({
   path: '/showcases/data-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
+  id: '/showcases/database',
+  path: '/showcases/database',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesFormattingRoute = ShowcasesFormattingRouteImport.update({
   id: '/showcases/formatting',
   path: '/showcases/formatting',
@@ -71,6 +78,11 @@ const ShowcasesHostRowsRoute = ShowcasesHostRowsRouteImport.update({
   path: '/showcases/host-rows',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesPerformanceRoute = ShowcasesPerformanceRouteImport.update({
+  id: '/showcases/performance',
+  path: '/showcases/performance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesSpreadsheetRoute = ShowcasesSpreadsheetRouteImport.update({
   id: '/showcases/spreadsheet',
   path: '/showcases/spreadsheet',
@@ -83,9 +95,11 @@ export interface FileRoutesByFullPath {
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
+  '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
+  '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -96,9 +110,11 @@ export interface FileRoutesByTo {
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
+  '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
+  '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
@@ -110,9 +126,11 @@ export interface FileRoutesById {
   '/docs/$': typeof DocsSplatRoute
   '/showcases/analysis': typeof ShowcasesAnalysisRoute
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
+  '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
+  '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -125,9 +143,11 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/data-tools'
+    | '/showcases/database'
     | '/showcases/formatting'
     | '/showcases/formulas'
     | '/showcases/host-rows'
+    | '/showcases/performance'
     | '/showcases/spreadsheet'
     | '/docs/'
     | '/showcases/'
@@ -138,9 +158,11 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/data-tools'
+    | '/showcases/database'
     | '/showcases/formatting'
     | '/showcases/formulas'
     | '/showcases/host-rows'
+    | '/showcases/performance'
     | '/showcases/spreadsheet'
     | '/docs'
     | '/showcases'
@@ -151,9 +173,11 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/showcases/analysis'
     | '/showcases/data-tools'
+    | '/showcases/database'
     | '/showcases/formatting'
     | '/showcases/formulas'
     | '/showcases/host-rows'
+    | '/showcases/performance'
     | '/showcases/spreadsheet'
     | '/docs/'
     | '/showcases/'
@@ -165,9 +189,11 @@ export interface RootRouteChildren {
   DocsSplatRoute: typeof DocsSplatRoute
   ShowcasesAnalysisRoute: typeof ShowcasesAnalysisRoute
   ShowcasesDataToolsRoute: typeof ShowcasesDataToolsRoute
+  ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
   ShowcasesFormattingRoute: typeof ShowcasesFormattingRoute
   ShowcasesFormulasRoute: typeof ShowcasesFormulasRoute
   ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
+  ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
@@ -224,6 +250,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ShowcasesDataToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/database': {
+      id: '/showcases/database'
+      path: '/showcases/database'
+      fullPath: '/showcases/database'
+      preLoaderRoute: typeof ShowcasesDatabaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/showcases/formatting': {
       id: '/showcases/formatting'
       path: '/showcases/formatting'
@@ -245,6 +278,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ShowcasesHostRowsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/performance': {
+      id: '/showcases/performance'
+      path: '/showcases/performance'
+      fullPath: '/showcases/performance'
+      preLoaderRoute: typeof ShowcasesPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/showcases/spreadsheet': {
       id: '/showcases/spreadsheet'
       path: '/showcases/spreadsheet'
@@ -261,9 +301,11 @@ const rootRouteChildren: RootRouteChildren = {
   DocsSplatRoute: DocsSplatRoute,
   ShowcasesAnalysisRoute: ShowcasesAnalysisRoute,
   ShowcasesDataToolsRoute: ShowcasesDataToolsRoute,
+  ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
   ShowcasesFormattingRoute: ShowcasesFormattingRoute,
   ShowcasesFormulasRoute: ShowcasesFormulasRoute,
   ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
+  ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,

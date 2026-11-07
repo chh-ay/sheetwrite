@@ -67,6 +67,30 @@ export const SHOWCASE_ISLANDS = {
     load: () =>
       import("./host-rows/HostRowsStage.js").then(({ HostRowsStage }) => withProps(HostRowsStage)),
   },
+  "showcase-performance": {
+    source: "src/showcases/performance/PerformanceStage.tsx",
+    load: () =>
+      import("./performance/PerformanceStage.js").then(({ PerformanceStage }) =>
+        withProps(PerformanceStage),
+      ),
+  },
+  "showcase-performance-diagnostics": {
+    source: "src/showcases/performance/PerformanceDiagnostics.tsx",
+    load: () =>
+      import("./performance/PerformanceDiagnostics.js").then(({ PerformanceDiagnostics }) =>
+        withProps(PerformanceDiagnostics),
+      ),
+  },
+  "showcase-database": {
+    source: "src/showcases/database/DatabaseStage.tsx",
+    load: () =>
+      import("./database/DatabaseStage.js").then(({ DatabaseStage }) => withProps(DatabaseStage)),
+  },
+  "showcase-database-lab": {
+    source: "src/showcases/database/DatabaseLab.tsx",
+    load: () =>
+      import("./database/DatabaseLab.js").then(({ DatabaseLab }) => withProps(DatabaseLab)),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 /** The showcase pages' islands; islands/Island.tsx adds these names to every island name. */
