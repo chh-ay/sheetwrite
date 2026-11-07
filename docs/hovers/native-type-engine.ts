@@ -390,6 +390,13 @@ class LanguageServer {
     });
   }
 
+  /** A socket on which this server also serves the TypeScript API (`custom/initializeAPISession`). */
+  async apiPipe(): Promise<string> {
+    const result = (await this.request("custom/initializeAPISession", {})) as { pipe?: unknown };
+    if (typeof result?.pipe !== "string") throw new Error("The server returned no API pipe");
+    return result.pipe;
+  }
+
   async shutdown(): Promise<void> {
     // The server rejects `params: null` here; JSON.stringify drops `undefined`.
     await this.request("shutdown", undefined);
@@ -506,7 +513,7 @@ export class NativeTypeEngine {
   private flushScheduled = false;
   private session: Promise<{ server: LanguageServer; cache: HoverCache }> | undefined;
   /** The API session holds the process open, so it closes once no batch has run for a moment. */
-  private parser: API | undefined;
+  private parser: Promise<API<boolean>> | undefined;
   private parserIdle: NodeJS.Timeout | undefined;
   private activeFlushes = 0;
   /** The server's own directory, which holds its built-in `lib.*.d.ts` files. */
@@ -571,7 +578,7 @@ export class NativeTypeEngine {
     clearTimeout(this.parserIdle);
     const parser = this.parser;
     this.parser = undefined;
-    await parser?.close();
+    await (await parser)?.close();
   }
 
   private sampleFile(sample: Pick<Sample, "key" | "language">, project: string): string {
@@ -645,9 +652,17 @@ export class NativeTypeEngine {
     return this.session;
   }
 
-  private parserSession(): API {
+  /**
+   * Identifier discovery parses with the language server's own process, over the API
+   * socket it opens on request, instead of starting a second TypeScript process. A server
+   * without that request (tsrs) gets a separate API process, as before.
+   */
+  private parserSession(server: LanguageServer): Promise<API<boolean>> {
     clearTimeout(this.parserIdle);
-    this.parser ??= new API({ cwd: this.options.cwd });
+    this.parser ??= server.apiPipe().then(
+      (pipe) => API.fromLSPConnection({ pipe }),
+      () => new API({ cwd: this.options.cwd }),
+    );
     return this.parser;
   }
 
@@ -695,7 +710,7 @@ export class NativeTypeEngine {
     samples: readonly Sample[],
     project: string,
   ): Promise<void> {
-    const parser = this.parserSession();
+    const parser = await this.parserSession(server);
     const files = samples.map((sample) => this.sampleFile(sample, project));
     const directory = `${this.projectDirectory}/${project}`;
     server.writeProject(directory, this.projectConfig(files));
@@ -802,7 +817,7 @@ export class NativeTypeEngine {
 
   private async sampleHovers(
     server: LanguageServer,
-    parser: API,
+    parser: API<boolean>,
     sample: Sample,
     project: string,
     phases: { checked(): void; lookups: Promise<void> },
@@ -949,7 +964,7 @@ export class NativeTypeEngine {
   }
 
   private async identifiers(
-    parser: API,
+    parser: API<boolean>,
     file: string,
     sample: Sample,
   ): Promise<NativeIdentifier[]> {
@@ -989,7 +1004,7 @@ export class NativeTypeEngine {
 
   /** Identifiers of `code`, a script that starts at `offset` in the sample's source. */
   private async scriptIdentifiers(
-    parser: API,
+    parser: API<boolean>,
     file: string,
     source: string,
     offset: number,
