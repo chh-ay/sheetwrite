@@ -12,6 +12,7 @@ import siteCoreStylesheet from "../styles/site-core.css?url";
 import siteMidStylesheet from "../styles/site-mid.css?url";
 import siteTailStylesheet from "../styles/site-tail.css?url";
 import docsFiguresStylesheet from "@docs/styles/docs-figures.css?url";
+import showcaseStylesheet from "@docs/styles/showcase.css?url";
 import apiReferenceStylesheet from "@docs/styles/site/api-reference.css?url";
 import formulaReferenceStylesheet from "@docs/styles/site/formula-reference.css?url";
 import playgroundStylesheet from "@docs/styles/site/playground.css?url";
@@ -90,6 +91,8 @@ export const Route = createRootRoute({
         stylesheet(siteMidStylesheet),
         featureStylesheet(playgroundStylesheet),
         stylesheet(siteTailStylesheet),
+        // The site chrome outside the docs (the 404 page).
+        featureStylesheet(showcaseStylesheet),
         featureStylesheet(docsFiguresStylesheet),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },

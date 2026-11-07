@@ -128,13 +128,18 @@ export default defineConfig({
     formulaTables(),
     perfFigureMarkup(),
     tanstackStart({
-      pages: PAGES.map((path) => ({ path })),
+      pages: [
+        { path: "/" },
+        ...PAGES.map((path) => ({ path })),
+        // Static hosts serve /404.html for every URL without a page; the
+        // deployment fallback supplies the 404 status for unknown URLs.
+        { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },
+      ],
       prerender: {
         enabled: true,
         crawlLinks: false,
         failOnError: true,
         autoSubfolderIndex: true,
-        filter: (page) => PAGES.includes(page.path),
       },
     }),
     solid({ ssr: true, extensions: [".md", ".mdx"] }),

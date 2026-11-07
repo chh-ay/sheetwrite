@@ -11,7 +11,7 @@ import { forwardedHeading } from "@docs/lib/moved-headings.js";
 import { installAnchorReveal, revealAnchoredMember } from "@docs/lib/reveal-anchor.ts";
 import { inject as injectAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
-import { type Component, createComponent, type JSX } from "solid-js";
+import { type Component, createComponent, type JSX, sharedConfig } from "solid-js";
 import { hydrate } from "solid-js/web";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
@@ -63,6 +63,20 @@ const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
     import("../components/ApiSymbolFilter.js").then(({ ApiSymbolFilter }) =>
       withProps(ApiSymbolFilter),
     ),
+  "landing-hero": () =>
+    import("../components/landing/HeroApp.js").then(({ HeroApp }) => withProps(HeroApp)),
+  "landing-architecture": () =>
+    import("../components/landing/ArchitectureScene.js").then(({ ArchitectureScene }) =>
+      withProps(ArchitectureScene),
+    ),
+  "landing-stories": () =>
+    import("../components/landing/StoryReel.js").then(({ StoryReel }) => withProps(StoryReel)),
+  "landing-code": () =>
+    Promise.all([import("../components/landing/CodeTabs.js"), import("./markup.js")]).then(
+      ([{ CodeTabs }, { markupOf }]): IslandRender =>
+        (island) =>
+          createComponent(CodeTabs, { panels: markupOf(island) }),
+    ),
 };
 
 function isIslandName(name: string | undefined): name is IslandName {
@@ -75,8 +89,24 @@ function islandLoader(island: HTMLElement): () => Promise<IslandRender> {
   return ISLANDS[name];
 }
 
+/**
+ * Each island is its own hydration root. Solid marks a page's hydration done
+ * at the first delegated event after one starts (its event handler sets
+ * `_$HY.done`), and from then on `hydrate` renders anew instead of adopting
+ * the server's nodes. An island that hydrates later, on first use, starts its
+ * own hydration again.
+ */
+function beginHydration(): void {
+  const registry = (globalThis._$HY ??= { events: [], completed: new WeakSet(), r: {} });
+  registry.done = false;
+  registry.events ??= [];
+  registry.completed ??= new WeakSet();
+  sharedConfig.done = false;
+}
+
 function hydrateWith(island: HTMLElement, render: IslandRender): void {
   const props: object = JSON.parse(island.dataset.props ?? "{}");
+  beginHydration();
   hydrate(() => render(island, props), island, { renderId: island.dataset.islandId ?? "" });
 }
 
@@ -210,7 +240,12 @@ function hydrateOnInteraction(island: HTMLElement): void {
 declare global {
   /** Solid's hydration registry; on fully hydrated pages HydrationScript creates it. */
   var _$HY:
-    | { events: unknown[]; completed: WeakSet<Element>; r: Record<string, unknown> }
+    | {
+        events: unknown[] | null;
+        completed: WeakSet<Element> | null;
+        r: Record<string, unknown>;
+        done?: boolean;
+      }
     | undefined;
 }
 
@@ -228,6 +263,9 @@ if (forwarded === undefined) {
   installGridScrollHints();
   installFigureTips();
   installDocsShell();
+  if (document.querySelector(".sw-landing") !== null) {
+    void import("../lib/landing.js").then(({ installLanding }) => installLanding());
+  }
   revealAnchoredMember();
   injectAnalytics({ framework: "solid" });
   injectSpeedInsights({ framework: "solid" });

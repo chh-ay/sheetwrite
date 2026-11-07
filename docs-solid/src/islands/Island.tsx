@@ -8,7 +8,11 @@ export type IslandName =
   | "live-grid"
   | "runnable-code"
   | "search"
-  | "api-symbol-filter";
+  | "api-symbol-filter"
+  | "landing-hero"
+  | "landing-architecture"
+  | "landing-stories"
+  | "landing-code";
 
 /**
  * When an island's code loads and hydrates. `load`: after the page's first

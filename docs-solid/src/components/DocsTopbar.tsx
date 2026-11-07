@@ -7,6 +7,7 @@ import { BrandMark } from "./BrandMark.js";
 import { NavigationSections } from "./DocsNavigation.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { Icon } from "./Icon.js";
+import { ThemeToggle } from "./ThemeToggle.js";
 
 /*
  * The documentation top bar, ported from docs/src/components/DocsTopbar.tsx,
@@ -15,21 +16,6 @@ import { Icon } from "./Icon.js";
  */
 
 const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";
-
-/** Switches between the light and dark theme; the server renders the dark theme's button. */
-function ThemeToggle() {
-  return (
-    <button
-      aria-label="Use light theme"
-      class="sw-icon-button"
-      data-theme-toggle=""
-      title="Use light theme"
-      type="button"
-    >
-      <Icon name="sun" size="md" />
-    </button>
-  );
-}
 
 /**
  * The documentation menu: the button that opens the drawer, and the drawer, a

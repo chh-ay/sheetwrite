@@ -16,3 +16,11 @@ declare module "virtual:formula-tables" {
   export function formulaTableHtml(family: string): string | null;
   export function formulaTableUrl(family: string): string | null;
 }
+
+/** A Markdown module compiled through Solid (vite.config.ts `docsPages`); it renders on the server. */
+declare module "*.mdx" {
+  import type { JSX } from "solid-js";
+
+  const MDXContent: (props: Record<string, unknown>) => JSX.Element;
+  export default MDXContent;
+}

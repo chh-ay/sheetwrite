@@ -2,22 +2,11 @@ import { For } from "solid-js";
 
 import { RunnableCode } from "../components/RunnableCode.js";
 import { Tab, Tabs } from "../components/Tabs.js";
+import { Markup } from "./markup.js";
 
-/*
- * Islands whose content is static page markup. The server renders the content
- * once into a `display: contents` holder; the client reads the holder's markup
- * back before hydrating, so the content never ships as script.
- */
+export { markupOf } from "./markup.js";
 
-/** Holds markup the island shows but never renders itself. */
-function Markup(props: { html: string }) {
-  return <div data-island-html="" innerHTML={props.html} style={{ display: "contents" }} />;
-}
-
-/** Every markup holder of a server-rendered static-markup island, in order. */
-export function markupOf(island: HTMLElement): string[] {
-  return Array.from(island.querySelectorAll("[data-island-html]"), (holder) => holder.innerHTML);
-}
+/* Islands whose content is static page markup (see markup.tsx). */
 
 /** Props of {@link StaticTabs}: a Tabs group whose panels are finished markup. */
 export interface StaticTabsProps {

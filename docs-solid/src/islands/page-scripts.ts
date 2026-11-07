@@ -25,6 +25,10 @@ const ON_DEMAND_ISLANDS: Readonly<Record<IslandName, string>> = {
   "runnable-code": "src/islands/StaticMarkup.tsx",
   search: "src/components/DocsSearch.tsx",
   "api-symbol-filter": "src/components/ApiSymbolFilter.tsx",
+  "landing-hero": "src/components/landing/HeroApp.tsx",
+  "landing-architecture": "src/components/landing/ArchitectureScene.tsx",
+  "landing-stories": "src/components/landing/StoryReel.tsx",
+  "landing-code": "src/components/landing/CodeTabs.tsx",
 };
 
 const CLIENT_OUTPUT = new URL("../../dist/client/", import.meta.url).pathname;
