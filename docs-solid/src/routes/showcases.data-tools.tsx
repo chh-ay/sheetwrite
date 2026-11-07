@@ -15,6 +15,7 @@ import {
 import DataToolsSnippet from "../showcases/snippets/data-tools.mdx";
 
 import stylesheet from "../styles/showcases/data-tools.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 export const Route = createFileRoute("/showcases/data-tools")({
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/showcases/data-tools")({
       "Filter and organize 4,800 dispatch orders. Exercise validation, protected ranges, row grouping and visibility with live Grid event receipts.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
     ],

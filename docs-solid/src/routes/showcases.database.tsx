@@ -10,6 +10,7 @@ import { ProofPage, type ProofPageContent } from "../showcases/layout/ProofPage.
 import DatabaseSnippet from "../showcases/snippets/database.mdx";
 
 import proofStylesheet from "../styles/showcases/proofs.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 const description =
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/showcases/database")({
   head: () => ({
     meta: pageMeta("Database and document lifecycle — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: proofStylesheet },
     ],

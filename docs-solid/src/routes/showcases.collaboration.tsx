@@ -11,6 +11,7 @@ import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import CollaborationSnippet from "../showcases/snippets/collaboration.mdx";
 
 import proofStylesheet from "../styles/showcases/proofs.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 const description =
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/showcases/collaboration")({
   head: () => ({
     meta: pageMeta("Live collaboration — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: proofStylesheet },
     ],

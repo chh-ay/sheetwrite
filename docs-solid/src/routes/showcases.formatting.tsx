@@ -10,6 +10,7 @@ import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayou
 import FormattingSnippet from "../showcases/snippets/formatting.mdx";
 
 import stylesheet from "../styles/showcases/formatting.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 export const Route = createFileRoute("/showcases/formatting")({
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/showcases/formatting")({
       "Style a live operating budget: typography, alignment, borders, conditional formatting, mixed per-cell number formats, and an executable XLSX round-trip proof.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
     ],

@@ -17,6 +17,7 @@ import { AnalysisStage } from "../showcases/analysis/AnalysisStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { ANALYSIS_WORKBOOK_TITLE } from "../showcases/scenarios/analysis.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 export const Route = createFileRoute("/showcases/analysis")({
@@ -25,7 +26,10 @@ export const Route = createFileRoute("/showcases/analysis")({
       "Pivot tables and charts — Sheetwrite showcases",
       "A pivot table and a live chart over two years of orders. Edit an order and both update in place; rearrange the pivot from its field list.",
     ),
-    links: [{ rel: "stylesheet", href: layoutStylesheet }],
+    links: [
+      { rel: "stylesheet", href: targetsStylesheet },
+      { rel: "stylesheet", href: layoutStylesheet },
+    ],
   }),
   component: AnalysisShowcase,
 });

@@ -8,6 +8,7 @@ import { Island } from "../islands/Island.js";
 import { FunctionsStage } from "../showcases/functions/FunctionsStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/showcases/functions")({
       "Engineering, financial, statistics, information, LOOKUP, TRIMRANGE, GETPIVOTDATA and REGEX functions, calculated live as you change their inputs.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
     ],

@@ -10,6 +10,7 @@ import { Island } from "../islands/Island.js";
 import { ALL_GROUPS, HubFilter } from "../showcases/hub/HubFilter.js";
 
 import hubStylesheet from "../styles/showcases/hub.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 
 export const Route = createFileRoute("/showcases/")({
   head: () => ({
@@ -17,7 +18,10 @@ export const Route = createFileRoute("/showcases/")({
       "Showcases — evaluate Sheetwrite by feature",
       "Live examples of every Sheetwrite feature: editing, formulas, pivot tables and charts, million-row scale, XLSX/CSV, offline sync and collaboration.",
     ),
-    links: [{ rel: "stylesheet", href: hubStylesheet }],
+    links: [
+      { rel: "stylesheet", href: targetsStylesheet },
+      { rel: "stylesheet", href: hubStylesheet },
+    ],
   }),
   component: ShowcaseHub,
 });

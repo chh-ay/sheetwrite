@@ -7,6 +7,7 @@ import { Island } from "../islands/Island.js";
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 import { VanillaWorkbench } from "../showcases/frameworks/vanilla/VanillaWorkbench.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
 import vanillaStylesheet from "@docs/styles/vanilla-workbench.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/vanilla")({
   head: () => ({
     meta: pageMeta("Vanilla engine workbench — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
       { rel: "stylesheet", href: vanillaStylesheet },

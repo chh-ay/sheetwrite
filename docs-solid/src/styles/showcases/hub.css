@@ -134,6 +134,7 @@
 }
 
 .sw-hub__filters button {
+  min-width: 2.75rem;
   min-height: 2.75rem;
   padding-inline: var(--sw-space-3);
   border: 1px solid var(--sw-border-strong);

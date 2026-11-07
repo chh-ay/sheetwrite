@@ -8,6 +8,7 @@ import { Island } from "../islands/Island.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { VersionHistoryStage } from "../showcases/version-history/VersionHistoryStage.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/showcases/version-history")({
       "Edit a shared budget with a teammate, save named versions, compare a version with the current document by author, and restore a range or a sheet.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
     ],

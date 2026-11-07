@@ -8,6 +8,7 @@ import { Island } from "../islands/Island.js";
 import { DataModelStage } from "../showcases/data-model/DataModelStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/showcases/data-model")({
       "Relate orders to products and regions, pivot by fields of the related tables with a measure, and see what a broken key does.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
     ],

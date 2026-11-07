@@ -8,6 +8,7 @@ import { Island } from "../islands/Island.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { SortStage } from "../showcases/sort/SortStage.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/showcases/sort")({
       "Sort orders in place as Excel does, or sort only the view, and see which formulas follow. Includes the Sort panel and undo.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
     ],

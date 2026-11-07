@@ -12,6 +12,7 @@ import { FormulasStage } from "../showcases/formulas/FormulasStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
 import stylesheet from "../styles/showcases/formulas.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 const description =
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/showcases/formulas")({
   head: () => ({
     meta: pageMeta("Formula analysis with the full engine — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
     ],

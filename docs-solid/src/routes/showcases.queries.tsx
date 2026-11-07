@@ -8,6 +8,7 @@ import { Island } from "../islands/Island.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { QueriesStage } from "../showcases/queries/QueriesStage.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/showcases/queries")({
       "Saved queries shape a CSV order feed and a JSON region list into workbook tables. Refresh them, change a step, and open Queries & Connections.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
     ],

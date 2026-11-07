@@ -13,6 +13,7 @@ import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayou
 import { SpreadsheetStage } from "../showcases/spreadsheet/SpreadsheetStage.js";
 
 import stylesheet from "../styles/showcases/spreadsheet.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 export const Route = createFileRoute("/showcases/spreadsheet")({
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/showcases/spreadsheet")({
       "A full spreadsheet app in the browser: an Excel-style ribbon, name box, formula bar, sheet tabs and a two-sheet sales workbook with cross-sheet formulas.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
     ],

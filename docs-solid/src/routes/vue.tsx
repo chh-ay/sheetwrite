@@ -6,6 +6,7 @@ import { Island } from "../islands/Island.js";
 import { VueWorkbenchIsland } from "../showcases/frameworks/FrameworkMount.js";
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
 import vueWorkbenchStylesheet from "@docs/styles/vue-workbench.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/vue")({
   head: () => ({
     meta: pageMeta("Vue business workbench — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
       { rel: "stylesheet", href: vueWorkbenchStylesheet },

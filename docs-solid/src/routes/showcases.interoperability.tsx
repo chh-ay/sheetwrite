@@ -15,6 +15,7 @@ import {
 import InteroperabilitySnippet from "../showcases/snippets/interoperability.mdx";
 
 import stylesheet from "../styles/showcases/interoperability.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 const description =
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/showcases/interoperability")({
   head: () => ({
     meta: pageMeta("Spreadsheet interoperability — Sheetwrite showcases", description),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
     ],

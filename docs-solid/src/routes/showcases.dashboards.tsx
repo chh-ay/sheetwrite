@@ -9,6 +9,7 @@ import { DashboardsStage } from "../showcases/dashboards/DashboardsStage.js";
 import { ItemCountFact } from "../showcases/dashboards/ItemCountFact.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/showcases/dashboards")({
       "A dashboard sheet of pivots and slicers: move and resize items with the mouse or the keyboard, add a pivot, pick slicer values, and undo each change.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
     ],

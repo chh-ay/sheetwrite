@@ -14,6 +14,7 @@ import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayou
 import HostRowsSnippet from "../showcases/snippets/host-rows.mdx";
 
 import stylesheet from "../styles/showcases/host-rows.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 export const Route = createFileRoute("/showcases/host-rows")({
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/showcases/host-rows")({
       "Sort and filter host-owned CRM accounts, import 10,000 leads through the row bridge, and watch the live ID-check and cell-load time.",
     ),
     links: [
+      { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
     ],
