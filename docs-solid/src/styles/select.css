@@ -125,3 +125,10 @@
     visibility: visible;
   }
 }
+
+/* Phone touch target: the field is at least 44 px tall. */
+@media (max-width: 42rem) {
+  .sw-select__trigger {
+    min-height: 44px;
+  }
+}
