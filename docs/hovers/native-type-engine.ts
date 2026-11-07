@@ -130,6 +130,46 @@ const SAMPLES_PER_PROJECT = 64;
  */
 const GENERIC_MEMBER_OWNER = /^\((?:property|method)\) [\w$]+(?:\.[\w$]+)*<(.+?)>\.[\w$]+[?:(<]/;
 const TYPE_PARAMETER_ARGUMENT = /\bextends\b|(?:^|,\s*)[A-Z][A-Za-z]{0,2}(?:,|$)/;
+
+/**
+ * A JSX attribute of a generic component showed, in about one run in ten, its declared
+ * owner (`Props<Id extends Key = Key>.height`) instead of the instantiated one
+ * (`Props<Key>.height`), and asking again or in the sample's own program did not settle
+ * it. When every type parameter of the owner has a default, this rewrites the declared
+ * form to the defaults, which is what the server answers in the other runs. Returns
+ * undefined for any other hover.
+ */
+function ownerWithDefaults(text: string): string | undefined {
+  const match = GENERIC_MEMBER_OWNER.exec(text);
+  const owner = match?.[1];
+  if (!match || owner === undefined || !/\bextends\b|=/.test(owner)) return undefined;
+  const parameters: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index <= owner.length; index++) {
+    const char = owner[index];
+    if (char === "<" || char === "(" || char === "[" || char === "{") depth += 1;
+    else if (char === ">" || char === ")" || char === "]" || char === "}") depth -= 1;
+    else if ((char === "," && depth === 0) || char === undefined) {
+      parameters.push(owner.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  const defaults = new Map<string, string>();
+  for (const parameter of parameters) {
+    const declared = /^([A-Za-z_$][\w$]*)\s+(?:extends\s+[\s\S]+?\s+)?=\s+([\s\S]+)$/.exec(
+      parameter,
+    );
+    if (!declared?.[1] || !declared[2]) return undefined;
+    defaults.set(declared[1], declared[2]);
+  }
+  const ownerEnd = match.index + match[0].indexOf(`<${owner}>`) + owner.length + 2;
+  const head = text.slice(0, ownerEnd - owner.length - 2);
+  const rest = text
+    .slice(ownerEnd)
+    .replace(/[A-Za-z_$][\w$]*/g, (name) => defaults.get(name) ?? name);
+  return `${head}<${[...defaults.values()].join(", ")}>${rest}`;
+}
 const HEADER_SEPARATOR = "\r\n\r\n";
 const CONTENT_LENGTH = /Content-Length: (\d+)/i;
 /** This package; `typescript` and `@vue/content-mapper` resolve from here as 7.1. */
@@ -459,8 +499,6 @@ export class NativeTypeEngine {
   private readonly declarationFiles = new Map<string, string[]>();
   /** Names each batch's project directory. */
   private batches = 0;
-  /** Hovers taken from their declaration; the isolated recheck leaves them as they are. */
-  private readonly declaredHovers = new WeakSet<SheetwriteTypeHover>();
   private queue: Sample[] = [];
   private flushScheduled = false;
   private session: Promise<LanguageServer> | undefined;
@@ -708,7 +746,6 @@ export class NativeTypeEngine {
     hovers: SheetwriteTypeHover[],
   ): Promise<SheetwriteTypeHover[]> {
     const suspects = hovers.filter((hover) => {
-      if (this.declaredHovers.has(hover)) return false;
       const owner = GENERIC_MEMBER_OWNER.exec(hover.text);
       return owner?.[1] !== undefined && TYPE_PARAMETER_ARGUMENT.test(owner[1]);
     });
@@ -796,18 +833,11 @@ export class NativeTypeEngine {
     const hovers = await Promise.all(
       answers.map(async ({ identifier, definitions, ...answer }) => {
         let { quickInfo } = answer;
-        let declared = false;
         if (identifier.propertyName && LITERAL_PROPERTY.test(quickInfo.text)) {
           quickInfo = (await this.declaredProperty(server, definitions, file)) ?? quickInfo;
         } else if (identifier.jsxAttribute) {
-          // A JSX attribute of a generic component got the instantiated or the declared
-          // owner depending on checking order; the declaration's own hover is the same in
-          // every run, and it is what 5.9 showed.
-          const declaration = await this.declaredProperty(server, definitions, file);
-          if (declaration) {
-            quickInfo = { ...declaration, docs: declaration.docs || quickInfo.docs };
-            declared = true;
-          }
+          const text = ownerWithDefaults(quickInfo.text);
+          if (text) quickInfo = { ...quickInfo, text };
         }
         if (!quickInfo.docs) {
           const docs = this.mergedDeclarationDocs(definitions, file);
@@ -825,9 +855,7 @@ export class NativeTypeEngine {
           line: identifier.line,
           character: identifier.character,
         };
-        const hover = this.hover(quickInfo, position, origin);
-        if (declared) this.declaredHovers.add(hover);
-        return hover;
+        return this.hover(quickInfo, position, origin);
       }),
     );
     return hovers;
