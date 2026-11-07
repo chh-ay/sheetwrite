@@ -212,11 +212,14 @@ describe("documentation generation", () => {
     expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
     expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
     // The symbol's own sections sit under the page title (H2); a member's sit
-    // under Members (H3). Neither may skip a heading level.
+    // under Members (H3). Neither may skip a heading level. The symbol's
+    // examples sit in the aside beside the main column.
     const summary = page.slice(0, page.indexOf("## Members"));
-    expect(summary).toMatch(/^## Examples$/m);
     expect(summary).toMatch(/^## See also$/m);
     expect(summary).not.toMatch(/^### /m);
+    const aside = /<aside class="api-layout__aside"[\s\S]*?<\/aside>/.exec(page)?.[0] ?? "";
+    expect(aside).toMatch(/^## Examples$/m);
+    expect(aside).not.toMatch(/^### /m);
     const member =
       /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/.exec(
         page,
