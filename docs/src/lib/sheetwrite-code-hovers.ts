@@ -406,7 +406,7 @@ function svelteScriptDocumentation(
   if (scripts.length === 0) return new Map();
 
   const documentation = new Map<string, string>();
-  for (const node of analyzer.analyze(scripts.join("\n"), "ts", "svelte")) {
+  for (const node of analyzer.analyze(scripts.join("\n"), "ts")) {
     if (node.type !== "hover" || !node.docs?.trim() || documentation.has(node.target)) continue;
     documentation.set(node.target, node.docs);
   }
@@ -424,7 +424,7 @@ function svelteSourceHovers(source: string, analyzer: SheetwriteTypeEngine): She
   const sourceLines = source.split("\n");
   const lineOffsets = lineStartOffsets(source);
 
-  const result = analyzer.analyze(transformed.code, "tsx", "svelte");
+  const result = analyzer.analyze(transformed.code, "tsx");
   const hovers: SheetwriteTypeHover[] = [];
   for (const node of result) {
     const original = originalPositionFor(sourceMap, {
@@ -492,13 +492,13 @@ export function collectFenceHovers(
   analyzer: SheetwriteTypeEngine,
   preludeName?: string,
 ): SheetwriteTypeHover[] {
+  // On the content-mapper route the engine reads Svelte files itself.
+  const throughSvelte2tsx = language === "svelte" && analyzer.frameworkRoute === "generated";
   if (preludeName === undefined) {
-    return language === "svelte"
-      ? mapSvelteHovers(code, analyzer)
-      : analyzer.analyze(code, language);
+    return throughSvelte2tsx ? mapSvelteHovers(code, analyzer) : analyzer.analyze(code, language);
   }
   const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));
-  if (language === "svelte") {
+  if (throughSvelte2tsx) {
     const mapped = remapThroughInjection(
       svelteSourceHovers(injection.analysisSource, analyzer),
       injection,

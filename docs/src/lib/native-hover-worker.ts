@@ -1,11 +1,16 @@
 /**
- * Worker side of `NativeHoverClient`. It owns two TypeScript 7.1 processes:
+ * Worker side of `NativeHoverClient`. It owns two processes of one compiler,
+ * TypeScript 7.1 (`tsgo`) or tsrs, which ships a copy of the 7.1 API:
  *
- * - the `typescript/async` API, which parses each sample to find its identifiers
- *   (`typescript/sync` cannot run under Bun: it reads Node's private
+ * - the `async` API, which parses each sample to find its identifiers
+ *   (`sync` cannot run under Bun: it reads Node's private
  *   `stdout._handle.fd`);
- * - the language server (`tsc --lsp --stdio`), which answers hover and
+ * - the language server (`--lsp --stdio`), which answers hover and
  *   definition requests, because the 7.1 API has no quick-info call.
+ *
+ * Vue and Svelte samples go through the content mappers that the hover
+ * tsconfig names: the API builds the project to read the mapped file and its
+ * span map, and the language server answers in positions of the original file.
  *
  * The main thread blocks on `signal` until the reply is posted, which keeps
  * `SheetwriteTypeEngine.analyze` synchronous.
@@ -18,9 +23,12 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { type MessagePort, workerData } from "node:worker_threads";
 
-import { type Node, ScriptKind } from "typescript-7.1/ast";
-import { isIdentifier } from "typescript-7.1/ast/is";
-import { API } from "typescript-7.1/async";
+import type * as NativeAst from "typescript-7.1/ast";
+import type * as NativeAstGuards from "typescript-7.1/ast/is";
+import type * as NativeAsyncApi from "typescript-7.1/async";
+import type * as NativeFileSystem from "typescript-7.1/fs";
+
+export type NativeCompiler = "tsgo" | "tsrs";
 
 export interface NativeHoverDocument {
   uri: string;
@@ -36,10 +44,19 @@ export interface NativeIdentifier {
   character: number;
 }
 
+/** A Vue or Svelte sample, with the hover tsconfig that names the content mappers. */
+export interface NativeMappedFile {
+  projectFile: string;
+  projectText: string;
+  fileName: string;
+  document: NativeHoverDocument;
+}
+
 export type NativeHoverRequest =
   | { kind: "open"; documents: readonly NativeHoverDocument[] }
   | { kind: "close"; uris: readonly string[] }
   | { kind: "analyze"; fileName: string; document: NativeHoverDocument }
+  | { kind: "analyzeMapped"; file: NativeMappedFile }
   | { kind: "dispose" };
 
 export interface NativeHoverAnswer {
@@ -58,6 +75,7 @@ export interface NativeHoverWorkerInput {
   port: MessagePort;
   signal: Int32Array;
   rootDirectory: string;
+  compiler: NativeCompiler;
   /** Source of the engine's pattern for compiler-generated names that get no hover. */
   internalIdentifier: string;
 }
@@ -87,7 +105,15 @@ interface PendingRequest {
 const HEADER_SEPARATOR = "\r\n\r\n";
 const CONTENT_LENGTH = /Content-Length: (\d+)/i;
 
-function nativeCompilerPath(): string {
+function nativeCompilerPath(compiler: NativeCompiler): string {
+  if (compiler === "tsrs") {
+    const packageJson = createRequire(import.meta.url).resolve("tsrs/package.json");
+    // The binary ships in a per-platform package; the Linux ones name their C library.
+    const libc = process.platform === "linux" ? "-gnu" : "";
+    const platformPackage = `@tsrs/${process.platform}-${process.arch}${libc}/package.json`;
+    const platformDirectory = dirname(createRequire(packageJson).resolve(platformPackage));
+    return join(platformDirectory, process.platform === "win32" ? "tsrs.exe" : "tsrs");
+  }
   const packageJson = createRequire(import.meta.url).resolve("typescript-7.1/package.json");
   const platformPackage = `@typescript/typescript-${process.platform}-${process.arch}/package.json`;
   const platformDirectory = dirname(createRequire(packageJson).resolve(platformPackage));
@@ -123,8 +149,8 @@ class LanguageServerConnection {
   private nextId = 1;
   private buffered = Buffer.alloc(0);
 
-  constructor() {
-    this.child = spawn(nativeCompilerPath(), ["--lsp", "--stdio"], {
+  constructor(compiler: NativeCompiler) {
+    this.child = spawn(nativeCompilerPath(compiler), ["--lsp", "--stdio"], {
       stdio: ["pipe", "pipe", "inherit"],
     });
     this.child.stdout?.on("data", (chunk: Buffer) => this.receive(chunk));
@@ -147,6 +173,8 @@ class LanguageServerConnection {
         general: { positionEncodings: ["utf-16"] },
         textDocument: { hover: { contentFormat: ["markdown"] }, definition: {} },
       },
+      // Lets the server start the content mappers that the hover tsconfig names.
+      initializationOptions: { runExternalCode: true },
     });
     this.notify("initialized", {});
   }
@@ -187,8 +215,9 @@ class LanguageServerConnection {
   }
 
   async shutdown(): Promise<void> {
-    await this.request("shutdown", null);
-    this.notify("exit", null);
+    // The server rejects `params: null` here; JSON.stringify drops `undefined`.
+    await this.request("shutdown", undefined);
+    this.notify("exit", undefined);
   }
 
   private request(method: string, params: unknown): Promise<unknown> {
@@ -242,11 +271,39 @@ class LanguageServerConnection {
   }
 }
 
-const { port, signal, rootDirectory, internalIdentifier } = workerData as NativeHoverWorkerInput;
+const { port, signal, rootDirectory, compiler, internalIdentifier } =
+  workerData as NativeHoverWorkerInput;
 const internalName = new RegExp(internalIdentifier);
-const parser = new API({ cwd: rootDirectory });
-const server = new LanguageServerConnection();
+const apiPackage = compiler === "tsrs" ? "tsrs" : "typescript-7.1";
+const [{ ScriptKind, SpanMapFidelity }, { isIdentifier }, { API }, { createFileSystemLayer }] =
+  await Promise.all([
+    import(`${apiPackage}/ast`) as Promise<typeof NativeAst>,
+    import(`${apiPackage}/ast/is`) as Promise<typeof NativeAstGuards>,
+    import(`${apiPackage}/async`) as Promise<typeof NativeAsyncApi>,
+    import(`${apiPackage}/fs`) as Promise<typeof NativeFileSystem>,
+  ]);
+const parser = new API({ cwd: rootDirectory, runExternalCode: true });
+const server = new LanguageServerConnection(compiler);
 const ready = server.initialize(rootDirectory);
+
+interface IdentifierNode {
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** Every identifier of a parsed file, minus compiler-generated names. */
+function identifierNodes(sourceFile: NativeAst.SourceFile): IdentifierNode[] {
+  const identifiers: IdentifierNode[] = [];
+  const visit = (node: NativeAst.Node): void => {
+    if (isIdentifier(node) && !internalName.test(node.text)) {
+      identifiers.push({ text: node.text, start: node.getStart(sourceFile), end: node.end });
+    }
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
+  return identifiers;
+}
 
 async function identifiersOf(
   fileName: string,
@@ -256,28 +313,68 @@ async function identifiersOf(
     scriptKind: document.languageId === "typescriptreact" ? ScriptKind.TSX : ScriptKind.TS,
   });
   try {
-    const { sourceFile } = lease;
     const starts = lineStarts(document.text);
-    const identifiers: NativeIdentifier[] = [];
-    const visit = (node: Node): void => {
-      if (isIdentifier(node) && !internalName.test(node.text)) {
-        const start = node.getStart(sourceFile);
-        identifiers.push({ text: node.text, start, end: node.end, ...positionAt(starts, start) });
-      }
-      node.forEachChild(visit);
-    };
-    visit(sourceFile);
-    return identifiers;
+    return identifierNodes(lease.sourceFile).map((identifier) => ({
+      ...identifier,
+      ...positionAt(starts, identifier.start),
+    }));
   } finally {
     await lease.dispose();
   }
 }
 
-async function analyze(
-  fileName: string,
+/**
+ * Identifiers of a content-mapped file, in positions of the original file: the
+ * project build returns the mapper's TypeScript and its span map, and only
+ * identifiers copied from the original as they are written are kept.
+ */
+async function mappedIdentifiersOf({
+  projectFile,
+  projectText,
+  fileName,
+  document,
+}: NativeMappedFile): Promise<NativeIdentifier[]> {
+  const snapshot = await parser.createSnapshot({
+    fileSystem: createFileSystemLayer([
+      [projectFile, projectText],
+      [fileName, document.text],
+    ]),
+    openProjects: [projectFile],
+  });
+  try {
+    const project = snapshot.getConfiguredProject(projectFile);
+    const sourceFile = await project?.program.getSourceFile(fileName);
+    const spanMap = sourceFile?.spanMap;
+    if (!sourceFile || !spanMap) {
+      throw new Error(`no content mapper turned ${fileName} into TypeScript`);
+    }
+    const starts = lineStarts(document.text);
+    const byStart = new Map<number, NativeIdentifier>();
+    for (const identifier of identifierNodes(sourceFile)) {
+      const { range, fidelity } = spanMap.virtualToOriginalSpan({
+        pos: identifier.start,
+        end: identifier.end,
+      });
+      if (fidelity !== SpanMapFidelity.Exact && fidelity !== SpanMapFidelity.Atom) continue;
+      if (document.text.slice(range.pos, range.end) !== identifier.text) continue;
+      if (byStart.has(range.pos)) continue;
+      byStart.set(range.pos, {
+        text: identifier.text,
+        start: range.pos,
+        end: range.end,
+        ...positionAt(starts, range.pos),
+      });
+    }
+    return [...byStart.values()].sort((left, right) => left.start - right.start);
+  } finally {
+    await snapshot.dispose();
+  }
+}
+
+async function answerAt(
   document: NativeHoverDocument,
+  identifiers: NativeIdentifier[],
 ): Promise<NativeHoverAnswer> {
-  const identifiers = await identifiersOf(fileName, document);
   server.open(document);
   const hovers = identifiers.map((identifier) => server.hover(document.uri, identifier));
   const definitions = identifiers.map((identifier) => server.definition(document.uri, identifier));
@@ -298,7 +395,18 @@ async function handle(request: NativeHoverRequest): Promise<NativeHoverReply> {
       for (const uri of request.uris) server.close(uri);
       return { ok: true };
     case "analyze":
-      return { ok: true, answer: await analyze(request.fileName, request.document) };
+      return {
+        ok: true,
+        answer: await answerAt(
+          request.document,
+          await identifiersOf(request.fileName, request.document),
+        ),
+      };
+    case "analyzeMapped":
+      return {
+        ok: true,
+        answer: await answerAt(request.file.document, await mappedIdentifiersOf(request.file)),
+      };
     case "dispose":
       await server.shutdown();
       await parser.close();
