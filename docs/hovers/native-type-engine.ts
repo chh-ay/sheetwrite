@@ -260,8 +260,16 @@ class LanguageServer {
   constructor(executable: string) {
     this.child = spawn(executable, ["--lsp", "--stdio"], {
       stdio: ["pipe", "pipe", "inherit"],
-      // Collecting at 75% heap growth instead of 100% kept the same time with less memory.
-      env: { ...process.env, GOGC: process.env.GOGC ?? "75" },
+      env: {
+        ...process.env,
+        // Collecting at 75% heap growth instead of 100% kept the same time with less memory.
+        GOGC: process.env.GOGC ?? "75",
+        // tsrs allocates with mimalloc. With transparent huge pages set to `always` (Linux),
+        // its eagerly committed arenas made the server peak at 1.0-1.3 GB instead of ~0.4 GB.
+        ...(basename(executable).startsWith("tsrs")
+          ? { MIMALLOC_ARENA_EAGER_COMMIT: "0", MIMALLOC_PURGE_DELAY: "0" }
+          : {}),
+      },
     });
     this.child.stdout?.on("data", (chunk: Buffer) => this.receive(chunk));
     this.child.on("exit", (code: number | null) => {
