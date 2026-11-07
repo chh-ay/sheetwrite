@@ -1,0 +1,28 @@
+{
+  "name": "@sheetwrite/docs-solid",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prototype: three docs pages on TanStack Start with Solid, to compare with the React docs site.",
+  "type": "module",
+  "scripts": {
+    "build:full": "node node_modules/vite/bin/vite.js build && bunx pagefind --site dist/client",
+    "build:islands": "DOCS_SOLID_ISLANDS=1 node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.islands.config.ts && bun src/islands/page-scripts.ts && bunx pagefind --site dist/client",
+    "typecheck": "node ../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@sheetwrite/core": "workspace:*",
+    "@sheetwrite/wasm": "workspace:*",
+    "@tanstack/solid-router": "1.170.41",
+    "@tanstack/solid-start": "1.169.1",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
+    "solid-js": "1.9.18"
+  },
+  "devDependencies": {
+    "@mdx-js/rollup": "3.1.1",
+    "typescript": "5.9.3",
+    "vite": "8.1.6",
+    "vite-plugin-solid": "2.11.15"
+  }
+}
