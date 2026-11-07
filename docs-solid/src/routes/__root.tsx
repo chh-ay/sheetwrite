@@ -7,19 +7,14 @@ import type { JSX } from "solid-js";
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { IconSprite } from "../components/IconSprite.js";
 
+import performanceStylesheet from "../styles/performance.css?url";
 import siteCoreStylesheet from "../styles/site-core.css?url";
 import siteMidStylesheet from "../styles/site-mid.css?url";
 import siteTailStylesheet from "../styles/site-tail.css?url";
 import docsFiguresStylesheet from "@docs/styles/docs-figures.css?url";
 import apiReferenceStylesheet from "@docs/styles/site/api-reference.css?url";
-import evidenceStylesheet from "@docs/styles/site/evidence.css?url";
-import figuresStylesheet from "@docs/styles/site/figures.css?url";
 import formulaReferenceStylesheet from "@docs/styles/site/formula-reference.css?url";
-import machineCompareStylesheet from "@docs/styles/site/machine-compare.css?url";
-import perfBarsStylesheet from "@docs/styles/site/perf-bars.css?url";
 import playgroundStylesheet from "@docs/styles/site/playground.css?url";
-import releaseChangeStylesheet from "@docs/styles/site/release-change.css?url";
-import speedStoryStylesheet from "@docs/styles/site/speed-story.css?url";
 import upgradeGuideStylesheet from "@docs/styles/site/upgrade-guide.css?url";
 // Expressive Code base and theme styles, shared by every page with code.
 import "virtual:expressive-code.css";
@@ -89,12 +84,7 @@ export const Route = createRootRoute({
         // Head links are render-blocking; link order is the cascade (site.css's order).
         stylesheet(siteCoreStylesheet),
         featureStylesheet(apiReferenceStylesheet),
-        featureStylesheet(evidenceStylesheet),
-        featureStylesheet(figuresStylesheet),
-        featureStylesheet(perfBarsStylesheet),
-        featureStylesheet(machineCompareStylesheet),
-        featureStylesheet(speedStoryStylesheet),
-        featureStylesheet(releaseChangeStylesheet),
+        featureStylesheet(performanceStylesheet),
         featureStylesheet(upgradeGuideStylesheet),
         featureStylesheet(formulaReferenceStylesheet),
         stylesheet(siteMidStylesheet),
