@@ -315,8 +315,14 @@ class LanguageServer {
    * of npm processes, and network access) in the middle of the pass.
    */
   writeProject(directory: string, config: string): void {
+    const file = join(directory, "tsconfig.json");
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, "tsconfig.json"), config);
+    writeFileSync(file, config);
+    // The server caches directory contents; without this it may not see the new file and
+    // put the samples in an inferred project with default options.
+    this.notify("workspace/didChangeWatchedFiles", {
+      changes: [{ uri: pathToFileURL(file).href, type: 1 }],
+    });
   }
 
   removeProject(directory: string): void {
