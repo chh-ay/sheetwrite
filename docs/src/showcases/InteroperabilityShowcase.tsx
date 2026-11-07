@@ -2387,7 +2387,9 @@ function ContractSection() {
                 <p className="sw-si-empty" data-testid="compatibility-results-empty">
                   {resultStatus === "regression"
                     ? "No reviewed regressions are recorded. Tested-app results are currently unavailable rather than assumed."
-                    : "No published example matches these filters. Choose a broader function, behavior, or status."}
+                    : resultStatus === "known-difference"
+                      ? "No known differences from Excel are recorded."
+                      : "No published example matches these filters. Choose a broader function, behavior, or status."}
                 </p>
               )}
             </div>

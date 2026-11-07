@@ -258,6 +258,13 @@ impl IfSum {
         Ok(())
     }
 
+    /// [`Self::add`] for a matched finite number, without building a value.
+    #[inline]
+    pub(super) fn add_number(&mut self, value: f64) {
+        self.sum += value;
+        self.count += 1;
+    }
+
     /// The `SUMIF` result, or `AVERAGEIF`'s when `average` is set.
     pub(super) fn finish(self, average: bool) -> Value {
         if average {

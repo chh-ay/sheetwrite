@@ -1,5 +1,5 @@
 import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
-import { cellScalarToText, parseCellInput } from "./cell-input.js";
+import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
@@ -222,7 +222,7 @@ export class InteractionSessions {
         viewAddress: { sheet: address.sheet, row: viewRow, col: address.col },
         column,
         value,
-        text: formula ?? cellScalarToText(value),
+        text: formula ?? cellEditText(value, column.type),
         label: this.editorLabel(viewRow, address.col),
       });
     }
@@ -310,7 +310,7 @@ export class InteractionSessions {
 
     const formula = this.deps.store.getFormula(dataAddr);
     const current = this.deps.store.getCell(dataAddr).resolved;
-    const text = initial ?? formula ?? cellScalarToText(current);
+    const text = initial ?? formula ?? cellEditText(current, column.type);
     const contentTop = this.deps.contentTop();
 
     this.cancelPointer();

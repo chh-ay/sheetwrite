@@ -6,9 +6,11 @@
 //
 // Excel's 1900 date system treats serial 60 as the non-existent 1900-02-29.
 // Real JavaScript Dates before 1900-03-01 use days since 1899-12-31; dates on or
-// after that cutoff receive one extra serial day. Serial 60 maps to
-// 1900-02-28 when converted to a Date, while numeric formula/XLSX paths can
-// preserve the serial itself.
+// after that cutoff receive one extra serial day. A JavaScript Date cannot hold
+// 1900-02-29, so `serialToDate(60)` returns 1900-02-28; the renderer replaces
+// its day of the month with 29 and input parsing maps 1900-02-29 to serial 60.
+// Excel's weekdays count every serial, the fictional day included, so weekday
+// names come from `serialToWeekdayDate` instead.
 //
 // Calendar construction and access use UTC (`Date.UTC` / `getUTC*`) so host
 // timezone offsets never shift calendar dates.
@@ -17,6 +19,12 @@
 const EPOCH_MS = Date.UTC(1899, 11, 31);
 const LEAP_BUG_CUTOFF_MS = Date.UTC(1900, 2, 1);
 const MS_PER_DAY = 86_400_000;
+
+/**
+ * Excel's serial for 29 February 1900, a day that never existed. Excel counts it
+ * so its serials match Lotus 1-2-3, and its weekday is a Wednesday.
+ */
+export const FICTIONAL_LEAP_DAY_SERIAL = 60;
 
 /**
  * Convert a real UTC `Date` to the Excel 1900-system serial. It is the inverse
@@ -36,15 +44,27 @@ export function dateToSerial(date: Date): number {
  * calendar fields are stable regardless of the host time zone.
  */
 export function serialToDate(serial: number): Date {
-  const realSerial = serial >= 60 ? serial - 1 : serial;
+  const realSerial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
   return new Date(EPOCH_MS + realSerial * MS_PER_DAY);
 }
 
 /**
+ * Return a UTC `Date` whose weekday is Excel's weekday for a serial. Excel counts
+ * weekdays through its fictional 29 February 1900 (serial 1 is a Sunday), so the
+ * serial maps to days since 1899-12-31 with no leap-day correction. For serials
+ * before 60 the weekday is one day earlier than the real date's; for serial 60
+ * and later it is the real date's. Only the weekday of the result is meaningful.
+ */
+export function serialToWeekdayDate(serial: number): Date {
+  return new Date(EPOCH_MS + (serial - 1) * MS_PER_DAY);
+}
+
+/**
  * Build a serial from calendar/time components, returning `null` when they do not
- * form a real date. Overflow (e.g. Feb 30, month 13) is rejected by round-tripping
- * the components through `Date.UTC` and checking they survive normalization; this
- * also rejects two-digit years, since `Date.UTC` would remap 0–99 into 1900–1999.
+ * form a date. Excel's fictional 29 February 1900 maps to serial 60. Other
+ * overflow (e.g. Feb 30, month 13) is rejected by round-tripping the components
+ * through `Date.UTC` and checking they survive normalization; this also rejects
+ * two-digit years, since `Date.UTC` would remap 0–99 into 1900–1999.
  */
 function componentsToSerial(
   year: number,
@@ -57,6 +77,10 @@ function componentsToSerial(
   if (month < 1 || month > 12) return null;
   if (day < 1 || day > 31) return null;
   if (hour > 23 || minute > 59 || second > 59) return null;
+
+  if (year === 1900 && month === 2 && day === 29) {
+    return FICTIONAL_LEAP_DAY_SERIAL + (hour * 3600 + minute * 60 + second) / 86_400;
+  }
 
   const ms = Date.UTC(year, month - 1, day, hour, minute, second);
   const check = new Date(ms);
