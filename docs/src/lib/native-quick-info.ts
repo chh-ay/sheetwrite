@@ -12,10 +12,11 @@
  *
  *     *@tag* `name` — text
  *
- * `@example` bodies follow on the next line inside a ```tsx fence unless the
- * comment was already fenced. Links to declarations are written as Markdown
- * links to `file://` URIs; they become `{@link Name}` again, which the popover
- * renderer already understands.
+ * `@example` bodies follow on the next line. An unfenced comment is wrapped in
+ * a ```tsx fence, which cannot be told apart from a comment fenced as tsx, so
+ * the body is kept as written; the popover strips fences either way. Links to
+ * declarations are Markdown links to `file://` URIs: in the summary they become
+ * `{@link Name}` again, in `@see` the bare name, as 5.9 returned them.
  */
 
 export interface NativeQuickInfo {
@@ -32,22 +33,17 @@ const TAG_START = /\n\n\*@([^*\s]+)\*/g;
 const DASH_PREFIX = /^ — /;
 const QUOTED_NAME = /^ `([^`]+)`/;
 const DECLARATION_LINK = /\[(`?)([^\]]*?)\1\]\(file:\/\/[^)\s]*\)/g;
+const URL_LINK = /\[([^\]]*)\]\((https?:\/\/[^)\s]*)\)/g;
 
-function declarationLinks(text: string): string {
-  return text.replace(DECLARATION_LINK, (_, quote: string, label: string) =>
-    quote ? `{@linkcode ${label}}` : `{@link ${label}}`,
-  );
-}
-
-/** Undo `writeCode(b, "tsx", text)`, which fences an unfenced `@example`. */
-function exampleText(body: string): string {
-  const text = body.replace(/^\n/, "").replace(/\n$/, "");
-  const fence = /^(`{3,})tsx\n([\s\S]*)\n\1$/.exec(text);
-  return fence?.[2] ?? text;
+function declarationLinks(text: string, format: "link" | "name"): string {
+  return text.replace(DECLARATION_LINK, (_, quote: string, label: string) => {
+    if (format === "name") return label;
+    return quote ? `{@linkcode ${label}}` : `{@link ${label}}`;
+  });
 }
 
 function tagText(name: string, body: string): string | undefined {
-  if (name === "example") return exampleText(body) || undefined;
+  if (name === "example") return body.replace(/^\n/, "").replace(/\n$/, "") || undefined;
   let rest = body;
   let prefix = "";
   const quoted = QUOTED_NAME.exec(rest);
@@ -56,8 +52,13 @@ function tagText(name: string, body: string): string | undefined {
     rest = rest.slice(quoted[0].length);
   }
   rest = rest.replace(DASH_PREFIX, "").replace(/^ /, "");
-  const text = declarationLinks([prefix, rest].filter(Boolean).join(" "));
-  return text || undefined;
+  const text = [prefix, rest].filter(Boolean).join(" ");
+  if (name !== "see") return declarationLinks(text, "link") || undefined;
+  // `@see {@link https://…}` keeps its tag syntax in 5.9; prose links only occur in summaries.
+  const urls = text.replace(URL_LINK, (_, label: string, url: string) =>
+    label === url ? `{@link ${url}}` : `{@link ${url} ${label}}`,
+  );
+  return declarationLinks(urls, "name") || undefined;
 }
 
 /**
@@ -83,7 +84,7 @@ export function parseNativeHover(markdown: string): NativeQuickInfo | undefined 
   });
   return {
     text: signature[2] ?? "",
-    docs: declarationLinks(documentation.slice(0, summaryEnd)),
+    docs: declarationLinks(documentation.slice(0, summaryEnd), "link"),
     tags,
   };
 }
