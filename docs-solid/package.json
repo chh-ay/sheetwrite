@@ -7,6 +7,7 @@
   "scripts": {
     "generate": "bun run --cwd ../docs ../scripts/docs-cli.ts generate",
     "build": "bun run generate && node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.islands.config.ts && bun src/islands/page-scripts.ts && bunx pagefind --site dist/client",
+    "build:test": "SHEETWRITE_DOCS_FIXTURES=1 bun run build",
     "typecheck": "bun run generate && node ../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

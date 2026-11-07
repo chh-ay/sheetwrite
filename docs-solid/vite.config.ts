@@ -20,6 +20,13 @@ const PAGES = globSync("**/*.{md,mdx}", { cwd: CONTENT_ROOT }).map((source) => {
   return page.length === 0 ? "/docs/" : `/docs/${page}/`;
 });
 
+/**
+ * The fixture pages for the browser tests (src/routes/test.*.tsx) are
+ * prerendered only when SHEETWRITE_DOCS_FIXTURES=1 (`bun run build:test`), so
+ * the published site has none.
+ */
+const BUILD_FIXTURES = process.env.SHEETWRITE_DOCS_FIXTURES === "1";
+
 /** The showcase pages (src/routes/showcases.*.tsx), each prerendered like a docs page. */
 const SHOWCASE_PAGES = [
   "/showcases/",
@@ -185,14 +192,14 @@ export default defineConfig({
         // Static hosts serve /404.html for every URL without a page; the
         // deployment fallback supplies the 404 status for unknown URLs.
         { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },
-        // Fixtures for the browser tests (test/browser), not linked from the site.
-        { path: "/test/islands/" },
       ],
       prerender: {
         enabled: true,
         crawlLinks: false,
         failOnError: true,
         autoSubfolderIndex: true,
+        // Every static route is discovered; the fixtures only in a test build.
+        filter: (page) => BUILD_FIXTURES || !page.path.startsWith("/test/"),
       },
     }),
     solid({ ssr: true, extensions: [".md", ".mdx"], exclude: REACT_WORKBENCH_FILES }),
