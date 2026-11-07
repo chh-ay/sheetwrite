@@ -65,14 +65,14 @@ impl FormulaBits {
     }
 
     /// Return whether this id is new, so a worklist can reject duplicates.
+    /// Every pass step calls this per formula, so the common case is inline
+    /// and only growing the words is out of line.
+    #[inline]
     pub(crate) fn insert(&mut self, id: FormulaId) -> bool {
         let index = id.index();
         let word = index / BITS_PER_WORD;
         if self.words.len() <= word {
-            if self.words.capacity() == 0 {
-                self.words.reserve_exact(word + 1);
-            }
-            self.words.resize(word + 1, 0);
+            self.grow_to(word);
         }
         let mask = 1u64 << (index % BITS_PER_WORD);
         let Some(word) = self.words.get_mut(word) else {
@@ -86,7 +86,18 @@ impl FormulaBits {
         true
     }
 
+    /// Adds words up to and including `word`.
+    #[cold]
+    #[inline(never)]
+    fn grow_to(&mut self, word: usize) {
+        if self.words.capacity() == 0 {
+            self.words.reserve_exact(word + 1);
+        }
+        self.words.resize(word + 1, 0);
+    }
+
     /// Remove membership while keeping the empty check constant-time.
+    #[inline]
     pub(crate) fn remove(&mut self, id: FormulaId) -> bool {
         let index = id.index();
         let Some(word) = self.words.get_mut(index / BITS_PER_WORD) else {
