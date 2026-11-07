@@ -398,17 +398,26 @@ export function isHighQualityHover(hover: SheetwriteTypeHover, language = "ts"):
   return hover.origin === "lib" || !LOW_QUALITY_HOVER.test(resolvedQuickInfo(hover, language));
 }
 
+/**
+ * Docs for `names` from the sample's script blocks analyzed on their own: hovers in the
+ * svelte2tsx output lose the JSDoc of some script declarations. Only `names` are asked.
+ */
 async function svelteScriptDocumentation(
   source: string,
   analyzer: SheetwriteTypeEngine,
+  names: ReadonlySet<string>,
 ): Promise<ReadonlyMap<string, string>> {
   const scripts = [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1]?.trim() ?? "")
     .filter(Boolean);
-  if (scripts.length === 0) return new Map();
+  if (scripts.length === 0 || names.size === 0) return new Map();
 
   const documentation = new Map<string, string>();
-  for (const node of await analyzer.analyze(scripts.join("\n"), "ts")) {
+  const hovers = await analyzer.analyze(scripts.join("\n"), "ts", {
+    key: `svelte-docs\0${[...names].sort().join("\0")}`,
+    keep: (identifier) => names.has(identifier.text),
+  });
+  for (const node of hovers) {
     if (node.type !== "hover" || !node.docs?.trim() || documentation.has(node.target)) continue;
     documentation.set(node.target, node.docs);
   }
@@ -484,14 +493,17 @@ async function svelteSourceHovers(
     return text === node.target ? { line: original.line - 1, column: original.column } : undefined;
   };
 
-  const [scriptDocumentation, result] = await Promise.all([
-    svelteScriptDocumentation(source, analyzer),
-    // Only generated identifiers that map back into the Svelte source can become hovers.
-    analyzer.analyze(transformed.code, "tsx", {
-      key: `svelte\0${source}`,
-      keep: (identifier) => mapsBack({ ...identifier, target: identifier.text }) !== undefined,
-    }),
-  ]);
+  // Only generated identifiers that map back into the Svelte source can become hovers.
+  const result = await analyzer.analyze(transformed.code, "tsx", {
+    key: `svelte\0${source}`,
+    keep: (identifier) => mapsBack({ ...identifier, target: identifier.text }) !== undefined,
+  });
+  const undocumented = new Set(
+    result
+      .filter((node) => !node.docs?.trim() && mapsBack(node) !== undefined)
+      .map((node) => node.target),
+  );
+  const scriptDocumentation = await svelteScriptDocumentation(source, analyzer, undocumented);
   const hovers: SheetwriteTypeHover[] = [];
   for (const node of result) {
     const original = mapsBack(node);
