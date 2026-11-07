@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Drop Tailwind. No page used a Tailwind utility, so the site's own reset (`styles/reset.css`, only the preflight rules a page needs) replaces it: the first stylesheet shrinks from 20.3 to 11.4 KB (4.7 to 2.7 KB Brotli), and every page type renders pixel for pixel as before at 1440, 834 and 390 px in both themes.
 - Keep the engine out of the script every page loads. The performance and interoperability showcases move to their own modules, and the router entry no longer imports `@sheetwrite/core`. The docs route loads its page index and the formula filter only where they're used. First-load JS drops 49–64% gzip on the landing page, the showcase hub, the docs overview, guides and formula family pages.
 - Add "Try it" to runnable examples: the example runs in an editor and a live grid on the page, loaded only after the click, with inline errors and a reset. The first grid guide and five feature pages have runnable examples.
 - Add "Edit on GitHub" and "Report a problem" to each docs page head, and a changelog RSS feed at `/changelog/rss.xml`.

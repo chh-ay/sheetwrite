@@ -2,7 +2,6 @@ import type { ExpressiveCodeTheme } from "@expressive-code/core";
 import { nodeTypes } from "@mdx-js/mdx";
 import mdx, { type Options as MdxOptions } from "@mdx-js/rollup";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import vue from "@vitejs/plugin-vue";
@@ -513,7 +512,6 @@ export default defineConfig({
     formulaTables(),
     speedStoryMarkup(),
     perfFigureMarkup(),
-    tailwindcss(),
     tanstackStart({
       pages: [
         { path: "/" },
