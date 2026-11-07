@@ -278,10 +278,12 @@ class LanguageServer {
       // Lets the server start the Vue content mapper the sample projects configure. Pushed
       // diagnostics would check opened samples in the background, beside the hover requests.
       // Type acquisition is off for every project, inferred ones included: it ran
-      // `npm install` whenever a hover opened a file outside the sample projects.
+      // `npm install` whenever a hover opened a file outside the sample projects. Only
+      // errors are logged (verbosity 5): a pass otherwise sent about 24,000 log messages.
       initializationOptions: {
         runExternalCode: true,
         disablePushDiagnostics: true,
+        logVerbosity: 5,
         userPreferences: { tsserver: { automaticTypeAcquisition: { enabled: false } } },
       },
       capabilities: {
