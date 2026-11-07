@@ -844,9 +844,9 @@ impl FormulaResults {
         std::mem::swap(&mut self.regexes, &mut other.regexes);
     }
 
-    /// Clears this pass's pulled results and any bits left set. A finished
-    /// pass has already cleared its own settled bits, so a small edit does
-    /// not touch every word.
+    /// Clears this pass's pulled results and any bits left set. A small pass
+    /// has already cleared its own settled bits, so a small edit does not
+    /// touch every word.
     #[inline(never)]
     pub(crate) fn clear(&mut self) {
         for &(id, _) in &self.pulled {
@@ -870,9 +870,14 @@ impl FormulaResults {
 
     /// Release wide result buffers before saving the cleared primary work space.
     pub(crate) fn finish(&mut self, mut work: FormulaWork) {
-        // Settled formulas are selected ones, so the selection clears them.
-        for id in work.ids() {
-            self.settled.remove(id);
+        // At the end of a pass every settled formula is a selected one. A
+        // pass that selected at least one formula per word clears the words
+        // in `clear`; a smaller pass removes its own bits, so it does not
+        // touch every word.
+        if work.len() < self.settled.words.len() {
+            for id in work.ids() {
+                self.settled.remove(id);
+            }
         }
         self.clear();
 
