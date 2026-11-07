@@ -5,8 +5,9 @@
   "description": "The docs site on TanStack Start with Solid, static pages with islands. Replaces docs/ when the migration (#504) completes.",
   "type": "module",
   "scripts": {
-    "build": "bun ../scripts/docs-cli.ts generate && node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.islands.config.ts && bun src/islands/page-scripts.ts",
-    "typecheck": "bun ../scripts/docs-cli.ts generate && node ../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+    "generate": "bun run --cwd ../docs ../scripts/docs-cli.ts generate",
+    "build": "bun run generate && node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.islands.config.ts && bun src/islands/page-scripts.ts",
+    "typecheck": "bun run generate && node ../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@kobalte/core": "0.13.14",
