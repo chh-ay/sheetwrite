@@ -530,9 +530,14 @@ export class NativeTypeEngine {
         noImplicitAny: false,
         noEmit: true,
       },
-      contentMappers: [
-        { package: "@vue/content-mapper", extensions: [".vue"], options: { target: 3.5 } },
-      ],
+      // Only projects holding a Vue sample start the mapper's process.
+      ...(files.some((file) => file.endsWith(".vue"))
+        ? {
+            contentMappers: [
+              { package: "@vue/content-mapper", extensions: [".vue"], options: { target: 3.5 } },
+            ],
+          }
+        : {}),
       typeAcquisition: { enable: false },
       files: files.map((file) => basename(file)),
     });
@@ -593,12 +598,22 @@ export class NativeTypeEngine {
   /**
    * The only place batches run, one after another until no sample is waiting. Samples
    * that arrive while a batch runs (Svelte samples, after their codegen) join the next
-   * batch; a second batch alongside the first held 1.1 GB and was no faster.
+   * batch; a second batch alongside the first held 1.1 GB and was no faster. Vue samples
+   * get batches of their own: only those projects configure the Vue content mapper, and
+   * the server stops the mapper's process once no project uses it.
    */
   private async drain(server: LanguageServer): Promise<void> {
     try {
       while (this.pending.length > 0) {
-        const samples = this.pending.splice(0, SAMPLES_PER_PROJECT);
+        const vue = this.pending[0]?.language === "vue";
+        const samples: Sample[] = [];
+        for (let index = 0; index < this.pending.length && samples.length < SAMPLES_PER_PROJECT;) {
+          const sample = this.pending[index];
+          if (sample && (sample.language === "vue") === vue) {
+            samples.push(sample);
+            this.pending.splice(index, 1);
+          } else index += 1;
+        }
         try {
           // A fresh directory per batch: its tsconfig is new, so no change needs announcing.
           await this.analyzeTogether(server, samples, `batch-${this.batches++}`);
