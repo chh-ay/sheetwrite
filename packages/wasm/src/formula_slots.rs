@@ -611,6 +611,8 @@ pub(crate) struct FormulaResults {
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
     lookups: crate::eval::LookupStates,
+    /// LET slot values and resolved bindings for this pass.
+    pub(crate) let_frame: crate::eval::LetFrame,
     /// Boxed, so the pass workspace the store keeps between passes grows by
     /// one pointer, not by the whole table.
     #[cfg(feature = "analysis")]
@@ -873,6 +875,7 @@ impl FormulaResults {
         self.range_sums.sums.clear();
         self.range_sums.last = None;
         self.lookups.clear();
+        self.let_frame.clear();
         #[cfg(feature = "analysis")]
         {
             self.regexes = None;
@@ -903,6 +906,7 @@ impl FormulaResults {
             self.range_sums.sums = Vec::new();
         }
         self.lookups.release();
+        self.let_frame.release_wide(SLOT_PAGE_LEN);
 
         // Reuse primary pass storage, never formula values or selected ids.
         work.clear();
@@ -920,6 +924,7 @@ impl FormulaResults {
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
+        self.let_frame.add_memory_stats(formulas);
         formulas.add_vec::<u32>(
             self.range_sums.slots.len(),
             self.range_sums.slots.capacity(),

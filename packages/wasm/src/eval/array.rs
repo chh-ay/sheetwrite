@@ -18,7 +18,7 @@ use super::matrix::{
 };
 use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
-use super::{with_let_slots, EvalPass};
+use super::EvalPass;
 
 pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
@@ -369,17 +369,18 @@ impl CellStore {
                     Ok(expanded) => expanded,
                     Err(error) => return Some(Err(error)),
                 };
-                return with_let_slots(slots, || {
-                    let expanded = self.resolve_let_runtime_refs(
-                        args,
-                        expanded,
-                        sheet,
-                        pass,
-                        depth + 1,
-                        RewriteScope::Root,
-                    );
-                    self.eval_dynamic_array(&expanded, sheet, pass, depth + 1)
-                });
+                let enclosing = pass.results.let_frame.open_expanded(slots);
+                let expanded = self.resolve_let_runtime_refs(
+                    args,
+                    expanded,
+                    sheet,
+                    pass,
+                    depth + 1,
+                    RewriteScope::Root,
+                );
+                let matrix = self.eval_dynamic_array(&expanded, sheet, pass, depth + 1);
+                pass.results.let_frame.close_expanded(enclosing);
+                return matrix;
             }
             Ast::Func(Func::Filter, args) => self.eval_filter(args, sheet, pass, depth + 1),
             Ast::Func(Func::Sort, args) => self.eval_sort(args, sheet, pass, depth + 1),
@@ -504,6 +505,14 @@ impl CellStore {
             }
             Ast::LetSlot { expression, .. } => {
                 return self.matrix_shape(expression, formula_sheet, pass);
+            }
+            // A resolved name has its binding's shape, as its expansion would.
+            Ast::LetName { slot, .. } => {
+                // SAFETY: a resolved name is evaluated only inside its LET,
+                // which has bound the slot and is still being evaluated.
+                if let Some(binding) = unsafe { pass.results.let_frame.binding(*slot) } {
+                    return self.matrix_shape(binding, formula_sheet, pass);
+                }
             }
             Ast::NamedFormula(named) => {
                 return self.matrix_shape(&named.expression, formula_sheet, pass);

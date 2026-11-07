@@ -16,6 +16,7 @@ mod functions;
 mod index;
 mod info;
 mod iteration;
+mod let_slots;
 mod literal_criteria;
 mod literal_products;
 mod literal_statistics;
@@ -47,7 +48,7 @@ mod value;
 mod wildcard;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::cmp::Ordering;
 
 use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
@@ -79,6 +80,7 @@ use dependency::{
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
+pub(crate) use let_slots::{resolve_let_names, LetFrame};
 use literal_criteria::CriteriaFold;
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
@@ -102,10 +104,6 @@ thread_local! {
     /// its guard restores the enclosing value, so nested evaluations keep a
     /// stack on the native stack without a heap list.
     static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
-    /// Values of the LET bindings of the evaluation in progress, indexed by
-    /// the slots of its expanded expression. Empty while no LET is running,
-    /// which leaves a slot use to evaluate its expression directly.
-    static LET_SLOT_VALUES: RefCell<Vec<Option<EvalResult>>> = const { RefCell::new(Vec::new()) };
 }
 
 #[cfg(test)]
@@ -113,28 +111,6 @@ thread_local! {
     /// Formula evaluations on this thread. Tests read it to count how often a
     /// formula ran, which no value can show.
     pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-/// Runs `evaluate` with one empty slot per binding of a LET expansion and
-/// restores the slots of the enclosing evaluation afterwards.
-pub(super) fn with_let_slots<Output>(slots: u32, evaluate: impl FnOnce() -> Output) -> Output {
-    let previous = LET_SLOT_VALUES
-        .with(|values| std::mem::replace(&mut *values.borrow_mut(), vec![None; slots as usize]));
-    let result = evaluate();
-    LET_SLOT_VALUES.with(|values| *values.borrow_mut() = previous);
-    result
-}
-
-fn cached_let_slot(slot: u32) -> Option<EvalResult> {
-    LET_SLOT_VALUES.with(|values| values.borrow().get(slot as usize).cloned().flatten())
-}
-
-fn remember_let_slot(slot: u32, value: EvalResult) {
-    LET_SLOT_VALUES.with(|values| {
-        if let Some(entry) = values.borrow_mut().get_mut(slot as usize) {
-            *entry = Some(value);
-        }
-    });
 }
 
 /// Sets the formula origin for one evaluation and restores the enclosing
@@ -298,9 +274,14 @@ fn expand_let_args<'a>(
     }
     let original_len = bindings.len();
     for pair in args[..args.len() - 1].as_chunks::<2>().0 {
-        let Ast::Name(name) = &pair[0] else {
-            bindings.truncate(original_len);
-            return Err(FormulaError::Value);
+        // A resolved LET keeps each binding's name in its `LetName`.
+        let name = match &pair[0] {
+            Ast::Name(name) => name.as_str(),
+            Ast::LetName { name, .. } => &**name,
+            _ => {
+                bindings.truncate(original_len);
+                return Err(FormulaError::Value);
+            }
         };
         if !valid_let_name(name) {
             bindings.truncate(original_len);
@@ -309,14 +290,14 @@ fn expand_let_args<'a>(
         let visible = bindings.len();
         let slot = *next_slot;
         *next_slot = next_slot.checked_add(1).ok_or(FormulaError::Num)?;
-        bindings.push((name.as_str(), &pair[1], visible, slot));
+        bindings.push((name, &pair[1], visible, slot));
     }
     let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot);
     bindings.truncate(original_len);
     result
 }
 
-fn valid_let_name(name: &str) -> bool {
+pub(super) fn valid_let_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
@@ -339,7 +320,13 @@ fn expand_let_node<'a>(
     nodes: &mut usize,
     next_slot: &mut u32,
 ) -> Result<Ast, FormulaError> {
-    if let Ast::Name(name) = ast {
+    // A resolved use expands like the name it keeps.
+    let used_name = match ast {
+        Ast::Name(name) => Some(name.as_str()),
+        Ast::LetName { name, .. } => Some(&**name),
+        _ => None,
+    };
+    if let Some(name) = used_name {
         if let Some((_, expression, visible, slot)) = bindings
             .iter()
             .rev()
@@ -1658,7 +1645,10 @@ impl CellStore {
                             self.eval_ast(&resolved, sheet, pass, depth + 1)
                         }
                     } else {
-                        self.eval_ast(ast, sheet, pass, depth + 1)
+                        let enclosing = pass.results.let_frame.begin_formula();
+                        let value = self.eval_ast(ast, sheet, pass, depth + 1);
+                        pass.results.let_frame.end_formula(enclosing);
+                        value
                     }
                 }
                 None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
@@ -1734,14 +1724,18 @@ impl CellStore {
             Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {
                 Value::Error(FormulaError::Ref)
             }
-            Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
+            Ast::LetSlot { slot, expression } => match pass.results.let_frame.expanded_value(*slot)
+            {
                 Some(value) => value,
                 None => {
                     let value = self.eval_ast(expression, sheet, pass, depth);
-                    remember_let_slot(*slot, value.clone());
+                    pass.results
+                        .let_frame
+                        .remember_expanded(*slot, value.clone());
                     value
                 }
             },
+            Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
             Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
             Ast::UnknownFunc(name, arguments) => {
@@ -1819,6 +1813,57 @@ impl CellStore {
         }
     }
 
+    /// Evaluates a LET whose names were resolved to slots when the formula
+    /// was entered: binds each slot to its expression in the original tree,
+    /// then evaluates the result expression. A binding is evaluated on its
+    /// first use, as the expansion does.
+    #[inline(never)]
+    fn eval_let_family(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let Some((result, bindings)) = args.split_last() else {
+            return Value::Error(FormulaError::Value);
+        };
+        let opened = pass.results.let_frame.open_resolved();
+        for pair in bindings.chunks(2) {
+            if let [Ast::LetName { slot, .. }, expression] = pair {
+                pass.results.let_frame.bind(*slot, expression);
+            }
+        }
+        let value = self.eval_ast(result, sheet, pass, depth + 1);
+        pass.results.let_frame.close_resolved(opened);
+        value
+    }
+
+    /// The value of a resolved LET name: its slot's value, or its binding's
+    /// value on first use, kept in the slot.
+    #[inline(never)]
+    fn eval_let_name_family(
+        &self,
+        slot: u32,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if let Some(value) = pass.results.let_frame.resolved_value(slot) {
+            return value;
+        }
+        // SAFETY: a resolved name occurs only inside its LET, which binds the
+        // slot before evaluating anything in it and is still being evaluated.
+        let Some(expression) = (unsafe { pass.results.let_frame.binding(slot) }) else {
+            return Value::Error(FormulaError::Name);
+        };
+        let value = self.eval_ast(expression, sheet, pass, depth);
+        pass.results
+            .let_frame
+            .remember_resolved(slot, value.clone());
+        value
+    }
+
     /// The value of a defined name's formula. Out of line, so the name adds
     /// one call to `eval_ast`, which must stay under the size above which
     /// JavaScriptCore does not optimize a function; the `_family` suffix
@@ -1882,8 +1927,12 @@ impl CellStore {
         }
 
         if func == Func::Let {
+            if matches!(args.first(), Some(Ast::LetName { .. })) {
+                return self.eval_let_family(args, sheet, pass, depth);
+            }
             return match expand_let_ast(args) {
-                Ok((expanded, slots)) => with_let_slots(slots, || {
+                Ok((expanded, slots)) => {
+                    let enclosing = pass.results.let_frame.open_expanded(slots);
                     let expanded = self.resolve_let_runtime_refs(
                         args,
                         expanded,
@@ -1892,8 +1941,10 @@ impl CellStore {
                         depth + 1,
                         RewriteScope::Nested,
                     );
-                    self.eval_ast(&expanded, sheet, pass, depth + 1)
-                }),
+                    let value = self.eval_ast(&expanded, sheet, pass, depth + 1);
+                    pass.results.let_frame.close_expanded(enclosing);
+                    value
+                }
                 Err(error) => Value::Error(error),
             };
         }
