@@ -35,6 +35,7 @@ import {
 import { html, readableId } from "./evidence-format.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
+import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 function packageSourcePath(packageName: string, source: string): string {
   const separator = source.indexOf("#");
@@ -722,44 +723,56 @@ export async function consumerIndex(manifest: PublicApiManifest): Promise<Consum
   return { dependents, references };
 }
 
+/** Published packages: the only dependents a public API page lists. */
+const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set(PUBLISHABLE_PACKAGE_ORDER);
+
+/**
+ * "Referenced by": the published packages that depend on the symbol's package,
+ * and the public exports whose declarations name it. An empty list is left
+ * out, and so is the section when both are empty.
+ */
 function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
-  const dependents = consumers.dependents.get(pkg.name) ?? [];
+  const dependents = (consumers.dependents.get(pkg.name) ?? []).filter((dependent) =>
+    PUBLISHED_PACKAGES.has(dependent.name),
+  );
   const references = (consumers.references.get(item.name) ?? []).filter(
     (reference) => !(reference.packageName === pkg.name && reference.name === item.name),
   );
-  const body = [
-    "## Referenced by",
-    "",
-    '<div class="api-consumers" data-pagefind-ignore>',
-    `<p class="api-consumers-label">Workspace packages depending on <code>${html(pkg.name)}</code></p>`,
-    "",
-    '<ul class="api-consumer-list">',
-  ];
-  for (const dependent of dependents) {
+  if (dependents.length === 0 && references.length === 0) return "";
+  const body = ["## Referenced by", "", '<div class="api-consumers" data-pagefind-ignore>'];
+  if (dependents.length > 0) {
     body.push(
-      `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+      `<p class="api-consumers-label">Packages that depend on <code>${html(pkg.name)}</code></p>`,
+      "",
+      '<ul class="api-consumer-list">',
+      ...dependents.map(
+        (dependent) =>
+          `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+      ),
+      "</ul>",
+      "",
     );
   }
-  if (dependents.length === 0) body.push("<li>None.</li>");
-  body.push(
-    "</ul>",
-    "",
-    `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
-    "",
-    '<ul class="api-consumer-list">',
-  );
-  for (const reference of references.slice(0, REFERENCE_DISPLAY_LIMIT)) {
+  if (references.length > 0) {
     body.push(
-      `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+      `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
+      "",
+      '<ul class="api-consumer-list">',
+      ...references
+        .slice(0, REFERENCE_DISPLAY_LIMIT)
+        .map(
+          (reference) =>
+            `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+        ),
     );
+    if (references.length > REFERENCE_DISPLAY_LIMIT) {
+      body.push(
+        `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
+      );
+    }
+    body.push("</ul>");
   }
-  if (references.length === 0) body.push("<li>None.</li>");
-  if (references.length > REFERENCE_DISPLAY_LIMIT) {
-    body.push(
-      `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
-    );
-  }
-  body.push("</ul>", "</div>", "");
+  body.push("</div>", "");
   return body.join("\n");
 }
 
@@ -1111,20 +1124,39 @@ export async function renderSymbolPage(
   const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
   const fields = item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
-  // The examples sit in an aside beside the reference at desktop width.
+  // The examples follow the summary; at desktop width they sit in an aside
+  // beside the summary and the rest of the reference.
   const hasAside = parts.examples.length > 0;
   const body = [
     frontmatter(`${item.name} | ${label}`, description, item.kind).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
     "",
-    ...(hasAside ? ['<div class="api-layout">', "", '<div class="api-layout__main">', ""] : []),
+    ...(hasAside ? ['<div class="api-layout">', "", '<div class="api-layout__summary">', ""] : []),
     summary,
     "",
     '<dl class="api-metadata" data-pagefind-ignore>',
-    `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`,
+    sourceRow(source),
     "</dl>",
     "",
   ];
+  if (hasAside) {
+    body.push(
+      "</div>",
+      "",
+      '<aside class="api-layout__aside" aria-label="Examples">',
+      "",
+      "## Examples",
+      "",
+      ...parts.examples.map((example) =>
+        resolveDocumentationLinks(example, pkg, entry, item, routes),
+      ),
+      "",
+      "</aside>",
+      "",
+      '<div class="api-layout__body">',
+      "",
+    );
+  }
   if (fields !== undefined) {
     body.push(renderFunctionFields(fields, parts, pkg, entry, item, routes));
   }
@@ -1173,24 +1205,31 @@ export async function renderSymbolPage(
     "",
     renderReferencedBy(pkg, item, consumers),
   );
-  if (hasAside) {
-    body.push(
-      "</div>",
-      "",
-      '<aside class="api-layout__aside" aria-label="Examples">',
-      "",
-      "## Examples",
-      "",
-      ...parts.examples.map((example) =>
-        resolveDocumentationLinks(example, pkg, entry, item, routes),
-      ),
-      "",
-      "</aside>",
-      "",
-      "</div>",
-    );
-  }
+  if (hasAside) body.push("</div>", "", "</div>");
   return `${body.join("\n").trimEnd()}\n`;
+}
+
+/** The metadata row linking a page's source file in the repository. */
+function sourceRow(source: string): string {
+  return `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`;
+}
+
+const EXPORT_COUNT_LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * An entry page's lead: what the entry point holds, by kind, so it says more
+ * than the title.
+ */
+function entryLead(label: string, entry: ApiEntryPoint): string {
+  if (entry.kind === "asset") return `${label} is a CSS or binary asset entry point.`;
+  if (entry.exports.length === 0) return `${label} exports no named symbols.`;
+  const counts = [...Map.groupBy(entry.exports, (item) => item.kind)]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([kind, items]) => {
+      const plural = (KIND_LABELS[kind] ?? `${kind}s`).toLowerCase();
+      return `${items.length} ${items.length === 1 ? kind : plural}`;
+    });
+  return `The ${entry.exports.length} exports of ${label}, by kind: ${EXPORT_COUNT_LIST.format(counts)}.`;
 }
 
 export function renderEntryPage(
@@ -1210,7 +1249,7 @@ export function renderEntryPage(
   const body = [
     frontmatter(
       label,
-      `API reference for ${label}.`,
+      entryLead(label, entry),
       undefined,
       entry.kind === "asset" ? undefined : entry.exports.length,
     ).trimEnd(),
@@ -1221,12 +1260,10 @@ export function renderEntryPage(
     '<dl class="api-metadata" data-pagefind-ignore>',
     `<div><dt>Declaration target</dt><dd><code>${html(entry.target)}</code></dd></div>`,
     `<div><dt>Exports</dt><dd>${entry.exports.length}</dd></div>`,
+    ...(entry.source === undefined ? [] : [sourceRow(packageSourcePath(pkg.name, entry.source))]),
     "</dl>",
     "",
   ];
-  if (entry.source !== undefined) {
-    body.push(`Source entry: \`${packageSourcePath(pkg.name, entry.source)}\``, "");
-  }
   if (entry.kind === "asset") {
     body.push(
       "This package export is an asset rather than a TypeScript module. It is tracked here so package drift cannot bypass documentation review.",

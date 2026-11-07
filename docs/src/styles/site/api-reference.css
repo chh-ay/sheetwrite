@@ -501,6 +501,11 @@
   letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
 }
+/* The identifier keeps its case inside the uppercase label. */
+.api-consumers-label code {
+  letter-spacing: normal;
+  text-transform: none;
+}
 
 .api-consumer-list {
   display: flex;
@@ -773,8 +778,8 @@
   font-size: var(--sw-text-small);
 }
 
-/* The example aside: after the reference on narrow screens, beside it (and
-   sticky) on wide ones. */
+/* The example aside: right after the summary on narrow screens; on wide ones
+   a sticky column beside the summary and the rest of the reference. */
 .sw-docs .sw-prose .api-layout__aside > h2 {
   margin-top: var(--sw-space-10);
 }
@@ -782,13 +787,23 @@
   .sw-prose .api-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 26rem;
-    gap: var(--sw-space-12);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "summary aside"
+      "body aside";
+    column-gap: var(--sw-space-12);
     align-items: start;
   }
-  .sw-prose .api-layout__main {
+  .sw-prose .api-layout__summary {
+    grid-area: summary;
+    min-width: 0;
+  }
+  .sw-prose .api-layout__body {
+    grid-area: body;
     min-width: 0;
   }
   .sw-prose .api-layout__aside {
+    grid-area: aside;
     position: sticky;
     top: calc(var(--sw-header-height) + var(--sw-space-6));
     max-height: calc(100vh - var(--sw-header-height) - var(--sw-space-12));

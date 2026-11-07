@@ -16,6 +16,7 @@ import { DocsNavigationMenu } from "./DocsNavigationMenu.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { DocsTopbar } from "./DocsTopbar.js";
 import { Icon } from "./Icon.js";
+import { RevealCurrentNavigation } from "./RevealCurrentNavigation.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
 
 interface DocsShellProps {
@@ -110,19 +111,21 @@ export function DocsShell({
       <a className="sw-skip-link" href="#main-content">
         Skip to content
       </a>
-      <aside className="sw-sidebar">
-        <Link aria-label="Sheetwrite home" className="sw-sidebar__brand" to="/">
-          <BrandMark />
-          <span>Sheetwrite</span>
-        </Link>
-        <NavigationSections activeHref={activeHref} tab={tab} />
-      </aside>
       <DocsTopbar
         activeHref={activeHref}
         activeTab={tab}
         menu={<DocsNavigationMenu activeHref={activeHref} tab={tab} />}
         search={<DocsSearch />}
       />
+      <aside className="sw-sidebar">
+        {/* No preload: the landing page's code loads only when it is opened. */}
+        <Link aria-label="Sheetwrite home" className="sw-sidebar__brand" preload={false} to="/">
+          <BrandMark />
+          <span>Sheetwrite</span>
+        </Link>
+        <NavigationSections activeHref={activeHref} tab={tab} />
+      </aside>
+      <RevealCurrentNavigation activeHref={activeHref} />
       <main
         className="sw-document"
         data-pagefind-body

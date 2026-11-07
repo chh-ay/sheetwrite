@@ -28,7 +28,8 @@ interface DocsTopbarProps {
 export function DocsTopbar({ activeTab, activeHref, search, menu }: DocsTopbarProps) {
   return (
     <header className="sw-docs-bar">
-      <Link aria-label="Sheetwrite home" className="sw-docs-bar__brand" to="/">
+      {/* No preload: the landing page's code loads only when it is opened. */}
+      <Link aria-label="Sheetwrite home" className="sw-docs-bar__brand" preload={false} to="/">
         <BrandMark />
         <span>Sheetwrite</span>
       </Link>

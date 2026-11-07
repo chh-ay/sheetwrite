@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useId } from "react";
 
 import {
   CURRENT_RELEASE,
@@ -88,6 +89,48 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
   });
 }
 
+interface NavigationSectionBlockProps {
+  section: NavigationSection;
+  current: NavigationLocation | undefined;
+  onNavigate?: () => void;
+}
+
+/**
+ * One section: a small label over its pages. The label is a paragraph that
+ * names the group, not a heading, so the page's own headings lead its outline.
+ */
+function NavigationSectionBlock({
+  section,
+  current,
+  onNavigate,
+}: Readonly<NavigationSectionBlockProps>) {
+  const labelId = useId();
+  const labelled = !sectionLabelHidden(section);
+  return (
+    <div
+      aria-labelledby={labelled ? labelId : undefined}
+      className="sw-nav-section"
+      role={labelled ? "group" : undefined}
+    >
+      {labelled ? (
+        <p className="sw-nav-section__label" id={labelId}>
+          {section.label}
+        </p>
+      ) : null}
+      <NavigationEntries
+        current={current}
+        // A section's own page leads its list, named Overview as a group's is.
+        items={
+          section.href === undefined
+            ? section.items
+            : [{ label: "Overview", href: section.href, icon: section.icon }, ...section.items]
+        }
+        onNavigate={onNavigate}
+      />
+    </div>
+  );
+}
+
 /** A section of one page and no overview leads with that page, unlabelled. */
 function sectionLabelHidden(section: NavigationSection): boolean {
   return section.href === undefined && section.items.length === 1;
@@ -109,19 +152,12 @@ export function NavigationSections({
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       {tabSections(tab).map((section) => (
-        <section className="sw-nav-section" key={section.label}>
-          {sectionLabelHidden(section) ? null : <h2>{section.label}</h2>}
-          <NavigationEntries
-            current={current}
-            // A section's own page leads its list, named Overview as a group's is.
-            items={
-              section.href === undefined
-                ? section.items
-                : [{ label: "Overview", href: section.href, icon: section.icon }, ...section.items]
-            }
-            onNavigate={onNavigate}
-          />
-        </section>
+        <NavigationSectionBlock
+          current={current}
+          key={section.label}
+          onNavigate={onNavigate}
+          section={section}
+        />
       ))}
     </nav>
   );

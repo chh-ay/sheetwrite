@@ -94,7 +94,7 @@
   gap: var(--sw-space-0-5);
 }
 /* Labels sit below the page rows in weight and colour: the pages lead. */
-.sw-nav-section > h2 {
+.sw-nav-section__label {
   margin: 0 0 var(--sw-space-2);
   padding-inline: var(--sw-space-3);
   color: var(--sw-fg-muted);
@@ -204,6 +204,9 @@ details[open] > summary > .sw-disclosure-icon {
   position: sticky;
   top: 0;
   z-index: 20;
+  /* First in the source, so the tabs and search come before the sidebar in
+     the tab order; placed over the reading column. */
+  grid-row: 1;
   grid-column: 2;
   display: flex;
   align-items: stretch;
@@ -269,7 +272,14 @@ details[open] > summary > .sw-disclosure-icon {
   align-items: center;
   gap: var(--sw-space-2);
 }
+/* Fixed widths, so the web font swapping in moves nothing in the bar. */
+.sw-docs-bar .sw-search-button {
+  width: 13.5rem;
+}
 .sw-docs-bar__link {
+  display: inline-block;
+  min-width: 4.25rem;
+  text-align: center;
   padding: var(--sw-space-2);
   border-radius: var(--sw-radius-md);
   color: var(--sw-fg-muted);
@@ -287,6 +297,7 @@ details[open] > summary > .sw-disclosure-icon {
 /* The reading column keeps the content width and centers in the space right
    of the sidebar; wide screens add the outline as a second column. */
 .sw-document {
+  grid-row: 2;
   grid-column: 2;
   display: grid;
   /* A fixed track, not one sized to its content: while the page is still
@@ -757,6 +768,16 @@ html:has(.sw-nav-dialog[open]) {
 @media (max-width: 42rem) {
   .sw-document {
     padding-top: var(--sw-space-6);
+  }
+  /* The bar's icon buttons keep their size but take a 44px touch target,
+     the height of the tab row's targets. */
+  .sw-docs-bar :is(.sw-search-button, .sw-icon-button) {
+    position: relative;
+  }
+  .sw-docs-bar :is(.sw-search-button, .sw-icon-button)::after {
+    position: absolute;
+    inset: calc((44px - var(--sw-control-height)) / -2);
+    content: "";
   }
   .sw-doc-pager,
   .sw-docs .api-symbol-grid {
