@@ -18,7 +18,7 @@ export function SiteNotFound() {
       <p>This page does not exist. It may have moved.</p>
       <p>
         <Link to="/">Home</Link> ·{" "}
-        <Link params={{ _splat: "" }} to="/docs/$/">
+        <Link to="/docs/">
           Documentation
         </Link>{" "}
         · <Link to="/showcases/">Showcases</Link>

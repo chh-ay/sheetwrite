@@ -3,6 +3,7 @@ import { lazy, Suspense, use, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
+import { DocumentReady } from "../components/DocumentReady.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import { type DocumentComponents, hasDocument, useDocumentComponent } from "../lib/content.js";
 import { normalizeDocumentHref } from "../lib/document-href.js";
@@ -127,20 +128,6 @@ function MovedDocument({ from, target }: Readonly<{ from: string; target: string
       <DocumentReady />
     </main>
   );
-}
-
-/**
- * Marks the docs page ready for interaction. In an article it runs inside the
- * content boundary, so it fires after the lazy MDX controls hydrate.
- */
-function DocumentReady() {
-  useEffect(() => {
-    document.documentElement.dataset.hydrated = "true";
-    return () => {
-      delete document.documentElement.dataset.hydrated;
-    };
-  }, []);
-  return null;
 }
 
 function DocumentRoute() {

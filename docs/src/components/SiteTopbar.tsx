@@ -67,8 +67,7 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
         <Link
           activeOptions={EXACT}
           aria-current={marker("docs", "/docs/")}
-          params={{ _splat: "" }}
-          to="/docs/$/"
+          to="/docs/"
         >
           Docs
         </Link>
