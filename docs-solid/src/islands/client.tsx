@@ -15,6 +15,7 @@ import { type Component, createComponent, type JSX } from "solid-js";
 import { hydrate } from "solid-js/web";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
+import { installDocsShell } from "../lib/shell.js";
 import type { IslandName } from "./Island.js";
 import type { StaticRunnableCodeProps, StaticTabsProps } from "./StaticMarkup.js";
 
@@ -56,6 +57,12 @@ const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
             html: markupOf(island)[0] ?? "",
           }),
     ),
+  search: () =>
+    import("../components/DocsSearch.js").then(({ DocsSearch }) => withProps(DocsSearch)),
+  "api-symbol-filter": () =>
+    import("../components/ApiSymbolFilter.js").then(({ ApiSymbolFilter }) =>
+      withProps(ApiSymbolFilter),
+    ),
 };
 
 function isIslandName(name: string | undefined): name is IslandName {
@@ -79,8 +86,19 @@ async function hydrateIsland(island: HTMLElement): Promise<void> {
 
 /** Pointing at or focusing an interaction island fetches its code ahead of use. */
 const PREFETCH_EVENTS = ["pointerover", "focusin"] as const;
-/** Events an interaction island's code must see: held until it hydrates, then replayed. */
-const ACTIVATION_EVENTS = ["pointerdown", "pointerup", "click", "keydown", "keyup"] as const;
+/**
+ * Events an interaction island's code must see: held until it hydrates, then
+ * replayed. Typing into a field (`input` included, which pasting and
+ * autofill send without keys) hydrates it too; the island reads the field.
+ */
+const ACTIVATION_EVENTS = [
+  "pointerdown",
+  "pointerup",
+  "click",
+  "keydown",
+  "keyup",
+  "input",
+] as const;
 
 /** Typing and caret placement in a text field work without the island's code. */
 function isTextEntry(target: EventTarget | null): boolean {
@@ -209,6 +227,7 @@ if (forwarded === undefined) {
   installAnchorReveal();
   installGridScrollHints();
   installFigureTips();
+  installDocsShell();
   revealAnchoredMember();
   injectAnalytics({ framework: "solid" });
   injectSpeedInsights({ framework: "solid" });

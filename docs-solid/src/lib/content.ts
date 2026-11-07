@@ -9,6 +9,8 @@ export interface DocumentFrontmatter {
   kind?: string;
   /** The page's outline, collected at build time; see docs/src/lib/outline.ts. */
   outline?: readonly OutlineItem[];
+  /** An API entry point's exported symbol count. */
+  symbols?: number;
   /** Set on pages the docs generator writes; they have no source to edit. */
   generated?: boolean;
 }
@@ -37,6 +39,8 @@ export interface DocumentRecord {
   description: string;
   kind: string | undefined;
   outline: readonly OutlineItem[];
+  /** An API entry point's exported symbol count, for its filter. */
+  symbols: number | undefined;
   /** The page's source file in the repository; generated pages have none. */
   sourcePath: string | undefined;
   stylesheets: readonly string[];
@@ -85,6 +89,7 @@ export async function documentForSplat(
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
+    symbols: module.frontmatter?.symbols,
     sourcePath: module.frontmatter?.generated ? undefined : source.sourcePath,
     stylesheets: module.stylesheets ?? [],
   };

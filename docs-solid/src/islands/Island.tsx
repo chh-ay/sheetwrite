@@ -6,7 +6,9 @@ export type IslandName =
   | "package-command"
   | "formula-reference"
   | "live-grid"
-  | "runnable-code";
+  | "runnable-code"
+  | "search"
+  | "api-symbol-filter";
 
 /**
  * When an island's code loads and hydrates. `load`: after the page's first

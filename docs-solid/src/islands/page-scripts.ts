@@ -23,6 +23,8 @@ const ON_DEMAND_ISLANDS: Readonly<Record<IslandName, string>> = {
   "live-grid": "src/components/LiveGrid.tsx",
   tabs: "src/islands/StaticMarkup.tsx",
   "runnable-code": "src/islands/StaticMarkup.tsx",
+  search: "src/components/DocsSearch.tsx",
+  "api-symbol-filter": "src/components/ApiSymbolFilter.tsx",
 };
 
 const CLIENT_OUTPUT = new URL("../../dist/client/", import.meta.url).pathname;

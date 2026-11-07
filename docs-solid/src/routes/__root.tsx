@@ -4,6 +4,7 @@ import bodyFont from "@fontsource-variable/instrument-sans/files/instrument-sans
 import { createRootRoute, HeadContent, Outlet, ScriptOnce } from "@tanstack/solid-router";
 import type { JSX } from "solid-js";
 
+import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { IconSprite } from "../components/IconSprite.js";
 
 import siteCoreStylesheet from "../styles/site-core.css?url";
@@ -28,9 +29,37 @@ import "virtual:expressive-code.css";
 const THEME_SCRIPT =
   '{let saved=null;try{saved=localStorage.getItem("sheetwrite-theme")}catch(error){if(!(error instanceof DOMException))throw error}document.documentElement.dataset.theme=saved??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}';
 
+// Kept short: search results cut long titles by pixel width, and Bing warns past about 70 characters.
 const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV";
 const SITE_DESCRIPTION =
   "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
+const SOCIAL_IMAGE_ALT =
+  "Sheetwrite multi-sheet workbook with selected formula cell and sheet tabs";
+const STRUCTURED_DATA = JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "Sheetwrite",
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": `${SITE_URL}/#source`,
+      name: "Sheetwrite",
+      description: SITE_DESCRIPTION,
+      url: SITE_URL,
+      codeRepository: "https://github.com/chh-ay/sheetwrite",
+      license: "https://opensource.org/license/mit",
+      programmingLanguage: ["TypeScript", "Rust"],
+      runtimePlatform: ["Web", "WebAssembly"],
+      version: corePackage.version,
+    },
+  ],
+});
 
 /** Fonts first in the head, so they load with the stylesheets and are ready for the first paint. */
 const FONT_PRELOAD = {
@@ -74,6 +103,13 @@ export const Route = createRootRoute({
         featureStylesheet(docsFiguresStylesheet),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        // The changelog feed, written by the docs build (scripts/docs-feed.ts).
+        {
+          rel: "alternate",
+          type: "application/rss+xml",
+          title: "Sheetwrite changelog",
+          href: "/changelog/rss.xml",
+        },
       ],
       meta: [
         { charSet: "utf-8" },
@@ -81,8 +117,24 @@ export const Route = createRootRoute({
         { name: "description", content: SITE_DESCRIPTION },
         { name: "robots", content: "index, follow" },
         { name: "theme-color", content: "#080b12" },
+        { property: "og:type", content: "website" },
+        { property: "og:site_name", content: "Sheetwrite" },
+        { property: "og:locale", content: "en_US" },
+        { property: "og:title", content: SITE_TITLE },
+        { property: "og:description", content: SITE_DESCRIPTION },
+        { property: "og:url", content: canonical },
+        { property: "og:image", content: `${SITE_URL}/og-sheetwrite.webp` },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: SOCIAL_IMAGE_ALT },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: SITE_TITLE },
+        { name: "twitter:description", content: SITE_DESCRIPTION },
+        { name: "twitter:image", content: `${SITE_URL}/og-sheetwrite.webp` },
+        { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT },
         { title: SITE_TITLE },
       ],
+      scripts: [{ type: "application/ld+json", children: STRUCTURED_DATA }],
     };
   },
   shellComponent: RootDocument,

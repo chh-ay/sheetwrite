@@ -120,6 +120,8 @@ export default defineConfig({
   // page script (src/islands/page-scripts.ts) drops those a page does not use.
   build: { cssCodeSplit: false, cssMinify: "lightningcss" },
   worker: { format: "es" },
+  // The docs site's static files: favicon, llms.txt, the changelog feed, figures.
+  publicDir: new URL("../docs/public/", import.meta.url).pathname,
   plugins: [
     docsPages(),
     expressiveCodeAssets(),
