@@ -1,0 +1,145 @@
+/* The formulas showcase: its recalculation receipt, recipe list, formula detail and playground. */
+.sw-fx-recalc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  align-items: baseline;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-fx-recalc strong {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-fx-recipes {
+  display: grid;
+  gap: var(--sw-space-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-fx-recipes .sw-button {
+  justify-content: flex-start;
+  width: 100%;
+  white-space: normal;
+  text-align: start;
+}
+
+.sw-fx-recipes code {
+  min-width: 3.5em;
+  color: var(--sw-accent-strong);
+  font-family: var(--sw-font-mono);
+}
+
+.sw-fx-detail {
+  display: grid;
+  gap: var(--sw-space-2);
+  min-width: 0;
+  padding-top: var(--sw-space-3);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-fx-detail h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-heading)
+    var(--sw-font-display);
+}
+
+.sw-fx-detail p {
+  margin: 0;
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-fx-detail .sw-fx-detail__kicker {
+  color: var(--sw-fg-muted);
+  font: var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+}
+
+.sw-fx-try {
+  display: grid;
+  gap: var(--sw-space-2);
+}
+
+.sw-fx-try input {
+  min-height: var(--sw-control-height);
+  padding: 0 var(--sw-space-3);
+  border: var(--sw-border-width) solid var(--sw-field-edge);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg-strong);
+  font: var(--sw-text-small) / 1 var(--sw-font-mono);
+}
+
+.sw-fx-try input:hover {
+  border-color: var(--sw-accent);
+}
+
+.sw-fx-try input:focus-visible {
+  outline: var(--sw-focus-ring-width) solid var(--sw-accent);
+  outline-offset: var(--sw-space-0-5);
+}
+
+.sw-fx-try output {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-fx-sheets {
+  display: inline-flex;
+  gap: var(--sw-space-1);
+}
+
+.sw-fx-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-fx-families li {
+  padding: var(--sw-space-1) var(--sw-space-3);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-pill);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-caption);
+}
+
+/* Panel controls stay inside the panel: long labels wrap, long formulas scroll. */
+.sw-showcase__controls [data-testid="formulas-promotion"] {
+  white-space: normal;
+}
+
+.sw-fx-detail > :last-child {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.sw-fx-try input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The family chips are a row of tags, not a bulleted prose list. */
+.sw-showcase__section .sw-fx-families {
+  padding: 0;
+}
+
+.sw-fx-families > li {
+  margin: 0;
+  list-style: none;
+}
+
+.sw-fx-families > li::marker {
+  content: none;
+}

@@ -31,6 +31,42 @@ export const SHOWCASE_ISLANDS = {
     load: () =>
       import("./analysis/AnalysisStage.js").then(({ AnalysisStage }) => withProps(AnalysisStage)),
   },
+  "showcase-data-tools": {
+    source: "src/showcases/data-tools/DataToolsStage.tsx",
+    load: () =>
+      import("./data-tools/DataToolsStage.js").then(({ DataToolsStage }) =>
+        withProps(DataToolsStage),
+      ),
+  },
+  "showcase-data-events": {
+    source: "src/showcases/data-tools/DataEvents.tsx",
+    load: () =>
+      import("./data-tools/DataEvents.js").then(({ DataEvents }) => withProps(DataEvents)),
+  },
+  "showcase-formulas": {
+    source: "src/showcases/formulas/FormulasStage.tsx",
+    load: () =>
+      import("./formulas/FormulasStage.js").then(({ FormulasStage }) => withProps(FormulasStage)),
+  },
+  "showcase-formatting": {
+    source: "src/showcases/formatting/FormattingStage.tsx",
+    load: () =>
+      import("./formatting/FormattingStage.js").then(({ FormattingStage }) =>
+        withProps(FormattingStage),
+      ),
+  },
+  "showcase-formatting-imported": {
+    source: "src/showcases/formatting/FormattingImported.tsx",
+    load: () =>
+      import("./formatting/FormattingImported.js").then(({ FormattingImported }) =>
+        withProps(FormattingImported),
+      ),
+  },
+  "showcase-host-rows": {
+    source: "src/showcases/host-rows/HostRowsStage.tsx",
+    load: () =>
+      import("./host-rows/HostRowsStage.js").then(({ HostRowsStage }) => withProps(HostRowsStage)),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 /** The showcase pages' islands; islands/Island.tsx adds these names to every island name. */

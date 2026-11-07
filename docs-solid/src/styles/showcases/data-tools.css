@@ -1,0 +1,156 @@
+/* The data tools showcase: its filter field, rule probes, role switch and event log. */
+.sw-data-field {
+  display: grid;
+  gap: var(--sw-space-1);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-data-field input {
+  min-height: var(--sw-control-height);
+  padding: 0 var(--sw-space-3);
+  border: var(--sw-border-width) solid var(--sw-field-edge);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg-strong);
+  font: var(--sw-text-small) / 1 var(--sw-font-body);
+}
+
+.sw-data-field input:focus-visible {
+  outline: var(--sw-focus-ring-width) solid var(--sw-accent);
+  outline-offset: var(--sw-space-0-5);
+}
+
+.sw-data-actions {
+  display: grid;
+  gap: var(--sw-space-2);
+}
+
+.sw-data-note {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-data-rules {
+  display: grid;
+  gap: var(--sw-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-data-rules li {
+  display: grid;
+  gap: var(--sw-space-1-5);
+}
+
+.sw-data-rules strong {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.sw-data-rules li > span {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+/* A dot in the outcome colour; the words carry the meaning. */
+.sw-data-result {
+  display: flex;
+  gap: var(--sw-space-2);
+  align-items: center;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-data-result::before {
+  width: var(--sw-space-2);
+  height: var(--sw-space-2);
+  flex: none;
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-border-strong);
+  content: "";
+}
+
+.sw-data-result:is([data-outcome="saved"], [data-outcome="warned"], [data-outcome="rejected"]) {
+  color: var(--sw-fg);
+}
+
+.sw-data-result[data-outcome="saved"]::before {
+  background: var(--sw-accent);
+}
+
+.sw-data-result[data-outcome="warned"]::before {
+  background: var(--sw-warning);
+}
+
+.sw-data-result[data-outcome="rejected"]::before {
+  background: var(--sw-danger);
+}
+
+/* Two-way role switch: the pressed button is the role the resolver sees. */
+.sw-data-role {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  align-items: center;
+}
+
+.sw-data-role span {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-data-events {
+  max-height: calc(var(--sw-control-height) * 10);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-data-events li {
+  display: grid;
+  grid-template-columns: var(--sw-space-2) minmax(0, 1fr);
+  gap: var(--sw-space-0-5) var(--sw-space-3);
+  padding: var(--sw-space-3) 0;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-data-events li::before {
+  grid-row: 1 / 3;
+  width: var(--sw-space-2);
+  height: var(--sw-space-2);
+  margin-top: var(--sw-space-2);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-border-strong);
+  content: "";
+}
+
+.sw-data-events li[data-tone="ok"]::before {
+  background: var(--sw-accent);
+}
+
+.sw-data-events li[data-tone="warn"]::before {
+  background: var(--sw-warning);
+}
+
+.sw-data-events li[data-tone="reject"]::before {
+  background: var(--sw-danger);
+}
+
+.sw-data-events span {
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+
+.sw-data-events code {
+  color: var(--sw-fg-muted);
+  font: var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
+}
