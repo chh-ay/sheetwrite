@@ -1,0 +1,11 @@
+{
+  "name": "@sheetwrite/docs-hovers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Code-sample hovers for the docs, from TypeScript 7.1. A package of its own so that `typescript` resolves to 7.1 here (for this engine and the Vue content mapper) while the docs package keeps TypeScript 5.9 for svelte2tsx.",
+  "dependencies": {
+    "@vue/content-mapper": "4.0.0-alpha.3",
+    "typescript": "7.1.0-beta"
+  }
+}

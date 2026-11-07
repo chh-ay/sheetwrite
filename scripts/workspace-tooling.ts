@@ -148,7 +148,6 @@ export const TOOLING_TEST_PATHS = [
   "scripts/formula-docs.test.ts",
   "scripts/release-performance-docs.test.ts",
   "scripts/coverage-check.test.ts",
-  "scripts/sheetwrite-code-hovers.test.ts",
   "scripts/normalize-sitemap.test.ts",
   "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
@@ -172,6 +171,8 @@ export const UNIT_TEST_PATHS = [
   "scripts/docs.test.ts",
   "scripts/docs-llms.test.ts",
   "scripts/docs-feed.test.ts",
+  // The hover engine reads the built @sheetwrite package declarations, as the site does.
+  "scripts/sheetwrite-code-hovers.test.ts",
   "bench/test",
   "docs/test",
 ] as const;

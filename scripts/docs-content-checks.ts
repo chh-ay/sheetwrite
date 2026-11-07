@@ -397,8 +397,73 @@ export async function validateMarkdown(
   manifest: PublicApiManifest,
   generatedPublicFiles: ReadonlySet<string> = new Set(),
 ): Promise<string[]> {
-  const failures: string[] = [];
   const hoverAnalyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
+  try {
+    // Every typed fence is requested at once so the type engine analyzes them in one batch.
+    const hoverFailures = Promise.all(
+      documents.flatMap((document) => fenceHoverFailures(document, hoverAnalyzer)),
+    );
+    const failures = await validateDocuments(documents, manifest, generatedPublicFiles);
+    failures.push(...(await hoverFailures).flat());
+    return failures;
+  } finally {
+    await hoverAnalyzer.dispose();
+  }
+}
+
+type TypedFence = Fence & { language: "ts" | "tsx" | "vue" | "svelte" };
+
+function isTypedFence(fence: Fence): fence is TypedFence {
+  return (
+    (fence.language === "ts" ||
+      fence.language === "tsx" ||
+      fence.language === "vue" ||
+      fence.language === "svelte") &&
+    !/(?:^|\s)generated(?:\s|$)/.test(fence.meta)
+  );
+}
+
+function fenceHoverFailures(
+  document: MarkdownDocument,
+  analyzer: SheetwriteTypeEngine,
+): Promise<string[]>[] {
+  let fences: Fence[];
+  try {
+    fences = parseFences(document.content);
+  } catch (error) {
+    // validateDocuments reports the unclosed fence for this document.
+    if (error instanceof Error) return [];
+    throw error;
+  }
+  const page = posix(relative(repositoryRoot, document.path));
+  return fences.filter(isTypedFence).map(async (fence) => {
+    try {
+      const hovers = await collectFenceHovers(
+        fence.code,
+        fence.language,
+        analyzer,
+        fenceMetaValue(fence.meta, "prelude"),
+      );
+      return hovers
+        .filter((hover) => !isHighQualityHover(hover, fence.language))
+        .map(
+          (hover) =>
+            `${page}:${fence.line + hover.line} low-quality hover for ${hover.target}: ${hover.text}`,
+        );
+    } catch (error) {
+      return [
+        `${page}:${fence.line} hover analysis failed: ${error instanceof Error ? error.message : String(error)}`,
+      ];
+    }
+  });
+}
+
+async function validateDocuments(
+  documents: readonly MarkdownDocument[],
+  manifest: PublicApiManifest,
+  generatedPublicFiles: ReadonlySet<string>,
+): Promise<string[]> {
+  const failures: string[] = [];
   const compiled: Array<{ document: MarkdownDocument; fence: Fence }> = [];
   // Generated pages are checked as rendered, before any copy is on disk.
   const documentPaths = new Set(documents.map((document) => document.path));
@@ -430,23 +495,9 @@ export async function validateMarkdown(
       const partial = /(?:^|\s)partial=(?:"[^"]+"|'[^']+')/.test(fence.meta);
       const prelude = fenceMetaValue(fence.meta, "prelude");
       if (typedLanguage && !generated) {
-        const language = fence.language as "ts" | "tsx" | "vue" | "svelte";
         if (partial && prelude === undefined) {
           failures.push(
             `${posix(relative(repositoryRoot, document.path))}:${fence.line} typed partial fence requires a named hover prelude`,
-          );
-        }
-        try {
-          const hovers = collectFenceHovers(fence.code, language, hoverAnalyzer, prelude);
-          for (const hover of hovers) {
-            if (isHighQualityHover(hover, language)) continue;
-            failures.push(
-              `${posix(relative(repositoryRoot, document.path))}:${fence.line + hover.line} low-quality hover for ${hover.target}: ${hover.text}`,
-            );
-          }
-        } catch (error) {
-          failures.push(
-            `${posix(relative(repositoryRoot, document.path))}:${fence.line} hover analysis failed: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
