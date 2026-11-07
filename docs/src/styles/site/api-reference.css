@@ -680,25 +680,6 @@
   min-width: 2ch;
 }
 
-@media (max-width: 48rem) {
-  /* Narrow screens scroll wide tables locally instead of stretching the page.
-     Markdown tables already scroll inside their frame. */
-  .sw-prose table:not(.sw-table-frame > table) {
-    display: block;
-    overflow-x: auto;
-  }
-}
-
-@media (max-width: 48rem) {
-  .sw-architecture__step > div {
-    grid-template-columns: 2rem 1fr;
-  }
-
-  .sw-architecture__step p {
-    grid-column: 2;
-  }
-}
-
 /* Search-target anchors exist for Pagefind sub-results and deep links only;
    the visible member list already names them. Kept in flow (zero-height) so
    #anchor navigation still lands on the right member. */
