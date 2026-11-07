@@ -281,10 +281,13 @@ class LanguageServer {
     await this.request("initialize", {
       processId: process.pid,
       rootUri: pathToFileURL(rootDirectory).href,
-      // Lets the server start the Vue content mapper the sample projects configure.
-      initializationOptions: { runExternalCode: true },
+      // Lets the server start the Vue content mapper the sample projects configure. Pushed
+      // diagnostics would check opened samples in the background, beside the hover requests.
+      initializationOptions: { runExternalCode: true, disablePushDiagnostics: true },
       capabilities: {
         general: { positionEncodings: ["utf-16"] },
+        // The server then reads `workspace/didChangeWatchedFiles`, which `writeProject` sends.
+        workspace: { didChangeWatchedFiles: { dynamicRegistration: true } },
         textDocument: { hover: { contentFormat: ["markdown"] }, definition: {} },
       },
     });
