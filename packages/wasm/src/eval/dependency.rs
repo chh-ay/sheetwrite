@@ -1541,14 +1541,23 @@ impl<'a> DependencyDepthWalk<'a> {
         affected: &FormulaWork,
         ranges: &'a mut GroupMarks,
     ) -> Self {
-        // Selected ids are already indexed; do not search their addresses again.
+        // Selected ids are indexed at their locations: every path that fills a
+        // formula slot indexes it there or retires it (`SheetFormulas`), so the
+        // walk does not search the addresses again.
         let formulas = WalkFormulas::new(
             affected
                 .ids()
                 .filter_map(|id| {
                     slots.get(id)?;
                     let key = slots.location(id)?;
-                    formula_exists(sheets, key).then_some((key, id))
+                    debug_assert_eq!(
+                        sheets
+                            .get(key.sheet as usize)
+                            .and_then(|sheet| sheet.formulas.id(key.local())),
+                        Some(id),
+                        "an occupied formula slot is indexed at its location"
+                    );
+                    Some((key, id))
                 })
                 .collect(),
         );
