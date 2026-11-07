@@ -304,6 +304,9 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "percentile-covariance", size: range }),
     formulaWorkloadKey({ id: "let-reuse-edit", size: range }),
     formulaWorkloadKey({ id: "let-repeat", size: range }),
+    ...(smoke ? [1_000] : LET_MANY_SIZES).map((size) =>
+      formulaWorkloadKey({ id: "let-many", size }),
+    ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
   );
@@ -330,6 +333,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "sumifs-3-criteria",
   "countif-100k",
   "let-repeat",
+  "let-many",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -426,6 +430,10 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return 3 * (size + 1);
     case "let-repeat":
       return `${LET_REPEAT_FACTOR * LOOKUP_RESULT_FACTOR * (size - 1)}:${size - 1}`;
+    case "let-many": {
+      const x = size * LET_MANY_EDITED_SCALE;
+      return x + (x + 1) + (x + 1) * x;
+    }
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -1784,6 +1792,49 @@ function letReuseFixture(count: number): TimedFixture {
   };
 }
 
+/** The `let-many` sizes: a normal sheet and a large one. */
+const LET_MANY_SIZES = [10_000, 100_000] as const;
+/** Every `let-many` formula reads this scale from `$C$1`, so one edit dirties all of them. */
+const LET_MANY_SCALE = 2;
+const LET_MANY_EDITED_SCALE = 3;
+
+/** Even rows bind one name, odd rows bind three that build on each other. */
+function letManyFormula(row: number): string {
+  const source = `A${row + 1}*$C$1`;
+  return row % 2 === 0 ? `=LET(x,${source},x+x+x)` : `=LET(x,${source},y,x+1,z,y*x,x+y+z)`;
+}
+
+/**
+ * A LET in every row, as modern workbooks write them. The timed edit changes
+ * the shared scale, so every LET recalculates.
+ */
+function letManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, LET_MANY_SCALE, 0);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, letManyFormula(row), 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, LET_MANY_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: LET_MANY_SCALE }),
+  };
+}
+
 /** The LET binding is used three times (`x+x+x`), so a re-evaluated binding costs that multiple. */
 const LET_REPEAT_FACTOR = 3;
 
@@ -1921,6 +1972,9 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("percentile-covariance", range, () => percentileCovarianceFixture(range));
   add("let-reuse-edit", range, () => letReuseFixture(range));
   add("let-repeat", range, () => letRepeatFixture(range));
+  for (const size of smoke ? [1_000] : LET_MANY_SIZES) {
+    add("let-many", size, () => letManyFixture(size));
+  }
   add("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000));
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
@@ -2567,6 +2621,7 @@ function validateFormulaEvidence(
       "percentile-covariance",
       "let-reuse-edit",
       "let-repeat",
+      "let-many",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
     ]) {

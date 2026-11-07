@@ -242,6 +242,15 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
+`let-many` (10K and 100K) puts a LET in every row, the way modern workbooks
+write them: even rows bind one name (`=LET(x,A1*$C$1,x+x+x)`), odd rows bind
+three that build on each other. The timed edit changes `$C$1`, so every LET
+recalculates. The other LET rows hold one LET over a 100K range, where LET
+itself is under 0.1% of the time. Here each LET evaluation's own cost
+shows: a LET formula took 2–5× the instructions of the same formula written
+without LET, with 18–34 heap allocations per evaluation. Its ratio limit is
+the 1.2 default until same-engine pairs calibrate it.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when

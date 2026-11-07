@@ -81,6 +81,9 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=percentile-covariance;size=100000": 1.15,
   "workload=let-reuse-edit;size=100000": 1.15,
   "workload=let-repeat;size=100000": 1.2,
+  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  "workload=let-many;size=10000": 1.2,
+  "workload=let-many;size=100000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
   "workload=spill-sequence-admission;size=100000": 1.15,

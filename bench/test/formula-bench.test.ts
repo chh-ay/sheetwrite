@@ -275,6 +275,7 @@ describe("formula regression gate", () => {
       "unicode-text-date-edit",
       "percentile-covariance",
       "let-reuse-edit",
+      "let-many",
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
