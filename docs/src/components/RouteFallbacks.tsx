@@ -17,11 +17,8 @@ export function SiteNotFound() {
       <h1>Page not found</h1>
       <p>This page does not exist. It may have moved.</p>
       <p>
-        <Link to="/">Home</Link> ·{" "}
-        <Link to="/docs/">
-          Documentation
-        </Link>{" "}
-        · <Link to="/showcases/">Showcases</Link>
+        <Link to="/">Home</Link> · <Link to="/docs/">Documentation</Link> ·{" "}
+        <Link to="/showcases/">Showcases</Link>
       </p>
     </SitePage>
   );

@@ -64,11 +64,7 @@ export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
         <span>Sheetwrite</span>
       </Link>
       <nav aria-label="Site" className="sw-header__nav" id="site-nav" popover="auto">
-        <Link
-          activeOptions={EXACT}
-          aria-current={marker("docs", "/docs/")}
-          to="/docs/"
-        >
+        <Link activeOptions={EXACT} aria-current={marker("docs", "/docs/")} to="/docs/">
           Docs
         </Link>
         <Link
