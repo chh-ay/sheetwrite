@@ -15,6 +15,7 @@ import { Route as ReactRouteImport } from './routes/react'
 import { Route as SvelteRouteImport } from './routes/svelte'
 import { Route as VanillaRouteImport } from './routes/vanilla'
 import { Route as VueRouteImport } from './routes/vue'
+import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as ShowcasesAnalysisRouteImport } from './routes/showcases.analysis'
@@ -71,6 +72,11 @@ const VanillaRoute = VanillaRouteImport.update({
 const VueRoute = VueRouteImport.update({
   id: '/vue',
   path: '/vue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsSplatRoute = DocsSplatRouteImport.update({
@@ -243,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
+  '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
   '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
@@ -278,6 +285,7 @@ export interface FileRoutesByTo {
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
+  '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
   '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
+  '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
   '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
@@ -351,6 +360,7 @@ export interface FileRouteTypes {
     | '/test/renderers'
     | '/test/semantic-grid'
     | '/test/xlsx'
+    | '/docs/'
     | '/showcases/'
     | '/test/framework-lifecycle/$framework'
   fileRoutesByTo: FileRoutesByTo
@@ -386,6 +396,7 @@ export interface FileRouteTypes {
     | '/test/renderers'
     | '/test/semantic-grid'
     | '/test/xlsx'
+    | '/docs'
     | '/showcases'
     | '/test/framework-lifecycle/$framework'
   id:
@@ -421,6 +432,7 @@ export interface FileRouteTypes {
     | '/test/renderers'
     | '/test/semantic-grid'
     | '/test/xlsx'
+    | '/docs/'
     | '/showcases/'
     | '/test/framework-lifecycle/$framework'
   fileRoutesById: FileRoutesById
@@ -457,6 +469,7 @@ export interface RootRouteChildren {
   TestRenderersRoute: typeof TestRenderersRoute
   TestSemanticGridRoute: typeof TestSemanticGridRoute
   TestXlsxRoute: typeof TestXlsxRoute
+  DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
   TestFrameworkLifecycleFrameworkRoute: typeof TestFrameworkLifecycleFrameworkRoute
 }
@@ -503,6 +516,13 @@ declare module '@tanstack/react-router' {
       path: '/vue'
       fullPath: '/vue'
       preLoaderRoute: typeof VueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/$': {
@@ -729,6 +749,7 @@ const rootRouteChildren: RootRouteChildren = {
   TestRenderersRoute: TestRenderersRoute,
   TestSemanticGridRoute: TestSemanticGridRoute,
   TestXlsxRoute: TestXlsxRoute,
+  DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,
   TestFrameworkLifecycleFrameworkRoute: TestFrameworkLifecycleFrameworkRoute,
 }
