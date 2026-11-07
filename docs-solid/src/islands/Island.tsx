@@ -10,9 +10,9 @@ export type IslandName =
 
 /**
  * When an island's code loads and hydrates. `load`: after the page's first
- * paint, on every page that holds it. `interaction`: only once the reader
- * reaches for it (islands/client.tsx), so pages where nobody uses it load none
- * of its code.
+ * paint, on every page that holds it. `interaction`: when the reader first
+ * reaches for it (islands/client.tsx); its code is fetched ahead at low
+ * priority once the island is on screen and the page is idle.
  */
 export type IslandHydration = "load" | "interaction";
 

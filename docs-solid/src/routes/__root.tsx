@@ -6,7 +6,7 @@ import type { JSX } from "solid-js";
 
 import { IconSprite } from "../components/IconSprite.js";
 
-import demoSelectStylesheet from "@docs/styles/demo-select.css?url";
+import selectStylesheet from "../styles/select.css?url";
 import docsFiguresStylesheet from "@docs/styles/docs-figures.css?url";
 import siteShellStylesheet from "@docs/styles/site-shell.css?url";
 import siteStylesheet from "@docs/styles/site.css?url";
@@ -44,7 +44,7 @@ export const Route = createRootRoute({
         { rel: "stylesheet", href: tokensStylesheet },
         { rel: "stylesheet", href: siteStylesheet },
         { rel: "stylesheet", href: siteShellStylesheet },
-        { rel: "stylesheet", href: demoSelectStylesheet },
+        { rel: "stylesheet", href: selectStylesheet },
         { rel: "stylesheet", href: docsFiguresStylesheet },
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },

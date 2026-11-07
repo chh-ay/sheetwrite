@@ -1,7 +1,7 @@
 import { createEffect, createSignal, createUniqueId, Show } from "solid-js";
 import { isServer } from "solid-js/web";
 
-import { DemoSelect } from "./DemoSelect.js";
+import { Select } from "./Select.js";
 
 /*
  * A formula family's filter, ported from docs/src/components/FormulaReference.tsx.
@@ -69,10 +69,11 @@ export function FormulaFilter(props: {
             value={query()}
           />
         </label>
-        <DemoSelect
+        <Select
           class="sw-formula-filter__engine"
+          id={`${id}-engine`}
           label="Available in"
-          onValueChange={setEngine}
+          onChange={setEngine}
           options={ENGINE_OPTIONS}
           value={engine()}
         />

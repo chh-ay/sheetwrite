@@ -102,6 +102,44 @@ function isPassThroughKey(event: Event): boolean {
   );
 }
 
+/** After the page's load event, once the browser has nothing else to do. */
+function whenIdleAfterLoad(run: () => void): void {
+  const idle = (): void => {
+    if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 2_000 });
+    else setTimeout(run, 200);
+  };
+  if (document.readyState === "complete") idle();
+  else window.addEventListener("load", idle, { once: true });
+}
+
+/**
+ * Fetches an interaction island's code (`data-island-code`, written by
+ * page-scripts.ts) at low priority once the island is on screen and the page
+ * is idle, so its first use doesn't wait for the network. The module preloads
+ * fill the module map; the island's own import then reuses them.
+ */
+function prefetchWhenVisible(island: HTMLElement): void {
+  const files = island.dataset.islandCode?.split(" ").filter(Boolean) ?? [];
+  // The island's wrapper has no box (display: contents); its content does.
+  const boxes = Array.from(island.children);
+  if (files.length === 0 || boxes.length === 0) return;
+  const observer = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    observer.disconnect();
+    whenIdleAfterLoad(() => {
+      for (const file of files) {
+        if (document.head.querySelector(`link[rel="modulepreload"][href="${file}"]`)) continue;
+        const link = document.createElement("link");
+        link.rel = "modulepreload";
+        link.fetchPriority = "low";
+        link.href = file;
+        document.head.append(link);
+      }
+    });
+  });
+  for (const box of boxes) observer.observe(box);
+}
+
 /**
  * An island that hydrates on first use. Its server markup stands in until
  * then. The first activation loads its code; that event and any that follow
@@ -123,7 +161,9 @@ function hydrateOnInteraction(island: HTMLElement): void {
   const activate = (event: Event): void => {
     if (isPassThroughKey(event)) return;
     if (!isTextEntry(event.target)) {
-      event.preventDefault();
+      // Pointer presses keep their default, so a touch still produces its
+      // click (and focuses what it presses); clicks and keys are held whole.
+      if (!(event instanceof PointerEvent)) event.preventDefault();
       event.stopImmediatePropagation();
       held.push(event);
     }
@@ -146,6 +186,7 @@ function hydrateOnInteraction(island: HTMLElement): void {
 
   for (const type of PREFETCH_EVENTS) island.addEventListener(type, prefetch, { once: true });
   for (const type of ACTIVATION_EVENTS) island.addEventListener(type, activate, true);
+  prefetchWhenVisible(island);
 }
 
 declare global {
@@ -171,7 +212,7 @@ if (forwarded === undefined) {
   revealAnchoredMember();
   injectAnalytics({ framework: "solid" });
   injectSpeedInsights({ framework: "solid" });
-  // Interaction islands listen at once; nothing of theirs loads until used.
+  // Interaction islands listen at once; their code loads ahead or on first use.
   const islands = Array.from(document.querySelectorAll<HTMLElement>("[data-island]"));
   const onLoad = islands.filter((island) => island.dataset.islandHydrate !== "interaction");
   for (const island of islands) {

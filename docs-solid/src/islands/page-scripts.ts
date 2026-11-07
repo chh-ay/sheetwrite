@@ -64,8 +64,8 @@ function isOnDemandIsland(name: string): name is IslandName {
 function pageScripts(manifest: Manifest, html: string): string {
   const entry = manifest[ISLANDS_ENTRY];
   if (entry === undefined) throw new Error(`${ISLANDS_ENTRY} is missing from ${ISLANDS_MANIFEST}`);
-  // Islands that hydrate on interaction fetch their code when the reader
-  // reaches for them; preloading it would cost every visit.
+  // Islands that hydrate on interaction fetch their code later (islands/client.tsx);
+  // preloading it would cost every visit.
   const onDemandSources = new Set(
     Array.from(html.matchAll(ISLAND_MARKER))
       .filter(([tag]) => !ON_INTERACTION.test(tag))
@@ -86,6 +86,23 @@ function pageScripts(manifest: Manifest, html: string): string {
   ].join("");
 }
 
+/**
+ * Each interaction island's tag lists its code's files (`data-island-code`),
+ * minus what the entry already loads, so the client can fetch them at low
+ * priority once the island is on screen and the page is idle.
+ */
+function withIslandCode(manifest: Manifest, html: string): string {
+  const entryFiles = new Set(chunkFiles(manifest, ISLANDS_ENTRY));
+  return html.replace(ISLAND_MARKER, (tag: string, name: string) => {
+    if (!ON_INTERACTION.test(tag) || !isOnDemandIsland(name)) return tag;
+    const code = chunkFiles(manifest, ON_DEMAND_ISLANDS[name])
+      .filter((file) => !entryFiles.has(file))
+      .map((file) => `/${file}`)
+      .join(" ");
+    return tag.replace(/>$/, ` data-island-code="${code}">`);
+  });
+}
+
 const manifestPath = join(CLIENT_OUTPUT, ISLANDS_MANIFEST);
 const manifest: Manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 let rewrittenPages = 0;
@@ -95,7 +112,8 @@ for await (const page of new Bun.Glob("**/*.html").scan(CLIENT_OUTPUT)) {
   // Pages without content islands still load the client: it runs the page-wide
   // enhancements (code copy and popovers) and marks the page hydrated.
   const withoutRouter = ROUTER_TAGS.reduce((markup, tag) => markup.replace(tag, ""), html);
-  await writeFile(path, withoutRouter.replace("</head>", `${pageScripts(manifest, html)}</head>`));
+  const withScripts = withoutRouter.replace("</head>", `${pageScripts(manifest, html)}</head>`);
+  await writeFile(path, withIslandCode(manifest, withScripts));
   rewrittenPages += 1;
 }
 // The manifest is a build input, not a page asset.

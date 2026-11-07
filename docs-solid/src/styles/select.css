@@ -1,0 +1,127 @@
+/* The site's select (components/Select.tsx). The list sits under the field,
+   or above it when only the space above holds it (`data-placement`). */
+@layer components {
+  .sw-select {
+    display: grid;
+    min-width: 0;
+    gap: var(--sw-space-1-5);
+  }
+
+  .sw-select__label {
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-text-caption);
+    cursor: default;
+  }
+
+  .sw-select__anchor {
+    position: relative;
+  }
+
+  .sw-select__trigger {
+    display: flex;
+    width: 100%;
+    min-width: 8rem;
+    min-height: 2.6rem;
+    box-sizing: border-box;
+    gap: var(--sw-space-2);
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sw-space-2);
+    border: 1px solid var(--sw-field-edge, var(--sw-border-strong));
+    border-radius: var(--sw-radius-sm);
+    background: var(--sw-surface-0);
+    color: var(--sw-fg-strong);
+    font: var(--sw-weight-medium) var(--sw-text-small) var(--font-sans);
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .sw-select__trigger:hover,
+  .sw-select__trigger[aria-expanded="true"],
+  .sw-select__trigger:focus-visible {
+    border-color: var(--sw-accent);
+  }
+
+  .sw-select__trigger:focus-visible {
+    outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring, var(--sw-accent));
+    outline-offset: calc(-1 * var(--sw-focus-ring-width));
+  }
+
+  .sw-select__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sw-select__icon {
+    flex: none;
+    color: var(--sw-fg-muted);
+    transition: transform 120ms ease;
+  }
+
+  .sw-select__trigger[aria-expanded="true"] .sw-select__icon {
+    transform: rotate(180deg);
+  }
+
+  .sw-select__list {
+    position: absolute;
+    z-index: 100;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    max-height: min(20rem, 60vh);
+    box-sizing: border-box;
+    padding: var(--sw-space-1);
+    overflow-y: auto;
+    border: 1px solid var(--sw-border-strong);
+    border-radius: var(--sw-radius-md);
+    background: var(--sw-surface-2);
+    color: var(--sw-fg);
+    box-shadow: var(--sw-shadow-lg);
+  }
+
+  .sw-select__list[data-placement="above"] {
+    top: auto;
+    bottom: calc(100% + 4px);
+  }
+
+  .sw-select__list[hidden] {
+    display: none;
+  }
+
+  .sw-select__option {
+    display: grid;
+    min-height: 2.25rem;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    gap: var(--sw-space-2);
+    align-items: center;
+    padding: var(--sw-space-1-5) var(--sw-space-2);
+    border-radius: var(--sw-radius-sm);
+    color: var(--sw-fg);
+    font: var(--sw-weight-medium) var(--sw-text-small) var(--font-sans);
+    cursor: default;
+    user-select: none;
+  }
+
+  /* The active option (keyboard or pointer): a quiet wash, no ring. */
+  .sw-select__option[data-active] {
+    background: color-mix(in srgb, var(--sw-fg) 8%, var(--sw-surface-2));
+    color: var(--sw-fg-strong);
+  }
+
+  /* The current value: the check mark and a heavier weight carry it. */
+  .sw-select__option[aria-selected="true"] {
+    color: var(--sw-fg-strong);
+    font-weight: var(--sw-weight-semibold);
+  }
+
+  .sw-select__check {
+    color: var(--sw-accent);
+    visibility: hidden;
+  }
+
+  .sw-select__option[aria-selected="true"] .sw-select__check {
+    visibility: visible;
+  }
+}

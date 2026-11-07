@@ -62,9 +62,8 @@ export function PackageCommand(props: ComponentProps<typeof PackageCommandView>)
 /**
  * A formula family page's table and filter. The table is static markup the
  * docs generator built (docs/src/lib/formula-tables.ts); only the filter is an
- * island, so the rows never ship as script or hydrate. The filter's select
- * brings most of its code, so it loads when the reader first reaches for the
- * filter, not with the page.
+ * island, so the rows never ship as script or hydrate. Most readers never
+ * touch the filter, so it hydrates when one first reaches for it.
  */
 export function FormulaReference(props: { readonly family: string }): JSX.Element {
   const table = formulaTableHtml(props.family);

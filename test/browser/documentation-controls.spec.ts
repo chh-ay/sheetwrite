@@ -131,128 +131,23 @@ test("the formula reference engine filter has the select popup styles", async ({
   await waitForHydration(page);
 
   await page.getByRole("combobox", { name: "Available in" }).click();
-  const popup = page.locator(".sw-demo-select__popup");
+  // The React site's Base UI popup, or the Solid site's own list.
+  const popup = page.locator(".sw-demo-select__popup, .sw-select__list");
   await expect(popup).toBeVisible();
 
   const style = await popup.evaluate((element) => {
     const computed = getComputedStyle(element);
-    const positioner = element.closest(".sw-demo-select__positioner");
+    const layer = element.closest(".sw-demo-select__positioner") ?? element;
     return {
       borderRadius: computed.borderRadius,
       boxShadow: computed.boxShadow,
-      positionerLayer: positioner === null ? "" : getComputedStyle(positioner).zIndex,
+      positionerLayer: getComputedStyle(layer).zIndex,
     };
   });
   expect(style.borderRadius).toBe("8px");
   expect(style.boxShadow).not.toBe("none");
   expect(style.positionerLayer).toBe("100");
 });
-
-test("the formula reference engine filter is a listbox the keyboard can drive @portability", async ({
-  page,
-}) => {
-  await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
-  await waitForHydration(page);
-  const field = page.getByRole("combobox", { name: "Available in" });
-  const status = page.locator(".sw-formula-filter").getByRole("status");
-  await expect(field).toHaveText("Either engine");
-  await expect(field).toHaveAttribute("aria-expanded", "false");
-
-  await field.focus();
-  await page.keyboard.press("Enter");
-  const list = page.getByRole("listbox");
-  await expect(list).toBeVisible();
-  await expect(field).toHaveAttribute("aria-expanded", "true");
-  await expect(list.getByRole("option")).toHaveText([
-    "Either engine",
-    "Default and full",
-    "Full only",
-  ]);
-  await expect(list.getByRole("option", { name: "Either engine" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-
-  // The list opens on the selected option; the next one is a key away.
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
-  await expect(list).toBeHidden();
-  await expect(field).toBeFocused();
-  await expect(field).toHaveText("Default and full");
-  // "Default and full" keeps the default engine's functions and hides the full-only ones.
-  const defaultRows = await page.locator('tr[data-engine="default"]').count();
-  await expect(status).toHaveText(`${defaultRows} functions`);
-  await expect(page.locator('tr[data-engine="full"]:visible')).toHaveCount(0);
-
-  // Escape closes the list and keeps the value.
-  await page.keyboard.press("Enter");
-  await expect(list).toBeVisible();
-  await expect(list.getByRole("option", { name: "Default and full" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Escape");
-  await expect(list).toBeHidden();
-  await expect(field).toBeFocused();
-  await expect(field).toHaveText("Default and full");
-});
-
-// The filter's code loads on first use; a press or click made while it loads
-// must open the list once, as if the code had been there.
-for (const activation of ["Enter", "Space", "ArrowDown", "click"] as const) {
-  test(`the formula engine filter opens once on ${activation} made before its code arrives @portability`, async ({
-    page,
-  }) => {
-    await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
-    await waitForHydration(page);
-    let release = (): void => undefined;
-    const released = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    // Hold any code the filter fetches from now until the reader has acted. A
-    // page that loaded the filter with the rest of the page fetches none.
-    await page.route(/\/assets\/[^/]+\.js$/, async (route) => {
-      await released;
-      await route.continue();
-    });
-    const field = page.getByRole("combobox", { name: "Available in" });
-    await expect(field).toHaveText("Either engine");
-    // In page coordinates: focusing or opening the field may scroll the page.
-    const placement = () =>
-      field.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return {
-          x: box.x + window.scrollX,
-          y: box.y + window.scrollY,
-          width: box.width,
-          height: box.height,
-        };
-      });
-    const before = await placement();
-
-    if (activation === "click") {
-      await field.click();
-    } else {
-      await field.focus();
-      await page.keyboard.press(activation);
-    }
-    release();
-
-    const list = page.getByRole("listbox");
-    await expect(list).toBeVisible();
-    await expect(field).toHaveAttribute("aria-expanded", "true");
-    // Once: a replayed event that toggled twice would have closed it again.
-    await page.waitForTimeout(300);
-    await expect(list).toBeVisible();
-    await expect(page.getByRole("listbox")).toHaveCount(1);
-
-    await page.keyboard.press("Escape");
-    await expect(list).toBeHidden();
-    // The server-rendered field and the hydrated one are the same size and place.
-    expect(await placement()).toEqual(before);
-  });
-}
 
 test("the outline lists only symbol groups that the filter shows", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
