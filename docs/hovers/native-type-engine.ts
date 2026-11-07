@@ -23,6 +23,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
@@ -308,6 +309,24 @@ class LanguageServer {
     this.notify("textDocument/didClose", { textDocument: { uri } });
   }
 
+  /**
+   * Writes a project's tsconfig to disk. An open tsconfig document would get an inferred
+   * project of its own, whose type acquisition runs `npm install types-registry` (180 MiB
+   * of npm processes, and network access) in the middle of the pass.
+   */
+  writeProject(directory: string, config: string): void {
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "tsconfig.json"), config);
+  }
+
+  removeProject(directory: string): void {
+    const file = join(directory, "tsconfig.json");
+    rmSync(directory, { recursive: true, force: true });
+    this.notify("workspace/didChangeWatchedFiles", {
+      changes: [{ uri: pathToFileURL(file).href, type: 3 }],
+    });
+  }
+
   async hover(
     uri: string,
     position: { line: number; character: number },
@@ -442,6 +461,8 @@ export class NativeTypeEngine {
   /** JSDoc summaries by declaration file and line, and declaration files by path, per session. */
   private readonly declarationDocs = new Map<string, string>();
   private readonly declarationFiles = new Map<string, string[]>();
+  /** Names each batch's project directory. */
+  private batches = 0;
   private queue: Sample[] = [];
   private flushScheduled = false;
   private session: Promise<{ server: LanguageServer; cache: HoverCache }> | undefined;
@@ -610,7 +631,8 @@ export class NativeTypeEngine {
       // One batch at a time: two in flight held 1.1 GB and were no faster.
       for (let index = 0; index < misses.length; index += SAMPLES_PER_PROJECT) {
         const samples = misses.slice(index, index + SAMPLES_PER_PROJECT);
-        await this.analyzeTogether(server, cache, samples, "shared");
+        // A fresh directory per batch: its tsconfig is new, so no change needs announcing.
+        await this.analyzeTogether(server, cache, samples, `batch-${this.batches++}`);
       }
     } catch (error) {
       const failure = error instanceof Error ? error : new Error(String(error));
@@ -632,12 +654,12 @@ export class NativeTypeEngine {
   ): Promise<void> {
     const parser = this.parserSession();
     const files = samples.map((sample) => this.sampleFile(sample, project));
-    const configUri = pathToFileURL(`${this.projectDirectory}/${project}/tsconfig.json`).href;
+    const directory = `${this.projectDirectory}/${project}`;
+    server.writeProject(directory, this.projectConfig(files));
     for (const [index, sample] of samples.entries()) {
       const file = files[index] ?? "";
       server.open(pathToFileURL(file).href, languageId(file), sample.source);
     }
-    server.open(configUri, "json", this.projectConfig(files));
     // Hovers at declarations outside the samples make the server look up those files'
     // projects, which in the middle of checking 64 samples cost 14 s of server CPU. They
     // wait until every sample of the batch has its own answers.
@@ -669,7 +691,7 @@ export class NativeTypeEngine {
     );
     // Closed samples leave the program, so the server holds only samples in flight.
     for (const file of files) server.close(pathToFileURL(file).href);
-    server.close(configUri);
+    server.removeProject(directory);
   }
 
   /**
@@ -690,9 +712,9 @@ export class NativeTypeEngine {
     const project = `alone-${sample.key.slice(0, 16)}`;
     const file = this.sampleFile(sample, project);
     const uri = pathToFileURL(file).href;
-    const configUri = pathToFileURL(`${this.projectDirectory}/${project}/tsconfig.json`).href;
+    const directory = `${this.projectDirectory}/${project}`;
+    server.writeProject(directory, this.projectConfig([file]));
     server.open(uri, languageId(file), sample.source);
-    server.open(configUri, "json", this.projectConfig([file]));
     try {
       const answers = new Map<SheetwriteTypeHover, NativeQuickInfo | undefined>();
       for (const hover of suspects) {
@@ -708,7 +730,7 @@ export class NativeTypeEngine {
       });
     } finally {
       server.close(uri);
-      server.close(configUri);
+      server.removeProject(directory);
     }
   }
 
