@@ -89,7 +89,11 @@ async function openLab(page: Page, lab: string): Promise<void> {
 
 test("@portability compatibility results expose every truthful state from checked data", async ({
   page,
+  browserName,
 }) => {
+  // WebKit on macOS moves Tab between form controls only, as Safari does by
+  // default; Option-Tab reaches every focusable element, buttons included.
+  const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
   const errors = collectErrors(page);
   await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
   await expect(page.locator("select")).toHaveCount(0);
@@ -244,11 +248,11 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(absResults).toHaveCount(1);
   await expect(absResults.first()).toContainText("ABS");
   await featureFilter.focus();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tab);
   await expect(page.getByTestId("compatibility-behavior-filter")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tab);
   await expect(page.getByTestId("compatibility-status-filter")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tab);
   await expect(absResults.first()).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(detail).toContainText("ABS");
