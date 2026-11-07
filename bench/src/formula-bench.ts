@@ -341,6 +341,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "concat-many",
   "offset-many",
   "indirect-many",
+  "let-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -448,6 +449,11 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "offset-many":
     case "indirect-many":
       return size + SHAPE_EDITED_SCALE;
+    case "let-calls": {
+      const x = size * SHAPE_EDITED_SCALE + 1;
+      const y = Math.round((x / 3) * 100) / 100;
+      return x + y + y * x;
+    }
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -1814,10 +1820,17 @@ const LET_MANY_EDITED_SCALE = 3;
 
 /**
  * Rows for formula shapes the other rows do not exercise: ROUND, text
- * concatenation, OFFSET and INDIRECT, one formula per row. Each formula reads
- * `$C$1`, so the timed edit recalculates all of them.
+ * concatenation, OFFSET, INDIRECT and LETs that bind function calls, one
+ * formula per row. Each formula reads `$C$1`, so the timed edit recalculates
+ * all of them.
  */
-const SHAPE_ROW_IDS = ["round-many", "concat-many", "offset-many", "indirect-many"] as const;
+const SHAPE_ROW_IDS = [
+  "round-many",
+  "concat-many",
+  "offset-many",
+  "indirect-many",
+  "let-calls",
+] as const;
 const SHAPE_ROW_SIZES = [10_000, 100_000] as const;
 const SHAPE_SCALE = 2;
 const SHAPE_EDITED_SCALE = 3;
@@ -1920,7 +1933,24 @@ function shapeRowFixture(id: (typeof SHAPE_ROW_IDS)[number], count: number): Tim
         SHAPE_EDITED_SCALE,
         last,
       );
+    case "let-calls":
+      return shapeRowsFixture(
+        count,
+        numbersInA(),
+        letCallsFormula,
+        SHAPE_SCALE,
+        SHAPE_EDITED_SCALE,
+        last,
+      );
   }
+}
+
+/** `let-many` with function-call bindings: even rows one, odd rows three. */
+function letCallsFormula(row: number): string {
+  const source = `A${row + 1}*$C$1`;
+  return row % 2 === 0
+    ? `=LET(x,ROUND(${source},2),x+x+x)`
+    : `=LET(x,SUM(${source},1),y,ROUND(x/3,2),z,y*x,x+y+z)`;
 }
 
 /** Even rows bind one name, odd rows bind three that build on each other. */
