@@ -148,6 +148,100 @@ test("the formula reference engine filter has the select popup styles", async ({
   expect(style.positionerLayer).toBe("100");
 });
 
+test("the formula reference engine filter is a listbox the keyboard can drive @portability", async ({
+  page,
+}) => {
+  await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
+  await waitForHydration(page);
+  const field = page.getByRole("combobox", { name: "Available in" });
+  const status = page.locator(".sw-formula-filter").getByRole("status");
+  await expect(field).toHaveText("Either engine");
+  await expect(field).toHaveAttribute("aria-expanded", "false");
+
+  await field.focus();
+  await page.keyboard.press("Enter");
+  const list = page.getByRole("listbox");
+  await expect(list).toBeVisible();
+  await expect(field).toHaveAttribute("aria-expanded", "true");
+  await expect(list.getByRole("option")).toHaveText([
+    "Either engine",
+    "Default and full",
+    "Full only",
+  ]);
+  await expect(list.getByRole("option", { name: "Either engine" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  // The list opens on the selected option; the next one is a key away.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(list).toBeHidden();
+  await expect(field).toBeFocused();
+  await expect(field).toHaveText("Default and full");
+  // "Default and full" keeps the default engine's functions and hides the full-only ones.
+  const defaultRows = await page.locator('tr[data-engine="default"]').count();
+  await expect(status).toHaveText(`${defaultRows} functions`);
+  await expect(page.locator('tr[data-engine="full"]:visible')).toHaveCount(0);
+
+  // Escape closes the list and keeps the value.
+  await page.keyboard.press("Enter");
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option", { name: "Default and full" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Escape");
+  await expect(list).toBeHidden();
+  await expect(field).toBeFocused();
+  await expect(field).toHaveText("Default and full");
+});
+
+// The filter's code loads on first use; a press or click made while it loads
+// must open the list once, as if the code had been there.
+for (const activation of ["Enter", "Space", "ArrowDown", "click"] as const) {
+  test(`the formula engine filter opens once on ${activation} made before its code arrives @portability`, async ({
+    page,
+  }) => {
+    let release = (): void => undefined;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Hold the filter's code until the reader has acted; a site that loads it with the page never asks.
+    await page.route(/\/assets\/FormulaReference-[^/]+\.js$/, async (route) => {
+      await released;
+      await route.continue();
+    });
+    await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
+    await waitForHydration(page);
+    const field = page.getByRole("combobox", { name: "Available in" });
+    await expect(field).toHaveText("Either engine");
+    const before = await field.boundingBox();
+
+    if (activation === "click") {
+      await field.click();
+    } else {
+      await field.focus();
+      await page.keyboard.press(activation);
+    }
+    release();
+
+    const list = page.getByRole("listbox");
+    await expect(list).toBeVisible();
+    await expect(field).toHaveAttribute("aria-expanded", "true");
+    // Once: a replayed event that toggled twice would have closed it again.
+    await page.waitForTimeout(300);
+    await expect(list).toBeVisible();
+    await expect(page.getByRole("listbox")).toHaveCount(1);
+
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    // The server-rendered field and the hydrated one are the same size and place.
+    expect(await field.boundingBox()).toEqual(before);
+  });
+}
+
 test("the outline lists only symbol groups that the filter shows", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(siteUrl("/docs/api/core/"));
