@@ -33,9 +33,9 @@ export const FICTIONAL_LEAP_DAY_SERIAL = 60;
  * (or via {@link parseDateInput}) to avoid host-timezone shifts.
  */
 export function dateToSerial(date: Date): number {
- const milliseconds = date.getTime();
- const serial = (milliseconds - EPOCH_MS) / MS_PER_DAY;
- return milliseconds >= LEAP_BUG_CUTOFF_MS ? serial + 1 : serial;
+  const milliseconds = date.getTime();
+  const serial = (milliseconds - EPOCH_MS) / MS_PER_DAY;
+  return milliseconds >= LEAP_BUG_CUTOFF_MS ? serial + 1 : serial;
 }
 
 /**
@@ -44,8 +44,8 @@ export function dateToSerial(date: Date): number {
  * calendar fields are stable regardless of the host time zone.
  */
 export function serialToDate(serial: number): Date {
- const realSerial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
- return new Date(EPOCH_MS + realSerial * MS_PER_DAY);
+  const realSerial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
+  return new Date(EPOCH_MS + realSerial * MS_PER_DAY);
 }
 
 /**
@@ -56,7 +56,7 @@ export function serialToDate(serial: number): Date {
  * and later it is the real date's. Only the weekday of the result is meaningful.
  */
 export function serialToWeekdayDate(serial: number): Date {
- return new Date(EPOCH_MS + (serial - 1) * MS_PER_DAY);
+  return new Date(EPOCH_MS + (serial - 1) * MS_PER_DAY);
 }
 
 /**
@@ -67,32 +67,32 @@ export function serialToWeekdayDate(serial: number): Date {
  * two-digit years, since `Date.UTC` would remap 0–99 into 1900–1999.
  */
 function componentsToSerial(
- year: number,
- month: number,
- day: number,
- hour: number,
- minute: number,
- second: number,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
 ): number | null {
- if (month < 1 || month > 12) return null;
- if (day < 1 || day > 31) return null;
- if (hour > 23 || minute > 59 || second > 59) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (hour > 23 || minute > 59 || second > 59) return null;
 
- if (year === 1900 && month === 2 && day === 29) {
-  return FICTIONAL_LEAP_DAY_SERIAL + (hour * 3600 + minute * 60 + second) / 86_400;
- }
+  if (year === 1900 && month === 2 && day === 29) {
+    return FICTIONAL_LEAP_DAY_SERIAL + (hour * 3600 + minute * 60 + second) / 86_400;
+  }
 
- const ms = Date.UTC(year, month - 1, day, hour, minute, second);
- const check = new Date(ms);
- if (
-  check.getUTCFullYear() !== year ||
-  check.getUTCMonth() !== month - 1 ||
-  check.getUTCDate() !== day
- ) {
-  return null;
- }
+  const ms = Date.UTC(year, month - 1, day, hour, minute, second);
+  const check = new Date(ms);
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    return null;
+  }
 
- return dateToSerial(new Date(ms));
+  return dateToSerial(new Date(ms));
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -115,50 +115,50 @@ const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
  * to a text literal.
  */
 export function parseDateInput(raw: string): number | null {
- const s = raw.trim();
+  const s = raw.trim();
 
- const dateTime = ISO_DATETIME.exec(s);
- if (dateTime) {
-  return componentsToSerial(
-   Number(dateTime[1]),
-   Number(dateTime[2]),
-   Number(dateTime[3]),
-   Number(dateTime[4]),
-   Number(dateTime[5]),
-   dateTime[6] ? Number(dateTime[6]) : 0,
-  );
- }
-
- const date = ISO_DATE.exec(s);
- if (date) {
-  return componentsToSerial(Number(date[1]), Number(date[2]), Number(date[3]), 0, 0, 0);
- }
-
- const slash = SLASH_DATE.exec(s);
- if (slash) {
-  const a = Number(slash[1]);
-  const b = Number(slash[2]);
-  const year = Number(slash[3]);
-
-  let month: number;
-  let day: number;
-  if (a > 12 && b <= 12) {
-   // dd/mm/yyyy — the first field cannot be a month.
-   day = a;
-   month = b;
-  } else if (a <= 12 && b <= 12) {
-   // Ambiguous or mm/dd/yyyy — default to month-first (US locale).
-   month = a;
-   day = b;
-  } else {
-   // b > 12 with a ≤ 12 is mm/dd; anything else (both > 12) is invalid.
-   if (a > 12) return null;
-   month = a;
-   day = b;
+  const dateTime = ISO_DATETIME.exec(s);
+  if (dateTime) {
+    return componentsToSerial(
+      Number(dateTime[1]),
+      Number(dateTime[2]),
+      Number(dateTime[3]),
+      Number(dateTime[4]),
+      Number(dateTime[5]),
+      dateTime[6] ? Number(dateTime[6]) : 0,
+    );
   }
 
-  return componentsToSerial(year, month, day, 0, 0, 0);
- }
+  const date = ISO_DATE.exec(s);
+  if (date) {
+    return componentsToSerial(Number(date[1]), Number(date[2]), Number(date[3]), 0, 0, 0);
+  }
 
- return null;
+  const slash = SLASH_DATE.exec(s);
+  if (slash) {
+    const a = Number(slash[1]);
+    const b = Number(slash[2]);
+    const year = Number(slash[3]);
+
+    let month: number;
+    let day: number;
+    if (a > 12 && b <= 12) {
+      // dd/mm/yyyy — the first field cannot be a month.
+      day = a;
+      month = b;
+    } else if (a <= 12 && b <= 12) {
+      // Ambiguous or mm/dd/yyyy — default to month-first (US locale).
+      month = a;
+      day = b;
+    } else {
+      // b > 12 with a ≤ 12 is mm/dd; anything else (both > 12) is invalid.
+      if (a > 12) return null;
+      month = a;
+      day = b;
+    }
+
+    return componentsToSerial(year, month, day, 0, 0, 0);
+  }
+
+  return null;
 }
