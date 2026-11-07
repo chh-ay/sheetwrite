@@ -67,7 +67,10 @@ function Verdict({ report }: Readonly<{ report: RejectionReport | null | undefin
 function AttackTable({ rows }: Readonly<{ rows: readonly AttackRow[] }>) {
   return (
     <div className="sw-si-tablewrap">
-      <table className="sw-si-table sw-si-attacks" data-testid="interop-hostile-table">
+      <table
+        className="sw-si-table sw-si-table--stack sw-si-attacks"
+        data-testid="interop-hostile-table"
+      >
         <caption className="sw-visually-hidden">
           Hostile packages and over-limit inputs, with the error each import raised
         </caption>

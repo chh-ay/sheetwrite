@@ -2250,6 +2250,7 @@
 
 .sw-si-lab-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sw-space-4);
   min-width: 0;
 }
@@ -2259,6 +2260,15 @@
   margin: 0;
   color: var(--sw-fg-muted);
   line-height: var(--sw-leading-body);
+}
+
+/* Paths and package names wrap rather than widen the panel on a phone. */
+.sw-si-lab-body__lede code {
+  overflow-wrap: anywhere;
+}
+
+.sw-si-table .sw-si-copy code {
+  white-space: nowrap;
 }
 
 .sw-si-lab-body__title {
@@ -2480,7 +2490,7 @@
 }
 
 .sw-si-labs .sw-si-compat > .sw-si-tablewrap {
-  max-height: 40rem;
+  max-height: none;
   border: 0;
   border-right: var(--sw-border-width) solid var(--sw-border);
   border-radius: 0;
@@ -2895,5 +2905,36 @@
 
   .sw-si-lab-panel {
     padding: var(--sw-space-4);
+  }
+
+  /* Phones: each table row becomes a short stack of its cells. */
+  .sw-si-table--stack,
+  .sw-si-table--stack tbody {
+    display: block;
+  }
+
+  .sw-si-table--stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .sw-si-table--stack tr {
+    display: grid;
+    gap: var(--sw-space-1);
+    padding: var(--sw-space-3);
+    border-top: var(--sw-border-width) solid var(--sw-border);
+  }
+
+  .sw-si-table--stack tbody tr:first-child {
+    border-top: 0;
+  }
+
+  .sw-si-table--stack :is(th, td) {
+    display: block;
+    padding: 0;
+    border: 0;
   }
 }

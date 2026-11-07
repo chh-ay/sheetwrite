@@ -59,7 +59,7 @@ export function OperationEvidence({
               </ul>
             </header>
             <div className="sw-si-tablewrap">
-              <table className="sw-si-table">
+              <table className="sw-si-table sw-si-table--stack">
                 <caption className="sw-visually-hidden">
                   The warnings {warningLog.operation} reported
                 </caption>

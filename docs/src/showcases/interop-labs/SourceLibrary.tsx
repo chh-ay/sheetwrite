@@ -106,7 +106,7 @@ function FixtureCard({
 function ProducerTable() {
   return (
     <div className="sw-si-tablewrap">
-      <table className="sw-si-table" data-testid="interop-producer-matrix">
+      <table className="sw-si-table sw-si-table--stack" data-testid="interop-producer-matrix">
         <caption>Results by producing application</caption>
         <thead>
           <tr>
