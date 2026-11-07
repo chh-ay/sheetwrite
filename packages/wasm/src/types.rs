@@ -18,6 +18,15 @@ pub(crate) const KIND_STRING: u8 = 2;
 pub(crate) const KIND_BOOL: u8 = 3;
 pub(crate) const KIND_FORMULA: u8 = 4;
 
+/// The bits the literal kinds use: every literal kind is at most this value,
+/// and every other kind (a formula, or a calculated slot) sets a higher bit,
+/// so one OR over a run of kind bytes tells whether it holds only literals.
+pub(crate) const LITERAL_KIND_BITS: u8 = 0b11;
+const _: () = assert!(
+    KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL == LITERAL_KIND_BITS
+        && KIND_FORMULA & !LITERAL_KIND_BITS != 0
+);
+
 pub(crate) const NO_STRING: u32 = u32::MAX;
 /// Bounds dependency/evaluation recursion; deeper formulas resolve to `#NUM!`.
 pub(crate) const FORMULA_RECURSION_LIMIT: usize = 256;

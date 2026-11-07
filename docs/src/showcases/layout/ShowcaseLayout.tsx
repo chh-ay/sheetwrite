@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { type ComponentType, Fragment, type ReactNode, useMemo } from "react";
 
 import { Icon } from "../../components/Icon.js";
 import { SiteTopbar } from "../../components/SiteTopbar.js";
@@ -11,6 +11,8 @@ export interface ShowcaseFact {
   readonly label: string;
   /** The value, read from the showcase's data or a generated source; never typed by hand. */
   readonly value: string;
+  /** The value is a code token, such as a package path: set in the code face, it wraps only after a "/". */
+  readonly code?: boolean;
 }
 
 /** The code that produced the demo: an MDX snippet, highlighted at build time. */
@@ -116,10 +118,28 @@ function ShowcaseFacts({ facts }: { readonly facts: readonly ShowcaseFact[] }) {
       {facts.map((fact) => (
         <div className="sw-showcase__fact" key={fact.label}>
           <dt>{fact.label}</dt>
-          <dd>{fact.value}</dd>
+          <dd>{fact.code === true ? <CodeFactValue value={fact.value} /> : fact.value}</dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+/** A package path that may wrap after each "/", never inside a name. */
+function CodeFactValue({ value }: { readonly value: string }) {
+  return (
+    <code>
+      {value.split("/").map((part, index) => (
+        <Fragment key={`${index}:${part}`}>
+          {index > 0 && (
+            <>
+              /<wbr />
+            </>
+          )}
+          {part}
+        </Fragment>
+      ))}
+    </code>
   );
 }
 
@@ -131,6 +151,9 @@ function ShowcaseCodeBlock({
   readonly guide: ShowcaseGuide | undefined;
 }) {
   const { Snippet } = code;
+  // Live demos re-render their page many times a second. The highlighted
+  // snippet never changes, so its element is kept and React skips it.
+  const snippet = useMemo(() => <Snippet />, [Snippet]);
   return (
     <section aria-labelledby="showcase-code-title" className="sw-showcase__code">
       <header className="sw-showcase__section-header">
@@ -146,7 +169,7 @@ function ShowcaseCodeBlock({
           </a>
         )}
       </header>
-      <Snippet />
+      {snippet}
     </section>
   );
 }

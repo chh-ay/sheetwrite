@@ -17,14 +17,20 @@ export type CapabilityOwnerId =
   | "database"
   | "interoperability"
   | "formatting"
-  | "engine"
   | "formulas"
   | "performance"
   | "collaboration"
   | "data-tools"
   | "host-rows"
   | "spreadsheet"
-  | "analysis";
+  | "analysis"
+  | "sort"
+  | "queries"
+  | "data-model"
+  | "version-history"
+  | "functions"
+  | "recalculation"
+  | "dashboards";
 
 export type CapabilityArea =
   | "editing"
@@ -142,15 +148,6 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     kind: "capability",
   },
   {
-    id: "engine",
-    label: "Live engine view",
-    href: "/showcases/engine/",
-    routeFile: "docs/src/routes/showcases.engine.tsx",
-    responsibility:
-      "One real paged formula Grid with bounded request, result, formula, resource, drawing, and host-save events.",
-    kind: "capability",
-  },
-  {
     id: "formulas",
     label: "Formula analysis",
     href: "/showcases/formulas/",
@@ -213,10 +210,72 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
       "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
     kind: "capability",
   },
+  {
+    id: "sort",
+    label: "Sort in place",
+    href: "/showcases/sort/",
+    routeFile: "docs/src/routes/showcases.sort.tsx",
+    responsibility:
+      "Excel's in-place sort of a range by several keys, the Sort panel, and the view-only sort, with formulas that read the sorted cells.",
+    kind: "capability",
+  },
+  {
+    id: "queries",
+    label: "Saved queries",
+    href: "/showcases/queries/",
+    routeFile: "docs/src/routes/showcases.queries.tsx",
+    responsibility:
+      "Power Query-style saved queries over host-loaded CSV and JSON sources: steps, merge, group, refresh into tables, and Queries & Connections.",
+    kind: "capability",
+  },
+  {
+    id: "data-model",
+    label: "Data model",
+    href: "/showcases/data-model/",
+    routeFile: "docs/src/routes/showcases.data-model.tsx",
+    responsibility:
+      "Relationships between workbook tables, key checks, pivots over fields of related tables, measures, GETPIVOTDATA over a model pivot, and the Relationships panel.",
+    kind: "capability",
+  },
+  {
+    id: "version-history",
+    label: "Version history",
+    href: "/showcases/version-history/",
+    routeFile: "docs/src/routes/showcases.version-history.tsx",
+    responsibility:
+      "History archives journaled by the document authority: named versions, authors, compare with the current document, restore of a range or a sheet, and the Version History panel.",
+    kind: "capability",
+  },
+  {
+    id: "functions",
+    label: "Excel functions",
+    href: "/showcases/functions/",
+    routeFile: "docs/src/routes/showcases.functions.tsx",
+    responsibility:
+      "The function families 0.7.0 adds: engineering, financial, statistics, information, math and text, LOOKUP and TRIMRANGE, GETPIVOTDATA, regex, and references to other workbooks.",
+    kind: "capability",
+  },
+  {
+    id: "recalculation",
+    label: "Live recalculation",
+    href: "/showcases/recalculation/",
+    routeFile: "docs/src/routes/showcases.recalculation.tsx",
+    responsibility:
+      "Recalculation timed in the browser: one edit under 100,000 formulas, 1,000 lookups over 100,000 rows, and the order of edit, results and paint.",
+    kind: "capability",
+  },
+  {
+    id: "dashboards",
+    label: "Dashboards",
+    href: "/showcases/dashboards/",
+    routeFile: "docs/src/routes/showcases.dashboards.tsx",
+    responsibility:
+      "Dashboard sheets of KPI cards, slicers, PivotCharts and pivots on a twelve-column grid: slicers filter them together; move, resize and add items, each one undo step.",
+    kind: "capability",
+  },
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
-const ENGINE_LIVE_SCENARIO = "docs/src/showcases/scenarios/engine-live.ts";
 const FORMULAS_SCENARIO = "docs/src/showcases/scenarios/formulas.ts";
 const ANALYTICS_SCENARIO = "docs/src/showcases/scenarios/analytics.ts";
 const BUSINESS_SCENARIO = "docs/src/showcases/scenarios/business.ts";
@@ -234,7 +293,6 @@ const VUE_SPEC = "test/browser/vue-workbench.spec.ts";
 const SVELTE_SPEC = "test/browser/svelte-workbench.spec.ts";
 const INTEROP_SPEC = "test/browser/showcase-interoperability.spec.ts";
 const PERFORMANCE_SPEC = "test/browser/showcase-performance.spec.ts";
-const ENGINE_LIVE_SPEC = "test/browser/showcase-engine.spec.ts";
 const FORMULAS_SPEC = "test/browser/showcase-formulas.spec.ts";
 const DATABASE_COLLAB_SPEC = "test/browser/database-collaboration.spec.ts";
 const LIFECYCLE_SPEC = "test/browser/framework-lifecycle.spec.ts";
@@ -541,6 +599,111 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
     boundary:
       "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
+  },
+  {
+    id: "data.sort-in-place",
+    title: "Sort in place",
+    area: "modeling",
+    primary: "sort",
+    interaction:
+      "Sort 40 orders in place by one or two keys, then sort the view only; formulas that read row 1 follow the in-place sort and keep their value under the view sort.",
+    scope: "browser",
+    accessibility:
+      "Labeled buttons, a polite status of moved rows, and the formula results as text in the side panel.",
+    testPath: "test/browser/showcase-sort.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/sort.ts"],
+    boundary:
+      "Sorting runs on the client document; servers that validate operations must accept `permuteRows` and the `sort` commit reason.",
+  },
+  {
+    id: "data.saved-queries",
+    title: "Saved queries and refresh",
+    area: "modeling",
+    primary: "queries",
+    interaction:
+      "Refresh two saved queries into tables, add orders to the host feed, change a filter step and refresh again; formulas over the output tables follow, and undo fetches nothing.",
+    scope: "browser",
+    accessibility:
+      "Labeled buttons and radio group, a polite refresh status, and the formula results as text.",
+    testPath: "test/browser/showcase-queries.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/queries.ts"],
+    boundary:
+      "Source fetching, credentials and network policy are host-owned; the session never calls fetch itself.",
+  },
+  {
+    id: "modeling.dashboards",
+    title: "Dashboards",
+    area: "modeling",
+    primary: "dashboards",
+    interaction:
+      "Keep one region in the Region slicer and read the filtered pivot total, swap the chart and the pivot, add a pivot item and undo; drag or use the item's actions menu with the arrow keys to move and resize items.",
+    scope: "browser",
+    accessibility:
+      "Items have keyboard Move and Resize from their actions menu; the saved layout is text in the side panel.",
+    testPath: "test/browser/showcase-dashboards.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/dashboards.ts"],
+    boundary:
+      "Dashboard pivots, charts and KPI cards need the full engine and the charts package; Excel receives a static worksheet.",
+  },
+  {
+    id: "modeling.data-model",
+    title: "Data model and measures",
+    area: "modeling",
+    primary: "data-model",
+    secondary: [
+      { owner: "analysis", reason: "Single-table pivots and their charts stay on Analysis." },
+    ],
+    interaction:
+      "Switch the model pivot's rows between fields of two related tables, repeat a lookup key and orphan an order, and read the key status and the GETPIVOTDATA totals.",
+    scope: "browser",
+    accessibility:
+      "Each relationship's key status is a polite status badge; the pivot totals are text in the side panel.",
+    testPath: "test/browser/showcase-data-model.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/data-model.ts"],
+    boundary:
+      "Key checks and model pivots run in the full engine; Excel's data model binary is not written, so Excel opens an exported file without relationships.",
+  },
+  {
+    id: "persistence.version-history",
+    title: "Version history",
+    area: "persistence",
+    primary: "version-history",
+    secondary: [
+      {
+        owner: "collaboration",
+        reason: "Collaboration shows the sync protocol whose commits the archive records.",
+      },
+    ],
+    interaction:
+      "Edit as yourself and as a second author, save a version, compare the approved version with the current document by author, then restore a range and the sheet.",
+    scope: "browser",
+    accessibility:
+      "Labeled buttons; versions and changed cells are text lists with the author of each.",
+    testPath: "test/browser/showcase-version-history.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/version-history.ts"],
+    boundary:
+      "The page's authority and archive live in memory; a real host keeps commits and the journal in one database transaction.",
+  },
+  {
+    id: "formulas.excel-function-families",
+    title: "Excel function families",
+    area: "modeling",
+    primary: "functions",
+    secondary: [
+      {
+        owner: "formulas",
+        reason: "Formula analysis keeps grouping, dynamic arrays and LAMBDA over a ledger.",
+      },
+    ],
+    interaction:
+      "Pick a function family, change its first input, and read each live result; references to other workbooks keep their text and show #REF!.",
+    scope: "browser",
+    accessibility:
+      "The family is a labeled select, the input a labeled field, and every result is text in the side panel.",
+    testPath: "test/browser/showcase-functions.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/functions.ts"],
+    boundary:
+      "Most families run only in the full engine; values for links to other workbooks are not loaded yet.",
   },
   {
     id: "workflow.ribbon",
@@ -1055,18 +1218,18 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
 
   {
     id: "lifecycle.engine-events",
-    title: "Live engine events",
+    title: "Recalculation, results and paint in order",
     area: "lifecycle",
-    primary: "engine",
+    primary: "recalculation",
     interaction:
-      "Jump, edit, undo, change the drawing path, and save; the working Grid changes before its bounded text record updates.",
-    scope: "browser+worker",
+      "Change the cell that 100,000 formulas read, or move 1,000 lookups; the side panel lists when the edit was applied, its results were readable and the next frame was painted.",
+    scope: "browser",
     accessibility:
-      "Every visual lane has matching text, and play, pause, step, reset, and speed controls work from the keyboard.",
-    testPath: ENGINE_LIVE_SPEC,
-    sharedModules: [ENGINE_LIVE_SCENARIO],
+      "Every timing and the event order are text in the side panel; the bars are decorative.",
+    testPath: "test/browser/showcase-recalculation.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/recalculation.ts"],
     boundary:
-      "Sheetwrite reports Grid work; the host decides when to save and what an acknowledgement means.",
+      "Timings depend on the reader's device and browser; the release benchmarks measure fixed machines.",
   },
   {
     id: "workflow.host-owned-rows",

@@ -1,0 +1,30 @@
+```ts prelude="core" title="recalculation.ts"
+// 5,000 rows of SKU, price and units, each with a revenue formula such as
+// =B1*C1*(1+$G$1) that reads the price-change cell G1
+declare function orderBlock(start: number, rows: number): PackedCellBlock;
+
+// The grid mounts empty; the rows follow in blocks with a yield between them,
+// so the page paints and takes input while 100,000 formulas load
+const grid = createGrid(host, { workbook });
+for (let start = 0; start < 100_000; start += 5_000) {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  grid.applyRemoteOperations([
+    {
+      op: "setBlock",
+      range: { sheet: "model", start: { row: start, col: 0 }, end: { row: start + 4_999, col: 3 } },
+      block: orderBlock(start, 5_000),
+    },
+  ]);
+}
+
+// One edit, timed until a dependent total is readable, then until the next frame
+const started = performance.now();
+grid.applyTransaction({
+  patches: [{ op: "set", addr: { sheet: "model", row: 0, col: 6 }, value: { kind: "literal", value: 0.05 } }],
+});
+grid.store.getCell({ sheet: "model", row: 1, col: 6 }).resolved;
+const recalcMs = performance.now() - started;
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => console.info({ recalcMs, paintedMs: performance.now() - started })),
+);
+```

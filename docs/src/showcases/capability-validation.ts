@@ -136,6 +136,24 @@ export function collectMissingCapabilityFiles(
   return issues;
 }
 
+/**
+ * A merged showcase must redirect to a registered showcase, and must not be
+ * registered itself: the old address would then never redirect.
+ */
+export function collectMovedShowcaseIssues(
+  moved: Readonly<Record<string, string>>,
+  owners: readonly CapabilityOwner[],
+): string[] {
+  const hrefs = new Set(owners.map((owner) => owner.href));
+  const issues: string[] = [];
+  for (const [from, to] of Object.entries(moved)) {
+    if (hrefs.has(from)) issues.push(`moved showcase ${from} is still a registered showcase`);
+    if (!hrefs.has(to))
+      issues.push(`moved showcase ${from} redirects to an unknown showcase ${to}`);
+  }
+  return issues;
+}
+
 /** Browser-safe assertion used at /showcases/ module scope: throw = no ship. */
 export function assertCapabilityInventory(
   inventory: readonly Capability[],

@@ -234,6 +234,14 @@ impl FormulaStore {
         }
     }
 
+    /// Every occupied slot with its location, for invariant checks.
+    #[cfg(test)]
+    pub(crate) fn occupied(&self) -> impl Iterator<Item = (FormulaId, AbsCellKey)> + '_ {
+        (0..self.locations.len() as u32)
+            .map(FormulaId)
+            .filter_map(|id| Some((id, self.location(id).filter(|_| self.get(id).is_some())?)))
+    }
+
     /// Resolve moved cells without keeping pointers in a pass worklist.
     #[inline]
     pub(crate) fn location(&self, id: FormulaId) -> Option<AbsCellKey> {

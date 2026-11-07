@@ -12,8 +12,7 @@ use super::{EvalPass, LiteralSources};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
-    RANGE_CELL_LIMIT,
+    CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, LITERAL_KIND_BITS, RANGE_CELL_LIMIT,
 };
 
 #[cfg(test)]
@@ -133,11 +132,10 @@ impl<'a> RangeReader<'a> {
             let (kinds, payloads) = column.raw_slices();
             let kinds = kinds.get(rows.clone())?;
 
-            // A raw empty kind without the calculated bit is a plain blank.
-            if !kinds
-                .iter()
-                .all(|&kind| matches!(kind, KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL))
-            {
+            // Literal kinds are 0..=3 (a raw empty kind without the calculated
+            // bit is a plain blank). Any other kind sets a higher bit, so one
+            // OR over the column decides it without a branch per cell.
+            if kinds.iter().fold(0, |any, &kind| any | kind) & !LITERAL_KIND_BITS != 0 {
                 return None;
             }
 

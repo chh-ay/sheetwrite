@@ -5,6 +5,7 @@ import {
   lazy,
 } from "react";
 
+import { normalizeDocumentHref } from "./document-href.js";
 import type { OutlineItem } from "./outline.js";
 
 export interface DocumentFrontmatter {
@@ -14,6 +15,8 @@ export interface DocumentFrontmatter {
   kind?: string;
   /** The page's outline, collected at build time; see lib/outline.ts. */
   outline?: readonly OutlineItem[];
+  /** Set on pages the docs generator writes; see `markGeneratedPages` in lib/generated-content.ts. */
+  generated?: boolean;
 }
 
 /** Element overrides and build-inserted components a compiled MDX document uses. */
@@ -21,8 +24,10 @@ export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
   /** Install fences become this terminal at build time; see vite.config.ts. */
   PackageCommand?: ComponentType<{ packages: string; note?: string }>;
-  /** A formula family's table and filter; see FormulaReference.tsx. */
-  FormulaReference?: ComponentType<{ family: string }>;
+  /** A formula family's table and filter, loaded with its page; see FormulaReference.tsx. */
+  FormulaReference?: LazyExoticComponent<ComponentType<{ family: string }>>;
+  /** A Performance page's figure, a static HTML asset, loaded with its page; see PerfFigure.tsx. */
+  PerfFigure?: LazyExoticComponent<ComponentType<{ name: string }>>;
 }
 
 type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;
@@ -38,9 +43,15 @@ interface DocumentSource {
   component: LazyExoticComponent<DocumentComponent>;
   fallbackTitle: string;
   load: () => Promise<DocumentModule>;
+  /** The glob key, `../content/docs/<page>.md`, relative to `docs/src/lib`. */
+  key: string;
 }
 
-export type DocumentRecord = DocumentFrontmatter & { stylesheets: readonly string[] };
+export type DocumentRecord = DocumentFrontmatter & {
+  stylesheets: readonly string[];
+  /** The page's source file in the repository; generated pages have none. */
+  sourcePath: string | undefined;
+};
 
 const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
@@ -57,18 +68,12 @@ const DOCUMENT_SOURCES: ReadonlyMap<string, DocumentSource> = new Map(
     const href = hrefFromSource(source);
     const fallbackTitle =
       href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite";
-    return [href, { component: lazy(load), fallbackTitle, load }];
+    return [href, { component: lazy(load), fallbackTitle, load, key: source }];
   }),
 );
 
 /** Modules `documentForSplat` has loaded, by page: the static docs render reads them synchronously. */
 const LOADED_MODULES = new Map<string, DocumentModule>();
-
-export function normalizeDocumentHref(splat: string | undefined): string {
-  const path = splat?.replace(/^\/+|\/+$/g, "") ?? "";
-  return `/docs/${path}${path.length === 0 ? "" : "/"}`;
-}
-
 export async function documentForSplat(
   splat: string | undefined,
 ): Promise<DocumentRecord | undefined> {
@@ -82,6 +87,7 @@ export async function documentForSplat(
     description: module.frontmatter?.description ?? "Sheetwrite documentation.",
     kind: module.frontmatter?.kind,
     outline: module.frontmatter?.outline ?? [],
+    sourcePath: module.frontmatter?.generated ? undefined : source.key.replace("..", "docs/src"),
     stylesheets: module.stylesheets ?? [],
   };
 }

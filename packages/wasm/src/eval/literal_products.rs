@@ -18,7 +18,7 @@ use crate::calc::Ast;
 use crate::cells::{payload_num, payload_str_id};
 use crate::store::CellStore;
 use crate::types::{
-    string_from_pool_ref, EvalResult, FormulaError, Value, KIND_NUMBER, KIND_STRING,
+    string_from_pool_ref, EvalResult, FormulaError, Value, KIND_EMPTY, KIND_NUMBER, KIND_STRING,
 };
 
 #[cfg(test)]
@@ -56,6 +56,16 @@ impl CellStore {
 
         #[cfg(test)]
         KERNEL_RESULTS.with(|calls| calls.set(calls.get() + 1));
+
+        // Single columns of numbers and blanks go to `number_columns_total`.
+        // Its only errors are a non-finite input, product or total, and each of
+        // them leaves the total non-finite (an infinity stays infinite or
+        // turns into NaN), which `Value::number` reads as `#NUM!`.
+        if cols == 1 {
+            if let Some(total) = number_columns_total(&ranges, rows) {
+                return Some(Value::number(total));
+            }
+        }
 
         let mut total = 0.0;
         for row in 0..rows {
@@ -98,6 +108,57 @@ impl CellStore {
     }
 }
 
+// The slice loop tells empty and number kinds apart from the rest by their
+// bits alone.
+const _: () = assert!(KIND_EMPTY == 0 && KIND_NUMBER == 1);
+
+/// The `SUMPRODUCT` total of single columns that hold only numbers and
+/// blanks, a blank counting as zero, with the products and the running total
+/// in the item loop's order. `None` when a column holds anything else.
+#[inline(never)]
+fn number_columns_total(ranges: &[LiteralColumns<'_>], rows: usize) -> Option<f64> {
+    let mut columns = Vec::new();
+    columns.try_reserve_exact(ranges.len()).ok()?;
+    for range in ranges {
+        let &(kinds, payloads) = range.columns.first()?;
+        let kinds = kinds.get(..rows)?;
+        let payloads = payloads.get(..rows)?;
+        if kinds.iter().fold(0, |any, &kind| any | kind) & !KIND_NUMBER != 0 {
+            return None;
+        }
+        columns.push((kinds, payloads));
+    }
+
+    let factor = |kind: u8, payload: u64| {
+        if kind == KIND_NUMBER {
+            payload_num(payload)
+        } else {
+            0.0
+        }
+    };
+    let mut total = 0.0;
+
+    // Two ranges are the common call; zipped slices need no index checks.
+    // `1.0 * a * b` rounds as `a * b`, so the product matches the item loop.
+    if let [(left_kinds, left_payloads), (right_kinds, right_payloads)] = columns[..] {
+        let left = left_kinds.iter().zip(left_payloads);
+        let right = right_kinds.iter().zip(right_payloads);
+        for ((&left_kind, &left), (&right_kind, &right)) in left.zip(right) {
+            total += factor(left_kind, left) * factor(right_kind, right);
+        }
+        return Some(total);
+    }
+
+    for row in 0..rows {
+        let mut product = 1.0;
+        for &(kinds, payloads) in &columns {
+            product *= factor(kinds[row], payloads[row]);
+        }
+        total += product;
+    }
+    Some(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::KERNEL_RESULTS;
@@ -109,6 +170,8 @@ mod tests {
 
     /// Columns A–F mixing numbers, text, booleans and blanks; B also holds a
     /// non-finite number and F numbers large enough to overflow a product.
+    /// G and H hold only numbers and blanks, with a non-finite number in H's
+    /// last rows.
     fn mixed_store() -> (CellStore, usize) {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(12, ROWS + 2);
@@ -128,8 +191,15 @@ mod tests {
                 }
             }
             store.set_number(sheet, row, 5, 1e200, 0);
+            if row % 4 != 1 {
+                store.set_number(sheet, row, 6, row as f64 * 0.3 - 2.0, 0);
+            }
+            if row % 3 != 2 {
+                store.set_number(sheet, row, 7, 1.0 / (row as f64 + 1.5), 0);
+            }
         }
         store.set_number(sheet, 17, 1, f64::NAN, 0);
+        store.set_number(sheet, ROWS - 3, 7, f64::INFINITY, 0);
         (store, sheet)
     }
 
@@ -146,6 +216,11 @@ mod tests {
             format!("=SUMPRODUCT(F1:F{last},F1:F{last})"),
             format!("=SUMPRODUCT(D1:E{last})"),
             format!("=SUMPRODUCT(A1:A{last},C1:C{half})"),
+            // Number-only columns.
+            format!("=SUMPRODUCT(G1:G{half},H1:H{half})"),
+            format!("=SUMPRODUCT(G1:G{last},H1:H{last})"),
+            format!("=SUMPRODUCT(G1:G{half})"),
+            format!("=SUMPRODUCT(G1:G{half},H1:H{half},G1:G{half})"),
             // A lone cell is a scalar argument: its numeric text counts.
             "=SUMPRODUCT(A1,F1)".to_owned(),
             "=SUMPRODUCT(A1,C1)".to_owned(),

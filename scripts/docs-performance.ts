@@ -4,9 +4,14 @@ import { join, relative, resolve } from "node:path";
 import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import { DATA_GATE_PROTOCOL_VERSION } from "../bench/src/gate-protocol.js";
 import { median } from "../bench/src/stats.js";
+import { inlineIcon } from "../docs/src/icons/inline-icon.js";
 import { formatTimes, type PerfRow, type PerfStat } from "../docs/src/lib/perf-bars.js";
 import type { ChangeMachine } from "../docs/src/lib/release-change.js";
-import { STORY_CATEGORIES, type StoryMachine } from "../docs/src/lib/speedup-story.js";
+import {
+  renderSpeedupStory,
+  STORY_CATEGORIES,
+  type StoryMachine,
+} from "../docs/src/lib/speedup-story.js";
 import { exists, frontmatter, posix, repositoryRoot } from "./docs-shared.js";
 import {
   allMeasurements,
@@ -169,11 +174,10 @@ export async function renderLandingStory(): Promise<string> {
   );
   return scale.machines.length === 0
     ? ""
-    : speedStory({
-        id: "story",
-        baseName: "Handsontable",
-        machines: storyMachines(scale.machines),
-      });
+    : renderSpeedupStory(
+        { id: "story", baseName: "Handsontable", machines: storyMachines(scale.machines) },
+        (name) => inlineIcon(name),
+      );
 }
 
 /** Download sizes on the landing page, Brotli-compressed as browsers fetch them. */
@@ -717,7 +721,7 @@ function benchMethod(
 }
 
 const RENDER_METHOD = benchMethod(
-  "Methodology - what each scenario does",
+  "Methodology: what each scenario does",
   [
     "Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.",
     "Each measured sample repeats one logical action until it covers at least 100 ms of measured time, so timer resolution and scheduler jitter cannot decide a sample. Every raw sample is retained in the artifact.",
@@ -760,7 +764,7 @@ const RENDER_METHOD = benchMethod(
 );
 
 const DATA_METHOD = benchMethod(
-  "Methodology - what each operation does",
+  "Methodology: what each operation does",
   [
     "Identical columnar datasets, per-operation warmup and iteration plans. Fresh instance per ingest; window reads rotate offsets to defeat caches; sort and filter reset between runs; Handsontable edits run with rendering suspended so only its data path is timed.",
     "Memory = JS-heap delta around one ingest in an isolated subprocess, plus Sheetwrite's WASM linear-memory delta.",
@@ -776,7 +780,7 @@ const DATA_METHOD = benchMethod(
 );
 
 const FORMULA_METHOD = benchMethod(
-  "Methodology - what each workload does",
+  "Methodology: what each workload does",
   [
     "Each workload builds a fresh WASM cell-store of the named dependency shape and times the recalculation from one action - usually a single edit. Sizes are formula-cell counts; bright = median, faded = p95.",
   ],
@@ -1746,7 +1750,7 @@ function liftHeadings(markdown: string): string {
  */
 export function splitPerformancePages(
   evidence: string,
-): Array<{ readonly route: string; readonly content: string }> {
+): Array<{ readonly slug: string; readonly route: string; readonly content: string }> {
   const sections = new Map<string, string>();
   for (const part of evidence.split(/^(?=## )/m)) {
     if (!part.startsWith("## ")) continue;
@@ -1771,6 +1775,7 @@ export function splitPerformancePages(
           ? liftHeadings((present[0] ?? "").replace(/^## [^\n]*\n+/, ""))
           : present.join("\n\n");
     return {
+      slug: page.slug,
       route: `performance/${page.slug}.md`,
       content: `${frontmatter(page.title, page.description)}${body}\n`,
     };
@@ -1793,7 +1798,7 @@ export function splitPerformancePages(
     ),
     "",
   ].join("\n");
-  return [{ route: "performance/index.md", content: overview }, ...pages];
+  return [{ slug: "index", route: "performance/index.md", content: overview }, ...pages];
 }
 
 /** Every benchmark and delivery section as `##` Markdown; `splitPerformancePages` publishes it. */
