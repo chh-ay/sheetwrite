@@ -1,5 +1,5 @@
 import { Select } from "@kobalte/core/select";
-import { createSignal } from "solid-js";
+import { createSignal, createUniqueId, type JSX } from "solid-js";
 
 import { Icon } from "./Icon.js";
 
@@ -27,12 +27,30 @@ interface DemoSelectProps {
 /** Gap between the field and its list, as the React version's `sideOffset`. */
 const LIST_OFFSET_PX = 4;
 
+/**
+ * The trigger's element. Kobalte links the field to its label and value in
+ * effects, which run only in the browser, so the server markup would have an
+ * unnamed field. Islands that hydrate on first use show that markup until the
+ * reader reaches for them; this names the field there with the ids Kobalte
+ * derives from the select's id, which its own value replaces once it runs.
+ */
+function namedTrigger(selectId: string) {
+  return (props: JSX.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button
+      {...props}
+      aria-labelledby={props["aria-labelledby"] ?? `${selectId}-label ${selectId}-value`}
+    />
+  );
+}
+
 export function DemoSelect(props: DemoSelectProps) {
   const [open, setOpen] = createSignal(false);
+  const selectId = `select-${createUniqueId()}`;
   const selected = () => props.options.find((option) => option.value === props.value);
   return (
     <div class={["sw-demo-select", props.class].filter(Boolean).join(" ")}>
       <Select<DemoSelectOption>
+        id={selectId}
         disabled={props.disabled}
         // Open below the field like a menu, never over it.
         gutter={LIST_OFFSET_PX}
@@ -62,6 +80,7 @@ export function DemoSelect(props: DemoSelectProps) {
           React version's popup does.
         */}
         <Select.Trigger
+          as={namedTrigger(selectId)}
           class="sw-demo-select__trigger"
           data-popup-open={open() ? "" : undefined}
           role="combobox"

@@ -68,13 +68,15 @@ export function PackageCommand(props: ComponentProps<typeof PackageCommandView>)
  */
 export function FormulaReference(props: { readonly family: string }): JSX.Element {
   const table = formulaTableHtml(props.family);
+  // One row per function (docs/src/lib/formula-tables.ts marks each with its name).
+  const total = table?.match(/\bdata-formula-name="/g)?.length ?? 0;
   return (
     <div class="sw-formula-reference">
       <Island
         component={FormulaFilter}
         hydrate="interaction"
         name="formula-reference"
-        props={{ family: props.family }}
+        props={{ family: props.family, total }}
       />
       <Show
         fallback={<p>The function table did not load. Reload the page to see it.</p>}

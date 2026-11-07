@@ -21,7 +21,11 @@ export function formulaTableId(family: string): string {
 }
 
 /** The find field, the engine select and the match count over the family's table. */
-export function FormulaFilter(props: { readonly family: string }) {
+export function FormulaFilter(props: {
+  readonly family: string;
+  /** The table's function count, so the server markup shows the count hydration keeps. */
+  readonly total: number;
+}) {
   const id = createUniqueId();
   // The island hydrates when the reader first uses it (islands/content.tsx), so
   // they may have typed into the server-rendered field already; keep that text.
@@ -30,7 +34,7 @@ export function FormulaFilter(props: { readonly family: string }) {
     : ((document.getElementById(`${id}-search`) as HTMLInputElement | null)?.value ?? "");
   const [query, setQuery] = createSignal(typed);
   const [engine, setEngine] = createSignal("all");
-  const [count, setCount] = createSignal<number | null>(null);
+  const [count, setCount] = createSignal(props.total);
 
   createEffect(() => {
     const needle = query().trim().toLowerCase();
@@ -72,7 +76,7 @@ export function FormulaFilter(props: { readonly family: string }) {
           options={ENGINE_OPTIONS}
           value={engine()}
         />
-        <p role="status">{count() === null ? "All functions" : `${count()} functions`}</p>
+        <p role="status">{`${count()} functions`}</p>
       </div>
       <Show when={count() === 0}>
         <p>No functions match. Try another name or engine.</p>
