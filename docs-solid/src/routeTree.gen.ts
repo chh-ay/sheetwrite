@@ -23,6 +23,7 @@ import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formul
 import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
 import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
+import { Route as TestIslandsRouteImport } from './routes/test.islands'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -94,6 +95,11 @@ const ShowcasesSpreadsheetRoute = ShowcasesSpreadsheetRouteImport.update({
   path: '/showcases/spreadsheet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestIslandsRoute = TestIslandsRouteImport.update({
+  id: '/test/islands',
+  path: '/test/islands',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
+  '/test/islands': typeof TestIslandsRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
 }
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
+  '/test/islands': typeof TestIslandsRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
 }
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
+  '/test/islands': typeof TestIslandsRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
 }
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/showcases/host-rows'
     | '/showcases/performance'
     | '/showcases/spreadsheet'
+    | '/test/islands'
     | '/docs/'
     | '/showcases/'
   fileRoutesByTo: FileRoutesByTo
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/showcases/host-rows'
     | '/showcases/performance'
     | '/showcases/spreadsheet'
+    | '/test/islands'
     | '/docs'
     | '/showcases'
   id:
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/showcases/host-rows'
     | '/showcases/performance'
     | '/showcases/spreadsheet'
+    | '/test/islands'
     | '/docs/'
     | '/showcases/'
   fileRoutesById: FileRoutesById
@@ -208,6 +220,7 @@ export interface RootRouteChildren {
   ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
+  TestIslandsRoute: typeof TestIslandsRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
 }
@@ -312,6 +325,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ShowcasesSpreadsheetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test/islands': {
+      id: '/test/islands'
+      path: '/test/islands'
+      fullPath: '/test/islands'
+      preLoaderRoute: typeof TestIslandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -328,6 +348,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
+  TestIslandsRoute: TestIslandsRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,
 }

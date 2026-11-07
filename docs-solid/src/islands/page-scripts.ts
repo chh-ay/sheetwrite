@@ -19,6 +19,7 @@ const ISLANDS_MANIFEST = "islands-manifest.json";
 
 /** The module each island loads on demand (islands/client.tsx imports the same paths). */
 const ON_DEMAND_ISLANDS: Readonly<Record<IslandName, string>> = {
+  "activation-fixture": "src/islands/ActivationFixture.tsx",
   "package-command": "src/components/PackageCommand.tsx",
   "formula-reference": "src/components/FormulaReference.tsx",
   "live-grid": "src/components/LiveGrid.tsx",

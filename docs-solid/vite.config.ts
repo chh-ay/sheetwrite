@@ -151,6 +151,8 @@ export default defineConfig({
         // Static hosts serve /404.html for every URL without a page; the
         // deployment fallback supplies the 404 status for unknown URLs.
         { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },
+        // Fixtures for the browser tests (test/browser), not linked from the site.
+        { path: "/test/islands/" },
       ],
       prerender: {
         enabled: true,

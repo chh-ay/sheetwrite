@@ -7,6 +7,7 @@ export type IslandName = CoreIslandName | ShowcaseIslandName;
 
 /** The docs shell's, the content pipeline's and the landing's islands. */
 export type CoreIslandName =
+  | "activation-fixture"
   | "tabs"
   | "package-command"
   | "formula-reference"
