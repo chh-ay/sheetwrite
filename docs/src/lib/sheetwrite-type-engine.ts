@@ -9,7 +9,7 @@ import {
 } from "@vue/language-core";
 import ts from "typescript";
 
-import { NativeTypeEngine } from "./native-type-engine.js";
+import { type IdentifierSelection, NativeTypeEngine } from "./native-type-engine.js";
 import { lineStartOffsets as lineOffsets } from "./source-offsets.js";
 
 /** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
@@ -38,22 +38,6 @@ const UNRESOLVED_ANY = /\bany\b/;
 
 /** Compiler-generated scaffolding (Vue SFC virtual code, private helpers) is never reader-facing. */
 const INTERNAL_TAG_TEXT = /__(?:VLS|vls)_?\w*|__sheetwrite/;
-
-/** Sample imports resolve to workspace sources, relative to the docs package. */
-const SAMPLE_PATHS: Readonly<Record<string, string[]>> = {
-  "@sheetwrite/core": ["../packages/core/src/index.ts"],
-  // Subpaths whose `exports` target differs from the file name; the wildcard
-  // below would resolve `history` to the internal undo module.
-  "@sheetwrite/core/history": ["../packages/core/src/history-archive.ts"],
-  "@sheetwrite/core/browser/history": ["../packages/core/src/history-indexeddb.ts"],
-  "@sheetwrite/core/*": ["../packages/core/src/*"],
-  "@sheetwrite/react": ["../packages/react/src/index.tsx"],
-  "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],
-  "@sheetwrite/vue": ["../packages/vue/src/index.ts"],
-  "@sheetwrite/wasm": ["../packages/wasm/loader.mjs"],
-  "@sheetwrite/xlsx": ["../packages/xlsx/src/index.ts"],
-  "@sheetwrite/xlsx/*": ["../packages/xlsx/src/*"],
-};
 
 function normalizedPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/\/{2,}/g, "/");
@@ -104,7 +88,6 @@ export class SheetwriteTypeEngine {
   constructor(private readonly options: SheetwriteTypeEngineOptions) {
     this.native = new NativeTypeEngine({
       cwd: options.cwd,
-      paths: SAMPLE_PATHS,
       internalIdentifier: INTERNAL_IDENTIFIER,
       internalTagText: INTERNAL_TAG_TEXT,
       ...(options.fsMap ? { fsMap: options.fsMap } : {}),
@@ -119,8 +102,6 @@ export class SheetwriteTypeEngine {
       jsx: ts.JsxEmit.Preserve,
       jsxImportSource: "react",
       lib: ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
-      baseUrl: options.cwd,
-      paths: SAMPLE_PATHS,
       allowJs: true,
       allowSyntheticDefaultImports: true,
       esModuleInterop: true,
@@ -137,9 +118,21 @@ export class SheetwriteTypeEngine {
   }
 
   /** Samples requested in the same turn of the event loop are analyzed together. */
-  analyze(source: string, language: "ts" | "tsx" | "vue"): Promise<SheetwriteTypeHover[]> {
+  analyze(
+    source: string,
+    language: "ts" | "tsx" | "vue",
+    selection?: IdentifierSelection,
+  ): Promise<SheetwriteTypeHover[]> {
     if (language === "vue") return this.analyzeVue(source);
-    return this.native.analyze(source, language);
+    return this.native.analyze(source, language, selection);
+  }
+
+  /** Hovers derived from generated code (Svelte samples), cached by `key` like every sample. */
+  remember(
+    key: string,
+    compute: () => Promise<SheetwriteTypeHover[]>,
+  ): Promise<SheetwriteTypeHover[]> {
+    return this.native.remember(key, compute);
   }
 
   /** Stops the TypeScript 7.1 processes; without it they stop once the process is idle. */
@@ -163,7 +156,11 @@ export class SheetwriteTypeEngine {
 
     const generated = embedded.snapshot.getText(0, embedded.snapshot.getLength());
     const mapper = defaultMapperFactory(embedded.mappings);
-    const generatedHovers = await this.native.analyze(generated, "tsx");
+    // Only generated identifiers that map back into the Vue source can become hovers.
+    const generatedHovers = await this.native.analyze(generated, "tsx", {
+      key: `vue\0${source}`,
+      keep: (identifier) => [...mapper.toSourceLocation(identifier.start)].length > 0,
+    });
     const offsets = lineOffsets(source);
     const mapped: SheetwriteTypeHover[] = [];
 

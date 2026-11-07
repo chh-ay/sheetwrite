@@ -65,6 +65,25 @@ export function persist(event: ChangeEvent): void {
     );
   });
 
+  it("answers object-literal property names with the declared property and its docs", async () => {
+    const engine = new SheetwriteTypeEngine({
+      cwd: new URL("../docs/", import.meta.url).pathname,
+    });
+    const hovers = await engine.analyze(
+      `import type { Column } from "@sheetwrite/core";
+export const columns: Column[] = [{ key: "name", header: "Name", width: 120, type: "text" }];
+export const controller = new AbortController();`,
+      "ts",
+    );
+    await engine.dispose();
+
+    const header = hovers.find((hover) => hover.target === "header");
+    expect(header?.text).toBe("(property) Column.header: string");
+    expect(header?.docs).toBeTruthy();
+    const abortController = hovers.filter((hover) => hover.target === "AbortController").at(-1);
+    expect(abortController?.docs).toContain("AbortController");
+  });
+
   it("repairs framework bindings only through explicit source relationships", () => {
     const engine = new SheetwriteTypeEngine({
       cwd: new URL("../docs/", import.meta.url).pathname,
