@@ -31,7 +31,7 @@ const STORE_SELECTOR = "template.sw-code-popover-store";
 /** One code line; a wrapped line is one element over several visual rows. */
 const LINE_SELECTOR = ".ec-line";
 /** The sticky site header; panels never open underneath it. */
-const HEADER_SELECTOR = ".sw-header";
+const HEADER_SELECTOR = ".sw-docs-bar, .sw-header";
 /** Marks the trigger whose panel is open. */
 const OPEN_ATTRIBUTE = "data-popover-open";
 /** Marks the other mentions of the open trigger's symbol in the same code block. */

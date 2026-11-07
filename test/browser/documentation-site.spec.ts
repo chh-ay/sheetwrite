@@ -45,7 +45,8 @@ for (const [width, hasDesktopOutline] of [
 ] as const) {
   test(`documentation has a visible route back home at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto(docsUrl("api/core/grid/"));
+    // A guide: API symbol pages use the full width and carry no outline column.
+    await page.goto(docsUrl("start/first-grid/"));
     await waitForHydration(page);
     if (hasDesktopOutline) {
       await expect(
@@ -63,21 +64,18 @@ for (const [width, hasDesktopOutline] of [
       .getByRole("link", { name: "Docs", exact: true })
       .click();
     await expect(page).toHaveURL(docsUrl());
-    await expect(page.getByRole("navigation", { name: "On this page", exact: true })).toHaveCount(
-      0,
-    );
-    if (width < 1024) {
-      await page.getByRole("button", { name: "Documentation menu", exact: true }).click();
-      await page
-        .getByRole("dialog", { name: "Documentation", exact: true })
-        .getByRole("link", { name: "Showcases", exact: true })
-        .click();
-    } else {
-      await page
-        .getByRole("navigation", { name: "Site", exact: true })
-        .getByRole("link", { name: "Showcases", exact: true })
-        .click();
-    }
+    // The overview opens with its section cards.
+    await expect(
+      page
+        .locator("main")
+        .getByRole("link", { name: /Getting started/ })
+        .first(),
+    ).toBeVisible();
+    // Showcases is a tab of the documentation bar at every width.
+    await page
+      .getByRole("navigation", { name: "Documentation sections", exact: true })
+      .getByRole("link", { name: "Showcases", exact: true })
+      .click();
     await expect(page).toHaveURL(siteUrl("/showcases/"));
   });
 }

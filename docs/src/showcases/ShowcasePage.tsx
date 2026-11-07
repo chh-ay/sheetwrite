@@ -5,7 +5,7 @@ import corePackage from "../../../packages/core/package.json" with { type: "json
 import { Icon } from "../components/Icon.js";
 import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
-import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
+import { SHOWCASE_NAVIGATION } from "../lib/site-links.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 
 import "../styles/workbench-stage.css";

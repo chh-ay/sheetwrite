@@ -100,7 +100,18 @@ export function stableJson(value: unknown): string {
  * The YAML frontmatter that starts a generated docs page. Symbol pages add
  * their declaration `kind`, which the page title shows as a chip.
  */
-export function frontmatter(title: string, description: string, kind?: string): string {
+/**
+ * A generated page's frontmatter. `kind` names an API symbol's declaration
+ * kind; `symbols` counts an entry point's exported symbols, so the page can
+ * render its symbol filter on the server.
+ */
+export function frontmatter(
+  title: string,
+  description: string,
+  kind?: string,
+  symbols?: number,
+): string {
   const kindLine = kind === undefined ? "" : `kind: ${JSON.stringify(kind)}\n`;
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n${kindLine}---\n\n`;
+  const symbolsLine = symbols === undefined ? "" : `symbols: ${symbols}\n`;
+  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n${kindLine}${symbolsLine}---\n\n`;
 }

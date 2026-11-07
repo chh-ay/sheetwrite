@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   breadcrumbsFor,
+  DOCS_NAVIGATION,
   documentNeighbours,
   type NavigationItem,
   navigationBadge,
@@ -86,5 +87,21 @@ describe("section overview pages", () => {
     expect(sectionPages("/docs/tutorials/").map((page) => page.href)).toContain(
       "/docs/tutorials/excel-in-react/",
     );
+  });
+});
+
+describe("sidebar icons", () => {
+  it("gives every sidebar entry and every section overview an icon", () => {
+    for (const section of DOCS_NAVIGATION) {
+      if (section.href !== undefined)
+        expect(`${section.label}: ${section.icon}`).not.toEndWith("undefined");
+      const visit = (items: readonly NavigationItem[]): void => {
+        for (const item of items) {
+          expect(`${section.label} › ${item.label}: ${item.icon}`).not.toEndWith("undefined");
+          visit(item.items ?? []);
+        }
+      };
+      visit(section.items);
+    }
   });
 });

@@ -1,32 +1,23 @@
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
-import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import {
-  breadcrumbsFor,
-  type Crumb,
-  DOCS_NAVIGATION,
   type DocumentNeighbours,
   documentNeighbours,
-  type NavigationItem,
-  type NavigationLocation,
-  navigationBadge,
   nearestNavigationItem,
+  tabForHref,
 } from "../lib/navigation.js";
 import type { OutlineItem } from "../lib/outline.js";
 import { editUrl, reportProblemUrl } from "../lib/page-links.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
+import { BrandMark } from "./BrandMark.js";
+import { NavigationSections } from "./DocsNavigation.js";
+import { DocsNavigationMenu } from "./DocsNavigationMenu.js";
 import { DocsSearch } from "./DocsSearch.js";
+import { DocsTopbar } from "./DocsTopbar.js";
 import { Icon } from "./Icon.js";
-import { SiteTopbar } from "./SiteTopbar.js";
+import { RevealCurrentNavigation } from "./RevealCurrentNavigation.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
-
-/**
- * Keep the sidebar only when it fits beside the reading panel; smaller
- * viewports use the same navigation in a modal drawer.
- */
-const RAIL_VIEWPORT_QUERY = "(min-width: 64rem)";
-const NAVIGATION_DIALOG_ID = "sw-docs-navigation";
 
 interface DocsShellProps {
   activeHref?: string;
@@ -34,257 +25,18 @@ interface DocsShellProps {
   description: string;
   /** Declaration kind of an API symbol page, shown as a chip beside the title. */
   kind?: string;
-  /**
-   * Include a collapsible outline above the article on narrow screens.
-   * The task-oriented overview omits it.
-   */
   /** The page's outline from the build, shown before the article is read. */
   outline?: readonly OutlineItem[];
+  /**
+   * Include the outline: on the right on wide screens, a collapsible row above
+   * the article on narrow ones. Error and not-found pages omit it.
+   */
   reserveOutline?: boolean;
+  /** An API entry point's exported symbol count, so its filter renders on the server. */
+  symbolCount?: number;
   /** The page's source file in the repository, for Edit on GitHub; generated pages have none. */
   sourcePath?: string;
   title: string;
-}
-
-function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
-  return (
-    <nav aria-label="Breadcrumb" className="sw-breadcrumb" data-pagefind-ignore>
-      <ol>
-        {trail.map((crumb) => (
-          <li key={`${crumb.href ?? "current"}|${crumb.label}`}>
-            {crumb.href === undefined ? (
-              <span aria-current={crumb === trail.at(-1) ? "page" : undefined}>{crumb.label}</span>
-            ) : (
-              // Ancestors are never the current page; the last crumb owns
-              // aria-current="page".
-              <Link activeOptions={{ exact: true }} to={crumb.href}>
-                {crumb.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
-/**
- * The newest release leads the navigation: a reader who upgrades should not
- * have to open a collapsed group to find what changed.
- */
-function LatestReleaseCard({
-  activeHref,
-  onNavigate,
-}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
-  const { href, date, dateLabel, version, summary } = releaseFacts.latest;
-
-  return (
-    <Link
-      aria-current={activeHref === href ? "page" : undefined}
-      className="sw-release-card"
-      onClick={onNavigate}
-      to={href}
-    >
-      <span className="sw-release-card__meta">
-        <span className="sw-release-card__badge">New</span>
-        <time dateTime={date}>{dateLabel}</time>
-      </span>
-      <strong>Sheetwrite {version}</strong>
-      <span className="sw-release-card__summary">{summary}</span>
-      <span className="sw-release-card__more">
-        Read the release notes <Icon name="arrow-right" />
-      </span>
-    </Link>
-  );
-}
-
-const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
-
-/**
- * New/Updated marker for a page changed in the latest release; text, so
- * screen readers announce it. Only page links carry it: a group marker would
- * repeat its pages' markers on a collapsed row.
- */
-function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
-  const badge = navigationBadge(item, releaseFacts.latest.version);
-  if (badge === undefined) return null;
-
-  return (
-    <span className="sw-nav-badge" data-badge={badge}>
-      {BADGE_TEXT[badge]}
-    </span>
-  );
-}
-
-interface NavigationEntriesProps {
-  items: readonly NavigationItem[];
-  current: NavigationLocation | undefined;
-  onNavigate?: () => void;
-}
-
-/**
- * One level of the tree. A group is a collapsible block that opens when the
- * current page is inside it; its own page, if any, is the first link inside,
- * because a link in the toggle row would also toggle the group.
- */
-function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEntriesProps>) {
-  return items.map((item) => {
-    if (item.items === undefined) {
-      return (
-        <Link
-          activeOptions={{ exact: true }}
-          aria-current={current?.href === item.href ? "page" : undefined}
-          key={item.href}
-          onClick={onNavigate}
-          to={item.href}
-        >
-          <span>{item.label}</span>
-          <NavigationBadgeLabel item={item} />
-        </Link>
-      );
-    }
-
-    // A group's own page opens the group too; call its link Overview to avoid repeating the name.
-    const open =
-      (current?.ancestors.includes(item) ?? false) ||
-      (item.href !== undefined && current?.href === item.href);
-    const ownPage =
-      item.href === undefined
-        ? []
-        : [
-            {
-              label: "Overview",
-              href: item.href,
-              added: item.added,
-              updated: item.updated,
-            },
-          ];
-    return (
-      <details className="sw-nav-subgroup" key={`${item.label}:${open}`} open={open}>
-        <summary>
-          <span>{item.label}</span>
-          <Icon className="sw-disclosure-icon" name="chevron-right" />
-        </summary>
-        <div>
-          <NavigationEntries
-            current={current}
-            items={[...ownPage, ...item.items]}
-            onNavigate={onNavigate}
-          />
-        </div>
-      </details>
-    );
-  });
-}
-
-/**
- * The section list itself, shared by the sidebar and the drawer so the two can
- * never advertise different documentation. `onNavigate` lets the drawer close
- * once a reader has picked a destination.
- */
-function NavigationSections({
-  activeHref,
-  onNavigate,
-}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
-  const current = nearestNavigationItem(activeHref);
-
-  return (
-    <nav aria-label="Documentation" className="sw-sidebar__nav">
-      <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
-      {DOCS_NAVIGATION.map((section) => (
-        <details
-          className="sw-nav-group"
-          key={`${section.label}:${current?.section}`}
-          open={section.label === current?.section}
-        >
-          <summary>
-            <span>{section.label}</span>
-            <Icon className="sw-disclosure-icon" name="chevron-right" />
-          </summary>
-          <div>
-            <NavigationEntries
-              current={current}
-              // A section's own page leads its list, named Overview as a group's is.
-              items={
-                section.href === undefined
-                  ? section.items
-                  : [{ label: "Overview", href: section.href }, ...section.items]
-              }
-              onNavigate={onNavigate}
-            />
-          </div>
-        </details>
-      ))}
-      <section>
-        <h2>Explore Sheetwrite</h2>
-        <Link activeOptions={{ exact: true }} onClick={onNavigate} to="/">
-          Home
-        </Link>
-        <Link activeOptions={{ exact: true }} onClick={onNavigate} to="/showcases/">
-          Showcases
-        </Link>
-        <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
-      </section>
-      <section>
-        <h2>For LLMs</h2>
-        {/* Plain text endpoints, not routes: no client-side navigation. */}
-        <a href="/llms.txt" title="Curated documentation index for AI agents">
-          llms.txt
-        </a>
-        <a href="/llms-full.txt" title="Complete documentation text for AI agents">
-          llms-full.txt
-        </a>
-      </section>
-    </nav>
-  );
-}
-
-interface NavigationDrawerProps {
-  activeHref?: string;
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  /** Asks the modal to close; Escape and the browser's own close report via onClosed. */
-  onDismiss: () => void;
-  onClosed: () => void;
-}
-
-/**
- * The section list for viewports without room for the sidebar. A modal dialog
- * brings the focus trap, Escape handling, backdrop, and focus restore with it;
- * the header button only opens it.
- */
-function NavigationDrawer({
-  activeHref,
-  dialogRef,
-  onDismiss,
-  onClosed,
-}: Readonly<NavigationDrawerProps>) {
-  return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
-    <dialog
-      aria-label="Documentation"
-      className="sw-nav-dialog"
-      id={NAVIGATION_DIALOG_ID}
-      onClick={(event) => {
-        // Only the backdrop targets the dialog itself: its children fill it.
-        if (event.target === event.currentTarget) onDismiss();
-      }}
-      onClose={onClosed}
-      ref={dialogRef}
-    >
-      <div className="sw-nav-dialog__head">
-        <span className="sw-nav-dialog__title">Documentation</span>
-        <button
-          aria-label="Close documentation menu"
-          className="sw-icon-button"
-          onClick={onDismiss}
-          type="button"
-        >
-          <Icon name="close" size="md" />
-        </button>
-      </div>
-      <NavigationSections activeHref={activeHref} onNavigate={onDismiss} />
-    </dialog>
-  );
 }
 
 /** Reading order: the neighbours of this page, when it sits in one. */
@@ -316,6 +68,25 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   );
 }
 
+/**
+ * The page's eyebrow: the group it sits in (the nearest group, else its
+ * section), or the package of a generated symbol page.
+ */
+function eyebrowFor(activeHref: string | undefined, titlePackage: string | undefined): string {
+  if (titlePackage !== undefined) return titlePackage;
+  const location = nearestNavigationItem(activeHref);
+  if (location === undefined) return "Documentation";
+  const group = location.ancestors.at(-1);
+  // A group's own page is the group: the section names its place.
+  if (group === undefined || group.href === activeHref) return location.section;
+  return group.label;
+}
+
+/**
+ * The documentation page layout: the sidebar, the top bar, the page head, the
+ * article with its outline, and the footer. Its interactive parts (search,
+ * theme, menu, outline and the API filter) are their own components.
+ */
 export function DocsShell({
   activeHref,
   children,
@@ -323,67 +94,38 @@ export function DocsShell({
   kind,
   outline: buildOutline,
   reserveOutline,
+  symbolCount,
   sourcePath,
   title,
 }: Readonly<DocsShellProps>) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
-  // better as a chip than as part of a display-size heading.
+  // better as the eyebrow than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
+  const tab = tabForHref(activeHref);
 
   const outline = useDocumentOutline(buildOutline);
   const neighbours = documentNeighbours(activeHref);
 
-  const navigationDialog = useRef<HTMLDialogElement>(null);
-  const [navigationOpen, setNavigationOpen] = useState(false);
-
-  // A drawer left open while the viewport grows would sit on top of the rail.
-  useEffect(() => {
-    const rail = window.matchMedia(RAIL_VIEWPORT_QUERY);
-    const closeWhenRailFits = (event: MediaQueryListEvent) => {
-      if (event.matches) navigationDialog.current?.close();
-    };
-    rail.addEventListener("change", closeWhenRailFits);
-    return () => rail.removeEventListener("change", closeWhenRailFits);
-  }, []);
-
-  const openNavigation = () => {
-    const dialog = navigationDialog.current;
-    if (dialog === null) return;
-
-    dialog.showModal();
-    setNavigationOpen(true);
-    // The current page can sit far down a long section list.
-    requestAnimationFrame(() => {
-      dialog
-        .querySelector<HTMLElement>('a[aria-current="page"]')
-        ?.scrollIntoView({ block: "nearest" });
-    });
-  };
-
   return (
-    <div className={`sw-docs${activeHref === "/docs/" ? " sw-docs--overview" : ""}`}>
+    <div className={`sw-docs${kind === undefined ? "" : " sw-docs--api"}`}>
       <a className="sw-skip-link" href="#main-content">
         Skip to content
       </a>
-      <SiteTopbar
+      <DocsTopbar
+        activeHref={activeHref}
+        activeTab={tab}
+        menu={<DocsNavigationMenu activeHref={activeHref} tab={tab} />}
         search={<DocsSearch />}
-        trailing={
-          <button
-            aria-controls={NAVIGATION_DIALOG_ID}
-            aria-expanded={navigationOpen}
-            aria-haspopup="dialog"
-            className="sw-icon-button sw-nav-toggle"
-            onClick={openNavigation}
-            type="button"
-          >
-            <Icon name="menu" size="md" />
-            <span className="sw-visually-hidden">Documentation menu</span>
-          </button>
-        }
       />
       <aside className="sw-sidebar">
-        <NavigationSections activeHref={activeHref} />
+        {/* No preload: the landing page's code loads only when it is opened. */}
+        <Link aria-label="Sheetwrite home" className="sw-sidebar__brand" preload={false} to="/">
+          <BrandMark />
+          <span>Sheetwrite</span>
+        </Link>
+        <NavigationSections activeHref={activeHref} tab={tab} />
       </aside>
+      <RevealCurrentNavigation activeHref={activeHref} />
       <main
         className="sw-document"
         data-pagefind-body
@@ -393,7 +135,9 @@ export function DocsShell({
         id="main-content"
       >
         <header className="sw-document__header">
-          <Breadcrumbs trail={breadcrumbsFor(activeHref, titleMain ?? title)} />
+          <p className="sw-document__eyebrow" data-pagefind-ignore>
+            {eyebrowFor(activeHref, titlePackage)}
+          </p>
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
             {kind === undefined ? null : (
@@ -401,14 +145,9 @@ export function DocsShell({
                 {kind}
               </span>
             )}
-            {titlePackage ? (
-              <code className="sw-title-package" data-pagefind-ignore>
-                {titlePackage}
-              </code>
-            ) : null}
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
-          {titlePackage === undefined ? <span>{description}</span> : null}
+          {titlePackage === undefined ? <p className="sw-document__lead">{description}</p> : null}
           {activeHref ? (
             <p className="sw-page-actions" data-pagefind-ignore>
               {sourcePath === undefined ? null : (
@@ -424,7 +163,7 @@ export function DocsShell({
             </p>
           ) : null}
         </header>
-        <ApiSymbolFilter />
+        <ApiSymbolFilter symbolCount={symbolCount} />
         {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}
         <article
           className={`sw-prose${activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}
@@ -436,16 +175,12 @@ export function DocsShell({
           <DocumentPager {...neighbours} />
           <div className="sw-document__colophon">
             <span>Sheetwrite is MIT licensed.</span>
+            {/* Plain text endpoints, not routes: no client-side navigation. */}
+            <a href="/llms.txt">llms.txt</a>
             <a href="https://github.com/chh-ay/sheetwrite/issues">Report a documentation issue</a>
           </div>
         </footer>
       </main>
-      <NavigationDrawer
-        activeHref={activeHref}
-        dialogRef={navigationDialog}
-        onClosed={() => setNavigationOpen(false)}
-        onDismiss={() => navigationDialog.current?.close()}
-      />
     </div>
   );
 }

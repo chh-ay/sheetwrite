@@ -3,8 +3,12 @@ import { join, relative, sep } from "node:path";
 
 import { element, type HastNode } from "./build-hast.js";
 import { docCard } from "./content-components.js";
-import { DOCS_NAVIGATION, type NavigationItem, navigationBadge } from "./navigation.js";
-import { RELEASES } from "./releases.js";
+import {
+  CURRENT_RELEASE,
+  DOCS_NAVIGATION,
+  type NavigationItem,
+  navigationBadge,
+} from "./navigation.js";
 
 /**
  * Group overview pages. `<div class="sw-section-cards"></div>` on the page of
@@ -13,9 +17,6 @@ import { RELEASES } from "./releases.js";
  * sidebar tree and each page's frontmatter. The sidebar stays the only list.
  */
 const CARDS_TAG = "sw-section-cards";
-
-/** The newest release, the next one included: its added pages carry New. */
-const CURRENT_RELEASE = RELEASES[0]?.version ?? "";
 
 /**
  * The illustration (public/figures/illustrations) on the card of each page

@@ -9,6 +9,7 @@ import {
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
   documentationLinkRoutes,
+  functionFields,
   movedPageIssues,
   renderEntryPage,
   renderSymbolPage,
@@ -211,11 +212,15 @@ describe("documentation generation", () => {
     expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
     expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
     // The symbol's own sections sit under the page title (H2); a member's sit
-    // under Members (H3). Neither may skip a heading level.
+    // under Members (H3). Neither may skip a heading level. The symbol's
+    // examples sit in an aside right after the summary.
     const summary = page.slice(0, page.indexOf("## Members"));
-    expect(summary).toMatch(/^## Examples$/m);
     expect(summary).toMatch(/^## See also$/m);
     expect(summary).not.toMatch(/^### /m);
+    const aside = /<aside class="api-layout__aside"[\s\S]*?<\/aside>/.exec(page)?.[0] ?? "";
+    expect(aside).toMatch(/^## Examples$/m);
+    expect(aside).not.toMatch(/^### /m);
+    expect(page.indexOf("## Examples")).toBeLessThan(page.indexOf("## See also"));
     const member =
       /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/.exec(
         page,
@@ -829,5 +834,33 @@ describe("generated docs ownership", () => {
     for (const page of GENERATED_CONTENT_PAGES) {
       expect(ignored.has(`docs/src/content/docs/${page}`)).toBeTrue();
     }
+  });
+});
+
+describe("API function fields", () => {
+  it("reads parameters and the return type from a recorded signature", () => {
+    expect(functionFields("(host: HTMLElement, opts: GridOptions): Grid", "createGrid")).toEqual({
+      parameters: [
+        { name: "host", type: "HTMLElement", optional: false },
+        { name: "opts", type: "GridOptions", optional: false },
+      ],
+      returns: "Grid",
+    });
+  });
+
+  it("keeps generic, function and record types whole", () => {
+    expect(
+      functionFields(
+        "<T>(map: Map<string, T>, pick?: (value: T, key: string) => boolean, ...rest: T[]): Promise<T[]>",
+        "pickAll",
+      ),
+    ).toEqual({
+      parameters: [
+        { name: "map", type: "Map<string, T>", optional: false },
+        { name: "pick", type: "(value: T, key: string) => boolean", optional: true },
+        { name: "...rest", type: "T[]", optional: false },
+      ],
+      returns: "Promise<T[]>",
+    });
   });
 });

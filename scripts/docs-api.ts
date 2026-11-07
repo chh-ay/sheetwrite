@@ -35,6 +35,7 @@ import {
 import { html, readableId } from "./evidence-format.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
+import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 function packageSourcePath(packageName: string, source: string): string {
   const separator = source.indexOf("#");
@@ -176,6 +177,55 @@ export function unresolvedDocumentationLinks(manifest: PublicApiManifest): strin
   return issues;
 }
 
+/** A doc comment split into its body and the tags the reference renders. */
+interface DocumentationParts {
+  readonly body: string;
+  readonly examples: readonly string[];
+  /** `@see` targets as Markdown list items. */
+  readonly related: readonly string[];
+  /** `@param` descriptions by parameter name. */
+  readonly parameters: ReadonlyMap<string, string>;
+  readonly returns?: string;
+}
+
+/** The tags a doc comment is split on; everything else stays in the body. */
+const DOCUMENTATION_TAG = /(?:^|\n)@(example|see|param|returns?)\b\s*/;
+
+function documentationParts(
+  documentation: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): DocumentationParts {
+  const sections = documentation.split(new RegExp(DOCUMENTATION_TAG, "g"));
+  const examples: string[] = [];
+  const related: string[] = [];
+  const parameters = new Map<string, string>();
+  let returns: string | undefined;
+  for (let index = 1; index < sections.length; index += 2) {
+    const tag = sections[index];
+    const value = sections[index + 1]?.trim() ?? "";
+    if (tag === "example") {
+      examples.push(value.replace(/^```(ts|tsx)(?:\s+compile)?\s*$/gm, "```$1 compile"));
+    } else if (tag === "see") {
+      const link = /^\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}$/.exec(value);
+      const target = link?.[1] ?? value;
+      const label = link?.[2]?.trim() || target;
+      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
+    } else if (tag === "param") {
+      const parameter = /^([\w$.]+)\s*(?:-\s*)?([\s\S]*)$/.exec(value);
+      if (parameter?.[1] !== undefined) {
+        parameters.set(parameter[1], (parameter[2] ?? "").replace(/\s+/g, " ").trim());
+      }
+    } else {
+      returns = value.replace(/\s+/g, " ").trim();
+    }
+  }
+  return { body: sections[0]?.trim() ?? "", examples, related, parameters, returns };
+}
+
 /**
  * JSDoc body, examples and related links. `headingLevel` places the Examples
  * and See also headings one level below whatever holds the text: 2 for a
@@ -191,26 +241,29 @@ function documentationSections(
   headingLevel: 2 | 3,
 ): string {
   const heading = "#".repeat(headingLevel);
-  const sections = documentation.split(/(?:^|\n)@(example|see)\b\s*\n?/);
-  const body = [sections[0]?.trim() ?? ""];
-  const examples: string[] = [];
-  const related: string[] = [];
-  for (let index = 1; index < sections.length; index += 2) {
-    const tag = sections[index];
-    const value = sections[index + 1]?.trim() ?? "";
-    if (tag === "example") {
-      examples.push(value.replace(/^```(ts|tsx)(?:\s+compile)?\s*$/gm, "```$1 compile"));
-    } else if (tag === "see") {
-      const link = /^\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}$/.exec(value);
-      const target = link?.[1] ?? value;
-      const label = link?.[2]?.trim() || target;
+  const { body, examples, related } = documentationParts(documentation, pkg, entry, item, routes);
+  const blocks = [body];
+  if (examples.length > 0) blocks.push(`${heading} Examples`, ...examples);
+  if (related.length > 0) blocks.push(`${heading} See also`, related.join("\n"));
+  return blocks.join("\n\n");
+}
+
+/** Replaces `{@link …}` with a Markdown link to the target's page, or inline code. */
+function resolveDocumentationLinks(
+  markdown: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  return markdown.replace(
+    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
+    (_match, target: string, label: string | undefined) => {
+      const text = label?.trim() || target;
       const route = documentationLinkRoute(pkg, entry, item, target, routes);
-      related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
-    }
-  }
-  if (examples.length > 0) body.push(`${heading} Examples`, ...examples);
-  if (related.length > 0) body.push(`${heading} See also`, related.join("\n"));
-  return body.join("\n\n");
+      return route === undefined ? `\`${text}\`` : `[\`${text}\`](${route})`;
+    },
+  );
 }
 
 function documentationMarkdown(
@@ -223,13 +276,12 @@ function documentationMarkdown(
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
-  return documentationSections(documentation, pkg, entry, item, routes, headingLevel).replace(
-    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
-    (_match, target: string, label: string | undefined) => {
-      const text = label?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
-      return route === undefined ? `\`${text}\`` : `[\`${text}\`](${route})`;
-    },
+  return resolveDocumentationLinks(
+    documentationSections(documentation, pkg, entry, item, routes, headingLevel),
+    pkg,
+    entry,
+    item,
+    routes,
   );
 }
 
@@ -671,45 +723,242 @@ export async function consumerIndex(manifest: PublicApiManifest): Promise<Consum
   return { dependents, references };
 }
 
+/** Published packages: the only dependents a public API page lists. */
+const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set(PUBLISHABLE_PACKAGE_ORDER);
+
+/**
+ * "Referenced by": the published packages that depend on the symbol's package,
+ * and the public exports whose declarations name it. An empty list is left
+ * out, and so is the section when both are empty.
+ */
 function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
-  const dependents = consumers.dependents.get(pkg.name) ?? [];
+  const dependents = (consumers.dependents.get(pkg.name) ?? []).filter((dependent) =>
+    PUBLISHED_PACKAGES.has(dependent.name),
+  );
   const references = (consumers.references.get(item.name) ?? []).filter(
     (reference) => !(reference.packageName === pkg.name && reference.name === item.name),
   );
-  const body = [
-    "## Referenced by",
-    "",
-    '<div class="api-consumers" data-pagefind-ignore>',
-    `<p class="api-consumers-label">Workspace packages depending on <code>${html(pkg.name)}</code></p>`,
-    "",
-    '<ul class="api-consumer-list">',
-  ];
-  for (const dependent of dependents) {
+  if (dependents.length === 0 && references.length === 0) return "";
+  const body = ["## Referenced by", "", '<div class="api-consumers" data-pagefind-ignore>'];
+  if (dependents.length > 0) {
     body.push(
-      `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+      `<p class="api-consumers-label">Packages that depend on <code>${html(pkg.name)}</code></p>`,
+      "",
+      '<ul class="api-consumer-list">',
+      ...dependents.map(
+        (dependent) =>
+          `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+      ),
+      "</ul>",
+      "",
     );
   }
-  if (dependents.length === 0) body.push("<li>None.</li>");
-  body.push(
-    "</ul>",
-    "",
-    `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
-    "",
-    '<ul class="api-consumer-list">',
-  );
-  for (const reference of references.slice(0, REFERENCE_DISPLAY_LIMIT)) {
+  if (references.length > 0) {
     body.push(
-      `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+      `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
+      "",
+      '<ul class="api-consumer-list">',
+      ...references
+        .slice(0, REFERENCE_DISPLAY_LIMIT)
+        .map(
+          (reference) =>
+            `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+        ),
     );
+    if (references.length > REFERENCE_DISPLAY_LIMIT) {
+      body.push(
+        `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
+      );
+    }
+    body.push("</ul>");
   }
-  if (references.length === 0) body.push("<li>None.</li>");
-  if (references.length > REFERENCE_DISPLAY_LIMIT) {
-    body.push(
-      `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
-    );
-  }
-  body.push("</ul>", "</div>", "");
+  body.push("</div>", "");
   return body.join("\n");
+}
+
+/** One parameter of a function's first call signature. */
+interface ParameterField {
+  readonly name: string;
+  readonly type: string;
+  readonly optional: boolean;
+}
+
+/** A function's first call signature, as reference fields. */
+interface FunctionFields {
+  readonly parameters: readonly ParameterField[];
+  readonly returns: string;
+}
+
+/**
+ * Splits `text` on top-level commas: not inside brackets, braces, parentheses,
+ * type arguments or string literals. An arrow's `=>` is not a closing bracket.
+ */
+function splitTopLevelCommas(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | undefined;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index] ?? "";
+    if (quote !== undefined) {
+      if (character === quote && text[index - 1] !== "\\") quote = undefined;
+    } else if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+    } else if ("([{<".includes(character)) {
+      depth += 1;
+    } else if (")]}".includes(character) || (character === ">" && text[index - 1] !== "=")) {
+      depth -= 1;
+    } else if (character === "," && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((part) => part.trim()).filter((part) => part.length > 0);
+}
+
+/** The index of the bracket that closes the one at `open`. */
+function closingIndex(text: string, open: number): number {
+  const pairs: Record<string, string> = { "(": ")", "<": ">" };
+  const opener = text[open] ?? "";
+  const closer = pairs[opener];
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === opener) depth += 1;
+    else if (character === closer && !(closer === ">" && text[index - 1] === "=")) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The parameters and return type of a function's first call signature, given
+ * as the manifest records it (`<T>(a: A, b?: B): R`) or as a declaration
+ * (`function name(…): R`); undefined when neither shape matches.
+ */
+export function functionFields(signature: string, name: string): FunctionFields | undefined {
+  const declared = signature.indexOf(`function ${name}`);
+  let open = declared === -1 ? 0 : declared + `function ${name}`.length;
+  if (signature[open] === "<") open = closingIndex(signature, open) + 1;
+  if (signature[open] !== "(") return undefined;
+  const close = closingIndex(signature, open);
+  if (close === -1) return undefined;
+  const parameters = splitTopLevelCommas(signature.slice(open + 1, close)).map((parameter) => {
+    const colon = parameter.indexOf(":");
+    const head = (colon === -1 ? parameter : parameter.slice(0, colon)).trim();
+    const optional = head.endsWith("?");
+    return {
+      name: head.replace(/\?$/, ""),
+      type: colon === -1 ? "unknown" : parameter.slice(colon + 1).trim(),
+      optional,
+    };
+  });
+  const returns =
+    /^\s*:\s*([\s\S]*?)\s*;?\s*(?:\n|$)/.exec(signature.slice(close + 1))?.[1] ?? "void";
+  return { parameters, returns };
+}
+
+/** A type in a field, with each documented type name linked to its page. */
+function linkedTypeHtml(
+  type: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  return html(type).replace(/\b[A-Z][A-Za-z0-9_]*\b/g, (name) => {
+    const route = documentationLinkRoute(pkg, entry, item, name, routes);
+    return route === undefined ? name : `<a href="${route}">${name}</a>`;
+  });
+}
+
+/**
+ * One field row: name (none for a return value), type, a required or optional
+ * marker, and its description.
+ */
+function fieldHtml(
+  id: string,
+  name: string | undefined,
+  typeHtml: string,
+  marker: string | undefined,
+  descriptionHtml: string | undefined,
+): string {
+  return [
+    `<div class="api-field" id="${id}">`,
+    '<div class="api-field__head">',
+    name === undefined ? "" : `<code class="api-field__name">${html(name)}</code>`,
+    `<code class="api-field__type">${typeHtml}</code>`,
+    marker === undefined ? "" : `<span class="api-field__marker">${marker}</span>`,
+    "</div>",
+    descriptionHtml === undefined || descriptionHtml === ""
+      ? ""
+      : `<p class="api-field__doc">${descriptionHtml}</p>`,
+    "</div>",
+  ]
+    .filter((line) => line !== "")
+    .join("");
+}
+
+/** A function's Parameters and Returns sections as fields. */
+function renderFunctionFields(
+  fields: FunctionFields,
+  parts: DocumentationParts,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  const describe = (text: string | undefined): string | undefined =>
+    text === undefined ? undefined : memberDocumentationHtml(pkg, entry, item, text, routes);
+  // Without its own description, a field named by one documented type reads
+  // that type's summary.
+  const typeSummary = (type: string): string | undefined => {
+    if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
+    const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
+    return target === undefined || target.trim() === ""
+      ? undefined
+      : compactSummary(target.split(/\n@/)[0] ?? "", true);
+  };
+  const blocks: string[] = [];
+  if (fields.parameters.length > 0) {
+    blocks.push(
+      "## Parameters",
+      "",
+      '<div class="api-fields">',
+      ...fields.parameters.map((parameter) =>
+        fieldHtml(
+          `parameter-${anchor(parameter.name.replace(/^\.\.\./, ""))}`,
+          parameter.name,
+          linkedTypeHtml(parameter.type, pkg, entry, item, routes),
+          parameter.optional ? "optional" : "required",
+          describe(
+            parts.parameters.get(parameter.name.replace(/^\.\.\./, "")) ??
+              typeSummary(parameter.type),
+          ),
+        ),
+      ),
+      "</div>",
+      "",
+    );
+  }
+  blocks.push(
+    "## Returns",
+    "",
+    '<div class="api-fields">',
+    fieldHtml(
+      "returns",
+      undefined,
+      linkedTypeHtml(fields.returns, pkg, entry, item, routes),
+      undefined,
+      describe(parts.returns ?? typeSummary(fields.returns)),
+    ),
+    "</div>",
+    "",
+  );
+  return blocks.join("\n");
 }
 
 async function renderDeclaration(signature: string, expanded: boolean): Promise<string> {
@@ -861,23 +1110,64 @@ export async function renderSymbolPage(
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
-  const summary = documentationMarkdown(pkg, entry, item, routes, item.documentation, 2);
+  const parts = documentationParts(
+    item.documentation.trim() || "Source summary unavailable; docs:check rejects this omission.",
+    pkg,
+    entry,
+    item,
+    routes,
+  );
+  const summary = resolveDocumentationLinks(parts.body, pkg, entry, item, routes);
   const declaration = parseableDeclaration(item);
   await prepareDeclarationShapes([declaration]);
   const shape = declarationShape(declaration);
   const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
+  const fields = item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
+  // The examples follow the summary; at desktop width they sit in an aside
+  // beside the summary and the rest of the reference.
+  const hasAside = parts.examples.length > 0;
   const body = [
     frontmatter(`${item.name} | ${label}`, description, item.kind).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
     "",
+    ...(hasAside ? ['<div class="api-layout">', "", '<div class="api-layout__summary">', ""] : []),
     summary,
     "",
     '<dl class="api-metadata" data-pagefind-ignore>',
-    `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`,
+    sourceRow(source),
     "</dl>",
     "",
   ];
+  if (hasAside) {
+    body.push(
+      "</div>",
+      "",
+      '<aside class="api-layout__aside" aria-label="Examples">',
+      "",
+      "## Examples",
+      "",
+      ...parts.examples.map((example) =>
+        resolveDocumentationLinks(example, pkg, entry, item, routes),
+      ),
+      "",
+      "</aside>",
+      "",
+      '<div class="api-layout__body">',
+      "",
+    );
+  }
+  if (fields !== undefined) {
+    body.push(renderFunctionFields(fields, parts, pkg, entry, item, routes));
+  }
+  if (parts.related.length > 0) {
+    body.push(
+      "## See also",
+      "",
+      resolveDocumentationLinks(parts.related.join("\n"), pkg, entry, item, routes),
+      "",
+    );
+  }
   if (shape.members.length > 0) {
     body.push(renderMembers(pkg, entry, item, shape.members, routes, aliases), "");
   }
@@ -915,7 +1205,31 @@ export async function renderSymbolPage(
     "",
     renderReferencedBy(pkg, item, consumers),
   );
+  if (hasAside) body.push("</div>", "", "</div>");
   return `${body.join("\n").trimEnd()}\n`;
+}
+
+/** The metadata row linking a page's source file in the repository. */
+function sourceRow(source: string): string {
+  return `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`;
+}
+
+const EXPORT_COUNT_LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * An entry page's lead: what the entry point holds, by kind, so it says more
+ * than the title.
+ */
+function entryLead(label: string, entry: ApiEntryPoint): string {
+  if (entry.kind === "asset") return `${label} is a CSS or binary asset entry point.`;
+  if (entry.exports.length === 0) return `${label} exports no named symbols.`;
+  const counts = [...Map.groupBy(entry.exports, (item) => item.kind)]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([kind, items]) => {
+      const plural = (KIND_LABELS[kind] ?? `${kind}s`).toLowerCase();
+      return `${items.length} ${items.length === 1 ? kind : plural}`;
+    });
+  return `The ${entry.exports.length} exports of ${label}, by kind: ${EXPORT_COUNT_LIST.format(counts)}.`;
 }
 
 export function renderEntryPage(
@@ -933,7 +1247,12 @@ export function renderEntryPage(
           ? "Testing-only public entry point"
           : "CSS or binary asset entry point";
   const body = [
-    frontmatter(label, `API reference for ${label}.`).trimEnd(),
+    frontmatter(
+      label,
+      entryLead(label, entry),
+      undefined,
+      entry.kind === "asset" ? undefined : entry.exports.length,
+    ).trimEnd(),
     `<span class="api-status" data-status="${entry.classification}">${entry.classification}</span>`,
     "",
     `**${status}.** Import this entry point as \`${label}\`.`,
@@ -941,12 +1260,10 @@ export function renderEntryPage(
     '<dl class="api-metadata" data-pagefind-ignore>',
     `<div><dt>Declaration target</dt><dd><code>${html(entry.target)}</code></dd></div>`,
     `<div><dt>Exports</dt><dd>${entry.exports.length}</dd></div>`,
+    ...(entry.source === undefined ? [] : [sourceRow(packageSourcePath(pkg.name, entry.source))]),
     "</dl>",
     "",
   ];
-  if (entry.source !== undefined) {
-    body.push(`Source entry: \`${packageSourcePath(pkg.name, entry.source)}\``, "");
-  }
   if (entry.kind === "asset") {
     body.push(
       "This package export is an asset rather than a TypeScript module. It is tracked here so package drift cannot bypass documentation review.",

@@ -165,7 +165,12 @@ a {
   white-space: nowrap;
 }
 
+/* Fixed width, so the label switching from ⌘K to Ctrl K after hydration
+   moves nothing around it. */
 .sw-search-button kbd {
+  flex: none;
+  width: 3.75rem;
+  text-align: center;
   border: 1px solid var(--sw-border);
   border-radius: var(--sw-radius-xs);
   padding: 0 var(--sw-space-1-5);
