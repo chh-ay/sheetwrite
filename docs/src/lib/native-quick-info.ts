@@ -26,7 +26,8 @@ export interface NativeQuickInfo {
 
 /** Hovers on positions with several projections are joined by this rule. */
 const PROJECTION_SEPARATOR = "\n\n---\n\n";
-const SIGNATURE_FENCE = /^(`{3,})typescript\n([\s\S]*?)\n\1\n/;
+/** Before a projection rule, the closing fence ends the text. */
+const SIGNATURE_FENCE = /^(`{3,})typescript\n([\s\S]*?)\n\1(?:\n|$)/;
 const TAG_START = /\n\n\*@([^*\s]+)\*/g;
 const DASH_PREFIX = /^ — /;
 const QUOTED_NAME = /^ `([^`]+)`/;
@@ -59,6 +60,13 @@ function tagText(name: string, body: string): string | undefined {
   return text || undefined;
 }
 
+/**
+ * The projections of one hover. A position in a content-mapped file can map to several
+ * places in the mapper's TypeScript; the server then answers one projection per place.
+ */
+export function nativeHoverProjections(markdown: string): string[] {
+  return markdown.split(PROJECTION_SEPARATOR);
+}
 export function parseNativeHover(markdown: string): NativeQuickInfo | undefined {
   const [first = ""] = markdown.split(PROJECTION_SEPARATOR);
   const signature = SIGNATURE_FENCE.exec(first);

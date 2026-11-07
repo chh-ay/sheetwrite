@@ -104,6 +104,8 @@ interface PendingRequest {
 
 const HEADER_SEPARATOR = "\r\n\r\n";
 const CONTENT_LENGTH = /Content-Length: (\d+)/i;
+/** Template attribute and event names, kebab case included (`default-rows`, `grid-change`). */
+const TEMPLATE_NAME = /^[A-Za-z_$][\w$-]*$/;
 
 function nativeCompilerPath(compiler: NativeCompiler): string {
   if (compiler === "tsrs") {
@@ -324,51 +326,79 @@ async function identifiersOf(
 }
 
 /**
- * Identifiers of a content-mapped file, in positions of the original file: the
- * project build returns the mapper's TypeScript and its span map, and only
- * identifiers copied from the original as they are written are kept.
+ * The project build that mapped samples read from. Each sample updates it, so the
+ * libraries, the Sheetwrite sources and the mapper output of unchanged files are reused.
  */
-async function mappedIdentifiersOf({
+let mappedProject: NativeAsyncApi.Snapshot | undefined;
+/** Sample files the mapped project has seen; a first `.svelte` after `.vue` samples is new to it. */
+const mappedFiles = new Set<string>();
+
+async function updateMappedProject({
   projectFile,
   projectText,
   fileName,
   document,
-}: NativeMappedFile): Promise<NativeIdentifier[]> {
-  const snapshot = await parser.createSnapshot({
-    fileSystem: createFileSystemLayer([
-      [projectFile, projectText],
-      [fileName, document.text],
-    ]),
-    openProjects: [projectFile],
-  });
-  try {
-    const project = snapshot.getConfiguredProject(projectFile);
-    const sourceFile = await project?.program.getSourceFile(fileName);
-    const spanMap = sourceFile?.spanMap;
-    if (!sourceFile || !spanMap) {
-      throw new Error(`no content mapper turned ${fileName} into TypeScript`);
-    }
-    const starts = lineStarts(document.text);
-    const byStart = new Map<number, NativeIdentifier>();
-    for (const identifier of identifierNodes(sourceFile)) {
-      const { range, fidelity } = spanMap.virtualToOriginalSpan({
-        pos: identifier.start,
-        end: identifier.end,
+}: NativeMappedFile): Promise<NativeAsyncApi.Snapshot> {
+  const previous = mappedProject;
+  mappedProject = previous
+    ? await previous.update({
+        fileSystem: createFileSystemLayer([[fileName, document.text]]),
+        fileNotifications: mappedFiles.has(fileName)
+          ? { changed: [fileName] }
+          : { created: [fileName] },
+        // Without this the update is lazy and the program can still hold the previous sample.
+        ensurePrograms: true,
+      })
+    : await parser.createSnapshot({
+        fileSystem: createFileSystemLayer([
+          [projectFile, projectText],
+          [fileName, document.text],
+        ]),
+        openProjects: [projectFile],
       });
-      if (fidelity !== SpanMapFidelity.Exact && fidelity !== SpanMapFidelity.Atom) continue;
-      if (document.text.slice(range.pos, range.end) !== identifier.text) continue;
-      if (byStart.has(range.pos)) continue;
-      byStart.set(range.pos, {
-        text: identifier.text,
-        start: range.pos,
-        end: range.end,
-        ...positionAt(starts, range.pos),
-      });
-    }
-    return [...byStart.values()].sort((left, right) => left.start - right.start);
-  } finally {
-    await snapshot.dispose();
+  mappedFiles.add(fileName);
+  await previous?.dispose();
+  return mappedProject;
+}
+
+/**
+ * Identifiers of a content-mapped file, in positions of the original file: the
+ * project build returns the mapper's TypeScript and its span map. Kept are
+ * identifiers copied from the original as they are written, and names the
+ * mapper respelled as one unit (`@grid-change` as `onGridChange`), which keep
+ * the original spelling as their target.
+ */
+async function mappedIdentifiersOf(file: NativeMappedFile): Promise<NativeIdentifier[]> {
+  const { projectFile, fileName, document } = file;
+  const snapshot = await updateMappedProject(file);
+  const project = snapshot.getConfiguredProject(projectFile);
+  const sourceFile = await project?.program.getSourceFile(fileName);
+  const spanMap = sourceFile?.spanMap;
+  if (!sourceFile || !spanMap) {
+    throw new Error(`no content mapper turned ${fileName} into TypeScript`);
   }
+  const starts = lineStarts(document.text);
+  const byStart = new Map<number, NativeIdentifier>();
+  for (const identifier of identifierNodes(sourceFile)) {
+    const { range, fidelity } = spanMap.virtualToOriginalSpan({
+      pos: identifier.start,
+      end: identifier.end,
+    });
+    if (fidelity !== SpanMapFidelity.Exact && fidelity !== SpanMapFidelity.Atom) continue;
+    const original = document.text.slice(range.pos, range.end);
+    const kept =
+      fidelity === SpanMapFidelity.Exact
+        ? original === identifier.text
+        : TEMPLATE_NAME.test(original);
+    if (!kept || byStart.has(range.pos)) continue;
+    byStart.set(range.pos, {
+      text: original,
+      start: range.pos,
+      end: range.end,
+      ...positionAt(starts, range.pos),
+    });
+  }
+  return [...byStart.values()].sort((left, right) => left.start - right.start);
 }
 
 async function answerAt(
@@ -409,6 +439,7 @@ async function handle(request: NativeHoverRequest): Promise<NativeHoverReply> {
       };
     case "dispose":
       await server.shutdown();
+      await mappedProject?.dispose();
       await parser.close();
       return { ok: true };
   }

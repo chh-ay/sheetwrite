@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseNativeHover } from "../docs/src/lib/native-quick-info.js";
+import { nativeHoverProjections, parseNativeHover } from "../docs/src/lib/native-quick-info.js";
 import {
   collectFenceHovers,
   isHighQualityHover,
@@ -39,6 +39,26 @@ describe("TypeScript 7.1 hover parsing", () => {
         ["example", "persist(event)"],
       ],
     });
+  });
+
+  it("reads every projection of a position in a content-mapped file", () => {
+    const markdown = [
+      "```typescript",
+      "function __VLS_unwrap<Ref<string, string>>(t: Ref<string, string>): string",
+      "```",
+      "",
+      "---",
+      "",
+      "```typescript",
+      "const error: Ref<string, string>",
+      "```",
+      "",
+    ].join("\n");
+
+    expect(nativeHoverProjections(markdown).map((part) => parseNativeHover(part)?.text)).toEqual([
+      "function __VLS_unwrap<Ref<string, string>>(t: Ref<string, string>): string",
+      "const error: Ref<string, string>",
+    ]);
   });
 });
 

@@ -18,7 +18,11 @@ import type {
   NativeHoverAnswer,
   NativeHoverDocument,
 } from "./native-hover-worker.js";
-import { parseNativeHover } from "./native-quick-info.js";
+import {
+  nativeHoverProjections,
+  type NativeQuickInfo,
+  parseNativeHover,
+} from "./native-quick-info.js";
 import { lineStartOffsets as lineOffsets } from "./source-offsets.js";
 
 /** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
@@ -100,12 +104,25 @@ function hoverOrigin(
   return origin;
 }
 
+/**
+ * The first projection can belong to a helper call the content mapper generated around the
+ * reader's name (`__VLS_unwrap(count)` for `{{ count }}`); the reader's own symbol wins.
+ */
+function readerQuickInfo(markdown: string): NativeQuickInfo | undefined {
+  const projections = nativeHoverProjections(markdown).flatMap(
+    (projection) => parseNativeHover(projection) ?? [],
+  );
+  return (
+    projections.find((projection) => !INTERNAL_TAG_TEXT.test(projection.text)) ?? projections[0]
+  );
+}
+
 /** Language-server answers in the engine's hover shape; positions without quick info drop out. */
 function nativeHovers(answer: NativeHoverAnswer, fileName: string): SheetwriteTypeHover[] {
   const hovers: SheetwriteTypeHover[] = [];
   for (const [index, identifier] of answer.identifiers.entries()) {
     const markdown = answer.hovers[index];
-    const quickInfo = markdown ? parseNativeHover(markdown) : undefined;
+    const quickInfo = markdown ? readerQuickInfo(markdown) : undefined;
     if (!quickInfo?.text) continue;
     const tags = quickInfo.tags.filter(([, value]) => !value || !INTERNAL_TAG_TEXT.test(value));
     const definitionFiles = (answer.definitions[index] ?? []).map((definition) =>
