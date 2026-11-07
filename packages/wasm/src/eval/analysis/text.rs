@@ -631,7 +631,7 @@ pub(super) fn shape(
 ) -> Result<(usize, usize, usize), FormulaError> {
     let affected = FormulaWork::default();
     let mut results = FormulaResults::default();
-    results.swap_regexes(outer.results);
+    results.swap_scratch(outer.results);
 
     let mut pass = EvalPass {
         affected: &affected,
@@ -639,7 +639,7 @@ pub(super) fn shape(
     };
     let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
 
-    results.swap_regexes(outer.results);
+    results.swap_scratch(outer.results);
     let matrix = matrix?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
