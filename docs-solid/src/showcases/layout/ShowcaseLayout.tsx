@@ -16,8 +16,11 @@ import { SiteTopbar } from "../../components/SiteTopbar.js";
 /** One measured fact in the showcase header, such as a row count or a timing. */
 export interface ShowcaseFact {
   readonly label: string;
-  /** The value, read from the showcase's data or a generated source; never typed by hand. */
-  readonly value: string;
+  /**
+   * The value, read from the showcase's data or a generated source; never typed
+   * by hand. A value the demo measures is an island that renders it.
+   */
+  readonly value: JSX.Element;
   /** The value is a code token, such as a package path: set in the code face, it wraps only after a "/". */
   readonly code?: boolean;
 }
@@ -85,7 +88,13 @@ function ShowcaseFacts(props: { readonly facts: readonly ShowcaseFact[] }) {
         {(fact) => (
           <div class="sw-showcase__fact">
             <dt>{fact.label}</dt>
-            <dd>{fact.code === true ? <CodeFactValue value={fact.value} /> : fact.value}</dd>
+            <dd>
+              {fact.code === true && typeof fact.value === "string" ? (
+                <CodeFactValue value={fact.value} />
+              ) : (
+                fact.value
+              )}
+            </dd>
           </div>
         )}
       </For>

@@ -66,6 +66,8 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   }
 
   // Filters are toggle buttons that work from the keyboard and show focus.
+  // The cards are static markup: a filter hides the others.
+  const shownLaunchers = launchers.filter({ visible: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   const allFilter = page.getByRole("button", { name: "All", exact: true });
   const dataFilter = page.getByRole("button", { name: "Data & scale", exact: true });
@@ -85,21 +87,21 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
   await expect
     .poll(async () =>
-      (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+      (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
     )
     .toEqual(["data-tools", "database", "host-rows", "performance", "queries", "sort"]);
 
   await workbookFilter.click();
   await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");
   expect(
-    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+    (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
   ).toEqual(["formatting", "interoperability", "spreadsheet"]);
   await page.getByRole("button", { name: "Formulas", exact: true }).click();
   expect(
-    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+    (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
   ).toEqual(["analysis", "dashboards", "data-model", "formulas", "functions", "recalculation"]);
   await allFilter.click();
-  await expect(launchers).toHaveCount(owners.length);
+  await expect(shownLaunchers).toHaveCount(owners.length);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);

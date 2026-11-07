@@ -105,6 +105,76 @@ export const SHOWCASE_ISLANDS = {
         withProps(CollaborationFaults),
       ),
   },
+  "showcase-interop": {
+    source: "src/showcases/interop/InteropStage.tsx",
+    load: () =>
+      import("./interop/InteropStage.js").then(({ InteropStage }) => withProps(InteropStage)),
+  },
+  "showcase-interop-spill": {
+    source: "src/showcases/interop/SpillProof.tsx",
+    load: () => import("./interop/SpillProof.js").then(({ SpillProof }) => withProps(SpillProof)),
+  },
+  "showcase-interop-labs": {
+    source: "src/showcases/interop/labs/InteropLabs.tsx",
+    load: () =>
+      import("./interop/labs/InteropLabs.js").then(({ InteropLabs }) => withProps(InteropLabs)),
+  },
+  "showcase-sort": {
+    source: "src/showcases/sort/SortStage.tsx",
+    load: () => import("./sort/SortStage.js").then(({ SortStage }) => withProps(SortStage)),
+  },
+  "showcase-functions": {
+    source: "src/showcases/functions/FunctionsStage.tsx",
+    load: () =>
+      import("./functions/FunctionsStage.js").then(({ FunctionsStage }) =>
+        withProps(FunctionsStage),
+      ),
+  },
+  "showcase-recalculation": {
+    source: "src/showcases/recalculation/RecalculationStage.tsx",
+    load: () =>
+      import("./recalculation/RecalculationStage.js").then(({ RecalculationStage }) =>
+        withProps(RecalculationStage),
+      ),
+  },
+  "showcase-recalculation-fact": {
+    source: "src/showcases/recalculation/FirstCalculationFact.tsx",
+    load: () =>
+      import("./recalculation/FirstCalculationFact.js").then(({ FirstCalculationFact }) =>
+        withProps(FirstCalculationFact),
+      ),
+  },
+  "showcase-data-model": {
+    source: "src/showcases/data-model/DataModelStage.tsx",
+    load: () =>
+      import("./data-model/DataModelStage.js").then(({ DataModelStage }) =>
+        withProps(DataModelStage),
+      ),
+  },
+  "showcase-dashboards": {
+    source: "src/showcases/dashboards/DashboardsStage.tsx",
+    load: () =>
+      import("./dashboards/DashboardsStage.js").then(({ DashboardsStage }) =>
+        withProps(DashboardsStage),
+      ),
+  },
+  "showcase-dashboards-items": {
+    source: "src/showcases/dashboards/ItemCountFact.tsx",
+    load: () =>
+      import("./dashboards/ItemCountFact.js").then(({ ItemCountFact }) => withProps(ItemCountFact)),
+  },
+  "showcase-queries": {
+    source: "src/showcases/queries/QueriesStage.tsx",
+    load: () =>
+      import("./queries/QueriesStage.js").then(({ QueriesStage }) => withProps(QueriesStage)),
+  },
+  "showcase-version-history": {
+    source: "src/showcases/version-history/VersionHistoryStage.tsx",
+    load: () =>
+      import("./version-history/VersionHistoryStage.js").then(({ VersionHistoryStage }) =>
+        withProps(VersionHistoryStage),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 /** The showcase pages' islands; islands/Island.tsx adds these names to every island name. */

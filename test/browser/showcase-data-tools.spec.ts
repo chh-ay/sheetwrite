@@ -4,8 +4,6 @@ import { siteUrl } from "./playwright.config.js";
 
 const ROUTE = siteUrl("/showcases/data-tools/");
 
-const SORT = "Sort by region, then units";
-
 /** Region is a semantic combobox: open it, then pick the option. */
 async function pickRegion(page: Page, region: string) {
   await page.getByRole("combobox", { name: "Region" }).click();
@@ -30,13 +28,12 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(ROUTE);
-  await expect(page.getByRole("button", { name: SORT })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Clear view", exact: true })).toBeEnabled();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await pickRegion(page, "EMEA");
   await page.getByLabel("Customer").fill("Northstar");
   await expect(page.getByTestId("data-visible")).toHaveText("640 / 4,800 rows visible");
-  await page.getByRole("button", { name: SORT }).click();
-  await expectLatestEvent(page, "info", "sortByMulti");
+  await expectLatestEvent(page, "info", "setColumnFilter");
   await page.getByRole("button", { name: "Clear view", exact: true }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await expect(page.getByRole("combobox", { name: "Region" })).toHaveText("All regions");

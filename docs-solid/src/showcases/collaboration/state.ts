@@ -39,16 +39,19 @@ export interface ClientView {
   log: readonly LogEntry[];
 }
 
-export const EMPTY_CLIENT_VIEW: ClientView = {
-  ready: false,
-  online: true,
-  syncState: null,
-  linkState: null,
-  total: "–",
-  account: "the first deal",
-  roster: [],
-  log: [],
-};
+/** A client before it mounts. A fresh object each time: the store mutates the objects it holds. */
+export function emptyClientView(): ClientView {
+  return {
+    ready: false,
+    online: true,
+    syncState: null,
+    linkState: null,
+    total: "–",
+    account: "the first deal",
+    roster: [],
+    log: [],
+  };
+}
 
 export interface ChaosReport {
   phase: "storm" | "settling" | "converged" | "diverged" | "timed-out";
@@ -77,8 +80,8 @@ export const [engine, setEngine] = createSignal<CollaborationEngine | null>(null
 export const [status, setStatus] = createSignal<"loading" | "ready" | "error">("loading");
 export const [statusDetail, setStatusDetail] = createSignal("Starting the in-page server…");
 export const [views, setViews] = createStore<Record<ClientKey, ClientView>>({
-  a: EMPTY_CLIENT_VIEW,
-  b: EMPTY_CLIENT_VIEW,
+  a: emptyClientView(),
+  b: emptyClientView(),
 });
 export const [serverLog, setServerLog] = createSignal<Array<LogEntry & { status: string }>>([]);
 export const [serverVersion, setServerVersion] = createSignal(0);

@@ -31,6 +31,14 @@ const SHOWCASE_PAGES = [
     "performance",
     "database",
     "collaboration",
+    "interoperability",
+    "sort",
+    "functions",
+    "recalculation",
+    "data-model",
+    "dashboards",
+    "queries",
+    "version-history",
   ].map((id) => `/showcases/${id}/`),
 ];
 

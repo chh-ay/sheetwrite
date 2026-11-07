@@ -48,7 +48,7 @@ import {
   CHAOS_DRAIN_MS,
   CLIENT_KEYS,
   type ClientKey,
-  EMPTY_CLIENT_VIEW,
+  emptyClientView,
   nextLogId,
   patchView,
   pushClientLog,
@@ -1096,7 +1096,7 @@ export function createCollaborationEngine(
           for (const key of CLIENT_KEYS) disposeClient(key);
           stopServers();
           if (generation !== bootGeneration) return;
-          setViews({ a: EMPTY_CLIENT_VIEW, b: EMPTY_CLIENT_VIEW });
+          setViews({ a: emptyClientView(), b: emptyClientView() });
           await bootAll(generation);
         },
         () => "Cannot reset the demo. Try again.",

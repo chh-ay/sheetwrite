@@ -1,16 +1,9 @@
 import { errorText } from "@docs/lib/errors.js";
+import type { LiveScenario } from "@docs/showcases/scenarios/live-scenario.js";
 import { type Accessor, createSignal, onCleanup, onMount } from "solid-js";
 
 import { useAction } from "../../lib/use-action.js";
 import { whenNearViewport } from "./near-viewport.js";
-
-/** A framework-neutral showcase scenario: a live grid and a snapshot of what it shows. */
-export interface LiveScenario<Snapshot> {
-  readonly ready: Promise<void>;
-  snapshot(): Snapshot;
-  subscribe(listener: () => void): () => void;
-  dispose(): void;
-}
 
 /** A scenario without a snapshot to follow: a grid that is ready, then disposed. */
 export interface StartedScenario {
