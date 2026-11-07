@@ -16,11 +16,12 @@ import { hydrate } from "solid-js/web";
 import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import { installDocsShell } from "../lib/shell.js";
-import type { IslandName } from "./Island.js";
+import { SHOWCASE_ISLANDS, type ShowcaseIsland } from "../showcases/islands.js";
+import type { CoreIslandName, IslandName } from "./Island.js";
 import type { StaticRunnableCodeProps, StaticTabsProps } from "./StaticMarkup.js";
 
 /** An island's root, from the props the server serialised for it and its own markup. */
-type IslandRender = (island: HTMLElement, props: object) => JSX.Element;
+export type IslandRender = (island: HTMLElement, props: object) => JSX.Element;
 
 function withProps<Props extends object>(component: Component<Props>): IslandRender {
   // The server wrote these props from the same component's props (Island.tsx).
@@ -28,7 +29,7 @@ function withProps<Props extends object>(component: Component<Props>): IslandRen
 }
 
 /** Each island's code loads only on the pages that hold it; page-scripts.ts preloads it there. */
-const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
+const CORE_ISLANDS: Readonly<Record<CoreIslandName, () => Promise<IslandRender>>> = {
   "package-command": () =>
     import("../components/PackageCommand.js").then(({ PackageCommand }) =>
       withProps(PackageCommand),
@@ -77,6 +78,13 @@ const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
         (island) =>
           createComponent(CodeTabs, { panels: markupOf(island) }),
     ),
+};
+
+const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
+  ...CORE_ISLANDS,
+  ...(Object.fromEntries(
+    Object.entries<ShowcaseIsland>(SHOWCASE_ISLANDS).map(([name, island]) => [name, island.load]),
+  ) as Record<keyof typeof SHOWCASE_ISLANDS, () => Promise<IslandRender>>),
 };
 
 function isIslandName(name: string | undefined): name is IslandName {

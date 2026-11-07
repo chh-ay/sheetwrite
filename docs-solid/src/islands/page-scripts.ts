@@ -11,6 +11,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { SHOWCASE_ISLANDS, type ShowcaseIsland } from "../showcases/islands.ts";
 import type { IslandName } from "./Island.tsx";
 
 const ISLANDS_ENTRY = "src/islands/client.tsx";
@@ -29,6 +30,9 @@ const ON_DEMAND_ISLANDS: Readonly<Record<IslandName, string>> = {
   "landing-architecture": "src/components/landing/ArchitectureScene.tsx",
   "landing-stories": "src/components/landing/StoryReel.tsx",
   "landing-code": "src/components/landing/CodeTabs.tsx",
+  ...(Object.fromEntries(
+    Object.entries<ShowcaseIsland>(SHOWCASE_ISLANDS).map(([name, island]) => [name, island.source]),
+  ) as Record<keyof typeof SHOWCASE_ISLANDS, string>),
 };
 
 const CLIENT_OUTPUT = new URL("../../dist/client/", import.meta.url).pathname;
