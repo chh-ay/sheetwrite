@@ -46,7 +46,7 @@ import type {
 import { type NativeQuickInfo, parseNativeHover } from "./native-quick-info.js";
 
 export interface NativeTypeEngineOptions {
-  /** The docs package directory; samples resolve `@sheetwrite/*` through its node_modules. */
+  /** Where the language server and API run; sample resolution and caches do not depend on it. */
   cwd: string;
   /** Identifiers that never get a hover (compiler-generated names). */
   internalIdentifier: RegExp;
@@ -139,19 +139,21 @@ const GENERIC_MEMBER_OWNER = /^\((?:property|method)\) [\w$]+(?:\.[\w$]+)*<(.+?)
 const TYPE_PARAMETER_ARGUMENT = /\bextends\b|(?:^|,\s*)[A-Z][A-Za-z]{0,2}(?:,|$)/;
 const HEADER_SEPARATOR = "\r\n\r\n";
 const CONTENT_LENGTH = /Content-Length: (\d+)/i;
+/** This package; `typescript` and `@vue/content-mapper` resolve from here as 7.1. */
+const HOVERS_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 /**
  * The in-memory projects live under node_modules: the server's search for a file's
  * tsconfig stops there, so opening them never loads the docs or package projects above.
  */
-const PROJECT_DIRECTORY = "node_modules/.sheetwrite-hover";
-const SHEETWRITE_PACKAGES = "node_modules/@sheetwrite";
-const CACHE_FILE = "node_modules/.cache/sheetwrite-hovers.jsonl";
+const PROJECT_DIRECTORY = join(HOVERS_DIRECTORY, "node_modules/.sheetwrite-hover");
+/** The Sheetwrite packages samples import, as the docs package installs them. */
+const SHEETWRITE_PACKAGES = join(HOVERS_DIRECTORY, "../node_modules/@sheetwrite");
+const LOCKFILE = join(HOVERS_DIRECTORY, "../../bun.lock");
+const CACHE_FILE = join(HOVERS_DIRECTORY, "node_modules/.cache/sheetwrite-hovers.jsonl");
 /** Files that can carry types; every file of every Sheetwrite package samples import is hashed. */
 const TYPED_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
 /** Never read by samples: Rust build output and installed packages. */
 const UNHASHED_DIRECTORIES = new Set(["node_modules", "target", ".git"]);
-/** This package; `typescript` and `@vue/content-mapper` resolve from here as 7.1. */
-const HOVERS_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 /** Code whose changes change hovers for unchanged sample text. */
 const ENGINE_FILES = [
   join(HOVERS_DIRECTORY, "native-type-engine.ts"),
@@ -449,7 +451,7 @@ export class NativeTypeEngine {
   private activeFlushes = 0;
 
   constructor(private readonly options: NativeTypeEngineOptions) {
-    this.projectDirectory = normalizedPath(join(HOVERS_DIRECTORY, PROJECT_DIRECTORY));
+    this.projectDirectory = normalizedPath(PROJECT_DIRECTORY);
   }
 
   /**
@@ -546,11 +548,11 @@ export class NativeTypeEngine {
     const parts: string[] = [
       readFileSync(createRequire(import.meta.url).resolve("typescript/package.json"), "utf8"),
       this.projectConfig([]),
-      readFileSync(join(this.options.cwd, "../bun.lock"), "utf8"),
+      readFileSync(LOCKFILE, "utf8"),
       ...[...(this.options.fsMap ?? [])].flat(),
     ];
     for (const file of ENGINE_FILES) parts.push(readFileSync(file, "utf8"));
-    const packages = join(this.options.cwd, SHEETWRITE_PACKAGES);
+    const packages = SHEETWRITE_PACKAGES;
     const roots = (await readdir(packages)).map((name) => realpathSync(join(packages, name)));
     const files = new Set<string>();
     const visit = async (directory: string): Promise<void> => {
@@ -568,7 +570,7 @@ export class NativeTypeEngine {
 
   private start(): Promise<{ server: LanguageServer; cache: HoverCache }> {
     this.session ??= (async () => {
-      const cache = new HoverCache(join(this.options.cwd, CACHE_FILE), await this.globalKey());
+      const cache = new HoverCache(CACHE_FILE, await this.globalKey());
       const server = new LanguageServer(nativeCompilerPath());
       await server.initialize(this.options.cwd);
       for (const [fileName, text] of this.options.fsMap ?? []) {
