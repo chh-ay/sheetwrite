@@ -251,6 +251,18 @@ shows: a LET formula took 2–5× the instructions of the same formula written
 without LET, with 18–34 heap allocations per evaluation. Its ratio limit is
 the 1.2 default until same-engine pairs calibrate it.
 
+`round-many`, `concat-many`, `offset-many` and `indirect-many` (10K and 100K)
+exist because the other rows did not exercise these shapes, so the gate could
+not see their cost. Each puts one formula per row, and every formula reads
+`$C$1`, which the timed edit changes. The shapes are
+`=ROUND(A1*$C$1,2)`, `=A1&" "&$C$1` over text cells, `=OFFSET(A1,$C$1,0)` and
+`=INDIRECT("A"&(ROW()+$C$1))`. Measured on develop before these rows existed
+(10K formulas, first recalculation, against a plain formula of the same
+shape), they took 3.3–11× the instructions, with 4–19 heap allocations per
+formula: ROUND 4,512 against 1,083, concatenation 4,596 against 1,405, OFFSET
+5,193 against 917, INDIRECT 10,137 against 917. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
@@ -438,11 +450,18 @@ conditional rules), column queries (aggregate, sort, filter, search, distinct
 values, data edges), batched cell reads (`getCell`, `cellSnapshots`,
 `captureRange`, `persistedCellData`, `rangeStyleIds`) and formula range
 readers (ten families of eight formulas over ~100k-row ranges, recomputed after
-an edit). `src/reader-bench.ts` holds the 39 readers and their deterministic
+an edit). `src/reader-bench.ts` holds the 40 readers and their deterministic
 100,000-row fixtures. As with the formula gate, the harness always comes from
 the checkout that runs the gate; `--base` and `--candidate` (default: this
 checkout) only supply a built `packages/wasm/pkg`, so a 0.5.x base works
 without this benchmark code.
+
+`getWindow 1000x8 formula rule` exists because the other conditional window
+readers apply one formula rule to one column, so the gate barely exercised
+formula rules. Here one formula rule covers all eight columns, so every visible
+cell evaluates it. Measured on develop before this reader existed, a formula
+rule added 778 instructions and 2 heap allocations per visible cell to a
+window read that otherwise took 373 instructions per cell.
 
 Build a 0.5.x base once, in its own worktree (48b137c8 is the v0.5.4 release
 commit):
@@ -1108,7 +1127,7 @@ bench/
     gate-protocol.ts       # exact matrices, resource/stat checks, fingerprints
     generate-baseline.ts   # non-overwriting controlled candidate generation
     render-gate.ts         # exact full/smoke renderer gate policies
-    reader-bench.ts        # one-engine CellStore reader timing (39 readers)
+    reader-bench.ts        # one-engine CellStore reader timing (40 readers)
     reader-gate.ts         # paired ABBA reader gate and noise-floor writer
     verify.ts              # deterministic CI smoke orchestration and artifacts
   results/
