@@ -3,9 +3,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
 import { DocumentReady } from "../components/DocumentReady.js";
-import Overview, { frontmatter, stylesheets } from "../content/docs/index.mdx";
+import type { DocumentModule } from "../lib/content.js";
 import { breadcrumbsFor } from "../lib/navigation.js";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "../lib/seo.js";
+
+/**
+ * The overview page module, bundled with this route. An eager glob rather than
+ * a named import: a page that uses no rare component has no `stylesheets` export.
+ */
+const overview = Object.values(
+  import.meta.glob<DocumentModule>("../content/docs/index.mdx", { eager: true }),
+)[0]!;
+const Overview = overview.default;
+if (overview.frontmatter === undefined) throw new Error("content/docs/index.mdx has no frontmatter");
+const frontmatter = overview.frontmatter;
+const stylesheets = overview.stylesheets ?? [];
 
 const OVERVIEW_HREF = "/docs/";
 const OVERVIEW_SOURCE = "docs/src/content/docs/index.mdx";
