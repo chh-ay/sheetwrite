@@ -1,5 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it } from "bun:test";
 
+import { parseNativeHover } from "../docs/hovers/native-quick-info.js";
 import {
   collectFenceHovers,
   isHighQualityHover,
@@ -10,18 +11,50 @@ import {
   type SheetwriteTypeHover,
 } from "../docs/src/lib/sheetwrite-type-engine.js";
 
+describe("TypeScript 7.1 hover parsing", () => {
+  it("splits a language-server hover into signature, summary and 5.9-shaped tags", () => {
+    const markdown = [
+      "```typescript",
+      "function persist(event: ChangeEvent): void",
+      "```",
+      "Persist one change. See [createGrid](file:///repo/packages/core/src/grid.ts#491,17-491,27).",
+      "",
+      "*@param* `event` — the change",
+      "",
+      "*@see* — [Grid](file:///repo/packages/core/src/grid.ts#10,18-10,22)",
+      "",
+      "*@example*",
+      "```tsx",
+      "persist(event)",
+      "```",
+      "",
+    ].join("\n");
+
+    expect(parseNativeHover(markdown)).toEqual({
+      text: "function persist(event: ChangeEvent): void",
+      docs: "Persist one change. See {@link createGrid}.",
+      tags: [
+        ["param", "event the change"],
+        ["see", "Grid"],
+        ["example", "```tsx\npersist(event)\n```"],
+      ],
+    });
+  });
+});
+
 describe("Sheetwrite type engine", () => {
-  it("owns TypeScript quick info with workspace module resolution", () => {
+  it("owns TypeScript quick info with workspace module resolution", async () => {
     const engine = new SheetwriteTypeEngine({
       cwd: new URL("../docs/", import.meta.url).pathname,
     });
-    const hovers = engine.analyze(
+    const hovers = await engine.analyze(
       `import type { ChangeEvent } from "@sheetwrite/core";
 export function persist(event: ChangeEvent): void {
   void event.transaction;
 }`,
       "ts",
     );
+    await engine.dispose();
 
     expect(hovers.find((hover) => hover.target === "ChangeEvent")?.text).toContain("ChangeEvent");
     expect(hovers.find((hover) => hover.target === "persist")?.text).toContain(
@@ -30,6 +63,25 @@ export function persist(event: ChangeEvent): void {
     expect(hovers.find((hover) => hover.target === "transaction")?.text).toContain(
       "ChangeEvent.transaction: Transaction",
     );
+  });
+
+  it("answers object-literal property names with the declared property and its docs", async () => {
+    const engine = new SheetwriteTypeEngine({
+      cwd: new URL("../docs/", import.meta.url).pathname,
+    });
+    const hovers = await engine.analyze(
+      `import type { Column } from "@sheetwrite/core";
+export const columns: Column[] = [{ key: "name", header: "Name", width: 120, type: "text" }];
+export const controller = new AbortController();`,
+      "ts",
+    );
+    await engine.dispose();
+
+    const header = hovers.find((hover) => hover.target === "header");
+    expect(header?.text).toBe("(property) Column.header: string");
+    expect(header?.docs).toBeTruthy();
+    const abortController = hovers.filter((hover) => hover.target === "AbortController").at(-1);
+    expect(abortController?.docs).toContain("AbortController");
   });
 
   it("repairs framework bindings only through explicit source relationships", () => {
@@ -102,10 +154,11 @@ describe("Sheetwrite hover preludes", () => {
   const engine = new SheetwriteTypeEngine({
     cwd: new URL("../docs/", import.meta.url).pathname,
   });
+  afterAll(() => engine.dispose());
 
-  it("maps single-line script positions around an injected prelude", () => {
+  it("maps single-line script positions around an injected prelude", async () => {
     const source = '<script lang="ts">grid.destroy();</script>';
-    const hovers = collectFenceHovers(source, "svelte", engine, "core");
+    const hovers = await collectFenceHovers(source, "svelte", engine, "core");
     const destroy = hovers.find((hover) => hover.target === "destroy");
     expect(destroy).toMatchObject({ line: 0, character: source.indexOf("destroy") });
     for (const hover of hovers) {
@@ -116,8 +169,8 @@ describe("Sheetwrite hover preludes", () => {
     }
   });
 
-  it("resolves prelude-backed host state in partial ts snippets", () => {
-    const hovers = collectFenceHovers(
+  it("resolves prelude-backed host state in partial ts snippets", async () => {
+    const hovers = await collectFenceHovers(
       "grid.destroy();\nworkbook.sheets.length;\n",
       "ts",
       engine,
@@ -157,12 +210,13 @@ describe("Sheetwrite hover quality", () => {
   });
 });
 describe("Sheetwrite hover preludes end to end", () => {
-  it("resolves template-only svelte snippets through the synthetic script", () => {
+  it("resolves template-only svelte snippets through the synthetic script", async () => {
     const engine = new SheetwriteTypeEngine({
       cwd: new URL("../docs/", import.meta.url).pathname,
     });
     const source = "<button onclick={() => grid.destroy()}>Reset</button>";
-    const hovers = collectFenceHovers(source, "svelte", engine, "core");
+    const hovers = await collectFenceHovers(source, "svelte", engine, "core");
+    await engine.dispose();
     const grid = hovers.find((hover) => hover.target === "grid");
     expect(grid?.line).toBe(0);
     expect(grid?.character).toBe(source.indexOf("grid"));
