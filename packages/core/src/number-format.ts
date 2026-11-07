@@ -1,4 +1,4 @@
-import { serialToDate } from "./date-serial.js";
+import { FICTIONAL_LEAP_DAY_SERIAL, serialToDate } from "./date-serial.js";
 
 interface NumericDescriptor {
   percent: boolean;
@@ -486,11 +486,16 @@ function calendarFormatter(
   );
 }
 
+/**
+ * Render date tokens for a serial. `serialToDate` gives serial 60 as 28 February
+ * 1900, which has the year, month, weekday and time Excel shows for its fictional
+ * 29 February, so only the day of the month changes.
+ */
 function renderDate(serial: number, tokens: readonly DateToken[], locale: string): string {
   const date = serialToDate(serial);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
-  const day = date.getUTCDate();
+  const day = Math.floor(serial) === FICTIONAL_LEAP_DAY_SERIAL ? 29 : date.getUTCDate();
   const hour24 = date.getUTCHours();
   const minute = date.getUTCMinutes();
   const second = date.getUTCSeconds();

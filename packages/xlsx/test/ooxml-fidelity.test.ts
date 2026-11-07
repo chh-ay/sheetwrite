@@ -40,13 +40,13 @@ function rawWorkbook(sheetXml: string, options: RawOptions = {}): Uint8Array {
     '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
     ...(options.styles
       ? [
-        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>',
-      ]
+          '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>',
+        ]
       : []),
     ...(options.theme
       ? [
-        '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>',
-      ]
+          '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>',
+        ]
       : []),
     options.overrides ?? "",
   ];
@@ -173,10 +173,10 @@ describe("raw spec-authored OOXML fidelity", () => {
       rawWorkbook(
         sheet(
           '<dimension ref="A1:D4"/><sheetData>' +
-          '<row r="1"><c r="C1"><f t="shared" si="0" ref="C1:D1">SUM(A:A)+XYZ1</f></c><c r="D1"><f t="shared" si="0"/></c></row>' +
-          '<row r="3"><c r="A3"><f t="shared" si="1" ref="A3:A4">SUM(1:1)*XFD1</f></c></row>' +
-          '<row r="4"><c r="A4"><f t="shared" si="1"/></c></row>' +
-          "</sheetData>",
+            '<row r="1"><c r="C1"><f t="shared" si="0" ref="C1:D1">SUM(A:A)+XYZ1</f></c><c r="D1"><f t="shared" si="0"/></c></row>' +
+            '<row r="3"><c r="A3"><f t="shared" si="1" ref="A3:A4">SUM(1:1)*XFD1</f></c></row>' +
+            '<row r="4"><c r="A4"><f t="shared" si="1"/></c></row>' +
+            "</sheetData>",
         ),
       ),
     );
@@ -198,10 +198,10 @@ describe("raw spec-authored OOXML fidelity", () => {
       rawWorkbook(
         sheet(
           '<dimension ref="A1:A3"/><sheetData>' +
-          '<row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A3">B1&amp;$C$1&amp;"open</f></c></row>' +
-          '<row r="2"><c r="A2"><f t="shared" si="0">B2&amp;$C$1&amp;"own</f></c></row>' +
-          '<row r="3"><c r="A3"><f t="shared" si="0"/></c></row>' +
-          "</sheetData>",
+            '<row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A3">B1&amp;$C$1&amp;"open</f></c></row>' +
+            '<row r="2"><c r="A2"><f t="shared" si="0">B2&amp;$C$1&amp;"own</f></c></row>' +
+            '<row r="3"><c r="A3"><f t="shared" si="0"/></c></row>' +
+            "</sheetData>",
         ),
       ),
       { onWarning: (warning) => warnings.push(warning) },
@@ -378,14 +378,14 @@ describe("raw spec-authored OOXML fidelity", () => {
         changed.workbook.externalLinks![0]!.sheets[0]!.cells[0]!.value = 9;
         const written = strFromU8(
           unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(changed))[
-          "xl/externalLinks/sheetwriteLink1.xml"
+            "xl/externalLinks/sheetwriteLink1.xml"
           ]!,
         );
         expect(written).toContain(
           '<sheetNames><sheetName val="Annual Plan"/></sheetNames><definedNames>' +
-          '<definedName name="Total" refersTo="=&apos;Annual Plan&apos;!$C$10"/>' +
-          '<definedName name="Local" refersTo="=&apos;Annual Plan&apos;!$C$11" sheetId="0"/>' +
-          "</definedNames><sheetDataSet>",
+            '<definedName name="Total" refersTo="=&apos;Annual Plan&apos;!$C$10"/>' +
+            '<definedName name="Local" refersTo="=&apos;Annual Plan&apos;!$C$11" sheetId="0"/>' +
+            "</definedNames><sheetDataSet>",
         );
 
         const reimported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
