@@ -256,6 +256,14 @@ function nativeCompilerPath(): string {
   return join(platformDirectory, "lib", process.platform === "win32" ? "tsc.exe" : "tsc");
 }
 
+/**
+ * The language server to run: TypeScript 7.1's `tsc`, or another server with the same
+ * `--lsp --stdio` interface (such as tsrs) named by `SHEETWRITE_HOVER_COMPILER`.
+ */
+function serverExecutable(): string {
+  return process.env.SHEETWRITE_HOVER_COMPILER || nativeCompilerPath();
+}
+
 function setReferenced(handle: object | null | undefined, referenced: boolean): void {
   if (!handle) return;
   if (referenced && "ref" in handle && typeof handle.ref === "function") handle.ref();
@@ -594,6 +602,7 @@ export class NativeTypeEngine {
     const parts: string[] = [
       readFileSync(createRequire(import.meta.url).resolve("typescript/package.json"), "utf8"),
       this.projectConfig([]),
+      serverExecutable(),
       readFileSync(LOCKFILE, "utf8"),
       ...[...(this.options.fsMap ?? [])].flat(),
     ];
@@ -617,7 +626,7 @@ export class NativeTypeEngine {
   private start(): Promise<{ server: LanguageServer; cache: HoverCache }> {
     this.session ??= (async () => {
       const cache = new HoverCache(CACHE_FILE, await this.globalKey());
-      const server = new LanguageServer(nativeCompilerPath());
+      const server = new LanguageServer(serverExecutable());
       await server.initialize(this.options.cwd);
       for (const [fileName, text] of this.options.fsMap ?? []) {
         server.open(pathToFileURL(fileName).href, languageId(fileName), text);
