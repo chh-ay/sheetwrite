@@ -1,5 +1,7 @@
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
 
+// The select brings its own stylesheet: islands load it with their code.
+import "../styles/select.css";
 import { Icon } from "./Icon.js";
 
 /*

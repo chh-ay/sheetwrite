@@ -6,11 +6,20 @@ import type { JSX } from "solid-js";
 
 import { IconSprite } from "../components/IconSprite.js";
 
-import selectStylesheet from "../styles/select.css?url";
+import siteCoreStylesheet from "../styles/site-core.css?url";
+import siteMidStylesheet from "../styles/site-mid.css?url";
+import siteTailStylesheet from "../styles/site-tail.css?url";
 import docsFiguresStylesheet from "@docs/styles/docs-figures.css?url";
-import siteShellStylesheet from "@docs/styles/site-shell.css?url";
-import siteStylesheet from "@docs/styles/site.css?url";
-import tokensStylesheet from "@docs/styles/tokens.css?url";
+import apiReferenceStylesheet from "@docs/styles/site/api-reference.css?url";
+import evidenceStylesheet from "@docs/styles/site/evidence.css?url";
+import figuresStylesheet from "@docs/styles/site/figures.css?url";
+import formulaReferenceStylesheet from "@docs/styles/site/formula-reference.css?url";
+import machineCompareStylesheet from "@docs/styles/site/machine-compare.css?url";
+import perfBarsStylesheet from "@docs/styles/site/perf-bars.css?url";
+import playgroundStylesheet from "@docs/styles/site/playground.css?url";
+import releaseChangeStylesheet from "@docs/styles/site/release-change.css?url";
+import speedStoryStylesheet from "@docs/styles/site/speed-story.css?url";
+import upgradeGuideStylesheet from "@docs/styles/site/upgrade-guide.css?url";
 // Expressive Code base and theme styles, shared by every page with code.
 import "virtual:expressive-code.css";
 
@@ -32,6 +41,14 @@ const FONT_PRELOAD = {
   fetchPriority: "high",
 } as const;
 
+const stylesheet = (href: string) => ({ rel: "stylesheet", href });
+/**
+ * A stylesheet only some pages use. `data-feature` marks it for the page
+ * script (islands/page-scripts.ts), which keeps it only where the page's
+ * markup uses its classes.
+ */
+const featureStylesheet = (href: string) => ({ rel: "stylesheet", href, "data-feature": "" });
+
 export const Route = createRootRoute({
   head: ({ matches }) => {
     const pathname = matches.at(-1)?.pathname ?? "/";
@@ -40,12 +57,21 @@ export const Route = createRootRoute({
       links: [
         { ...FONT_PRELOAD, href: headingFont },
         { ...FONT_PRELOAD, href: bodyFont },
-        // Head links are render-blocking; link order is the cascade.
-        { rel: "stylesheet", href: tokensStylesheet },
-        { rel: "stylesheet", href: siteStylesheet },
-        { rel: "stylesheet", href: siteShellStylesheet },
-        { rel: "stylesheet", href: selectStylesheet },
-        { rel: "stylesheet", href: docsFiguresStylesheet },
+        // Head links are render-blocking; link order is the cascade (site.css's order).
+        stylesheet(siteCoreStylesheet),
+        featureStylesheet(apiReferenceStylesheet),
+        featureStylesheet(evidenceStylesheet),
+        featureStylesheet(figuresStylesheet),
+        featureStylesheet(perfBarsStylesheet),
+        featureStylesheet(machineCompareStylesheet),
+        featureStylesheet(speedStoryStylesheet),
+        featureStylesheet(releaseChangeStylesheet),
+        featureStylesheet(upgradeGuideStylesheet),
+        featureStylesheet(formulaReferenceStylesheet),
+        stylesheet(siteMidStylesheet),
+        featureStylesheet(playgroundStylesheet),
+        stylesheet(siteTailStylesheet),
+        featureStylesheet(docsFiguresStylesheet),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       ],

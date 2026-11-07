@@ -18,6 +18,26 @@ const PAGES = globSync("**/*.{md,mdx}", { cwd: CONTENT_ROOT }).map((source) => {
   return page.length === 0 ? "/docs/" : `/docs/${page}/`;
 });
 
+/**
+ * The browsers the site's CSS is compiled for (Lightning CSS prefixes and
+ * lowers only what these need): Vite's default build target,
+ * "baseline-widely-available", which the islands' JavaScript is built for.
+ */
+const version = (major: number, minor = 0): number => (major << 16) | (minor << 8);
+export const CSS_TARGETS = {
+  chrome: version(111),
+  edge: version(111),
+  firefox: version(114),
+  safari: version(16, 4),
+  ios_saf: version(16, 4),
+};
+
+/** Lightning CSS compiles every stylesheet (vite.islands.config.ts uses the same). */
+export const CSS_OPTIONS = {
+  transformer: "lightningcss",
+  lightningcss: { targets: CSS_TARGETS },
+} as const;
+
 type PageOutput = { code: string; map?: unknown } | undefined;
 
 /**
@@ -95,8 +115,10 @@ export default defineConfig({
       },
     ],
   },
-  // One document-wide stylesheet, as the React site builds it.
-  build: { cssCodeSplit: false },
+  css: CSS_OPTIONS,
+  // Pages link their stylesheets from `?url` imports (routes/__root.tsx); the
+  // page script (src/islands/page-scripts.ts) drops those a page does not use.
+  build: { cssCodeSplit: false, cssMinify: "lightningcss" },
   worker: { format: "es" },
   plugins: [
     docsPages(),
