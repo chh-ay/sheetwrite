@@ -1,0 +1,13 @@
+/* An island's wrapper is `display: contents`, so it draws nothing, but it is
+   still its container's first or last child. The containers that drop their
+   children's outer margins reach through it to the island's own root. */
+:is(.sw-prose, .sw-step__body, .sw-prose blockquote, .sw-callout .sw-callout__body)
+  > [data-island]:first-child
+  > :first-child {
+  margin-top: 0;
+}
+:is(.sw-step__body, .sw-prose blockquote, .sw-callout .sw-callout__body)
+  > [data-island]:last-child
+  > :last-child {
+  margin-bottom: 0;
+}

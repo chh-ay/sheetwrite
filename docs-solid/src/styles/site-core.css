@@ -6,3 +6,4 @@
 @import "@docs/styles/components.css";
 @import "@docs/styles/site/base.css";
 @import "@docs/styles/site/code-hovers.css";
+@import "./islands.css";
