@@ -30,17 +30,20 @@ import { createRequire } from "node:module";
 import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { type Node, ScriptKind } from "typescript-7.1/ast";
+import { type Node, ScriptKind } from "typescript/ast";
 import {
   isIdentifier,
   isObjectLiteralExpression,
   isPropertyAssignment,
   isShorthandPropertyAssignment,
-} from "typescript-7.1/ast/is";
-import { API } from "typescript-7.1/async";
+} from "typescript/ast/is";
+import { API } from "typescript/async";
 
+import type {
+  SheetwriteHoverOrigin,
+  SheetwriteTypeHover,
+} from "../src/lib/sheetwrite-type-engine.js";
 import { type NativeQuickInfo, parseNativeHover } from "./native-quick-info.js";
-import type { SheetwriteHoverOrigin, SheetwriteTypeHover } from "./sheetwrite-type-engine.js";
 
 export interface NativeTypeEngineOptions {
   /** The docs package directory; samples resolve `@sheetwrite/*` through its node_modules. */
@@ -52,7 +55,16 @@ export interface NativeTypeEngineOptions {
   fsMap?: ReadonlyMap<string, string>;
 }
 
-type Language = "ts" | "tsx";
+type Language = "ts" | "tsx" | "vue";
+
+/** Names in a Vue template: identifiers and kebab-case attribute and event names. */
+const TEMPLATE_NAME = /[A-Za-z_$][\w$]*(?:-[\w$]+)*/g;
+/** Words a template name pattern also matches that are never bindings. */
+const RESERVED_WORDS = new Set(
+  "break case catch class const continue debugger default delete do else export extends false finally for function if import in instanceof new null return super switch this throw true try typeof undefined var void while with yield let static await of as".split(
+    " ",
+  ),
+);
 
 /** An identifier in a sample, in UTF-16 offsets and LSP line/character. */
 export interface NativeIdentifier {
@@ -136,15 +148,18 @@ const SHEETWRITE_PACKAGES = "node_modules/@sheetwrite";
 const CACHE_FILE = "node_modules/.cache/sheetwrite-hovers.jsonl";
 /** Files that can carry types; every file of every Sheetwrite package samples import is hashed. */
 const TYPED_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
-/** Never read by samples: Rust build output, installed packages, the original sources. */
-const UNHASHED_DIRECTORIES = new Set(["node_modules", "target", ".git", "src"]);
-/** Code whose changes change hovers for unchanged sample text (relative to the docs package). */
+/** Never read by samples: Rust build output and installed packages. */
+const UNHASHED_DIRECTORIES = new Set(["node_modules", "target", ".git"]);
+/** This package; `typescript` and `@vue/content-mapper` resolve from here as 7.1. */
+const HOVERS_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+/** Code whose changes change hovers for unchanged sample text. */
 const ENGINE_FILES = [
-  "src/lib/native-type-engine.ts",
-  "src/lib/native-quick-info.ts",
-  "src/lib/sheetwrite-type-engine.ts",
-  "src/lib/sheetwrite-code-hovers.ts",
-  "src/lib/hover-preludes.ts",
+  join(HOVERS_DIRECTORY, "native-type-engine.ts"),
+  join(HOVERS_DIRECTORY, "native-quick-info.ts"),
+  join(HOVERS_DIRECTORY, "package.json"),
+  join(HOVERS_DIRECTORY, "../src/lib/sheetwrite-type-engine.ts"),
+  join(HOVERS_DIRECTORY, "../src/lib/sheetwrite-code-hovers.ts"),
+  join(HOVERS_DIRECTORY, "../src/lib/hover-preludes.ts"),
 ];
 /**
  * A property of the object literal itself: no declaring type before the name, and not
@@ -183,6 +198,29 @@ function hoverOrigin(
   return origin;
 }
 
+/**
+ * The summary of the JSDoc comment that ends right above `line` (the declaration's name
+ * line, or the line its comment-led statement starts on), without leading `*` and without
+ * the `@tag` section, as the language server shows it. Empty when there is none.
+ */
+function jsDocSummaryBefore(lines: readonly string[], line: number): string {
+  let end = line - 1;
+  while (end >= 0 && (lines[end] ?? "").trim() === "") end -= 1;
+  if (!(lines[end] ?? "").trim().endsWith("*/")) return "";
+  let start = end;
+  while (start >= 0 && !(lines[start] ?? "").includes("/**")) start -= 1;
+  if (start < 0) return "";
+  const body = lines
+    .slice(start, end + 1)
+    .join("\n")
+    .replace(/^[\s\S]*?\/\*\*/, "")
+    .replace(/\*\/\s*$/, "")
+    .split("\n")
+    .map((text) => text.replace(/^\s*\* ?/, ""));
+  const tagStart = body.findIndex((text) => /^\s*@\w/.test(text));
+  return (tagStart < 0 ? body : body.slice(0, tagStart)).join("\n").trim();
+}
+
 function lineStarts(text: string): number[] {
   const starts = [0];
   for (let index = 0; index < text.length; index++) {
@@ -205,10 +243,8 @@ function positionAt(
   return { line: low, character: offset - (starts[low] ?? 0) };
 }
 
-function nativeCompilerPath(cwd: string): string {
-  const packageJson = createRequire(join(cwd, "package.json")).resolve(
-    "typescript-7.1/package.json",
-  );
+function nativeCompilerPath(): string {
+  const packageJson = createRequire(import.meta.url).resolve("typescript/package.json");
   const platformPackage = `@typescript/typescript-${process.platform}-${process.arch}/package.json`;
   const platformDirectory = dirname(createRequire(packageJson).resolve(platformPackage));
   return join(platformDirectory, "lib", process.platform === "win32" ? "tsc.exe" : "tsc");
@@ -242,6 +278,8 @@ class LanguageServer {
     await this.request("initialize", {
       processId: process.pid,
       rootUri: pathToFileURL(rootDirectory).href,
+      // Lets the server start the Vue content mapper the sample projects configure.
+      initializationOptions: { runExternalCode: true },
       capabilities: {
         general: { positionEncodings: ["utf-16"] },
         textDocument: { hover: { contentFormat: ["markdown"] }, definition: {} },
@@ -399,6 +437,9 @@ export class NativeTypeEngine {
    * which do not change during a session; many samples ask about the same ones.
    */
   private readonly declarationHovers = new Map<string, Promise<NativeQuickInfo | undefined>>();
+  /** JSDoc summaries by declaration file and line, and declaration files by path, per session. */
+  private readonly declarationDocs = new Map<string, string>();
+  private readonly declarationFiles = new Map<string, string[]>();
   private queue: Sample[] = [];
   private flushScheduled = false;
   private session: Promise<{ server: LanguageServer; cache: HoverCache }> | undefined;
@@ -408,7 +449,7 @@ export class NativeTypeEngine {
   private activeFlushes = 0;
 
   constructor(private readonly options: NativeTypeEngineOptions) {
-    this.projectDirectory = normalizedPath(join(options.cwd, PROJECT_DIRECTORY));
+    this.projectDirectory = normalizedPath(join(HOVERS_DIRECTORY, PROJECT_DIRECTORY));
   }
 
   /**
@@ -493,20 +534,22 @@ export class NativeTypeEngine {
         noImplicitAny: false,
         noEmit: true,
       },
+      contentMappers: [
+        { package: "@vue/content-mapper", extensions: [".vue"], options: { target: 3.5 } },
+      ],
       files: files.map((file) => basename(file)),
     });
   }
 
   /** Everything that changes hover results for unchanged sample text. */
   private async globalKey(): Promise<string> {
-    const require = createRequire(join(this.options.cwd, "package.json"));
     const parts: string[] = [
-      readFileSync(require.resolve("typescript-7.1/package.json"), "utf8"),
+      readFileSync(createRequire(import.meta.url).resolve("typescript/package.json"), "utf8"),
       this.projectConfig([]),
       readFileSync(join(this.options.cwd, "../bun.lock"), "utf8"),
       ...[...(this.options.fsMap ?? [])].flat(),
     ];
-    for (const file of ENGINE_FILES) parts.push(readFileSync(join(this.options.cwd, file), "utf8"));
+    for (const file of ENGINE_FILES) parts.push(readFileSync(file, "utf8"));
     const packages = join(this.options.cwd, SHEETWRITE_PACKAGES);
     const roots = (await readdir(packages)).map((name) => realpathSync(join(packages, name)));
     const files = new Set<string>();
@@ -526,7 +569,7 @@ export class NativeTypeEngine {
   private start(): Promise<{ server: LanguageServer; cache: HoverCache }> {
     this.session ??= (async () => {
       const cache = new HoverCache(join(this.options.cwd, CACHE_FILE), await this.globalKey());
-      const server = new LanguageServer(nativeCompilerPath(this.options.cwd));
+      const server = new LanguageServer(nativeCompilerPath());
       await server.initialize(this.options.cwd);
       for (const [fileName, text] of this.options.fsMap ?? []) {
         server.open(pathToFileURL(fileName).href, languageId(fileName), text);
@@ -649,7 +692,10 @@ export class NativeTypeEngine {
       const answers = new Map<SheetwriteTypeHover, NativeQuickInfo | undefined>();
       for (const hover of suspects) {
         const markdown = await server.hover(uri, hover);
-        answers.set(hover, markdown ? parseNativeHover(markdown) : undefined);
+        answers.set(
+          hover,
+          markdown ? parseNativeHover(markdown, this.options.internalTagText) : undefined,
+        );
       }
       return hovers.map((hover) => {
         const quickInfo = answers.get(hover);
@@ -702,7 +748,9 @@ export class NativeTypeEngine {
       const found = await Promise.all(
         identifiers.map(async (identifier) => {
           const markdown = await server.hover(uri, identifier);
-          const quickInfo = markdown ? parseNativeHover(markdown) : undefined;
+          const quickInfo = markdown
+            ? parseNativeHover(markdown, this.options.internalTagText)
+            : undefined;
           if (!quickInfo?.text) return undefined;
           // Only positions with a hover ask where their symbol is declared.
           return { identifier, quickInfo, definitions: await server.definitions(uri, identifier) };
@@ -720,7 +768,7 @@ export class NativeTypeEngine {
           quickInfo = (await this.declaredProperty(server, definitions, file)) ?? quickInfo;
         }
         if (!quickInfo.docs) {
-          const docs = await this.mergedDeclarationDocs(server, definitions, file);
+          const docs = this.mergedDeclarationDocs(definitions, file);
           if (docs) quickInfo = { ...quickInfo, docs };
         }
         const origin = hoverOrigin(
@@ -763,22 +811,39 @@ export class NativeTypeEngine {
    * 5.9 joined the docs of every declaration of a symbol; 7.1 shows none when the
    * declaration it reads has none, as for `AbortController`, whose value (`declare var`)
    * is undocumented and whose interface carries the docs. The first other declaration
-   * with docs supplies them.
+   * with a JSDoc comment supplies them. The comment is read from the declaration file:
+   * hovering there made the server load a project for every library file it touched.
    */
-  private async mergedDeclarationDocs(
-    server: LanguageServer,
+  private mergedDeclarationDocs(
     definitions: readonly Definition[],
     sampleFile: string,
-  ): Promise<string | undefined> {
+  ): string | undefined {
     const declarations = definitions.filter(
       (definition) => normalizedPath(definition.file) !== sampleFile,
     );
     if (declarations.length < 2) return undefined;
     for (const declaration of declarations) {
-      const docs = (await this.declarationHover(server, declaration))?.docs;
+      const key = `${declaration.file}:${declaration.position.line}`;
+      let docs = this.declarationDocs.get(key);
+      if (docs === undefined) {
+        docs = jsDocSummaryBefore(
+          this.declarationText(declaration.file),
+          declaration.position.line,
+        );
+        this.declarationDocs.set(key, docs);
+      }
       if (docs) return docs;
     }
     return undefined;
+  }
+
+  private declarationText(file: string): string[] {
+    let lines = this.declarationFiles.get(file);
+    if (!lines) {
+      lines = readFileSync(file, "utf8").split("\n");
+      this.declarationFiles.set(file, lines);
+    }
+    return lines;
   }
 
   private declarationHover(
@@ -790,19 +855,67 @@ export class NativeTypeEngine {
     if (!hover) {
       hover = server
         .hover(definition.uri, definition.position)
-        .then((markdown) => (markdown ? parseNativeHover(markdown) : undefined));
+        .then((markdown) =>
+          markdown ? parseNativeHover(markdown, this.options.internalTagText) : undefined,
+        );
       this.declarationHovers.set(key, hover);
     }
     return hover;
   }
 
-  private async identifiers(parser: API, file: string, sample: Sample) {
-    const lease = await parser.createSourceFile(file, sample.source, {
-      scriptKind: sample.language === "tsx" ? ScriptKind.TSX : ScriptKind.TS,
+  private async identifiers(
+    parser: API,
+    file: string,
+    sample: Sample,
+  ): Promise<NativeIdentifier[]> {
+    if (sample.language !== "vue")
+      return this.scriptIdentifiers(parser, file, sample.source, 0, sample.language);
+    // Script blocks are parsed; template names are found by pattern. The server answers
+    // only positions the content mapper maps, so text words drop out on their own.
+    const identifiers: NativeIdentifier[] = [];
+    const blocks = [...sample.source.matchAll(/(<(script|style)\b[^>]*>)([\s\S]*?)<\/\2>/gi)];
+    for (const block of blocks) {
+      if (block[2]?.toLowerCase() !== "script") continue;
+      const start = (block.index ?? 0) + (block[1]?.length ?? 0);
+      const kind = /\blang=["']tsx["']/.test(block[1] ?? "") ? "tsx" : "ts";
+      identifiers.push(
+        ...(await this.scriptIdentifiers(parser, file, sample.source, start, kind, block[3] ?? "")),
+      );
+    }
+    const starts = lineStarts(sample.source);
+    for (const word of sample.source.matchAll(TEMPLATE_NAME)) {
+      const start = word.index ?? 0;
+      const inBlock = blocks.some(
+        (block) => start >= (block.index ?? 0) && start < (block.index ?? 0) + block[0].length,
+      );
+      if (inBlock || RESERVED_WORDS.has(word[0])) continue;
+      const text = word[0];
+      identifiers.push({
+        text,
+        start,
+        end: start + text.length,
+        propertyName: false,
+        ...positionAt(starts, start),
+      });
+    }
+    return identifiers.sort((left, right) => left.start - right.start);
+  }
+
+  /** Identifiers of `code`, a script that starts at `offset` in the sample's source. */
+  private async scriptIdentifiers(
+    parser: API,
+    file: string,
+    source: string,
+    offset: number,
+    language: "ts" | "tsx",
+    code = source,
+  ): Promise<NativeIdentifier[]> {
+    const lease = await parser.createSourceFile(`${file}.${language}`, code, {
+      scriptKind: language === "tsx" ? ScriptKind.TSX : ScriptKind.TS,
     });
     try {
       const { sourceFile } = lease;
-      const starts = lineStarts(sample.source);
+      const starts = lineStarts(source);
       const identifiers: NativeIdentifier[] = [];
       const propertyNames = new Set<Node>();
       const visit = (node: Node, parent?: Node): void => {
@@ -814,11 +927,11 @@ export class NativeTypeEngine {
           propertyNames.add(node.name);
         }
         if (isIdentifier(node) && !this.options.internalIdentifier.test(node.text)) {
-          const start = node.getStart(sourceFile);
+          const start = offset + node.getStart(sourceFile);
           identifiers.push({
             text: node.text,
             start,
-            end: node.end,
+            end: offset + node.end,
             propertyName: propertyNames.has(node),
             ...positionAt(starts, start),
           });
@@ -835,5 +948,6 @@ export class NativeTypeEngine {
 }
 
 function languageId(fileName: string): string {
+  if (fileName.endsWith(".vue")) return "vue";
   return fileName.endsWith(".tsx") ? "typescriptreact" : "typescript";
 }

@@ -61,11 +61,23 @@ function tagText(name: string, body: string): string | undefined {
   return declarationLinks(urls, "name") || undefined;
 }
 
-export function parseNativeHover(markdown: string): NativeQuickInfo | undefined {
-  const [first = ""] = markdown.split(PROJECTION_SEPARATOR);
-  const signature = SIGNATURE_FENCE.exec(first);
+/**
+ * A position with several projections (a Vue template expression maps to more than one
+ * place in the generated code) has one hover per projection; the first whose signature
+ * does not match `internal` (compiler scaffolding) is the reader's.
+ */
+export function parseNativeHover(markdown: string, internal?: RegExp): NativeQuickInfo | undefined {
+  for (const projection of markdown.split(PROJECTION_SEPARATOR)) {
+    const quickInfo = parseProjection(projection);
+    if (quickInfo && !internal?.test(quickInfo.text)) return quickInfo;
+  }
+  return undefined;
+}
+
+function parseProjection(projection: string): NativeQuickInfo | undefined {
+  const signature = SIGNATURE_FENCE.exec(projection);
   if (!signature) return undefined;
-  const documentation = first.slice(signature[0].length);
+  const documentation = projection.slice(signature[0].length);
 
   const starts = [...documentation.matchAll(TAG_START)];
   const summaryEnd = starts[0]?.index ?? documentation.length;

@@ -1,16 +1,4 @@
-import {
-  CompilerOptionsResolver,
-  createLanguage,
-  createVueLanguagePlugin,
-  defaultMapperFactory,
-  FileMap,
-  type LanguagePlugin,
-  type VueVirtualCode,
-} from "@vue/language-core";
-import ts from "typescript";
-
-import { type IdentifierSelection, NativeTypeEngine } from "./native-type-engine.js";
-import { lineStartOffsets as lineOffsets } from "./source-offsets.js";
+import { type IdentifierSelection, NativeTypeEngine } from "../../hovers/native-type-engine.js";
 
 /** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
 export type SheetwriteHoverOrigin = "lib" | "workspace" | "snippet";
@@ -39,24 +27,6 @@ const UNRESOLVED_ANY = /\bany\b/;
 /** Compiler-generated scaffolding (Vue SFC virtual code, private helpers) is never reader-facing. */
 const INTERNAL_TAG_TEXT = /__(?:VLS|vls)_?\w*|__sheetwrite/;
 
-function normalizedPath(path: string): string {
-  return path.replaceAll("\\", "/").replace(/\/{2,}/g, "/");
-}
-
-function sourcePosition(
-  offsets: readonly number[],
-  offset: number,
-): { line: number; character: number } {
-  let low = 0;
-  let high = offsets.length;
-  while (low + 1 < high) {
-    const middle = (low + high) >>> 1;
-    if ((offsets[middle] ?? 0) <= offset) low = middle;
-    else high = middle;
-  }
-  return { line: low, character: offset - (offsets[low] ?? 0) };
-}
-
 function usefulType(text: string): boolean {
   return text.length > 0 && !UNRESOLVED_ANY.test(text);
 }
@@ -76,45 +46,19 @@ function typeAfterDeclaration(text: string): string | undefined {
 }
 
 /**
- * Repository-owned quick-info engine. TypeScript 7.1 (`NativeTypeEngine`) is the type
- * system for every sample; this class turns Vue samples into TypeScript with
- * `@vue/language-core`, maps their hovers back, and repairs unresolved framework types.
+ * Repository-owned quick-info engine. TypeScript 7.1 (`NativeTypeEngine`) answers every
+ * sample, Vue ones through the Vue content mapper; this class repairs unresolved
+ * framework types the samples' bindings leave behind.
  */
 export class SheetwriteTypeEngine {
   private readonly native: NativeTypeEngine;
-  /** `@vue/language-core` generates code with the TypeScript 5.9 library; it checks nothing. */
-  private readonly vuePlugin: LanguagePlugin<string, VueVirtualCode>;
-
-  constructor(private readonly options: SheetwriteTypeEngineOptions) {
+  constructor(options: SheetwriteTypeEngineOptions) {
     this.native = new NativeTypeEngine({
       cwd: options.cwd,
       internalIdentifier: INTERNAL_IDENTIFIER,
       internalTagText: INTERNAL_TAG_TEXT,
       ...(options.fsMap ? { fsMap: options.fsMap } : {}),
     });
-    const resolver = new CompilerOptionsResolver(ts as never, ts.sys.readFile);
-    resolver.addConfig({}, options.cwd);
-    // The options the generated code was written for before TypeScript 7.1 checked it.
-    const codegenOptions: ts.CompilerOptions = {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      jsx: ts.JsxEmit.Preserve,
-      jsxImportSource: "react",
-      lib: ["lib.es2022.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
-      allowJs: true,
-      allowSyntheticDefaultImports: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      strict: true,
-      noImplicitAny: false,
-    };
-    this.vuePlugin = createVueLanguagePlugin<string>(
-      ts as never,
-      codegenOptions as never,
-      resolver.build(),
-      (id) => id,
-    );
   }
 
   /** Samples requested in the same turn of the event loop are analyzed together. */
@@ -123,8 +67,10 @@ export class SheetwriteTypeEngine {
     language: "ts" | "tsx" | "vue",
     selection?: IdentifierSelection,
   ): Promise<SheetwriteTypeHover[]> {
-    if (language === "vue") return this.analyzeVue(source);
-    return this.native.analyze(source, language, selection);
+    if (language !== "vue") return this.native.analyze(source, language, selection);
+    return this.native
+      .analyze(source, language, selection)
+      .then((hovers) => this.resolveFrameworkTypes(hovers, source));
   }
 
   /** Hovers derived from generated code (Svelte samples), cached by `key` like every sample. */
@@ -138,48 +84,6 @@ export class SheetwriteTypeEngine {
   /** Stops the TypeScript 7.1 processes; without it they stop once the process is idle. */
   dispose(): Promise<void> {
     return this.native.dispose();
-  }
-
-  private async analyzeVue(source: string): Promise<SheetwriteTypeHover[]> {
-    const language = createLanguage(
-      [this.vuePlugin],
-      new FileMap(ts.sys.useCaseSensitiveFileNames),
-      () => {},
-    );
-    const sourceFileName = normalizedPath(`${this.options.cwd}/.sheetwrite-hover.vue`);
-    const script = language.scripts.set(sourceFileName, ts.ScriptSnapshot.fromString(source));
-    if (!script?.generated) return [];
-    const embedded = [...script.generated.embeddedCodes.values()].find(
-      (code) => code.id === "script_ts",
-    );
-    if (!embedded) return [];
-
-    const generated = embedded.snapshot.getText(0, embedded.snapshot.getLength());
-    const mapper = defaultMapperFactory(embedded.mappings);
-    // Only generated identifiers that map back into the Vue source can become hovers.
-    const generatedHovers = await this.native.analyze(generated, "tsx", {
-      key: `vue\0${source}`,
-      keep: (identifier) => [...mapper.toSourceLocation(identifier.start)].length > 0,
-    });
-    const offsets = lineOffsets(source);
-    const mapped: SheetwriteTypeHover[] = [];
-
-    for (const hover of generatedHovers) {
-      const startMapping = [...mapper.toSourceLocation(hover.start)][0];
-      if (!startMapping) continue;
-      const start = startMapping[0];
-      let end = [...mapper.toSourceLocation(hover.start + hover.length)][0]?.[0];
-      if (end === undefined && startMapping[1].sourceOffsets[0] === start) {
-        end = startMapping[1].sourceOffsets[1];
-      }
-      if (end === undefined || start < 0 || end <= start || end > source.length) continue;
-      const target = source.slice(start, end);
-      if (!target.trim()) continue;
-      const { line, character } = sourcePosition(offsets, start);
-      mapped.push({ ...hover, start, length: end - start, target, line, character });
-    }
-
-    return this.resolveFrameworkTypes(mapped, source);
   }
 
   resolveFrameworkTypes(

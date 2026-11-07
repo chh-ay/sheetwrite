@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "bun:test";
 
-import { parseNativeHover } from "../docs/src/lib/native-quick-info.js";
+import { parseNativeHover } from "../docs/hovers/native-quick-info.js";
 import {
   collectFenceHovers,
   isHighQualityHover,
