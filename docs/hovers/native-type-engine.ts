@@ -129,6 +129,8 @@ const PARSER_IDLE_MS = 1000;
  * server about 150 MiB smaller; 32 or fewer get slower as the program is rebuilt more often.
  */
 const SAMPLES_PER_PROJECT = 64;
+/** Shared projects in flight at once; see `flush`. */
+const PROJECTS_IN_FLIGHT = 2;
 /**
  * In a program shared by many samples the 7.1 server sometimes prints a member's
  * declared owner instead of the instantiated one (`Array<T>.length` for
@@ -510,7 +512,7 @@ export class NativeTypeEngine {
     await parser?.close();
   }
 
-  private sampleFile(sample: Pick<Sample, "key" | "language">, project = "shared"): string {
+  private sampleFile(sample: Pick<Sample, "key" | "language">, project: string): string {
     return `${this.projectDirectory}/${project}/${sample.key.slice(0, 16)}.${sample.language}`;
   }
 
@@ -605,9 +607,23 @@ export class NativeTypeEngine {
         this.inFlight.set(sample.key, result);
         result.then(sample.resolve, sample.reject);
       }
+      // Two batches at a time: the server builds the next batch's program while it
+      // answers the current one, and only two programs are held at once.
+      const batches: Sample[][] = [];
       for (let index = 0; index < misses.length; index += SAMPLES_PER_PROJECT) {
-        await this.analyzeTogether(server, cache, misses.slice(index, index + SAMPLES_PER_PROJECT));
+        batches.push(misses.slice(index, index + SAMPLES_PER_PROJECT));
       }
+      let next = 0;
+      const analyzeBatches = async (project: string): Promise<void> => {
+        for (let samples = batches[next++]; samples; samples = batches[next++]) {
+          await this.analyzeTogether(server, cache, samples, project);
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(PROJECTS_IN_FLIGHT, batches.length) }, (_, index) =>
+          analyzeBatches(`shared-${index}`),
+        ),
+      );
     } catch (error) {
       const failure = error instanceof Error ? error : new Error(String(error));
       for (const sample of batch) sample.reject(failure);
@@ -624,10 +640,11 @@ export class NativeTypeEngine {
     server: LanguageServer,
     cache: HoverCache,
     samples: readonly Sample[],
+    project: string,
   ): Promise<void> {
     const parser = this.parserSession();
-    const files = samples.map((sample) => this.sampleFile(sample));
-    const configUri = pathToFileURL(`${this.projectDirectory}/shared/tsconfig.json`).href;
+    const files = samples.map((sample) => this.sampleFile(sample, project));
+    const configUri = pathToFileURL(`${this.projectDirectory}/${project}/tsconfig.json`).href;
     for (const [index, sample] of samples.entries()) {
       const file = files[index] ?? "";
       server.open(pathToFileURL(file).href, languageId(file), sample.source);
@@ -648,7 +665,7 @@ export class NativeTypeEngine {
     await Promise.all(
       samples.map(async (sample) => {
         try {
-          const shared = await this.sampleHovers(server, parser, sample, {
+          const shared = await this.sampleHovers(server, parser, sample, project, {
             checked: sampleChecked,
             lookups,
           });
@@ -733,9 +750,10 @@ export class NativeTypeEngine {
     server: LanguageServer,
     parser: API,
     sample: Sample,
+    project: string,
     phases: { checked(): void; lookups: Promise<void> },
   ): Promise<SheetwriteTypeHover[]> {
-    const file = this.sampleFile(sample);
+    const file = this.sampleFile(sample, project);
     const uri = pathToFileURL(file).href;
     let answers: {
       identifier: NativeIdentifier;
