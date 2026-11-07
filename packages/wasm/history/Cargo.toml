@@ -1,6 +1,6 @@
 [package]
 name = "sheetwrite-history"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
 license = "MIT"
 description = "History-only cell diff kernel for Sheetwrite version history (Rust/WASM)."
