@@ -216,6 +216,10 @@ describe("CI and release workflow contracts", () => {
     const env = {
       PREFLIGHT: "success",
       UNIT_COVERAGE: "success",
+      UNIT: "success",
+      RUST: "success",
+      STATIC: "success",
+      BENCH: "success",
       ARTIFACT_BUILD: "success",
       PACKED: "success",
       BUNDLERS: "success",
