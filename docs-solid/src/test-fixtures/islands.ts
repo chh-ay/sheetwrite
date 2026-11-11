@@ -36,6 +36,13 @@ export const TEST_FIXTURE_ISLANDS = {
         withProps(CollaborationFixture),
       ),
   },
+  "test-grid-memory": {
+    source: "src/test-fixtures/grid-memory/GridMemoryFixture.tsx",
+    load: () =>
+      import("./grid-memory/GridMemoryFixture.js").then(({ GridMemoryFixture }) =>
+        withProps(GridMemoryFixture),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 export type TestFixtureIslandName = keyof typeof TEST_FIXTURE_ISLANDS;
