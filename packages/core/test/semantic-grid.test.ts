@@ -309,7 +309,6 @@ describe("custom editor canonical lifecycle", () => {
     expect({ cancels, destroys }).toEqual({ cancels: 2, destroys: 2 });
 
     grid.beginEdit(0, 0);
-    expect(latestContext).toBeDefined();
     expect(() => latestContext?.commit(42 as never)).not.toThrow();
     expect(latestContext?.signal.aborted).toBe(true);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();

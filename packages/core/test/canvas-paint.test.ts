@@ -379,7 +379,6 @@ describe("paintFrame column styles", () => {
 
     // Column B's header gets its own background fill at the column's position.
     const bg = ctx.fillRects.find((r) => r.fillStyle === HEADER_BG);
-    expect(bg).toBeDefined();
     expect(bg?.x).toBe(100);
     expect(bg?.w).toBe(80);
     expect(bg?.h).toBe(theme.headerHeight);
@@ -457,17 +456,7 @@ describe("paintFrame typography and wrapping", () => {
   });
 });
 
-describe("paintFrame text decorations", () => {});
-
-describe("scroll blit and damage-band integrity", () => {
-  const blitViewport = (scrollTop: number): Viewport => ({
-    scrollTop,
-    scrollLeft: 0,
-    width: 400,
-    height: 300,
-    contentRevision: 7,
-  });
-
+describe("paintFrame text decorations", () => {
   function runBlit(prevTop: number, nextTop: number, dpr = 1) {
     const ctx = makeRecordingCtx();
     const draws: unknown[][] = [];
@@ -509,7 +498,6 @@ describe("scroll blit and damage-band integrity", () => {
     // strip's background erase the glyph half inside it - sliced digits.
     const ctx = render(view, layout, UNIFORM_VIEWPORT, theme, { x: 0, y: 62, w: 400, h: 18 });
     const label = ctx.fillTexts.find((call) => call.text === "2");
-    expect(label).toBeDefined();
     expect(label?.y).toBe(56);
   });
 });

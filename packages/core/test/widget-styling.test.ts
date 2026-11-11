@@ -5,7 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, Theme } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { elementAdded, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 // A full, deliberately un-themey palette. Passing every Theme field avoids
 // Partial-merge ambiguity, and the distinctive hex values make the seeded
@@ -60,14 +60,6 @@ afterEach(() => {
   restoreStubs();
   globalThis.requestAnimationFrame = originalRaf;
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 // `config: {}` is truthy with no flag disabled, so the grid mounts the default
 // toolbar; the context menu and find bar are on by default. A caller-supplied
@@ -185,7 +177,6 @@ describe("built-in widget styling", () => {
       injectStyle(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
       const overridden = getComputedStyle(findEl).background;
       expect(overridden).toBe("#abcabc");
-      expect(overridden).not.toBe(THEME.bg);
     } else {
       // Fallback: the seeding + structure contract still holds.
       expect(host.style.getPropertyValue("--sheetwrite-widget-bg")).toBe(THEME.bg);

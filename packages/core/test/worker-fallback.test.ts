@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridEvents } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -18,14 +18,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 describe("worker renderer fallback observability", () => {
   it("falls back exactly once when a constructed worker fails asynchronously", async () => {
