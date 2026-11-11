@@ -10,6 +10,11 @@ use crate::wire::decode_type;
 
 /// Packed metadata contains id, name, then an interned code pool for sparse error rows.
 #[wasm_bindgen(js_name = ColumnBuilder)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct ColumnBuilder {
     rows: u32,
     buffers: ColumnBuffers,
@@ -19,6 +24,10 @@ pub struct ColumnBuilder {
 impl ColumnBuilder {
     /// The constructor adopts metadata and masks; payload lanes arrive through typed setters.
     #[wasm_bindgen(constructor)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "a wasm-bindgen constructor; JavaScript passes each lane as its own argument"
+    )]
     pub fn new(
         kind: u8,
         rows: u32,

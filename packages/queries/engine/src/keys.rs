@@ -6,6 +6,12 @@ use crate::plan::Diagnostic;
 use std::cmp::Ordering;
 
 /// Composite keys compare left-to-right; null equals null before any typed value.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the comparator of every key sort and merge; passing each side as a struct made \
+              join and group 3-4% slower in packages/queries/bench.ts on the Mac (Apple \
+              Silicon, Bun)"
+)]
 pub(crate) fn compare_keys(
     left: &Batch,
     right: &Batch,

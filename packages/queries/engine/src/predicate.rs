@@ -9,9 +9,9 @@ use crate::plan::{ColumnType, CompareOp, Diagnostic, Literal, Predicate, MAX_PRE
 fn literal_value(value: &Literal) -> Value<'_> {
     match value {
         Literal::Null => Value::Null,
-        Literal::Logical(value) => Value::Logical(*value),
-        Literal::Number(value) => Value::Number(*value),
-        Literal::Text(value) => Value::Text(value),
+        Literal::Logical(logical) => Value::Logical(*logical),
+        Literal::Number(number) => Value::Number(*number),
+        Literal::Text(text) => Value::Text(text),
     }
 }
 
@@ -27,9 +27,9 @@ pub(crate) enum CompiledPredicate<'a> {
         column: usize,
         text: &'a str,
     },
-    And(Vec<CompiledPredicate<'a>>),
-    Or(Vec<CompiledPredicate<'a>>),
-    Not(Box<CompiledPredicate<'a>>),
+    And(Vec<Self>),
+    Or(Vec<Self>),
+    Not(Box<Self>),
 }
 
 /// Bounded preparation rejects missing columns and incompatible literal types.
@@ -88,8 +88,8 @@ pub(crate) fn compile_predicate<'a>(
                 .map(|child| compile_predicate(batch, child, depth + 1))
                 .collect::<Result<_, _>>()?,
         ),
-        Predicate::Not { predicate } => {
-            CompiledPredicate::Not(Box::new(compile_predicate(batch, predicate, depth + 1)?))
+        Predicate::Not { predicate: inner } => {
+            CompiledPredicate::Not(Box::new(compile_predicate(batch, inner, depth + 1)?))
         }
     })
 }
@@ -149,7 +149,11 @@ pub(crate) fn test_predicate(
         CompiledPredicate::Contains { column, text } => match checked_value(batch, *column, row)? {
             Value::Text(value) => Some(value.contains(text)),
             Value::Null => None,
-            _ => return Err(Diagnostic::new("predicate-type")),
+            Value::Error(_)
+            | Value::Number(_)
+            | Value::Logical(_)
+            | Value::Date(_)
+            | Value::DateTime(_) => return Err(Diagnostic::new("predicate-type")),
         },
         CompiledPredicate::And(predicates) => {
             let mut result = Some(true);
@@ -177,8 +181,6 @@ pub(crate) fn test_predicate(
 
             result
         }
-        CompiledPredicate::Not(predicate) => {
-            test_predicate(batch, row, predicate)?.map(|value| !value)
-        }
+        CompiledPredicate::Not(inner) => test_predicate(batch, row, inner)?.map(|value| !value),
     })
 }

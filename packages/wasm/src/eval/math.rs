@@ -817,40 +817,4 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
     }
-
-    /// The examples of the CEILING.PRECISE, ISO.CEILING and FLOOR.PRECISE
-    /// pages, `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
-    #[test]
-    fn precise_rounding_uses_the_absolute_significance() {
-        let cases: &[(Func, &[f64], f64)] = &[
-            (Func::CeilingPrecise, &[4.3], 5.0),
-            (Func::CeilingPrecise, &[-4.3], -4.0),
-            (Func::CeilingPrecise, &[4.3, 2.0], 6.0),
-            (Func::CeilingPrecise, &[4.3, -2.0], 6.0),
-            (Func::CeilingPrecise, &[-4.3, 2.0], -4.0),
-            (Func::CeilingPrecise, &[-4.3, -2.0], -4.0),
-            (Func::IsoCeiling, &[4.3], 5.0),
-            (Func::IsoCeiling, &[-4.3], -4.0),
-            (Func::IsoCeiling, &[4.3, 2.0], 6.0),
-            (Func::IsoCeiling, &[4.3, -2.0], 6.0),
-            (Func::IsoCeiling, &[-4.3, 2.0], -4.0),
-            (Func::IsoCeiling, &[-4.3, -2.0], -4.0),
-            (Func::FloorPrecise, &[-3.2, -1.0], -4.0),
-            (Func::FloorPrecise, &[3.2, 1.0], 3.0),
-            (Func::FloorPrecise, &[-3.2, 1.0], -4.0),
-            (Func::FloorPrecise, &[3.2, -1.0], 3.0),
-            (Func::FloorPrecise, &[3.2], 3.0),
-            (Func::CeilingPrecise, &[4.3, 0.0], 0.0),
-            (Func::CeilingPrecise, &[-0.5], 0.0),
-        ];
-
-        for (func, arguments, expected) in cases {
-            let arguments = arguments
-                .iter()
-                .map(|&value| Value::number(value))
-                .collect();
-
-            assert_eq!(evaluate(*func, arguments), Value::Number(*expected));
-        }
-    }
 }

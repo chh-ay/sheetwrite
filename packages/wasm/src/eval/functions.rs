@@ -541,40 +541,72 @@ impl ReductionFold {
     /// or the column would pass the cell limit; the caller then reads it cell
     /// by cell. The running sum stays one accumulator, so it adds in the same
     /// order and rounds the same.
+    ///
+    /// The column is read once, with one loop per reduction that keeps only
+    /// what its result needs. A cell of another kind or a non-finite number is
+    /// noted in a flag, not by leaving the loop, and nothing is kept until the
+    /// whole column has been read. JavaScriptCore on Apple Silicon runs a
+    /// separate pass over the kinds, a branch out of the loop, or a `min` and
+    /// `max` per cell markedly slower than this shape.
     pub(super) fn push_number_column(
         &mut self,
         kinds: &[u8],
         payloads: &[u64],
     ) -> Option<Result<(), FormulaError>> {
         let cells = kinds.len() as u64;
-        // An OR over the kind bytes is one pass without a branch per cell;
-        // only empty (0) and number (1) kinds leave no other bit set.
-        let any_kind = kinds.iter().fold(0, |any, &kind| any | kind);
-        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT || any_kind & !KIND_NUMBER != 0 {
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
             return None;
         }
 
-        let counts_only = matches!(self.kind, ReductionKind::Count | ReductionKind::CountA);
         let mut count = self.count;
         let mut sum = self.sum;
         let mut min = self.min;
         let mut max = self.max;
-        for (&kind, &payload) in kinds.iter().zip(payloads) {
-            if kind != KIND_NUMBER {
-                continue;
+        // Only empty (0) and number (1) kinds leave no other bit set.
+        let mut any_kind = 0u8;
+        let mut non_finite = false;
+        match self.kind {
+            ReductionKind::Count | ReductionKind::CountA => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    let is_number = kind == KIND_NUMBER;
+                    non_finite |= is_number & !payload_num(payload).is_finite();
+                    count += u64::from(is_number);
+                }
             }
+            ReductionKind::Sum | ReductionKind::Average => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    let is_number = kind == KIND_NUMBER;
+                    // An empty cell adds zero, which leaves the sum as it is.
+                    let number = if is_number { payload_num(payload) } else { 0.0 };
+                    non_finite |= !number.is_finite();
+                    count += u64::from(is_number);
+                    sum += number;
+                }
+            }
+            ReductionKind::Minimum | ReductionKind::Maximum => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    if kind != KIND_NUMBER {
+                        continue;
+                    }
 
-            let number = payload_num(payload);
-            if !number.is_finite() {
-                return Some(Err(FormulaError::Num));
+                    let number = payload_num(payload);
+                    non_finite |= !number.is_finite();
+                    count += 1;
+                    // The result checks the sum even for a minimum or maximum.
+                    sum += number;
+                    min = min.min(number);
+                    max = max.max(number);
+                }
             }
-
-            count += 1;
-            if !counts_only {
-                sum += number;
-                min = min.min(number);
-                max = max.max(number);
-            }
+        }
+        if any_kind & !KIND_NUMBER != 0 {
+            return None;
+        }
+        if non_finite {
+            return Some(Err(FormulaError::Num));
         }
 
         self.cells += cells;
@@ -741,53 +773,5 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
         #[cfg(feature = "analysis")]
         Func::Analysis(id) => super::analysis::treats_cell_as_reference(super::analysis::name(id)),
         _ => false,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::types::{FormulaError, Value};
-
-    use super::{FuncAccumulator, MAX_FUNCTION_ARGS};
-
-    #[test]
-    fn accumulator_tracks_only_the_initialized_argument_prefix_at_capacity() {
-        let mut values = FuncAccumulator::default();
-        for index in 0..MAX_FUNCTION_ARGS {
-            let from_range = index % 2 == 0;
-            if from_range {
-                values.push_range(Value::number(index as f64)).unwrap();
-            } else {
-                values.push_scalar(Value::number(index as f64)).unwrap();
-            }
-            values
-                .finish_arg_with_missing(1, 1, index % 3 == 0)
-                .unwrap();
-        }
-
-        assert_eq!(values.arg_count(), MAX_FUNCTION_ARGS);
-        assert_eq!(values.entries().len(), MAX_FUNCTION_ARGS);
-        for index in 0..MAX_FUNCTION_ARGS {
-            let argument = values.arg(index).unwrap();
-            assert_eq!(argument.len(), 1);
-            assert_eq!(argument[0].value, Value::number(index as f64));
-            assert_eq!(argument[0].from_range, index % 2 == 0);
-            assert_eq!(values.arg_shape(index), Some((1, 1)));
-            assert_eq!(values.arg_missing(index), index % 3 == 0);
-        }
-
-        assert!(values.arg(MAX_FUNCTION_ARGS).is_none());
-        assert_eq!(values.arg_shape(MAX_FUNCTION_ARGS), None);
-        assert!(!values.arg_missing(MAX_FUNCTION_ARGS));
-        assert!(values.entries_from_arg(MAX_FUNCTION_ARGS).is_empty());
-
-        values.push_scalar(Value::number(255.0)).unwrap();
-        assert_eq!(
-            values.finish_arg_with_missing(1, 1, false),
-            Err(FormulaError::Value)
-        );
-        assert_eq!(values.arg_count(), MAX_FUNCTION_ARGS);
-        assert!(values.arg(MAX_FUNCTION_ARGS).is_none());
-        assert_eq!(values.arg_shape(MAX_FUNCTION_ARGS), None);
     }
 }

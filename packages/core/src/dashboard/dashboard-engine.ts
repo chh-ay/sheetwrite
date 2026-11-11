@@ -57,9 +57,9 @@ export function pivotOutputOf(store: Store, sheet: SheetId, index: number): Pivo
   const output = storeEngine(store)?.pivotOutputCells(sheet, index) ?? null;
   if (output === null) return null;
   try {
-    const kinds = output.kinds();
-    const numbers = output.numbers();
-    const texts = output.texts();
+    const kinds = output.takeKinds();
+    const numbers = output.takeNumbers();
+    const texts = output.takeTexts();
     const [rows = 0, cols = 0, headerRows = 0, labelCols = 0] = output.layout();
     let text = 0;
     const cells = Array.from(kinds, (kind, cell): CellScalar => {

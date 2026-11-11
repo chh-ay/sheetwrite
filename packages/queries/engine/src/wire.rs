@@ -21,23 +21,22 @@ pub(crate) fn decode_strings(bytes: &[u8], offsets: &[u32]) -> Result<Vec<String
 
     let mut strings = Vec::with_capacity(offsets.len().saturating_sub(1));
     for range in offsets.windows(2) {
-        let [start, end] = range else {
+        let [start_offset, end_offset] = range else {
             return Err(Diagnostic::new("shape"));
         };
-        let start = row_index(*start)?;
-        let end = row_index(*end)?;
-        let value = bytes
+        let start = row_index(*start_offset)?;
+        let end = row_index(*end_offset)?;
+        let slice = bytes
             .get(start..end)
             .ok_or_else(|| Diagnostic::new("shape"))?;
-        let value = std::str::from_utf8(value).map_err(|_| Diagnostic::new("utf8"))?;
-        strings.push(value.to_owned());
+        strings.push(std::str::from_utf8(slice)?.to_owned());
     }
 
     Ok(strings)
 }
 
 /// Type codes share primitive mixed tags; mixed itself has a separate schema code.
-pub(crate) fn encode_type(kind: ColumnType) -> u8 {
+pub(crate) const fn encode_type(kind: ColumnType) -> u8 {
     match kind {
         ColumnType::Number => NUMBER_TAG,
         ColumnType::Logical => LOGICAL_TAG,

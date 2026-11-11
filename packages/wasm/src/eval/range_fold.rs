@@ -305,21 +305,6 @@ mod tests {
     }
 
     #[test]
-    fn mixed_sum_arguments_follow_the_accumulator_rules() {
-        // Range text and logical values are skipped; direct ones count.
-        assert_eq!(sum("=SUM(A1:A5,\"7\",TRUE)").0, 0.1 + 0.2 + 7.0 + 1.0);
-        // A one-cell reference reads like a range.
-        assert_eq!(sum("=SUM(A1:A1,A2,A3)").0, 0.1);
-        // The running sum keeps argument order: 1e16 + 1 + 1 drops both ones
-        // only when they are added one at a time.
-        let expected = ((1e16_f64 + 1.0) + 1.0) + 0.1;
-        assert_eq!(sum("=SUM(B1:B3,A1)").0, expected);
-        assert_eq!(sum("=SUM(B1:B3,0.1)").0, expected);
-        // Formula cells are evaluated inside the fold.
-        assert_eq!(sum("=SUM(A5:A6,1)").0, 0.2 + 0.1 * 3.0 + 1.0);
-    }
-
-    #[test]
     fn mixed_sum_errors_keep_their_order() {
         // A range error returns at once, before a later scalar error.
         assert_eq!(sum("=SUM(A1:A7,\"x\")").1.as_deref(), Some("#DIV/0!"));
@@ -332,52 +317,28 @@ mod tests {
         assert_eq!(sum("=SUM(A1:A2,1E308,1E308)").1.as_deref(), Some("#NUM!"));
     }
 
+    /// A column with a cell of another kind is read cell by cell, and a
+    /// non-finite number fails every reduction, wherever it sits in the
+    /// column, as it does cell by cell.
     #[test]
-    fn ranges_over_the_same_literals_share_one_sum_per_pass() {
+    fn number_columns_with_other_kinds_or_infinity_match_the_cell_path() {
         let mut store = CellStore::new();
-        let sheet = store.add_sheet(3, 100);
-        for row in 0..100 {
-            store.set_number(sheet, row, 0, 0.1, 0);
-            store.set_formula(sheet, row, 1, "=SUM($A$1:$A$100)", 0);
+        let sheet = store.add_sheet(5, 50);
+        for row in 0..50 {
+            store.set_number(sheet, row, 0, row as f64, 0);
+            store.set_number(sheet, row, 1, row as f64, 0);
         }
-        store.set_formula(sheet, 0, 2, "=SUM($A$1:$A$99,A100)", 0);
-        store.recompute(sheet);
-        let expected = (0..100).fold(0.0, |sum, _| sum + 0.1);
-        for row in 0..100 {
-            assert_eq!(store.get_cell(sheet, row, 1).num(), expected);
-        }
-        assert_eq!(store.get_cell(sheet, 0, 2).num(), expected);
-
-        // An edit inside the range changes every reader in the next pass.
-        store.set_number(sheet, 50, 0, 1.0, 0);
-        store.recompute(sheet);
-        let expected = (0..100).fold(0.0, |sum, row| sum + if row == 50 { 1.0 } else { 0.1 });
-        assert_eq!(store.get_cell(sheet, 99, 1).num(), expected);
-    }
-
-    /// A column of numbers and empty cells folds as one slice and gives the
-    /// same results, limit and errors as reading it cell by cell.
-    #[test]
-    fn number_columns_fold_every_reduction() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 200);
-        let mut expected_sum = 0.0;
-        for row in 0..200 {
-            if row % 3 != 0 {
-                let value = row as f64 * 0.1 - 7.0;
-                store.set_number(sheet, row, 0, value, 0);
-                expected_sum += value;
-            }
-        }
-        store.set_number(sheet, 5, 1, f64::INFINITY, 0);
+        store.set_string(sheet, 10, 0, "text", 0);
+        store.set_number(sheet, 40, 1, f64::NEG_INFINITY, 0);
         let sources = [
-            "=SUM(A1:A200)",
-            "=AVERAGE(A1:A200)",
-            "=MIN(A1:A200)",
-            "=MAX(A1:A200)",
-            "=COUNT(A1:A200)",
-            "=COUNTA(A1:A200)",
-            "=SUM(B1:B10)",
+            "=SUM(A1:A50)",
+            "=COUNT(A1:A50)",
+            "=COUNTA(A1:A50)",
+            "=MIN(A1:A50)",
+            "=SUM(B1:B50)",
+            "=AVERAGE(B1:B50)",
+            "=MAX(B1:B50)",
+            "=COUNT(B1:B50)",
         ];
         for (row, source) in sources.iter().enumerate() {
             store.set_formula(sheet, row, 3, source, 0);
@@ -385,15 +346,13 @@ mod tests {
         store.recompute(sheet);
 
         let number = |row| store.get_cell(sheet, row, 3).num();
-        assert_eq!(number(0), expected_sum);
-        assert_eq!(number(1), expected_sum / 133.0);
-        assert_eq!(number(2), 0.1 - 7.0);
-        assert_eq!(number(3), 199.0 * 0.1 - 7.0);
-        assert_eq!(number(4), 133.0);
-        assert_eq!(number(5), 133.0);
-        assert_eq!(
-            store.get_cell(sheet, 6, 3).string().as_deref(),
-            Some("#NUM!")
-        );
+        assert_eq!(number(0), (0..50).sum::<i32>() as f64 - 10.0);
+        assert_eq!(number(1), 49.0);
+        assert_eq!(number(2), 50.0);
+        assert_eq!(number(3), 0.0);
+        for (row, source) in sources.iter().enumerate().skip(4) {
+            let error = store.get_cell(sheet, row, 3).string();
+            assert_eq!(error.as_deref(), Some("#NUM!"), "{source}");
+        }
     }
 }

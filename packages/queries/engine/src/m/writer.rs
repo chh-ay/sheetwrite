@@ -1,5 +1,6 @@
 //! Writes the lane layout that `plan_wire` reads, so imported queries cross back to the host.
 
+use crate::buffers::saturating_u32;
 use crate::plan::{AggregateOp, CompareOp, ErrorPolicy, JoinKind, Literal, Predicate, Step};
 use crate::plan_wire::{
     LITERAL_FALSE, LITERAL_NULL, LITERAL_NUMBER, LITERAL_TEXT, LITERAL_TRUE, NO_COLUMN,
@@ -10,7 +11,7 @@ use crate::plan_wire::{
 use crate::wire::encode_type;
 
 /// Code, literal and string lanes; equal strings share one table entry.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct PlanWriter {
     pub codes: Vec<u32>,
     pub numbers: Vec<f64>,
@@ -20,7 +21,7 @@ pub(crate) struct PlanWriter {
 }
 
 // Operator codes are one-based positions in the decoder's tables (`plan_wire.rs`).
-fn compare_code(op: CompareOp) -> u32 {
+const fn compare_code(op: CompareOp) -> u32 {
     match op {
         CompareOp::Eq => 1,
         CompareOp::Neq => 2,
@@ -31,14 +32,14 @@ fn compare_code(op: CompareOp) -> u32 {
     }
 }
 
-fn policy_code(policy: ErrorPolicy) -> u32 {
+const fn policy_code(policy: ErrorPolicy) -> u32 {
     match policy {
         ErrorPolicy::Error => 1,
         ErrorPolicy::Null => 2,
     }
 }
 
-fn join_code(kind: JoinKind) -> u32 {
+const fn join_code(kind: JoinKind) -> u32 {
     match kind {
         JoinKind::Inner => 1,
         JoinKind::Left => 2,
@@ -51,7 +52,7 @@ fn join_code(kind: JoinKind) -> u32 {
     }
 }
 
-fn aggregate_code(op: AggregateOp) -> u32 {
+const fn aggregate_code(op: AggregateOp) -> u32 {
     match op {
         AggregateOp::CountRows => 1,
         AggregateOp::Count => 2,
@@ -69,23 +70,21 @@ impl PlanWriter {
 
     /// Counts never exceed the decoder's u32 lanes; larger values saturate and fail decoding.
     pub(crate) fn code_usize(&mut self, value: usize) {
-        self.codes.push(u32::try_from(value).unwrap_or(u32::MAX));
+        self.codes.push(saturating_u32(value));
     }
 
     pub(crate) fn string(&mut self, value: &str) {
-        let index = match self.strings.iter().position(|entry| entry == value) {
-            Some(index) => index,
-            None => {
-                if self.offsets.is_empty() {
-                    self.offsets.push(0);
-                }
-
-                self.text.extend_from_slice(value.as_bytes());
-                self.offsets
-                    .push(u32::try_from(self.text.len()).unwrap_or(u32::MAX));
-                self.strings.push(value.to_owned());
-                self.strings.len() - 1
+        let index = if let Some(index) = self.strings.iter().position(|entry| entry == value) {
+            index
+        } else {
+            if self.offsets.is_empty() {
+                self.offsets.push(0);
             }
+
+            self.text.extend_from_slice(value.as_bytes());
+            self.offsets.push(saturating_u32(self.text.len()));
+            self.strings.push(value.to_owned());
+            self.strings.len() - 1
         };
 
         self.code_usize(index);
@@ -93,7 +92,7 @@ impl PlanWriter {
 
     pub(crate) fn optional_string(&mut self, value: Option<&str>) {
         match value {
-            Some(value) => self.string(value),
+            Some(text) => self.string(text),
             None => self.code(NO_COLUMN),
         }
     }
@@ -159,9 +158,9 @@ impl PlanWriter {
                     self.predicate(child);
                 }
             }
-            Predicate::Not { predicate } => {
+            Predicate::Not { predicate: inner } => {
                 self.code(PREDICATE_NOT);
-                self.predicate(predicate);
+                self.predicate(inner);
             }
         }
     }
