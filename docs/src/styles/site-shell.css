@@ -925,6 +925,26 @@ html:has(.sw-nav-dialog[open]) {
     min-height: 44px;
     align-items: center;
   }
+  /* An API index lists its exports as one 44 px row each on a phone: the
+     kind and the name. The summary stays in the page (search reads it) and
+     on the symbol's page, one tap away. */
+  .sw-docs .api-symbol-grid {
+    gap: 0;
+    margin-block: var(--sw-space-2) var(--sw-space-8);
+    border-top: var(--sw-border-width) solid var(--sw-border);
+  }
+  .sw-docs .api-symbol-card {
+    min-height: 44px;
+    justify-content: center;
+    padding: var(--sw-space-1) var(--sw-space-2);
+    border: 0;
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+    border-radius: 0;
+    background: transparent;
+  }
+  .sw-docs .api-symbol-card__desc {
+    display: none;
+  }
   /* The open outline's rows are 44 px tall. */
   .sw-toc-inline a {
     display: flex;
