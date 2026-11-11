@@ -41,6 +41,61 @@ fn assert_same_cells(left: &CellStore, right: &CellStore, sheet: usize) {
     }
 }
 
+struct GeneratedBlock {
+    offsets: Vec<u32>,
+    kinds: Vec<u8>,
+    numbers: Vec<f64>,
+    styles: Vec<u32>,
+    text: String,
+    text_offsets: Vec<u32>,
+}
+
+impl GeneratedBlock {
+    fn new(seed: u32) -> Self {
+        // Multiplication by a coprime permutes 119 offsets, including both
+        // sides of a bitset-word boundary and nonzero block origins.
+        let offsets: Vec<u32> = (0..119)
+            .map(|index| (index * 37 + seed) % 119)
+            .filter(|offset| seed == 0 || (offset + seed) % 3 != 0)
+            .collect();
+        let mut block = Self {
+            offsets, kinds: Vec::new(), numbers: Vec::new(), styles: Vec::new(),
+            text: String::new(), text_offsets: vec![0],
+        };
+        for &offset in &block.offsets {
+            let kind = match (offset + seed) % 5 {
+                0 => KIND_NUMBER,
+                1 => KIND_STRING,
+                2 => KIND_BOOL,
+                3 => KIND_EMPTY,
+                _ => KIND_FORMULA, // Without a source, this clears the cell.
+            };
+            block.kinds.push(kind);
+            block.numbers.push(if kind == KIND_BOOL {
+                f64::from(offset % 2 != 0)
+            } else if offset % 2 == 0 {
+                -0.0
+            } else {
+                f64::from(offset) / 3.0
+            });
+            block.styles.push(offset + 1);
+            if kind == KIND_STRING {
+                block.text.push_str(if offset % 2 == 0 { "hé雪😀" } else { "" });
+                block.text_offsets.push(block.text.len() as u32);
+            }
+        }
+        block
+    }
+
+    fn write(&self, store: &mut CellStore, sheet: usize) -> u32 {
+        store.set_sparse_block(
+            sheet, 2, 1, 17, 7, &self.offsets, &self.kinds, &self.numbers,
+            self.text.as_bytes(), &self.text_offsets, &self.styles,
+            &[], Vec::new(), &[], &[],
+        )
+    }
+}
+
 #[test]
 fn sparse_columns_match_old_source_replacement_over_generated_blocks() {
     for storage in [Storage::Dense, Storage::Paged, Storage::Spill] {
@@ -48,51 +103,21 @@ fn sparse_columns_match_old_source_replacement_over_generated_blocks() {
             for seed in 0..8u32 {
                 let (mut columns, sheet) = fixture(storage);
                 let (mut scalar, _) = fixture(storage);
-                // Multiplication by a coprime permutes 119 offsets, including
-                // both sides of a bitset-word boundary and nonzero origins.
-                let offsets: Vec<u32> = (0..119)
-                    .map(|index| (index * 37 + seed) % 119)
-                    .filter(|offset| seed == 0 || (offset + seed) % 3 != 0)
-                    .collect();
-                let mut kinds = Vec::new();
-                let mut numbers = Vec::new();
-                let mut styles = Vec::new();
-                let mut text = String::new();
-                let mut text_offsets = vec![0];
-                for &offset in &offsets {
-                    let kind = match (offset + seed) % 5 {
-                        0 => KIND_NUMBER,
-                        1 => KIND_STRING,
-                        2 => KIND_BOOL,
-                        3 => KIND_EMPTY,
-                        _ => KIND_FORMULA, // No source: the scalar path clears it.
-                    };
-                    kinds.push(kind);
-                    numbers.push(if offset % 2 == 0 { -0.0 } else { f64::from(offset) / 3.0 });
-                    styles.push(offset + 1);
-                    if kind == KIND_STRING {
-                        text.push_str(if offset % 2 == 0 { "hé雪😀" } else { "" });
-                        text_offsets.push(text.len() as u32);
-                    }
-                }
+                let block = GeneratedBlock::new(seed);
                 if hydrating {
                     columns.begin_page_load();
                     scalar.begin_page_load();
                 }
-                let write = |store: &mut CellStore| store.set_sparse_block(
-                    sheet, 2, 1, 17, 7, &offsets, &kinds, &numbers,
-                    text.as_bytes(), &text_offsets, &styles, &[], Vec::new(), &[], &[],
-                );
-                let actual = write(&mut columns);
+                let actual = block.write(&mut columns, sheet);
                 SPARSE_COLUMNS_OFF.set(true);
-                let expected = write(&mut scalar);
+                let expected = block.write(&mut scalar, sheet);
                 SPARSE_COLUMNS_OFF.set(false);
                 assert_eq!(actual, BLOCK_OK, "{storage:?}, hydration={hydrating}, seed={seed}");
                 assert_eq!(actual, expected);
                 columns.commit_sources();
                 scalar.commit_sources();
                 assert_same_cells(&columns, &scalar, sheet);
-                // Retiring a formula must also remove its old graph edges.
+                // Revisit dependencies after retiring covered formula sources.
                 columns.set_number(sheet, 2, 1, 42.0, 0);
                 scalar.set_number(sheet, 2, 1, 42.0, 0);
                 columns.commit_sources();
