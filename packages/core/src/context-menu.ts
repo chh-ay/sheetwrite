@@ -3,6 +3,7 @@ import type { IconName } from "./icons/icon-names.js";
 import { iconNode } from "./icons/resolve.js";
 import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
 import { pivotAt } from "./panels/panel-loader.js";
+import { checkIconStyles, checkStylePart } from "./style-parts.js";
 import type {
   ContextMenuActionName,
   ContextMenuContext,
@@ -354,6 +355,8 @@ export class ContextMenu {
 
     const menu = this.el;
     menu.style.display = "block";
+    checkStylePart(menu, "context-menu", "The context menu");
+    checkIconStyles(menu, "The context menu");
 
     const clampedX = Math.max(0, Math.min(context.clientX, window.innerWidth - menu.offsetWidth));
     const clampedY = Math.max(0, Math.min(context.clientY, window.innerHeight - menu.offsetHeight));

@@ -121,6 +121,10 @@ sheet or a cell. Then the field list opens in the side panel.
 With the default engine, **Insert › PivotTable** is disabled, and its tooltip
 says that pivot tables need the full engine.
 
+## Styles
+
+The PivotTable Fields panel needs `@sheetwrite/core/styles/panels.css`. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Define a pivot
 
 A pivot belongs to the sheet that holds its anchor cell. Commit the complete

@@ -185,6 +185,40 @@ Import the stylesheet once. It styles the host container (the grid adds the `.sh
 import "@sheetwrite/core/styles.css";
 ```
 
+### Stylesheet parts
+
+`styles.css` imports every part of the stylesheet. To ship less CSS, import only the parts your grid uses from `@sheetwrite/core/styles/`. Import `grid.css` first and the other parts in the order of this table, the order `styles.css` uses. The framework adapters have the same parts: `@sheetwrite/react/styles/grid.css`, `@sheetwrite/vue/styles/grid.css` and `@sheetwrite/svelte/styles/grid.css`.
+
+| Part | What it styles | Needed when |
+| --- | --- | --- |
+| `grid.css` | The grid host, the cell editor, data validation lists, notes, action messages and the theme variables | Always |
+| `formula-help.css` | The function list, argument guide and colored references while a formula is edited | Always, unless users never type formulas |
+| `find.css` | The find and replace bar | `find` is not `false` |
+| `ribbon.css` | The ribbon, the toolbar, and their menus and forms | `toolbar` or `ribbon` is set, or you call `createToolbar` or `createRibbon` |
+| `panels.css` | Side panels and dialogs: chart, pivot field list, names, sort, queries, links, version history, Explain Formula | A command or `grid.openPanel` opens a panel |
+| `context-menu.css` | The right-click menu | `contextMenu` is not `false` |
+| `tabs.css` | The sheet tab bar | `tabs` is not `false`, or the shell shows sheet tabs |
+| `charts.css` | Chart series colors and charts over the cells | The grid shows charts from `@sheetwrite/charts`, also on a dashboard |
+| `icons.css` | Command icons | The ribbon, the toolbar, the context menu or the chart panel shows built-in icons |
+| `dashboard.css` | The dashboard view | The workbook has a dashboard |
+
+The find bar, the context menu, formula help and the sheet tabs are on by default. This is the default grid, with no toolbar or ribbon:
+
+```ts prelude="theming" partial="requires surrounding host state" title="Import the parts of a default grid"
+import "@sheetwrite/core/styles/grid.css";
+import "@sheetwrite/core/styles/formula-help.css";
+import "@sheetwrite/core/styles/find.css";
+import "@sheetwrite/core/styles/context-menu.css";
+import "@sheetwrite/core/styles/tabs.css";
+import "@sheetwrite/core/styles/icons.css";
+```
+
+A grid with `find`, `contextMenu` and `tabs` set to `false` whose users do not type formulas needs only `grid.css`, about 5 KB.
+
+In a development build (one where your bundler sets `process.env.NODE_ENV` to `"development"`), a widget whose part is missing logs one console warning that names the part to import.
+
+`icons.css` loads the icon sheet, `icons.svg`, from beside it, so only pages that show icons download it and the browser caches it. Vite, webpack and Next.js copy it into the build. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. Without one, the build fails with `No loader is configured for ".svg" files: icons.svg`. The sheet is a file, not a `data:` URL, so a Content Security Policy that allows images from your own origin allows it. To replace every glyph, set `--sheetwrite-icon-sheet` to `url()` of your own sheet, drawn on the layout in `@sheetwrite/core/icons.json`.
+
 `resolveThemeFromCss` maps these custom properties onto `Theme` fields:
 
 | CSS custom property | Theme field |
