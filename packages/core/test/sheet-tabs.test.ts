@@ -19,8 +19,35 @@ function applied(sheet: string): SheetLifecycleResult {
   };
 }
 
+function rejected(
+  sheet: string,
+  message: string,
+  code: "blank" | "duplicate" | "last-visible-sheet" = "duplicate",
+): SheetLifecycleResult {
+  return {
+    status: "rejected",
+    epoch: 1,
+    sheet,
+    issues: [
+      {
+        kind: "sheet-lifecycle",
+        severity: "error",
+        code,
+        sheet,
+        operationIndex: 0,
+        message,
+      },
+    ],
+  };
+}
+
 function tabButtons(host: HTMLElement): HTMLButtonElement[] {
   return [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+}
+
+function inputText(input: HTMLInputElement, value: string): void {
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 function key(target: EventTarget, value: string, init: KeyboardEventInit = {}): void {
@@ -85,6 +112,119 @@ describe("SheetTabs", () => {
     tabButtons(host)[0]?.focus();
     key(host, "Backspace");
     expect(removed).toEqual([]);
+  });
+
+  it("renames inline by double-click and F2, committing Enter or changed blur and cancelling Escape", () => {
+    const renames: Array<[string, string]> = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onRename: (id, name) => {
+        renames.push([id, name]);
+        return applied(id);
+      },
+    });
+    tabs.update(SHEETS, "b");
+
+    tabButtons(host)[1]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    // The editor sits outside the tab list, which keeps the selected tab.
+    expect(input.closest('[role="tablist"]')).toBeNull();
+    expect(
+      host.querySelector('[role="tablist"] [role="tab"][aria-selected="true"]'),
+    ).not.toBeNull();
+    inputText(input, "Revenue");
+    key(input, "Enter");
+    expect(renames).toEqual([["b", "Revenue"]]);
+    expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
+
+    tabButtons(host)[1]!.focus();
+    key(host, "F2");
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    inputText(input, "Forecast");
+    input.blur();
+    expect(renames.at(-1)).toEqual(["b", "Forecast"]);
+    expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
+
+    tabButtons(host)[1]!.focus();
+    key(host, "F2");
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    inputText(input, "Cancelled");
+    key(input, "Escape");
+    expect(renames).toHaveLength(2);
+    expect(document.activeElement).toBe(tabButtons(host)[1]!);
+
+    key(host, "F2");
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    input.blur();
+    expect(renames).toHaveLength(2);
+  });
+
+  it("does not commit Enter during IME composition", () => {
+    const renames: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onRename: (id, name) => {
+        renames.push(`${id}:${name}`);
+        return applied(id);
+      },
+    });
+    tabs.update(SHEETS, "b");
+    tabButtons(host)[1]!.focus();
+    key(host, "F2");
+    const input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    input.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    inputText(input, "売上");
+    key(input, "Enter");
+    expect(renames).toEqual([]);
+    expect(host.querySelector(".sheetwrite-tab-input")).toBe(input);
+
+    input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "売上" }));
+    key(input, "Enter");
+    expect(renames).toEqual(["b:売上"]);
+  });
+
+  it("keeps invalid Enter and blur edits focused with their structured lifecycle error associated", () => {
+    // Rejection messages come from the host; the tabs forward them unchanged.
+    const duplicateMessage = "host duplicate message";
+    const blankMessage = "host blank message";
+    const attempts: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onRename: (id, name) => {
+        attempts.push(name);
+        return name.length === 0
+          ? rejected(id, blankMessage, "blank")
+          : rejected(id, duplicateMessage, "duplicate");
+      },
+    });
+    tabs.update(SHEETS, "b");
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+    const rename = host.querySelector<HTMLButtonElement>('[aria-label="Rename Sales sheet"]')!;
+    expect(document.activeElement).toBe(rename);
+    rename.click();
+
+    let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    inputText(input, "Summary");
+    key(input, "Enter");
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    const error = host.querySelector<HTMLElement>('[role="alert"]')!;
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(error.id);
+    expect(error.textContent).toBe(duplicateMessage);
+    expect(error.dataset.code).toBe("duplicate");
+
+    inputText(input, "");
+    input.blur();
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    expect(document.activeElement).toBe(input);
+    const blankError = host.querySelector<HTMLElement>('[role="alert"]')!;
+    expect(blankError.textContent).toBe(blankMessage);
+    expect(blankError.dataset.code).toBe("blank");
+    expect(attempts).toEqual(["Summary", ""]);
   });
 
   it("exposes lifecycle actions through an accessible active-sheet menu and keyboard shortcuts", () => {
