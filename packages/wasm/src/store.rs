@@ -1106,14 +1106,16 @@ impl CellStore {
             return BLOCK_INVALID;
         }
 
-        let Ok(text_buf) = std::str::from_utf8(text_buf) else {
+        let Ok(text) = std::str::from_utf8(text_buf) else {
             return BLOCK_SOURCE_INVALID;
         };
-        let string_entries = kinds.iter().filter(|&&kind| kind == KIND_STRING).count();
+        let string_entries = kinds
+            .iter()
+            .fold(0, |count, &kind| count + usize::from(kind == KIND_STRING));
         if text_offsets.len() != string_entries + 1
             || text_offsets
                 .iter()
-                .any(|&bound| !text_buf.is_char_boundary(bound as usize))
+                .any(|&bound| !text.is_char_boundary(bound as usize))
         {
             return BLOCK_SOURCE_INVALID;
         }
@@ -1212,7 +1214,7 @@ impl CellStore {
                 return BLOCK_SOURCE_INVALID;
             };
             if !(has_sources && source_offsets.contains(&offsets[index])) {
-                string_ids[index] = self.intern(&text_buf[start as usize..end as usize]);
+                string_ids[index] = self.intern(&text[start as usize..end as usize]);
             }
         }
 
