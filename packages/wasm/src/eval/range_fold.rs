@@ -430,9 +430,9 @@ mod tests {
         assert_eq!(number(1), 49.0);
         assert_eq!(number(2), 50.0);
         assert_eq!(number(3), 0.0);
-        for row in 4..8 {
+        for (row, source) in sources.iter().enumerate().skip(4) {
             let error = store.get_cell(sheet, row, 3).string();
-            assert_eq!(error.as_deref(), Some("#NUM!"), "{}", sources[row]);
+            assert_eq!(error.as_deref(), Some("#NUM!"), "{source}");
         }
     }
 }
