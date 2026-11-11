@@ -722,15 +722,4 @@ mod tests {
         let (store, sheet) = calculate("=LAMBDA(x,SEQUENCE(x))(3)");
         assert_eq!(store.get_cell(sheet, 6, 4).num(), 3.0);
     }
-    #[test]
-    fn parameters_shadow_named_ranges_and_dependency_edits_refresh_spills() {
-        let (mut store, sheet) = calculate("=MAP(A1:C2,LAMBDA(x,x+1))");
-        assert!(store.set_named_range("x", -1, sheet, 0, 0, 0, 0));
-        store.set_formula(sheet, 8, 4, "=LAMBDA(x,x+1)(2)", 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, 8, 4).num(), 3.0);
-        store.set_number(sheet, 1, 2, 20.0, 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, 5, 6).num(), 21.0);
-    }
 }

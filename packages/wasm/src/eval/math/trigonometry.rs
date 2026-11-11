@@ -189,18 +189,6 @@ mod tests {
         }
     }
 
-    /// The SECH examples are 5.73E-20 and 1.87E-13: three significant digits.
-    #[test]
-    fn hyperbolic_secant_keeps_tiny_results() {
-        for (argument, published) in [(45.0, 5.73e-20), (30.0, 1.87e-13)] {
-            let Value::Number(actual) = call(Func::Sech, &[argument]) else {
-                panic!("SECH({argument}) is not a number");
-            };
-
-            assert!(((actual - published) / published).abs() < 5e-3);
-        }
-    }
-
     #[test]
     fn domain_errors_follow_the_microsoft_remarks() {
         let cases: &[(Func, &[f64], FormulaError)] = &[

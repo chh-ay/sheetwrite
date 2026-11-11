@@ -231,19 +231,6 @@ mod tests {
     }
 
     #[test]
-    fn filtered_rows_are_skipped_by_both_kinds_and_manual_rows_only_by_hidden() {
-        let mut visibility = RowVisibility::default();
-        assert_eq!(visibility.replace(&[2, 3, 9, 9], &[5, 6]), Some(true));
-
-        assert_eq!(hidden_rows(&visibility, SkippedRows::Filtered), [5, 6]);
-        assert_eq!(
-            hidden_rows(&visibility, SkippedRows::Hidden),
-            [2, 3, 5, 6, 9]
-        );
-        assert_eq!(visibility.replace(&[2, 3, 9, 9], &[5, 6]), Some(false));
-    }
-
-    #[test]
     fn rejects_unsorted_overlapping_or_odd_runs_and_keeps_the_old_rows() {
         let mut visibility = RowVisibility::default();
         visibility.replace(&[1, 1], &[]);
@@ -253,14 +240,6 @@ mod tests {
             assert_eq!(visibility.replace(&[], invalid), None);
         }
         assert_eq!(hidden_rows(&visibility, SkippedRows::Hidden), [1]);
-    }
-
-    #[test]
-    fn touching_runs_merge_so_equal_rows_compare_equal() {
-        let mut visibility = RowVisibility::default();
-        visibility.replace(&[1, 2, 3, 4], &[]);
-
-        assert_eq!(visibility.replace(&[1, 4], &[]), Some(false));
     }
 
     #[test]

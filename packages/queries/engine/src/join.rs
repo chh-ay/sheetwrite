@@ -205,7 +205,9 @@ fn run_count(
             JoinKind::LeftSemi => Ok(left),
             JoinKind::RightSemi => Ok(right),
             JoinKind::LeftAnti | JoinKind::RightAnti => Ok(0),
-            _ => left.checked_mul(right).ok_or_else(Diagnostic::limit),
+            JoinKind::Inner | JoinKind::Left | JoinKind::Right | JoinKind::Full => {
+                left.checked_mul(right).ok_or_else(Diagnostic::limit)
+            }
         };
     }
 
@@ -213,7 +215,7 @@ fn run_count(
         JoinKind::Left | JoinKind::LeftAnti => left,
         JoinKind::Right | JoinKind::RightAnti => right,
         JoinKind::Full => left + right,
-        _ => 0,
+        JoinKind::Inner | JoinKind::LeftSemi | JoinKind::RightSemi => 0,
     })
 }
 

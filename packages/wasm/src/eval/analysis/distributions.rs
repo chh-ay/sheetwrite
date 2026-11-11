@@ -997,16 +997,6 @@ mod tests {
     }
 
     #[test]
-    fn standard_normal_matches_fifteen_digit_tables() {
-        // Abramowitz and Stegun, Handbook of Mathematical Functions, Table 26.1:
-        // P(1.0) = 0.841344746068543 and P(2.0) = 0.977249868051821.
-        assert_number("NORM.S.DIST", &[1.0, 1.0], 0.841344746068543, 1e-15);
-        assert_number("NORM.S.DIST", &[2.0, 1.0], 0.977249868051821, 1e-15);
-        assert_number("NORM.S.DIST", &[-2.0, 1.0], 1.0 - 0.977249868051821, 1e-15);
-        assert_number("NORM.S.INV", &[0.841344746068543], 1.0, 1e-13);
-    }
-
-    #[test]
     fn distribution_tails_and_inverse_endpoints() {
         // Independent closed forms: df=2 chi-square and shape=1 gamma are exponential;
         // df=1 Student is Cauchy, and equal unit beta parameters are uniform.

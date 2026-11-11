@@ -5,25 +5,25 @@
 use crate::transfer::{Block, KIND_EMPTY, KIND_FORMULA, KIND_STRING};
 
 /// The literal value, or whether the cell holds a literal or a formula, changed.
-pub const VALUE: u8 = 1;
+pub(crate) const VALUE: u8 = 1;
 /// A formula source was added, removed or changed.
-pub const FORMULA: u8 = 2;
+pub(crate) const FORMULA: u8 = 2;
 /// The style changed, compared by content.
-pub const STYLE: u8 = 4;
+pub(crate) const STYLE: u8 = 4;
 /// The cell had no value or formula before and has one now.
-pub const ADDED: u8 = 8;
+pub(crate) const ADDED: u8 = 8;
 /// The cell had a value or formula before and has none now.
-pub const REMOVED: u8 = 16;
+pub(crate) const REMOVED: u8 = 16;
 
 /// Style IDs are local to each store; `table` maps them to content IDs that
 /// both versions share. An ID outside the table is compared as itself.
-pub fn style(table: &[u32], id: u32) -> u32 {
-    table.get(id as usize).copied().unwrap_or(id)
+pub(crate) fn style(table: &[u32], id: u32) -> u32 {
+    table.get(id as usize).map_or(id, |&content| content)
 }
 
 /// One cell of a decoded block.
 #[derive(Clone, Copy)]
-pub struct Cell<'a> {
+pub(crate) struct Cell<'a> {
     pub block: &'a Block,
     pub index: usize,
     pub style: u32,
@@ -52,10 +52,11 @@ impl Cell<'_> {
     }
 }
 
-/// Change flags of `after` against `before`; `before` is `None` for a cell on
-/// a row or column that the earlier version did not have. `0` means unchanged.
-pub fn flags(before: Option<Cell<'_>>, after: Cell<'_>) -> u8 {
-    let Some(before) = before else {
+/// Change flags of `after` against `earlier`, the same cell in the earlier
+/// version; `earlier` is `None` for a cell on a row or column that the earlier
+/// version did not have. `0` means unchanged.
+pub(crate) fn flags(earlier: Option<Cell<'_>>, after: Cell<'_>) -> u8 {
+    let Some(before) = earlier else {
         let mut flags = if after.kind() == KIND_EMPTY { 0 } else { ADDED };
         if after.kind() == KIND_FORMULA {
             flags |= FORMULA;
