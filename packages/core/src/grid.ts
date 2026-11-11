@@ -95,6 +95,7 @@ import {
   viewSortPatch,
 } from "./store/view-patches.js";
 import { StyleActions } from "./style-actions.js";
+import { checkStylePart } from "./style-parts.js";
 import {
   beginGridTransactionAdmission,
   hasGridTransactionAdmission,
@@ -893,6 +894,7 @@ export class GridImpl implements Grid {
 
     // host chrome: optional toolbar (top) + viewport (cells) + optional tab bar.
     host.classList.add("sheetwrite");
+    checkStylePart(host, "grid", "The grid");
     host.style.position = host.style.position || "relative";
     host.style.overflow = "hidden";
     if (!host.hasAttribute("tabindex")) host.tabIndex = 0;

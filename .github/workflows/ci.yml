@@ -122,11 +122,14 @@ jobs:
             ~/.cargo/git
           key: ${{ steps.cargo-audit.outputs.cache-primary-key }}
 
+  # Each test suite runs once: the package suites and the analysis, history
+  # and queries Rust tests run only under coverage, and the jobs below split the
+  # rest so that none of them waits on another.
   unit-coverage:
     name: Unit Tests & Coverage
     needs: artifact-build
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,6 +147,94 @@ jobs:
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify and hydrate canonical package outputs
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Generate sources
+        run: bun scripts/workspace-tooling.ts generate
+      - name: Package suites under coverage
+        run: bun run test:coverage:ts
+      - name: Upload coverage evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-coverage-failure-evidence
+          path: |
+            test-results/
+            coverage/
+          if-no-files-found: warn
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+
+  unit-tests:
+    name: Unit Tests
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        id: bun-downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify and hydrate canonical package outputs
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Unit suites outside the coverage run
+        run: bun run test:unit:uncovered
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+
+  rust-coverage:
+    name: Rust Tests & Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
       - name: Cache Rust coverage compilation
         id: rust-coverage-compilation
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -163,64 +254,24 @@ jobs:
             ~/.cargo/bin/cargo-audit
             ~/.cargo/bin/cargo-llvm-cov
           key: release-tools-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
       - name: Install pinned Rust toolchain
         run: rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install coverage toolchain
         run: command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
-      # `bench:verify` launches Chromium only; Firefox and WebKit are exercised
-      # separately by `browser-smoke`.
-      - name: Cache Chromium
-        id: chromium
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
-      - name: Install Chromium for the render smoke
-        run: bun run browser:install:chromium
-      - name: Download canonical tarballs
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-release-artifacts
-          path: test-results/release-artifacts
-      - name: Verify and hydrate canonical package outputs
-        env:
-          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
-        run: |
-          test -n "$ARTIFACT_DIGEST"
-          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
-      - name: Unit and Rust tests
-        run: |
-          bun run test:unit
-          cargo test --manifest-path packages/wasm/Cargo.toml
-          cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
-          cargo test --manifest-path packages/wasm/history/Cargo.toml
-          cargo test --manifest-path packages/queries/engine/Cargo.toml
-      - name: Type checks, public API and generated docs
-        run: |
-          bun run typecheck
-          bun run api:check
-          bun run docs:check
-      - name: Benchmark smoke and safety ceilings (not regression evidence)
-        run: bun run --filter '@sheetwrite/bench' bench:verify
-      - name: Source coverage
-        run: bun run test:coverage
+      # The coverage run below runs the analysis build and the other crates.
+      - name: Default-feature engine tests
+        run: cargo test --manifest-path packages/wasm/Cargo.toml
+      - name: Rust tests under coverage
+        run: bun run test:coverage:rust
       - name: Upload coverage evidence on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: unit-coverage-failure-evidence
+          name: rust-coverage-failure-evidence
           path: |
             test-results/
             coverage/
           if-no-files-found: warn
-      - name: Save Bun downloads cache
-        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
       - name: Save Rust coverage compilation cache
         if: env.SAVE_CACHE == 'true' && steps.rust-coverage-compilation.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -238,6 +289,105 @@ jobs:
             ~/.cargo/bin/cargo-audit
             ~/.cargo/bin/cargo-llvm-cov
           key: ${{ steps.release-verification-tools.outputs.cache-primary-key }}
+
+  static-checks:
+    name: Type Checks & Generated Docs
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        id: bun-downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify and hydrate canonical package outputs
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Type checks, public API and generated docs
+        run: |
+          bun run typecheck
+          bun run api:check
+          bun run docs:check
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
+
+  bench-smoke:
+    name: Benchmark Smoke
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        id: bun-downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Cache Chromium
+        id: chromium
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+      - name: Install Chromium
+        run: bun run browser:install:chromium
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify and hydrate canonical package outputs
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Benchmark smoke and safety ceilings (not regression evidence)
+        run: bun run --filter '@sheetwrite/bench' bench:verify
+      - name: Save Bun downloads cache
+        if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
       - name: Save Chromium cache
         if: env.SAVE_CACHE == 'true' && steps.chromium.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -532,8 +682,9 @@ jobs:
 
   docs-build:
     name: Production Docs
-    # Builds the committed tree: Delivery Size checks the size report and the unit
-    # job checks generated docs, both in parallel with this build.
+    # Builds the committed tree: Delivery Size checks the size report and Type
+    # Checks & Generated Docs type-checks the docs app and checks generated docs,
+    # both in parallel with this build.
     needs: [preflight, artifact-build]
     if: needs.preflight.outputs.docs_required == 'true'
     runs-on: ubuntu-latest
@@ -568,10 +719,8 @@ jobs:
         run: |
           test -n "$ARTIFACT_DIGEST"
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
-      - name: Type check and build production docs
-        run: |
-          bun run --filter '@sheetwrite/docs-start' typecheck
-          bun run --filter '@sheetwrite/docs-start' build:site
+      - name: Build production docs
+        run: bun run --filter '@sheetwrite/docs-start' build:site
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
       - name: Upload production docs
@@ -655,6 +804,10 @@ jobs:
     needs:
       - preflight
       - unit-coverage
+      - unit-tests
+      - rust-coverage
+      - static-checks
+      - bench-smoke
       - artifact-build
       - packed-consumers
       - bundler-consumers
@@ -668,6 +821,10 @@ jobs:
         env:
           PREFLIGHT: ${{ needs.preflight.result }}
           UNIT_COVERAGE: ${{ needs.unit-coverage.result }}
+          UNIT: ${{ needs.unit-tests.result }}
+          RUST: ${{ needs.rust-coverage.result }}
+          STATIC: ${{ needs.static-checks.result }}
+          BENCH: ${{ needs.bench-smoke.result }}
           ARTIFACT_BUILD: ${{ needs.artifact-build.result }}
           PACKED: ${{ needs.packed-consumers.result }}
           BUNDLERS: ${{ needs.bundler-consumers.result }}
@@ -678,6 +835,10 @@ jobs:
         run: |
           test "$PREFLIGHT" = success
           test "$UNIT_COVERAGE" = success
+          test "$UNIT" = success
+          test "$RUST" = success
+          test "$STATIC" = success
+          test "$BENCH" = success
           test "$ARTIFACT_BUILD" = success
           test "$PACKED" = success
           test "$BUNDLERS" = success

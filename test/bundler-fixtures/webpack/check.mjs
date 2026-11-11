@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
+import { assertIconSheetEmitted } from "../icon-sheet.mjs";
 import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
@@ -166,6 +167,19 @@ const STORE_MARKER = "Encoded JSON exceeds the";
 if (mainCode.includes(STORE_MARKER)) {
   throw new Error("Store helpers are in webpack's main.js; a lazy module imports the store");
 }
+
+// webpack.styles.config.js builds core's stylesheet on its own.
+const stylesRoot = resolve("dist-styles");
+const stylesheet = await readFile(resolve(stylesRoot, "styles.css"), "utf8");
+if (!stylesheet.includes(".sheetwrite-tabstrip")) {
+  throw new Error("webpack did not inline the parts that core's styles.css imports");
+}
+await assertIconSheetEmitted({
+  bundler: "webpack",
+  stylesheets: [{ path: resolve(stylesRoot, "styles.css"), text: stylesheet }],
+  resolveUrl: (url, path) => resolve(dirname(path), url),
+  packagedSheet: resolve("node_modules/@sheetwrite/core/styles/icons.svg"),
+});
 
 const assets = publicFiles.map((file) => {
   const kind = file.endsWith(".js") ? "javascript" : file.endsWith(".css") ? "css" : "wasm";
