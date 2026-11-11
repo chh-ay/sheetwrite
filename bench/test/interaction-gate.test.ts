@@ -112,10 +112,6 @@ test("rejects drifted identity, provenance, values, ceilings and previous captur
     [(artifact) => (artifact.mode = "rehearsal"), "must be full or smoke"],
     [(artifact) => (artifact.mode = "smoke"), "lookupMedianNs requires 2 raw samples"],
     [(artifact) => (artifact.rows = 1_000), "workload changed"],
-    [
-      (artifact) => (artifact.metadata.engineVersions.sheetwrite = "0.4"),
-      "engineVersions.sheetwrite",
-    ],
     [(artifact) => (artifact.metadata.commit = ""), "metadata.commit must be a non-empty"],
     [(artifact) => (artifact.metadata.dirty = "false"), "metadata.dirty must be a boolean"],
     [

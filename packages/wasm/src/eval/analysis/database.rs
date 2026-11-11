@@ -410,6 +410,8 @@ mod tests {
         for (row, (formula, number, text)) in cases.iter().enumerate() {
             let cell = store.get_cell(sheet, row + 18, 8);
             if let Some(number) = number {
+                // An error cell also reads as 0: the number must not be text.
+                assert!(cell.string().is_none(), "{formula}: {:?}", cell.string());
                 assert_eq!(cell.num(), *number, "{formula}");
             } else {
                 assert_eq!(cell.string().as_deref(), *text, "{formula}");

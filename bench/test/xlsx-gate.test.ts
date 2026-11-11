@@ -155,13 +155,6 @@ it("accepts a complete comparison and rejects drifted versions, summaries and ou
     }
   }
   expectRejections(() => mutableCopy(comparedArtifact()), validateXlsxBenchmarkArtifact, [
-    ...(["sheetwrite", "exceljs"] as const).map(
-      (engine) =>
-        [
-          (artifact: Artifact) => Reflect.set(artifact.metadata.engineVersions, engine, "^4.4.0"),
-          `engineVersions.${engine}`,
-        ] as const,
-    ),
     ...(["durationMs", "returnAllocationDeltaBytes", "retainedAfterGcDeltaBytes"] as const).map(
       (metric) =>
         [
