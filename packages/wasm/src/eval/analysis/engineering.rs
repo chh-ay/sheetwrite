@@ -1,6 +1,8 @@
 //! Engineering functions for number bases, bits, steps and the error
 //! function: `BIN2DEC`, `BITAND`, `DELTA`, `ERF` and their relatives.
 
+use std::borrow::Cow;
+
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
 use super::super::value::text_from_value;
 use super::distributions::gamma_probability;
@@ -141,7 +143,7 @@ fn digits_argument(values: &FuncAccumulator) -> Result<String, FormulaError> {
     match values.arg_value(0).unwrap_or(&Value::Blank) {
         Value::Bool(_) => Err(FormulaError::Value),
         Value::Number(number) if *number < 0.0 || number.fract() != 0.0 => Err(FormulaError::Num),
-        value => text_from_value(value),
+        value => text_from_value(value).map(Cow::into_owned),
     }
 }
 
