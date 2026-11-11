@@ -312,8 +312,8 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
-    formulaWorkloadKey({ id: "index-match-many", size: lookupFormulas }),
-    formulaWorkloadKey({ id: "rank-many", size: smoke ? 1_000 : 10_000 }),
+    formulaWorkloadKey({ id: "index-match-many", size: smoke ? 50 : INDEX_MATCH_FORMULAS }),
+    formulaWorkloadKey({ id: "rank-many", size: smoke ? 1_000 : RANK_MANY_SIZE }),
     formulaWorkloadKey({ id: "sort-unique-filter", size: range }),
     formulaWorkloadKey({ id: "subtotal-filtered", size: range }),
     formulaWorkloadKey({ id: "sparse-page-write", size: range }),
@@ -1985,6 +1985,12 @@ function letManyFormula(row: number): string {
  * sparse block written during a page load.
  */
 const INDEX_MATCH_VALUE_SCALE = 10;
+/** Lookups in `index-match-many`. Each reads a 100,000-row table, so a few hundred is enough. */
+const INDEX_MATCH_FORMULAS = 200;
+/**
+ * Rows of `rank-many`. Every formula reads the whole column, so the work grows with the square.
+ */
+const RANK_MANY_SIZE = 4_000;
 /** The `rank-many` edit moves A1 below every other value. */
 const RANK_MANY_EDITED_FIRST = -1;
 /** `sort-unique-filter` keys cycle through this many labels (a prime, so a row step visits all). */
@@ -2427,8 +2433,10 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
   );
-  add("index-match-many", lookupFormulas, () => indexMatchFixture(lookupFormulas, range));
-  add("rank-many", topology, () => rankManyFixture(topology));
+  const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
+  add("index-match-many", indexMatchFormulas, () => indexMatchFixture(indexMatchFormulas, range));
+  const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
+  add("rank-many", rankManySize, () => rankManyFixture(rankManySize));
   add("sort-unique-filter", range, () => sortUniqueFilterFixture(range));
   add("subtotal-filtered", range, () => subtotalFilteredFixture(range));
   add("sparse-page-write", range, () => sparsePageWriteFixture(range));
