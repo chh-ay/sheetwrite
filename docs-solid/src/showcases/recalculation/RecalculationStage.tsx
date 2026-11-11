@@ -1,16 +1,9 @@
-import {
-  FORMULA_COUNT,
-  LOOKUPS,
-  type MeasuredRun,
-  median,
-  PRICE_CHANGE_CELL,
-  type RecalculationScenario,
-  type RecalculationSnapshot,
-  ROWS,
-  type RunKind,
-  SERIES_LENGTH,
+import type {
+  MeasuredRun,
+  RecalculationScenario,
+  RecalculationSnapshot,
+  RunKind,
 } from "@docs/showcases/scenarios/recalculation.js";
-import { formatNumber } from "@sheetwrite/core";
 import { createEffect, For, Show } from "solid-js";
 
 import { ActionError } from "../../lib/use-action.js";
@@ -33,12 +26,37 @@ const RUN_LABEL: Readonly<Record<RunKind, string>> = {
 const latest = (runs: readonly MeasuredRun[], kind: RunKind) =>
   runs.find((run) => run.kind === kind);
 
-const money = (value: unknown) => (typeof value === "number" ? formatNumber(value, "$#,##0") : "…");
+/** Props of {@link RecalculationStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
+export interface RecalculationStageProps {
+  readonly rows: number;
+  readonly lookups: number;
+  readonly formulaCount: number;
+  readonly seriesLength: number;
+  /** The cell every revenue formula reads, such as `$B$2`. */
+  readonly priceChangeCell: string;
+}
+
+const DOLLARS = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+const money = (value: unknown) => (typeof value === "number" ? DOLLARS.format(value) : "…");
+
+/** The middle value; the mean of the two middle values for an even count. */
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? (sorted[middle] ?? 0)
+    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+}
 
 /** The recent runs as bars, scaled to the slowest one; before the first, the load progress. */
 function RunBars(props: {
   readonly runs: readonly MeasuredRun[];
   readonly snapshot: RecalculationSnapshot | null;
+  readonly formulaCount: number;
 }) {
   const slowest = () => Math.max(...props.runs.map((run) => run.recalcMs + run.paintMs));
   return (
@@ -46,7 +64,7 @@ function RunBars(props: {
       fallback={
         <ShowcaseStatus tone="neutral">
           {props.snapshot?.firstCalculationMs == null
-            ? `Calculating ${(props.snapshot?.loadedFormulas ?? 0).toLocaleString("en")} of ${FORMULA_COUNT.toLocaleString("en")} formulas…`
+            ? `Calculating ${(props.snapshot?.loadedFormulas ?? 0).toLocaleString("en")} of ${props.formulaCount.toLocaleString("en")} formulas…`
             : "No edits measured yet"}
         </ShowcaseStatus>
       }
@@ -76,7 +94,7 @@ function RunBars(props: {
 }
 
 /** The recalculation showcase's island: the 100,000-row model and its timed edits. */
-export function RecalculationStage() {
+export function RecalculationStage(props: RecalculationStageProps) {
   const live = createLiveScenario<RecalculationScenario, RecalculationSnapshot>(() =>
     import("./boot.js").then(({ createRecalculationScenario }) => createRecalculationScenario),
   );
@@ -94,8 +112,8 @@ export function RecalculationStage() {
       controls={
         <>
           <ShowcaseControlGroup
-            description={`Every revenue formula reads the price-change cell ${PRICE_CHANGE_CELL.replaceAll("$", "")}.`}
-            title={`Edit under ${ROWS.toLocaleString("en")} formulas`}
+            description={`Every revenue formula reads the price-change cell ${props.priceChangeCell.replaceAll("$", "")}.`}
+            title={`Edit under ${props.rows.toLocaleString("en")} formulas`}
           >
             <ControlActions>
               <ControlButton
@@ -113,7 +131,7 @@ export function RecalculationStage() {
                 icon="play"
                 onClick={() => void action.run("The series", (current) => current.runSeries())}
               >
-                Run {SERIES_LENGTH} changes
+                Run {props.seriesLength} changes
               </ControlButton>
             </ControlActions>
             <ShowcaseReadout
@@ -135,8 +153,8 @@ export function RecalculationStage() {
             />
           </ShowcaseControlGroup>
           <ShowcaseControlGroup
-            description={`Each XLOOKUP searches ${ROWS.toLocaleString("en")} SKUs; they share one index per recalculation.`}
-            title={`${LOOKUPS.toLocaleString("en")} lookups`}
+            description={`Each XLOOKUP searches ${props.rows.toLocaleString("en")} SKUs; they share one index per recalculation.`}
+            title={`${props.lookups.toLocaleString("en")} lookups`}
           >
             <ControlActions>
               <ControlButton
@@ -181,7 +199,7 @@ export function RecalculationStage() {
                 />
               )}
             </Show>
-            <RunBars runs={runs()} snapshot={live.snapshot()} />
+            <RunBars formulaCount={props.formulaCount} runs={runs()} snapshot={live.snapshot()} />
             <ActionError error={action.error()} />
           </ShowcaseControlGroup>
         </>
@@ -190,7 +208,7 @@ export function RecalculationStage() {
         <>
           <DemoGrid
             host={live.host}
-            label={`${ROWS.toLocaleString("en")}-row model`}
+            label={`${props.rows.toLocaleString("en")}-row model`}
             testId="recalc-grid"
           />
           <ActionError error={live.error()} />

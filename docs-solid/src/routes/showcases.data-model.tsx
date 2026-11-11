@@ -1,13 +1,23 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { ORDER_ROWS, RELATIONSHIPS } from "@docs/showcases/scenarios/data-model.js";
+import {
+  ORDER_ROWS,
+  PENDING_SNAPSHOT,
+  PIVOT_ROWS_USED,
+  RELATIONSHIPS,
+  ROW_FIELDS,
+  type RowFieldId,
+  UNKNOWN_PRODUCT,
+} from "@docs/showcases/scenarios/data-model.js";
 import DataModelSnippet from "@docs/showcases/snippets/data-model.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { DataModelDiagram } from "../showcases/art/diagrams.js";
 import { DataModelStage } from "../showcases/data-model/DataModelStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -19,6 +29,7 @@ export const Route = createFileRoute("/showcases/data-model")({
       "Relate orders to products and regions, pivot by fields of the related tables with a measure, and see what a broken key does.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
@@ -40,7 +51,21 @@ function DataModelShowcase() {
         ]}
         guide={{ href: "/docs/features/analysis/data-model/", label: "Read the data model guide" }}
         id="data-model"
-        stage={<Island component={DataModelStage} name="showcase-data-model" props={{}} />}
+        stage={
+          <Island
+            component={DataModelStage}
+            name="showcase-data-model"
+            props={{
+              pending: PENDING_SNAPSHOT,
+              rowFields: (Object.keys(ROW_FIELDS) as RowFieldId[]).map((id) => ({
+                value: id,
+                label: ROW_FIELDS[id].label,
+              })),
+              unknownProduct: UNKNOWN_PRODUCT,
+              rowsUsed: PIVOT_ROWS_USED,
+            }}
+          />
+        }
         task={
           <>
             Pivot orders by a column of a related table, with a measure that recalculates in every
@@ -49,6 +74,7 @@ function DataModelShowcase() {
         }
         title="One pivot across related tables"
       >
+        <DataModelDiagram />
         <ShowcaseSection id="data-model-rules" title="How the model reads the tables">
           <ul>
             <li>

@@ -1,14 +1,16 @@
 import { pageMeta } from "@docs/lib/seo.js";
 import { CAPABILITY_OWNERS, type CapabilityOwnerId } from "@docs/showcases/hub-inventory.js";
 import { createFileRoute } from "@tanstack/solid-router";
-import { For, Show } from "solid-js";
+import { For } from "solid-js";
 import { NoHydration } from "solid-js/web";
 
 import { Icon } from "../components/Icon.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { Island } from "../islands/Island.js";
+import { HUB_ART } from "../showcases/art/hub-art.js";
 import { ALL_GROUPS, HubFilter } from "../showcases/hub/HubFilter.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import hubStylesheet from "../styles/showcases/hub.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/showcases/")({
     links: [
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: hubStylesheet },
+      { rel: "stylesheet", href: artStylesheet },
     ],
   }),
   component: ShowcaseHub,
@@ -75,26 +78,6 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
     "Edit a cell that a sheet full of formulas reads, and move its lookups, timed in your browser.",
 };
 
-/** Real import and mount line per first-party adapter. */
-const FRAMEWORK_MOUNTS: Readonly<Record<string, { name: string; mount: string; pkg: string }>> = {
-  vanilla: { name: "createGrid", mount: "createGrid(host, { workbook })", pkg: "@sheetwrite/core" },
-  react: {
-    name: "SheetwriteGrid",
-    mount: "<SheetwriteGrid workbook={book} />",
-    pkg: "@sheetwrite/react",
-  },
-  vue: {
-    name: "SheetwriteGrid",
-    mount: '<SheetwriteGrid :workbook="book" />',
-    pkg: "@sheetwrite/vue",
-  },
-  svelte: {
-    name: "SheetwriteGrid",
-    mount: "<SheetwriteGrid {workbook} bind:grid />",
-    pkg: "@sheetwrite/svelte",
-  },
-};
-
 const FRAMEWORK_SUMMARY: Readonly<Record<string, string>> = {
   vanilla: "Direct lifecycle, renderer choice, and workbook operations.",
   react: "Controlled analytics, formulas, clipboard, and reset semantics.",
@@ -133,51 +116,10 @@ function ownerGroup(owner: HubOwner): HubGroup {
   return "data";
 }
 
-/** The size `scripts/docs-showcase-previews.ts` captures a demo at, for the image's aspect ratio. */
-const PREVIEW_WIDTH = 960;
-const PREVIEW_HEIGHT = 600;
-
-/**
- * The live demo of a showcase, as `scripts/docs-showcase-previews.ts` captured
- * it in each theme. Both images are in the card; the site theme shows one.
- */
-function ShowcasePreview(props: Readonly<{ id: SceneOwnerId }>) {
-  return (
-    <span aria-hidden="true" class="sw-hub-preview">
-      <For each={["light", "dark"] as const}>
-        {(theme) => (
-          <img
-            alt=""
-            data-preview-theme={theme}
-            decoding="async"
-            height={PREVIEW_HEIGHT}
-            loading="lazy"
-            src={`/showcase-previews/${props.id}-${theme}.jpg`}
-            width={PREVIEW_WIDTH}
-          />
-        )}
-      </For>
-    </span>
-  );
-}
-
-function FrameworkScene(props: Readonly<{ id: string }>) {
-  const cue = () => FRAMEWORK_MOUNTS[props.id];
-  return (
-    <span aria-hidden="true" class="sw-hub-framework-scene">
-      <code class="sw-hub-framework-scene__import">
-        <span>
-          <i>import</i> {"{ "}
-          {cue()?.name}
-          {" }"}
-        </span>{" "}
-        <span>
-          <i>from</i> <em>"{cue()?.pkg}"</em>
-        </span>
-      </code>
-      <code class="sw-hub-framework-scene__mount">{cue()?.mount}</code>
-    </span>
-  );
+/** A card's illustration, drawn for its showcase or framework (showcases/art/hub-art.tsx). */
+function CardArt(props: Readonly<{ id: string }>) {
+  const Art = HUB_ART[props.id];
+  return <span class="sw-hub-preview">{Art === undefined ? null : <Art />}</span>;
 }
 
 function HubCard(props: Readonly<{ owner: HubOwner }>) {
@@ -193,12 +135,7 @@ function HubCard(props: Readonly<{ owner: HubOwner }>) {
         data-owner={props.owner.id}
         href={props.owner.href}
       >
-        <Show
-          fallback={<ShowcasePreview id={props.owner.id as SceneOwnerId} />}
-          when={isFramework()}
-        >
-          <FrameworkScene id={props.owner.id} />
-        </Show>
+        <CardArt id={props.owner.id} />
         <span class="sw-hub-launch__body">
           <span class="sw-hub-launch__meta">
             {HUB_GROUPS.find((item) => item.id === ownerGroup(props.owner))?.label}

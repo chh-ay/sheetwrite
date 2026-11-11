@@ -27,8 +27,12 @@ import {
 } from "@sheetwrite/core/shell";
 
 import {
-  abortedImport,
   ADVERSARIAL_FIXTURES,
+  type InteropFixture,
+  POSITIVE_FIXTURES,
+} from "../scenarios/interop-fixtures.js";
+import {
+  abortedImport,
   BULK_SALES_ROWS,
   createBulkSalesCsv,
   createInjectionSnapshot,
@@ -42,8 +46,6 @@ import {
   importWorkbook,
   INTEROP_ANALYSIS_SHEET,
   INTEROP_ASSUMPTIONS_SHEET,
-  type InteropFixture,
-  POSITIVE_FIXTURES,
   probeXlsxRegistration,
   roundTripWorkbook,
   sha256Hex,

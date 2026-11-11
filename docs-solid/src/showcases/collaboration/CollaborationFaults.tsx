@@ -1,13 +1,13 @@
-import { COLLABORATION_ACTORS } from "@docs/showcases/collaboration-protocol.js";
 import { For, Show } from "solid-js";
 
 import { Icon } from "../../components/Icon.js";
 import { pendingProps } from "../../lib/use-action.js";
 import { Button } from "../ui/Button.js";
+import type { Actors } from "./CollaborationStage.js";
 import { actionPending, CLIENT_KEYS, engine, views } from "./state.js";
 
 /** Recovery drills and each client's full event log, after the code. */
-export function CollaborationFaults() {
+export function CollaborationFaults(props: Readonly<{ actors: Actors }>) {
   return (
     <details class="sw-clb__advanced">
       <summary>
@@ -17,7 +17,7 @@ export function CollaborationFaults() {
       <div class="sw-clb__advanced-body">
         <For each={CLIENT_KEYS}>
           {(key) => {
-            const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+            const actor = key === "a" ? props.actors[0] : props.actors[1];
             const held = () => views[key].linkState?.heldBroadcasts ?? 0;
             return (
               <section

@@ -15,11 +15,13 @@ import { For, Show } from "solid-js";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { PagingDiagram } from "../showcases/art/diagrams.js";
 import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
 import { PerformanceDiagnostics } from "../showcases/performance/PerformanceDiagnostics.js";
 import { PerformanceStage } from "../showcases/performance/PerformanceStage.js";
 import PerformanceSnippet from "../showcases/snippets/performance.mdx";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import stylesheet from "../styles/showcases/performance.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -31,6 +33,7 @@ export const Route = createFileRoute("/showcases/performance")({
   head: () => ({
     meta: pageMeta("One-billion-address Grid — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
@@ -271,6 +274,7 @@ function PerformanceShowcase() {
         }
         title="A billion cells. Within reach."
       >
+        <PagingDiagram />
         <div class="sw-sp-page">
           <Island
             component={PerformanceDiagnostics}

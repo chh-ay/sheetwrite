@@ -1,5 +1,10 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { FEED_START_ROWS, LARGE_ORDER_AMOUNT } from "@docs/showcases/scenarios/queries.js";
+import {
+  FEED_BATCH_ROWS,
+  FEED_START_ROWS,
+  LARGE_ORDER_AMOUNT,
+  REPORT_ROWS_USED,
+} from "@docs/showcases/scenarios/queries.js";
 import QueriesSnippet from "@docs/showcases/snippets/queries.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
@@ -43,7 +48,16 @@ function QueriesShowcase() {
           label: "Read the queries guide",
         }}
         id="queries"
-        stage={<Island component={QueriesStage} name="showcase-queries" props={{}} />}
+        stage={
+          <Island
+            component={QueriesStage}
+            name="showcase-queries"
+            props={{
+              batchRows: FEED_BATCH_ROWS,
+              rowsUsed: REPORT_ROWS_USED,
+            }}
+          />
+        }
         task={
           <>
             Refresh two saved queries that shape an order feed into workbook tables. Let new orders

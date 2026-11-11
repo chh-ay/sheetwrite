@@ -1,4 +1,5 @@
-/* Route-owned gallery. Static previews do not mount a Grid or runtime. */
+/* Route-owned gallery. Each card's illustration is inline SVG
+   (showcases/art/hub-art.tsx); nothing on the page mounts a Grid. */
 
 .sw-hub-frame {
   position: relative;
@@ -212,7 +213,7 @@
   grid-template-rows: auto 1fr;
   border: 1px solid var(--sw-border);
   border-radius: var(--sw-radius-xl);
-  /* The preview paints its own background; clip it to the rounded corners. */
+  /* The illustration paints its own background; clip it to the rounded corners. */
   overflow: clip;
   background: var(--sw-surface-1);
   color: var(--sw-fg);
@@ -294,9 +295,7 @@
   transform: translateX(var(--sw-space-0-5));
 }
 
-/* A capability card leads with its live demo, captured in the site theme by
-   scripts/docs-showcase-previews.ts. Both images are in the card; the page
-   theme shows one. */
+/* Every card leads with its illustration. */
 .sw-hub-preview {
   display: block;
   aspect-ratio: 8 / 5;
@@ -304,66 +303,14 @@
   background: var(--sw-surface-0);
 }
 
-.sw-hub-preview img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top left;
-}
-
-:root[data-theme="dark"] .sw-hub-preview [data-preview-theme="light"],
-:root:not([data-theme="dark"]) .sw-hub-preview [data-preview-theme="dark"] {
-  display: none;
-}
-
-.sw-hub-framework-scene {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--sw-space-2);
-  padding: var(--sw-space-5);
-  background: var(--sw-surface-0);
-  color: var(--sw-fg);
-}
-.sw-hub-framework-scene code {
-  display: block;
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.55 var(--sw-font-mono);
-  text-wrap: balance;
-}
-
-.sw-hub-framework-scene__import {
-  color: var(--sw-fg);
-}
-
-.sw-hub-framework-scene__import span {
-  white-space: nowrap;
-}
-
-.sw-hub-framework-scene__import i {
-  color: var(--sw-hub-accent-ink);
-  font-style: normal;
-}
-
-.sw-hub-framework-scene__import em {
-  color: var(--sw-accent-strong);
-  font-style: normal;
-}
-
-.sw-hub-framework-scene__mount {
-  color: var(--sw-hub-accent-ink);
-  font-weight: var(--sw-weight-semibold);
-}
-
-/* The app showcase leads the hub at full width: preview beside the copy. */
+/* The app showcase leads the hub at full width: its illustration beside the copy. */
 .sw-hub-scenes > li[data-owner="spreadsheet"] {
   grid-column: 1 / -1;
 }
 
 .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  /* At least the other previews' height; taller when the copy wraps. */
+  /* At least the other illustrations' height; taller when the copy wraps. */
   grid-template-rows: minmax(12rem, auto);
 }
 
@@ -375,14 +322,14 @@
   }
 }
 
-/* Beside the preview, the app card's copy and link sit together in the
+/* Beside the illustration, the app card's copy and link sit together in the
    middle of the pane rather than spreading to its edges. */
 .sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-launch__body {
   grid-template-rows: auto;
   align-content: center;
 }
 
-/* The preview fills its pane, however tall the row beside it is. */
+/* The illustration fills its pane, however tall the row beside it is. */
 .sw-hub-scenes > li[data-owner="spreadsheet"] .sw-hub-preview {
   height: 100%;
   aspect-ratio: auto;

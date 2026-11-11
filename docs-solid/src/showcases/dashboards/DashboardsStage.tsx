@@ -1,8 +1,4 @@
-import {
-  type DashboardScenario,
-  type DashboardSnapshot,
-  REGIONS,
-} from "@docs/showcases/scenarios/dashboards.js";
+import type { DashboardScenario, DashboardSnapshot } from "@docs/showcases/scenarios/dashboards.js";
 import { createEffect } from "solid-js";
 
 import { ActionError } from "../../lib/use-action.js";
@@ -15,7 +11,13 @@ import { setItemCount } from "./item-count.js";
 const GRID_ROWS = 18;
 
 /** The dashboards showcase's island: the dashboard sheet, its slicer and its saved layout. */
-export function DashboardsStage() {
+/** Props of {@link DashboardsStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
+export interface DashboardsStageProps {
+  /** The region the slicer button keeps. */
+  readonly firstRegion: string;
+}
+
+export function DashboardsStage(props: DashboardsStageProps) {
   const live = createLiveScenario<DashboardScenario, DashboardSnapshot>(() =>
     import("./boot.js").then(({ createDashboardScenario }) => createDashboardScenario),
   );
@@ -39,7 +41,7 @@ export function DashboardsStage() {
                 }
                 variant="primary"
               >
-                Keep {REGIONS[0]} in the Region slicer
+                Keep {props.firstRegion} in the Region slicer
               </ControlButton>
             </ControlActions>
             <ShowcaseReadout

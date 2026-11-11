@@ -1,11 +1,7 @@
-import {
-  type DataModelScenario,
-  type DataModelSnapshot,
-  PENDING_SNAPSHOT,
-  PIVOT_ROWS_USED,
-  ROW_FIELDS,
-  type RowFieldId,
-  UNKNOWN_PRODUCT,
+import type {
+  DataModelScenario,
+  DataModelSnapshot,
+  RowFieldId,
 } from "@docs/showcases/scenarios/data-model.js";
 import type { RelationshipStatus } from "@sheetwrite/core";
 import { For } from "solid-js";
@@ -22,7 +18,14 @@ import { createLiveScenario, createScenarioAction } from "../lib/live-scenario.j
 import { ControlActions, ControlButton, DemoGrid } from "../ui/feature-controls.js";
 import { RadioGroup } from "../ui/RadioGroup.js";
 
-const ROW_FIELD_IDS = Object.keys(ROW_FIELDS) as RowFieldId[];
+/** Props of {@link DataModelStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
+export interface DataModelStageProps {
+  /** The panel before the grid is ready. */
+  readonly pending: DataModelSnapshot;
+  readonly rowFields: readonly { readonly value: RowFieldId; readonly label: string }[];
+  readonly unknownProduct: string;
+  readonly rowsUsed: number;
+}
 
 /** What a relationship's key check means for the reader, and how loudly to say it. */
 function keyStatus(status: RelationshipStatus): { tone: ShowcaseStatusTone; text: string } {
@@ -44,12 +47,12 @@ function keyStatus(status: RelationshipStatus): { tone: ShowcaseStatusTone; text
 }
 
 /** The data model showcase's island: three related tables, their pivot and its reads. */
-export function DataModelStage() {
+export function DataModelStage(props: DataModelStageProps) {
   const live = createLiveScenario<DataModelScenario, DataModelSnapshot>(() =>
     import("./boot.js").then(({ createDataModelScenario }) => createDataModelScenario),
   );
   const action = createScenarioAction(live.scenario);
-  const snapshot = () => live.snapshot() ?? PENDING_SNAPSHOT;
+  const snapshot = () => live.snapshot() ?? props.pending;
 
   return (
     <ShowcaseStage
@@ -88,7 +91,7 @@ export function DataModelStage() {
                   void action.run("The order change", (current) => current.orphanOrder())
                 }
               >
-                Order product {UNKNOWN_PRODUCT}
+                Order product {props.unknownProduct}
               </ControlButton>
               <ControlButton
                 disabled={action.disabled()}
@@ -110,7 +113,7 @@ export function DataModelStage() {
               onChange={(value) =>
                 void action.run("The pivot change", (current) => current.setRowField(value))
               }
-              options={ROW_FIELD_IDS.map((id) => ({ value: id, label: ROW_FIELDS[id].label }))}
+              options={props.rowFields}
               value={snapshot().rowField}
             />
             <ControlActions>
@@ -153,7 +156,7 @@ export function DataModelStage() {
           <DemoGrid
             host={live.host}
             label="Data model workbook"
-            rows={PIVOT_ROWS_USED}
+            rows={props.rowsUsed}
             testId="model-grid"
           />
           <ActionError error={live.error()} />

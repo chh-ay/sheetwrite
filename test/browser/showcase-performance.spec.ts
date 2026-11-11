@@ -268,6 +268,8 @@ test("row and column navigators agree with the public window headers", async ({ 
   expect(landmarkRows[2]).toBeLessThan(landmarkRows[3]!);
 
   const rail = page.getByTestId("scale-overview");
+  // The rail sits under the grid; the mouse reaches only what is on screen.
+  await rail.scrollIntoViewIfNeeded();
   const railBox = await rail.boundingBox();
   if (!railBox) throw new Error("Overview rail has no physical bounds");
   await page.mouse.move(railBox.x + railBox.width * 0.02, railBox.y + railBox.height / 2);
