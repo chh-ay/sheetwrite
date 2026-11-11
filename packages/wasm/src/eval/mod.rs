@@ -2531,68 +2531,6 @@ impl CellStore {
         range_view::RangeView::new(self, range, depth)?.materialize(pass)
     }
 
-    #[cfg(test)]
-    fn legacy_range_matrix(
-        &self,
-        range: CellRange,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
-        let sheet = range.sheet as usize;
-        let Some(data) = self.sheets.get(sheet) else {
-            return Err(FormulaError::Ref);
-        };
-        if data.cells.row_count() == 0
-            || data.cells.n_cols() == 0
-            || range.row_start as usize >= data.cells.row_count()
-            || range.col_start as usize >= data.cells.n_cols()
-        {
-            return Err(FormulaError::Ref);
-        }
-        let row_start = range.row_start as usize;
-        let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
-        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
-        let rows = row_end - row_start + 1;
-        let cols = col_end - col_start + 1;
-        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
-        let mut payload_bytes = total
-            .checked_mul(std::mem::size_of::<Value>())
-            .ok_or(FormulaError::Num)?;
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                let index = data.cells.idx(row, col);
-                if matches!(data.cells.kind_at(index), KIND_STRING | KIND_FORMULA) {
-                    if let Some(text) =
-                        string_from_pool_ref(&self.strings, data.cells.str_id_at(index))
-                    {
-                        payload_bytes = payload_bytes
-                            .checked_add(text.len())
-                            .ok_or(FormulaError::Num)?;
-                        if payload_bytes > matrix::SPILL_MAX_BYTES {
-                            return Err(FormulaError::Num);
-                        }
-                    }
-                }
-            }
-        }
-        let mut values = Vec::with_capacity(total);
-        let literals = LiteralSources::new(data, depth);
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                if !data.cells.is_loaded(row, col) {
-                    return Err(FormulaError::Loading);
-                }
-                let index = data.cells.idx(row, col);
-                let value = literals
-                    .and_then(|sources| sources.value_at(&self.strings, index))
-                    .unwrap_or_else(|| self.eval_at(sheet, row, col, pass, depth + 1));
-                values.push(value);
-            }
-        }
-        Ok(EvalMatrix::new(rows, cols, values))
-    }
-
     fn eval_criterion(
         &self,
         ast: &Ast,

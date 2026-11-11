@@ -66,7 +66,9 @@ fn position(value: &Value) -> Result<usize, FormulaError> {
 
 impl CellStore {
     /// The area INDEX reads and the 1-based row and column it selects, where
-    /// zero is a whole axis. A one-row or one-column area needs only one
+    /// zero is a whole axis. A written area is read in place when one cell is
+    /// selected; a literal zero position copies the whole area, as the array
+    /// result needs it. A one-row or one-column area needs only one
     /// position, and the other axis is its only row or column.
     fn index_target<'a>(
         &'a self,
@@ -152,11 +154,7 @@ impl CellStore {
             .map_err(|_| FormulaError::Num)?;
         for row in rows {
             for col in cols.clone() {
-                let value = matrix.cell(row, col, pass);
-                if matches!(value, Value::Error(FormulaError::Loading)) {
-                    return Err(FormulaError::Loading);
-                }
-                values.push(value);
+                values.push(matrix.cell(row, col, pass));
             }
         }
         Ok(EvalMatrix::new(row_count, col_count, values))
