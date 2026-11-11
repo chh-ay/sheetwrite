@@ -178,7 +178,11 @@ impl CellStore {
         let index = sheet.cells.idx(row, col);
         match cached_formula_value(sheet, &self.strings, index, error) {
             Value::Error(FormulaError::Cycle) => Value::Number(0.0),
-            value => value,
+            value @ (Value::Number(_)
+            | Value::Text(_)
+            | Value::Bool(_)
+            | Value::Blank
+            | Value::Error(_)) => value,
         }
     }
 

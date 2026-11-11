@@ -54,7 +54,9 @@ fn pivot_data(
         None => {
             return match store.eval_ast(&args[1], sheet, pass, depth + 1) {
                 Value::Error(error) => Err(error),
-                _ => Err(FormulaError::Ref),
+                Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                    Err(FormulaError::Ref)
+                }
             }
         }
     };
@@ -65,7 +67,7 @@ fn pivot_data(
         let field = text(field_ast, pass)?;
         let item = match store.eval_ast(item_ast, sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
-            item => item,
+            item @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => item,
         };
         items.push((field, item));
     }

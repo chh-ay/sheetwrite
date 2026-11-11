@@ -31,7 +31,33 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
         }
         Ast::Neg(inner) => static_integer(Some(inner)).and_then(i64::checked_neg),
         Ast::Pos(inner) => static_integer(Some(inner)),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -573,7 +599,37 @@ impl CellStore {
         }
         let range = match ast {
             Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet)?,
-            _ => range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?,
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+                range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?
+            }
         };
         let data = self
             .sheets
@@ -924,7 +980,9 @@ impl CellStore {
             Some(result) => result?,
             None => match self.eval_ast(&args[0], sheet, pass, depth + 1) {
                 Value::Error(error) => return Err(error),
-                value => EvalMatrix::new(1, 1, vec![value]),
+                value @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => {
+                    EvalMatrix::new(1, 1, vec![value])
+                }
             },
         };
         let trim_rows = self.trim_mode(optional_ast(args, 1), sheet, pass, depth)?;
