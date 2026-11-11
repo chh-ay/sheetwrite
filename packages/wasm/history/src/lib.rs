@@ -31,6 +31,7 @@ struct Page {
     before_row: Vec<u32>,
     before_col: Vec<u32>,
     flags: Vec<u8>,
+    author: Vec<u32>,
 }
 
 impl Page {
@@ -45,6 +46,7 @@ impl Page {
         self.before_row.clear();
         self.before_col.clear();
         self.flags.clear();
+        self.author.clear();
     }
 }
 
@@ -302,6 +304,7 @@ impl DiffKernel {
     #[wasm_bindgen(js_name = pageSheets)]
     #[must_use]
     pub fn page_sheets(&mut self) -> Vec<u32> {
+        self.finish_page();
         std::mem::take(&mut self.page.sheet)
     }
 
@@ -309,6 +312,7 @@ impl DiffKernel {
     #[wasm_bindgen(js_name = pageRows)]
     #[must_use]
     pub fn page_rows(&mut self) -> Vec<u32> {
+        self.finish_page();
         std::mem::take(&mut self.page.row)
     }
 
@@ -316,6 +320,7 @@ impl DiffKernel {
     #[wasm_bindgen(js_name = pageCols)]
     #[must_use]
     pub fn page_cols(&mut self) -> Vec<u32> {
+        self.finish_page();
         std::mem::take(&mut self.page.col)
     }
 
@@ -323,6 +328,7 @@ impl DiffKernel {
     #[wasm_bindgen(js_name = pageBeforeRows)]
     #[must_use]
     pub fn page_before_rows(&mut self) -> Vec<u32> {
+        self.finish_page();
         std::mem::take(&mut self.page.before_row)
     }
 
@@ -330,6 +336,7 @@ impl DiffKernel {
     #[wasm_bindgen(js_name = pageBeforeCols)]
     #[must_use]
     pub fn page_before_cols(&mut self) -> Vec<u32> {
+        self.finish_page();
         std::mem::take(&mut self.page.before_col)
     }
 
@@ -337,30 +344,16 @@ impl DiffKernel {
     #[wasm_bindgen(js_name = pageFlags)]
     #[must_use]
     pub fn page_flags(&mut self) -> Vec<u8> {
+        self.finish_page();
         std::mem::take(&mut self.page.flags)
     }
 
     /// The last writer of each changed cell; `0xFFFFFFFF` when no logged write reaches it.
     #[wasm_bindgen(js_name = pageAuthors)]
     #[must_use]
-    pub fn page_authors(&self) -> Vec<u32> {
-        let len = self.page.sheet.len();
-        let mut authors = vec![NONE; len];
-        let mut order: Vec<u32> = (0..len as u32).collect();
-        order.sort_unstable_by_key(|&i| (self.page.sheet[i as usize], self.page.row[i as usize], self.page.col[i as usize]));
-        let mut start = 0;
-        while start < order.len() {
-            let slot = self.page.sheet[order[start] as usize];
-            let mut end = start;
-            while end < order.len() && self.page.sheet[order[end] as usize] == slot { end += 1; }
-            let run = &order[start..end];
-            if let Some(Some(sheet)) = self.sheets.get(slot as usize) {
-                let rows: Vec<u32> = run.iter().map(|&i| self.page.row[i as usize]).collect();
-                sheet.touches.assign_last_authors(&rows, run, &self.page.col, &mut authors);
-            }
-            start = end;
-        }
-        authors
+    pub fn page_authors(&mut self) -> Vec<u32> {
+        self.finish_page();
+        std::mem::take(&mut self.page.author)
     }
 
     /// Empty the page so `compare` can fill it again.
@@ -383,6 +376,30 @@ impl DiffKernel {
 }
 
 impl DiffKernel {
+    /// Proto: last authors of the page, one sweep over the log per sheet.
+    fn finish_page(&mut self) {
+        let len = self.page.flags.len();
+        if self.page.author.len() == len {
+            return;
+        }
+        let mut authors = vec![NONE; len];
+        let mut order: Vec<u32> = (0..len as u32).collect();
+        order.sort_unstable_by_key(|&i| (self.page.sheet[i as usize], self.page.row[i as usize], self.page.col[i as usize]));
+        let mut start = 0;
+        while start < order.len() {
+            let slot = self.page.sheet[order[start] as usize];
+            let mut end = start;
+            while end < order.len() && self.page.sheet[order[end] as usize] == slot { end += 1; }
+            let run = &order[start..end];
+            if let Some(Some(sheet)) = self.sheets.get(slot as usize) {
+                let rows: Vec<u32> = run.iter().map(|&i| self.page.row[i as usize]).collect();
+                sheet.touches.assign_last_authors(&rows, run, &self.page.col, &mut authors);
+            }
+            start = end;
+        }
+        self.page.author = authors;
+    }
+
     fn rows(&mut self, slot: u32, op: AxisOp) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
             sheet.rows.apply(op);
