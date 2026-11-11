@@ -218,6 +218,25 @@ impl OwnerRuns {
 
     /// Marks the runs of `anchor` in column `col` between `row_start` and
     /// `row_end` vacant.
+    /// The runs of column `col` that meet rows `row_start..=row_end`.
+    fn runs_meeting(&self, col: u32, row_start: u32, row_end: u32) -> &[OwnedRun] {
+        let Some(column) = self.runs(col) else {
+            return &[];
+        };
+        let first = column.partition_point(|run| run.row_end < row_start);
+        let last = column.partition_point(|run| run.row_start <= row_end);
+        column.get(first..last).unwrap_or_default()
+    }
+
+    /// Whether a live run owns any cell of `range`.
+    fn owns_any_of(&self, range: SpillRange) -> bool {
+        (range.anchor.1..=range.col_end).any(|col| {
+            self.runs_meeting(col, range.anchor.0, range.row_end)
+                .iter()
+                .any(|run| run.is_live())
+        })
+    }
+
     fn vacate(&mut self, col: u32, anchor: CellKey, row_start: u32, row_end: u32) {
         let Some(column) = runs_mut(&mut self.columns, col) else {
             return;
@@ -518,23 +537,41 @@ impl SpillState {
             return;
         };
 
-        for row in range.anchor.0..=range.row_end {
-            for col in range.anchor.1..=range.col_end {
-                let cell = (row, col);
-                if cell == anchor
-                    || self.owner(cell) != Some(anchor)
-                    || !cells.contains_cell(row as usize, col as usize)
-                {
-                    continue;
+        let mut remove = |cell: CellKey| {
+            if cell == anchor || !cells.contains_cell(cell.0 as usize, cell.1 as usize) {
+                return;
+            }
+            let index = cells.idx(cell.0 as usize, cell.1 as usize);
+            let value = if KEEP_VALUES {
+                cells.calculated_cell_at(index)
+            } else {
+                None
+            };
+            cells.remove_calculated(index);
+            removed(cell, value);
+        };
+        match self.owners.as_deref() {
+            // A one-column spill reads its own runs in row order, which is
+            // also the row-major order its cells were written in.
+            Some(owners) if range.anchor.1 == range.col_end => {
+                let col = range.anchor.1;
+                for run in owners.runs_meeting(col, range.anchor.0, range.row_end) {
+                    if run.anchor != anchor {
+                        continue;
+                    }
+                    for row in run.row_start.max(range.anchor.0)..=run.row_end.min(range.row_end) {
+                        remove((row, col));
+                    }
                 }
-                let index = cells.idx(row as usize, col as usize);
-                let value = if KEEP_VALUES {
-                    cells.calculated_cell_at(index)
-                } else {
-                    None
-                };
-                cells.remove_calculated(index);
-                removed(cell, value);
+            }
+            _ => {
+                for row in range.anchor.0..=range.row_end {
+                    for col in range.anchor.1..=range.col_end {
+                        if self.owner((row, col)) == Some(anchor) {
+                            remove((row, col));
+                        }
+                    }
+                }
             }
         }
         if let Some(owners) = self.owners.as_deref_mut() {
@@ -631,6 +668,12 @@ impl SpillState {
             return Err(FormulaError::Spill);
         }
 
+        // Most destinations meet no installed spill; only then is each cell's
+        // owner looked up.
+        let owned = self
+            .owners
+            .as_deref()
+            .is_some_and(|owners| owners.owns_any_of(range));
         for row in range.anchor.0..=range.row_end {
             for col in range.anchor.1..=range.col_end {
                 let cell = (row, col);
@@ -644,7 +687,7 @@ impl SpillState {
                 }
 
                 let index = cells.idx(row as usize, col as usize);
-                if self.owner(cell).is_some()
+                if (owned && self.owner(cell).is_some())
                     || formulas.contains(cell)
                     || cells.source_kind_at(index) != KIND_EMPTY
                 {
