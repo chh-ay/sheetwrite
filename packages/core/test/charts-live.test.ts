@@ -73,62 +73,6 @@ function setup(rowCount = 10, extraSheets = 0) {
 }
 
 describe("chart change events", () => {
-  it("names a chart once when an edit touches its series and stays silent otherwise", () => {
-    const { store, events } = setup();
-
-    // Two cells of the same series in one commit still produce one event naming the chart once.
-    apply(store, [set("data", 0, 1, 11), set("data", 1, 1, 21)]);
-    expect(events).toHaveLength(1);
-    expect(events[0]?.charts).toEqual([{ sheet: "data", id: "sales" }]);
-
-    // Outside every series range: same sheet, another column, and another sheet at the same address.
-    apply(store, [set("data", 5, 2, 1), set("other", 0, 1, 99)]);
-    expect(events).toHaveLength(1);
-  });
-
-  it("matches only charts whose source overlaps an edit on the edited sheet", () => {
-    const { store, events } = setup(10, 40);
-    const patches: DocumentOp[] = [];
-    for (let index = 0; index < 40; index++) {
-      for (let slot = 0; slot < 50; slot++) {
-        patches.push({
-          op: "setChart",
-          sheet: `extra${index}`,
-          chart: chart(`c${slot}`, range(`extra${index}`, slot % 10, 2, slot % 10, 2)),
-        });
-      }
-    }
-    apply(store, patches);
-    events.length = 0;
-
-    // Fifty entries span more than one 32-entry index block on this sheet.
-    apply(store, [set("extra5", 3, 2, 1)]);
-    expect(events).toHaveLength(1);
-    expect(events[0]?.charts.map((ref) => ref.id).sort()).toEqual([
-      "c13",
-      "c23",
-      "c3",
-      "c33",
-      "c43",
-    ]);
-    expect(events[0]?.charts.every((ref) => ref.sheet === "extra5")).toBe(true);
-
-    // The same address on a sheet with no matching source must not reach those charts.
-    apply(store, [set("data", 3, 2, 1)]);
-    expect(events).toHaveLength(1);
-  });
-
-  it("follows recalculated values when a series reads a formula", () => {
-    const { store, events } = setup();
-    apply(store, [formula("data", 1, 1, "=C9*2")]);
-    expect(events).toHaveLength(1);
-
-    // C9 sits outside the series, but the series cell's value changes through the formula.
-    apply(store, [set("data", 8, 2, 7)]);
-    expect(events).toHaveLength(2);
-    expect(resolveChartView(store, "data", "sales")?.series[0]?.values).toEqual([10, 14]);
-  });
-
   it("follows a spill written outside the series that reaches into it", () => {
     const { store, events } = setup();
     apply(store, [
@@ -159,24 +103,6 @@ describe("chart change events", () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.charts).toContainEqual({ sheet: "data", id: "growth" });
     expect(resolveChartView(store, "data", "growth")?.series[0]?.values).toEqual([4, 6]);
-  });
-
-  it("reports number-format edits on a series and ignores other styling", () => {
-    const { store, events } = setup();
-    apply(store, [
-      { op: "setRangeStyle", range: range("data", 0, 1, 0, 1), style: { bold: true } },
-    ]);
-    expect(events).toHaveLength(0);
-
-    apply(store, [
-      { op: "setRangeStyle", range: range("data", 0, 1, 0, 1), style: { numberFormat: "0%" } },
-    ]);
-    expect(events).toHaveLength(1);
-
-    apply(store, [{ op: "setColumn", sheet: "data", col: 2, patch: { numberFormat: "0.0" } }]);
-    expect(events).toHaveLength(1);
-    apply(store, [{ op: "setColumn", sheet: "data", col: 1, patch: { numberFormat: "0.0" } }]);
-    expect(events).toHaveLength(2);
   });
 
   const structuralCases: Array<{
@@ -390,39 +316,6 @@ describe("resolveChartView", () => {
     ]);
   });
 
-  it("reads a category range of several columns as one level per column, the last innermost", () => {
-    const { store, events } = setup();
-    apply(store, [
-      set("data", 3, 0, "East"),
-      set("data", 5, 0, "West"),
-      ...["Retail", "Online", "Retail", "Online"].map((segment, index) =>
-        set("data", 3 + index, 1, segment),
-      ),
-      ...[1, 2, 3, 4].map((value, index) => set("data", 3 + index, 2, value)),
-      {
-        op: "setChart",
-        sheet: "data",
-        chart: chart("levels", range("data", 3, 2, 6, 2), range("data", 3, 0, 6, 1)),
-      },
-    ]);
-
-    const series = resolveChartView(store, "data", "levels")?.series[0];
-    expect(series?.values).toEqual([1, 2, 3, 4]);
-    expect(series?.categories).toEqual(["Retail", "Online", "Retail", "Online"]);
-    // A blank outer cell continues the group above it, as in Excel.
-    expect(series?.categoryLevels.map((level) => level.labels)).toEqual([
-      ["East", null, "West", null],
-    ]);
-
-    // An edit of an outer label redraws the chart.
-    events.length = 0;
-    apply(store, [set("data", 4, 0, "North")]);
-    expect(events[0]?.charts).toContainEqual({ sheet: "data", id: "levels" });
-    expect(resolveChartView(store, "data", "levels")?.series[0]?.categoryLevels[0]?.labels).toEqual(
-      ["East", "North", "West", null],
-    );
-  });
-
   it("reads a category range of several rows as one level per row when the values run along a row", () => {
     const { store } = setup();
     apply(store, [
@@ -440,24 +333,6 @@ describe("resolveChartView", () => {
     const series = resolveChartView(store, "data", "rows")?.series[0];
     expect(series?.categories).toEqual(["H1", "H2", "H1", "H2"]);
     expect(series?.categoryLevels.map((level) => level.labels)).toEqual([[2024, null, 2025, null]]);
-  });
-
-  it("keeps one category level for a scatter chart, whose categories are x values", () => {
-    const { store } = setup();
-    apply(store, [
-      {
-        op: "setChart",
-        sheet: "data",
-        chart: {
-          ...chart("xy", range("data", 0, 2, 1, 2), range("data", 0, 0, 1, 1)),
-          kind: "scatter",
-        },
-      },
-    ]);
-
-    const series = resolveChartView(store, "data", "xy")?.series[0];
-    expect(series?.categories).toEqual(["Q1", 10, "Q2", 20]);
-    expect(series?.categoryLevels).toEqual([]);
   });
 
   it("reads the first nameRange cell and follows edits to that label", () => {

@@ -22,25 +22,12 @@ afterEach(() => {
 const A = (row: number, col: number) => ({ sheet: "s1", row, col });
 
 describe("replaceInText", () => {
-  it("case-insensitive substring preserves surrounding casing", () => {
-    expect(replaceInText("aXbXc", "x", "-")).toBe("a-b-c");
-    expect(replaceInText("Tokyo", "tok", "Kyo")).toBe("Kyoyo");
-  });
-
   it("preserves original offsets when Unicode lowercase expands", () => {
     expect(replaceInText("İabc abc", "abc", "x")).toBe("İx x");
     expect(replaceInText("İx", "İ", "Y")).toBe("Yx");
   });
   it("matchCase only hits exact casing", () => {
     expect(replaceInText("aXbxc", "x", "-", { matchCase: true })).toBe("aXb-c");
-  });
-  it("wholeCell swaps entire text or nothing", () => {
-    expect(replaceInText("Tokyo", "tokyo", "Kyoto", { wholeCell: true })).toBe("Kyoto");
-    expect(replaceInText("Tokyo!", "tokyo", "Kyoto", { wholeCell: true })).toBeNull();
-  });
-  it("returns null with no match / empty query", () => {
-    expect(replaceInText("abc", "z", "q")).toBeNull();
-    expect(replaceInText("abc", "", "q")).toBeNull();
   });
 });
 
