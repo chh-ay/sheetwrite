@@ -20,15 +20,24 @@ pub(crate) struct Writer(pub(crate) Vec<u8>);
 /// # Safety
 /// Implementors must have nonzero size, no padding, and accept every bit pattern.
 #[cfg(any(target_arch = "wasm32", test))]
+#[allow(
+    unsafe_code,
+    reason = "transfer arrays are decoded straight into the vector that is returned, without a second copy"
+)]
 unsafe trait TransferWord: Copy + Default {}
 
 // SAFETY: These unsigned integer types have nonzero size, no padding, and
 // every bit pattern is a valid value.
 #[cfg(any(target_arch = "wasm32", test))]
+#[allow(unsafe_code, reason = "implements `TransferWord`; see its reason")]
 unsafe impl TransferWord for u8 {}
+// SAFETY: as for u8.
 #[cfg(any(target_arch = "wasm32", test))]
+#[allow(unsafe_code, reason = "implements `TransferWord`; see its reason")]
 unsafe impl TransferWord for u32 {}
+// SAFETY: as for u8.
 #[cfg(any(target_arch = "wasm32", test))]
+#[allow(unsafe_code, reason = "implements `TransferWord`; see its reason")]
 unsafe impl TransferWord for u64 {}
 
 impl Writer {
@@ -82,6 +91,10 @@ impl Writer {
         self.bytes(value.as_bytes());
     }
 
+    #[allow(
+        unsafe_code,
+        reason = "writes the words' bytes without packing a second vector"
+    )]
     pub(crate) fn words(&mut self, value: &[u64]) {
         // WASM is little-endian; borrow the backing bytes instead of packing a second vector.
         // SAFETY: u64 has no padding, so all size_of_val(value) bytes are
@@ -92,6 +105,10 @@ impl Writer {
         });
     }
 
+    #[allow(
+        unsafe_code,
+        reason = "writes the integers' bytes without packing a second vector"
+    )]
     pub(crate) fn ints(&mut self, value: &[u32]) {
         // SAFETY: u32 has no padding, so all size_of_val(value) bytes are
         // initialized. u8 needs only byte alignment. The slice stays within
@@ -120,6 +137,10 @@ impl Writer {
 /// Like `vec![0; count]`, it asks the allocator for zeroed memory, which
 /// fresh WASM pages already are.
 #[cfg(any(target_arch = "wasm32", test))]
+#[allow(
+    unsafe_code,
+    reason = "asks the allocator for zeroed memory, which fresh WASM pages already are, instead of writing zeros"
+)]
 fn zeroed_vec<T: TransferWord>(count: usize) -> Option<Vec<T>> {
     let layout = std::alloc::Layout::array::<T>(count).ok()?;
     if layout.size() == 0 {
@@ -279,6 +300,10 @@ impl<'a> Reader<'a> {
         // every bit pattern the decoder can write. The vector owns exactly
         // length initialized bytes. u8 requires no stricter alignment, and
         // the exclusive byte borrow ends before values is read or returned.
+        #[allow(
+            unsafe_code,
+            reason = "decodes into the vector that is returned; see `TransferWord`"
+        )]
         let bytes =
             unsafe { std::slice::from_raw_parts_mut(values.as_mut_ptr().cast::<u8>(), length) };
         self.fill_array(bytes)?;

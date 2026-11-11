@@ -511,6 +511,7 @@ impl CellStore {
                 // SAFETY: a resolved name is evaluated only inside its LET,
                 // which has bound the slot and is still being evaluated.
                 let frame = pass.results.let_frame();
+                #[allow(unsafe_code, reason = "calls `LetFrame::binding`; see its reason")]
                 let binding = frame.and_then(|frame| unsafe { frame.binding(*slot) });
                 if let Some(binding) = binding {
                     return self.matrix_shape(binding, formula_sheet, pass);

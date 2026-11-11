@@ -1,0 +1,62 @@
+# Clippy settings for the three Rust crates (packages/wasm,
+# packages/wasm/history, packages/queries/engine). Clippy reads the nearest
+# clippy.toml above each crate, so this one file covers all three.
+# Policy: docs/contributing/rust.md.
+
+# Stack and pass-by-value limits, in bytes.
+too-large-for-stack = 128
+pass-by-value-size-limit = 128
+trivial-copy-size-limit = 32
+array-size-threshold = 8192
+
+# Complexity limits.
+cognitive-complexity-threshold = 15
+type-complexity-threshold = 100
+too-many-arguments-threshold = 5
+too-many-lines-threshold = 75
+
+# Tests may unwrap, expect, panic and use dbg!.
+allow-dbg-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true
+
+# Formula, workbook and file-format names that doc comments use as words.
+doc-valid-idents = [
+  "..",
+  "GROUPBY",
+  "PIVOTBY",
+  "JavaScript",
+  "JavaScriptCore",
+  "TypeScript",
+  "WebAssembly",
+  "WebKit",
+]
+
+# Nothing outside the repo calls the crates' Rust API, so lints may change it.
+avoid-breaking-exported-api = false
+check-inconsistent-struct-field-initializers = true
+
+# The engine runs inside a host page or Node process: it reports through
+# return values, never through stdout or stderr.
+disallowed-macros = [
+  { path = "std::print", reason = "return the message to the host instead" },
+  { path = "std::println", reason = "return the message to the host instead" },
+  { path = "std::eprint", reason = "return the message to the host instead" },
+  { path = "std::eprintln", reason = "return the message to the host instead" },
+]
+
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "use `rustc_hash::FxHashMap`, or a flat array when the key is a dense index" },
+  { path = "std::collections::HashSet", reason = "use `rustc_hash::FxHashSet`, or a bitset when the key is a dense index" },
+  { path = "std::collections::LinkedList", reason = "use `Vec` or `VecDeque`" },
+  { path = "std::sync::Mutex", reason = "WASM runs on one thread: use `Cell` or `RefCell`" },
+  { path = "std::sync::RwLock", reason = "WASM runs on one thread: use `Cell` or `RefCell`" },
+]
+
+disallowed-methods = [
+  { path = "std::env::var", reason = "the engine reads no environment; pass settings in from the host" },
+  { path = "std::mem::drop", reason = "use `_ = value` to discard a value, or a block to end a borrow early" },
+  { path = "core::option::Option::unwrap_or", reason = "use `map_or`, `if let`, `let ... else` or `?`" },
+  { path = "core::result::Result::unwrap_or", reason = "use `map_or`, `if let`, `let ... else` or `?`" },
+]
