@@ -297,6 +297,45 @@ export function addPackageSizeMetrics(
   }
 }
 
+/**
+ * Core's stylesheets as an app loads them: `styles.css` with the parts it
+ * imports (all of them, in order), each part on its own, the icon sheet that
+ * icons.css loads, and shell.css.
+ */
+async function coreStylesheets(): Promise<{ name: string; owner: string; bytes: Uint8Array }[]> {
+  const core = join(repositoryRoot, "packages/core");
+  const index = await readFile(join(core, "styles.css"), "utf8");
+  const parts = [...index.matchAll(/@import "\.\/styles\/([a-z-]+)\.css";/g)].map(
+    (match) => match[1] ?? "",
+  );
+  if (parts.length === 0) throw new Error("packages/core/styles.css imports no style parts");
+  const partSheets = await Promise.all(
+    parts.map(async (part) => ({
+      name: `styles.${metricSegment(part)}`,
+      owner: `@sheetwrite/core/styles/${part}.css`,
+      bytes: await readFile(join(core, "styles", `${part}.css`)),
+    })),
+  );
+  return [
+    {
+      name: "styles",
+      owner: "@sheetwrite/core/styles.css",
+      bytes: Buffer.concat(partSheets.map((sheet) => sheet.bytes)),
+    },
+    ...partSheets,
+    {
+      name: "styles.iconSheet",
+      owner: "@sheetwrite/core/styles/icons.svg",
+      bytes: await readFile(join(core, "styles/icons.svg")),
+    },
+    {
+      name: "shell",
+      owner: "@sheetwrite/core/shell.css",
+      bytes: await readFile(join(core, "shell.css")),
+    },
+  ];
+}
+
 async function buildSizeReport(
   reuseBundlers: boolean,
   artifactDirectory?: string,
@@ -464,19 +503,15 @@ async function buildSizeReport(
         );
       }
     }
-    for (const [name, path] of [
-      ["styles", join(repositoryRoot, "packages/core/styles.css")],
-      ["shell", join(repositoryRoot, "packages/core/shell.css")],
-    ] as const) {
-      const sizes = compressedSizes(await readFile(path));
-      for (const [metric, value] of Object.entries(sizes)) {
+    for (const stylesheet of await coreStylesheets()) {
+      for (const [metric, value] of Object.entries(compressedSizes(stylesheet.bytes))) {
         addMetric(
           metrics,
-          `css.${name}.${metric}`,
+          `css.${stylesheet.name}.${metric}`,
           value,
           "bytes",
           "browser-css",
-          `@sheetwrite/core/${name}.css`,
+          stylesheet.owner,
         );
       }
     }

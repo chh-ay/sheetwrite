@@ -1,4 +1,5 @@
 import { actionFeedbackFor } from "./action-feedback.js";
+import { checkStylePart } from "./style-parts.js";
 import type { Grid, SearchResult } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
@@ -157,6 +158,7 @@ export class FindBar {
 
     const replaceInput = this.readOnly ? null : this.buildReplaceRow(el);
     this.host.appendChild(el);
+    checkStylePart(el, "find", "The find bar");
 
     this.elements = { el, input, count, replaceInput };
     return this.elements;

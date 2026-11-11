@@ -12,6 +12,10 @@ When a cell editor or the formula bar holds a formula (text that starts with `=`
 
 Formula help does not calculate. It reads the text and the function metadata only, so it never runs a volatile or host function.
 
+## Styles
+
+Formula help needs `@sheetwrite/core/styles/formula-help.css`. The Explain Formula panel needs `@sheetwrite/core/styles/panels.css`. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Keys
 
 While the function list is open:

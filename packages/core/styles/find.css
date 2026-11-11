@@ -1,0 +1,146 @@
+/* @sheetwrite/core/styles/find.css: the find and replace bar (Ctrl/Cmd+F). */
+
+/* Development builds read this to warn once when this part is missing. */
+.sheetwrite-find {
+  --sheetwrite-find-ready: 1;
+}
+
+/* ── Built-in widgets (find bar / toolbar / context menu) ─────────────────── */
+/* Owned by WidgetCss (src/find-bar.ts, toolbar.ts, context-menu.ts). Every
+   cosmetic property reads a --sheetwrite-widget-* (or -toolbar-* / -menu-*)
+   custom property, seeded from the active Theme at construction
+   (src/widget-theme.ts) and falling back to the base grid vars / literal
+   defaults, so the default look is identical to the old inline styles. Only
+   positioning + visibility stay inline on the elements (behavior); everything
+   here is restylable. Because these declarations live in the stylesheet — not
+   inline — a host rule like `.sheetwrite-find { background: … }` wins without
+   !important; and because the tokens are seeded on the grid root (an ancestor),
+   `.sheetwrite-find { --sheetwrite-widget-bg: … }` wins too. */
+
+/* Find / replace bar: two rows of one field and its buttons. Both fields share
+   one bordered style with their own focus ring, so host page styles cannot
+   make them differ. The match count sits inside the find field. */
+.sheetwrite-find {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 8px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-find-shadow, 0 2px 6px rgba(60, 64, 67, 0.3));
+  box-sizing: border-box;
+  z-index: 1000;
+}
+
+.sheetwrite-find-row,
+.sheetwrite-find-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sheetwrite-find-field {
+  position: relative;
+  display: inline-flex;
+}
+
+.sheetwrite-find-input,
+.sheetwrite-find-replace-input {
+  width: 240px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Room for "12 of 340" inside the find field. */
+.sheetwrite-find-input {
+  padding-right: 76px;
+}
+
+.sheetwrite-find-input:focus,
+.sheetwrite-find-replace-input:focus {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  box-shadow: 0 0 0 2px var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb33));
+}
+
+.sheetwrite-find-count {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.sheetwrite-find-btn {
+  border: none;
+  background: transparent;
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sheetwrite-find-btn:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-find-btn:focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.sheetwrite-find-icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-find-icon-btn:hover {
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+}
+
+/* The divider before Close. It is drawn here, not as a DOM node, because it is
+   only cosmetic. The margin plus the row gap leaves 6px on each side of it. */
+.sheetwrite-find-close {
+  position: relative;
+  margin-left: 9px;
+}
+
+.sheetwrite-find-close::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -7px;
+  width: 1px;
+  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-find-text-btn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 6px;
+  font-weight: 500;
+}
