@@ -325,3 +325,115 @@ test("mobile touch input, renderer swap, and responsive reflow stay operable @po
   expect(errors).toEqual([]);
   await context.close();
 });
+
+async function assertLoadedPeriodWithoutStaleFlash(page: Page, row: number): Promise<void> {
+  const expectedPeriod = `FY${2024 + (Math.floor(row / 12) % 5)} P${String((row % 12) + 1).padStart(2, "0")}`;
+  const samples: Array<{ state: string | null; value: unknown }> = [];
+  for (let sample = 0; sample < 8; sample += 1) {
+    samples.push(
+      await page.evaluate((targetRow) => {
+        const store = window.__sheetwriteScaleGrid?.store;
+        return {
+          state: store?.getCellLoadState?.({ sheet: "scale", row: targetRow, col: 0 }) ?? null,
+          value: store?.getCell({ sheet: "scale", row: targetRow, col: 0 }).resolved,
+        };
+      }, row),
+    );
+    await page.waitForTimeout(20);
+  }
+  for (const sample of samples) {
+    if (sample.state === "unloaded") {
+      expect(sample.value).toBe("#LOADING!");
+    } else {
+      expect(sample.value).toBe(expectedPeriod);
+    }
+  }
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (targetRow) =>
+            window.__sheetwriteScaleGrid?.store.getCell({
+              sheet: "scale",
+              row: targetRow,
+              col: 0,
+            }).resolved,
+          row,
+        ),
+      { timeout: 20_000 },
+    )
+    .toBe(expectedPeriod);
+}
+
+test("row and column navigators agree with the public window headers", async ({ page }) => {
+  await bootScale(page);
+  const grid = page.locator(GRID);
+  await grid.scrollIntoViewIfNeeded();
+  const box = await grid.boundingBox();
+  if (!box) throw new Error("Grid has no physical bounds");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  const initial = await readWindow(page);
+  await page.mouse.wheel(0, 1_800);
+  await expect
+    .poll(async () => (await readWindow(page)).firstRow)
+    .toBeGreaterThan(initial.firstRow);
+  const afterWheel = await readWindow(page);
+
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.press("PageDown");
+  await expect
+    .poll(async () => (await readWindow(page)).firstRow)
+    .toBeGreaterThan(afterWheel.firstRow);
+  const afterPageDown = await readWindow(page);
+  await page.keyboard.press("PageUp");
+  await expect
+    .poll(async () => (await readWindow(page)).firstRow)
+    .toBeLessThan(afterPageDown.firstRow);
+
+  const landmarkRows: number[] = [];
+  for (const [landmark, selected, dataRow] of [
+    ["25", "A250001", 250_000],
+    ["50", "A500001", 500_000],
+    ["75", "A750000", 749_999],
+    ["100", "A1000000", 999_999],
+  ] as const) {
+    await page.getByTestId(`scale-landmark-${landmark}`).click();
+    await expect(page.getByTestId("scale-current-a1")).toHaveText(selected);
+    await expect
+      .poll(async () => {
+        const rows = (await page.getByTestId("scale-window-rows").textContent())?.match(
+          /([\d,]+)\s*–\s*([\d,]+)/,
+        );
+        return numericText(rows?.[2] ?? null);
+      })
+      .toBeGreaterThanOrEqual(dataRow + 1);
+    const readout = await readWindow(page);
+    expect(readout.firstRow).toBeLessThanOrEqual(dataRow + 1);
+    expect(readout.lastRow).toBeGreaterThanOrEqual(dataRow + 1);
+    landmarkRows.push(readout.firstRow);
+    await assertLoadedPeriodWithoutStaleFlash(page, dataRow);
+  }
+  expect(landmarkRows[0]).toBeLessThan(landmarkRows[1]!);
+  expect(landmarkRows[1]).toBeLessThan(landmarkRows[2]!);
+  expect(landmarkRows[2]).toBeLessThan(landmarkRows[3]!);
+
+  const rail = page.getByTestId("scale-overview");
+  const railBox = await rail.boundingBox();
+  if (!railBox) throw new Error("Overview rail has no physical bounds");
+  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height * 0.02);
+  await page.mouse.down();
+  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height * 0.55, {
+    steps: 14,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => (await readWindow(page)).firstRow).toBeLessThan(landmarkRows[2]!);
+  await readWindow(page);
+
+  const columnRail = page.getByTestId("scale-column-overview");
+  await columnRail.focus();
+  await page.keyboard.press("End");
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(/^ALL\d+$/);
+  await expect.poll(async () => (await readWindow(page)).firstColumn).toBeGreaterThan(900);
+  await expect(page.getByTestId("scale-selected-formula")).toHaveText(/^=/);
+});
