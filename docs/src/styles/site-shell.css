@@ -47,16 +47,25 @@
   /* The reading column's width (its tracks, outline included), whose edges
      the top bar's content shares. */
   --sw-docs-frame-max: var(--sw-content-width);
+  /* The docs frame (the sidebar, then the reading column with its gutters)
+     is centred: on a screen wider than the frame, the rest is shared out on
+     both sides, so the column always starts one gutter after the sidebar. */
+  --sw-docs-outside: max(
+    0px,
+    (100% - var(--sw-sidebar-width) - var(--sw-docs-frame-max) - 2 * var(--sw-page-gutter)) / 2
+  );
 
   display: grid;
   grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
-  /* The sidebar is sticky and one screen tall; its column's surface and
-     hairline run the full page height from here. */
+  padding-inline: var(--sw-docs-outside);
+  /* The sidebar is sticky and one screen tall; its surface (out to the
+     screen's left edge) and hairline run the full page height from here. */
   background: linear-gradient(
     to right,
-    var(--sw-surface-0) calc(var(--sw-sidebar-width) - var(--sw-border-width)),
-    var(--sw-border) 0 var(--sw-sidebar-width),
+    var(--sw-surface-0)
+      calc(var(--sw-docs-outside) + var(--sw-sidebar-width) - var(--sw-border-width)),
+    var(--sw-border) 0 calc(var(--sw-docs-outside) + var(--sw-sidebar-width)),
     var(--sw-surface-1) 0
   );
 }
