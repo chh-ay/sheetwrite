@@ -13,6 +13,9 @@ it("builds one fixture per sample, restores it between edits and warms up for th
   await engine.load();
   let builds = 0;
   let runs = 0;
+  let restores = 0;
+  // Every timed edit must start from the unedited state, or a later run times a no-op.
+  const statesBeforeRun = new Set<string>();
   const started = performance.now();
   const sample = collectAggregatedSample(
     "formula-constant-edit",
@@ -20,11 +23,19 @@ it("builds one fixture per sample, restores it between edits and warms up for th
     () => {
       builds += 1;
       const fixture = constantEditFixture(FORMULAS);
-      const run = fixture.run;
+      const unedited = fixture.check();
+      const { run, restore } = fixture;
       fixture.run = () => {
         runs += 1;
+        statesBeforeRun.add(fixture.check() === unedited ? "unedited" : "edited");
         run();
       };
+      if (restore !== undefined) {
+        fixture.restore = () => {
+          restores += 1;
+          restore();
+        };
+      }
       return fixture;
     },
     {
@@ -41,4 +52,6 @@ it("builds one fixture per sample, restores it between edits and warms up for th
   expect(sample.totalMs).toBeGreaterThanOrEqual(MINIMUM_SAMPLE_MS);
   expect(elapsedMs).toBeGreaterThanOrEqual(MINIMUM_WARMUP_MS + MINIMUM_SAMPLE_MS);
   expect(runs).toBeGreaterThan(sample.iterations + WARMUP_FIXTURES);
+  expect([...statesBeforeRun]).toEqual(["unedited"]);
+  expect(restores).toBe(runs - 1);
 });
