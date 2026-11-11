@@ -901,6 +901,12 @@ html:has(.sw-nav-dialog[open]) {
   .sw-toc-inline > summary {
     min-height: 44px;
   }
+  /* The open outline's rows are 44 px tall. */
+  .sw-toc-inline a {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+  }
   /* Article disclosures (signature profiles, accordions): text centred where
      the browser can centre a block's content, at the top elsewhere. */
   .sw-prose details > summary {
