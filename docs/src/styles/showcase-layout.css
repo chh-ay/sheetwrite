@@ -195,7 +195,7 @@
 }
 
 /* Text keeps its reading measure inside the frame. */
-.sw-showcase__section > :is(p, ul, ol, .sw-showcase__section-text) {
+.sw-showcase__section > :is(p, ul, ol, .sw-showcase__section-text):not(.sw-proof-cards) {
   max-width: var(--sw-measure-prose);
 }
 

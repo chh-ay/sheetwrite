@@ -125,7 +125,15 @@
   }
 }
 
-/* The framework pages' proof section: the cards take its full width. */
+/* The framework pages' proof section: the cards take its full width, and
+   the section's numbered-list rules (showcase.css) don't reach them. */
 .sw-showcase-page__proof .sw-proof-cards {
   grid-column: 1 / -1;
+}
+
+.sw-showcase-page__proof .sw-proof-cards > li {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
 }
