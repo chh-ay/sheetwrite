@@ -141,6 +141,54 @@
   }
 }
 
+/* Phones read the landing as one column: shorter bands between sections,
+   and each feature card sets its drawing beside its text instead of above
+   it. Nothing is left out. */
+@media (max-width: 42rem) {
+  .sw-lp-section {
+    padding-top: var(--sw-space-12);
+  }
+
+  .sw-lp-head {
+    margin-bottom: var(--sw-space-6);
+  }
+
+  .sw-features {
+    gap: var(--sw-space-3);
+  }
+
+  .sw-features a {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .sw-features__art {
+    grid-row: 1 / -1;
+    height: auto;
+    padding: var(--sw-space-2);
+    border-right: 1px solid var(--sw-border);
+    border-bottom: 0;
+  }
+
+  .sw-features strong,
+  .sw-features__summary,
+  .sw-features__cta {
+    grid-column: 2;
+  }
+
+  .sw-features strong {
+    padding: var(--sw-space-4) var(--sw-space-4) 0;
+  }
+
+  .sw-features__summary {
+    padding: var(--sw-space-1-5) var(--sw-space-4) 0;
+  }
+
+  .sw-features__cta {
+    padding: var(--sw-space-3) var(--sw-space-4) var(--sw-space-4);
+  }
+}
+
 /* Phone touch targets: every control takes at least 44 × 44 px. Links and
    small buttons that keep their look get the rest as an invisible, centred
    area (the layout does not move); tabs, footer links, the copy button and
