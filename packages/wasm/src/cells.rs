@@ -125,17 +125,17 @@ fn try_dense_buffers(n_cols: usize, row_count: usize) -> Result<DenseBuffers, St
     })?;
     let mut kind = Vec::new();
     kind.try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell kinds".to_owned())?;
     kind.resize(len, KIND_EMPTY);
     let mut payload = Vec::new();
     payload
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell payloads".to_owned())?;
     payload.resize(len, 0);
     let mut style = Vec::new();
     style
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell styles".to_owned())?;
     style.resize(len, 0);
     Ok((kind, payload, style))
 }

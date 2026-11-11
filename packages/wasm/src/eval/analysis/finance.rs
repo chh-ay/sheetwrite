@@ -130,10 +130,10 @@ fn periods(arguments: &FuncAccumulator) -> NumberResult {
     let payment = number_arg(arguments, 1, None)?;
     let present = number_arg(arguments, 2, None)?;
     let future = number_arg(arguments, 3, Some(0.0))?;
-    let timing = if number_arg(arguments, 4, Some(0.0))? != 0.0 {
-        1.0
-    } else {
+    let timing = if number_arg(arguments, 4, Some(0.0))? == 0.0 {
         0.0
+    } else {
+        1.0
     };
     if rate == 0.0 {
         if payment == 0.0 {
