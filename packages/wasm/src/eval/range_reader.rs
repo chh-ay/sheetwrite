@@ -174,7 +174,9 @@ impl<'a> RangeReader<'a> {
         }
 
         let index = self.data.cells.idx(self.row, self.col);
-        let value = if !self.data.cells.is_paged() {
+        let value = if self.data.cells.is_paged() {
+            self.paged_value_at(index, pass)?
+        } else {
             if let Some(value) = self
                 .literals
                 .and_then(|sources| sources.value_at(&self.store.strings, index))
@@ -183,8 +185,6 @@ impl<'a> RangeReader<'a> {
             } else {
                 self.dense_value_at(self.row, self.col, pass)
             }
-        } else {
-            self.paged_value_at(index, pass)?
         };
 
         self.col += 1;

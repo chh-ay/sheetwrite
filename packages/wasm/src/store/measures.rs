@@ -235,7 +235,7 @@ impl CellStore {
     ) -> Vec<(usize, Value)> {
         // Each slot is a table read in one filter context; slot 0 is the
         // base table in the cell's own context.
-        let mut slots = vec![(base.to_string(), 0)];
+        let mut slots = vec![(base.to_owned(), 0)];
         let mut contexts = vec![ContextEdit::default()];
         let mut prepared: Vec<Result<PreparedMeasure, FormulaError>> = cache
             .values()
@@ -545,12 +545,11 @@ impl CellStore {
             }
             let start = related.keys.len();
             for field in 0..related.levels.len() {
-                match key_part(&source.value(row, field)) {
-                    Ok(key) => related.keys.push(key),
-                    Err(_) => {
-                        related.keys.truncate(start);
-                        continue 'rows;
-                    }
+                if let Ok(key) = key_part(&source.value(row, field)) {
+                    related.keys.push(key)
+                } else {
+                    related.keys.truncate(start);
+                    continue 'rows;
                 }
             }
             related.rows.push(row as u32);

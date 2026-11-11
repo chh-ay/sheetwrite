@@ -47,6 +47,8 @@ mod range_transfer;
 mod related_measure_tests;
 #[cfg(feature = "analysis")]
 mod relationships;
+#[cfg(test)]
+mod sparse_tests;
 #[cfg(all(test, feature = "analysis"))]
 mod tests;
 mod transfer;
@@ -234,6 +236,72 @@ pub(crate) const BLOCK_INVALID: u32 = 1;
 const BLOCK_SOURCE_INVALID: u32 = 2;
 pub(crate) const BLOCK_RESOURCE_LIMIT: u32 = 3;
 
+/// Entry indexes of a sparse block grouped by block column: column `c` owns
+/// `entries[starts[c]..starts[c + 1]]`, in caller entry order.
+struct SparseColumns {
+    starts: Vec<u32>,
+    entries: Vec<u32>,
+}
+
+/// Validated literal entries of a sparse block, in caller entry order.
+struct SparseLiteralBlock<'a> {
+    start: (usize, usize),
+    dimensions: (usize, usize),
+    offsets: &'a [u32],
+    kinds: &'a [u8],
+    numbers: &'a [f64],
+    styles: &'a [u32],
+    string_ids: Vec<u32>,
+}
+
+impl SparseLiteralBlock<'_> {
+    /// Counting-sort entry indexes by column while rejecting invalid offsets.
+    fn column_entries(&self) -> Option<SparseColumns> {
+        let (rows, cols) = self.dimensions;
+        let mut seen = vec![0u64; (rows * cols).div_ceil(u64::BITS as usize)];
+        let mut starts = vec![0u32; cols + 1];
+        for &offset in self.offsets {
+            let offset_index = offset as usize;
+            if offset_index >= rows * cols {
+                return None;
+            }
+            let word = &mut seen[offset_index / u64::BITS as usize];
+            let bit = 1u64 << (offset_index % u64::BITS as usize);
+            if *word & bit != 0 {
+                return None;
+            }
+            *word |= bit;
+            starts[offset_index % cols + 1] += 1;
+        }
+        for col in 0..cols {
+            starts[col + 1] += starts[col];
+        }
+        let mut entries = vec![0u32; self.offsets.len()];
+        for (index, &offset) in self.offsets.iter().enumerate() {
+            let col = offset as usize % cols;
+            entries[starts[col] as usize] = index as u32;
+            starts[col] += 1;
+        }
+        starts.rotate_right(1);
+        starts[0] = 0;
+        Some(SparseColumns { starts, entries })
+    }
+
+    fn cell(&self, index: usize) -> (usize, u8, u64, u32) {
+        let (kind, payload) = match self.kinds[index] {
+            KIND_NUMBER | KIND_BOOL => (self.kinds[index], encode_num(self.numbers[index])),
+            KIND_STRING => (KIND_STRING, encode_str_id(self.string_ids[index])),
+            _ => (KIND_EMPTY, 0),
+        };
+        (
+            self.start.0 + self.offsets[index] as usize / self.dimensions.1,
+            kind,
+            payload,
+            self.styles[index],
+        )
+    }
+}
+
 const MAX_TABLES: usize = 1_024;
 const MAX_TABLE_COLUMNS: usize = 16_384;
 const MAX_TABLE_NAME_BYTES: usize = 255;
@@ -382,8 +450,9 @@ impl BlockInputOrder {
 #[wasm_bindgen]
 impl CellStore {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> CellStore {
-        CellStore {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
             sheets: Vec::new(),
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
@@ -748,8 +817,8 @@ impl CellStore {
 
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
-        self.sheet_names[sheet] = name.to_string();
-        self.sheet_ids.insert(id.to_string(), sheet);
+        self.sheet_names[sheet] = name.to_owned();
+        self.sheet_ids.insert(id.to_owned(), sheet);
         self.sheet_lookup.insert(sheet_name_key(name), sheet);
     }
 
@@ -790,7 +859,7 @@ impl CellStore {
 
         self.rename_sheet_in_named_formulas(sheet as u32, name);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
-        self.sheet_names[sheet] = name.to_string();
+        self.sheet_names[sheet] = name.to_owned();
         self.sheet_lookup.insert(name_key, sheet);
         self.graph.invalidate();
 
@@ -1018,8 +1087,9 @@ impl CellStore {
     }
 
     /// Write one sparse mixed transaction/page/snapshot block without
-    /// allocating by logical rectangle size. Inside `beginPageLoad`, dirty
-    /// paged cells are skipped; otherwise the whole sparse write is preflighted.
+    /// allocating by logical rectangle size on paged sheets. Dense sheets use
+    /// a compact offset bitset. Inside `beginPageLoad`, dirty paged cells are
+    /// skipped; otherwise the whole sparse write is preflighted.
     ///
     /// Text arrives packed, as in [`Self::set_block_packed`]: `text_buf` holds
     /// the UTF-8 bytes of every `KIND_STRING` entry in entry order, and the
@@ -1100,6 +1170,42 @@ impl CellStore {
                 .any(|&bound| !text.is_char_boundary(bound as usize))
         {
             return BLOCK_SOURCE_INVALID;
+        }
+
+        // Paged cells need dirty-overlay preflight and residency checks; spills
+        // need per-cell detachment. Neither can use the dense column writer.
+        if !offsets.is_empty()
+            && formula_offsets.is_empty()
+            && reference_offsets.is_empty()
+            && !existing.cells.is_paged()
+            && existing.spill.is_empty()
+        {
+            let mut block = SparseLiteralBlock {
+                start: (start_row, start_col),
+                dimensions: (rows, cols),
+                offsets,
+                kinds,
+                numbers,
+                styles,
+                string_ids: Vec::new(),
+            };
+            let Some(columns) = block.column_entries() else {
+                return BLOCK_INVALID;
+            };
+            if string_entries != 0 {
+                block.string_ids = vec![NO_STRING; offsets.len()];
+                let mut bounds = text_offsets.windows(2);
+                for (index, &kind) in kinds.iter().enumerate() {
+                    if kind == KIND_STRING {
+                        let Some(&[start, end]) = bounds.next() else {
+                            return BLOCK_SOURCE_INVALID;
+                        };
+                        block.string_ids[index] = self.intern(&text[start as usize..end as usize]);
+                    }
+                }
+            }
+            self.write_sparse_columns(sheet, &block, &columns, hydrating);
+            return BLOCK_OK;
         }
 
         let mut destination_cells = Vec::with_capacity(offsets.len());
@@ -1647,10 +1753,10 @@ impl CellStore {
             let kind = s.cells.source_kind_at(index);
             let source_payload = s.cells.source_payload_at(index);
             let source_string = payload_str_id(source_payload);
-            let string_id = if source_string != NO_STRING {
-                f64::from(source_string)
-            } else {
+            let string_id = if source_string == NO_STRING {
                 -1.0
+            } else {
+                f64::from(source_string)
             };
             let source = s.formulas.get(key, &self.formula_slots);
             let text = source
@@ -1737,10 +1843,10 @@ impl CellStore {
                 kind.push(s.cells.source_kind_at(index));
                 let source_payload = s.cells.source_payload_at(index);
                 let source_string = payload_str_id(source_payload);
-                payload.push(if source_string != NO_STRING {
-                    encode_str_id(strings.intern(self.strings.get(source_string)?))
-                } else {
+                payload.push(if source_string == NO_STRING {
                     source_payload
+                } else {
+                    encode_str_id(strings.intern(self.strings.get(source_string)?))
                 });
                 style.push(s.cells.style_at(index));
             }
@@ -2182,7 +2288,7 @@ impl CellStore {
             return CellOut {
                 kind: KIND_STRING,
                 num: 0.0,
-                string: Some(FormulaError::Loading.sentinel().to_string()),
+                string: Some(FormulaError::Loading.sentinel().to_owned()),
                 style: 0,
             };
         }
@@ -2205,7 +2311,7 @@ impl CellStore {
                 return CellOut {
                     kind: KIND_STRING,
                     num: 0.0,
-                    string: Some(error.sentinel().to_string()),
+                    string: Some(error.sentinel().to_owned()),
                     style: s.cells.style_at(index),
                 };
             }
@@ -2265,7 +2371,7 @@ impl CellStore {
         }
         let key = (scope, workbook_name_key(name));
         let definition = NamedRangeRef {
-            name: name.to_string(),
+            name: name.to_owned(),
             scope,
             sheet: sheet as u32,
             row_start: row_start as u32,
@@ -2407,8 +2513,8 @@ impl CellStore {
             });
         }
         let definition = TableDefinition {
-            id: id.to_string(),
-            name: name.to_string(),
+            id: id.to_owned(),
+            name: name.to_owned(),
             sheet: sheet as u32,
             row_start: row_start as u32,
             col_start: col_start as u32,
@@ -3251,6 +3357,60 @@ impl CellStore {
         self.replace_cell_source_inner(write, false)
     }
 
+    /// Writes a validated, spill-free dense literal block column by column.
+    /// Formula retirement and dirty seeds still describe only listed cells.
+    #[inline(never)]
+    fn write_sparse_columns(
+        &mut self,
+        sheet: usize,
+        block: &SparseLiteralBlock<'_>,
+        columns: &SparseColumns,
+        hydrating: bool,
+    ) {
+        let sheet_data = &mut self.sheets[sheet];
+        for (col, bounds) in columns.starts.windows(2).enumerate() {
+            let column = &columns.entries[bounds[0] as usize..bounds[1] as usize];
+            sheet_data.cells.write_dense_column_cells(
+                block.start.1 + col,
+                column.iter().map(|&index| block.cell(index as usize)),
+            );
+        }
+        let keys = || {
+            block.offsets.iter().filter_map(|&offset| {
+                let offset_index = offset as usize;
+                cell_key(
+                    block.start.0 + offset_index / block.dimensions.1,
+                    block.start.1 + offset_index % block.dimensions.1,
+                )
+            })
+        };
+        if !sheet_data.formulas.is_empty() {
+            for key in keys() {
+                self.graph.replace_entry(
+                    &mut sheet_data.formulas,
+                    &mut self.formula_slots,
+                    sheet,
+                    key,
+                    None,
+                );
+            }
+        }
+        if hydrating {
+            sheet_data.formulas.mark_all_dirty();
+        } else if block.offsets.len() == block.dimensions.0 * block.dimensions.1 {
+            if let Some(rect) = DirtyRect::new(
+                block.start.0,
+                block.start.1,
+                block.start.0 + block.dimensions.0 - 1,
+                block.start.1 + block.dimensions.1 - 1,
+            ) {
+                sheet_data.formulas.mark_dirty_rect(rect);
+            }
+        } else {
+            sheet_data.formulas.mark_cells_dirty(keys());
+        }
+    }
+
     fn replace_prepared_cell_source(&mut self, write: CellSourceWrite) -> bool {
         self.replace_cell_source_inner(write, true)
     }
@@ -3348,10 +3508,7 @@ impl CellStore {
         }
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        metadata.add_payload(
-            std::mem::size_of::<CellStore>(),
-            std::mem::size_of::<CellStore>(),
-        );
+        metadata.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
         if self.iteration.is_some() {
             metadata.add_payload(size_of::<IterationLimits>(), size_of::<IterationLimits>());
         }
@@ -3706,7 +3863,7 @@ impl CellStore {
         formula_col: u32,
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
-            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_string()),
+            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned()),
             Err(error) => FormulaEntry::error(source, error),
         }
     }
@@ -4051,21 +4208,25 @@ impl CellOut {
 #[wasm_bindgen]
 impl CellOut {
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn kind(&self) -> u8 {
         self.kind
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn num(&self) -> f64 {
         self.num
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn string(&self) -> Option<String> {
         self.string.clone()
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn style(&self) -> u32 {
         self.style
     }

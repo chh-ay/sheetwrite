@@ -125,17 +125,17 @@ fn try_dense_buffers(n_cols: usize, row_count: usize) -> Result<DenseBuffers, St
     })?;
     let mut kind = Vec::new();
     kind.try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell kinds".to_owned())?;
     kind.resize(len, KIND_EMPTY);
     let mut payload = Vec::new();
     payload
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell payloads".to_owned())?;
     payload.resize(len, 0);
     let mut style = Vec::new();
     style
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell styles".to_owned())?;
     style.resize(len, 0);
     Ok((kind, payload, style))
 }
@@ -1152,6 +1152,32 @@ impl CellStorage {
             }
         }
         true
+    }
+
+    /// Writes validated rows of one dense column, leaving unlisted cells alone.
+    /// Like `write_dense_block`, replaces sources and discards calculated slots.
+    pub(crate) fn write_dense_column_cells(
+        &mut self,
+        col: usize,
+        cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+    ) {
+        debug_assert!(
+            self.paged.is_none() && col < self.n_cols,
+            "dense column writes need an in-bounds dense column"
+        );
+        let column = col * self.row_count..(col + 1) * self.row_count;
+        let kinds = &mut self.kind[column.clone()];
+        let payloads = &mut self.payload[column.clone()];
+        let styles = &mut self.style[column];
+        let has_calculated = self.dense_calculated_cells != 0;
+        for (row, kind, payload, style) in cells {
+            if has_calculated && kinds[row] & CALCULATED != 0 {
+                self.dense_calculated_cells -= 1;
+            }
+            kinds[row] = kind;
+            payloads[row] = payload;
+            styles[row] = style;
+        }
     }
 
     /// Releases paged calculated pages that hold no result.

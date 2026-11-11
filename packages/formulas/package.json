@@ -49,7 +49,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis && bun ../../scripts/wasm-factory.ts .",
+    "build": "CARGO_TARGET_DIR=../wasm/target/analysis wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis && bun ../../scripts/wasm-factory.ts .",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf pkg"

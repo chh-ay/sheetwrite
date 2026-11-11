@@ -419,7 +419,7 @@ fn format_complex(number: Complex, suffix: char) -> String {
 
     let coefficient = match imaginary.as_str() {
         "1" => String::new(),
-        "-1" => "-".to_string(),
+        "-1" => "-".to_owned(),
         _ => imaginary,
     };
 

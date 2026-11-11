@@ -160,7 +160,7 @@ impl CellStore {
     /// exactly: `address`, `col`, `contents`, `row` and `type`. Number formats,
     /// widths, colors and file names live in the host, so those types are
     /// `#VALUE!`. Without a reference, CELL describes the formula's own cell,
-    /// as LibreOffice does; Excel would use the last changed cell instead.
+    /// as `LibreOffice` does; Excel would use the last changed cell instead.
     fn cell_info(
         &self,
         args: &[Ast],
@@ -178,15 +178,14 @@ impl CellStore {
             _ => return Err(FormulaError::Value),
         };
 
-        let cell = match optional_ast(args, 1) {
-            Some(reference) => self.reference_cell(reference, sheet, pass, depth)?,
-            None => {
-                let (row, col) = current_formula_origin().ok_or(FormulaError::Value)?;
-                AbsCellKey {
-                    sheet: sheet as u32,
-                    row,
-                    col,
-                }
+        let cell = if let Some(reference) = optional_ast(args, 1) {
+            self.reference_cell(reference, sheet, pass, depth)?
+        } else {
+            let (row, col) = current_formula_origin().ok_or(FormulaError::Value)?;
+            AbsCellKey {
+                sheet: sheet as u32,
+                row,
+                col,
             }
         };
 
@@ -306,7 +305,7 @@ impl CellStore {
         Ok(Value::number(count as f64))
     }
 
-    /// INFO(type_text), for the types that do not depend on the program
+    /// `INFO(type_text)`, for the types that do not depend on the program
     /// that runs the workbook: "numfile" is the number of sheets and
     /// "recalc" is "Automatic", since the engine always recalculates.
     /// "memavail", "memused" and "totmem" are `#N/A`, as in current Excel.

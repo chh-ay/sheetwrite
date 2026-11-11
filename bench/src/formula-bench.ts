@@ -322,6 +322,18 @@ export function expectedFormulaWorkloadKeys(
     ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
+    formulaWorkloadKey({ id: "paged-cell-reads", size: range }),
+    formulaWorkloadKey({ id: "paged-insert-row", size: smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS }),
+    formulaWorkloadKey({ id: "paged-range-loaded", size: smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS }),
+    formulaWorkloadKey({
+      id: "paged-eviction",
+      size: smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES,
+    }),
+    formulaWorkloadKey({ id: "index-match-many", size: smoke ? 50 : INDEX_MATCH_FORMULAS }),
+    formulaWorkloadKey({ id: "rank-many", size: smoke ? 1_000 : RANK_MANY_SIZE }),
+    formulaWorkloadKey({ id: "sort-unique-filter", size: range }),
+    formulaWorkloadKey({ id: "subtotal-filtered", size: range }),
+    formulaWorkloadKey({ id: "sparse-page-write", size: range }),
   );
   keys.push(formulaWorkloadKey({ id: "spill-sequence-admission", size: smoke ? 1_000 : 100_000 }));
   if (enginePackage === "formulas") {
@@ -376,6 +388,15 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "paged-cell-reads",
+  "paged-insert-row",
+  "paged-range-loaded",
+  "paged-eviction",
+  "index-match-many",
+  "rank-many",
+  "sort-unique-filter",
+  "subtotal-filtered",
+  "sparse-page-write",
   "map-lambda",
   "reduce-lambda",
   "byrow-lambda",
@@ -502,6 +523,24 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return `12:${size + 1}`;
     case "spill-sequence-admission":
       return `1:${size}:0`;
+    case "paged-cell-reads":
+      return pagedCellReadsOutput(size);
+    case "paged-insert-row":
+      return pagedInsertRowOutput(size);
+    case "paged-range-loaded":
+      return 1;
+    case "paged-eviction":
+      return pagedEvictionOutput(size);
+    case "index-match-many":
+      return INDEX_MATCH_VALUE_SCALE * (SHAPE_EDITED_SCALE + size - 1);
+    case "rank-many":
+      return `${size}:${RANK_MANY_EDITED_FIRST}`;
+    case "sort-unique-filter":
+      return sortUniqueOutput(SORT_UNIQUE_EDITED_ROWS);
+    case "subtotal-filtered":
+      return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
+    case "sparse-page-write":
+      return sparsePageOutput(size);
     case "map-lambda":
     case "lambda-call":
     case "named-lambda":
@@ -2587,6 +2626,280 @@ function letManyFormula(row: number): string {
 }
 
 /**
+ * Rows for how functions read ranges: INDEX/MATCH, RANK and LARGE filled
+ * down, SORT(UNIQUE(FILTER())), SUBTOTAL over a filtered column, and one
+ * sparse block written during a page load.
+ */
+const INDEX_MATCH_VALUE_SCALE = 10;
+/** Lookups in `index-match-many`. Each reads a 100,000-row table, so a few hundred is enough. */
+const INDEX_MATCH_FORMULAS = 200;
+/**
+ * Rows of `rank-many`. Every formula reads the whole column, so the work grows with the square.
+ */
+const RANK_MANY_SIZE = 4_000;
+/** The `rank-many` edit moves A1 below every other value. */
+const RANK_MANY_EDITED_FIRST = -1;
+/** `sort-unique-filter` keys cycle through this many labels (a prime, so a row step visits all). */
+const SORT_UNIQUE_KEYS = 997;
+const SORT_UNIQUE_STEP = 7_919;
+/** The timed edit keeps only the rows before this one. */
+const SORT_UNIQUE_EDITED_ROWS = 500;
+/** `subtotal-filtered` hides every other block of this many rows. */
+const SUBTOTAL_BLOCK_ROWS = 10;
+const SUBTOTAL_EDITED_FIRST = 2;
+const SPARSE_PAGE_COLUMNS = 10;
+/** One cell in this many is blank, so the block is sparse. */
+const SPARSE_PAGE_BLANK_EVERY = 10;
+const SPARSE_PAGE_LABELS = 97;
+const KIND_NUMBER = 1;
+const KIND_STRING = 2;
+
+function sortUniqueKey(row: number): string {
+  return `k${(row * SORT_UNIQUE_STEP) % SORT_UNIQUE_KEYS}`;
+}
+
+/** First and last of the sorted distinct keys of the rows before `rows`, and their count. */
+function sortUniqueOutput(rows: number): string {
+  const keys = [...new Set(Array.from({ length: rows }, (_, row) => sortUniqueKey(row)))].sort();
+  return `${keys[0]}:${keys.at(-1)}:${keys.length}`;
+}
+
+function subtotalVisible(row: number): boolean {
+  return Math.floor(row / SUBTOTAL_BLOCK_ROWS) % 2 === 0;
+}
+
+/** Sum of `row + 1` over the visible rows, with A1 holding `first`. */
+function subtotalOutput(count: number, first: number): number {
+  let total = first;
+  for (let row = 1; row < count; row++) if (subtotalVisible(row)) total += row + 1;
+  return total;
+}
+
+/** The value a `sparse-page-write` block holds at one offset: blank, a number or a label. */
+function sparsePageValue(offset: number): number | string | null {
+  if (offset % SPARSE_PAGE_BLANK_EVERY === 0) return null;
+  return offset % 2 === 0 ? offset : `label${offset % SPARSE_PAGE_LABELS}`;
+}
+
+function sparsePageOutput(rows: number): string {
+  const last = (rows - 1) * SPARSE_PAGE_COLUMNS;
+  return `${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 2))}:${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 1))}`;
+}
+
+/**
+ * `formulas` INDEX/MATCH lookups over a `rows`-row table: keys in A, values in
+ * B. Each key is `$C$1` plus the formula's row, so the timed edit recomputes
+ * every lookup, and each match lands near the top of the table.
+ */
+function indexMatchFixture(formulas: number, rows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, rows);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(rows, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(rows, (row) => (row + 1) * INDEX_MATCH_VALUE_SCALE),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, SHAPE_SCALE, 0);
+  for (let row = 0; row < formulas; row++) {
+    store.setFormula(
+      sheet,
+      row,
+      3,
+      `=INDEX($B$1:$B$${rows},MATCH($C$1+${row},$A$1:$A$${rows},0))`,
+      0,
+    );
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, SHAPE_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, formulas - 1, 3),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: SHAPE_SCALE }),
+  };
+}
+
+/**
+ * RANK.EQ in even rows and LARGE in odd rows, each over the whole column, so
+ * one edit of A1 recomputes all of them: the fill-down shape that reads the
+ * column once per formula.
+ */
+function rankManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(
+      sheet,
+      row,
+      1,
+      row % 2 === 0 ? `=RANK.EQ(A${row + 1},$A$1:$A$${count})` : `=LARGE($A$1:$A$${count},ROW())`,
+      0,
+    );
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, RANK_MANY_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+  };
+}
+
+/**
+ * One `SORT(UNIQUE(FILTER()))` over text keys in A, kept while B is below
+ * `$D$1`. The timed edit narrows the filter to the first rows.
+ */
+function sortUniqueFilterFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  for (let row = 0; row < count; row++) store.setString(sheet, row, 0, sortUniqueKey(row), 0);
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setNumber(sheet, 0, 3, count, 0);
+  store.setFormula(sheet, 0, 2, `=SORT(UNIQUE(FILTER(A1:A${count},B1:B${count}<$D$1)))`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 3, SORT_UNIQUE_EDITED_ROWS, 0);
+      store.recompute(sheet);
+    },
+    check: () => {
+      const last = SORT_UNIQUE_EDITED_ROWS - 1;
+      const spilled = store.spillAnchorRow(sheet, last, 2) === 0 ? SORT_UNIQUE_EDITED_ROWS : 0;
+      return `${textAt(store, sheet, 0, 2) ?? ""}:${textAt(store, sheet, last, 2) ?? ""}:${spilled}`;
+    },
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 3, value: count }),
+  };
+}
+
+/** `SUBTOTAL(109)` over a column whose filter hides every other block of rows. */
+function subtotalFilteredFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  const hidden: number[] = [];
+  for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
+    hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
+  }
+  assert(
+    store.setHiddenRows(sheet, new Uint32Array(), Uint32Array.from(hidden)),
+    "subtotal-filtered: hidden rows rejected",
+  );
+  store.setFormula(sheet, 0, 1, `=SUBTOTAL(109,A1:A${count})`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, SUBTOTAL_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, 0, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+  };
+}
+
+/**
+ * One sparse block of `rows` × 10 cells written inside a page load, as
+ * snapshot hydration and datasource pages write: numbers and labels, with
+ * every tenth cell blank. The inputs are built before the timed write.
+ */
+function sparsePageWriteFixture(rows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(SPARSE_PAGE_COLUMNS, rows);
+  const offsets: number[] = [];
+  const kinds: number[] = [];
+  const numbers: number[] = [];
+  const texts: string[] = [];
+  for (let offset = 0; offset < rows * SPARSE_PAGE_COLUMNS; offset++) {
+    const value = sparsePageValue(offset);
+    if (value === null) continue;
+    offsets.push(offset);
+    kinds.push(typeof value === "number" ? KIND_NUMBER : KIND_STRING);
+    numbers.push(typeof value === "number" ? value : 0);
+    if (typeof value === "string") texts.push(value);
+  }
+  const encoder = new TextEncoder();
+  const textBytes = encoder.encode(texts.join(""));
+  const textOffsets = new Uint32Array(texts.length + 1);
+  for (let index = 0; index < texts.length; index++) {
+    textOffsets[index + 1] = (textOffsets[index] ?? 0) + encoder.encode(texts[index]).length;
+  }
+  const entryOffsets = Uint32Array.from(offsets);
+  const entryKinds = Uint8Array.from(kinds);
+  const entryNumbers = Float64Array.from(numbers);
+  const styles = new Uint32Array(offsets.length);
+  const none = new Uint32Array();
+  return {
+    store,
+    run: () => {
+      store.beginPageLoad();
+      const status = store.setSparseBlock(
+        sheet,
+        0,
+        0,
+        rows,
+        SPARSE_PAGE_COLUMNS,
+        entryOffsets,
+        entryKinds,
+        entryNumbers,
+        textBytes,
+        textOffsets,
+        styles,
+        none,
+        [],
+        none,
+        none,
+      );
+      store.commitSources();
+      assert(status === 0, `sparse-page-write: block rejected with ${status}`);
+    },
+    check: () => {
+      const last = rows - 1;
+      const number = numberAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 2);
+      return `${number}:${textAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 1) ?? ""}`;
+    },
+    dispose: () => store.free(),
+  };
+}
+
+/**
  * A LET in every row, as modern workbooks write them. The timed edit changes
  * the shared scale, so every LET recalculates.
  */
@@ -2692,6 +3005,185 @@ function incrementalDependencyClosureFixture(count: number): TimedFixture {
   };
 }
 
+/**
+ * Rows for paged storage: single-cell reads through formulas, a row insert
+ * near the top, the loaded-range check, and page loads through a full cache.
+ * Every paged sheet loads its values as clean pages, the way datasource pages
+ * arrive, and keeps some local edits on top.
+ */
+const PAGED_ROWS = 1_000_000;
+const PAGED_SMOKE_ROWS = 10_000;
+const PAGED_CHUNK_ROWS = 4_096;
+/** Local edits spread over column B of the insert and range-check sheets. */
+const PAGED_DIRTY_CELLS = 1_000;
+const PAGED_DIRTY_OFFSET = 0.5;
+const PAGED_INSERT_AT = 10;
+const PAGED_READ_SCALE = 2;
+const PAGED_READ_EDITED_SCALE = 3;
+/** The eviction row loads 4-row pages through a cache that holds 512 of them. */
+const PAGED_EVICTION_CHUNK_ROWS = 4;
+const PAGED_EVICTION_PAGES = 8_192;
+const PAGED_EVICTION_SMOKE_PAGES = 1_024;
+const PAGED_EVICTION_RESIDENT = 512;
+/** Pages a viewport band pins at the top of the eviction sheet. */
+const PAGED_EVICTION_PINNED = 16;
+/** Bytes of one resident page: kind, payload and style per row, plus the loaded bits. */
+const PAGED_EVICTION_PAGE_BYTES =
+  PAGED_EVICTION_CHUNK_ROWS *
+    (Uint8Array.BYTES_PER_ELEMENT +
+      Float64Array.BYTES_PER_ELEMENT +
+      Uint32Array.BYTES_PER_ELEMENT) +
+  BigUint64Array.BYTES_PER_ELEMENT;
+
+/** Column A holds `row`, column B `row + 1`, and `$C$1` the scale. */
+function pagedCellReadsOutput(count: number): number {
+  const last = count - 1;
+  return last + (last + 1) * PAGED_READ_EDITED_SCALE;
+}
+
+/** Old row 10 of column A one row lower, and every loaded and edited cell kept. */
+function pagedInsertRowOutput(rows: number): string {
+  return `${PAGED_INSERT_AT}:${rows * 2}:${PAGED_DIRTY_CELLS}`;
+}
+
+function pagedEvictionOutput(pages: number): string {
+  return `${PAGED_EVICTION_RESIDENT}:${pages * PAGED_EVICTION_CHUNK_ROWS - 1}:0`;
+}
+
+/**
+ * A paged sheet whose first `loaded` columns hold `row + col` in clean,
+ * loaded pages. A budget of 0 keeps every page resident.
+ */
+function loadedPagedSheet(
+  cols: number,
+  rows: number,
+  loaded: number,
+  chunkRows: number,
+  byteBudget: number,
+): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(cols, rows, chunkRows, byteBudget, 0);
+  store.beginPageLoad();
+  for (let col = 0; col < loaded; col++) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(rows, (row) => row + col),
+      0,
+    );
+  }
+  store.commitSources();
+  return { store, sheet };
+}
+
+/** `PAGED_DIRTY_CELLS` local edits spread evenly down column B. */
+function addPagedEdits(store: CellStore, sheet: number, rows: number): void {
+  for (let index = 0; index < PAGED_DIRTY_CELLS; index++) {
+    const row = Math.floor((index * rows) / PAGED_DIRTY_CELLS);
+    store.setNumber(sheet, row, 1, row + 1 + PAGED_DIRTY_OFFSET, 0);
+  }
+}
+
+/**
+ * `=A{r}+B{r}*$C$1` in every row of a paged sheet: each formula reads two
+ * loaded cells and one edited cell, one at a time. The timed edit changes the
+ * scale, so every formula recalculates.
+ */
+function pagedCellReadsFixture(count: number): TimedFixture {
+  const { store, sheet } = loadedPagedSheet(4, count, 2, PAGED_CHUNK_ROWS, 0);
+  store.setNumber(sheet, 0, 2, PAGED_READ_SCALE, 0);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 3, `=A${row + 1}+B${row + 1}*$C$1`, 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, PAGED_READ_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 3),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: PAGED_READ_SCALE }),
+  };
+}
+
+/** Two loaded columns of `rows` rows, with local edits in column B. */
+function editedPagedSheet(rows: number): { store: CellStore; sheet: number } {
+  const paged = loadedPagedSheet(2, rows, 2, PAGED_CHUNK_ROWS, 0);
+  addPagedEdits(paged.store, paged.sheet, rows);
+  return paged;
+}
+
+function pagedInsertRowCheck(store: CellStore, sheet: number): string {
+  const stats = store.pagedStats(sheet);
+  return `${numberAt(store, sheet, PAGED_INSERT_AT + 1, 0)}:${stats[1]}:${stats[2]}`;
+}
+
+/** One row inserted near the top of a paged sheet; removing it again restores the sheet. */
+function pagedInsertRowFixture(rows: number): TimedFixture {
+  const { store, sheet } = editedPagedSheet(rows);
+  return {
+    store,
+    run: () => assert(store.addRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: insert"),
+    check: () => pagedInsertRowCheck(store, sheet),
+    dispose: () => store.free(),
+    restore: () => assert(store.removeRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: restore"),
+  };
+}
+
+/** Whether every cell of both columns is loaded. The check changes nothing to restore. */
+function pagedRangeLoadedFixture(rows: number): TimedFixture {
+  const { store, sheet } = editedPagedSheet(rows);
+  let loaded = false;
+  return {
+    store,
+    run: () => {
+      loaded = store.rangeFullyLoaded(sheet, 0, 0, rows - 1, 1);
+    },
+    check: () => (loaded ? 1 : 0),
+    dispose: () => store.free(),
+    restore: () => {},
+  };
+}
+
+/**
+ * One page load of `pages` 4-row pages through a cache that holds 512, with
+ * the top 16 pages pinned by a viewport band, so every unpinned page the load
+ * writes evicts the oldest one. The fixture starts in the state a run leaves:
+ * the pinned pages and the newest pages resident. So a run needs no restore.
+ */
+function pagedEvictionFixture(pages: number): TimedFixture {
+  const rows = pages * PAGED_EVICTION_CHUNK_ROWS;
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(
+    1,
+    rows,
+    PAGED_EVICTION_CHUNK_ROWS,
+    PAGED_EVICTION_RESIDENT * PAGED_EVICTION_PAGE_BYTES,
+    0,
+  );
+  const pinnedRows = PAGED_EVICTION_PINNED * PAGED_EVICTION_CHUNK_ROWS;
+  store.pinViewportBands(sheet, Uint32Array.of(0, pinnedRows, 0, 1));
+  const values = numericColumn(rows, (row) => row);
+  const load = (start: number, end: number) => {
+    store.beginPageLoad();
+    store.setColumnNumbers(sheet, 0, start, values.subarray(start, end), 0);
+    store.commitSources();
+  };
+  load(0, pinnedRows);
+  load(rows - (PAGED_EVICTION_RESIDENT - PAGED_EVICTION_PINNED) * PAGED_EVICTION_CHUNK_ROWS, rows);
+  return {
+    store,
+    run: () => load(0, rows),
+    check: () =>
+      `${store.pagedStats(sheet)[0]}:${numberAt(store, sheet, rows - 1, 0)}:${numberAt(store, sheet, 0, 0)}`,
+    dispose: () => store.free(),
+    restore: () => {},
+  };
+}
+
 /** One matrix row: its identity and a factory for a fresh, untimed fixture. */
 interface FormulaWorkload {
   readonly id: string;
@@ -2771,6 +3263,19 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
   );
+  add("paged-cell-reads", range, () => pagedCellReadsFixture(range));
+  const pagedRows = smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS;
+  add("paged-insert-row", pagedRows, () => pagedInsertRowFixture(pagedRows));
+  add("paged-range-loaded", pagedRows, () => pagedRangeLoadedFixture(pagedRows));
+  const evictionPages = smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES;
+  add("paged-eviction", evictionPages, () => pagedEvictionFixture(evictionPages));
+  const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
+  add("index-match-many", indexMatchFormulas, () => indexMatchFixture(indexMatchFormulas, range));
+  const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
+  add("rank-many", rankManySize, () => rankManyFixture(rankManySize));
+  add("sort-unique-filter", range, () => sortUniqueFilterFixture(range));
+  add("subtotal-filtered", range, () => subtotalFilteredFixture(range));
+  add("sparse-page-write", range, () => sparsePageWriteFixture(range));
   add("spill-sequence-admission", large, () => spillSequenceAdmissionFixture(large));
   if (ENGINE_PACKAGE === "formulas") {
     for (const id of CLOSURE_ROW_IDS) {
