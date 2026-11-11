@@ -1318,8 +1318,11 @@
   color: var(--sw-fg-muted);
 }
 
+/* Sized to the lab, not to its toolbar's widest content: on a phone the
+   search field and the result filter share one row of the lab's width. */
 .sw-vault-browse {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sw-space-4);
 }
 
