@@ -18,7 +18,7 @@ use crate::formula_slots::{FormulaResults, FormulaWork};
 use std::rc::Rc;
 
 use super::super::array::ast_produces_array;
-use super::super::matrix::{EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
+use super::super::matrix::{EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE};
 use super::super::value::number_from_value;
 use super::super::EvalPass;
 use crate::calc::{Ast, Func};
@@ -62,6 +62,13 @@ pub(crate) enum Slot {
     Closure { definition: *const Ast, link: u32 },
     /// An argument left out (`ISOMITTED` is TRUE); it reads as a blank.
     Missing,
+    /// Shape analysis only: an argument's shape, known without evaluating
+    /// it. Its value is not known, so reading it is `#VALUE!`.
+    Shaped {
+        rows: usize,
+        cols: usize,
+        is_array: bool,
+    },
 }
 
 impl Slot {
@@ -106,6 +113,9 @@ pub(crate) struct CallFrame {
     nesting: usize,
     /// Calls made since the outermost of them began.
     work: usize,
+    /// Set when shape analysis reads the value of a [`Slot::Shaped`]
+    /// parameter: the shape it found depended on a value it did not have.
+    shaped_read: std::cell::Cell<bool>,
 }
 
 impl CallFrame {
@@ -248,7 +258,12 @@ impl<'a> Shapes<'a> {
             self.call
         };
         Some(match frame.slot_from(from, depth, index)? {
-            Slot::Value(_) | Slot::Missing => Kind::Scalar,
+            Slot::Value(_)
+            | Slot::Missing
+            | Slot::Shaped {
+                is_array: false, ..
+            } => Kind::Scalar,
+            Slot::Shaped { is_array: true, .. } => Kind::Array,
             Slot::OneCell(_) | Slot::Array { .. } => Kind::Array,
             Slot::Closure { definition, link } => Kind::Closure(
                 CallFrame::closure(*definition),
@@ -450,6 +465,10 @@ pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16)
         Some(Slot::Value(value) | Slot::OneCell(value)) => value.clone(),
         Some(Slot::Array { values, .. }) => values.first().cloned().unwrap_or(Value::Blank),
         Some(Slot::Missing) => Value::Blank,
+        Some(Slot::Shaped { .. }) => {
+            frame.inspect(|frame| frame.shaped_read.set(true));
+            Value::Error(FormulaError::Value)
+        }
         // A LAMBDA is not a value, as `=LAMBDA(x,x)` is not.
         Some(Slot::Closure { .. }) => Value::Error(FormulaError::Calc),
         None => Value::Error(FormulaError::Name),
@@ -465,7 +484,7 @@ pub(crate) fn parameter_matrix(
     match frame?.slot(depth, index)? {
         Slot::OneCell(value) => Some(EvalMatrix::new(1, 1, vec![value.clone()])),
         Slot::Array { rows, cols, values } => Some(EvalMatrix::new(*rows, *cols, values.to_vec())),
-        Slot::Value(_) | Slot::Missing | Slot::Closure { .. } => None,
+        Slot::Value(_) | Slot::Missing | Slot::Closure { .. } | Slot::Shaped { .. } => None,
     }
 }
 
@@ -478,7 +497,12 @@ pub(crate) fn parameter_shape(
     match frame?.slot(depth, index)? {
         Slot::OneCell(_) => Some((1, 1)),
         Slot::Array { rows, cols, .. } => Some((*rows, *cols)),
-        Slot::Value(_) | Slot::Missing | Slot::Closure { .. } => None,
+        Slot::Shaped {
+            rows,
+            cols,
+            is_array: true,
+        } => Some((*rows, *cols)),
+        Slot::Value(_) | Slot::Missing | Slot::Closure { .. } | Slot::Shaped { .. } => None,
     }
 }
 
@@ -568,14 +592,19 @@ fn helper_shape(
     arguments: &[Ast],
 ) -> Result<(usize, usize, usize), FormulaError> {
     let (rows, cols) = match name {
-        // A parameter has no shape before its call binds it, so a call's
-        // shape is the shape of the array its body produces.
+        // The body's shape with each parameter's shape and no values. A
+        // shape that needs a value, such as `SEQUENCE(x)`, comes from the
+        // evaluation instead: this is the only place that evaluates a call
+        // to size it, for an operator that needs both shapes first.
         CALL => {
+            if let Some(shape) = context.static_call_shape(arguments)? {
+                return Ok(shape);
+            }
             return context.call_arguments(arguments, |context, body| {
                 let matrix = context.matrix(body)?;
                 let cells = EvalMatrix::validate_shape(matrix.rows, matrix.cols, 1, 0)?;
                 Ok((matrix.rows, matrix.cols, cells))
-            })
+            });
         }
         "MAKEARRAY" => {
             if arguments.len() != 3 {
@@ -635,6 +664,21 @@ pub(crate) fn bound(
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
+    if name == CALL {
+        // A call is sized from its parameters' shapes when that is enough;
+        // otherwise the spill is charged for what the call's own evaluation
+        // produces, so the body runs once.
+        pass.results.call_frame_mut().enter()?;
+        let mut context = Context {
+            store,
+            sheet,
+            pass,
+            depth: 0,
+        };
+        let shape = context.static_call_shape(arguments);
+        context.pass.results.call_frame_mut().exit();
+        return Ok(shape?.map_or(UNKNOWN_SIZE_PRECHARGE, |(_, _, cells)| cells));
+    }
     shape(store, name, arguments, sheet, pass).map(|(_, _, cells)| cells)
 }
 
@@ -982,6 +1026,64 @@ fn evaluate_with_context(
 }
 
 impl Context<'_, '_> {
+    /// A call's shape from its arguments' shapes, without evaluating the
+    /// call or its arguments: `None` when the body's shape needs a value.
+    fn static_call_shape(
+        &mut self,
+        arguments: &[Ast],
+    ) -> Result<Option<(usize, usize, usize)>, FormulaError> {
+        let (function, supplied) = arguments.split_first().ok_or(FormulaError::Value)?;
+        let callee = self.callee(function)?;
+        if callee.parameters.len() != supplied.len() {
+            return Err(FormulaError::Value);
+        }
+        let mut slots = Vec::with_capacity(supplied.len());
+        for argument in supplied {
+            let slot = match argument {
+                Ast::Missing => Slot::Missing,
+                Ast::Parameter { depth, index, .. }
+                    if matches!(self.slot(*depth, *index), Some(Slot::Closure { .. })) =>
+                {
+                    self.bind(argument)?
+                }
+                argument if definition(argument).is_ok() => self.bind(argument)?,
+                argument if ast_produces_array(argument, self.shapes()) => {
+                    match self.store.matrix_shape(argument, self.sheet, self.pass) {
+                        Ok((rows, cols, _)) => Slot::Shaped {
+                            rows,
+                            cols,
+                            is_array: true,
+                        },
+                        Err(FormulaError::Value) => return Ok(None),
+                        Err(error) => return Err(error),
+                    }
+                }
+                _ => Slot::Shaped {
+                    rows: 1,
+                    cols: 1,
+                    is_array: false,
+                },
+            };
+            slots.push(slot);
+        }
+        let frame = self.pass.results.call_frame_mut();
+        frame.push(callee.link, slots);
+        let frame = self.pass.results.call_frame_mut();
+        let outer_read = frame.shaped_read.replace(false);
+        let shape = self.store.matrix_shape(callee.body, self.sheet, self.pass);
+        let frame = self.pass.results.call_frame_mut();
+        let read_value = frame.shaped_read.replace(outer_read);
+        frame.pop();
+        if read_value {
+            return Ok(None);
+        }
+        match shape {
+            Ok(shape) => Ok(Some(shape)),
+            Err(FormulaError::Value) => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
     /// One aggregation's value: an array must hold one cell; a scalar is
     /// kept, errors included.
     fn aggregation_value(&mut self, expression: &Ast) -> Result<Value, FormulaError> {
@@ -1236,6 +1338,55 @@ mod tests {
         let (store, sheet) = calculate("=LAMBDA(x,x*2)(A2)");
         assert_eq!(store.get_cell(sheet, 4, 4).num(), 8.0);
         assert_eq!(store.get_cell(sheet, 5, 4).kind(), 0);
+    }
+
+    /// A call that spills is sized from its parameters' shapes, or charged
+    /// for what its one evaluation produces: its body runs once per call,
+    /// whether its shape is static (`x*TICK()`) or needs a value
+    /// (`SEQUENCE(x)`). TICK is a host function that counts its calls.
+    #[test]
+    fn a_spilling_call_runs_its_body_once() {
+        use crate::eval::custom::CustomFunction;
+        use crate::types::Value;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        for (formula, cells) in [
+            ("=LAMBDA(x,x*TICK())(A1:A3)", 3),
+            ("=LAMBDA(x,SEQUENCE(x)*TICK())(A3)", 3),
+            ("=LAMBDA(x,y,x+y*TICK())(A1:A3,B1)", 3),
+        ] {
+            let calls = Rc::new(Cell::new(0));
+            let counter = Rc::clone(&calls);
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(8, 8);
+            for row in 0..3 {
+                store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+            }
+            store.set_number(sheet, 0, 1, 1.0, 0);
+            assert!(store.install_custom_function(
+                "TICK",
+                CustomFunction {
+                    implementation: Rc::new(move |_| {
+                        counter.set(counter.get() + 1);
+                        Value::number(1.0)
+                    }),
+                    volatile: false,
+                }
+            ));
+            store.set_formula(sheet, 0, 4, formula, 0);
+            store.recompute(sheet);
+            assert!(
+                store.get_cell(sheet, cells - 1, 4).num() >= 3.0,
+                "{formula} spills"
+            );
+            assert_eq!(
+                calls.get(),
+                1,
+                "{formula} ran its body {} times",
+                calls.get()
+            );
+        }
     }
 
     #[test]
