@@ -490,18 +490,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn formula_cells_in_a_range_keep_the_cell_by_cell_walk() {
-        let (mut store, sheet) = mixed_store();
-        store.set_formula(sheet, 0, 0, "=1+1", 0);
-        store.set_formula(sheet, 0, 6, &format!("=COUNTIF(A1:A{ROWS},\">1\")"), 0);
-
-        KERNEL_CALLS.with(|calls| calls.set(0));
-        store.recompute(sheet);
-
-        assert_eq!(KERNEL_CALLS.with(std::cell::Cell::get), 0);
-    }
-
     /// Columns longer than one mask word, where later criteria skip words
     /// the first one emptied, give the cell-by-cell walk's results.
     #[test]

@@ -1,5 +1,5 @@
 // Key checks need the full engine, and engine selection is process-wide,
-// so `data-model.test.ts` runs this file in its own process.
+// so `full-engine.test.ts` runs this file apart from the default-engine suites.
 import { beforeAll, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";

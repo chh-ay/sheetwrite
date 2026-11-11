@@ -41,23 +41,23 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
     relationshipStatus?(id: string): Uint32Array;
   };
 
-/** Dashboard pivot output in row-major order; free after reading. */
+/** Dashboard pivot output in row-major order; take each buffer once, then free it. */
 export interface PivotOutputCells {
   /** 0 blank, 1 number, 2 text, 3 boolean, 4 error. */
-  kinds(): Uint8Array;
+  takeKinds(): Uint8Array;
   /** `[rows, cols, headerRows, labelCols]` of the output. */
   layout(): Uint32Array;
   /** Per cell: the number, the boolean as 0 or 1, or the error slot. */
-  numbers(): Float64Array;
+  takeNumbers(): Float64Array;
   /** The text cells, in order. */
-  texts(): string[];
+  takeTexts(): string[];
   free(): void;
 }
 
-/** Source fields reported by the full engine; free after reading. */
+/** Source fields reported by the full engine; take each buffer once, then free it. */
 interface PivotFieldList {
-  names(): string[];
+  takeNames(): string[];
   /** 0 blank, 1 number, 2 text, 3 boolean, 4 mixed. */
-  types(): Uint8Array;
+  takeTypes(): Uint8Array;
   free(): void;
 }

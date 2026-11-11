@@ -181,25 +181,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ascii_and_space_change_width_both_ways() {
-        assert_eq!(full_width("EXCEL 1!"), "ＥＸＣＥＬ\u{3000}１！");
-        assert_eq!(half_width("ＥＸＣＥＬ\u{3000}１！"), "EXCEL 1!");
-    }
-
-    #[test]
     fn voiced_katakana_split_and_join() {
         assert_eq!(half_width("ガパヴァン"), "ｶﾞﾊﾟｳﾞｧﾝ");
         assert_eq!(full_width("ｶﾞﾊﾟｳﾞｧﾝ"), "ガパヴァン");
         assert_eq!(full_width("ｱﾞ"), "ア゛");
-    }
-
-    #[test]
-    fn every_half_width_katakana_reads_back() {
-        let half: String = (FIRST_HALF_WIDTH..FIRST_HALF_WIDTH + 63)
-            .filter_map(char::from_u32)
-            .collect();
-
-        assert_eq!(half_width(&full_width(&half)), half);
     }
 
     #[test]

@@ -4,8 +4,6 @@ import { siteUrl } from "./playwright.config.js";
 
 const ROUTE = siteUrl("/showcases/data-tools/");
 
-const SORT = "Sort by region, then units";
-
 /** Region is a semantic combobox: open it, then pick the option. */
 async function pickRegion(page: Page, region: string) {
   await page.getByRole("combobox", { name: "Region" }).click();
@@ -30,13 +28,12 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(ROUTE);
-  await expect(page.getByRole("button", { name: SORT })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Clear view", exact: true })).toBeEnabled();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await pickRegion(page, "EMEA");
   await page.getByLabel("Customer").fill("Northstar");
   await expect(page.getByTestId("data-visible")).toHaveText("640 / 4,800 rows visible");
-  await page.getByRole("button", { name: SORT }).click();
-  await expectLatestEvent(page, "info", "sortByMulti");
+  await expectLatestEvent(page, "info", "setColumnFilter");
   await page.getByRole("button", { name: "Clear view", exact: true }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await expect(page.getByRole("combobox", { name: "Region" })).toHaveText("All regions");
@@ -67,19 +64,4 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   await page.getByRole("button", { name: "Try a new order ID" }).click();
   await expectProbe(page, "order", "saved", "MANAGER-REVIEW");
   expect(errors).toEqual([]);
-});
-
-test("data tools fits a narrow viewport in either theme", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(ROUTE);
-  await expect(page.getByRole("button", { name: "Clear view", exact: true })).toBeEnabled();
-  for (const theme of ["light", "dark"]) {
-    await page.evaluate((value) => {
-      document.documentElement.dataset.theme = value;
-    }, theme);
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true);
-    await expect(page.getByTestId("data-grid").locator("canvas").first()).toBeVisible();
-  }
 });

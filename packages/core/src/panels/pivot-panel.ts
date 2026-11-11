@@ -5,6 +5,7 @@
 
 import { scanColumnValues } from "../data-window-reads.js";
 import { Scope } from "../scope.js";
+import { storeEngine } from "../store/engine-registry.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { TableColumnRef } from "../types/data-model.js";
@@ -104,18 +105,36 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           ?.columns.findIndex((column) => column.id === modelField.column) ?? -1)
       : field;
     if (offset < 0) return [];
+
     // Related fields can be blank because a fact key has no matching row.
     const seen = new Set<CellScalar>(modelField ? [null] : []);
-    const span = {
-      sheet: range.sheet,
-      col: range.start.col + offset,
-      startRow: range.start.row,
-      endRow: range.end.row,
-    };
-    scanColumnValues(grid.store, span, (value) => {
+    const col = range.start.col + offset;
+    const keep = (value: CellScalar): boolean => {
       seen.add(value);
       return seen.size <= MAX_FILTER_VALUES;
-    });
+    };
+
+    // The engine scans the source rows in one call; a custom store, or a
+    // paged sheet that is not fully loaded, is read through data windows.
+    const engine = storeEngine(grid.store);
+    if (engine && engine.queryCapability(range.sheet).status === "complete") {
+      const rows = { start: range.start.row, end: range.end.row + 1 };
+      // The engine keeps 0 and -0 apart and the Set merges them, so one more
+      // value still shows an overflow.
+      const limit = MAX_FILTER_VALUES + 2;
+      for (const value of engine.distinctValues(range.sheet, col, limit, rows)) {
+        if (!keep(value)) break;
+      }
+    } else {
+      const span = {
+        sheet: range.sheet,
+        col,
+        startRow: range.start.row,
+        endRow: range.end.row,
+      };
+      scanColumnValues(grid.store, span, keep);
+    }
+
     return [...seen].sort(compareScalars);
   };
 

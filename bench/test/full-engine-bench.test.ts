@@ -1,117 +1,102 @@
-import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { expect, it } from "bun:test";
 
 import { formulaSourceDigest } from "../src/formula-bench.js";
 import { type FullEngineResult, validateFullEngineResult } from "../src/full-engine-bench.js";
+import { expectRejections, must, type Rejection } from "./gate-fixtures.js";
 
-function recordedCapture(): FullEngineResult {
-  return JSON.parse(
-    readFileSync(new URL("../results/full-engine-results.json", import.meta.url), "utf8"),
-  ) as FullEngineResult;
-}
-function firstEngine(result: FullEngineResult) {
-  const engine = result.engines[0];
-  if (!engine) throw new Error("Missing recorded engine");
-  return engine;
-}
-function firstAnalysis(result: FullEngineResult) {
-  const workload = result.analysis[0];
-  if (!workload) throw new Error("Missing recorded analysis workload");
-  return workload;
-}
+const RECORDED = (await Bun.file(
+  new URL("../results/full-engine-results.json", import.meta.url),
+).json()) as FullEngineResult;
+const recorded = () => structuredClone(RECORDED);
+const firstEngine = (result: FullEngineResult) => must(result.engines[0], "engine");
+const sharedWorkload = (result: FullEngineResult) =>
+  must(firstEngine(result).shared.workloads[0], "shared workload");
+const analysis = (result: FullEngineResult) => must(result.analysis[0], "analysis workload");
+const ZERO_DIGEST = "0".repeat(64);
+
 /** Files the shared capture's engine hashes under `packages/<enginePackage>/`, as a new capture does. */
-function rekeyShared(result: FullEngineResult, engineId: string, enginePackage: string): void {
-  const capture = result.engines.find((engine) => engine.engine === engineId);
-  const source = capture?.shared.source;
-  if (!source) throw new Error(`Missing ${engineId} shared source`);
+function rekeyShared(
+  result: FullEngineResult,
+  engineId: string,
+  enginePackage: string,
+): FullEngineResult {
+  const source = must(
+    result.engines.find((engine) => engine.engine === engineId)?.shared.source,
+    engineId,
+  );
   source.files = Object.fromEntries(
     Object.entries(source.files)
       .map(([path, digest]) => [
         path.replace("packages/wasm/", `packages/${enginePackage}/`),
         digest,
       ])
-      .sort(([left = ""], [right = ""]) => left.localeCompare(right)),
+      .toSorted(([left = ""], [right = ""]) => left.localeCompare(right)),
   );
   source.digest = formulaSourceDigest(source.commit, source.files, source.baselineContext);
+  return result;
 }
-describe("full engine benchmark evidence", () => {
-  it("accepts the complete recorded engine matrix", () => {
-    expect(() => validateFullEngineResult(recordedCapture())).not.toThrow();
-  });
-  it("accepts engine hashes keyed by the package the shared capture loaded", () => {
-    const result = recordedCapture();
-    rekeyShared(result, "full", "formulas");
 
-    expect(() => validateFullEngineResult(result)).not.toThrow();
-  });
-  it("rejects default-engine hashes keyed by the full engine package", () => {
-    const result = recordedCapture();
-    rekeyShared(result, "default", "formulas");
+it("accepts the recorded matrix and engine hashes keyed by the package the full engine loaded", () => {
+  expect(() => validateFullEngineResult(recorded())).not.toThrow();
+  expect(() => validateFullEngineResult(rekeyShared(recorded(), "full", "formulas"))).not.toThrow();
+});
 
-    expect(() => validateFullEngineResult(result)).toThrow();
-  });
-  it.each(["missing", "duplicate", "unknown"])("rejects %s engines", (fault) => {
-    const result = recordedCapture();
-    if (fault === "missing") result.engines.pop();
-    if (fault === "duplicate") result.engines.push(structuredClone(firstEngine(result)));
-    if (fault === "unknown")
-      Object.defineProperty(firstEngine(result), "engine", { value: "unknown" });
-    expect(() => validateFullEngineResult(result)).toThrow();
-  });
-  it.each(["raw", "summary", "allocation", "output", "source"])(
-    "keeps shared %s validation",
-    (fault) => {
-      const result = recordedCapture();
-      const shared = firstEngine(result).shared;
-      const workload = shared.workloads[0];
-      if (!workload) throw new Error("Missing shared workload");
-      if (fault === "raw") workload.samplesMs.pop();
-      if (fault === "summary")
+it("rejects drifted engines, shared workloads, analysis and engine evidence", () => {
+  const rejections: Rejection<FullEngineResult>[] = [
+    [(result) => rekeyShared(result, "default", "formulas")],
+    [(result) => result.engines.pop()],
+    [(result) => result.engines.push(structuredClone(firstEngine(result)))],
+    [(result) => Object.defineProperty(firstEngine(result), "engine", { value: "unknown" })],
+    [(result) => sharedWorkload(result).samplesMs.pop()],
+    [
+      (result) => {
+        const workload = sharedWorkload(result);
         workload.stat = { ...workload.stat, median: workload.stat.median + 1 };
-      if (fault === "allocation") workload.allocationSamples.pop();
-      if (fault === "output") workload.output = "wrong";
-      if (fault === "source" && shared.source) shared.source.digest = "0".repeat(64);
-      expect(() => validateFullEngineResult(result)).toThrow();
-    },
-  );
-  it.each(["raw", "summary", "output", "allocation", "missing"])(
-    "rejects invalid analysis %s evidence",
-    (fault) => {
-      const result = recordedCapture();
-      const workload = firstAnalysis(result);
-      if (fault === "raw") workload.samplesMs.pop();
-      if (fault === "summary") workload.stat = { ...workload.stat, mean: workload.stat.mean + 1 };
-      if (fault === "output") workload.output = 0;
-      if (fault === "allocation")
-        workload.allocationStat.retainedBytes = {
-          ...workload.allocationStat.retainedBytes,
-          mean: workload.allocationStat.retainedBytes.mean + 1,
+      },
+    ],
+    [(result) => sharedWorkload(result).allocationSamples.pop()],
+    [(result) => (sharedWorkload(result).output = "wrong")],
+    [(result) => (must(firstEngine(result).shared.source, "source").digest = ZERO_DIGEST)],
+    [(result) => analysis(result).samplesMs.pop()],
+    [
+      (result) =>
+        (analysis(result).stat = {
+          ...analysis(result).stat,
+          mean: analysis(result).stat.mean + 1,
+        }),
+    ],
+    [(result) => (analysis(result).output = 0)],
+    [
+      (result) => {
+        const { allocationStat } = analysis(result);
+        allocationStat.retainedBytes = {
+          ...allocationStat.retainedBytes,
+          mean: allocationStat.retainedBytes.mean + 1,
         };
-      if (fault === "missing") result.analysis.pop();
-      expect(() => validateFullEngineResult(result)).toThrow();
-    },
-  );
-  it.each(["raw", "summary", "wasm", "digest", "commit", "binding", "node"])(
-    "rejects invalid engine %s evidence",
-    (fault) => {
-      const result = recordedCapture();
-      const engine = firstEngine(result);
-      if (fault === "raw") engine.initialization.samplesMs.pop();
-      if (fault === "summary")
-        engine.initialization.stat = {
-          ...engine.initialization.stat,
-          mean: engine.initialization.stat.mean + 1,
-        };
-      if (fault === "wasm") engine.wasm.sha256 = "0".repeat(64);
-      if (fault === "digest") result.sourceDigest = "0".repeat(64);
-      if (fault === "commit") engine.shared.meta.commit = "0".repeat(40);
-      if (fault === "node") engine.initialization.node = "";
-      if (fault === "binding") {
-        const other = result.engines.find((capture) => capture.engine !== engine.engine);
-        if (!other) throw new Error("Missing second engine");
+      },
+    ],
+    [(result) => result.analysis.pop()],
+    [(result) => firstEngine(result).initialization.samplesMs.pop()],
+    [
+      (result) => {
+        const { initialization } = firstEngine(result);
+        initialization.stat = { ...initialization.stat, mean: initialization.stat.mean + 1 };
+      },
+    ],
+    [(result) => (firstEngine(result).wasm.sha256 = ZERO_DIGEST)],
+    [(result) => (result.sourceDigest = ZERO_DIGEST)],
+    [(result) => (firstEngine(result).shared.meta.commit = "0".repeat(40))],
+    [(result) => (firstEngine(result).initialization.node = "")],
+    [
+      (result) => {
+        const engine = firstEngine(result);
+        const other = must(
+          result.engines.find((capture) => capture.engine !== engine.engine),
+          "second engine",
+        );
         engine.shared = structuredClone(other.shared);
-      }
-      expect(() => validateFullEngineResult(result)).toThrow();
-    },
-  );
+      },
+    ],
+  ];
+  expectRejections(recorded, validateFullEngineResult, rejections);
 });

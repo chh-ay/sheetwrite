@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { expect, it } from "bun:test";
 
 import {
   createRuntimeResourceSnapshot,
@@ -14,11 +14,11 @@ import {
 import {
   RESOURCE_BENCHMARK_SCHEMA_VERSION,
   RESOURCE_FULL_SCENARIOS,
-  RESOURCE_SMOKE_SCENARIOS,
   type ResourceBenchmarkArtifact,
   type ResourceScenarioId,
   validateResourceBenchmark,
 } from "../src/resource-protocol.js";
+import { type DeepMutable, expectRejections, must, mutableCopy } from "./gate-fixtures.js";
 
 const OPERATION_BY_SCENARIO: Record<ResourceScenarioId, RuntimeResourceOperation> = {
   "dense-ingest": "ingest",
@@ -33,19 +33,20 @@ const OPERATION_BY_SCENARIO: Record<ResourceScenarioId, RuntimeResourceOperation
   "sort-filter-refusal": "scroll",
   teardown: "teardown",
 };
+const WASM_PAGE_BYTES = 64 * 1024;
 
+/** A snapshot in which every WASM owner reports zero bytes. */
 function snapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase) {
-  const encoded: number[] = [
+  const header = [
     STORE_MEMORY_PROTOCOL_VERSION,
     WASM_MEMORY_OWNERS.length,
     STORE_MEMORY_HASH_ESTIMATE_VERSION,
   ];
-  for (let index = 0; index < WASM_MEMORY_OWNERS.length; index++) encoded.push(0, 0, 0);
-  encoded.push(0, 0);
+  const encoded = [...header, ...WASM_MEMORY_OWNERS.flatMap(() => [0, 0, 0]), 0, 0];
   return createRuntimeResourceSnapshot({
     operation,
     phase,
-    wasm: decodeStoreMemoryStats(encoded, 64 * 1024),
+    wasm: decodeStoreMemoryStats(encoded, WASM_PAGE_BYTES),
     runtime: {
       usedJSHeapSize: 1,
       arrayBufferBytes: 2,
@@ -55,20 +56,12 @@ function snapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePha
   });
 }
 
-function scenario(id: ResourceScenarioId) {
-  const operation = OPERATION_BY_SCENARIO[id];
-  return {
-    id,
-    operation,
-    durationMs: 1,
-    phases: {
-      before: snapshot(operation, "before"),
-      peak: snapshot(operation, "peak"),
-      settled: snapshot(operation, "settled"),
-      ...(id === "teardown" ? { "after-destroy": snapshot(operation, "after-destroy") } : {}),
-    },
-    deltas: [],
-    transientPeaks:
+function fullArtifact(): DeepMutable<ResourceBenchmarkArtifact> {
+  const scenarios = RESOURCE_FULL_SCENARIOS.map((id) => {
+    const operation = OPERATION_BY_SCENARIO[id];
+    const phases: RuntimeResourcePhase[] = ["before", "peak", "settled"];
+    if (id === "teardown") phases.push("after-destroy");
+    const transientPeaks =
       id === "formula-recompute"
         ? [
             {
@@ -78,135 +71,105 @@ function scenario(id: ResourceScenarioId) {
               measurement: "instrumented-operation-peak" as const,
             },
           ]
-        : [],
-    sentinel: `${id}:ok`,
-  } as const;
-}
-
-function artifact(mode: "smoke" | "full" = "smoke"): ResourceBenchmarkArtifact {
-  const ids = mode === "smoke" ? RESOURCE_SMOKE_SCENARIOS : RESOURCE_FULL_SCENARIOS;
-  return {
+        : [];
+    return {
+      id,
+      operation,
+      durationMs: 1,
+      phases: Object.fromEntries(phases.map((phase) => [phase, snapshot(operation, phase)])),
+      deltas: [],
+      transientPeaks,
+      sentinel: `${id}:ok`,
+    };
+  });
+  return mutableCopy({
     schemaVersion: RESOURCE_BENCHMARK_SCHEMA_VERSION,
     resourceSchemaVersion: RUNTIME_RESOURCE_SCHEMA_VERSION,
-    mode,
+    mode: "full",
     provenance: {
       commit: "fixture",
       runtime: "bun-test",
       forcedGcCheckpoints: ["before", "settled", "after-destroy"],
     },
-    scenarios: ids.map(scenario),
-    optimizations:
-      mode === "full"
-        ? [
-            {
-              owner: "wasm.string-index",
-              scenario: "dense-ingest",
-              admissionRule: "capacity-slack",
-              observed: 0.3,
-              threshold: 0.25,
-              unit: "ratio",
-              before: 100,
-              after: 70,
-              timingBeforeMs: 10,
-              timingAfterMs: 8,
-              budgetBefore: 120,
-              budgetAfter: 80,
-              profileArtifact: null,
-            },
-          ]
-        : [],
-  };
+    scenarios,
+    optimizations: [
+      {
+        owner: "wasm.string-index",
+        scenario: "dense-ingest",
+        admissionRule: "capacity-slack",
+        observed: 0.3,
+        threshold: 0.25,
+        unit: "ratio",
+        before: 100,
+        after: 70,
+        timingBeforeMs: 10,
+        timingAfterMs: 8,
+        budgetBefore: 120,
+        budgetAfter: 80,
+        profileArtifact: null,
+      },
+    ],
+  } satisfies ResourceBenchmarkArtifact);
 }
 
-describe("resource benchmark protocol", () => {
-  it("fails closed on missing phases, duplicate scenarios, and owner overlap", () => {
-    const smoke = artifact();
-    expect(() =>
-      validateResourceBenchmark({ ...smoke, scenarios: smoke.scenarios.slice(1) }, "smoke"),
-    ).toThrow("missing resource scenario");
-    expect(() =>
-      validateResourceBenchmark(
-        { ...smoke, scenarios: [...smoke.scenarios, smoke.scenarios[0]!] },
-        "smoke",
-      ),
-    ).toThrow("duplicate resource scenario");
+type Artifact = DeepMutable<ResourceBenchmarkArtifact>;
+const scenarioOf = (artifact: Artifact, id: ResourceScenarioId) =>
+  must(
+    artifact.scenarios.find((entry) => entry.id === id),
+    id,
+  );
+const formulaPeak = (artifact: Artifact) =>
+  must(scenarioOf(artifact, "formula-recompute").transientPeaks[0], "transient peak");
+const optimization = (artifact: Artifact) => must(artifact.optimizations[0], "optimization");
 
-    const [first, ...rest] = smoke.scenarios;
-    const before = first!.phases.before!;
-    const duplicatedOwner = {
-      ...before,
-      jsOwners: [
-        {
-          owner: "wasm.dense.kinds",
-          logicalBytes: 1,
-          allocatedBytes: 1,
-          entries: 1,
-          measurement: "typed-array-byte-length" as const,
-        },
-      ],
-      totals: { logicalLiveBytes: 1, allocatedCapacityBytes: 1 },
-    };
-    expect(() =>
-      validateResourceBenchmark(
-        {
-          ...smoke,
-          scenarios: [
-            { ...first!, phases: { ...first!.phases, before: duplicatedOwner } },
-            ...rest,
-          ],
-        },
-        "smoke",
-      ),
-    ).toThrow("counted twice");
-  });
+it("keeps transient peaks out of the retained totals", () => {
+  const artifact = fullArtifact();
+  formulaPeak(artifact).peakBytes = Number.MAX_SAFE_INTEGER;
+  expect(() => validateResourceBenchmark(artifact, "full")).not.toThrow();
+  const peak = must(scenarioOf(artifact, "formula-recompute").phases.peak, "peak phase");
+  expect(peak.totals.allocatedCapacityBytes).toBe(0);
+});
 
-  it("keeps transient peaks out of retained totals and rejects duplicate transient owners", () => {
-    const full = artifact("full");
-    const formula = full.scenarios.find((entry) => entry.id === "formula-recompute")!;
-    const transient = formula.transientPeaks[0]!;
-    const measured = {
-      ...formula,
-      transientPeaks: [{ ...transient, peakBytes: Number.MAX_SAFE_INTEGER }],
-    };
-    expect(() =>
-      validateResourceBenchmark(
-        {
-          ...full,
-          scenarios: full.scenarios.map((entry) =>
-            entry.id === "formula-recompute" ? measured : entry,
-          ),
-        },
-        "full",
-      ),
-    ).not.toThrow();
-    expect(measured.phases.peak!.totals.allocatedCapacityBytes).toBe(0);
-    expect(() =>
-      validateResourceBenchmark(
-        {
-          ...full,
-          scenarios: full.scenarios.map((entry) =>
-            entry.id === "formula-recompute"
-              ? { ...formula, transientPeaks: [transient, transient] }
-              : entry,
-          ),
-        },
-        "full",
-      ),
-    ).toThrow("invalid transient resource accounting");
-  });
-
-  it("rejects unadmitted, non-improving, and unbudgeted optimizations", () => {
-    const full = artifact("full");
-    const evidence = full.optimizations[0]!;
-    for (const [patch, message] of [
-      [{ observed: evidence.threshold }, "did not cross"],
-      [{ after: evidence.before }, "lacks a lower"],
-      [{ budgetAfter: evidence.budgetBefore }, "budget was not lowered"],
-      [{ timingAfterMs: Number.NaN }, "lacks finite"],
-    ] as const) {
-      expect(() =>
-        validateResourceBenchmark({ ...full, optimizations: [{ ...evidence, ...patch }] }, "full"),
-      ).toThrow(message);
-    }
-  });
+it("fails closed on drifted scenarios, owner accounting and optimization evidence", () => {
+  expectRejections(fullArtifact, (artifact) => validateResourceBenchmark(artifact, "full"), [
+    [(artifact) => artifact.scenarios.shift(), "missing resource scenario"],
+    [
+      (artifact) =>
+        artifact.scenarios.push(structuredClone(must(artifact.scenarios[0], "scenario"))),
+      "duplicate resource scenario",
+    ],
+    [
+      (artifact) => {
+        const before = must(scenarioOf(artifact, "dense-ingest").phases.before, "before phase");
+        before.jsOwners = [
+          {
+            owner: "wasm.dense.kinds",
+            logicalBytes: 1,
+            allocatedBytes: 1,
+            entries: 1,
+            measurement: "typed-array-byte-length",
+          },
+        ];
+        before.totals = { logicalLiveBytes: 1, allocatedCapacityBytes: 1 };
+      },
+      "counted twice",
+    ],
+    [
+      (artifact) =>
+        scenarioOf(artifact, "formula-recompute").transientPeaks.push(
+          structuredClone(formulaPeak(artifact)),
+        ),
+      "invalid transient resource accounting",
+    ],
+    [
+      (artifact) => (optimization(artifact).observed = optimization(artifact).threshold),
+      "did not cross",
+    ],
+    [(artifact) => (optimization(artifact).after = optimization(artifact).before), "lacks a lower"],
+    [
+      (artifact) => (optimization(artifact).budgetAfter = optimization(artifact).budgetBefore),
+      "budget was not lowered",
+    ],
+    [(artifact) => (optimization(artifact).timingAfterMs = Number.NaN), "lacks finite"],
+  ]);
 });

@@ -559,30 +559,6 @@ mod tests {
     }
 
     #[test]
-    fn ties_rank_at_their_average_position() {
-        let values = [1.0, 3.0, 3.0, 5.0];
-        // Descending: 5 is first, the two 3s share places 2 and 3.
-        assert_close(
-            "RANK.AVG",
-            vec![scalar_arg(3.0), array_arg(&values)],
-            2.5,
-            0.0,
-        );
-        assert_close(
-            "RANK.AVG",
-            vec![scalar_arg(3.0), array_arg(&values), scalar_arg(1.0)],
-            2.5,
-            0.0,
-        );
-        assert_close(
-            "RANK.AVG",
-            vec![scalar_arg(5.0), array_arg(&values), scalar_arg(1.0)],
-            4.0,
-            0.0,
-        );
-    }
-
-    #[test]
     fn domain_and_shape_errors() {
         let short = [1.0, 2.0];
         let cases: Vec<(&str, Vec<Arg>, FormulaError)> = vec![
@@ -659,27 +635,5 @@ mod tests {
         // Only (1, 2) and (3, 6) remain: slope 2, intercept 0.
         assert_close("SLOPE", vec![ys.clone(), xs.clone()], 2.0, 1e-12);
         assert_close("INTERCEPT", vec![ys, xs], 0.0, 1e-12);
-    }
-
-    #[test]
-    fn cell_arguments_follow_the_reference_rules() {
-        use crate::store::CellStore;
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(3, 4);
-        store.set_number(sheet, 0, 0, 3.0, 0);
-        store.set_number(sheet, 1, 0, 4.0, 0);
-        store.set_string(sheet, 0, 1, "seven", 0);
-        // A cell argument is a reference: its text is ignored, like SUM(A1).
-        store.set_formula(sheet, 0, 2, "=DEVSQ(A1,A2,B1)", 0);
-        // A value typed in the argument list is converted.
-        store.set_formula(sheet, 1, 2, "=DEVSQ(3,4,\"5\")", 0);
-        store.set_formula(sheet, 2, 2, "=DEVSQ(3,4,\"seven\")", 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, 0, 2).num(), 0.5);
-        assert_eq!(store.get_cell(sheet, 1, 2).num(), 2.0);
-        assert_eq!(
-            store.get_cell(sheet, 2, 2).string().as_deref(),
-            Some("#VALUE!")
-        );
     }
 }

@@ -17,7 +17,21 @@ declare module "virtual:formula-tables" {
   export function formulaTableUrl(family: string): string | null;
 }
 
+/** A Svelte component: the /svelte/ workbench (vite.config.ts `frameworkWorkbenches`). */
+declare module "*.svelte" {
+  import type { Component } from "svelte";
+
+  const component: Component;
+  export default component;
+}
+
 /** A Markdown module compiled through Solid (vite.config.ts `docsPages`); it renders on the server. */
+/** A snippet file's text (vite.config.ts `snippetSources`). */
+declare module "*.mdx?source" {
+  const text: string;
+  export default text;
+}
+
 declare module "*.mdx" {
   import type { JSX } from "solid-js";
 

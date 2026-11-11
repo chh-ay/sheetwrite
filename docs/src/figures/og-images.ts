@@ -5,12 +5,13 @@
  * section, title and description beside the section's illustration, in the
  * dark theme's tokens and the site's own fonts.
  *
- *   bun src/figures/og-images.ts     (from docs/, after the vite build)
+ *   bun src/figures/og-images.ts dist/client     (after the vite build; the
+ *   argument is the built client directory of either docs app)
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { availableParallelism, tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { inflateSync } from "node:zlib";
 
 import { renderAsync } from "@resvg/resvg-js";
@@ -21,7 +22,11 @@ import { RELEASES, releaseHref } from "../lib/releases.ts";
 import { ogImagePath } from "../lib/seo.ts";
 
 const DOCS = join(import.meta.dir, "../..");
-const CLIENT = join(DOCS, "dist/client");
+const [clientDirectory] = process.argv.slice(2);
+if (clientDirectory === undefined) {
+  throw new Error("usage: bun og-images.ts <built client directory>");
+}
+const CLIENT = resolve(clientDirectory);
 const ILLUSTRATIONS = join(DOCS, "public/figures/illustrations");
 const WIDTH = 1200;
 /** Social platforms fetch cards on demand; each stays small. */
@@ -161,9 +166,12 @@ function docsPages(): Page[] {
       if (statSync(path).isDirectory()) walk(path);
       else if (entry === "index.html") {
         const html = readFileSync(path, "utf8");
-        if (/<meta name="robots" content="noindex/.test(html)) continue;
+        // Either app's head: a meta tag may carry other attributes first.
+        if (/<meta\b[^>]*\bname="robots"[^>]*\bcontent="noindex/.test(html)) continue;
         const meta = (property: string) =>
-          new RegExp(`<meta property="${property}" content="([^"]*)"`).exec(html)?.[1];
+          new RegExp(`<meta\\b[^>]*\\bproperty="${property}"[^>]*\\bcontent="([^"]*)"`).exec(
+            html,
+          )?.[1];
         const title = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1]?.replace(/<[^>]+>/g, "");
         const description = meta("og:description");
         if (title === undefined || description === undefined) continue;

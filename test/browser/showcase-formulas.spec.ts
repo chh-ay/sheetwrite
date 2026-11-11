@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import {
   ANALYSIS_SHEET_ID,
@@ -11,7 +11,7 @@ import {
 } from "../../docs/src/showcases/scenarios/formulas.js";
 import { PEAK_MONTHS_OF_YEAR } from "../../docs/src/showcases/scenarios/orders-story.js";
 import type { Grid } from "../../packages/core/src/types.js";
-import { siteUrl } from "./playwright.config.js";
+import { expect, siteUrl, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -21,20 +21,6 @@ declare global {
 
 const ROUTE = siteUrl("/showcases/formulas/");
 const LEDGER_MONTHS = 12;
-
-interface BootErrors {
-  console: string[];
-  page: string[];
-}
-
-function collectErrors(page: Page): BootErrors {
-  const errors: BootErrors = { console: [], page: [] };
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.console.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.page.push(error.message));
-  return errors;
-}
 
 function panel(id: string) {
   const found = FORMULA_PANELS.find((candidate) => candidate.id === id);
@@ -83,7 +69,6 @@ async function bootFormulas(page: Page): Promise<void> {
 test("the full engine computes the dashboard and every panel follows one edit", async ({
   page,
 }) => {
-  const errors = collectErrors(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(ROUTE);
   await bootFormulas(page);
@@ -151,13 +136,9 @@ test("the full engine computes the dashboard and every panel follows one edit", 
       col: PLAYGROUND.col,
     }),
   ).toBe(draft);
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
 });
 
 test("arriving from a default-engine page loads the full engine", async ({ page }) => {
-  const errors = collectErrors(page);
   // The performance page selects the default engine. Follow the real links to
   // the formula page: the hub card opens it as a new document.
   await page.goto(siteUrl("/showcases/performance/"));
@@ -171,6 +152,4 @@ test("arriving from a default-engine page loads the full engine", async ({ page 
   await expect(page).toHaveURL(new RegExp(`${new URL(ROUTE).pathname}$`));
   await bootFormulas(page);
   await expect(page.getByTestId("formulas-recalc")).toContainText("First calculation");
-
-  expect(errors.page).toEqual([]);
 });

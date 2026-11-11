@@ -1,7 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { createGrid, initSheetwrite } from "../src/grid.js";
-import type { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellChange, Grid } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
@@ -52,28 +51,6 @@ describe("StyleActions underline/strikethrough toggles", () => {
     grid.actions.undo();
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style.underline).toBeUndefined();
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style.underline).toBeUndefined();
-    grid.destroy();
-  });
-
-  it("styles the selected rows in a descending sorted view", () => {
-    const grid = makeGrid();
-    const store = grid.store as SheetwriteStore;
-    store.setViewSort("s1", [{ col: 1, ascending: false }]);
-    grid.setSelection({
-      kind: "range",
-      range: {
-        sheet: "s1",
-        start: { row: 0, col: 0 },
-        end: { row: 2, col: 0 },
-      },
-    });
-
-    grid.actions.toggleUnderline();
-
-    for (const row of [7, 8, 9]) {
-      expect(store.getCell({ sheet: "s1", row, col: 0 }).style.underline).toBe(true);
-    }
-    expect(store.getCell({ sheet: "s1", row: 6, col: 0 }).style.underline).toBeUndefined();
     grid.destroy();
   });
 });

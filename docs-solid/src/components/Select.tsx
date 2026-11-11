@@ -242,7 +242,10 @@ export function Select(props: SelectProps) {
                 class="sw-select__option"
                 data-active={open() && index() === active() ? "" : undefined}
                 id={optionId(index())}
-                onClick={() => choose(index())}
+                // A listener on the option itself, not Solid's delegated one on
+                // the document: WebKit turns a tap into a click only on an
+                // element that listens for clicks (or takes focus).
+                on:click={() => choose(index())}
                 onPointerMove={() => setActive(index())}
                 role="option"
               >

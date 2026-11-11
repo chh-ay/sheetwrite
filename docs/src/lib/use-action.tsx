@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { useRef, useState } from "react";
 
 import { type ActionGuard, type ActionState, createActionGuard } from "./action-guard.js";

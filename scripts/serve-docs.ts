@@ -3,7 +3,7 @@ import { resolve, sep } from "node:path";
 import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
-const outputRoot = resolve(repositoryRoot, process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client");
+const outputRoot = resolve(repositoryRoot, process.env.DOCS_OUTPUT_DIR ?? "docs-solid/dist/client");
 const port = Number.parseInt(process.env.PORT ?? "4173", 10);
 const LOCAL_VERCEL_SCRIPTS = new Set([
   "/_vercel/insights/script.js",

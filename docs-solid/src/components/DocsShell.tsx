@@ -8,6 +8,9 @@ import type { OutlineItem } from "@docs/lib/outline.js";
 import { editUrl, reportProblemUrl } from "@docs/lib/page-links.js";
 import { type JSX, Show } from "solid-js";
 
+import { DOCS_CARD_ART } from "../art/docs-art.js";
+import { SECTION_HEADER_ART, SECTION_MARKS } from "../art/docs-pictures.js";
+import { SectionMark } from "../art/section-marks.js";
 import { Island } from "../islands/Island.js";
 import { revealCurrentNavigation } from "../lib/shell-ids.js";
 import { ApiSymbolFilter, MINIMUM_FILTERABLE_CARDS } from "./ApiSymbolFilter.js";
@@ -103,6 +106,16 @@ function eyebrowFor(activeHref: string | undefined, titlePackage: string | undef
   return group.label;
 }
 
+/** A section page's illustration beside its title (art/docs-pictures.ts); nothing elsewhere. */
+function SectionArt(props: { readonly href: string | undefined }) {
+  const Art = DOCS_CARD_ART[SECTION_HEADER_ART[props.href ?? ""] ?? ""];
+  return Art === undefined ? null : (
+    <div class="sw-section-art">
+      <Art />
+    </div>
+  );
+}
+
 export function DocsShell(props: DocsShellProps) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
   // better as the eyebrow than as part of a display-size heading.
@@ -135,9 +148,13 @@ export function DocsShell(props: DocsShellProps) {
         id="main-content"
       >
         <header class="sw-document__header">
+          <Show when={SECTION_MARKS[props.activeHref ?? ""]}>
+            {(mark) => <SectionMark name={mark()} />}
+          </Show>
           <p class="sw-document__eyebrow" data-pagefind-ignore>
             {eyebrowFor(props.activeHref, titlePackage)}
           </p>
+          <SectionArt href={props.activeHref} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
             <Show when={props.kind}>

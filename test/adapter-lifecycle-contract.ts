@@ -1,96 +1,35 @@
-import { describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 
 import type {
   GridAdapterEventHandlers,
   GridReadyEvent,
   GridReadyReason,
+  SheetwriteInitializationProps,
 } from "../packages/core/src/adapter.js";
 import type {
   CellEditor,
-  ChangeEvent,
   ColumnarData,
   DataSource,
   DataSourcePage,
   Grid,
   GridEvents,
   GridOptions,
-  Selection,
   Workbook,
 } from "../packages/core/src/index.js";
+import type * as Core from "../packages/core/src/index.js";
+import type * as Testing from "../packages/core/src/testing.js";
 import type * as XlsxSlots from "../packages/core/src/xlsx-slots.js";
 
-// The adapters load core's built entry, and the built package keeps no declarations for this
-// internal module, so the test loads its runtime from dist with the source module's types.
+// The adapters load core's built entry, and the built package keeps no declarations for these
+// internal paths, so the test loads their runtime from dist with the source modules' types.
+const BUILT_CORE: string = "../packages/core/dist/index.js";
+const BUILT_TESTING: string = "../packages/core/dist/testing.js";
 const BUILT_XLSX_SLOTS: string = "../packages/core/dist/xlsx-slots.js";
+const { initSheetwrite } = (await import(BUILT_CORE)) as typeof Core;
+const { installCanvasTestStubs } = (await import(BUILT_TESTING)) as typeof Testing;
 const { setXlsxTableExportBackend, xlsxTableExportBackend } = (await import(
   BUILT_XLSX_SLOTS
 )) as typeof XlsxSlots;
-
-export interface AdapterLifecycleCase {
-  id:
-    | "single-live-grid"
-    | "loading-fallback"
-    | "current-initialization-error"
-    | "retry-after-corrected-input"
-    | "stale-initialization-cancellation"
-    | "current-callbacks"
-    | "live-options"
-    | "construction-reset"
-    | "exact-cleanup"
-    | "publication-agreement"
-    | "operational-events"
-    | "initial-sync-datasource-error"
-    | "semantic-extensibility"
-    | "generation-safe-events";
-  observable: string;
-}
-
-export const ADAPTER_LIFECYCLE_CONTRACT = [
-  { id: "single-live-grid", observable: "one grid is live after readiness" },
-  { id: "loading-fallback", observable: "fallback is rendered before readiness" },
-  {
-    id: "current-initialization-error",
-    observable: "the current initialization-error callback runs once per failed generation",
-  },
-  {
-    id: "retry-after-corrected-input",
-    observable: "corrected initialization input reaches readiness",
-  },
-  {
-    id: "stale-initialization-cancellation",
-    observable: "replaced and unmounted initialization work cannot publish",
-  },
-  { id: "current-callbacks", observable: "callback replacement does not recreate the grid" },
-  { id: "live-options", observable: "live options update without recreation" },
-  {
-    id: "construction-reset",
-    observable: "construction-bound options recreate once with the shared reason",
-  },
-  {
-    id: "exact-cleanup",
-    observable: "listeners, observers, and each created grid are cleaned once",
-  },
-  {
-    id: "publication-agreement",
-    observable: "published grid and readiness generation refer to the same live grid",
-  },
-  {
-    id: "operational-events",
-    observable: "all operational Grid events retain typed declarative payloads",
-  },
-  {
-    id: "initial-sync-datasource-error",
-    observable: "an initial synchronous datasource failure reaches the mounted adapter",
-  },
-  {
-    id: "generation-safe-events",
-    observable: "replaced and unmounted grids cannot deliver stale adapter events",
-  },
-  {
-    id: "semantic-extensibility",
-    observable: "semantic headers and custom editor lifecycle cross the framework boundary",
-  },
-] as const satisfies readonly AdapterLifecycleCase[];
 
 type GridOptionConformance =
   | { policy: "live"; reason: null }
@@ -132,85 +71,44 @@ export function makeConformanceWorkbook(label = "Lifecycle"): Workbook {
   };
 }
 
-export function makeConformanceData(label = "Row"): ColumnarData {
+function makeConformanceData(label = "Row"): ColumnarData {
   return { rowCount: 3, columns: { name: [`${label} 1`, `${label} 2`, `${label} 3`] } };
 }
 
-export function makeConformanceDatasource(label: string): DataSource {
+/** A windowed datasource whose rows are named after `label`. */
+function makeDatasource(label: string): DataSource {
   return {
     capabilities: { protocol: 2, columns: "windowed" },
     getRows: async ({ start, end, columns }) => ({
       protocol: 2,
       start,
       columns,
-      rows: Array.from({ length: end - start }, (_, offset) => {
-        const row: DataSourcePage["rows"][number] = {};
-        for (const key of columns.flatMap((band) => band.keys)) {
-          row[key] = key === "name" ? `${label} ${start + offset + 1}` : null;
-        }
-        return row;
-      }),
+      rows: Array.from({ length: end - start }, (_, offset) => ({
+        name: `${label} ${start + offset + 1}`,
+      })),
     }),
   };
 }
 
-function makeProtectedWorkbook(label = "Protected"): Workbook {
-  const workbook = makeConformanceWorkbook(label);
-  workbook.sheets[0]!.protectedRanges = [
-    {
-      id: "locked",
-      range: {
-        sheet: "lifecycle",
-        start: { row: 0, col: 0 },
-        end: { row: 0, col: 0 },
-      },
-    },
-  ];
-  return workbook;
+/** Returns `value`, failing the test with `what` when it is missing. */
+export function present<T>(value: T | null | undefined, what: string): T {
+  if (value === null || value === undefined) throw new Error(`Missing ${what}`);
+  return value;
 }
 
-function rejectProtectedEdit(grid: Grid): void {
-  const result = grid.applyTransaction({
-    patches: [
-      {
-        op: "set",
-        addr: { sheet: "lifecycle", row: 0, col: 0 },
-        value: { kind: "literal", value: "rejected" },
-      },
-    ],
-  });
-  expect(result.status).toBe("rejected");
-}
+const WAIT_FOR_EVENT_MS = 5_000;
 
-async function nextTask(): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 0);
-  await promise;
-}
-
+/** Lets tasks run until `predicate` holds. */
 async function waitFor(predicate: () => boolean): Promise<void> {
-  const deadline = Date.now() + 5_000;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await nextTask();
-  }
-  if (predicate()) return;
-  throw new Error("Timed out waiting for adapter event");
-}
-
-async function waitForDelivery<T>(promise: Promise<T>, label: string): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeout = setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), 15_000);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeout !== undefined) clearTimeout(timeout);
+  const deadline = Date.now() + WAIT_FOR_EVENT_MS;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for adapter event");
+    await Bun.sleep(0);
   }
 }
 
-export interface AdapterConformanceProps extends GridOptions, GridAdapterEventHandlers {
+export interface AdapterConformanceProps
+  extends GridOptions, GridAdapterEventHandlers, SheetwriteInitializationProps {
   fallbackLabel: string;
 }
 
@@ -224,80 +122,47 @@ export interface MountedAdapter {
 
 export type MountAdapter = (props: AdapterConformanceProps) => Promise<MountedAdapter>;
 
-interface LifecycleRecorder {
-  ready: GridReadyEvent[];
-  destroyCalls: Map<Grid, number>;
-  onReady(event: GridReadyEvent): void;
-}
-
-function createLifecycleRecorder(): LifecycleRecorder {
+/** Ready events of a mount, with the number of times each created grid was destroyed. */
+function createLifecycleRecorder() {
   const ready: GridReadyEvent[] = [];
   const destroyCalls = new Map<Grid, number>();
-  return {
-    ready,
-    destroyCalls,
-    onReady(event) {
-      const originalDestroy = event.grid.destroy.bind(event.grid);
-      destroyCalls.set(event.grid, 0);
-      event.grid.destroy = () => {
-        destroyCalls.set(event.grid, (destroyCalls.get(event.grid) ?? 0) + 1);
-        originalDestroy();
-      };
-      ready.push(event);
-    },
+  const onReady = (event: GridReadyEvent): void => {
+    const originalDestroy = event.grid.destroy.bind(event.grid);
+    destroyCalls.set(event.grid, 0);
+    event.grid.destroy = () => {
+      destroyCalls.set(event.grid, (destroyCalls.get(event.grid) ?? 0) + 1);
+      originalDestroy();
+    };
+    ready.push(event);
   };
-}
-
-function initialProps(recorder: LifecycleRecorder): AdapterConformanceProps {
-  return {
+  const props: AdapterConformanceProps = {
     workbook: makeConformanceWorkbook(),
     data: makeConformanceData(),
     fallbackLabel: "lifecycle fallback",
-    onReady: (event) => recorder.onReady(event),
+    onReady,
   };
+  return { ready, destroyCalls, onReady, props };
 }
 
-interface InitializationProbeResult {
-  adapter: string;
-  staleReady: number;
-  staleErrors: number;
-  currentErrors: number;
-  generation: number;
-  reason: GridReadyReason;
-  publishedBeforeReady: boolean;
-  readyCount: number;
-  sameGrid: boolean;
-  selectionPreserved: boolean;
-  editPreserved: boolean;
-}
-
-async function runInitializationProbe(
-  adapter: string,
-  pendingLive = false,
-): Promise<InitializationProbeResult | { pendingLiveOptions: true }> {
-  const repositoryRoot = new URL("../", import.meta.url).pathname;
-  const probe = new URL("./adapter-initialization-probe.ts", import.meta.url).pathname;
-  const domSetup = new URL("../test-setup.ts", import.meta.url).pathname;
-  const svelteSetup = new URL("../test-setup-svelte.ts", import.meta.url).pathname;
-  const process = Bun.spawn(
-    ["bun", "--preload", domSetup, "--preload", svelteSetup, probe, adapter],
-    {
-      cwd: repositoryRoot,
-      env: { ...Bun.env, ADAPTER_PENDING_LIVE_ONLY: pendingLive ? "1" : "0" },
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  );
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ]);
-  expect(exitCode, stderr).toBe(0);
-  return JSON.parse(stdout.trim()) as InitializationProbeResult;
+/** Mounts with the recorder's props plus `extra`, and returns the published grid too. */
+async function mountRecorded(mount: MountAdapter, extra: Partial<AdapterConformanceProps> = {}) {
+  const recorder = createLifecycleRecorder();
+  const props: AdapterConformanceProps = { ...recorder.props, ...extra };
+  const mounted = await mount(props);
+  return { ...recorder, props, mounted, grid: present(mounted.getPublishedGrid(), "grid") };
 }
 
 export function runSharedAdapterLifecycleContract(adapter: string, mount: MountAdapter): void {
+  let restoreStubs = (): void => {};
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+  beforeEach(() => {
+    document.body.replaceChildren();
+    restoreStubs = installCanvasTestStubs();
+  });
+  afterEach(() => restoreStubs());
+
   describe(`${adapter} shared lifecycle contract`, () => {
     it("aborts pending summary, clipboard and save work when the framework unmounts", async () => {
       const clipboardRead = Promise.withResolvers<string>();
@@ -313,10 +178,9 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         if (isUnmounted) callbacksAfterUnmount += 1;
       };
       const workbook = makeConformanceWorkbook();
-      const summaryRows = 100_000;
-      const sheet = workbook.sheets[0];
-      if (!sheet) throw new Error("Conformance workbook needs a sheet");
-      sheet.rowCount = summaryRows;
+      const sheet = present(workbook.sheets[0], "sheet");
+      // Large enough that summarizing the selection is still pending at unmount.
+      sheet.rowCount = 100_000;
       Object.defineProperty(navigator, "clipboard", {
         configurable: true,
         value: { readText: () => clipboardRead.promise },
@@ -341,16 +205,15 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
           onSelectionChange: observeCallback,
           onExportError: (event) => reportedErrors.push(event),
         });
-        const grid = mounted.getPublishedGrid();
-        if (!grid) throw new Error("Adapter did not publish a grid");
+        const grid = present(mounted.getPublishedGrid(), "grid");
         grid.actions.exportXlsx();
-        const saveSignal = await waitForDelivery(saveStarted.promise, "save start");
+        const saveSignal = await saveStarted.promise;
         grid.setSelection({
           kind: "range",
           range: {
             sheet: sheet.id,
             start: { row: 0, col: 0 },
-            end: { row: summaryRows - 1, col: 0 },
+            end: { row: sheet.rowCount - 1, col: 0 },
           },
         });
         const summary = grid.summarizeSelection().then(observeCallback, (error: unknown) => error);
@@ -364,7 +227,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         savedBytes.reject(new Error("late save failure"));
         expect(await summary).toMatchObject({ name: "AbortError" });
         expect(await paste).toBe("empty");
-        await nextTask();
+        await Bun.sleep(0);
         expect(callbacksAfterUnmount).toBe(0);
         expect(reportedErrors).toHaveLength(0);
         expect(errors).toHaveBeenCalledTimes(0);
@@ -379,26 +242,24 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       }
     });
 
-    it("applies pending committed live options before publishing readiness", async () => {
-      expect(await runInitializationProbe(adapter.toLowerCase(), true)).toEqual({
-        pendingLiveOptions: true,
+    it("shares fallback, current-error, retry, stale-generation and pending-option semantics", async () => {
+      // WASM initialization is process-wide, so the probe needs a fresh process.
+      const root = new URL("../", import.meta.url).pathname;
+      const preloads = ["../test-setup.ts", "../test-setup-svelte.ts"].flatMap((path) => [
+        "--preload",
+        new URL(path, import.meta.url).pathname,
+      ]);
+      const probe = new URL("./adapter-initialization-probe.ts", import.meta.url).pathname;
+      const child = Bun.spawn(["bun", ...preloads, probe, adapter.toLowerCase()], {
+        cwd: root,
+        stdout: "pipe",
+        stderr: "pipe",
       });
-    });
-
-    it("shares fallback, current-error, retry, and stale-generation semantics", async () => {
-      expect(await runInitializationProbe(adapter.toLowerCase())).toEqual({
-        adapter: adapter.toLowerCase(),
-        staleReady: 0,
-        staleErrors: 0,
-        currentErrors: 2,
-        generation: 1,
-        reason: "initial",
-        readyCount: 1,
-        publishedBeforeReady: true,
-        sameGrid: true,
-        selectionPreserved: true,
-        editPreserved: true,
-      });
+      const [stderr, exitCode] = await Promise.all([
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      expect(exitCode, stderr).toBe(0);
     });
 
     it("retires a generation when onReady throws without reclassifying the consumer error", async () => {
@@ -412,7 +273,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       try {
         try {
           mounted = await mount({
-            ...initialProps(recorder),
+            ...recorder.props,
             onReady(event) {
               recorder.onReady(event);
               throw failure;
@@ -431,455 +292,240 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         expect([...recorder.destroyCalls.values()]).toEqual([1]);
       } finally {
         globalThis.reportError = originalReportError;
-        if (mounted) await mounted.unmount();
+        await mounted?.unmount();
       }
     });
 
-    it("treats the effective default renderer as unchanged and preserves reset precedence", async () => {
-      const recorder = createLifecycleRecorder();
-      const props = initialProps(recorder);
-      const mounted = await mount(props);
-      const first = mounted.getPublishedGrid();
-      await mounted.render({ ...props, renderer: "canvas" });
-      expect(mounted.getPublishedGrid()).toBe(first);
-      expect(recorder.ready).toHaveLength(1);
+    for (const resetCase of ["workbook", "data", "datasource", "renderer"] as const) {
+      it(`publishes one live grid, recreates once when ${resetCase} changes, and cleans up`, async () => {
+        const isDatasource = resetCase === "datasource";
+        const { mounted, props, ready, destroyCalls, grid } = await mountRecorded(
+          mount,
+          isDatasource ? { data: undefined, datasource: makeDatasource("First") } : {},
+        );
+        expect(ready).toMatchObject([{ grid, generation: 1, reason: "initial" }]);
+        expect(mounted.publishedAtReady).toEqual([grid]);
+
+        await mounted.render({
+          ...props,
+          workbook: resetCase === "workbook" ? makeConformanceWorkbook("Next") : props.workbook,
+          data: resetCase === "data" ? makeConformanceData("Next") : props.data,
+          datasource: isDatasource ? makeDatasource("Next") : props.datasource,
+          renderer: resetCase === "renderer" ? "worker" : props.renderer,
+        });
+        const second = present(mounted.getPublishedGrid(), "replacement grid");
+        const reason = resetCase === "renderer" ? "renderer-reset" : "input-reset";
+
+        expect(second).not.toBe(grid);
+        expect(ready).toHaveLength(2);
+        expect(ready[1]).toMatchObject({ grid: second, generation: 2, reason });
+        expect(mounted.publishedAtReady.at(-1)).toBe(second);
+        expect(destroyCalls.get(grid)).toBe(1);
+        expect(mounted.host.querySelectorAll('[role="grid"]')).toHaveLength(1);
+
+        await mounted.unmount();
+        expect(destroyCalls.get(second)).toBe(1);
+        expect(mounted.getPublishedGrid() ?? null).toBeNull();
+        expect(mounted.host.childElementCount).toBe(0);
+      });
+    }
+
+    it("delivers grid events to the current callbacks and applies live options in place", async () => {
+      const log: string[] = [];
+      const handlersFor = (tag: string): Partial<AdapterConformanceProps> => ({
+        onViewportChange: () => log.push(`${tag} viewport`),
+        onCommandStateChange: () => log.push(`${tag} command`),
+        onGridChange: (event) => log.push(`${tag} change ${event.transaction.patches.length}`),
+        onSelectionChange: (selection) => log.push(`${tag} select ${selection?.kind ?? "none"}`),
+        onActiveSheetChange: (event) => log.push(`${tag} sheet ${event.sheet}`),
+      });
+      const workbook = makeConformanceWorkbook();
+      const first = present(workbook.sheets[0], "sheet");
+      workbook.sheets.push({ ...first, id: "second", name: "Second" });
+      const { mounted, props, ready, destroyCalls, grid } = await mountRecorded(mount, {
+        workbook,
+        ...handlersFor("old"),
+      });
+      // Edits, selects a cell, then switches sheets, which clears the selection.
+      const exercise = (row: number, nextSheet: string): string[] => {
+        log.length = 0;
+        const value = { kind: "literal" as const, value: `edit ${row}` };
+        grid.store.applyTransaction({
+          patches: [{ op: "set", addr: { sheet: "lifecycle", row, col: 0 }, value }],
+        });
+        grid.setSelection({ kind: "cell", addr: { sheet: grid.getActiveSheet(), row, col: 0 } });
+        grid.setActiveSheet(nextSheet);
+        grid.refresh();
+        return [...new Set(log)].sort();
+      };
+      const expected = (tag: string, sheet: string) =>
+        [
+          `${tag} change 1`,
+          `${tag} command`,
+          `${tag} select cell`,
+          `${tag} select none`,
+          `${tag} sheet ${sheet}`,
+          `${tag} viewport`,
+        ].sort();
+
+      expect(exercise(1, "second")).toEqual(expected("old", "second"));
+
       await mounted.render({
         ...props,
-        workbook: makeConformanceWorkbook("Replacement"),
-        renderer: "worker",
-      });
-      expect(recorder.ready).toHaveLength(2);
-      expect(recorder.ready[1]?.reason).toBe("input-reset");
-      await mounted.unmount();
-    });
-
-    it("publishes exactly one live grid before generation-one readiness and clears it once", async () => {
-      const recorder = createLifecycleRecorder();
-      const props = initialProps(recorder);
-      const mounted = await mount(props);
-
-      expect(recorder.ready).toHaveLength(1);
-      expect(recorder.ready[0]).toMatchObject({ generation: 1, reason: "initial" });
-      expect(mounted.getPublishedGrid()).toBe(recorder.ready[0]!.grid);
-      expect(mounted.publishedAtReady).toEqual([recorder.ready[0]!.grid]);
-      expect(mounted.host.querySelectorAll('[role="grid"]')).toHaveLength(1);
-
-      await mounted.unmount();
-      expect(mounted.getPublishedGrid() ?? null).toBeNull();
-      expect(recorder.destroyCalls.get(recorder.ready[0]!.grid)).toBe(1);
-      expect(mounted.host.childElementCount).toBe(0);
-    });
-
-    it("uses current callbacks, applies theme and minColumns live, and keeps the grid on overscan change", async () => {
-      const recorder = createLifecycleRecorder();
-      const oldCalls: string[] = [];
-      const newCalls: string[] = [];
-      const props: AdapterConformanceProps = {
-        ...initialProps(recorder),
-        onViewportChange: () => oldCalls.push("old"),
-      };
-      const mounted = await mount(props);
-      const first = mounted.getPublishedGrid()!;
-      oldCalls.length = 0;
-
-      const updated: AdapterConformanceProps = {
-        ...props,
+        ...handlersFor("new"),
         theme: { bg: "#102030" },
         overscan: 9,
         minColumns: 12,
-        onViewportChange: () => newCalls.push("new"),
-      };
-      await mounted.render(updated);
-      oldCalls.length = 0;
-      newCalls.length = 0;
-      mounted.getPublishedGrid()!.refresh();
-
-      expect(mounted.getPublishedGrid()).toBe(first);
-      expect(recorder.ready).toHaveLength(1);
-      expect(first.getEffectiveTheme().bg).toBe("#102030");
-      expect(mounted.host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("12");
-      expect(newCalls.length).toBeGreaterThan(0);
-      expect(oldCalls).toHaveLength(0);
-
-      await mounted.unmount();
-      expect(recorder.destroyCalls.get(first)).toBe(1);
-    });
-
-    it("delivers command state only to the currently attached handler", async () => {
-      const recorder = createLifecycleRecorder();
-      const first: Array<GridEvents["command-state-change"]> = [];
-      const second: Array<GridEvents["command-state-change"]> = [];
-      const props: AdapterConformanceProps = {
-        ...initialProps(recorder),
-        onCommandStateChange: (event) => first.push(event),
-      };
-      const mounted = await mount(props);
-      const grid = mounted.getPublishedGrid()!;
-
-      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 1, col: 0 } });
-      expect(first).toHaveLength(1);
-
-      await mounted.render({ ...props, onCommandStateChange: (event) => second.push(event) });
-      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 2, col: 0 } });
-      expect(first).toHaveLength(1);
-      expect(second).toHaveLength(1);
-
-      await mounted.render({ ...props, onCommandStateChange: undefined });
-      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 0, col: 0 } });
-      expect(first).toHaveLength(1);
-      expect(second).toHaveLength(1);
-
-      await mounted.unmount();
-    });
-
-    it("forwards change, selection, and active-sheet events to the current callbacks", async () => {
-      const recorder = createLifecycleRecorder();
-      const first = {
-        changes: [] as ChangeEvent[],
-        selections: [] as Array<Selection | null>,
-        sheets: [] as Array<GridEvents["active-sheet"]>,
-      };
-      const second = {
-        changes: [] as ChangeEvent[],
-        selections: [] as Array<Selection | null>,
-        sheets: [] as Array<GridEvents["active-sheet"]>,
-      };
-      const base = initialProps(recorder);
-      const workbook = makeConformanceWorkbook();
-      workbook.sheets.push({ ...workbook.sheets[0]!, id: "second", name: "Second" });
-      const handlersFor = (sink: typeof first): Partial<AdapterConformanceProps> => ({
-        onGridChange: (event) => sink.changes.push(event),
-        onSelectionChange: (selection) => sink.selections.push(selection),
-        onActiveSheetChange: (event) => sink.sheets.push(event),
       });
-      const props: AdapterConformanceProps = { ...base, workbook, ...handlersFor(first) };
-      const mounted = await mount(props);
-      const grid = mounted.getPublishedGrid()!;
-      const exercise = (value: string, row: number, active: string, next: string) => {
-        grid.store.applyTransaction({
-          patches: [
-            {
-              op: "set",
-              addr: { sheet: "lifecycle", row: 0, col: 0 },
-              value: { kind: "literal", value },
-            },
-          ],
-        });
-        grid.setSelection({ kind: "cell", addr: { sheet: active, row, col: 0 } });
-        grid.setActiveSheet(next);
-      };
-
-      exercise("first", 1, "lifecycle", "second");
-      expect(first.changes.map((event) => event.transaction.patches)).toEqual([
-        [
-          {
-            op: "set",
-            addr: { sheet: "lifecycle", row: 0, col: 0 },
-            value: { kind: "literal", value: "first" },
-          },
-        ],
-      ]);
-      expect(first.selections).toContainEqual({
-        kind: "cell",
-        addr: { sheet: "lifecycle", row: 1, col: 0 },
-      });
-      expect(first.sheets).toEqual([{ sheet: "second" }]);
-      const firstSelectionCount = first.selections.length;
-
-      await mounted.render({ ...props, ...handlersFor(second) });
       expect(mounted.getPublishedGrid()).toBe(grid);
-      expect(recorder.ready).toHaveLength(1);
-      exercise("second", 2, "second", "lifecycle");
-      expect(first.changes).toHaveLength(1);
-      expect(first.selections).toHaveLength(firstSelectionCount);
-      expect(first.sheets).toHaveLength(1);
-      expect(second.changes).toHaveLength(1);
-      expect(second.selections).toContainEqual({
-        kind: "cell",
-        addr: { sheet: "second", row: 2, col: 0 },
-      });
-      expect(second.sheets).toEqual([{ sheet: "lifecycle" }]);
+      expect(ready).toHaveLength(1);
+      expect(grid.getEffectiveTheme().bg).toBe("#102030");
+      expect(mounted.host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("12");
+      expect(exercise(2, "lifecycle")).toEqual(expected("new", "lifecycle"));
+
+      await mounted.render({ ...props, ...handlersFor("new"), onCommandStateChange: undefined });
+      expect(exercise(0, "second")).not.toContain("new command");
 
       await mounted.unmount();
+      expect(destroyCalls.get(grid)).toBe(1);
     });
 
-    it("forwards every operational event with typed payloads and current callbacks", async () => {
-      const recorder = createLifecycleRecorder();
-      const mutationEvents: Array<GridEvents["mutation-rejected"]> = [];
-      const fallbackEvents: Array<GridEvents["renderer-fallback"]> = [];
-      const datasourceEvents: Array<GridEvents["datasource-error"]> = [];
-      const exportDelivery = Promise.withResolvers<GridEvents["export-error"]>();
-      const datasourceFailure = new Error("adapter datasource failure");
-      const exportFailure = new Error("adapter export failure");
+    it("forwards mutation, renderer, datasource and export failures to their callbacks", async () => {
+      const events: string[] = [];
+      const exported = Promise.withResolvers<void>();
+      const workbook = makeConformanceWorkbook();
+      const locked = { sheet: "lifecycle", row: 0, col: 0 };
+      present(workbook.sheets[0], "sheet").protectedRanges = [
+        { id: "locked", range: { sheet: "lifecycle", start: locked, end: locked } },
+      ];
+      let requests = 0;
+      // A synchronous throw from the first request must still reach the mounted adapter.
       const datasource: DataSource = {
         capabilities: { protocol: 2, columns: "windowed" },
-        async getRows() {
-          throw datasourceFailure;
+        getRows() {
+          requests += 1;
+          if (requests === 1) throw new Error("datasource failure");
+          return Promise.withResolvers<DataSourcePage>().promise;
         },
       };
-      const props: AdapterConformanceProps = {
-        ...initialProps(recorder),
-        workbook: makeProtectedWorkbook(),
+      const { mounted, grid } = await mountRecorded(mount, {
+        workbook,
         data: undefined,
         datasource,
         renderer: "worker",
-        onMutationRejected: (event) => mutationEvents.push(event),
-        onRendererFallback: (event) => fallbackEvents.push(event),
-        onDatasourceError: (event) => datasourceEvents.push(event),
-        onExportError: exportDelivery.resolve,
-      };
-      const mounted = await mount(props);
-      const grid = mounted.getPublishedGrid()!;
-
-      rejectProtectedEdit(grid);
+        onMutationRejected: (event) => events.push(`mutation ${event.issues[0]?.kind}`),
+        onRendererFallback: (event) => events.push(`fallback ${event.requested}`),
+        onDatasourceError: (event) => events.push(`datasource ${event.error.code}`),
+        onExportError: (event) => {
+          events.push(`export ${event.error.code}`);
+          exported.resolve();
+        },
+      });
       // The test's exporter stands in for any installed one, which it puts back.
       const installedTableExport = xlsxTableExportBackend();
       setXlsxTableExportBackend({
         name: "adapter-rejecting-export",
         async toXlsxTable() {
-          throw exportFailure;
+          throw new Error("export failure");
         },
       });
-      grid.actions.exportXlsx();
-      await waitFor(() => fallbackEvents.length === 1 && datasourceEvents.length === 1);
-      const exportEvent = await waitForDelivery(exportDelivery.promise, "export error event");
-      setXlsxTableExportBackend(installedTableExport);
+      try {
+        const value = { kind: "literal" as const, value: "rejected" };
+        grid.applyTransaction({ patches: [{ op: "set", addr: locked, value }] });
+        grid.actions.exportXlsx();
+        await exported.promise;
+        await waitFor(() => events.length === 4);
+      } finally {
+        setXlsxTableExportBackend(installedTableExport);
+      }
 
-      expect(mutationEvents).toHaveLength(1);
-      expect(mutationEvents[0]!.issues.map((issue) => issue.kind)).toEqual(["protection"]);
-      expect(fallbackEvents[0]).toMatchObject({
-        requested: "worker",
-        error: { code: "renderer-fallback", operation: "renderer-worker" },
-      });
-      expect(datasourceEvents[0]).toMatchObject({
-        request: { sheet: "lifecycle", start: 0 },
-        error: {
-          code: "datasource-request-failed",
-          operation: "datasource-request",
-          message: datasourceFailure.message,
-        },
-      });
-      expect(datasourceEvents[0]!.error.cause).toBe(datasourceFailure);
-      expect("signal" in datasourceEvents[0]!.request).toBe(false);
-      expect(exportEvent).toMatchObject({
-        format: "xlsx",
-        error: { code: "export-failed", operation: "xlsx-export", cause: exportFailure },
-      });
-
-      const swapped: Array<GridEvents["mutation-rejected"]> = [];
-      await mounted.render({ ...props, onMutationRejected: (event) => swapped.push(event) });
-      expect(mounted.getPublishedGrid()).toBe(grid);
-      rejectProtectedEdit(grid);
-      expect(mutationEvents).toHaveLength(1);
-      expect(swapped).toHaveLength(1);
-
-      const hostFailure = new Error("throwing host callback");
-      await mounted.render({
-        ...props,
-        onMutationRejected: () => {
-          throw hostFailure;
-        },
-      });
-      expect(() => rejectProtectedEdit(grid)).toThrow(hostFailure);
-
-      await mounted.unmount();
-    }, 25_000);
-
-    it("delivers an initial synchronous datasource throw after listener wiring", async () => {
-      const recorder = createLifecycleRecorder();
-      const datasourceFailure = new Error("initial synchronous datasource failure");
-      const datasourceEvents: Array<GridEvents["datasource-error"]> = [];
-      let requests = 0;
-      const props: AdapterConformanceProps = {
-        ...initialProps(recorder),
-        data: undefined,
-        datasource: {
-          capabilities: { protocol: 2, columns: "windowed" },
-          getRows() {
-            requests += 1;
-            if (requests === 1) throw datasourceFailure;
-            return new Promise<DataSourcePage>(() => {});
-          },
-        },
-        onDatasourceError: (event) => datasourceEvents.push(event),
-      };
-
-      const mounted = await mount(props);
-      await waitFor(() => datasourceEvents.length === 1);
-
-      expect(datasourceEvents[0]).toMatchObject({
-        request: { sheet: "lifecycle", start: 0 },
-        error: {
-          code: "datasource-request-failed",
-          operation: "datasource-request",
-          message: datasourceFailure.message,
-        },
-      });
-      expect(datasourceEvents[0]!.error.cause).toBe(datasourceFailure);
-      expect("signal" in datasourceEvents[0]!.request).toBe(false);
-
+      expect(events.sort()).toEqual([
+        "datasource datasource-request-failed",
+        "export export-failed",
+        "fallback worker",
+        "mutation protection",
+      ]);
       await mounted.unmount();
     });
 
     it("drops stale datasource delivery after replacement and unmount", async () => {
-      const recorder = createLifecycleRecorder();
-      const staleEvents: Array<GridEvents["datasource-error"]> = [];
-      const currentEvents: Array<GridEvents["datasource-error"]> = [];
-      const staleRequest = Promise.withResolvers<DataSourcePage>();
-      const currentRequest = Promise.withResolvers<DataSourcePage>();
-      let staleRequests = 0;
-      let currentRequests = 0;
-      const staleDatasource: DataSource = {
-        capabilities: { protocol: 2, columns: "windowed" },
-        getRows() {
-          staleRequests += 1;
-          return staleRequest.promise;
-        },
-      };
-      const currentDatasource: DataSource = {
-        capabilities: { protocol: 2, columns: "windowed" },
-        getRows() {
-          currentRequests += 1;
-          return currentRequest.promise;
-        },
-      };
-      const props: AdapterConformanceProps = {
-        ...initialProps(recorder),
-        data: undefined,
-        datasource: staleDatasource,
-        onDatasourceError: (event) => staleEvents.push(event),
-      };
-      const mounted = await mount(props);
-      await waitFor(() => staleRequests > 0);
-      const staleGrid = mounted.getPublishedGrid()!;
-
-      await mounted.render({
-        ...props,
-        datasource: currentDatasource,
-        onDatasourceError: (event) => currentEvents.push(event),
-      });
-      await waitFor(() => currentRequests > 0);
-      expect(mounted.getPublishedGrid()).not.toBe(staleGrid);
-
-      staleRequest.reject(new Error("stale generation"));
-      await nextTask();
-      expect(staleEvents).toHaveLength(0);
-      expect(currentEvents).toHaveLength(0);
-
-      const currentFailure = new Error("current generation");
-      currentRequest.reject(currentFailure);
-      await waitFor(() => currentEvents.length === 1);
-      expect(currentEvents[0]!.error).toMatchObject({
-        code: "datasource-request-failed",
-        operation: "datasource-request",
-        message: currentFailure.message,
-      });
-
-      const unmountedRequest = Promise.withResolvers<DataSourcePage>();
-      let unmountedRequests = 0;
-      await mounted.render({
-        ...props,
-        datasource: {
+      const delivered: string[] = [];
+      /** A datasource whose requests stay pending until the returned `fail` runs. */
+      const pendingDatasource = () => {
+        const request = Promise.withResolvers<DataSourcePage>();
+        const state = { requests: 0 };
+        const datasource: DataSource = {
           capabilities: { protocol: 2, columns: "windowed" },
           getRows() {
-            unmountedRequests += 1;
-            return unmountedRequest.promise;
+            state.requests += 1;
+            return request.promise;
           },
-        },
-        onDatasourceError: (event) => currentEvents.push(event),
+        };
+        return { datasource, state, fail: (message: string) => request.reject(new Error(message)) };
+      };
+      const stale = pendingDatasource();
+      const { mounted, props, grid } = await mountRecorded(mount, {
+        data: undefined,
+        datasource: stale.datasource,
+        onDatasourceError: () => delivered.push("stale"),
       });
-      await waitFor(() => unmountedRequests > 0);
+      await waitFor(() => stale.state.requests > 0);
+
+      const current = pendingDatasource();
+      const onDatasourceError = (event: GridEvents["datasource-error"]) =>
+        delivered.push(event.error.message);
+      await mounted.render({ ...props, datasource: current.datasource, onDatasourceError });
+      await waitFor(() => current.state.requests > 0);
+      expect(mounted.getPublishedGrid()).not.toBe(grid);
+
+      stale.fail("stale generation");
+      await Bun.sleep(0);
+      expect(delivered).toEqual([]);
+      current.fail("current generation");
+      await waitFor(() => delivered.length === 1);
+      expect(delivered).toEqual(["current generation"]);
+
+      const unmounted = pendingDatasource();
+      await mounted.render({ ...props, datasource: unmounted.datasource, onDatasourceError });
+      await waitFor(() => unmounted.state.requests > 0);
       await mounted.unmount();
-      unmountedRequest.reject(new Error("unmounted generation"));
-      await nextTask();
-      expect(currentEvents).toHaveLength(1);
+      unmounted.fail("unmounted generation");
+      await Bun.sleep(0);
+      expect(delivered).toEqual(["current generation"]);
     });
 
     it("forwards semantic headers and custom editor lifecycle through the framework boundary", async () => {
-      const recorder = createLifecycleRecorder();
       const workbook = makeConformanceWorkbook();
-      workbook.sheets[0]!.columns[0]!.editor = "framework";
-      let mounts = 0;
-      let destroys = 0;
+      present(workbook.sheets[0]?.columns[0], "column").editor = "framework";
+      const lifecycle: string[] = [];
       let signal: AbortSignal | undefined;
       const editor: CellEditor = {
         mount(host, context) {
-          mounts += 1;
           signal = context.signal;
-          const input = document.createElement("input");
-          input.value = context.text;
-          host.appendChild(input);
+          lifecycle.push("mount");
+          const input = host.appendChild(document.createElement("input"));
           return {
             update() {},
             reposition() {},
             commit: () => input.value,
             cancel() {},
-            destroy() {
-              destroys += 1;
-            },
+            destroy: () => lifecycle.push("destroy"),
           };
         },
       };
-      const mounted = await mount({
+      const { mounted, grid } = await mountRecorded(mount, {
         workbook,
-        data: makeConformanceData(),
         presentation: "data-grid",
         editors: { framework: editor },
-        fallbackLabel: "semantic fallback",
-        onReady: (event) => recorder.onReady(event),
       });
-      const grid = mounted.getPublishedGrid()!;
 
-      expect(mounted.host.querySelector<HTMLElement>('[role="columnheader"]')?.textContent).toBe(
-        "Name",
-      );
+      expect(mounted.host.querySelector('[role="columnheader"]')?.textContent).toBe("Name");
       grid.beginEdit(0, 0);
-      expect(mounts).toBe(1);
-      expect(signal?.aborted).toBe(false);
+      expect([lifecycle, signal?.aborted]).toEqual([["mount"], false]);
       expect(mounted.host.querySelector(".sheetwrite-custom-editor input")).not.toBeNull();
 
       await mounted.unmount();
-      expect(signal?.aborted).toBe(true);
-      expect(destroys).toBe(1);
+      expect([lifecycle, signal?.aborted]).toEqual([["mount", "destroy"], true]);
     });
-
-    for (const resetCase of ["workbook", "data", "datasource", "renderer"] as const) {
-      it(`recreates once with the shared reason when ${resetCase} changes`, async () => {
-        const recorder = createLifecycleRecorder();
-        const props = initialProps(recorder);
-        if (resetCase === "datasource") {
-          props.data = undefined;
-          props.datasource = makeConformanceDatasource("First");
-        }
-        const mounted = await mount(props);
-        const first = mounted.getPublishedGrid()!;
-        const updated: AdapterConformanceProps = { ...props };
-
-        if (resetCase === "workbook") updated.workbook = makeConformanceWorkbook("Replacement");
-        if (resetCase === "data") updated.data = makeConformanceData("Replacement");
-        if (resetCase === "datasource") {
-          updated.datasource = makeConformanceDatasource("Replacement");
-        }
-        if (resetCase === "renderer") updated.renderer = "worker";
-
-        await mounted.render(updated);
-        const second = mounted.getPublishedGrid()!;
-        const expectedReason = resetCase === "renderer" ? "renderer-reset" : "input-reset";
-
-        expect(second).not.toBe(first);
-        expect(recorder.ready).toHaveLength(2);
-        expect(recorder.ready[1]).toMatchObject({
-          grid: second,
-          generation: 2,
-          reason: expectedReason,
-        });
-        expect(mounted.publishedAtReady.at(-1)).toBe(second);
-        expect(recorder.destroyCalls.get(first)).toBe(1);
-        expect(mounted.host.querySelectorAll('[role="grid"]')).toHaveLength(1);
-
-        await mounted.unmount();
-        expect(recorder.destroyCalls.get(second)).toBe(1);
-      });
-    }
   });
 }

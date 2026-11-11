@@ -115,7 +115,9 @@ describe("CI and release workflow contracts", () => {
     expect(Object.keys(docs.on ?? {}).sort()).toEqual(["workflow_call", "workflow_dispatch"]);
     expect(docs.on?.workflow_dispatch?.inputs?.ref?.required).toBeTrue();
     expect(job("docs", "deploy").environment).toBe("Production");
-    expect(job("docs", "deploy").needs).toBe("build");
+    // The packaged site passes its browser specs before it deploys.
+    expect(job("docs", "check").needs).toBe("build");
+    expect(job("docs", "deploy").needs).toEqual(["build", "check"]);
   });
 
   it("builds docs with the toolchain versions CI tests", () => {

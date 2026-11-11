@@ -10,57 +10,26 @@ import {
   noiseFloorFromAaResults,
   parseReaderNoiseFloor,
   type ReaderGatePair,
-  type ReaderNoiseFloor,
   summarizeReaderPairs,
 } from "../src/reader-gate.js";
+import { must } from "./gate-fixtures.js";
 
 const GATE_PAIRS = 8;
 const READER = "aggregate SUM A";
 const FLOOR_PATH = "reader-noise-floor.json";
 const AA_PATH = "aa-report.json";
-const MEASURED_AT = "2026-10-27T00:00:00.000Z";
 const AA_SHA = "48b137c8aca8724d99622a1edaad6f5bfcf2490a";
-const OTHER_SHA = "f61edeaa23167fc79616bdb85cf19092de318523";
 const AA_ENGINE = "a".repeat(64);
-const OTHER_ENGINE = "b".repeat(64);
 const AA_CPUS = "8";
 const BASE_DIGEST = 42;
 /** The highest single-pair A/A ratio in the 0.5.x floor (range SUM(D)). */
 const AA_OUTLIER = 2.124;
 
-/**
- * 24 same-engine pair ratios: a ±5 % spread like the measured 0.5.x A/A run,
- * plus one slow pair at the worst ratio that run saw.
- */
-const AA_RATIOS = [
-  0.95,
-  0.96,
-  0.97,
-  0.97,
-  0.98,
-  0.98,
-  0.99,
-  0.99,
-  0.99,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.01,
-  1.01,
-  1.01,
-  1.02,
-  1.02,
-  1.03,
-  1.03,
-  1.04,
-  1.05,
-  1.05,
-  AA_OUTLIER,
+/** 24 same-engine pair ratios: the ±5 % spread of the 0.5.x A/A run plus its worst pair. */
+const AA_SPREAD = [
+  0.95, 0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 0.99, 0.99, 1.0, 1.0, 1.0, 1.0, 1.01, 1.01, 1.01, 1.02,
+  1.02, 1.03, 1.03, 1.04, 1.05, 1.05,
 ];
-
-/** Eight pairs drawn from the same spread as AA_RATIOS, without its outlier. */
-const AA_LIKE_RUN = [0.96, 1.04, 0.98, 1.03, 1.0, 0.97, 1.05, 1.02];
 
 function run(medianSampleMs: number, digest = BASE_DIGEST): ReaderRunResult[] {
   return READER_CASE_NAMES.map((name) => ({
@@ -76,21 +45,18 @@ function run(medianSampleMs: number, digest = BASE_DIGEST): ReaderRunResult[] {
 
 /** Each pair runs at its own machine speed; only READER's paired ratio is set. */
 function pairs(ratios: readonly number[], candidateDigest = BASE_DIGEST): ReaderGatePair[] {
-  return ratios.map((ratio, index) => {
-    const speed = index + 1;
-    return {
-      order: index % 2 === 0 ? ["base", "candidate"] : ["candidate", "base"],
-      base: run(speed),
-      candidate: run(speed * ratio, candidateDigest),
-    };
-  });
+  return ratios.map((ratio, index) => ({
+    order: index % 2 === 0 ? ["base", "candidate"] : ["candidate", "base"],
+    base: run(index + 1),
+    candidate: run((index + 1) * ratio, candidateDigest),
+  }));
 }
 
 /** An A/A report as the gate's `--output` writes it. */
 function aaReport(meta: Record<string, unknown> = {}, verdict: unknown = null): unknown {
   return {
     meta: {
-      measuredAt: MEASURED_AT,
+      measuredAt: "2026-10-27T00:00:00.000Z",
       baseSha: AA_SHA,
       candidateSha: AA_SHA,
       engineSha256: { base: AA_ENGINE, candidate: AA_ENGINE },
@@ -98,89 +64,77 @@ function aaReport(meta: Record<string, unknown> = {}, verdict: unknown = null): 
       readerFilter: null,
       ...meta,
     },
-    summary: summarizeReaderPairs(READER_CASE_NAMES, pairs(AA_RATIOS)),
+    summary: summarizeReaderPairs(READER_CASE_NAMES, pairs([...AA_SPREAD, AA_OUTLIER])),
     verdict,
   };
 }
 
-/**
- * The floor of `aaReport()`. Resampling 20,000 medians per reader takes about
- * a second, so the tests share one floor; the fixed seed makes it the same
- * floor every call would build.
- */
-const FLOOR: ReaderNoiseFloor = noiseFloorFromAaResults(aaReport(), AA_PATH);
-
-function floor(): ReaderNoiseFloor {
-  return FLOOR;
-}
+/** Resampling 20,000 medians per reader takes about a second; the fixed seed makes one floor enough. */
+const FLOOR = noiseFloorFromAaResults(aaReport(), AA_PATH);
 
 function verdict(ratios: readonly number[], candidateDigest = BASE_DIGEST): boolean | undefined {
   const summary = summarizeReaderPairs(READER_CASE_NAMES, pairs(ratios, candidateDigest));
-  return judgeReaderRows(summary, floor()).rows.find((row) => row.name === READER)?.passed;
+  return judgeReaderRows(summary, FLOOR).rows.find((row) => row.name === READER)?.passed;
 }
 
-function repeat(ratio: number, count: number): number[] {
-  return Array.from({ length: count }, () => ratio);
-}
+const repeat = (ratio: number, count = GATE_PAIRS) => Array.from({ length: count }, () => ratio);
+const SLOW_WITH_ONE_FAST = [...repeat(1.15, GATE_PAIRS - 1), 0.95];
 
-it("fails a 1.15x slowdown although one pair of eight was faster", () => {
-  expect(verdict([...repeat(1.15, GATE_PAIRS - 1), 0.95])).toBe(false);
+it.each([
+  ["fails a 1.15x slowdown although one pair of eight was faster", SLOW_WITH_ONE_FAST, false],
+  ["fails a uniform 2.1x slowdown that one slow A/A pair would have excused", repeat(2.1), false],
+  ["passes a run that looks like A/A noise", [0.96, 1.04, 0.98, 1.03, 1.0, 0.97, 1.05, 1.02], true],
+  ["passes a faster run", repeat(0.9), true],
+  [
+    "does not let 16 pairs pass a slowdown that eight pairs fail",
+    [...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST],
+    false,
+  ],
+  [
+    "does not let 24 pairs pass it",
+    [...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST],
+    false,
+  ],
+] as const)("%s", (_name, ratios, passed) => {
+  expect(verdict(ratios)).toBe(passed);
 });
 
-it("fails a uniform 2.1x slowdown that one slow A/A pair would have excused", () => {
-  expect(verdict(repeat(2.1, GATE_PAIRS))).toBe(false);
-});
-
-it("passes runs that look like A/A noise and runs that are faster", () => {
-  expect(verdict(AA_LIKE_RUN)).toBe(true);
-  expect(verdict(repeat(0.9, GATE_PAIRS))).toBe(true);
-});
-
-it("does not let extra pairs pass a slowdown that eight pairs fail", () => {
-  const eight = [...repeat(1.15, GATE_PAIRS - 1), 0.95];
-  expect(verdict([...eight, ...eight])).toBe(false);
-  expect(verdict([...eight, ...eight, ...eight])).toBe(false);
-});
-
-it("rejects a run with fewer pairs than the limits were resampled at", () => {
+it("fails a reader whose result differs and rejects runs with too few pairs", () => {
+  expect(verdict(repeat(0.9), BASE_DIGEST + 1)).toBe(false);
   expect(() => verdict(repeat(1, GATE_PAIRS - 1))).toThrow();
 });
 
-it("fails a reader whose result differs from the base", () => {
-  expect(verdict(repeat(0.9, GATE_PAIRS), BASE_DIGEST + 1)).toBe(false);
-});
-
 it("builds limits from resampled medians, not from the slowest A/A pair", () => {
-  const limit = floor().rows[READER]?.limit ?? Number.NaN;
+  const limit = must(FLOOR.rows[READER], READER).limit;
   expect(limit).toBeGreaterThan(1);
   expect(limit).toBeLessThan(1.15);
-  const quiet = READER_CASE_NAMES.find((name) => name !== READER) ?? READER;
-  expect(floor().rows[quiet]?.limit).toBe(1);
+  const quiet = must(
+    READER_CASE_NAMES.find((name) => name !== READER),
+    "quiet reader",
+  );
+  expect(FLOOR.rows[quiet]?.limit).toBe(1);
 });
 
 it("writes a floor only from an A/A report of one engine", () => {
-  const notAa = [
-    aaReport({ candidateSha: OTHER_SHA }),
-    aaReport({ engineSha256: { base: AA_ENGINE, candidate: OTHER_ENGINE } }),
+  for (const report of [
+    aaReport({ candidateSha: "f61edeaa23167fc79616bdb85cf19092de318523" }),
+    aaReport({ engineSha256: { base: AA_ENGINE, candidate: "b".repeat(64) } }),
     aaReport({}, { passed: true, rows: [] }),
     aaReport({ readerFilter: "^aggregate" }),
-  ];
-  for (const report of notAa) {
+  ]) {
     expect(() => noiseFloorFromAaResults(report, AA_PATH)).toThrow();
   }
-  const written = floor();
-  expect(written.source).toEqual({ sha: AA_SHA, engineSha256: AA_ENGINE, cpus: AA_CPUS });
-  expect(parseReaderNoiseFloor(written, FLOOR_PATH)).toEqual(written);
+  expect(FLOOR.source).toEqual({ sha: AA_SHA, engineSha256: AA_ENGINE, cpus: AA_CPUS });
+  expect(parseReaderNoiseFloor(FLOOR, FLOOR_PATH)).toEqual(FLOOR);
 });
 
 it("rejects floors with missing, unknown or loosened rows", () => {
-  const { rows } = floor();
-  const row = rows[READER];
-  if (row === undefined) throw new Error(`floor has no ${READER}`);
+  const { rows } = FLOOR;
+  const row = must(rows[READER], READER);
   const { [READER]: _dropped, ...missing } = rows;
   const loosened = { ...rows, [READER]: { ...row, limit: row.limit + 0.05 } };
   for (const bad of [missing, { ...rows, "unknown reader": row }, loosened]) {
-    expect(() => parseReaderNoiseFloor({ ...floor(), rows: bad }, FLOOR_PATH)).toThrow();
+    expect(() => parseReaderNoiseFloor({ ...FLOOR, rows: bad }, FLOOR_PATH)).toThrow();
   }
 });
 

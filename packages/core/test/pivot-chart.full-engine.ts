@@ -1,5 +1,5 @@
 // Charts over worksheet pivots need the full engine, and engine selection is
-// process-wide, so `charts-live.test.ts` runs this file in its own process.
+// process-wide, so `full-engine.test.ts` runs this file apart from the default-engine suites.
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";
