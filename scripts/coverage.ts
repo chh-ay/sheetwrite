@@ -16,6 +16,7 @@ import {
   serialiseNormalizedLcov,
 } from "./coverage-check.js";
 import { captureProcess } from "./script-io.js";
+import { COVERED_PACKAGE_TEST_ROOTS } from "./workspace-tooling.js";
 
 const CARGO_LLVM_COV_VERSION = "0.8.7";
 const RUST_VERSION = "1.99.0";
@@ -29,15 +30,6 @@ const TYPESCRIPT_ROOTS = [
   "packages/queries/src",
 ] as const;
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".svelte"]);
-const TYPESCRIPT_TEST_ROOTS = [
-  "packages/core/test",
-  "packages/react/test",
-  "packages/vue/test",
-  "packages/svelte/test",
-  "packages/xlsx/test",
-  "packages/charts/test",
-  "packages/queries/test",
-] as const;
 const RUST_CRATES = [
   {
     name: "wasm",
@@ -214,7 +206,7 @@ export async function runTypeScriptCoverage(root = resolve(import.meta.dir, ".."
   await mkdir(resolve(root, rawRoot), { recursive: true });
 
   const coverageRuns = [
-    { directory: `${rawRoot}/unified`, tests: [...TYPESCRIPT_TEST_ROOTS] },
+    { directory: `${rawRoot}/unified`, tests: [...COVERED_PACKAGE_TEST_ROOTS] },
     {
       directory: `${rawRoot}/loader-default`,
       tests: [
@@ -282,7 +274,10 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
     const crateRawRoot = `${rawRoot}/${crate.name}`;
     await mkdir(resolve(root, crateRawRoot), { recursive: true });
 
-    // Each independent crate owns its instrumented target and raw reports.
+    // Each independent crate owns its instrumented target and raw reports. CI
+    // restores the target from a cache, and `--no-report` keeps old profiles
+    // and test binaries, which the report would merge: remove them first.
+    await run(["cargo", "llvm-cov", "clean", "--workspace", ...common], root);
     await run(["cargo", "llvm-cov", ...common, ...crate.testArguments, "--no-report"], root);
     await run(
       [
