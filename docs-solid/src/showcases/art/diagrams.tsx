@@ -142,7 +142,7 @@ const INTEROP_TEXT: DiagramText = {
 };
 
 /** Interoperability: the XLSX import path, where hostile files stop, and what export reports. */
-function InteropFlowDiagram() {
+export function InteropFlowDiagram() {
   const stepClass = (index: number) => (index === 1 || index === 2 ? "hue-soft" : "panel");
   return (
     <Responsive
@@ -321,7 +321,7 @@ function fan(fromX: number, fromY: number, toX: number, toY: number, vertical = 
 }
 
 /** Recalculation: two control cells and the formulas that read each, timed from edit to paint. */
-function RecalculationDiagram() {
+export function RecalculationDiagram() {
   const groups = [
     [
       "Price change",
@@ -579,7 +579,7 @@ const DATA_MODEL_TEXT: DiagramText = {
 };
 
 /** Data model: Orders related to Products and Regions, and the model pivot over them. */
-function DataModelDiagram() {
+export function DataModelDiagram() {
   return (
     <Responsive
       narrow={{
@@ -750,7 +750,7 @@ function CollaborationSequence(
 }
 
 /** Collaboration: how a client recovers a missed version, and how offline edits drain on reconnect. */
-function CollaborationRecoveryDiagram() {
+export function CollaborationRecoveryDiagram() {
   return (
     <Responsive
       narrow={{
@@ -882,7 +882,7 @@ const PAGING_TEXT: DiagramText = {
 };
 
 /** Performance: the address space, the pages kept near the viewport, and the host's page provider. */
-function PagingDiagram() {
+export function PagingDiagram() {
   return (
     <Responsive
       narrow={{

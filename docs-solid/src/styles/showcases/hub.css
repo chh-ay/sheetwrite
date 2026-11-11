@@ -196,6 +196,12 @@
   grid-template-rows: 8.5rem 1fr;
 }
 
+/* A framework card's illustration fills its 8.5rem row. */
+.sw-hub-launch--framework > .sw-hub-preview {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
 .sw-hub-launch {
   --sw-hub-accent: var(--sw-accent);
   --sw-hub-accent-ink: color-mix(in srgb, var(--sw-hub-accent) 72%, var(--sw-fg-strong));
@@ -433,6 +439,41 @@
   .sw-hub__toolbar {
     align-items: start;
     gap: var(--sw-space-3);
+  }
+
+  /* Phones: a compact card with the illustration beside the title and
+     summary, so the hub scrolls about a third as far. The whole card stays
+     the link, well over the 44px target. */
+  .sw-hub-scenes {
+    gap: var(--sw-space-3);
+  }
+
+  .sw-hub-scenes > li > .sw-hub-launch,
+  .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    grid-template-rows: auto;
+    border-radius: var(--sw-radius-lg);
+  }
+
+  .sw-hub-scenes > li .sw-hub-launch > .sw-hub-preview {
+    height: 100%;
+    aspect-ratio: auto;
+    border-right: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
+  }
+
+  .sw-hub-scenes > li .sw-hub-launch__body {
+    gap: var(--sw-space-1);
+    padding: var(--sw-space-3) var(--sw-space-4);
+    border-top: 0;
+  }
+
+  .sw-hub-launch__body > strong {
+    font-size: var(--sw-text-h4);
+  }
+
+  .sw-hub-launch__meta,
+  .sw-hub-launch .sw-hub__owner-count {
+    display: none;
   }
 }
 

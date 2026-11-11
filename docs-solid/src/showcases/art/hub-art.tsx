@@ -742,120 +742,169 @@ function DataToolsArt() {
   );
 }
 
-/** A grid mounted into a host element, with the calls that own its lifecycle. */
+/** A cloud shape whose lower-left corner is (x, y). */
+function cloudPath(x: number, y: number): string {
+  return `M${x} ${y}a14 14 0 0 1 2-28a20 20 0 0 1 38-6a15 15 0 0 1 6 34z`;
+}
+
+/** The grid's lifecycle in a host element, and the renderer it paints with. */
 function VanillaArt() {
-  const calls = ["createGrid", "renderer", "destroy"] as const;
   return (
     <CardArt alt="blue" height={FRAMEWORK_CARD_HEIGHT} hue="amber">
-      <rect class="hue-line dash" height={124} rx={8} width={184} x={18} y={18} />
-      <text class="hue-text small" x={28} y={34}>
+      <rect class="hue-soft" height={22} rx={11} width={124} x={18} y={12} />
+      <text class="strong small" text-anchor="middle" x={80} y={27}>
+        createGrid(host)
+      </text>
+      <path class="ink-line" d={`M80 36v8${head(80, 46, 90)}`} />
+      <rect class="hue-line dash" height={62} rx={6} width={124} x={18} y={50} />
+      <text class="hue-text small" x={26} y={64}>
         #host
       </text>
-      <Sheet ch={18} cols={5} cw={32} head={14} rows={4} x={30} y={44} />
-      <Bar w={20} x={36} y={65} />
-      <Bar w={16} x={100} y={83} />
-      <Bar w={22} x={132} y={101} />
-      <For each={calls}>
-        {(call, index) => (
+      <Sheet ch={12} cols={4} cw={24} rows={3} x={32} y={70} />
+      <path class="ink-line" d={`M80 114v8${head(80, 124, 90)}`} />
+      <rect class="panel" height={22} rx={11} width={124} x={18} y={128} />
+      <text class="strong small" text-anchor="middle" x={80} y={143}>
+        destroy()
+      </text>
+      <text class="small" x={168} y={22}>
+        renderer
+      </text>
+      <rect class="panel" height={26} rx={13} width={134} x={166} y={30} />
+      <rect class="hue" height={22} rx={11} width={64} x={168} y={32} />
+      <text class="on-hue small" text-anchor="middle" x={200} y={47}>
+        canvas
+      </text>
+      <text class="strong small" text-anchor="middle" x={266} y={47}>
+        worker
+      </text>
+      <Panel class="hue-soft" h={62} w={58} x={170} y={78} />
+      <Panel class="alt-soft" h={62} w={58} x={242} y={78} />
+      <For each={[90, 100, 110]}>
+        {(y) => (
           <>
-            <rect
-              class={index() === 0 ? "hue-soft" : "panel"}
-              height={24}
-              rx={12}
-              width={88}
-              x={216}
-              y={20 + index() * 46}
-            />
-            <text class="strong small" text-anchor="middle" x={260} y={35 + index() * 46}>
-              {call}
+            <Bar class="hue" w={38} x={180} y={y} />
+            <Bar class="alt" w={38} x={252} y={y} />
+          </>
+        )}
+      </For>
+      <text class="small" text-anchor="middle" x={199} y={132}>
+        main
+      </text>
+      <text class="small" text-anchor="middle" x={271} y={132}>
+        worker
+      </text>
+      <path class="ink-line dash" d="M230 109h10" />
+    </CardArt>
+  );
+}
+
+/** Analytics in a KPI, a formula in the bar, and a copied range on the clipboard. */
+function ReactArt() {
+  return (
+    <CardArt alt="green" height={FRAMEWORK_CARD_HEIGHT} hue="react">
+      <Panel h={24} r={5} w={286} x={16} y={12} />
+      <text class="hue-text" x={26} y={28}>
+        fx
+      </text>
+      <path class="rule" d="M46 17v14" />
+      <text class="strong" x={54} y={28}>
+        =<tspan class="hue-text">SUM</tspan>(D2:D9)
+      </text>
+      <Panel h={88} w={92} x={16} y={50} />
+      <Bar w={44} x={26} y={62} />
+      <text class="glyph hue-text" x={26} y={98}>
+        48.2k
+      </text>
+      <path class="alt-line" d="M28 124l14-8l12 4l14-12l12 2l10-10" />
+      <Sheet
+        ch={18}
+        cols={3}
+        cw={36}
+        fill={<rect class="hue-tint" height={36} width={72} x={156} y={68} />}
+        rows={5}
+        x={120}
+        y={50}
+      />
+      <rect class="hue-line dash" height={36} width={72} x={156} y={68} />
+      <path class="alt-line" d={`M232 86h14${head(246, 86, 0)}`} />
+      <rect class="panel" height={86} rx={6} width={52} x={250} y={52} />
+      <rect class="ink" height={10} rx={3} width={24} x={264} y={47} />
+      <Sheet ch={14} cols={2} cw={16} rows={2} x={260} y={72} />
+      <rect class="hue-tint" height={28} width={32} x={260} y={72} />
+      <text class="small" text-anchor="middle" x={276} y={126}>
+        copied
+      </text>
+    </CardArt>
+  );
+}
+
+/** Validation, protection and notes: a cell's list, a locked range, a note. */
+function VueArt() {
+  return (
+    <CardArt alt="violet" height={FRAMEWORK_CARD_HEIGHT} hue="vue">
+      <Panel h={24} r={4} w={88} x={16} y={20} />
+      <Bar w={40} x={24} y={30} />
+      <path class="ink-line" d="M88 30l4 4l4-4" />
+      <Panel h={76} r={4} w={88} x={16} y={50} />
+      <rect class="hue-tint" height={18} rx={3} width={80} x={20} y={54} />
+      <path class="hue-line" d="M26 63l3 3l6-6" />
+      <Bar w={40} x={42} y={61} />
+      <Bar w={50} x={26} y={82} />
+      <Bar w={36} x={26} y={98} />
+      <Bar w={44} x={26} y={114} />
+      <Sheet ch={22} cols={2} cw={40} rows={3} x={120} y={20} />
+      <path
+        class="rule"
+        d="M120 42l22-22M120 64l44-44M120 86l66-66M134 86l66-66M156 86l44-44M178 86l22-22"
+      />
+      <rect class="shade" height={30} rx={6} width={38} x={143} y={97} />
+      <rect class="ink" height={30} rx={6} width={38} x={141} y={94} />
+      <path class="ink-line" d="M150 94v-8a10 10 0 0 1 20 0v8" stroke-width={2.5} />
+      <circle class="on-hue" cx={160} cy={108} r={3.5} />
+      <rect class="panel" height={22} width={40} x={216} y={20} />
+      <path class="alt" d="M248 20h8v8z" />
+      <path class="alt-soft" d={docPath(222, 50, 82, 80)} />
+      <path class="alt-line" d={foldPath(222, 50, 82)} stroke-width={1.5} />
+      <Bar class="alt" w={50} x={232} y={72} />
+      <Bar class="alt" w={40} x={232} y={84} />
+      <Bar class="alt" w={46} x={232} y={96} />
+      <path class="alt-line dash" d="M252 28c14 0 20 6 20 20" />
+    </CardArt>
+  );
+}
+
+/** Edits queued while offline, then drained to the server once the connection returns. */
+function SvelteArt() {
+  const edits = ["set A2", "set B5", "fill C1"] as const;
+  return (
+    <CardArt alt="green" height={FRAMEWORK_CARD_HEIGHT} hue="svelte">
+      <path class="panel" d={cloudPath(24, 50)} />
+      <path class="ink-line" d="M28 18l40 38" stroke-width={2.5} />
+      <For each={edits}>
+        {(edit, index) => (
+          <>
+            <rect class="hue-soft" height={20} rx={10} width={88} x={18} y={66 + index() * 26} />
+            <text class="strong small" x={30} y={80 + index() * 26}>
+              {edit}
             </text>
           </>
         )}
       </For>
-      <path class="ink-line" d={`M260 46v16${head(260, 62, 90)}M260 92v16${head(260, 108, 90)}`} />
-    </CardArt>
-  );
-}
-
-/** A component tree: props flow down into the grid component, events come back up. */
-function ReactArt() {
-  return (
-    <CardArt alt="green" height={FRAMEWORK_CARD_HEIGHT} hue="react">
-      <Panel h={26} w={72} x={20} y={18} />
-      <text class="strong" text-anchor="middle" x={56} y={35}>
-        {"<App>"}
+      <circle class="hue" cx={106} cy={66} r={10} />
+      <text class="on-hue small" text-anchor="middle" x={106} y={70}>
+        3
       </text>
-      <Panel class="hue-soft" h={26} w={128} x={20} y={110} />
-      <text class="hue-text" text-anchor="middle" x={84} y={127}>
-        {"<SheetwriteGrid>"}
+      <path class="ink-line dash faint" d="M112 102h42" />
+      <circle class="hue-soft" cx={164} cy={102} r={9} />
+      <path class="hue-line" d="M161 97v4h6l-4 7" stroke-width={1.5} />
+      <path class="hue-line" d={`M175 102h56${head(231, 102, 0)}`} />
+      <rect class="hue" height={10} rx={5} width={20} x={184} y={86} />
+      <rect class="hue" height={10} rx={5} width={20} x={208} y={86} />
+      <path class="panel" d={cloudPath(240, 124)} />
+      <path class="alt-line" d="M254 106l6 6l12-12" stroke-width={2.5} />
+      <text class="small" text-anchor="middle" x={166} y={130}>
+        reconnect
       </text>
-      <path class="hue-line" d={`M48 48v56${head(48, 104, 90)}`} />
-      <text class="hue-text small" text-anchor="end" x={42} y={80}>
-        props
-      </text>
-      <path class="alt-line" d={`M112 104V56${head(112, 50, -90)}`} />
-      <text class="alt-text small" x={118} y={80}>
-        events
-      </text>
-      <path class="ink-line" d={`M150 123h20${head(170, 123, 0)}`} />
-      <Sheet ch={20} cols={4} cw={30} head={14} headClass="hue-tint" rows={5} x={176} y={18} />
-      <Bar w={18} x={184} y={38} />
-      <Bar w={20} x={214} y={58} />
-      <Bar w={14} x={244} y={78} />
-      <Bar w={22} x={274} y={98} />
-    </CardArt>
-  );
-}
-
-/** A validated cell's list, a note on a cell, a locked range and sheet tabs. */
-function VueArt() {
-  return (
-    <CardArt alt="violet" height={FRAMEWORK_CARD_HEIGHT} hue="vue">
-      <Sheet ch={18} cols={5} cw={36} head={14} rows={5} x={20} y={18} />
-      <path class="alt" d="M158 32h6v6z" />
-      <rect class="hue-line" height={18} width={36} x={56} y={50} />
-      <path class="ink-line" d="M82 57l3 3l3-3" />
-      <Panel h={46} r={4} w={72} x={56} y={72} />
-      <rect class="hue-tint" height={14} rx={2} width={64} x={60} y={76} />
-      <Bar w={36} x={66} y={81} />
-      <Bar w={44} x={66} y={97} />
-      <Bar w={30} x={66} y={109} />
-      <path class="alt-line dash" d="M164 32c20 0 26 0 44 0" />
-      <Panel class="alt-soft" h={36} w={92} x={208} y={18} />
-      <Bar w={60} x={218} y={30} />
-      <Bar w={44} x={218} y={40} />
-      <path class="ink-line" d="M250 92v-6a8 8 0 0 1 16 0v6" stroke-width={2.5} />
-      <rect class="ink" height={22} rx={4} width={28} x={244} y={92} />
-      <circle class="on-hue" cx={258} cy={102} r={2.5} />
-      <rect class="hue-soft" height={12} rx={3} width={40} x={20} y={134} />
-      <rect class="panel" height={12} rx={3} width={40} x={64} y={134} />
-      <rect class="panel" height={12} rx={3} width={40} x={108} y={134} />
-    </CardArt>
-  );
-}
-
-/** Edits queued while offline, then drained to the server on reconnect. */
-function SvelteArt() {
-  return (
-    <CardArt alt="green" height={FRAMEWORK_CARD_HEIGHT} hue="svelte">
-      <Panel h={108} w={100} x={20} y={26} />
-      <Sheet ch={16} cols={3} cw={26} head={12} rows={5} x={31} y={44} />
-      <circle class="hue-line faint" cx={108} cy={36} r={7} />
-      <circle class="hue" cx={108} cy={36} r={3.5} />
-      <For each={[0, 1, 2]}>
-        {(chip) => (
-          <>
-            <rect class="hue-soft" height={20} rx={10} width={64} x={138} y={36 + chip * 26} />
-            <Bar w={36} x={150} y={44 + chip * 26} />
-          </>
-        )}
-      </For>
-      <text class="hue-text small" text-anchor="middle" x={170} y={126}>
-        3 pending
-      </text>
-      <path class="hue-line dash" d={`M124 72h10M206 72h22${head(228, 72, 0)}`} />
-      <path class="panel" d="M246 98a16 16 0 0 1 2-32a22 22 0 0 1 40-6a16 16 0 0 1 6 38z" />
-      <path class="alt-line" d="M256 80l6 6l12-12" stroke-width={2.5} />
     </CardArt>
   );
 }

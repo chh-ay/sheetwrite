@@ -7,7 +7,7 @@ import "../../../styles/site-tail.css";
 import "../../../styles/showcases/touch-targets.css";
 import "../../../styles/showcases/hub.css";
 import "../art.css";
-import { For, type JSX, Show } from "solid-js";
+import { For, type JSX } from "solid-js";
 import { render } from "solid-js/web";
 
 import { DIAGRAMS } from "../diagrams.js";
@@ -187,12 +187,7 @@ function Card(props: Readonly<{ card: PreviewCard; framework?: boolean }>) {
         href="#"
         style={{ "--sw-hub-accent": `var(--sw-${props.card.hue})` }}
       >
-        <Show
-          fallback={<span class="sw-hub-preview">{Art && <Art />}</span>}
-          when={props.framework}
-        >
-          <span style={{ display: "block", "min-height": 0 }}>{Art && <Art />}</span>
-        </Show>
+        <span class="sw-hub-preview">{Art && <Art />}</span>
         <span class="sw-hub-launch__body">
           <span class="sw-hub-launch__meta">{props.card.group}</span>
           <strong>{props.card.label}</strong>
