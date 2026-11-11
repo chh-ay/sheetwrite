@@ -64,7 +64,7 @@
     "wasm:profile:decide": "bun scripts/wasm-profile-matrix.ts decide",
     "wasm:store-only:probe": "bun scripts/wasm-profile-matrix.ts probe-store",
     "test:browser": "playwright test --config test/browser/playwright.config.ts",
-    "browser:install:chromium": "playwright install --with-deps chromium",
+    "browser:install:chromium": "bun scripts/install-chromium.ts",
     "test:browser:portability": "playwright test --config test/browser/playwright.config.ts --grep @portability",
     "test:tooling": "bun scripts/workspace-tooling.ts test-tooling",
     "test:unit": "bun scripts/workspace-tooling.ts test-unit",

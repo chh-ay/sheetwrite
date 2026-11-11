@@ -864,7 +864,7 @@ impl FormulaResults {
     /// above those in use and drop them before it returns, so the frame comes
     /// back as it was lent.
     #[cfg(feature = "analysis")]
-    pub(crate) fn swap_scratch(&mut self, other: &mut FormulaResults) {
+    pub(crate) fn swap_scratch(&mut self, other: &mut Self) {
         std::mem::swap(&mut self.scratch, &mut other.scratch);
     }
 

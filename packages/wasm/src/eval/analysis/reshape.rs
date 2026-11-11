@@ -369,7 +369,7 @@ struct Inputs {
 impl Inputs {
     fn read(evaluation: &mut Evaluation<'_, '_>, name: &str) -> Result<Self, FormulaError> {
         let args = evaluation.args;
-        let mut inputs = Inputs {
+        let mut inputs = Self {
             matrices: Vec::with_capacity(sources(name, args).len()),
             cells: 0,
             bytes: 0,
