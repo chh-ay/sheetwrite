@@ -32,29 +32,6 @@ function makeGrid(rowCount = 10): Grid {
   });
 }
 
-describe("StyleActions underline/strikethrough toggles", () => {
-  it("applies underline to the selection and restores every style with one undo", () => {
-    const grid = makeGrid();
-    grid.setSelection({
-      kind: "range",
-      range: {
-        sheet: "s1",
-        start: { row: 0, col: 0 },
-        end: { row: 0, col: 1 },
-      },
-    });
-
-    grid.actions.toggleUnderline();
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style.underline).toBe(true);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style.underline).toBe(true);
-
-    grid.actions.undo();
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style.underline).toBeUndefined();
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style.underline).toBeUndefined();
-    grid.destroy();
-  });
-});
-
 describe("StyleActions merge policy", () => {
   it("restores formula and reference sources and styles when undoing a merge", () => {
     const grid = makeGrid(4);

@@ -39,8 +39,6 @@ import { Route as TestCollaborationRouteImport } from './routes/test.collaborati
 import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
 import { Route as TestGridMemoryRouteImport } from './routes/test.grid-memory'
 import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
-import { Route as TestRenderersRouteImport } from './routes/test.renderers'
-import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
 import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
 import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/test.framework-lifecycle.$framework'
 
@@ -195,16 +193,6 @@ const TestPrefetchRoute = TestPrefetchRouteImport.update({
   path: '/test/prefetch',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestRenderersRoute = TestRenderersRouteImport.update({
-  id: '/test/renderers',
-  path: '/test/renderers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TestSemanticGridRoute = TestSemanticGridRouteImport.update({
-  id: '/test/semantic-grid',
-  path: '/test/semantic-grid',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TestXlsxRoute = TestXlsxRouteImport.update({
   id: '/test/xlsx',
   path: '/test/xlsx',
@@ -246,8 +234,6 @@ export interface FileRoutesByFullPath {
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/prefetch': typeof TestPrefetchRoute
-  '/test/renderers': typeof TestRenderersRoute
-  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -282,8 +268,6 @@ export interface FileRoutesByTo {
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/prefetch': typeof TestPrefetchRoute
-  '/test/renderers': typeof TestRenderersRoute
-  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
@@ -319,8 +303,6 @@ export interface FileRoutesById {
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/prefetch': typeof TestPrefetchRoute
-  '/test/renderers': typeof TestRenderersRoute
-  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -357,8 +339,6 @@ export interface FileRouteTypes {
     | '/test/formulas-engine'
     | '/test/grid-memory'
     | '/test/prefetch'
-    | '/test/renderers'
-    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -393,8 +373,6 @@ export interface FileRouteTypes {
     | '/test/formulas-engine'
     | '/test/grid-memory'
     | '/test/prefetch'
-    | '/test/renderers'
-    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs'
     | '/showcases'
@@ -429,8 +407,6 @@ export interface FileRouteTypes {
     | '/test/formulas-engine'
     | '/test/grid-memory'
     | '/test/prefetch'
-    | '/test/renderers'
-    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -466,8 +442,6 @@ export interface RootRouteChildren {
   TestFormulasEngineRoute: typeof TestFormulasEngineRoute
   TestGridMemoryRoute: typeof TestGridMemoryRoute
   TestPrefetchRoute: typeof TestPrefetchRoute
-  TestRenderersRoute: typeof TestRenderersRoute
-  TestSemanticGridRoute: typeof TestSemanticGridRoute
   TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
@@ -686,20 +660,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestPrefetchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/test/renderers': {
-      id: '/test/renderers'
-      path: '/test/renderers'
-      fullPath: '/test/renderers'
-      preLoaderRoute: typeof TestRenderersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test/semantic-grid': {
-      id: '/test/semantic-grid'
-      path: '/test/semantic-grid'
-      fullPath: '/test/semantic-grid'
-      preLoaderRoute: typeof TestSemanticGridRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/test/xlsx': {
       id: '/test/xlsx'
       path: '/test/xlsx'
@@ -746,8 +706,6 @@ const rootRouteChildren: RootRouteChildren = {
   TestFormulasEngineRoute: TestFormulasEngineRoute,
   TestGridMemoryRoute: TestGridMemoryRoute,
   TestPrefetchRoute: TestPrefetchRoute,
-  TestRenderersRoute: TestRenderersRoute,
-  TestSemanticGridRoute: TestSemanticGridRoute,
   TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,

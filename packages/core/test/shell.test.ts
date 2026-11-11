@@ -371,7 +371,7 @@ describe("createSpreadsheetShell", () => {
     shell.destroy();
   });
 
-  it("keeps read-only and config wrappers coherent with the shell chrome", () => {
+  it("keeps read-only and config wrappers coherent with the shell chrome", async () => {
     const host = mountHost();
     const shell = createSpreadsheetShell(host, {
       grid: { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
@@ -385,8 +385,10 @@ describe("createSpreadsheetShell", () => {
 
     // Reconfiguring can never resurrect a second toolbar or tab list.
     shell.setGridConfig({ toolbar: true, tabs: true, find: false });
-    expect(host.querySelectorAll('[role="toolbar"]').length).toBeLessThanOrEqual(1);
-    expect(host.querySelectorAll('[role="tablist"]').length).toBeLessThanOrEqual(1);
+    await import("../src/shell/toolbar-factory.js");
+    for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+    expect(host.querySelectorAll('[role="toolbar"]')).toHaveLength(1);
+    expect(host.querySelectorAll('[role="tablist"]')).toHaveLength(1);
 
     shell.setTheme({ bg: "#123456" });
     expect(shell.element.style.getPropertyValue("--sheetwrite-widget-bg")).toBe("#123456");

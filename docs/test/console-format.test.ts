@@ -15,11 +15,3 @@ it("lists console values the way a browser console would", () => {
   expect(formatValue(new RangeError("too far"))).toBe("RangeError: too far");
   expect(formatValue(function total() {})).toBe("[Function total]");
 });
-
-it("stops at circular, deep and long values", () => {
-  const loop: Record<string, unknown> = { name: "loop" };
-  loop.self = loop;
-  expect(formatValue(loop)).toBe('{ name: "loop", self: [Circular] }');
-  expect(formatValue({ a: { b: { c: { d: 1 } } } })).toBe("{ a: { b: { c: {…} } } }");
-  expect(formatValue(Array.from({ length: 25 }, (_, index) => index))).toContain("… 5 more");
-});

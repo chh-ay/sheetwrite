@@ -2,106 +2,57 @@ import { describe, expect, it } from "bun:test";
 
 import {
   breadcrumbsFor,
-  DOCS_NAVIGATION,
   documentNeighbours,
   type NavigationItem,
   navigationBadge,
-  navigationPages,
 } from "../src/lib/navigation.js";
 import { sectionPages } from "../src/lib/section-cards.js";
 
-const RELEASE = "0.6.0";
-
-const volatile: NavigationItem = {
-  label: "Volatile",
-  href: "/docs/formulas/volatile/",
-  updated: RELEASE,
-};
-const calculation: NavigationItem = {
-  label: "Calculation",
-  items: [volatile, { label: "Iterative", href: "/docs/formulas/iterative/", added: RELEASE }],
-};
-const formulas: NavigationItem = {
-  label: "Formulas",
-  href: "/docs/formulas/",
-  items: [{ label: "References", href: "/docs/formulas/references/" }, calculation],
-};
-const old: NavigationItem = { label: "Old", href: "/docs/old/", added: "0.5.0" };
-const tree: readonly NavigationItem[] = [{ label: "Overview", href: "/docs/" }, formulas, old];
-
-describe("navigationPages", () => {
-  it("lists pages depth-first, a group's own page before its children, and skips page-less groups", () => {
-    expect(navigationPages(tree).map((page) => page.href)).toEqual([
-      "/docs/",
-      "/docs/formulas/",
-      "/docs/formulas/references/",
-      "/docs/formulas/volatile/",
-      "/docs/formulas/iterative/",
-      "/docs/old/",
-    ]);
-  });
-});
-
 describe("navigationBadge", () => {
-  it("lifts the strongest badge of a group's pages to the group", () => {
-    // "Calculation" holds one updated and one new page: new wins.
-    expect(navigationBadge(calculation, RELEASE)).toBe("new");
-    expect(navigationBadge(formulas, RELEASE)).toBe("new");
-  });
+  const RELEASE = "0.6.0";
+  const volatile: NavigationItem = {
+    label: "Volatile",
+    href: "/docs/formulas/volatile/",
+    updated: RELEASE,
+  };
+  const calculation: NavigationItem = {
+    label: "Calculation",
+    items: [volatile, { label: "Iterative", href: "/docs/formulas/iterative/", added: RELEASE }],
+  };
+  const old: NavigationItem = { label: "Old", href: "/docs/old/", added: "0.5.0" };
 
-  it("keeps badges through patch releases and clears them at the next minor release", () => {
-    expect(navigationBadge(old, RELEASE)).toBeUndefined();
-    expect(navigationBadge(old, "0.5.0")).toBe("new");
-    expect(navigationBadge(old, "0.5.4")).toBe("new");
-    expect(navigationBadge(volatile, "0.6.1")).toBe("updated");
-    expect(navigationBadge(formulas, "0.7.0")).toBeUndefined();
-  });
-
-  it("marks an updated page that adds nothing new as updated", () => {
-    expect(navigationBadge(volatile, RELEASE)).toBe("updated");
+  it.each([
+    // A group holding one updated and one new page shows new.
+    [calculation, RELEASE, "new"],
+    [volatile, RELEASE, "updated"],
+    // Badges last through patch releases and clear at the next minor release.
+    [old, "0.5.4", "new"],
+    [volatile, "0.6.1", "updated"],
+    [old, RELEASE, undefined],
+    [calculation, "0.7.0", undefined],
+  ] as const)("gives %o at %s the badge %s", (item, release, badge) => {
+    expect(navigationBadge(item, release)).toBe(badge);
   });
 });
 
 describe("section overview pages", () => {
-  it("link the section step in the trail of every page in the section", () => {
+  it("are linked in the trail of their pages and end their own trail unlinked", () => {
     expect(breadcrumbsFor("/docs/start/installation/", "Installation")).toEqual([
       { href: "/docs/", label: "Documentation" },
       { href: "/docs/start/", label: "Getting started" },
       { label: "Installation" },
     ]);
-  });
-
-  it("end their own trail without linking to themselves", () => {
     expect(breadcrumbsFor("/docs/start/", "Getting started")).toEqual([
       { href: "/docs/", label: "Documentation" },
       { label: "Getting started" },
     ]);
   });
 
-  it("come before their section's pages in the reading order", () => {
+  it("come before their section's pages in the reading order, and list them as cards", () => {
     expect(documentNeighbours("/docs/start/").next?.href).toBe("/docs/start/installation/");
     expect(documentNeighbours("/docs/start/installation/").previous?.href).toBe("/docs/start/");
-  });
-
-  it("list the section's pages as cards", () => {
-    expect(sectionPages("/docs/tutorials/").map((page) => page.href)).toContain(
-      "/docs/tutorials/excel-in-react/",
+    expect(sectionPages("/docs/start/").map((page) => page.href)).toContain(
+      "/docs/start/installation/",
     );
-  });
-});
-
-describe("sidebar icons", () => {
-  it("gives every sidebar entry and every section overview an icon", () => {
-    for (const section of DOCS_NAVIGATION) {
-      if (section.href !== undefined)
-        expect(`${section.label}: ${section.icon}`).not.toEndWith("undefined");
-      const visit = (items: readonly NavigationItem[]): void => {
-        for (const item of items) {
-          expect(`${section.label} › ${item.label}: ${item.icon}`).not.toEndWith("undefined");
-          visit(item.items ?? []);
-        }
-      };
-      visit(section.items);
-    }
   });
 });

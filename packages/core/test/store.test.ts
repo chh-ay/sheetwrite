@@ -10,13 +10,7 @@ import {
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
-import type {
-  CellStyle,
-  ChangeEvent,
-  DocumentOp,
-  Workbook,
-  WorkbookSnapshot,
-} from "../src/types.js";
+import type { CellStyle, ChangeEvent, DocumentOp, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
@@ -730,7 +724,7 @@ describe("stable formula sheet identity", () => {
     };
   }
 
-  it("renames resolved references canonically and supports inverse rename", () => {
+  it("rewrites references through renameSheet, quoting names and saving the new name", () => {
     const workbook = lifecycleWorkbook();
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
@@ -748,58 +742,32 @@ describe("stable formula sheet identity", () => {
       ],
     });
 
-    expect(store.renameSheetFormulaIdentity("source", "Sales Data")).toBe(true);
+    const rename = (name: string) =>
+      store.applyTransaction({ patches: [{ op: "renameSheet", sheet: "source", name }] }).status;
+
+    expect(rename("Sales Data")).toBe("applied");
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
 
-    expect(store.renameSheetFormulaIdentity("source", "O'Brien")).toBe(true);
+    expect(rename("O'Brien")).toBe("applied");
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='O''Brien'!A1+1");
-    workbook.sheets[0]!.name = "O'Brien";
-    const snapshot: WorkbookSnapshot = {
-      schemaVersion: 1,
-      workbook: { activeSheet: "summary" },
-      sheets: workbook.sheets.map((sheet, order) => ({
-        ...sheet,
-        order,
-        rowMeta: sheet.rowHeights
-          ? [...sheet.rowHeights].map(([row, height]) => [row, { height }])
-          : [],
-        cells:
-          sheet.id === "summary"
-            ? [
-                {
-                  startRow: 0,
-                  startCol: 0,
-                  rowCount: 1,
-                  colCount: 1,
-                  cells: [
-                    {
-                      rowOffset: 0,
-                      colOffset: 0,
-                      value: {
-                        kind: "formula",
-                        src: store.getFormula({ sheet: "summary", row: 0, col: 0 })!,
-                      },
-                    },
-                  ],
-                },
-              ]
-            : [],
-      })),
-    };
-    const roundTrip = validateWorkbookSnapshot(JSON.parse(JSON.stringify(snapshot)));
+    const roundTrip = validateWorkbookSnapshot(JSON.parse(JSON.stringify(store.exportSnapshot())));
     expect(roundTrip.ok).toBe(true);
     if (!roundTrip.ok) throw new Error("renamed snapshot did not validate");
-    expect(roundTrip.value.sheets[1]?.cells[0]?.cells[0]?.value).toEqual({
-      kind: "formula",
-      src: "='O''Brien'!A1+1",
-    });
-    expect(store.renameSheetFormulaIdentity("source", "Sales")).toBe(true);
+    const summary = roundTrip.value.sheets.find((sheet) => sheet.id === "summary");
+    expect(summary?.cells.flatMap((block) => block.cells).map((cell) => cell.value)).toContainEqual(
+      {
+        kind: "formula",
+        src: "='O''Brien'!A1+1",
+      },
+    );
+
+    expect(rename("Sales")).toBe("applied");
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Sales!A1+1");
     store.dispose();
   });
 
-  it("tombstones removed handles and repairs transitive dependencies", () => {
+  it("turns references to a removed sheet into #REF! through their dependents", () => {
     const workbook = lifecycleWorkbook();
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
@@ -823,12 +791,14 @@ describe("stable formula sheet identity", () => {
     });
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(6);
 
-    expect(store.removeSheetFormulaIdentity("source")).toBe(true);
+    const removeSource = () =>
+      store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "source" }] }).status;
+    expect(removeSource()).toBe("applied");
 
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe("#REF!");
-    expect(store.removeSheetFormulaIdentity("source")).toBe(false);
+    expect(removeSource()).not.toBe("applied");
     store.dispose();
   });
 });

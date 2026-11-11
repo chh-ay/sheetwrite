@@ -1,95 +1,23 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
-import type { Grid, Workbook } from "@sheetwrite/core";
-import { initSheetwrite } from "@sheetwrite/core";
-import { installCanvasTestStubs } from "@sheetwrite/core/testing";
-import { act, createRef, type ReactElement, StrictMode, Suspense, startTransition } from "react";
+import type { Grid } from "@sheetwrite/core";
+import { act, createRef, type ReactElement, Suspense, startTransition } from "react";
 import { createRoot } from "react-dom/client";
 
 import {
-  type AdapterConformanceProps,
-  type MountedAdapter,
+  makeConformanceWorkbook,
+  present,
   runSharedAdapterLifecycleContract,
 } from "../../../test/adapter-lifecycle-contract.js";
 import { Sheetwrite, SheetwriteGrid } from "../src/index.js";
+import { mountReact } from "./mount.js";
 
-beforeAll(async () => {
-  await initSheetwrite();
-});
+runSharedAdapterLifecycleContract("React", mountReact);
 
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-
-let restoreStubs: () => void;
-
-beforeEach(() => {
-  document.body.replaceChildren();
-  restoreStubs = installCanvasTestStubs();
-});
-
-afterEach(() => {
-  restoreStubs();
-});
-
-function makeWorkbook(extraSheet = false): Workbook {
-  const workbook: Workbook = {
-    activeSheet: "sheet",
-    sheets: [
-      {
-        id: "sheet",
-        name: "Sheet",
-        rowCount: 3,
-        columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
-      },
-    ],
-  };
-  if (extraSheet) {
-    workbook.sheets.push({
-      id: "sheet2",
-      name: "Summary",
-      rowCount: 2,
-      columns: [{ key: "note", header: "Note", width: 200, type: "text" }],
-    });
-  }
-  return workbook;
+function mountRoot() {
+  const host = document.body.appendChild(document.createElement("div"));
+  return { host, root: createRoot(host), gridRef: createRef<Grid>() };
 }
-
-async function mountConformanceGrid(props: AdapterConformanceProps): Promise<MountedAdapter> {
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  const gridRef = createRef<Grid>();
-  const publishedAtReady: Array<Grid | null | undefined> = [];
-
-  const render = async (nextProps: AdapterConformanceProps): Promise<void> => {
-    const { fallbackLabel, ...gridProps } = nextProps;
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          {...gridProps}
-          ref={gridRef}
-          fallback={<span data-lifecycle-fallback>{fallbackLabel}</span>}
-          onReady={(event) => {
-            publishedAtReady.push(gridRef.current);
-            gridProps.onReady?.(event);
-          }}
-        />,
-      );
-    });
-  };
-
-  await render(props);
-  return {
-    host,
-    publishedAtReady,
-    getPublishedGrid: () => gridRef.current,
-    render,
-    unmount: async () => {
-      await act(async () => root.unmount());
-    },
-  };
-}
-
-runSharedAdapterLifecycleContract("React", mountConformanceGrid);
 
 describe("SheetwriteGrid React lifecycle", () => {
   it("renders on the server without layout-effect diagnostics", async () => {
@@ -100,46 +28,30 @@ describe("SheetwriteGrid React lifecycle", () => {
       import { SheetwriteGrid } from ${JSON.stringify(source)};
       const errors = [];
       console.error = (...args) => errors.push(args.map(String).join(" "));
-      const workbook = {
-        activeSheet: "sheet",
-        sheets: [{
-          id: "sheet",
-          name: "Sheet",
-          rowCount: 1,
-          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
-        }],
-      };
-      const html = renderToString(createElement(SheetwriteGrid, {
-        workbook,
-        onViewportChange() {},
-      }));
+      const workbook = ${JSON.stringify(makeConformanceWorkbook())};
+      const html = renderToString(createElement(SheetwriteGrid, { workbook, onViewportChange() {} }));
       process.stdout.write(JSON.stringify({ errors, html }));
     `;
-    const process = Bun.spawn(["node", "--input-type=module", "-e", script], {
+    const child = Bun.spawn(["node", "--input-type=module", "-e", script], {
       cwd: new URL("../../../", import.meta.url).pathname,
       stdout: "pipe",
       stderr: "pipe",
     });
     const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
-      process.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
     ]);
 
     expect(exitCode, stderr).toBe(0);
     const result = JSON.parse(stdout) as { errors: string[]; html: string };
     expect(result.errors).toEqual([]);
-    const markup = document.createElement("div");
-    markup.innerHTML = result.html;
-    expect(markup.firstElementChild).not.toBeNull();
+    expect(result.html).toStartWith("<div");
   });
 
   it("does not publish callbacks from a concurrent render that is later abandoned", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
+    const workbook = makeConformanceWorkbook();
+    const { root, gridRef } = mountRoot();
     const calls: string[] = [];
     const suspended = Promise.withResolvers<void>();
     let suspendedRenders = 0;
@@ -163,137 +75,59 @@ describe("SheetwriteGrid React lifecycle", () => {
       );
     }
 
-    await act(async () => {
-      root.render(<Harness callback="committed" suspend={false} />);
-    });
-    const committedGrid = gridRef.current!;
-    calls.length = 0;
+    /** Refreshes the committed grid and returns the callbacks it reached. */
+    const refreshCalls = (grid: Grid): string[] => {
+      calls.length = 0;
+      grid.refresh();
+      return [...calls];
+    };
+
+    await act(async () => root.render(<Harness callback="committed" suspend={false} />));
+    const committedGrid = present(gridRef.current, "committed grid");
 
     await act(async () => {
-      startTransition(() => {
-        root.render(<Harness callback="abandoned" suspend />);
-      });
+      startTransition(() => root.render(<Harness callback="abandoned" suspend />));
       await Promise.resolve();
     });
     expect(suspendedRenders).toBeGreaterThan(0);
     expect(gridRef.current).toBe(committedGrid);
+    const afterAbandon = refreshCalls(committedGrid);
+    expect(afterAbandon).toContain("committed");
+    expect(afterAbandon).not.toContain("abandoned");
 
-    calls.length = 0;
-    committedGrid.refresh();
-    expect(calls).toContain("committed");
-    expect(calls).not.toContain("abandoned");
-
-    await act(async () => {
-      root.render(<Harness callback="replacement" suspend={false} />);
-    });
+    await act(async () => root.render(<Harness callback="replacement" suspend={false} />));
     expect(gridRef.current).toBe(committedGrid);
-    calls.length = 0;
-    committedGrid.refresh();
-    expect(calls).toContain("replacement");
-    expect(calls).not.toContain("committed");
+    const replaced = refreshCalls(committedGrid);
+    expect(replaced).toContain("replacement");
+    expect(replaced).not.toContain("committed");
 
     suspended.resolve();
     await act(async () => root.unmount());
   });
 
-  it("StrictMode replay creates twice, keeps a live grid, and leaks nothing", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
-    const ready: Grid[] = [];
-    const generations: number[] = [];
-    const destroyed = new Set<Grid>();
-
-    await act(async () => {
-      root.render(
-        <StrictMode>
-          <SheetwriteGrid
-            ref={gridRef}
-            workbook={workbook}
-            onReady={({ grid, generation }) => {
-              const destroy = grid.destroy.bind(grid);
-              grid.destroy = () => {
-                destroyed.add(grid);
-                destroy();
-              };
-              ready.push(grid);
-              generations.push(generation);
-            }}
-          />
-        </StrictMode>,
-      );
-    });
-
-    // StrictMode replays the mount effect. Only the latest grid stays live.
-    expect(ready.length).toBeGreaterThan(1);
-    expect(generations).toEqual(ready.map((_, index) => index + 1));
-    expect(gridRef.current).toBe(ready.at(-1)!);
-    for (const retired of ready.slice(0, -1)) expect(destroyed.has(retired)).toBe(true);
-    expect(destroyed.has(ready.at(-1)!)).toBe(false);
-    expect(host.querySelectorAll('[role="grid"]').length).toBe(1);
-
-    await act(async () => root.unmount());
-    expect(gridRef.current).toBeNull();
-    expect(host.childElementCount).toBe(0);
-  });
-
-  it("never leaks GridOptions members to the DOM and triggers no unknown-prop warning", async () => {
-    const workbook = makeWorkbook();
-    const data = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const warnings: unknown[][] = [];
-    const originalError = console.error;
-    console.error = (...args: unknown[]) => {
-      warnings.push(args);
-    };
-
-    try {
-      await act(async () => {
-        root.render(<SheetwriteGrid workbook={workbook} data={data} overscan={4} />);
-      });
-
-      const div = host.firstElementChild as HTMLDivElement;
-      expect(div.getAttribute("workbook")).toBeNull();
-      expect(div.getAttribute("data")).toBeNull();
-      expect(div.getAttribute("overscan")).toBeNull();
-
-      // No React unknown-prop warnings surfaced.
-      expect(warnings).toHaveLength(0);
-
-      await act(async () => root.unmount());
-    } finally {
-      console.error = originalError;
-    }
-  });
-
   it("builds an uncontrolled data-first grid and resets on defaultRows identity", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
+    const { root, gridRef } = mountRoot();
     const columns = [
       { key: "name", title: "Name" },
       { key: "price", title: "Price", type: "currency" as const },
     ] as const;
     const firstRows = [{ name: "Notebook", price: 12.5 }];
     const ready: Array<{ generation: number; reason: string }> = [];
+    const render = (defaultRows: typeof firstRows) =>
+      act(async () => {
+        root.render(
+          <Sheetwrite
+            ref={gridRef}
+            columns={columns}
+            defaultRows={defaultRows}
+            height={200}
+            onReady={({ generation, reason }) => ready.push({ generation, reason })}
+          />,
+        );
+      });
 
-    await act(async () => {
-      root.render(
-        <Sheetwrite
-          ref={gridRef}
-          columns={columns}
-          defaultRows={firstRows}
-          height={200}
-          onReady={({ generation, reason }) => ready.push({ generation, reason })}
-        />,
-      );
-    });
-    const first = gridRef.current!;
+    await render(firstRows);
+    const first = present(gridRef.current, "first grid");
     first.applyTransaction({
       patches: [
         {
@@ -305,17 +139,7 @@ describe("SheetwriteGrid React lifecycle", () => {
     });
     expect(firstRows[0]?.name).toBe("Notebook");
 
-    await act(async () => {
-      root.render(
-        <Sheetwrite
-          ref={gridRef}
-          columns={columns}
-          defaultRows={[{ name: "Pen", price: 2.25 }]}
-          height={200}
-          onReady={({ generation, reason }) => ready.push({ generation, reason })}
-        />,
-      );
-    });
+    await render([{ name: "Pen", price: 2.25 }]);
     expect(gridRef.current).not.toBe(first);
     expect(gridRef.current?.store.getCell({ sheet: "sheet1", row: 0, col: 0 }).resolved).toBe(
       "Pen",

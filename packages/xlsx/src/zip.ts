@@ -602,16 +602,9 @@ export function* zipChunks(
  * Buffered API: parts are materialized and sorted by name for canonical archives.
  * Streams cannot sort because styles and content types depend on every worksheet.
  */
-export function writeZip(
-  parts: ReadonlyMap<string, Uint8Array> | Iterable<ZipPart>,
-  context: XlsxCodecContext,
-): Uint8Array {
+export function writeZip(parts: Iterable<ZipPart>, context: XlsxCodecContext): Uint8Array {
   const materialized: ZipPart[] = [];
-  const entries =
-    parts instanceof Map
-      ? [...parts].map(([name, data]) => ({ name, data }))
-      : (parts as Iterable<ZipPart>);
-  for (const part of entries) {
+  for (const part of parts) {
     if ("stored" in part || part.data instanceof Uint8Array) {
       materialized.push(part);
       continue;

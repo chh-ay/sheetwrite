@@ -25,6 +25,11 @@ pub(super) const SPILL_MAX_COLS: usize = SHEET_COLS as usize;
 pub(super) const SPILL_MAX_CELLS: usize = 1_000_000;
 pub(super) const SPILL_MAX_BYTES: usize = 64 * 1024 * 1024;
 pub(super) const SPILL_MAX_RECOMPUTE_CELLS: usize = 2_000_000;
+/// Spill-budget cells charged before evaluating a formula whose size is known
+/// only once it runs: a size read from a cell, a runtime reference. The
+/// pending loop charges whatever the result holds beyond this, so the pass
+/// budget still stops a pass that really produces more than it allows.
+pub(super) const UNKNOWN_SIZE_PRECHARGE: usize = 1;
 
 #[derive(Debug)]
 pub(super) struct EvalMatrix {

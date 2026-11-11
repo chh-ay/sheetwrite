@@ -42,11 +42,12 @@ describe("TypeScript 7.1 hover parsing", () => {
   });
 });
 
+// One language-server process serves every test; starting one costs seconds.
+const engine = new SheetwriteTypeEngine({ cwd: new URL("../docs/", import.meta.url).pathname });
+afterAll(() => engine.dispose());
+
 describe("Sheetwrite type engine", () => {
   it("owns TypeScript quick info with workspace module resolution", async () => {
-    const engine = new SheetwriteTypeEngine({
-      cwd: new URL("../docs/", import.meta.url).pathname,
-    });
     const hovers = await engine.analyze(
       `import type { ChangeEvent } from "@sheetwrite/core";
 export function persist(event: ChangeEvent): void {
@@ -54,7 +55,6 @@ export function persist(event: ChangeEvent): void {
 }`,
       "ts",
     );
-    await engine.dispose();
 
     expect(hovers.find((hover) => hover.target === "ChangeEvent")?.text).toContain("ChangeEvent");
     expect(hovers.find((hover) => hover.target === "persist")?.text).toContain(
@@ -66,16 +66,12 @@ export function persist(event: ChangeEvent): void {
   });
 
   it("answers object-literal property names with the declared property and its docs", async () => {
-    const engine = new SheetwriteTypeEngine({
-      cwd: new URL("../docs/", import.meta.url).pathname,
-    });
     const hovers = await engine.analyze(
       `import type { Column } from "@sheetwrite/core";
 export const columns: Column[] = [{ key: "name", header: "Name", width: 120, type: "text" }];
 export const controller = new AbortController();`,
       "ts",
     );
-    await engine.dispose();
 
     const header = hovers.find((hover) => hover.target === "header");
     expect(header?.text).toBe("(property) Column.header: string");
@@ -85,9 +81,6 @@ export const controller = new AbortController();`,
   });
 
   it("repairs framework bindings only through explicit source relationships", () => {
-    const engine = new SheetwriteTypeEngine({
-      cwd: new URL("../docs/", import.meta.url).pathname,
-    });
     const source = `<script lang="ts">
 const handleGridChange = (event: ChangeEvent): void => {};
 let { columns }: Props = $props();
@@ -151,11 +144,6 @@ let { columns }: Props = $props();
 });
 
 describe("Sheetwrite hover preludes", () => {
-  const engine = new SheetwriteTypeEngine({
-    cwd: new URL("../docs/", import.meta.url).pathname,
-  });
-  afterAll(() => engine.dispose());
-
   it("maps single-line script positions around an injected prelude", async () => {
     const source = '<script lang="ts">grid.destroy();</script>';
     const hovers = await collectFenceHovers(source, "svelte", engine, "core");
@@ -188,6 +176,15 @@ describe("Sheetwrite hover preludes", () => {
       expect(isHighQualityHover(hover, "ts")).toBe(true);
     }
   });
+
+  it("resolves template-only svelte snippets through the synthetic script", async () => {
+    const source = "<button onclick={() => grid.destroy()}>Reset</button>";
+    const hovers = await collectFenceHovers(source, "svelte", engine, "core");
+    const grid = hovers.find((hover) => hover.target === "grid");
+    expect(grid?.line).toBe(0);
+    expect(grid?.character).toBe(source.indexOf("grid"));
+    expect(grid?.text).toContain("Grid");
+  });
 });
 
 describe("Sheetwrite hover quality", () => {
@@ -209,21 +206,6 @@ describe("Sheetwrite hover quality", () => {
     expect(isHighQualityHover(hover("const grid: Grid", "workspace"))).toBe(true);
   });
 });
-describe("Sheetwrite hover preludes end to end", () => {
-  it("resolves template-only svelte snippets through the synthetic script", async () => {
-    const engine = new SheetwriteTypeEngine({
-      cwd: new URL("../docs/", import.meta.url).pathname,
-    });
-    const source = "<button onclick={() => grid.destroy()}>Reset</button>";
-    const hovers = await collectFenceHovers(source, "svelte", engine, "core");
-    await engine.dispose();
-    const grid = hovers.find((hover) => hover.target === "grid");
-    expect(grid?.line).toBe(0);
-    expect(grid?.character).toBe(source.indexOf("grid"));
-    expect(grid?.text).toContain("Grid");
-  });
-});
-
 describe("Generated fence reference links", () => {
   it("links inferred local values when their type resolves to one public API symbol", () => {
     const inferredRoutes = new Map([

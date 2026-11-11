@@ -200,9 +200,47 @@ function markdownReport(counts: Counts): string {
   ].join("\n");
 }
 
+/**
+ * Spelling in the crates (typos.toml) and the licenses, bans and sources of
+ * their dependencies (deny.toml). `bun scripts/install-rust-checks.ts`
+ * installs both tools at their reviewed versions.
+ */
+async function runSupplyChecks(): Promise<void> {
+  const crateDirs = Object.values(CRATES).map((dir) => resolve(root, dir));
+  const commands: string[][] = [
+    [
+      "typos",
+      "--config",
+      resolve(root, "typos.toml"),
+      ...crateDirs.map((dir) => resolve(dir, "src")),
+    ],
+    ...crateDirs.map((dir) => [
+      "cargo",
+      "deny",
+      "--manifest-path",
+      resolve(dir, "Cargo.toml"),
+      "check",
+      "licenses",
+      "bans",
+      "sources",
+    ]),
+  ];
+  for (const command of commands) {
+    const child = Bun.spawn(command, { cwd: root, stdout: "inherit", stderr: "inherit" });
+    const exitCode = await child.exited;
+    if (exitCode !== 0) {
+      throw new Error(
+        `${command.slice(0, 2).join(" ")} failed (exit ${exitCode}); ` +
+          "install the reviewed tools with `bun scripts/install-rust-checks.ts`.",
+      );
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const mode = process.argv[2];
   await checkLintTablesMatch();
+  await runSupplyChecks();
   const findings = await collectFindings();
 
   const errors = findings.filter(({ level }) => level === "error");

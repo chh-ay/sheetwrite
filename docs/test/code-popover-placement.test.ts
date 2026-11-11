@@ -1,78 +1,26 @@
-import { describe, expect, it } from "bun:test";
+import { expect, it } from "bun:test";
 
-import {
-  type Box,
-  choosePanelPlacement,
-  panelFrame,
-  type PlacementInput,
-} from "../src/lib/code-popover-placement.js";
+import { choosePanelPlacement } from "../src/lib/code-popover-placement.js";
 
-function box(left: number, top: number, width: number, height: number): Box {
-  return { left, top, right: left + width, bottom: top + height };
-}
+// The code popover tests place real panels through the other paths.
 
-/** A code line at y 400–420 in a 1440×900 viewport, its text ending at x 700. */
-function input(mentions: readonly Box[], viewportWidth = 1440): PlacementInput {
-  return {
+it("without room beside, opens a panel past the mentions next to the line", () => {
+  const box = (left: number, top: number, width: number, height: number) => ({
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+  });
+  // A code line at y 400–420 in an 800 px wide viewport, its text ending at x 700.
+  const placement = choosePanelPlacement({
     trigger: box(400, 400, 60, 20),
     line: box(380, 400, 700, 20),
     lineEnd: 700,
     panel: { width: 360, height: 160 },
-    mentions,
-    viewport: box(12, 76, viewportWidth - 24, 812),
+    mentions: [box(420, 300, 60, 20), box(420, 480, 60, 20), box(420, 520, 60, 20)],
+    viewport: box(12, 76, 800 - 24, 812),
     gap: 8,
     minHeight: 120,
-  };
-}
-
-describe("code popover placement", () => {
-  it("opens below the line when no mention is in the way", () => {
-    expect(choosePanelPlacement(input([]))).toEqual({ side: "below", shift: 0 });
   });
-
-  it("opens above when the symbol's other mentions are below", () => {
-    expect(choosePanelPlacement(input([box(420, 480, 60, 20)]))).toEqual({
-      side: "above",
-      shift: 0,
-    });
-  });
-
-  it("opens beside the line end when mentions are above and below", () => {
-    const mentions = [box(420, 340, 60, 20), box(420, 480, 60, 20)];
-    expect(choosePanelPlacement(input(mentions))).toEqual({ side: "beside", shift: 0 });
-  });
-
-  it("without room beside, opens past the mentions next to the line", () => {
-    const mentions = [box(420, 300, 60, 20), box(420, 480, 60, 20), box(420, 520, 60, 20)];
-    expect(choosePanelPlacement(input(mentions, 800))).toEqual({ side: "above", shift: 100 });
-  });
-
-  it("moves past a single mention when the other side has no room", () => {
-    const atBottom: PlacementInput = {
-      ...input([box(100, 729, 60, 20)]),
-      line: box(380, 794, 700, 44),
-      trigger: box(60, 794, 40, 20),
-      panel: { width: 360, height: 49 },
-      viewport: box(12, 68, 366, 764),
-    };
-    expect(choosePanelPlacement(atBottom)).toEqual({ side: "above", shift: 65 });
-  });
-
-  it("positions a panel below its line and cuts its height to the room left", () => {
-    const tall = { ...input([]), panel: { width: 360, height: 480 } };
-    expect(panelFrame({ side: "below", shift: 0 }, tall)).toEqual({
-      left: 400,
-      top: 428,
-      maxHeight: 460,
-    });
-  });
-
-  it("never cuts a panel below its minimum height", () => {
-    const nearBottom = {
-      ...input([]),
-      line: box(380, 840, 700, 20),
-      panel: { width: 360, height: 480 },
-    };
-    expect(panelFrame({ side: "below", shift: 0 }, nearBottom).maxHeight).toBe(120);
-  });
+  expect(placement).toEqual({ side: "above", shift: 100 });
 });

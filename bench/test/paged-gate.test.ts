@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import {
@@ -6,135 +6,61 @@ import {
   PAGED_SMOKE_ROWS,
   type PagedBenchmarkResult,
   type PagedScenario,
-  type PagedTimingResult,
   validatePagedBenchmark,
 } from "../src/paged-bench.js";
 import { summarize } from "../src/stats.js";
+import { type DeepMutable, expectRejections, must, mutableCopy } from "./gate-fixtures.js";
 
-function smokeFixture(): PagedBenchmarkResult {
-  const timing = (): PagedTimingResult => ({ samplesMs: [1, 2], stat: summarize([1, 2]) });
-  const timingsByKey: Record<string, PagedTimingResult> = {
-    startup: timing(),
-    "first-page": timing(),
-    "distant-page": timing(),
-    "wide-page": timing(),
-    "cache-churn": timing(),
-  };
-  const timings = timingsByKey as PagedBenchmarkResult["timings"];
-  const probes: Array<{
-    scenario: string;
-    wasmDeltaBytes: number;
-    chunks: number;
-    loadedCells: number;
-    dirtyCells: number;
-    allocatedBytes: number;
-    dirtyAllocatedBytes: number;
-    retainedBytes: number;
-    fullyLoaded: boolean;
-  }> = [
-    {
-      scenario: "empty",
-      wasmDeltaBytes: 1024,
-      chunks: 0,
-      loadedCells: 0,
-      dirtyCells: 0,
-      allocatedBytes: 0,
-      dirtyAllocatedBytes: 0,
-      retainedBytes: 0,
-      fullyLoaded: false,
-    },
-    {
-      scenario: "viewport",
-      wasmDeltaBytes: 1024,
-      chunks: 5,
-      loadedCells: 150,
-      dirtyCells: 0,
-      allocatedBytes: 268_800,
-      dirtyAllocatedBytes: 0,
-      retainedBytes: 268_800,
-      fullyLoaded: false,
-    },
-    {
-      scenario: "dirty-100",
-      wasmDeltaBytes: 1024,
-      chunks: 0,
-      loadedCells: 100,
-      dirtyCells: 100,
-      allocatedBytes: 0,
-      dirtyAllocatedBytes: 4_000,
-      retainedBytes: 4_000,
-      fullyLoaded: false,
-    },
-  ];
-  const typedProbes = probes as Array<(typeof probes)[number] & { scenario: PagedScenario }>;
+const CHUNK_BYTES = 53_760;
+const COLUMNS = 5;
+/** Bytes per logical cell: one kind byte, one number and one string index. */
+const DENSE_CELL_BYTES = 1 + 8 + 4;
+
+function probe(
+  scenario: PagedScenario,
+  chunks: number,
+  loadedCells: number,
+  dirtyCells = 0,
+  dirtyAllocatedBytes = 0,
+) {
+  const allocatedBytes = chunks * CHUNK_BYTES;
   return {
-    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
-    mode: "smoke",
-    matrixId: MATRIX_IDS.paged.smoke,
-    meta: {
-      commit: "fixture",
-      dirty: false,
-      timestamp: "2026-10-07T00:00:00Z",
-      engineVersions: { sheetwrite: "0.4.0" },
-    },
-    rows: PAGED_SMOKE_ROWS,
-    columns: 5,
-    runs: 2,
-    pageRows: 120,
-    cacheBudgetBytes: 32 * 1024 * 1024,
-    chunkRows: 4096,
-    denseLogicalBytes: PAGED_SMOKE_ROWS * 5 * (1 + 8 + 4),
-    widePageColumns: 256,
-    cacheChurnPages: 2048,
-    cacheChurnBudgetBytes: 30_720,
-    cacheChurnRetainedChunks: 512,
-    timings,
-    peakAllocatedBytes: 537_600,
-    peakChunks: 10,
-    probes: typedProbes,
-  };
-}
-
-function fullFixture(): PagedBenchmarkResult {
-  const samplesMs = Array.from({ length: 12 }, () => 1);
-  const timing = (): PagedTimingResult => ({
-    samplesMs: [...samplesMs],
-    stat: summarize(samplesMs),
-  });
-  const probe = (
-    scenario: PagedScenario,
-    chunks: number,
-    loadedCells: number,
-    dirtyCells = 0,
-    dirtyAllocatedBytes = 0,
-  ) => ({
     scenario,
     wasmDeltaBytes: 65_536,
     chunks,
     loadedCells,
     dirtyCells,
-    allocatedBytes: chunks * 53_760,
+    allocatedBytes,
     dirtyAllocatedBytes,
-    retainedBytes: chunks * 53_760 + dirtyAllocatedBytes,
+    retainedBytes: allocatedBytes + dirtyAllocatedBytes,
     fullyLoaded: false,
-  });
-  return {
+  };
+}
+
+function fixture(mode: "smoke" | "full"): DeepMutable<PagedBenchmarkResult> {
+  const rows = mode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
+  const runs = mode === "smoke" ? 2 : 12;
+  const timing = () => {
+    const samplesMs = Array.from({ length: runs }, (_, index) => index + 1);
+    return { samplesMs, stat: summarize(samplesMs) };
+  };
+  const result: PagedBenchmarkResult = {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
-    mode: "full",
-    matrixId: MATRIX_IDS.paged.full,
+    mode,
+    matrixId: MATRIX_IDS.paged[mode],
     meta: {
       commit: "fixture",
       dirty: false,
       timestamp: "2026-10-07T00:00:00Z",
       engineVersions: { sheetwrite: "0.4.0" },
     },
-    rows: PAGED_FULL_ROWS,
-    columns: 5,
-    runs: 12,
+    rows,
+    columns: COLUMNS,
+    runs,
     pageRows: 120,
     cacheBudgetBytes: 32 * 1024 * 1024,
     chunkRows: 4096,
-    denseLogicalBytes: PAGED_FULL_ROWS * 5 * (1 + 8 + 4),
+    denseLogicalBytes: rows * COLUMNS * DENSE_CELL_BYTES,
     widePageColumns: 256,
     cacheChurnPages: 2048,
     cacheChurnBudgetBytes: 30_720,
@@ -146,83 +72,68 @@ function fullFixture(): PagedBenchmarkResult {
       "wide-page": timing(),
       "cache-churn": timing(),
     },
-    peakAllocatedBytes: 537_600,
+    peakAllocatedBytes: 10 * CHUNK_BYTES,
     peakChunks: 10,
-    probes: [
-      probe("empty", 0, 0),
-      probe("padding", 0, 0),
-      probe("viewport", 5, 150),
-      probe("scroll-1", 15, 50_000),
-      probe("scroll-10", 125, 500_000),
-      probe("scroll-100", 624, 2_538_304),
-      probe("dirty-100", 0, 100, 100, 4_000),
-      probe("dirty-10000", 0, 10_000, 10_000, 450_000),
-    ],
+    probes:
+      mode === "smoke"
+        ? [probe("empty", 0, 0), probe("viewport", 5, 150), probe("dirty-100", 0, 100, 100, 4_000)]
+        : [
+            probe("empty", 0, 0),
+            probe("padding", 0, 0),
+            probe("viewport", 5, 150),
+            probe("scroll-1", 15, 50_000),
+            probe("scroll-10", 125, 500_000),
+            probe("scroll-100", 624, 2_538_304),
+            probe("dirty-100", 0, 100, 100, 4_000),
+            probe("dirty-10000", 0, 10_000, 10_000, 450_000),
+          ],
   };
+  return mutableCopy(result);
 }
 
-describe("paged benchmark exact matrix", () => {
-  test("requires the measured Sheetwrite semantic version", () => {
-    const valid = smokeFixture();
+const probeOf = (result: DeepMutable<PagedBenchmarkResult>, scenario: PagedScenario) =>
+  must(
+    result.probes.find((entry) => entry.scenario === scenario),
+    scenario,
+  );
+
+test("accepts the exact smoke and full matrices", () => {
+  expect(() => validatePagedBenchmark(fixture("smoke"), "smoke")).not.toThrow();
+  expect(() => validatePagedBenchmark(fixture("full"), "full")).not.toThrow();
+});
+
+test("rejects a drifted full traversal", () => {
+  const corrupted = fixture("full");
+  probeOf(corrupted, "scroll-100").loadedCells -= 1;
+  expect(() => validatePagedBenchmark(corrupted, "full")).toThrow(
+    "rows=1000000;probe=scroll-100 does not match the cache-bounded full traversal",
+  );
+});
+
+test("rejects missing versions and provenance and out-of-bounds resource counters", () => {
+  for (const engine of ["sheetwrite"]) {
     for (const version of [undefined, "", "0.4", "^0.4.0"]) {
-      const invalid = {
-        ...valid,
-        meta: { ...valid.meta, engineVersions: { sheetwrite: version } },
-      };
-      expect(() => validatePagedBenchmark(invalid as PagedBenchmarkResult)).toThrow(
-        "engineVersions.sheetwrite",
-      );
+      const artifact = fixture("smoke");
+      Reflect.set(artifact.meta.engineVersions, engine, version);
+      expect(() => validatePagedBenchmark(artifact, "smoke")).toThrow(`engineVersions.${engine}`);
     }
-  });
-
-  test("requires the exact cache-bounded full traversal evidence", () => {
-    const source = fullFixture();
-    expect(() => validatePagedBenchmark(source, "full")).not.toThrow();
-    const corrupted = {
-      ...source,
-      probes: source.probes.map((probe) =>
-        probe.scenario === "scroll-100" ? { ...probe, loadedCells: 2_538_303 } : probe,
-      ),
-    };
-    expect(() => validatePagedBenchmark(corrupted, "full")).toThrow(
-      "rows=1000000;probe=scroll-100 does not match the cache-bounded full traversal",
-    );
-  });
-
-  test("rejects resource counters outside cache and logical bounds", () => {
-    const source = smokeFixture();
-    const overBudget = {
-      ...source,
-      probes: source.probes.map((probe) =>
-        probe.scenario === "viewport"
-          ? { ...probe, allocatedBytes: source.cacheBudgetBytes + 1 }
-          : probe,
-      ),
-    };
-    expect(() => validatePagedBenchmark(overBudget, "smoke")).toThrow(
-      "rows=10000;probe=viewport resource counters violate",
-    );
-
-    const staleLoadFlag = {
-      ...source,
-      probes: source.probes.map((probe) =>
-        probe.scenario === "viewport" ? { ...probe, fullyLoaded: true } : probe,
-      ),
-    };
-    expect(() => validatePagedBenchmark(staleLoadFlag, "smoke")).toThrow(
-      "rows=10000;probe=viewport.fullyLoaded",
-    );
-  });
-
-  test("rejects a capture without a usable provenance stamp", () => {
-    const source = smokeFixture();
-    expect(() => validatePagedBenchmark(source, "smoke")).not.toThrow();
-    const unstamped = {
-      ...source,
-      meta: { ...source.meta, commit: "", timestamp: "not a timestamp" },
-    };
-    expect(() => validatePagedBenchmark(unstamped, "smoke")).toThrow(
-      "paged capture provenance is incomplete",
-    );
-  });
+  }
+  expectRejections(
+    () => fixture("smoke"),
+    (result) => validatePagedBenchmark(result, "smoke"),
+    [
+      [
+        (result) => Object.assign(result.meta, { commit: "", timestamp: "not a timestamp" }),
+        "paged capture provenance is incomplete",
+      ],
+      [
+        (result) => (probeOf(result, "viewport").allocatedBytes = result.cacheBudgetBytes + 1),
+        "rows=10000;probe=viewport resource counters violate",
+      ],
+      [
+        (result) => (probeOf(result, "viewport").fullyLoaded = true),
+        "rows=10000;probe=viewport.fullyLoaded",
+      ],
+    ],
+  );
 });

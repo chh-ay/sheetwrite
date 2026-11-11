@@ -13,7 +13,7 @@ use std::mem::size_of;
 use super::super::array::ast_produces_array;
 use super::super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES, SPILL_MAX_CELLS, SPILL_MAX_COLS,
-    SPILL_MAX_RECOMPUTE_CELLS, SPILL_MAX_ROWS,
+    SPILL_MAX_RECOMPUTE_CELLS, SPILL_MAX_ROWS, UNKNOWN_SIZE_PRECHARGE,
 };
 use super::super::value::{bool_from_value, compare_values, number_from_value};
 use super::super::EvalPass;
@@ -298,11 +298,8 @@ fn estimate(
             literal_expand_size(static_argument(args, 2), source_cols),
         ) {
             (Some(rows), Some(cols)) => Estimate::Exact { rows, cols },
-            _ => Estimate::Approximate {
-                rows: source_rows,
-                cols: source_cols,
-                max_cells: SPILL_MAX_CELLS,
-            },
+            // A size read from a cell is known only after evaluation.
+            _ => Estimate::Unknown,
         },
         "SORTBY" => Estimate::Exact {
             rows: source_rows,
@@ -352,7 +349,7 @@ pub(super) fn bound(
     match estimate(store, name, args, sheet, pass)? {
         Estimate::Exact { rows, cols } => EvalMatrix::validate_shape(rows, cols, 1, 0),
         Estimate::Approximate { max_cells, .. } => Ok(max_cells.min(SPILL_MAX_CELLS)),
-        Estimate::Unknown => Ok(SPILL_MAX_CELLS),
+        Estimate::Unknown => Ok(UNKNOWN_SIZE_PRECHARGE),
     }
 }
 
