@@ -375,7 +375,7 @@ fn gcd_lcm(values: &FuncAccumulator, lcm: bool) -> Value {
                 .checked_div(divisor)
                 .and_then(|part| part.checked_mul(value))
             {
-                Some(value) => value,
+                Some(product) => product,
                 None => return Value::Error(FormulaError::Num),
             };
         } else {
@@ -530,11 +530,11 @@ mod tests {
     use super::super::test_support::mixed_arguments;
 
     fn evaluate(func: Func, arguments: Vec<Value>) -> Value {
-        let arguments = arguments
+        let mixed = arguments
             .into_iter()
             .map(|value| (false, vec![value]))
             .collect();
-        apply(func, &mixed_arguments(arguments)).unwrap()
+        apply(func, &mixed_arguments(mixed)).unwrap()
     }
 
     fn assert_number(value: Value, expected: f64) {
@@ -844,11 +844,8 @@ mod tests {
             (Func::CeilingPrecise, &[-0.5], 0.0),
         ];
 
-        for (func, arguments, expected) in cases {
-            let arguments = arguments
-                .iter()
-                .map(|&value| Value::number(value))
-                .collect();
+        for (func, inputs, expected) in cases {
+            let arguments = inputs.iter().map(|&value| Value::number(value)).collect();
 
             assert_eq!(evaluate(*func, arguments), Value::Number(*expected));
         }

@@ -141,11 +141,11 @@ fn aggregate(
         }) {
             continue;
         }
-        let Some(column) = column else {
+        let Some(field) = column else {
             count += 1;
             continue;
         };
-        let value = &record[column];
+        let value = &record[field];
         match name {
             "DGET" => {
                 if single.is_some() {
@@ -452,8 +452,8 @@ mod tests {
         store.recompute(sheet);
         for (row, (formula, number, text)) in cases.iter().enumerate() {
             let cell = store.get_cell(sheet, row + 18, 8);
-            if let Some(number) = number {
-                assert_eq!(cell.num(), *number, "{formula}");
+            if let Some(expected) = number {
+                assert_eq!(cell.num(), *expected, "{formula}");
             } else {
                 assert_eq!(cell.string().as_deref(), *text, "{formula}");
             }

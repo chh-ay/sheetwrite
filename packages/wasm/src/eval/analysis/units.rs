@@ -496,13 +496,13 @@ fn resolve(spelling: &str) -> Option<Resolved> {
 }
 
 fn find(symbol: &str, scale: f64) -> Option<Resolved> {
-    let (index, symbol) = UNIT_SYMBOLS
+    let (index, known) = UNIT_SYMBOLS
         .split(' ')
         .enumerate()
         .find(|&(_, candidate)| candidate == symbol)?;
 
     Some(Resolved {
-        symbol,
+        symbol: known,
         kind: UNIT_KINDS[index],
         factor: UNIT_FACTORS[index],
         scale,

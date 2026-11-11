@@ -129,8 +129,8 @@ impl<'a> RangeReader<'a> {
 
         for col in self.col_start..=self.col_end {
             let column = self.data.cells.dense_column(col)?;
-            let (kinds, payloads) = column.raw_slices();
-            let kinds = kinds.get(rows.clone())?;
+            let (column_kinds, payloads) = column.raw_slices();
+            let kinds = column_kinds.get(rows.clone())?;
 
             // Literal kinds are 0..=3 (a raw empty kind without the calculated
             // bit is a plain blank). Any other kind sets a higher bit, so one

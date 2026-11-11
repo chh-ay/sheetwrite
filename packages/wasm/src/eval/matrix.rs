@@ -38,8 +38,8 @@ impl EvalMatrix {
     pub(super) fn new(rows: usize, cols: usize, values: Vec<Value>) -> Self {
         let bytes = values.capacity().saturating_mul(size_of::<Value>()) as u64;
         MATRIX_RESOURCE_STATS.with(|stats| {
-            let [current, peak, allocations] = stats.get();
-            let current = current.saturating_add(bytes);
+            let [live, peak, allocations] = stats.get();
+            let current = live.saturating_add(bytes);
             stats.set([current, peak.max(current), allocations.saturating_add(1)]);
         });
         Self {
@@ -113,8 +113,8 @@ impl EvalMatrix {
             total.checked_add(payload)
         });
         if bytes
-            .and_then(|bytes| bytes.checked_mul(copies))
-            .is_none_or(|bytes| bytes > SPILL_MAX_BYTES)
+            .and_then(|total| total.checked_mul(copies))
+            .is_none_or(|needed| needed > SPILL_MAX_BYTES)
         {
             return Err(crate::types::FormulaError::Num);
         }

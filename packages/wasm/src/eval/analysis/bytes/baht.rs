@@ -46,8 +46,8 @@ pub(super) fn baht_text(values: &FuncAccumulator) -> EvalResult {
 
 fn words(number: f64) -> String {
     let digits = fixed_text(number.abs(), SATANG_PLACES);
-    let (baht, satang) = digits.split_at(digits.len() - 3);
-    let satang = &satang[1..];
+    let (baht, point_and_satang) = digits.split_at(digits.len() - 3);
+    let satang = &point_and_satang[1..];
     let has_baht = baht != "0";
     let has_satang = satang != "00";
 

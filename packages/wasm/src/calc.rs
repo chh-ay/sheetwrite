@@ -783,7 +783,9 @@ impl Ast {
         let mut expression = self;
         loop {
             expression = match expression {
-                Self::LetSlot { expression, .. } => expression,
+                Self::LetSlot {
+                    expression: bound, ..
+                } => bound,
                 Self::NamedFormula(named) => &named.expression,
                 _ => return expression,
             };
@@ -993,11 +995,11 @@ fn parse_col(letters: &str) -> Option<u32> {
 /// Parse an A1 token like `B12` or `$B$12`, preserving absolute markers.
 pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let col_abs = token.starts_with('$');
-    let token = token.strip_prefix('$').unwrap_or(token);
+    let unmarked = token.strip_prefix('$').unwrap_or(token);
 
     let mut letters_end = 0;
 
-    for (idx, ch) in token.char_indices() {
+    for (idx, ch) in unmarked.char_indices() {
         if !ch.is_ascii_alphabetic() {
             break;
         }
@@ -1009,8 +1011,8 @@ pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
         return None;
     }
 
-    let letters = &token[..letters_end];
-    let row_token = &token[letters_end..];
+    let letters = &unmarked[..letters_end];
+    let row_token = &unmarked[letters_end..];
     let row_abs = row_token.starts_with('$');
     let digits = row_token.strip_prefix('$').unwrap_or(row_token);
 
@@ -1789,8 +1791,8 @@ impl<'a> Parser<'a> {
     fn unary_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
-        if let Some(Tok::Op(sign @ ('+' | '-'))) = self.peek() {
-            let sign = *sign;
+        if let Some(Tok::Op(peeked @ ('+' | '-'))) = self.peek() {
+            let sign = *peeked;
             let _ = self.next();
             let inner = Box::new(self.unary_at(depth + 1)?);
             return Ok(if sign == '-' {
@@ -1888,8 +1890,12 @@ impl<'a> Parser<'a> {
                 _ => return Err("Use , ; or } between the values of an array constant.".into()),
             }
         }
-        let cols = u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_owned())?;
-        Ok(Ast::Array { cols, values })
+        let width =
+            u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_owned())?;
+        Ok(Ast::Array {
+            cols: width,
+            values,
+        })
     }
 
     /// One array-constant element: a number with an optional sign, text, a
@@ -2026,8 +2032,8 @@ impl<'a> Parser<'a> {
             }
         }
         self.close_paren()?;
-        Ok(if let Some(func) = func {
-            Ast::Func(func, args)
+        Ok(if let Some(known) = func {
+            Ast::Func(known, args)
         } else {
             self.features.names = true;
             Ast::UnknownFunc(name.into_owned(), args)
@@ -2145,9 +2151,9 @@ impl<'a> Parser<'a> {
         let first = self.next();
         if let Some(Tok::Ident(end_sheet, _)) = &first {
             if self.peek() == Some(&Tok::Bang) {
-                let end_sheet = end_sheet.to_string();
+                let end_sheet_name = end_sheet.to_string();
                 let _ = self.next();
-                return Ok((end_sheet, self.area_end("!")?));
+                return Ok((end_sheet_name, self.area_end("!")?));
             }
         }
 
@@ -2189,8 +2195,11 @@ fn missing_area_end(after: &str) -> String {
 /// another workbook, the folder before `[` is left out, so
 /// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
 pub(crate) fn sheet_name_key(name: &str) -> String {
-    let name = name.rfind('[').map_or(name, |start| &name[start..]);
-    name.chars().flat_map(char::to_lowercase).collect()
+    let book_and_sheet = name.rfind('[').map_or(name, |start| &name[start..]);
+    book_and_sheet
+        .chars()
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 /// The lookup key of a defined name of another workbook, from the text a
@@ -2202,11 +2211,11 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// doubled, as a quoted formula writes it. `None` for a name without a
 /// workbook.
 pub(crate) fn external_name_key(text: &str) -> Option<String> {
-    let (qualifier, name) = text.rsplit_once('!')?;
-    let qualifier = qualifier
+    let (quoted_qualifier, name) = text.rsplit_once('!')?;
+    let qualifier = quoted_qualifier
         .strip_prefix('\'')
         .and_then(|inner| inner.strip_suffix('\''))
-        .unwrap_or(qualifier);
+        .unwrap_or(quoted_qualifier);
     let key = if let Some(start) = qualifier.rfind('[') {
         format!("{}!{name}", &qualifier[start..])
     } else {
@@ -2563,8 +2572,8 @@ where
                 .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
                 .collect(),
         ),
-        Ast::UnknownFunc(name, args) => {
-            let args = args
+        Ast::UnknownFunc(name, unresolved_args) => {
+            let args = unresolved_args
                 .into_iter()
                 .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
                 .collect();
@@ -2654,8 +2663,8 @@ where
     match ast {
         Ast::UnresolvedStructured(reference) => {
             resolve(&reference, formula_sheet, formula_row, formula_col)
-                .map_or(Ast::UnresolvedStructured(reference), |reference| {
-                    Ast::Structured(Box::new(reference))
+                .map_or(Ast::UnresolvedStructured(reference), |resolved| {
+                    Ast::Structured(Box::new(resolved))
                 })
         }
         Ast::Func(func, args) => Ast::Func(
@@ -2765,11 +2774,11 @@ fn translated_coordinate(
     if absolute {
         return Some(value);
     }
-    let translated = i64::from(value).checked_add(delta)?;
+    let shifted = i64::from(value).checked_add(delta)?;
     let translated = if wrap {
-        translated.rem_euclid(i64::from(axis.len()))
+        shifted.rem_euclid(i64::from(axis.len()))
     } else {
-        translated
+        shifted
     };
     u32::try_from(translated)
         .ok()
@@ -2971,8 +2980,8 @@ impl AxisEdit {
             AxisChange::Move { from, count, to } => moved_span(*start, *end, from, count, to),
         };
         match span {
-            Some((shifted_start, shifted_end)) if shifted_start <= last => {
-                let shifted_end = shifted_end.min(last);
+            Some((shifted_start, unclamped_end)) if shifted_start <= last => {
+                let shifted_end = unclamped_end.min(last);
                 if (shifted_start, shifted_end) == (*start, *end) {
                     return Moved::Unchanged;
                 }
@@ -3136,24 +3145,24 @@ pub(crate) fn moved_span(
         ));
     }
 
-    let (start, end) = shift_range(start, end, from, -i64::from(count))?;
-    shift_range(start, end, to, i64::from(count))
+    let (closed_start, closed_end) = shift_range(start, end, from, -i64::from(count))?;
+    shift_range(closed_start, closed_end, to, i64::from(count))
 }
 
 /// Shift or contract an inclusive range; deleting every target invalidates it.
 pub(crate) fn shift_range(start: u32, end: u32, at: u32, delta: i64) -> Option<(u32, u32)> {
     if delta >= 0 {
-        let start = if start >= at {
+        let shifted_start = if start >= at {
             clamp_index(i64::from(start) + delta)
         } else {
             start
         };
-        let end = if end >= at {
+        let shifted_end = if end >= at {
             clamp_index(i64::from(end) + delta)
         } else {
             end
         };
-        return Some((start, end));
+        return Some((shifted_start, shifted_end));
     }
 
     let count = (-delta) as u32;
@@ -3233,8 +3242,8 @@ where
 {
     if let Ast::Structured(reference) = ast {
         if reference.table_id == table_id {
-            *ast = resolve(reference).map_or(Ast::InvalidRef, |reference| {
-                Ast::Structured(Box::new(reference))
+            *ast = resolve(reference).map_or(Ast::InvalidRef, |resolved| {
+                Ast::Structured(Box::new(resolved))
             });
             return true;
         }
@@ -3250,12 +3259,12 @@ where
 /// sheets of linked workbooks come and go this way; the text stays the same.
 pub(crate) fn relink_sheet_refs(ast: &mut Ast, key: &str, handle: Option<u32>) -> bool {
     let relinked = match (&*ast, handle) {
-        (Ast::SheetCell(sheet, row, col, flags), Some(handle))
+        (Ast::SheetCell(sheet, row, col, flags), Some(linked))
             if sheet_name_key(&sheet.name) == key =>
         {
             Some(Ast::AbsCell(
                 SheetRef {
-                    handle,
+                    handle: linked,
                     name: sheet.name.clone(),
                     quoted: sheet.quoted,
                 },
@@ -3264,12 +3273,12 @@ pub(crate) fn relink_sheet_refs(ast: &mut Ast, key: &str, handle: Option<u32>) -
                 *flags,
             ))
         }
-        (Ast::SheetRange(sheet, r0, c0, r1, c1, flags), Some(handle))
+        (Ast::SheetRange(sheet, r0, c0, r1, c1, flags), Some(linked))
             if sheet_name_key(&sheet.name) == key =>
         {
             Some(Ast::AbsRange(
                 SheetRef {
-                    handle,
+                    handle: linked,
                     name: sheet.name.clone(),
                     quoted: sheet.quoted,
                 },
@@ -3310,8 +3319,8 @@ pub(crate) fn relink_sheet_refs(ast: &mut Ast, key: &str, handle: Option<u32>) -
     };
 
     match relinked {
-        Some(relinked) => {
-            *ast = relinked;
+        Some(replacement) => {
+            *ast = replacement;
             true
         }
         None => ast.fold_children_mut(&mut |child| relink_sheet_refs(child, key, handle)),
@@ -3454,7 +3463,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                 match value {
                     Value::Number(number) => out.push_str(NumberText::of(*number).as_str()),
                     Value::Text(text) => write_text(text, out),
-                    Value::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+                    Value::Bool(flag) => out.push_str(if *flag { "TRUE" } else { "FALSE" }),
                     Value::Error(error) => out.push_str(error.sentinel()),
                     Value::Blank => {}
                 }

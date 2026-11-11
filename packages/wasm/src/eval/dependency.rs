@@ -110,7 +110,10 @@ impl ExactBand {
 
     /// Drops every `reader` edge of source `row` in place.
     fn remove_edge(&mut self, row: u32, reader: FormulaId) {
-        let Ok(source) = self.sources.binary_search_by_key(&row, |&(row, _)| row) else {
+        let Ok(source) = self
+            .sources
+            .binary_search_by_key(&row, |&(source_row, _)| source_row)
+        else {
             return;
         };
         let start = source
@@ -133,7 +136,10 @@ impl ExactBand {
 
     /// Adds one `reader` edge to source `row` in place.
     fn add_edge(&mut self, row: u32, reader: FormulaId) {
-        let source = match self.sources.binary_search_by_key(&row, |&(row, _)| row) {
+        let source = match self
+            .sources
+            .binary_search_by_key(&row, |&(source_row, _)| source_row)
+        {
             Ok(source) => source,
             Err(source) => {
                 let start = source
@@ -176,16 +182,16 @@ fn trim_spare<T>(items: &mut Vec<T>) {
 
 /// Removes every `reader` in `readers[start..end]` and returns how many.
 fn remove_reader(readers: &mut Vec<FormulaId>, start: u32, end: u32, reader: FormulaId) -> u32 {
-    let (start, end) = (start as usize, end as usize);
-    let mut write = start;
-    for read in start..end {
+    let (from, to) = (start as usize, end as usize);
+    let mut write = from;
+    for read in from..to {
         if readers[read] != reader {
             readers[write] = readers[read];
             write += 1;
         }
     }
-    readers.drain(write..end);
-    (end - write) as u32
+    readers.drain(write..to);
+    (to - write) as u32
 }
 
 struct RangeGroup {
@@ -242,14 +248,17 @@ impl DepIndex {
             return &[];
         };
         let bands = &self.exact[column].bands;
-        let band = cell.row / FORMULA_INDEX_PAGE_ROWS;
+        let band_index = cell.row / FORMULA_INDEX_PAGE_ROWS;
         let Some(first) = bands.first() else {
             return &[];
         };
-        let Some(band) =
-            offset_or_search(bands, band, band.wrapping_sub(first.band), |band| band.band)
-                .and_then(|band| bands.get(band))
-        else {
+        let Some(band) = offset_or_search(
+            bands,
+            band_index,
+            band_index.wrapping_sub(first.band),
+            |stored| stored.band,
+        )
+        .and_then(|position| bands.get(position)) else {
             return &[];
         };
         offset_or_search(
@@ -283,11 +292,11 @@ impl DepIndex {
         let start = group
             .checked_sub(1)
             .and_then(|previous| self.range_groups.get(previous))
-            .map_or(0, |group| group.end as usize);
+            .map_or(0, |previous_group| previous_group.end as usize);
         let end = self
             .range_groups
             .get(group)
-            .map_or(start, |group| group.end as usize);
+            .map_or(start, |stored| stored.end as usize);
         self.range_readers.get(start..end).unwrap_or_default()
     }
 
@@ -347,13 +356,13 @@ impl DepIndex {
         previous: Option<FormulaEntry>,
         next: Option<&FormulaEntry>,
     ) {
-        if let Some(previous) = &previous {
+        if let Some(removed) = &previous {
             self.formulas -= 1;
-            self.dynamic_array_formulas -= usize::from(previous.produces_array());
+            self.dynamic_array_formulas -= usize::from(removed.produces_array());
         }
-        if let Some(next) = next {
+        if let Some(added) = next {
             self.formulas += 1;
-            self.dynamic_array_formulas += usize::from(next.produces_array());
+            self.dynamic_array_formulas += usize::from(added.produces_array());
         }
 
         if self.pending_ids.insert(formula) {
@@ -447,8 +456,8 @@ impl DepIndex {
                 }
             };
             let bands = &mut self.exact[column].bands;
-            let position = bands.binary_search_by_key(&band, |band| band.band);
-            if let (Ok(position), true) = (position, run.len() <= IN_PLACE_EDGES) {
+            let search = bands.binary_search_by_key(&band, |stored| stored.band);
+            if let (Ok(position), true) = (search, run.len() <= IN_PLACE_EDGES) {
                 let stored = &mut bands[position];
                 self.exact_sources -= stored.sources.len();
 
@@ -478,7 +487,7 @@ impl DepIndex {
                 .is_ok()
             };
             edges.clear();
-            if let Ok(position) = position {
+            if let Ok(position) = search {
                 for (row, readers) in bands[position].edges() {
                     edges.extend(
                         readers
@@ -496,7 +505,7 @@ impl DepIndex {
             );
             edges.sort_unstable();
 
-            match (position, edges.is_empty()) {
+            match (search, edges.is_empty()) {
                 (Ok(position), true) => {
                     bands.remove(position);
                 }
@@ -506,7 +515,7 @@ impl DepIndex {
                     bands.insert(position, ExactBand::from_edges(band, &edges));
                 }
             }
-            let (Ok(position) | Err(position)) = position;
+            let (Ok(position) | Err(position)) = search;
             if let Some(stored) = bands.get(position).filter(|stored| stored.band == band) {
                 self.exact_sources += stored.sources.len();
             }
@@ -1121,7 +1130,7 @@ impl DirtyWalk<'_> {
             debug_assert!(index
                 .range_groups
                 .get(group)
-                .is_some_and(|group| group.range.contains(cell)));
+                .is_some_and(|stored| stored.range.contains(cell)));
             self.fire_group(group);
         }
     }
@@ -1251,8 +1260,8 @@ pub(super) fn direct_readers(
         let mut add = |ids: &[FormulaId]| {
             readers.extend(ids.iter().filter_map(|&id| slots.location(id)));
         };
-        for &cell in cells {
-            let cell = AbsCellKey::from_local(sheet, cell);
+        for &local in cells {
+            let cell = AbsCellKey::from_local(sheet, local);
             add(index.exact_readers(cell));
             index.collect_matching_range_groups(cell, &mut range_matches, &mut row_matches);
             for &group in &range_matches {
@@ -1370,7 +1379,7 @@ impl WalkFormulas {
 
     fn node(&self, key: AbsCellKey) -> Option<usize> {
         self.0
-            .binary_search_by_key(&column_major(key), |&(key, _)| column_major(key))
+            .binary_search_by_key(&column_major(key), |&(node_key, _)| column_major(node_key))
             .ok()
     }
 }
@@ -1419,9 +1428,9 @@ impl<'a> EdgeCursor<'a> {
                 }
             }
             DependencyNode::Range(group) => {
-                let range = index.range_groups.get(group).map(|group| group.range);
-                let next = range.map_or(formulas.len(), |range| {
-                    let first = (range.sheet, range.col_start, range.row_start);
+                let range = index.range_groups.get(group).map(|stored| stored.range);
+                let next = range.map_or(formulas.len(), |bounds| {
+                    let first = (bounds.sheet, bounds.col_start, bounds.row_start);
                     formulas
                         .0
                         .partition_point(|&(key, _)| column_major(key) < first)
@@ -1619,12 +1628,12 @@ impl<'a> DependencyDepthWalk<'a> {
         // The root is the last node to finish.
         let mut finished = Ok(0);
         while let Some(frame) = self.stack.last_mut() {
-            let dependency = if frame.deepest.is_ok() {
+            let pending = if frame.deepest.is_ok() {
                 frame.edges.next_dependency(self.index, &self.formulas)
             } else {
                 None
             };
-            if let Some(dependency) = dependency {
+            if let Some(dependency) = pending {
                 match self.state(dependency) {
                     Some(NodeDepth::Done(result)) => {
                         if let Some(frame) = self.stack.last_mut() {
@@ -1922,9 +1931,9 @@ mod tests {
     }
 
     fn sorted_readers(readers: &[FormulaId]) -> Vec<FormulaId> {
-        let mut readers = readers.to_vec();
-        readers.sort_unstable();
-        readers
+        let mut sorted = readers.to_vec();
+        sorted.sort_unstable();
+        sorted
     }
 
     fn interval_rows(intervals: &[RangeInterval]) -> Vec<IntervalRow> {

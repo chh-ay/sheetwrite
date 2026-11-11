@@ -350,13 +350,13 @@ fn resolve_commas(section: &mut Section<'_>) {
         .iter()
         .position(|token| matches!(token, Token::Point | Token::Exponent { .. }))
         .unwrap_or(section.tokens.len());
-    let last_digit = section.tokens[..integer_end]
+    let last_digit_at = section.tokens[..integer_end]
         .iter()
         .rposition(|token| matches!(token, Token::Digit(_)));
-    let first_digit = section.tokens[..integer_end]
+    let first_digit_at = section.tokens[..integer_end]
         .iter()
         .position(|token| matches!(token, Token::Digit(_)));
-    let (Some(first_digit), Some(last_digit)) = (first_digit, last_digit) else {
+    let (Some(first_digit), Some(last_digit)) = (first_digit_at, last_digit_at) else {
         return;
     };
 

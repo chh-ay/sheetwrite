@@ -231,7 +231,7 @@ impl CellStore {
     ) -> Result<&'a Ast, FormulaError> {
         let index = match area_num {
             None | Some(Ast::Missing) => 0,
-            Some(area_num) => positive_index(&self.eval_ast(area_num, sheet, pass, depth + 1))?,
+            Some(area_ast) => positive_index(&self.eval_ast(area_ast, sheet, pass, depth + 1))?,
         };
         match reference {
             Ast::Func(Func::Union, areas) => areas.get(index).ok_or(FormulaError::Ref),

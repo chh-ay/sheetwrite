@@ -88,8 +88,8 @@ pub(super) fn full_width(text: &str) -> String {
         };
 
         match combined {
-            Some(combined) => {
-                output.push(combined);
+            Some(merged) => {
+                output.push(merged);
                 characters.next();
             }
             None => output.push(full),

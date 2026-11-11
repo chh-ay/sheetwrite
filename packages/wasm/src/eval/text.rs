@@ -186,7 +186,7 @@ fn mid(values: &FuncAccumulator) -> Value {
     };
     let start = match integer_arg(values, 1, None) {
         Ok(start) if start > 0 => match usize::try_from(start - 1) {
-            Ok(start) => start,
+            Ok(index) => index,
             Err(_) => return Value::Error(FormulaError::Value),
         },
         Ok(_) => return Value::Error(FormulaError::Value),
@@ -298,7 +298,7 @@ fn substitute(values: &FuncAccumulator) -> Value {
     let instance = if values.arg_count() == 4 {
         match integer_arg(values, 3, None) {
             Ok(value) if value > 0 => match usize::try_from(value) {
-                Ok(value) => Some(value),
+                Ok(converted) => Some(converted),
                 Err(_) => return Value::Error(FormulaError::Value),
             },
             Ok(_) => return Value::Error(FormulaError::Value),
@@ -338,7 +338,7 @@ fn replace(values: &FuncAccumulator) -> Value {
     };
     let start = match integer_arg(values, 1, None) {
         Ok(value) if value > 0 => match usize::try_from(value - 1) {
-            Ok(value) => value,
+            Ok(index) => index,
             Err(_) => return Value::Error(FormulaError::Value),
         },
         Ok(_) => return Value::Error(FormulaError::Value),
@@ -385,31 +385,31 @@ fn find_search(values: &FuncAccumulator, case_sensitive: bool) -> Value {
     if let Err(error) = require_arity(values, 2, 3) {
         return Value::Error(error);
     }
-    let needle = match text_arg(values, 0, None) {
+    let needle_text = match text_arg(values, 0, None) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let haystack = match text_arg(values, 1, None) {
+    let haystack_text = match text_arg(values, 1, None) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
     let start = match integer_arg(values, 2, Some(1)) {
         Ok(value) if value > 0 => match usize::try_from(value - 1) {
-            Ok(value) => value,
+            Ok(index) => index,
             Err(_) => return Value::Error(FormulaError::Value),
         },
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
     };
     if !case_sensitive {
-        return wildcard_search(&haystack, &needle, start);
+        return wildcard_search(&haystack_text, &needle_text, start);
     }
 
-    let haystack = match collect_code_points(&haystack) {
+    let haystack = match collect_code_points(&haystack_text) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let needle = match collect_code_points(&needle) {
+    let needle = match collect_code_points(&needle_text) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
@@ -507,15 +507,15 @@ fn repeat(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let count = match integer_arg(values, 1, None) {
+    let requested = match integer_arg(values, 1, None) {
         Ok(value) if value >= 0 => value,
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
     };
-    if text.is_empty() || count == 0 {
+    if text.is_empty() || requested == 0 {
         return Value::text("");
     }
-    let count = match usize::try_from(count) {
+    let count = match usize::try_from(requested) {
         Ok(value) => value,
         Err(_) => return Value::Error(FormulaError::Num),
     };
@@ -596,15 +596,15 @@ fn number_value(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let decimal = match text_arg(values, 1, Some(".")) {
+    let decimal_text = match text_arg(values, 1, Some(".")) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let group = match text_arg(values, 2, Some(",")) {
+    let group_text = match text_arg(values, 2, Some(",")) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let Some((decimal, group)) = number_separators(&decimal, &group) else {
+    let Some((decimal, group)) = number_separators(&decimal_text, &group_text) else {
         return Value::Error(FormulaError::Value);
     };
     parse_number(&text, decimal, group, InnerSpaces::Ignore)
@@ -695,11 +695,11 @@ mod tests {
     use super::super::test_support::mixed_arguments;
 
     fn evaluate(func: Func, arguments: Vec<Value>) -> Value {
-        let arguments = arguments
+        let mixed = arguments
             .into_iter()
             .map(|value| (false, vec![value]))
             .collect();
-        apply(func, &mixed_arguments(arguments)).unwrap()
+        apply(func, &mixed_arguments(mixed)).unwrap()
     }
 
     fn assert_number(value: Value, expected: f64) {

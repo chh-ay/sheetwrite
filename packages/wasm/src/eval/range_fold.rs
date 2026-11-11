@@ -130,29 +130,30 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        let group = self
+        let shared_group = self
             .graph
             .index()
             .and_then(|index| index.shared_range_group(range));
-        if let Some(sum) = group.and_then(|(group, _)| pass.results.range_sum(range, group)) {
+        if let Some(sum) = shared_group.and_then(|(group, _)| pass.results.range_sum(range, group))
+        {
             return sum_value(sum);
         }
 
         let Some(mut fold) = ReductionFold::new(Func::Sum) else {
             return Value::Error(FormulaError::Value);
         };
-        let sum = self
+        let folded = self
             .fold_range(range, &mut fold, false, pass, depth)
             .and_then(|literal_only| match fold.finish() {
                 Value::Number(sum) => Ok((sum, literal_only)),
                 Value::Error(error) => Err(error),
                 _ => Err(FormulaError::Value),
             });
-        let (sum, literal_only) = match sum {
+        let (sum, literal_only) = match folded {
             Ok((sum, literal_only)) => (Ok(sum), literal_only),
             Err(error) => (Err(error), false),
         };
-        if let (Some((group, groups)), true) = (group, literal_only) {
+        if let (Some((group, groups)), true) = (shared_group, literal_only) {
             pass.results.share_range_sum(range, group, groups, sum);
         }
         sum_value(sum)
@@ -270,7 +271,7 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
 
 fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
     match sum {
-        Ok(sum) => Value::Number(sum),
+        Ok(total) => Value::Number(total),
         Err(error) => Value::Error(error),
     }
 }
