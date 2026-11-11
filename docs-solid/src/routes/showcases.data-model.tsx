@@ -13,12 +13,12 @@ import DataModelSnippetSource from "@docs/showcases/snippets/data-model.mdx?sour
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { DataModelDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { DataModelDiagram } from "../showcases/art/diagrams.js";
 import { DataModelStage } from "../showcases/data-model/DataModelStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

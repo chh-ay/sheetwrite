@@ -4,13 +4,13 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { For } from "solid-js";
 import { NoHydration } from "solid-js/web";
 
+import { HUB_ART } from "../art/hub-art.js";
 import { Icon } from "../components/Icon.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { Island } from "../islands/Island.js";
-import { HUB_ART } from "../showcases/art/hub-art.js";
 import { ALL_GROUPS, HubFilter } from "../showcases/hub/HubFilter.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import hubStylesheet from "../styles/showcases/hub.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 
@@ -116,7 +116,7 @@ function ownerGroup(owner: HubOwner): HubGroup {
   return "data";
 }
 
-/** A card's illustration, drawn for its showcase or framework (showcases/art/hub-art.tsx). */
+/** A card's illustration, drawn for its showcase or framework (art/hub-art.tsx). */
 function CardArt(props: Readonly<{ id: string }>) {
   const Art = HUB_ART[props.id];
   return <span class="sw-hub-preview">{Art === undefined ? null : <Art />}</span>;

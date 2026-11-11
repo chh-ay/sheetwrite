@@ -14,15 +14,15 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
 import { NoHydration } from "solid-js/web";
 
+import { PagingDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { PagingDiagram } from "../showcases/art/diagrams.js";
 import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
 import { PerformanceDiagnostics } from "../showcases/performance/PerformanceDiagnostics.js";
 import { PerformanceStage } from "../showcases/performance/PerformanceStage.js";
 import PerformanceSnippet from "../showcases/snippets/performance.mdx";
 import PerformanceSnippetSource from "../showcases/snippets/performance.mdx?source";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/performance.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

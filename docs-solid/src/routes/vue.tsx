@@ -2,12 +2,12 @@ import { pageMeta } from "@docs/lib/seo.js";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { FRAMEWORK_PROOF_ART } from "../art/proof-art.js";
 import { Island } from "../islands/Island.js";
-import { FRAMEWORK_PROOF_ART } from "../showcases/art/proof-art.js";
 import { VueWorkbenchIsland } from "../showcases/frameworks/FrameworkMount.js";
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import bandStylesheet from "../styles/showcases/workbench-band.css?url";

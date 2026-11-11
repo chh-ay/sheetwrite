@@ -12,6 +12,7 @@ import { formulaTables } from "../docs/src/lib/formula-tables.ts";
 import { perfFigureMarkup } from "../docs/src/lib/perf-figure-markup.ts";
 import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "../docs/vite.config.ts";
 import { SOLID_MDX_OPTIONS } from "./src/lib/recma-solid-elements.ts";
+import { rehypeDocsPictures } from "./src/lib/rehype-docs-pictures.ts";
 
 const DOCS_SOURCE = new URL("../docs/src/", import.meta.url).pathname;
 const CONTENT_ROOT = `${DOCS_SOURCE}content/docs/`;
@@ -135,7 +136,12 @@ function snippetSources(): Plugin {
 }
 
 function docsPages(): Plugin {
-  const pages = mdx({ ...DOCS_MDX_OPTIONS, ...SOLID_MDX_OPTIONS });
+  const pages = mdx({
+    ...DOCS_MDX_OPTIONS,
+    ...SOLID_MDX_OPTIONS,
+    // Last, after rehype-slug gives headings their ids: the docs art.
+    rehypePlugins: [...DOCS_MDX_OPTIONS.rehypePlugins, rehypeDocsPictures],
+  });
   const compile = pages.transform as (source: string, id: string) => Promise<PageOutput>;
   // Each page is compiled by whichever environment builds first and taken by the other.
   const pending = new Map<string, { source: string; output: Promise<PageOutput> }>();

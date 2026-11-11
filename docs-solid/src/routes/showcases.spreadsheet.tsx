@@ -9,12 +9,12 @@ import SpreadsheetSetupSnippetSource from "@docs/showcases/snippets/spreadsheet-
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { CommandModelDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { CommandModelDiagram } from "../showcases/art/diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { SpreadsheetStage } from "../showcases/spreadsheet/SpreadsheetStage.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/spreadsheet.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

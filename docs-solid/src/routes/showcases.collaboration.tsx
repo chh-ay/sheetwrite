@@ -3,9 +3,9 @@ import { COLLABORATION_ACTORS } from "@docs/showcases/collaboration-protocol.js"
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { CollaborationRecoveryDiagram } from "../art/diagrams.js";
+import { COLLABORATION_PROOF_ART } from "../art/proof-art.js";
 import { Island } from "../islands/Island.js";
-import { CollaborationRecoveryDiagram } from "../showcases/art/diagrams.js";
-import { COLLABORATION_PROOF_ART } from "../showcases/art/proof-art.js";
 import { CollaborationFaults } from "../showcases/collaboration/CollaborationFaults.js";
 import { CollaborationStage } from "../showcases/collaboration/CollaborationStage.js";
 import { ProofPage, type ProofPageContent } from "../showcases/layout/ProofPage.js";
@@ -13,7 +13,7 @@ import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import CollaborationSnippet from "../showcases/snippets/collaboration.mdx";
 import CollaborationSnippetSource from "../showcases/snippets/collaboration.mdx?source";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import proofStylesheet from "../styles/showcases/proofs.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";

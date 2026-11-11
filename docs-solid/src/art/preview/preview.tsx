@@ -1,11 +1,11 @@
 // Review page for the showcase illustrations; served by preview/vite.config.ts
 // only, never part of the site build. `?view=hub` (default) or `?view=diagrams`,
 // and `?theme=dark`.
-import "../../../styles/site-core.css";
-import "../../../styles/site-mid.css";
-import "../../../styles/site-tail.css";
-import "../../../styles/showcases/touch-targets.css";
-import "../../../styles/showcases/hub.css";
+import "../../styles/site-core.css";
+import "../../styles/site-mid.css";
+import "../../styles/site-tail.css";
+import "../../styles/showcases/touch-targets.css";
+import "../../styles/showcases/hub.css";
 import "../art.css";
 import { For, type JSX } from "solid-js";
 import { render } from "solid-js/web";
@@ -18,6 +18,8 @@ import {
   DIAGRAMS,
   RecalculationDiagram,
 } from "../diagrams.js";
+import { DOCS_CARD_ART, DOCS_DIAGRAMS } from "../docs-art.js";
+import { MECHANISM_DIAGRAMS } from "../docs-mechanisms.js";
 import {
   ChartReadsCellsDiagram,
   DashboardDiagram,
@@ -37,6 +39,7 @@ import {
   FRAMEWORK_PROOF_ART,
   VANILLA_PROOF_ART,
 } from "../proof-art.js";
+import { SectionMark, type SectionMarkName } from "../section-marks.js";
 
 const params = new URLSearchParams(location.search);
 if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
@@ -209,7 +212,7 @@ function Card(props: Readonly<{ card: PreviewCard; framework?: boolean }>) {
       <a
         class={`sw-hub-launch${props.framework ? " sw-hub-launch--framework" : ""}`}
         data-owner={props.card.id}
-        href="#"
+        href={`/showcases/${props.card.id}/`}
         style={{ "--sw-hub-accent": `var(--sw-${props.card.hue})` }}
       >
         <span class="sw-hub-preview">{Art && <Art />}</span>
@@ -363,6 +366,37 @@ function Parts() {
   );
 }
 
-const views: Record<string, () => JSX.Element> = { hub: Hub, diagrams: Diagrams, parts: Parts };
+/** Every docs picture, each under a `data-part` name, for the docs mockups. */
+function DocParts() {
+  const marks: readonly SectionMarkName[] = ["guides", "api", "formulas", "changelog"];
+  const parts: readonly (readonly [string, () => JSX.Element])[] = [
+    ...Object.entries(DOCS_CARD_ART).map(([id, Art]) => [`card:${id}`, () => <Art />] as const),
+    ...Object.entries(DOCS_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(MECHANISM_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...marks.map((name) => [`mark:${name}`, () => <SectionMark name={name} />] as const),
+  ];
+  return (
+    <main>
+      <For each={parts}>
+        {([name, Part]) => (
+          <div data-part={name}>
+            <Part />
+          </div>
+        )}
+      </For>
+    </main>
+  );
+}
+
+const views: Record<string, () => JSX.Element> = {
+  hub: Hub,
+  diagrams: Diagrams,
+  parts: Parts,
+  docparts: DocParts,
+};
 const root = document.getElementById("root");
 if (root) render(views[params.get("view") ?? "hub"] ?? Hub, root);

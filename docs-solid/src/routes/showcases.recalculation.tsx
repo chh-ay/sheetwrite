@@ -11,13 +11,13 @@ import RecalculationSnippetSource from "@docs/showcases/snippets/recalculation.m
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { RecalculationDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { RecalculationDiagram } from "../showcases/art/diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { FirstCalculationFact } from "../showcases/recalculation/FirstCalculationFact.js";
 import { RecalculationStage } from "../showcases/recalculation/RecalculationStage.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

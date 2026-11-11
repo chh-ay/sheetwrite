@@ -3,8 +3,8 @@ import { pageMeta } from "@docs/lib/seo.js";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { InteropFlowDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { InteropFlowDiagram } from "../showcases/art/diagrams.js";
 import { InteropStage } from "../showcases/interop/InteropStage.js";
 import { InteropLabs } from "../showcases/interop/labs/InteropLabs.js";
 import { SpillProof } from "../showcases/interop/SpillProof.js";
@@ -16,7 +16,7 @@ import {
 import InteroperabilitySnippet from "../showcases/snippets/interoperability.mdx";
 import InteroperabilitySnippetSource from "../showcases/snippets/interoperability.mdx?source";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/interoperability.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

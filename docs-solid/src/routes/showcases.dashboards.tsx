@@ -5,13 +5,13 @@ import DashboardsSnippetSource from "@docs/showcases/snippets/dashboards.mdx?sou
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { DashboardDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
-import { DashboardDiagram } from "../showcases/art/explain-diagrams.js";
 import { DashboardsStage } from "../showcases/dashboards/DashboardsStage.js";
 import { ItemCountFact } from "../showcases/dashboards/ItemCountFact.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
