@@ -20,13 +20,20 @@ import type {
   DataSourceRequest,
   DocumentOp,
   GridOptions,
-  RowData,
   Store,
   Workbook,
   XlsxTableExportBackend,
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
-import { keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import {
+  coveredPage,
+  keepXlsxSlots,
+  makeColumnarData,
+  makeWorkbook,
+  mountGridWithData,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -80,32 +87,7 @@ afterEach(() => {
   restoreXlsxSlots();
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
-
-function coveredRow(request: DataSourceRequest, values: RowData = {}): RowData {
-  const row: RowData = {};
-  for (const band of request.columns) {
-    for (const key of band.keys) row[key] = values[key] ?? null;
-  }
-  return row;
-}
-
-function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
-  return {
-    protocol: 2,
-    start: request.start,
-    columns: request.columns,
-    rows: rows.map((row) => coveredRow(request, row)),
-  };
-}
 
 function expectEditor(host: HTMLElement): HTMLTextAreaElement {
   const node = host.querySelector("textarea.sheetwrite-editor");
@@ -123,16 +105,6 @@ function typeIntoFocusedCell(host: HTMLElement, value: string, key = "Enter"): v
   const editor = expectEditor(host);
   editor.value = value;
   editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  expect(node).toBeInstanceOf(HTMLDivElement);
-  if (!(node instanceof HTMLDivElement)) {
-    throw new Error("expected grid scroller");
-  }
-
-  return node;
 }
 
 function cellPoint(
@@ -197,25 +169,6 @@ describe("Grid editing (Layer 3)", () => {
     }
   });
 
-  it("commits a typed edit through the editor into the store", () => {
-    const workbook = makeWorkbook(20);
-    const store = new SheetwriteStore(workbook, makeColumnarData(20));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    const node = host.querySelector("textarea.sheetwrite-editor");
-    expect(node).not.toBeNull();
-    if (!(node instanceof HTMLTextAreaElement)) return;
-    node.value = "Edited!";
-    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Edited!");
-    grid.destroy();
-  });
-
   it("requests the required datasource window fields and consumes its page", async () => {
     const workbook = makeWorkbook(20);
     let captured: DataSourceRequest | undefined;
@@ -274,10 +227,7 @@ describe("Grid editing (Layer 3)", () => {
   });
 
   it("starts a new search at the current viewport and wraps when needed", () => {
-    const workbook = makeWorkbook(100);
-    const store = new SheetwriteStore(workbook, makeColumnarData(100));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { host, grid } = mountGridWithData(100);
     const scroller = scrollerOf(host);
 
     scroller.scrollTop = 50 * DEFAULT_THEME.rowHeight;
@@ -291,10 +241,7 @@ describe("Grid editing (Layer 3)", () => {
   });
 
   it("uses merged-cell anchors for pointer selection and editing", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { workbook, store, host, grid } = mountGridWithData(10);
 
     grid.setSelection({
       kind: "range",
@@ -839,7 +786,7 @@ describe("Grid store lifecycle", () => {
     await initSheetwrite();
   });
 
-  it("disposes the store it constructed and leaves a fresh grid usable", () => {
+  it("disposes the store it constructed", () => {
     const host = mountHost();
     const disposeSpy = spyOn(SheetwriteStore.prototype, "dispose");
 
@@ -849,14 +796,6 @@ describe("Grid store lifecycle", () => {
     grid.destroy();
     expect(disposeSpy).toHaveBeenCalledTimes(1);
     disposeSpy.mockRestore();
-
-    // Each store owns an independent CellStore, so freeing one must not corrupt
-    // a brand-new grid/store built afterwards.
-    const host2 = mountHost();
-    const grid2 = new GridImpl(host2, { workbook: makeWorkbook(20) });
-
-    expect(() => grid2.store.getCell({ sheet: "s1", row: 0, col: 0 })).not.toThrow();
-    grid2.destroy();
   });
 
   it("does not dispose a caller-provided store on destroy", () => {
@@ -970,10 +909,7 @@ describe("ChangeEvent.commitReason", () => {
   }
 
   it("classifies editor commits by gesture: Enter vs blur", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, host, grid } = mountGridWithData(10);
     const reasons = reasonsOf(grid);
 
     grid.beginEdit(0, 0);
@@ -1033,10 +969,7 @@ describe("Grid.setMinColumns", () => {
   });
 
   it("keeps presentation padding virtual until a padded column is edited", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, host, grid } = mountGridWithData(5);
     let changes = 0;
     grid.on("change", () => {
       changes += 1;

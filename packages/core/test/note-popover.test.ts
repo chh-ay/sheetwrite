@@ -5,7 +5,7 @@ import { NOTE_HOVER_DELAY_MS } from "../src/note-popover.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellAddress } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, scrollerOf } from "./fixtures.js";
 
 const NOTED: CellAddress = { sheet: "s1", row: 2, col: 1 };
 const PLAIN: CellAddress = { sheet: "s1", row: 4, col: 0 };
@@ -40,12 +40,6 @@ function mount(options: { readOnly?: boolean } = {}): { host: HTMLDivElement; gr
   grid.setNote(NOTED, "Check the totals");
   if (options.readOnly) grid.setReadOnly(true);
   return { host, grid };
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
 }
 
 /** Client point at the center of a cell; the test viewport starts at (0, 0). */

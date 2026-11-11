@@ -5,7 +5,7 @@ import { initSheetwrite } from "../src/grid.js";
 import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, GridEvents, Selection, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreStubs: () => void;
 
@@ -20,14 +20,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 function multiSheetWorkbook(): Workbook {
   const base = makeWorkbook(10);

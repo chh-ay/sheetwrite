@@ -101,19 +101,6 @@ function serverThread(overrides: Partial<CommentThread> = {}): CommentThread {
   };
 }
 
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve(value: T): void;
-}
-
-function deferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((onResolve) => {
-    resolve = onResolve;
-  });
-  return { promise, resolve };
-}
-
 describe("presence coordinator", () => {
   it("reports failures while reading the active sheet", async () => {
     const mounted = mountGrid();
@@ -361,8 +348,8 @@ describe("comment coordinator", () => {
   });
 
   it("does not commit pending list or mutation responses after destroy", async () => {
-    const listing = deferred<CommentListResult>();
-    const mutation = deferred<CommentMutationResponse>();
+    const listing = Promise.withResolvers<CommentListResult>();
+    const mutation = Promise.withResolvers<CommentMutationResponse>();
     const adapter: CommentAdapter = {
       listComments: () => listing.promise,
       mutateComment: () => mutation.promise,
