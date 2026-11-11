@@ -7,6 +7,7 @@
 import { iconNode } from "../icons/resolve.js";
 import { onQueryCommandsChange } from "../query-commands.js";
 import { Scope } from "../scope.js";
+import { checkIconStyles, checkStylePart } from "../style-parts.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
 import {
   commandAvailable,
@@ -149,6 +150,7 @@ export class Ribbon {
     this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
+    checkStylePart(this.element, "ribbon", "The ribbon");
     this.lifetime.add(() => this.element.remove());
     this.lifetime.add(() => this.popup.destroy());
 
@@ -256,6 +258,7 @@ export class Ribbon {
     const panel = { element, groups, controls, fitSteps: ribbonFitSteps(reduceOrder) };
     this.panels[index] = panel;
     this.element.appendChild(element);
+    checkIconStyles(element, "The ribbon");
     return panel;
   }
 

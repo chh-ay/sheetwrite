@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
@@ -93,6 +93,14 @@ function injectStyle(css: string): HTMLStyleElement {
   return style;
 }
 
+/** styles.css with the parts it imports inlined, as a bundler serves it. */
+function allStyles(): string {
+  const index = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  return index.replace(/@import "\.\/(styles\/[a-z-]+\.css)";/g, (_, part: string) =>
+    readFileSync(new URL(`../${part}`, import.meta.url), "utf8"),
+  );
+}
+
 function mustFind<T extends Element = HTMLElement>(host: HTMLElement, selector: string): T {
   const node = host.querySelector(selector);
   if (!node) throw new Error(`expected ${selector} to be mounted`);
@@ -112,8 +120,10 @@ describe("built-in widget styling", () => {
       "--sheetwrite-menu-disabled-opacity": true,
     };
     const reads: { name: string; fallback: string }[] = [];
-    for (const sheet of ["../styles.css", "../shell.css"]) {
-      const css = readFileSync(new URL(sheet, import.meta.url), "utf8");
+    for (const css of [
+      allStyles(),
+      readFileSync(new URL("../shell.css", import.meta.url), "utf8"),
+    ]) {
       for (const match of css.matchAll(/var\((--sheetwrite-(?:widget|toolbar|menu)-[a-z-]+)/g)) {
         // The fallback runs from the first comma to the parenthesis that closes this var().
         let depth = 1;
@@ -145,7 +155,7 @@ describe("built-in widget styling", () => {
   // widget element wins over the ancestor-inherited value WITHOUT !important —
   // which is the whole point of seeding on the root, not the widget.
   it("resolves seeded vars to themed colors and lets a host rule override without !important", async () => {
-    injectStyle(readFileSync(new URL("../styles.css", import.meta.url), "utf8"));
+    injectStyle(allStyles());
 
     const { host } = await makeGrid();
 
@@ -180,6 +190,35 @@ describe("built-in widget styling", () => {
       // Fallback: the seeding + structure contract still holds.
       expect(host.style.getPropertyValue("--sheetwrite-widget-bg")).toBe(THEME.bg);
       expect(getComputedStyle(findEl).display).toBe("flex");
+    }
+  });
+});
+
+describe("stylesheet parts", () => {
+  // Contract: in development builds a widget whose stylesheet part is missing
+  // warns once, naming the part to import, and a loaded part keeps it quiet.
+  it("warns once in development when a widget's part is missing", async () => {
+    const nodeEnv = process.env.NODE_ENV;
+    const warn = spyOn(console, "warn").mockImplementation(() => undefined);
+    process.env.NODE_ENV = "development";
+    try {
+      injectStyle(readFileSync(new URL("../styles/grid.css", import.meta.url), "utf8"));
+      for (let grids = 0; grids < 2; grids += 1) {
+        const { host } = await makeGrid({ toolbar: false, tabs: false });
+        host.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }),
+        );
+        await elementAdded(host, ".sheetwrite-find", HTMLDivElement);
+      }
+
+      const warnings = warn.mock.calls
+        .map(([message]) => String(message))
+        .filter((message) => message.startsWith("Sheetwrite:"));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('"@sheetwrite/core/styles/find.css"');
+    } finally {
+      process.env.NODE_ENV = nodeEnv;
+      warn.mockRestore();
     }
   });
 });

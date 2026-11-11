@@ -273,6 +273,10 @@ further chart frames also stay opaque instead of being parsed into charts.
 Excel files do not store colors, fonts or styles from Sheetwrite. A chart that
 Sheetwrite exports has Excel's default style.
 
+## Styles
+
+Charts need `@sheetwrite/core/styles/charts.css`, which also sets the series colors. The Chart panel needs `@sheetwrite/core/styles/panels.css` and `@sheetwrite/core/styles/icons.css`. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Colors
 
 Series take their colors in order from `--sheetwrite-chart-1` to

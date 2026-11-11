@@ -1,6 +1,7 @@
 import { createChartRenderer } from "./chart-backend.js";
 import { CHART_KIND_LABELS } from "./chart-definition.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
+import { checkStylePart } from "./style-parts.js";
 import type {
   ChartAnchor,
   ChartDefinition,
@@ -275,6 +276,7 @@ export class ObjectLayer {
 
     // Charts paint in document order, so a later chart covers an earlier one.
     this.panes["bottom-right"].appendChild(frame);
+    checkStylePart(frame, "charts", "The chart");
 
     const zoom = this.options.zoom();
     const size = { width: chart.anchor.width * zoom, height: chart.anchor.height * zoom };

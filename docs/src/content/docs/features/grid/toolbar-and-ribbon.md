@@ -357,6 +357,10 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 
 Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z** undoes the last edit, **Ctrl+Shift+Z** redoes it, and **Ctrl+F** opens the find widget (unless `find: false`).
 
+## Styles
+
+The toolbar and the ribbon need `@sheetwrite/core/styles/ribbon.css`, and `@sheetwrite/core/styles/icons.css` for their built-in icons. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Edge cases and limits
 
 - A custom `toolbar: [...]` item list still renders the toolbar, even with `ribbon: true`.
