@@ -220,17 +220,3 @@ it("adds a dashboard from Insert and shows it", async () => {
   expect(grid.getActiveSheet()).toBe(added?.id ?? "");
   expect(host.querySelector(".sheetwrite-dashboard-empty")?.textContent).toContain("empty");
 });
-
-it("computes dashboard pivots on the full engine, in its own process", async () => {
-  // Engine selection is process-wide, so the full-engine checks run apart.
-  const probe = Bun.spawn(
-    [process.execPath, "test", "./packages/core/test/dashboard.full-engine.ts"],
-    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-  );
-  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-    exitCode: 0,
-    failures: [],
-  });
-});

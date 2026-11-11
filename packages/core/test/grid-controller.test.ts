@@ -4,6 +4,7 @@ import { createGridController, type GridControllerHandlers } from "../src/grid-c
 import { initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, GridEvents, Workbook } from "../src/types.js";
+import { mountHost } from "./fixtures.js";
 
 let restoreStubs: () => void;
 
@@ -18,14 +19,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 /** A grid wide enough for the 4,096-cell selection a command-state snapshot is bounded to. */
 function wideWorkbook(rowCount: number, columnCount: number): Workbook {

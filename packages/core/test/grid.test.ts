@@ -19,12 +19,18 @@ import type {
   DataSourceRequest,
   DocumentOp,
   GridOptions,
-  RowData,
   Store,
   Workbook,
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
-import { keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import {
+  coveredPage,
+  keepXlsxSlots,
+  makeColumnarData,
+  makeWorkbook,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -78,32 +84,7 @@ afterEach(() => {
   restoreXlsxSlots();
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
-
-function coveredRow(request: DataSourceRequest, values: RowData = {}): RowData {
-  const row: RowData = {};
-  for (const band of request.columns) {
-    for (const key of band.keys) row[key] = values[key] ?? null;
-  }
-  return row;
-}
-
-function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
-  return {
-    protocol: 2,
-    start: request.start,
-    columns: request.columns,
-    rows: rows.map((row) => coveredRow(request, row)),
-  };
-}
 
 function expectEditor(host: HTMLElement): HTMLTextAreaElement {
   const node = host.querySelector("textarea.sheetwrite-editor");
@@ -121,16 +102,6 @@ function typeIntoFocusedCell(host: HTMLElement, value: string, key = "Enter"): v
   const editor = expectEditor(host);
   editor.value = value;
   editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  expect(node).toBeInstanceOf(HTMLDivElement);
-  if (!(node instanceof HTMLDivElement)) {
-    throw new Error("expected grid scroller");
-  }
-
-  return node;
 }
 
 describe("Grid editing (Layer 3)", () => {
@@ -711,6 +682,12 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#f0f2f5");
 
     grid.destroy();
+  });
+});
+
+describe("ChangeEvent.commitReason", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
   });
 });
 

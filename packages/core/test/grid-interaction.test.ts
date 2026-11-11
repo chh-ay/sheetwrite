@@ -6,7 +6,6 @@ import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type {
   CellScalar,
-  DataSourcePage,
   DataSourceRequest,
   GridEvents,
   Renderer,
@@ -14,7 +13,14 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import {
+  coveredPage,
+  makeColumnarData,
+  makeWorkbook,
+  mountGridWithData,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -39,32 +45,7 @@ afterEach(() => {
   globalThis.requestAnimationFrame = originalRaf;
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
-
-function coveredRow(request: DataSourceRequest, values: RowData): RowData {
-  const row: RowData = {};
-  for (const band of request.columns) {
-    for (const key of band.keys) row[key] = values[key] ?? null;
-  }
-  return row;
-}
-
-function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
-  return {
-    protocol: 2,
-    start: request.start,
-    columns: request.columns,
-    rows: rows.map((row) => coveredRow(request, row)),
-  };
-}
 
 function requestColumnIndices(request: DataSourceRequest): number[] {
   const indices: number[] = [];
@@ -72,12 +53,6 @@ function requestColumnIndices(request: DataSourceRequest): number[] {
     for (let column = band.start; column < band.end; column++) indices.push(column);
   }
   return indices;
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
 }
 
 interface PaintRecorder extends Renderer {
@@ -116,10 +91,7 @@ describe("row-resize repaint invalidation", () => {
   // so the paint signature's window/scroll/store components are all invariant
   // across the resize. The only way a repaint can fire is the row-height epoch.
   it("repaints with the new row height after a row-header drag", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { host, grid } = mountGridWithData(5);
 
     const recorder = makePaintRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);

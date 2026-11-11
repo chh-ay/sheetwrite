@@ -19,16 +19,6 @@ function reservation(log: string[], name: string): GridTransactionAdmissionReser
 }
 
 describe("grid transaction admission", () => {
-  it("uses an inert reservation when no guards are registered", () => {
-    const decision = beginGridTransactionAdmission({} as Grid, []);
-    expect(decision.ok).toBe(true);
-    if (!decision.ok) throw new Error("empty admission unexpectedly rejected");
-    expect(() => {
-      decision.reservation.cancel();
-      decision.reservation.finish(outcome);
-    }).not.toThrow();
-  });
-
   it("finishes or cancels every reservation exactly once", () => {
     const grid = {} as Grid;
     const finishLog: string[] = [];

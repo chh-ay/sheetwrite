@@ -4,7 +4,7 @@ import { ContextMenu } from "../src/context-menu.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, GridActions, GridConfig } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 let clipboardDescriptor: PropertyDescriptor | undefined;
@@ -27,14 +27,6 @@ afterEach(() => {
   }
   document.body.innerHTML = "";
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 describe("ContextMenu", () => {
   it("dispatches every built-in action to its GridActions method", () => {
