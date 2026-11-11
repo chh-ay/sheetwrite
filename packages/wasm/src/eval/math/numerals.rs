@@ -114,8 +114,8 @@ fn arabic(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         return Err(FormulaError::Value);
     }
 
-    let text = text_arg(values, 0, None)?;
-    let text = text.trim_matches(' ');
+    let raw = text_arg(values, 0, None)?;
+    let text = raw.trim_matches(' ');
 
     if text.len() > MAX_TEXT_LENGTH {
         return Err(FormulaError::Value);

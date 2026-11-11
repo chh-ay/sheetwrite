@@ -87,8 +87,8 @@ pub(crate) fn shape(
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let (rows, cols) = match (name, args) {
-        ("MUNIT", [dimension]) => {
-            let dimension = literal_dimension(dimension).ok_or(FormulaError::Value)??;
+        ("MUNIT", [dimension_ast]) => {
+            let dimension = literal_dimension(dimension_ast).ok_or(FormulaError::Value)??;
             (dimension, dimension)
         }
         ("MINVERSE", [argument]) => {
@@ -143,8 +143,8 @@ pub(crate) fn evaluate_matrix(
         depth,
     };
     let (rows, cols, numbers) = match (name, args) {
-        ("MUNIT", [dimension]) => {
-            let dimension = dimension_from_number(context.number(dimension)?)?;
+        ("MUNIT", [dimension_ast]) => {
+            let dimension = dimension_from_number(context.number(dimension_ast)?)?;
             EvalMatrix::validate_shape(dimension, dimension, 1, 0)?;
             let mut identity = zeros(dimension * dimension)?;
             for index in 0..dimension {
@@ -157,9 +157,9 @@ pub(crate) fn evaluate_matrix(
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension, inverse(dimension, numbers)?)
         }
-        ("MMULT", [left, right]) => {
-            let (rows, inner, left) = context.numbers(left)?;
-            let (right_rows, cols, right) = context.numbers(right)?;
+        ("MMULT", [left_ast, right_ast]) => {
+            let (rows, inner, left) = context.numbers(left_ast)?;
+            let (right_rows, cols, right) = context.numbers(right_ast)?;
             if inner != right_rows {
                 return Err(FormulaError::Value);
             }

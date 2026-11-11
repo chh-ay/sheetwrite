@@ -225,14 +225,14 @@ fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
 
 fn serial_date_arg(values: &FuncAccumulator, index: usize) -> Result<i64, FormulaError> {
     let value = values.arg_value(index).ok_or(FormulaError::Value)?;
-    let serial = match value {
+    let number = match value {
         Value::Text(text) => number_from_text(text)?,
         _ => number_from_value(value)?,
     };
-    if !serial.is_finite() {
+    if !number.is_finite() {
         return Err(FormulaError::Num);
     }
-    let serial = serial.floor();
+    let serial = number.floor();
     if !(0.0..=MAX_DATE_SERIAL as f64).contains(&serial) {
         return Err(FormulaError::Num);
     }
@@ -371,17 +371,17 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
         .try_reserve(entries.len())
         .map_err(|_| FormulaError::Num)?;
     for entry in entries {
-        let serial = match &entry.value {
+        let number = match &entry.value {
             Value::Blank => continue,
             Value::Text(text) if text.trim().is_empty() => continue,
             Value::Text(text) => number_from_text(text)?,
             Value::Error(error) => return Err(*error),
             value => number_from_value(value)?,
         };
-        if !serial.is_finite() {
+        if !number.is_finite() {
             return Err(FormulaError::Num);
         }
-        let serial = serial.floor();
+        let serial = number.floor();
         if !(0.0..=MAX_DATE_SERIAL as f64).contains(&serial) {
             return Err(FormulaError::Num);
         }
@@ -606,7 +606,7 @@ fn time_function(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         .and_then(|value| {
             minute
                 .checked_mul(60)
-                .and_then(|minute| value.checked_add(minute))
+                .and_then(|minute_seconds| value.checked_add(minute_seconds))
         })
         .and_then(|value| value.checked_add(second))
         .ok_or(FormulaError::Num)?;
@@ -740,10 +740,10 @@ mod tests {
     }
 
     fn number(value: Value) -> f64 {
-        let Value::Number(value) = value else {
+        let Value::Number(number) = value else {
             panic!("expected a number, got {value:?}");
         };
-        value
+        number
     }
 
     #[test]

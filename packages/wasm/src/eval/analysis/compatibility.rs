@@ -200,8 +200,8 @@ mod tests {
         evaluate(name, &values)
     }
 
-    fn call_numbers(name: &str, arguments: &[f64]) -> Value {
-        let arguments: Vec<Value> = arguments.iter().copied().map(Value::number).collect();
+    fn call_numbers(name: &str, numbers: &[f64]) -> Value {
+        let arguments: Vec<Value> = numbers.iter().copied().map(Value::number).collect();
 
         call(name, &arguments)
     }
@@ -217,9 +217,9 @@ mod tests {
         evaluate(name, &values)
     }
 
-    fn assert_published(name: &str, actual: Value, published: &str) {
-        let Value::Number(actual) = actual else {
-            panic!("{name} returned {actual:?}");
+    fn assert_published(name: &str, value: Value, published: &str) {
+        let Value::Number(actual) = value else {
+            panic!("{name} returned {value:?}");
         };
         let decimals = published
             .split_once('.')

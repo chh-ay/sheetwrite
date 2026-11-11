@@ -68,7 +68,7 @@ impl CellStore {
             Ast::InvalidRef | Ast::SheetCell(..) | Ast::SheetRange(..) => {
                 return Err(FormulaError::Ref)
             }
-            reference => match range_from_ast(reference, sheet) {
+            expression => match range_from_ast(expression, sheet) {
                 Some(range) => range,
                 None => {
                     return match self.eval_ast(reference, sheet, pass, depth + 1) {
@@ -122,8 +122,8 @@ impl CellStore {
         }
 
         match source {
-            Some(source) if source.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
-                Ok(Value::text(&*source))
+            Some(formula_text) if formula_text.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
+                Ok(Value::text(&*formula_text))
             }
             _ => Err(FormulaError::Na),
         }
@@ -139,19 +139,19 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        let (link, friendly) = match args {
+        let (link_ast, friendly) = match args {
             [link] => (link, None),
             [link, friendly] => (link, optional_ast(args, 1).map(|_| friendly)),
             _ => return Err(FormulaError::Value),
         };
 
-        let link = self.eval_ast(link, sheet, pass, depth + 1);
+        let link = self.eval_ast(link_ast, sheet, pass, depth + 1);
         if let Value::Error(error) = link {
             return Err(error);
         }
 
         Ok(match friendly {
-            Some(friendly) => self.eval_ast(friendly, sheet, pass, depth + 1),
+            Some(friendly_ast) => self.eval_ast(friendly_ast, sheet, pass, depth + 1),
             None => link,
         })
     }
