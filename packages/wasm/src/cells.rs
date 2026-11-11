@@ -1161,7 +1161,10 @@ impl CellStorage {
         col: usize,
         cells: impl Iterator<Item = (usize, u8, u64, u32)>,
     ) {
-        debug_assert!(self.paged.is_none() && col < self.n_cols);
+        debug_assert!(
+            self.paged.is_none() && col < self.n_cols,
+            "dense column writes need an in-bounds dense column"
+        );
         let column = col * self.row_count..(col + 1) * self.row_count;
         let kinds = &mut self.kind[column.clone()];
         let payloads = &mut self.payload[column.clone()];

@@ -47,16 +47,11 @@ mod range_transfer;
 mod related_measure_tests;
 #[cfg(feature = "analysis")]
 mod relationships;
+#[cfg(test)]
+mod sparse_tests;
 #[cfg(all(test, feature = "analysis"))]
 mod tests;
 mod transfer;
-#[cfg(test)]
-mod sparse_tests;
-
-#[cfg(test)]
-thread_local! {
-    static SPARSE_COLUMNS_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
 
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
     let mut slices = Vec::with_capacity(limit);
@@ -241,6 +236,13 @@ pub(crate) const BLOCK_INVALID: u32 = 1;
 const BLOCK_SOURCE_INVALID: u32 = 2;
 pub(crate) const BLOCK_RESOURCE_LIMIT: u32 = 3;
 
+/// Entry indexes of a sparse block grouped by block column: column `c` owns
+/// `entries[starts[c]..starts[c + 1]]`, in caller entry order.
+struct SparseColumns {
+    starts: Vec<u32>,
+    entries: Vec<u32>,
+}
+
 /// Validated literal entries of a sparse block, in caller entry order.
 struct SparseLiteralBlock<'a> {
     start: (usize, usize),
@@ -254,7 +256,7 @@ struct SparseLiteralBlock<'a> {
 
 impl SparseLiteralBlock<'_> {
     /// Counting-sort entry indexes by column while rejecting invalid offsets.
-    fn column_entries(&self) -> Option<(Vec<u32>, Vec<u32>)> {
+    fn column_entries(&self) -> Option<SparseColumns> {
         let (rows, cols) = self.dimensions;
         let mut seen = vec![0u64; (rows * cols).div_ceil(u64::BITS as usize)];
         let mut starts = vec![0u32; cols + 1];
@@ -282,7 +284,7 @@ impl SparseLiteralBlock<'_> {
         }
         starts.rotate_right(1);
         starts[0] = 0;
-        Some((starts, entries))
+        Some(SparseColumns { starts, entries })
     }
 
     fn cell(&self, index: usize) -> (usize, u8, u64, u32) {
@@ -1171,12 +1173,7 @@ impl CellStore {
 
         // Paged cells need dirty-overlay preflight and residency checks; spills
         // need per-cell detachment. Neither can use the dense column writer.
-        #[cfg(test)]
-        let use_columns = !SPARSE_COLUMNS_OFF.get();
-        #[cfg(not(test))]
-        let use_columns = true;
-        if use_columns
-            && !offsets.is_empty()
+        if !offsets.is_empty()
             && formula_offsets.is_empty()
             && reference_offsets.is_empty()
             && !existing.cells.is_paged()
@@ -1191,7 +1188,7 @@ impl CellStore {
                 styles,
                 string_ids: Vec::new(),
             };
-            let Some((starts, entries)) = block.column_entries() else {
+            let Some(columns) = block.column_entries() else {
                 return BLOCK_INVALID;
             };
             if string_entries != 0 {
@@ -1206,7 +1203,7 @@ impl CellStore {
                     }
                 }
             }
-            self.write_sparse_columns(sheet, &block, (&starts, &entries), hydrating);
+            self.write_sparse_columns(sheet, &block, &columns, hydrating);
             return BLOCK_OK;
         }
 
@@ -3366,13 +3363,12 @@ impl CellStore {
         &mut self,
         sheet: usize,
         block: &SparseLiteralBlock<'_>,
-        columns: (&[u32], &[u32]),
+        columns: &SparseColumns,
         hydrating: bool,
     ) {
-        let (starts, entries) = columns;
         let sheet_data = &mut self.sheets[sheet];
-        for (col, bounds) in starts.windows(2).enumerate() {
-            let column = &entries[bounds[0] as usize..bounds[1] as usize];
+        for (col, bounds) in columns.starts.windows(2).enumerate() {
+            let column = &columns.entries[bounds[0] as usize..bounds[1] as usize];
             sheet_data.cells.write_dense_column_cells(
                 block.start.1 + col,
                 column.iter().map(|&index| block.cell(index as usize)),
