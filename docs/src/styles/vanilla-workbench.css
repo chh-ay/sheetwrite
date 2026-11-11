@@ -351,7 +351,7 @@
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  align-items: start;
+  align-items: stretch;
   background: var(--sw-surface-0);
 }
 

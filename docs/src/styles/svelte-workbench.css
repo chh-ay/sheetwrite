@@ -177,7 +177,7 @@
   display: grid;
   min-width: 0;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  align-items: start;
+  align-items: stretch;
   padding: 0;
   overflow: visible;
   border-top: 1px solid var(--sw-border-strong);
