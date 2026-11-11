@@ -950,6 +950,12 @@ html:has(.sw-nav-dialog[open]) {
   .sw-prose .api-member-index > summary {
     min-height: 44px;
   }
+  /* A symbol's "See also" list: one link per row, each 44 px tall. */
+  .sw-prose .api-layout__body > ul > li > a {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+  }
   .fig-range-row__name {
     min-height: 44px;
     align-items: center;
