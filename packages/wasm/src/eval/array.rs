@@ -700,17 +700,19 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(args, 3, false, sheet, pass, depth + 1)?;
+        // FILTER and UNIQUE report their range's shape here, an upper bound
+        // for the budget checks; the rows they return can be fewer.
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
-        let item_count = if by_col { array_cols } else { array_rows };
-        let extra = item_count
+        let item_bound = if by_col { array_cols } else { array_rows };
+        let extra = item_bound
             .checked_mul(size_of::<usize>())
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
-        let comparisons = if item_count < 2 {
+        let comparisons = if item_bound < 2 {
             0
         } else {
-            let log = usize::BITS as usize - item_count.leading_zeros() as usize;
-            item_count.checked_mul(log).ok_or(FormulaError::Num)?
+            let log = usize::BITS as usize - item_bound.leading_zeros() as usize;
+            item_bound.checked_mul(log).ok_or(FormulaError::Num)?
         };
         if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
             return Err(FormulaError::Num);
@@ -733,7 +735,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
 
-        debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
+        let item_count = if by_col { array.cols } else { array.rows };
         let key = sort_index as usize - 1;
         let mut indices: Vec<usize> = (0..item_count).collect();
         let mut error = None;
@@ -795,17 +797,19 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(args, 1, false, sheet, pass, depth + 1)?;
+        // As in SORT, the shape of a FILTER argument bounds the budget; the
+        // items come from the evaluated array.
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
-        let item_count = if by_col { array_cols } else { array_rows };
+        let item_bound = if by_col { array_cols } else { array_rows };
         const UNIQUE_ITEM_BYTES: usize = 64;
-        let extra = item_count
+        let extra = item_bound
             .checked_mul(UNIQUE_ITEM_BYTES)
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
         let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
         let exactly_once = self.optional_bool_array_arg(args, 2, false, sheet, pass, depth + 1)?;
-        debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
+        let item_count = if by_col { array.cols } else { array.rows };
 
         // Store collision chains in insertion order, without an allocation per hash.
         let mut buckets: HashMap<u64, (usize, usize)> = HashMap::new();
@@ -1393,5 +1397,35 @@ mod tests {
         store.recompute(sheet);
         assert_eq!(text(&store, sheet, 0, 1).as_deref(), Some("#NUM!"));
         assert_eq!(matrix_resource_stats(), [0, 0, 0]);
+    }
+
+    #[test]
+    fn sort_and_unique_read_the_rows_a_shrinking_array_returns() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 6);
+        for (row, label) in ["b", "a", "b", "c", "a", "d"].into_iter().enumerate() {
+            store.set_string(sheet, row, 0, label, 0);
+            store.set_number(sheet, row, 1, row as f64, 0);
+        }
+
+        // UNIQUE and FILTER return fewer rows than their range; SORT and
+        // UNIQUE read the rows they return, not the rows of the range.
+        for (formula, expected) in [
+            ("=SORT(UNIQUE(A1:A6))", vec!["a", "b", "c", "d"]),
+            ("=SORT(FILTER(A1:A6,B1:B6<3),1,-1)", vec!["b", "b", "a"]),
+            ("=UNIQUE(FILTER(A1:A6,B1:B6<3))", vec!["b", "a"]),
+        ] {
+            store.set_formula(sheet, 0, 2, formula, 0);
+            store.recompute(sheet);
+            let sorted: Vec<Option<String>> = (0..expected.len())
+                .map(|row| text(&store, sheet, row, 2))
+                .collect();
+            let wanted: Vec<Option<String>> = expected
+                .iter()
+                .map(|label| Some((*label).to_owned()))
+                .collect();
+            assert_eq!(sorted, wanted, "{formula}");
+            assert_eq!(store.get_cell(sheet, expected.len(), 2).kind(), KIND_EMPTY);
+        }
     }
 }
