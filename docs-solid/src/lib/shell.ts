@@ -177,8 +177,9 @@ function installOutline(): void {
 
 export function installDocsShell(): void {
   installThemeToggle();
+  // Every page with the search control (docs pages and the 404 page).
+  installSearchShortcut();
   if (document.querySelector(".sw-docs") === null) return;
   installNavigationMenu();
-  installSearchShortcut();
   installOutline();
 }
