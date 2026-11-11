@@ -85,7 +85,7 @@ pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
-use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+use matrix::{optional_ast, range_from_ast, EvalMatrix};
 #[cfg(feature = "analysis")]
 pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
@@ -2569,7 +2569,7 @@ impl CellStore {
                         payload_bytes = payload_bytes
                             .checked_add(text.len())
                             .ok_or(FormulaError::Num)?;
-                        if payload_bytes > SPILL_MAX_BYTES {
+                        if payload_bytes > matrix::SPILL_MAX_BYTES {
                             return Err(FormulaError::Num);
                         }
                     }

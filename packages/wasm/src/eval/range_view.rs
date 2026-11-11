@@ -161,9 +161,15 @@ mod differential {
                     match (row + col) % 6 {
                         0 => store.set_number(sheet, row, col, (row * 13 + col) as f64, 0),
                         1 => store.set_string(sheet, row, col, "éclair", 0),
-                        2 => store.set_formula(sheet, row, col, "=TRUE()", 0),
-                        3 => store.set_formula(sheet, row, col, "=1/0", 0),
-                        4 => store.set_formula(sheet, row, col, "=17+2", 0),
+                        2 => {
+                            store.set_formula(sheet, row, col, "=TRUE()", 0);
+                        }
+                        3 => {
+                            store.set_formula(sheet, row, col, "=1/0", 0);
+                        }
+                        4 => {
+                            store.set_formula(sheet, row, col, "=17+2", 0);
+                        }
                         _ => continue,
                     }
                 }
