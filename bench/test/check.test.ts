@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -92,86 +92,94 @@ test("rejects a baseline without runner or raw samples, or with a raised thresho
   );
 });
 
-const candidateRoot = resolve(REPOSITORY_ROOT, "bench/results/candidates");
-mkdirSync(candidateRoot, { recursive: true });
-const directory = mkdtempSync(resolve(candidateRoot, "check-"));
-afterAll(() => rmSync(directory, { recursive: true, force: true }));
-const head = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: REPOSITORY_ROOT })
-  .stdout.toString()
-  .trim();
-const rawPath = resolve(directory, "raw.json");
-const baselinePath = resolve(directory, "baseline.json");
+// Git-dependent provenance setup stays scoped to the command tests.
+describe("check command", () => {
+  const candidateRoot = resolve(REPOSITORY_ROOT, "bench/results/candidates");
+  mkdirSync(candidateRoot, { recursive: true });
+  const directory = mkdtempSync(resolve(candidateRoot, "check-"));
+  afterAll(() => rmSync(directory, { recursive: true, force: true }));
+  const head = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: REPOSITORY_ROOT })
+    .stdout.toString()
+    .trim();
+  const rawPath = resolve(directory, "raw.json");
+  const baselinePath = resolve(directory, "baseline.json");
 
-beforeAll(() => {
-  const raw = makeRenderArtifact({ rounds: ROUNDS, commit: head });
-  const rawBytes = `${JSON.stringify(raw, null, 2)}\n`;
-  writeFileSync(rawPath, rawBytes);
-  const baseline = buildControlledBaseline(
-    raw,
-    computeHarnessFingerprint(MATRIX_IDS.render.full, CONTROLLED_SAMPLING_FINGERPRINT),
-    TEST_RUNNER,
-    relative(REPOSITORY_ROOT, rawPath),
-    createHash("sha256").update(rawBytes).digest("hex"),
-  );
-  writeFileSync(baselinePath, stableBaselineJson(baseline));
-});
-
-function freshJson(sampleMs = 10, timestamp = new Date().toISOString()): string {
-  const samples = () => [sampleMs, sampleMs, sampleMs];
-  return JSON.stringify(makeRenderArtifact({ rounds: ROUNDS, commit: head, timestamp, samples }));
-}
-
-/** Runs the check command in process; returns its exit code and verdict. */
-async function check(fresh: string, extraArgs: readonly string[] = []) {
-  const freshPath = resolve(directory, `fresh-${crypto.randomUUID()}.json`);
-  writeFileSync(freshPath, fresh);
-  const stderr: string[] = [];
-  const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    stderr.push(String(chunk));
-    return true;
+  beforeAll(() => {
+    const raw = makeRenderArtifact({ rounds: ROUNDS, commit: head });
+    const rawBytes = `${JSON.stringify(raw, null, 2)}\n`;
+    writeFileSync(rawPath, rawBytes);
+    const baseline = buildControlledBaseline(
+      raw,
+      computeHarnessFingerprint(MATRIX_IDS.render.full, CONTROLLED_SAMPLING_FINGERPRINT),
+      TEST_RUNNER,
+      relative(REPOSITORY_ROOT, rawPath),
+      createHash("sha256").update(rawBytes).digest("hex"),
+    );
+    writeFileSync(baselinePath, stableBaselineJson(baseline));
   });
-  // The comparison table goes to standard output; the verdict goes to standard error.
-  const table = spyOn(console, "log").mockImplementation(() => undefined);
-  try {
-    const exitCode = await runCheck([
-      ...["--baseline", baselinePath, "--fresh", freshPath, ...extraArgs],
-      ...["--power-mode", TEST_RUNNER.powerMode, "--concurrency", String(TEST_RUNNER.concurrency)],
-    ]);
-    return { exitCode, stderr: stderr.join("") };
-  } finally {
-    write.mockRestore();
-    table.mockRestore();
-  }
-}
 
-test("the check command passes a matched result, fails malformed, stale or slower ones, and reports only on request", async () => {
-  const passing = await check(freshJson());
-  expect(passing.exitCode, passing.stderr).toBe(0);
-  expect(passing.stderr).toContain("no statistically detected regression");
-  for (const [fresh, verdict] of [
-    ["{broken", "performance gate invalid"],
-    [freshJson(10, "2020-01-01T00:00:00.000Z"), "stale render result timestamp"],
-    [freshJson(10.01), "statistically significant slowdown"],
-  ] as const) {
-    const failing = await check(fresh);
-    expect(failing.exitCode).toBe(1);
-    expect(failing.stderr).toContain(verdict);
+  function freshJson(sampleMs = 10, timestamp = new Date().toISOString()): string {
+    const samples = () => [sampleMs, sampleMs, sampleMs];
+    return JSON.stringify(makeRenderArtifact({ rounds: ROUNDS, commit: head, timestamp, samples }));
   }
-  const diagnostic = await check("{broken", ["--report-only"]);
-  expect(diagnostic.exitCode).toBe(0);
-  expect(diagnostic.stderr).toContain("REPORT ONLY — NON-GATING");
-});
 
-test("the check command fails when checked-in raw provenance is missing or checksum-mismatched", async () => {
-  const original = readFileSync(rawPath, "utf8");
-  try {
-    rmSync(rawPath);
-    expect((await check(freshJson())).exitCode).toBe(1);
-    writeFileSync(rawPath, `${original} `);
-    const mismatch = await check(freshJson());
-    expect(mismatch.exitCode).toBe(1);
-    expect(mismatch.stderr).toContain("checksum mismatch");
-  } finally {
-    writeFileSync(rawPath, original);
+  /** Runs the check command in process; returns its exit code and verdict. */
+  async function check(fresh: string, extraArgs: readonly string[] = []) {
+    const freshPath = resolve(directory, `fresh-${crypto.randomUUID()}.json`);
+    writeFileSync(freshPath, fresh);
+    const stderr: string[] = [];
+    const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderr.push(String(chunk));
+      return true;
+    });
+    // The comparison table goes to standard output; the verdict goes to standard error.
+    const table = spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const exitCode = await runCheck([
+        ...["--baseline", baselinePath, "--fresh", freshPath, ...extraArgs],
+        ...[
+          "--power-mode",
+          TEST_RUNNER.powerMode,
+          "--concurrency",
+          String(TEST_RUNNER.concurrency),
+        ],
+      ]);
+      return { exitCode, stderr: stderr.join("") };
+    } finally {
+      write.mockRestore();
+      table.mockRestore();
+    }
   }
+
+  test("passes a matched result, fails malformed, stale or slower ones, and reports only on request", async () => {
+    const passing = await check(freshJson());
+    expect(passing.exitCode, passing.stderr).toBe(0);
+    expect(passing.stderr).toContain("no statistically detected regression");
+    for (const [fresh, verdict] of [
+      ["{broken", "performance gate invalid"],
+      [freshJson(10, "2020-01-01T00:00:00.000Z"), "stale render result timestamp"],
+      [freshJson(10.01), "statistically significant slowdown"],
+    ] as const) {
+      const failing = await check(fresh);
+      expect(failing.exitCode).toBe(1);
+      expect(failing.stderr).toContain(verdict);
+    }
+    const diagnostic = await check("{broken", ["--report-only"]);
+    expect(diagnostic.exitCode).toBe(0);
+    expect(diagnostic.stderr).toContain("REPORT ONLY — NON-GATING");
+  });
+
+  test("fails when checked-in raw provenance is missing or checksum-mismatched", async () => {
+    const original = readFileSync(rawPath, "utf8");
+    try {
+      rmSync(rawPath);
+      expect((await check(freshJson())).exitCode).toBe(1);
+      writeFileSync(rawPath, `${original} `);
+      const mismatch = await check(freshJson());
+      expect(mismatch.exitCode).toBe(1);
+      expect(mismatch.stderr).toContain("checksum mismatch");
+    } finally {
+      writeFileSync(rawPath, original);
+    }
+  });
 });

@@ -21,10 +21,8 @@ import {
   withFailedFirstCell,
 } from "./gate-fixtures.js";
 
-const TIMESTAMP = "2026-07-14T12:00:00.000Z";
-
 function artifact(): RenderBenchmarkArtifact {
-  return makeRenderArtifact({ rows: [200], measuredSamples: 2, timestamp: TIMESTAMP });
+  return makeRenderArtifact({ rows: [200], measuredSamples: 2 });
 }
 
 /** Window-read counters for `frames` logical frames; the upper bound reads nothing. */
