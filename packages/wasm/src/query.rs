@@ -1680,21 +1680,6 @@ impl SortKeyBuilder {
         index
     }
 
-    /// Bytes allocated for collation: the arena, the distinct-text spans and
-    /// the pool-id table.
-    #[cfg(test)]
-    pub(crate) fn collation_bytes(&self) -> usize {
-        self.arena.capacity()
-            + self.texts.capacity() * std::mem::size_of::<CollatedText>()
-            + self.text_by_pool_id.capacity() * std::mem::size_of::<u32>()
-    }
-
-    /// Bytes of collation keys in the arena.
-    #[cfg(test)]
-    pub(crate) fn arena_len(&self) -> usize {
-        self.arena.len()
-    }
-
     /// Sort the distinct strings once and give each its rank in collation
     /// order; equal keys get equal ranks. Rows then compare text by rank, so
     /// the row sort makes no byte comparison. The arena is dropped here.

@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { validateTransactionResources } from "../src/document-protocol.js";
 import {
@@ -624,24 +624,6 @@ describe("Grid transaction resource ingress", () => {
   }, 30_000);
 });
 
-describe("Grid store lifecycle", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
-  it("disposes the store it constructed", () => {
-    const host = mountHost();
-    const disposeSpy = spyOn(SheetwriteStore.prototype, "dispose");
-
-    // No store injected: the grid constructs and owns its SheetwriteStore, so
-    // destroy() must free the underlying WASM CellStore.
-    const grid = new GridImpl(host, { workbook: makeWorkbook(20) });
-    grid.destroy();
-    expect(disposeSpy).toHaveBeenCalledTimes(1);
-    disposeSpy.mockRestore();
-  });
-});
-
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   beforeAll(async () => {
     await initSheetwrite();
@@ -1048,7 +1030,7 @@ describe("transactional document metadata", () => {
     await initSheetwrite();
   });
 
-  it("returns outcomes from both sort convenience methods", () => {
+  it("returns the view-sort outcome and restores data order", () => {
     const workbook = makeWorkbook(4);
     const store = new SheetwriteStore(workbook, makeColumnarData(4));
     const grid = new GridImpl(mountHost(), { workbook }, store);

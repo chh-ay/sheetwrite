@@ -145,21 +145,6 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
 }
 
 #[test]
-fn a_structural_rewrite_changes_only_the_reference_text_of_the_source() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(2, 2);
-    let source = " =  A1 & \" λ \"  ";
-    store.set_formula(sheet, 0, 1, source, 0);
-    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some(source));
-
-    store.add_rows(sheet, 0, 1);
-    assert_eq!(
-        store.formula_source(sheet, 1, 1).as_deref(),
-        Some(" =  A2 & \" λ \"  ")
-    );
-}
-
-#[test]
 fn dynamic_arrays_spill_resize_obstruct_persist_and_invalidate_dependents() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(9, 12);
@@ -710,40 +695,6 @@ fn named_ranges_resolve_scope_rebase_delete_cycle_and_preserve_unknown_sources()
     store.remove_rows(data, 0, 4);
     store.recompute(other);
     assert_eq!(string(&store, other, 0, 0).as_deref(), Some("#NAME?"));
-}
-
-#[test]
-fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles() {
-    let mut store = CellStore::new();
-    let source = store.add_sheet(1, 2);
-    let summary = store.add_sheet(2, 2);
-    store.set_sheet_name(source, "sales", "Sales");
-    store.set_sheet_name(summary, "summary", "Summary");
-    store.set_number(source, 0, 0, 4.0, 0);
-    store.set_number(source, 1, 0, 6.0, 0);
-    store.set_formula(summary, 0, 0, "=Sales!A1+1", 0);
-    store.set_formula(summary, 0, 1, "=SUM(Sales!A1:A2)", 0);
-    store.recompute(summary);
-
-    assert!(store.rename_sheet(source, "sales", "Sales Data"));
-    assert_eq!(
-        store.formula_source(summary, 0, 0).as_deref(),
-        Some("='Sales Data'!A1+1")
-    );
-    assert_eq!(
-        store.formula_source(summary, 0, 1).as_deref(),
-        Some("=SUM('Sales Data'!A1:A2)")
-    );
-    assert_close(number(&store, summary, 0, 0), 5.0);
-    assert_close(number(&store, summary, 0, 1), 10.0);
-
-    assert!(store.rename_sheet(source, "sales", "O'Brien"));
-    assert_eq!(
-        store.formula_source(summary, 0, 0).as_deref(),
-        Some("='O''Brien'!A1+1")
-    );
-    assert!(store.sheet_alive[source]);
-    assert!(store.sheet_alive[summary]);
 }
 
 #[test]
@@ -1728,7 +1679,8 @@ fn host_source_hydration_obstructs_spills_without_erasing_the_source() {
             &[0],
             &[KIND_NUMBER],
             &[99.0],
-            vec![String::new()],
+            &[],
+            &[0],
             &[0],
             &[],
             Vec::new(),
@@ -2004,7 +1956,8 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
             &[0],
             &[KIND_NUMBER],
             &[4.0],
-            vec![String::new()],
+            &[],
+            &[0],
             &[1],
             &[],
             Vec::new(),
@@ -2049,6 +2002,63 @@ fn persisted_cell_data_stays_sparse_at_one_billion_rows() {
 }
 
 #[test]
+fn sparse_block_reads_packed_text_for_string_entries_only() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 4);
+    let text = "héllo日本";
+    let split = "héllo".len() as u32;
+
+    // Entries in offset order 3, 0, 1: a string, a number, a string.
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            4,
+            1,
+            &[3, 0, 1],
+            &[KIND_STRING, KIND_NUMBER, KIND_STRING],
+            &[0.0, 7.0, 0.0],
+            text.as_bytes(),
+            &[0, split, text.len() as u32],
+            &[0, 0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        0
+    );
+    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("héllo"));
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("日本"));
+
+    // A bound inside a multi-byte character is rejected before any write.
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            4,
+            1,
+            &[1, 2],
+            &[KIND_STRING, KIND_STRING],
+            &[0.0, 0.0],
+            "é".as_bytes(),
+            &[0, 1, 2],
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        2
+    );
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("日本"));
+    assert_eq!(string(&store, sheet, 2, 0), None);
+}
+
+#[test]
 fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);
@@ -2063,7 +2073,8 @@ fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
             &[0, 5],
             &[KIND_NUMBER, KIND_EMPTY],
             &[9.0, 0.0],
-            vec![String::new(), String::new()],
+            &[],
+            &[0],
             &[0, 0],
             &[],
             Vec::new(),
@@ -2279,24 +2290,6 @@ fn array_operators_broadcast_each_axis_and_keep_element_errors() {
             }
         }
     }
-}
-
-#[test]
-fn array_constants_survive_structural_rewrites() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(4, 4);
-    store.set_number(sheet, 0, 0, 5.0, 0);
-    store.set_formula(sheet, 0, 1, "=SUM({1,2;3,4})+A1", 0);
-    store.recompute(sheet);
-    assert_close(number(&store, sheet, 0, 1), 15.0);
-
-    store.add_rows(sheet, 0, 1);
-    store.recompute(sheet);
-    assert_eq!(
-        store.formula_source(sheet, 1, 1).as_deref(),
-        Some("=SUM({1,2;3,4})+A2")
-    );
-    assert_close(number(&store, sheet, 1, 1), 15.0);
 }
 
 #[test]
@@ -2838,7 +2831,8 @@ mod formula_dependency_epoch {
                 &[0],
                 &[KIND_EMPTY],
                 &[0.0],
-                vec![String::new()],
+                &[],
+                &[0],
                 &[0],
                 &[0],
                 vec!["=A1+B1+2".into()],

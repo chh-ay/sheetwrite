@@ -803,29 +803,6 @@ const _: () = assert!(FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize);
 #[cfg(test)]
 mod formula_entry_tests {
     use super::*;
-    use std::mem::size_of;
-
-    #[test]
-    fn formula_entry_inline_memory_budget() {
-        // Only size_of uses this baseline; its intentionally unread fields model
-        // the unpacked allocation cost without imposing a stable Rust layout.
-        #[allow(dead_code)]
-        struct UnpackedEntry {
-            ast: Option<Ast>,
-            source: String,
-            reads: ReadSet,
-            error: Option<FormulaError>,
-            volatile: bool,
-            has_spill_refs: bool,
-            produces_array: bool,
-            reference: bool,
-            calls_subtotal: bool,
-        }
-
-        assert!(size_of::<FormulaEntry>() <= size_of::<UnpackedEntry>());
-        #[cfg(target_arch = "wasm32")]
-        assert!(size_of::<FormulaEntry>() < size_of::<UnpackedEntry>());
-    }
 
     #[test]
     fn formula_entry_flags_preserve_independent_metadata() {

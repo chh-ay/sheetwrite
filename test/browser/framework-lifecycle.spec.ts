@@ -4,8 +4,10 @@ import {
 } from "../../docs/src/test-fixtures/framework-lifecycle/fixture.js";
 import { canvasPainted, expect, gridCellTexts, test } from "./fixtures.js";
 
+// Chromium only: the lifecycle is framework code, the same in every engine. Cross-engine
+// boot and paint stay with the examples harness and vanilla workbench @portability tests.
 for (const framework of ["react", "vue", "svelte"] as const) {
-  test(`framework lifecycle: ${framework} mounts, resets, destroys, and recovers errors @portability`, async ({
+  test(`framework lifecycle: ${framework} mounts, resets, destroys, and recovers errors`, async ({
     page,
   }) => {
     await page.goto(`/test/framework-lifecycle/${framework}/`);
