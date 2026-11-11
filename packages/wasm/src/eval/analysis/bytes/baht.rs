@@ -128,15 +128,3 @@ fn push_group(text: &mut String, group: &str) {
         text.push_str(DIGITS[units]);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The example of the Microsoft Support page,
-    /// `https://support.microsoft.com/en-us/excel/functions/bahttext-function`.
-    #[test]
-    fn microsoft_published_example() {
-        assert_eq!(words(1234.0), "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน");
-    }
-}

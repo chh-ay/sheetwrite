@@ -310,6 +310,9 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     ...SHAPE_ROW_IDS.flatMap((id) =>
       (smoke ? [1_000] : SHAPE_ROW_SIZES).map((size) => formulaWorkloadKey({ id, size })),
     ),
+    ...BINDING_ROW_IDS.flatMap((id) =>
+      (smoke ? [1_000] : BINDING_ROW_SIZES).map((size) => formulaWorkloadKey({ id, size })),
+    ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
     formulaWorkloadKey({ id: "index-match-many", size: smoke ? 50 : INDEX_MATCH_FORMULAS }),
@@ -347,6 +350,13 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "offset-many",
   "indirect-many",
   "let-calls",
+  "name-define",
+  "row-insert-names",
+  "table-append-row",
+  "sort-formula-column",
+  "parse-load-qualified",
+  "parse-load-table",
+  "memory-import",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -464,6 +474,18 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       const y = Math.round((x / 3) * 100) / 100;
       return x + y + y * x;
     }
+    case "name-define":
+    case "row-insert-names":
+      return (size - NAMED_FORMULA_STRIDE + 1) * NAME_SCALE;
+    case "table-append-row":
+      return ((size + 1) * (size + 2)) / 2;
+    case "sort-formula-column":
+      return 2 * (sortedSourceRow(size, size - 1) + 1);
+    case "parse-load-qualified":
+      return size;
+    case "parse-load-table":
+    case "memory-import":
+      return size * 2;
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -1973,6 +1995,362 @@ function letCallsFormula(row: number): string {
     : `=LET(x,SUM(${source},1),y,ROUND(x/3,2),z,y*x,x+y+z)`;
 }
 
+/**
+ * Rows for binding formulas to sheets, names and tables: defining names, a
+ * row insert in a workbook with names, a table that grows by a row, a sort
+ * that moves formulas, loading formulas that name another sheet or a table
+ * column, and restoring a released engine from its memory state.
+ */
+const BINDING_ROW_IDS = [
+  "name-define",
+  "row-insert-names",
+  "table-append-row",
+  "sort-formula-column",
+  "parse-load-qualified",
+  "parse-load-table",
+  "memory-import",
+] as const;
+const BINDING_ROW_SIZES = [10_000, 100_000] as const;
+/** Defined names `Scale_0`…`Scale_9`; each points at one cell holding `NAME_SCALE`. */
+const BINDING_NAMES = 10;
+/** One formula in this many uses a name; the others are plain. */
+const NAMED_FORMULA_STRIDE = 10;
+const NAME_SCALE = 2;
+/** Sorting moves row `i` to row `(i * SORT_STRIDE) % rows`; prime, so it permutes every size. */
+const SORT_STRIDE = 7_919;
+
+function bindingName(index: number): string {
+  return `Scale_${index}`;
+}
+
+/** Every `NAMED_FORMULA_STRIDE`th formula multiplies by a defined name, the others by 2. */
+function namedRowFormula(row: number, cell: string): string {
+  const scale =
+    row % NAMED_FORMULA_STRIDE === 0
+      ? bindingName((row / NAMED_FORMULA_STRIDE) % BINDING_NAMES)
+      : String(NAME_SCALE);
+  return `=${cell}*${scale}`;
+}
+
+/** Points the names at `C1`…`C10` of `sheet`, one name at a time. */
+function defineBindingNames(store: CellStore, sheet: number): void {
+  for (let index = 0; index < BINDING_NAMES; index++) {
+    assert(
+      store.setNamedRange(bindingName(index), -1, sheet, index, 2, index, 2),
+      "binding name defined",
+    );
+  }
+}
+
+/** Column A holds 1…count, column B a formula per row, and C1:C10 the values the names point at. */
+function namedFormulasSheet(store: CellStore, count: number): number {
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    2,
+    0,
+    numericColumn(BINDING_NAMES, () => NAME_SCALE),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, namedRowFormula(row, `A${row + 1}`), 0);
+  }
+  return sheet;
+}
+
+/** The value of the last formula that uses a name, `offset` rows below where it was written. */
+function lastNamedFormula(store: CellStore, sheet: number, count: number, offset = 0): number {
+  return numberAt(store, sheet, count - NAMED_FORMULA_STRIDE + offset, 1);
+}
+
+/**
+ * The formulas exist before the names, as when a workbook defines its names
+ * after its formulas. The timed run defines the ten names one at a time.
+ */
+function nameDefineFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = namedFormulasSheet(store, count);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      defineBindingNames(store, sheet);
+      store.recompute(sheet);
+    },
+    check: () => lastNamedFormula(store, sheet, count),
+    dispose: () => store.free(),
+    restore: () => {
+      for (let index = 0; index < BINDING_NAMES; index++) {
+        store.removeNamedRange(bindingName(index), -1);
+      }
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** The timed run inserts one row above everything, so every formula and name moves. */
+function rowInsertNamesFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = namedFormulasSheet(store, count);
+  defineBindingNames(store, sheet);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      assert(store.addRows(sheet, 0, 1), "row inserted");
+      store.recompute(sheet);
+    },
+    check: () => lastNamedFormula(store, sheet, count, 1),
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.removeRows(sheet, 0, 1), "row removed");
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** Table `Sales` over A:B with a header row: `Amount` holds numbers, `Double` is `=[@Amount]*2`. */
+function setSalesTable(store: CellStore, sheet: number, bodyRows: number): void {
+  assert(
+    store.setTable(
+      "sales",
+      "Sales",
+      sheet,
+      0,
+      0,
+      bodyRows,
+      1,
+      true,
+      false,
+      ["amount", "double"],
+      ["Amount", "Double"],
+    ),
+    "table set",
+  );
+}
+
+/** A sheet whose rows 1…count are the body of `Sales`, with `Amount` 1…count and room for one more row. */
+function salesSheet(store: CellStore, count: number): number {
+  const sheet = store.addSheet(4, count + 2);
+  store.setString(sheet, 0, 0, "Amount", 0);
+  store.setString(sheet, 0, 1, "Double", 0);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    1,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  setSalesTable(store, sheet, count);
+  return sheet;
+}
+
+const TABLE_ROW_FORMULA = "=[@Amount]*2";
+
+/**
+ * Every body row has `=[@Amount]*2`, and D1 sums the column. The timed run
+ * appends a row the way a user does: a value, the table grown by one row,
+ * and the column's formula in the new row.
+ */
+function tableAppendRowFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = salesSheet(store, count);
+  for (let row = 1; row <= count; row++) {
+    store.setFormula(sheet, row, 1, TABLE_ROW_FORMULA, 0);
+  }
+  store.setFormula(sheet, 0, 3, "=SUM(Sales[Amount])", 0);
+  store.recompute(sheet);
+  const added = count + 1;
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, added, 0, added, 0);
+      setSalesTable(store, sheet, added);
+      store.setFormula(sheet, added, 1, TABLE_ROW_FORMULA, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, 0, 3),
+    dispose: () => store.free(),
+    restore: () => {
+      setSalesTable(store, sheet, count);
+      store.clearCell(sheet, added, 1, 0);
+      store.clearCell(sheet, added, 0, 0);
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** The source row that sorting moves to target row `row`. */
+function sortedSourceRow(rows: number, row: number): number {
+  return (row * SORT_STRIDE) % rows;
+}
+
+/** Column A holds 1…count and column B `=A{r}*2`. The timed run sorts A:B by a fixed shuffle. */
+function sortFormulaColumnFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, `=A${row + 1}*2`, 0);
+  }
+  store.recompute(sheet);
+  const order = Uint32Array.from({ length: count }, (_, row) => sortedSourceRow(count, row));
+  const inverse = new Uint32Array(count);
+  for (const [target, source] of order.entries()) inverse[source] = target;
+  return {
+    store,
+    run: () => {
+      assert(store.permuteRows(sheet, 0, 0, 2, order) === 0, "rows sorted");
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 1),
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.permuteRows(sheet, 0, 0, 2, inverse) === 0, "rows unsorted");
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** Loads `=Data!A{r}+Data!B{r}` into a second sheet; A holds the row and B holds 1. */
+function parseLoadQualifiedFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const data = store.addSheet(2, count);
+  const calc = store.addSheet(1, count);
+  store.setSheetName(data, "data", "Data");
+  store.setSheetName(calc, "calc", "Calc");
+  store.setColumnNumbers(
+    data,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    data,
+    1,
+    0,
+    numericColumn(count, () => 1),
+    0,
+  );
+  const formulas = Array.from({ length: count }, (_, row) => `=Data!A${row + 1}+Data!B${row + 1}`);
+  return {
+    store,
+    run: () => {
+      for (const [row, formula] of formulas.entries()) store.setFormula(calc, row, 0, formula, 0);
+    },
+    check: () => {
+      store.recompute(calc);
+      return numberAt(store, calc, count - 1, 0);
+    },
+    dispose: () => store.free(),
+  };
+}
+
+/** Loads `=[@Amount]*2` into every body row of `Sales`. */
+function parseLoadTableFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = salesSheet(store, count);
+  return {
+    store,
+    run: () => {
+      for (let row = 1; row <= count; row++) {
+        store.setFormula(sheet, row, 1, TABLE_ROW_FORMULA, 0);
+      }
+    },
+    check: () => {
+      store.recompute(sheet);
+      return numberAt(store, sheet, count, 1);
+    },
+    dispose: () => store.free(),
+  };
+}
+
+/**
+ * A released engine's state restored: formulas on `Calc` read `Data`, and
+ * every tenth one also uses a defined name. The timed run imports the state
+ * exported at setup.
+ */
+function memoryImportFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const data = store.addSheet(3, count);
+  const calc = store.addSheet(1, count);
+  store.setSheetName(data, "data", "Data");
+  store.setSheetName(calc, "calc", "Calc");
+  store.setColumnNumbers(
+    data,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    data,
+    2,
+    0,
+    numericColumn(BINDING_NAMES, () => NAME_SCALE),
+    0,
+  );
+  defineBindingNames(store, data);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(calc, row, 0, namedRowFormula(row, `Data!A${row + 1}`), 0);
+  }
+  store.recompute(calc);
+  const state = store.exportMemoryState();
+  let imported: CellStore | undefined;
+  return {
+    store,
+    run: () => {
+      imported = CellStore.importMemoryState(state);
+    },
+    check: () => {
+      assert(imported, "memory state imported");
+      imported.recompute(calc);
+      return numberAt(imported, calc, count - 1, 0);
+    },
+    dispose: () => {
+      imported?.free();
+      store.free();
+    },
+    restore: () => {
+      imported?.free();
+      imported = undefined;
+    },
+  };
+}
+
+function bindingRowFixture(id: (typeof BINDING_ROW_IDS)[number], count: number): TimedFixture {
+  switch (id) {
+    case "name-define":
+      return nameDefineFixture(count);
+    case "row-insert-names":
+      return rowInsertNamesFixture(count);
+    case "table-append-row":
+      return tableAppendRowFixture(count);
+    case "sort-formula-column":
+      return sortFormulaColumnFixture(count);
+    case "parse-load-qualified":
+      return parseLoadQualifiedFixture(count);
+    case "parse-load-table":
+      return parseLoadTableFixture(count);
+    case "memory-import":
+      return memoryImportFixture(count);
+  }
+}
+
 /** Even rows bind one name, odd rows bind three that build on each other. */
 function letManyFormula(row: number): string {
   const source = `A${row + 1}*$C$1`;
@@ -2427,6 +2805,11 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   for (const id of SHAPE_ROW_IDS) {
     for (const size of smoke ? [1_000] : SHAPE_ROW_SIZES) {
       add(id, size, () => shapeRowFixture(id, size));
+    }
+  }
+  for (const id of BINDING_ROW_IDS) {
+    for (const size of smoke ? [1_000] : BINDING_ROW_SIZES) {
+      add(id, size, () => bindingRowFixture(id, size));
     }
   }
   add("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000));

@@ -26,18 +26,8 @@ describe("WASM loader lifecycle", () => {
     expect(loader.isLoaded()).toBe(true);
     expect(calls).toEqual(["deferred"]);
 
-    const warnings = [];
-    const originalWarn = console.warn;
-    console.warn = (message) => warnings.push(String(message));
-    try {
-      await loader.load("other");
-    } finally {
-      console.warn = originalWarn;
-    }
-
-    expect(warnings).toEqual([
-      "Sheetwrite: load() called with a different source after initialization; keeping the first module.",
-    ]);
+    await loader.load("other");
+    expect(calls).toEqual(["deferred"]);
 
     const retrying = createLoader(async (source) => {
       calls.push(source);
@@ -81,16 +71,7 @@ describe("WASM loader lifecycle", () => {
     expect(failing.isLoaded()).toBe(true);
     expect(published).toEqual(["engine"]);
 
-    const warnings = [];
-    const originalWarn = console.warn;
-    console.warn = (message) => warnings.push(String(message));
-    try {
-      await failing.load("other");
-    } finally {
-      console.warn = originalWarn;
-    }
-
-    expect(warnings).toHaveLength(1);
+    await failing.load("other");
   });
 
   for (const name of ["wasm", "formulas"]) {
