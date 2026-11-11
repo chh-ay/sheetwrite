@@ -1594,9 +1594,7 @@ impl<'a> ComparableCell<'a> {
                     KIND_EMPTY => Self::Empty,
                     KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
                     KIND_STRING => Self::pool_text(strings, payload_str_id(payload))
-                        .map_or(Self::Number(OrderedNumber(payload_num(payload))), |value| {
-                            value
-                        }),
+                        .unwrap_or(Self::Number(OrderedNumber(payload_num(payload)))),
                     _ => Self::Number(OrderedNumber(payload_num(payload))),
                 }
             }

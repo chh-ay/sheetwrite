@@ -57,10 +57,7 @@ pub(crate) fn flat_index(index: usize) -> Result<u32, Diagnostic> {
 
 /// Lengths written for the host saturate at `u32::MAX`, which every decoder rejects.
 pub(crate) fn saturating_u32(value: usize) -> u32 {
-    match u32::try_from(value) {
-        Ok(narrow) => narrow,
-        Err(_) => u32::MAX,
-    }
+    u32::try_from(value).unwrap_or(u32::MAX)
 }
 
 /// A packed row mask: bit i is row i, with low bits first in each byte.
