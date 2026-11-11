@@ -713,6 +713,40 @@ fn named_ranges_resolve_scope_rebase_delete_cycle_and_preserve_unknown_sources()
 }
 
 #[test]
+fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(1, 2);
+    let summary = store.add_sheet(2, 2);
+    store.set_sheet_name(source, "sales", "Sales");
+    store.set_sheet_name(summary, "summary", "Summary");
+    store.set_number(source, 0, 0, 4.0, 0);
+    store.set_number(source, 1, 0, 6.0, 0);
+    store.set_formula(summary, 0, 0, "=Sales!A1+1", 0);
+    store.set_formula(summary, 0, 1, "=SUM(Sales!A1:A2)", 0);
+    store.recompute(summary);
+
+    assert!(store.rename_sheet(source, "sales", "Sales Data"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("='Sales Data'!A1+1")
+    );
+    assert_eq!(
+        store.formula_source(summary, 0, 1).as_deref(),
+        Some("=SUM('Sales Data'!A1:A2)")
+    );
+    assert_close(number(&store, summary, 0, 0), 5.0);
+    assert_close(number(&store, summary, 0, 1), 10.0);
+
+    assert!(store.rename_sheet(source, "sales", "O'Brien"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("='O''Brien'!A1+1")
+    );
+    assert!(store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
+}
+
+#[test]
 fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencies() {
     let mut store = CellStore::new();
     let source = store.add_sheet(1, 2);
@@ -904,6 +938,29 @@ fn skipped_and_unloaded_window_cells_have_no_style() {
 }
 
 #[test]
+fn match_cache_handles_repeats_eviction_and_collisions() {
+    let mut store = CellStore::new();
+    // More distinct values than MATCH_CACHE_SLOTS (1024) so str_ids collide
+    // mod slot count and evict each other mid-scan.
+    let rows = 3000usize;
+    let sheet = store.add_sheet(2, rows);
+    for r in 0..rows {
+        store.set_string(sheet, r, 0, &format!("item{r}"), 0);
+        store.set_string(sheet, r, 1, if r % 3 == 0 { "Tokyo" } else { "Berlin" }, 0);
+    }
+
+    // Unique column: a colliding/evicting cache must still equal a brute scan.
+    let expected: Vec<u32> = (0..rows)
+        .filter(|r| format!("item{r}").contains('7'))
+        .map(|r| r as u32)
+        .collect();
+    assert_eq!(store.filter_rows(sheet, 0, "7"), expected);
+
+    let tokyo: Vec<u32> = (0..rows).step_by(3).map(|r| r as u32).collect();
+    assert_eq!(store.filter_rows(sheet, 1, "tokyo"), tokyo);
+}
+
+#[test]
 fn numeric_sort_radix_boundary_matches_comparison_contract() {
     let mut store = CellStore::new();
     let rows = 4_096usize;
@@ -967,6 +1024,46 @@ fn data_edge_follows_google_ctrl_arrow_semantics() {
 
     assert_eq!(store.data_edge(99, 0, 0, 1, 0), 0);
     assert_eq!(store.data_edge(sheet, 50, 0, 1, 0), 0);
+}
+
+#[test]
+fn structural_edits_rewrite_cross_sheet_targets_and_preserve_qualifiers() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(2, 5);
+    let other = store.add_sheet(2, 5);
+    let summary = store.add_sheet(3, 5);
+    store.set_sheet_name(source, "source", "Source Data");
+    store.set_sheet_name(other, "other", "Other");
+    store.set_sheet_name(summary, "summary", "Summary");
+    store.set_number(source, 1, 0, 9.0, 0);
+    store.set_number(other, 0, 0, 7.0, 0);
+    store.set_formula(summary, 0, 0, "='Source Data'!$A$2", 0);
+    store.set_formula(summary, 1, 0, "=Other!A1", 0);
+    store.recompute(summary);
+
+    store.add_rows(source, 1, 1);
+    store.recompute(source);
+    store.recompute(summary);
+    assert_close(number(&store, summary, 0, 0), 9.0);
+    assert_close(number(&store, summary, 1, 0), 7.0);
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("='Source Data'!$A$3")
+    );
+    assert_eq!(
+        store.formula_source(summary, 1, 0).as_deref(),
+        Some("=Other!A1")
+    );
+
+    store.remove_rows(source, 2, 1);
+    store.recompute(source);
+    store.recompute(summary);
+    assert_eq!(string(&store, summary, 0, 0).as_deref(), Some("#REF!"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("=#REF!")
+    );
+    assert_close(number(&store, summary, 1, 0), 7.0);
 }
 
 #[test]
@@ -1300,6 +1397,23 @@ fn many_scalar_writes_before_a_bulk_write_recompute_every_reader() {
 }
 
 #[test]
+fn rectangle_clear_releases_attempted_spill_without_disturbing_other_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 6000);
+    store.set_number(sheet, 4999, 0, 1.0, 0);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(5000)", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(2,1,20)", 0);
+    store.commit_sources();
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#SPILL!"));
+
+    assert!(store.clear_range(sheet, 1, 0, 5000, 0, true, false));
+    assert_close(number(&store, sheet, 1, 2), 21.0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 4999, 0), 5000.0);
+    assert_close(number(&store, sheet, 1, 2), 21.0);
+}
+
+#[test]
 fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 3);
@@ -1367,6 +1481,40 @@ fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
         string(&store, sheet, 0, 1).as_deref(),
         Some("formula survivor")
     );
+}
+
+#[test]
+fn paged_derived_text_is_remapped_by_collection_but_not_captured_as_source() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 3, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    for row in 0..3 {
+        store.clear_cell(sheet, row, 0, 0);
+    }
+    for edit in 0..100 {
+        store.set_string(sheet, 0, 1, &format!("obsolete-{edit}"), 0);
+    }
+    store.set_formula(
+        sheet,
+        0,
+        0,
+        "={\"anchor\";\"first child\";\"second child\"}",
+        0,
+    );
+    store.commit_sources();
+    store.clear_cell(sheet, 0, 1, 0);
+    store.compact_string_storage();
+    assert!(store.string_pool_epoch() > 0);
+    assert_eq!(
+        [0, 1, 2].map(|row| string(&store, sheet, row, 0)),
+        [
+            Some("anchor".into()),
+            Some("first child".into()),
+            Some("second child".into())
+        ],
+    );
+    let snapshot = store.capture_range(sheet, 0, 0, 3, 1).unwrap();
+    assert_eq!(store.snapshot_texts(&snapshot), vec!["", "", ""]);
+    assert_eq!(snapshot.kinds(), vec![KIND_FORMULA, KIND_EMPTY, KIND_EMPTY]);
 }
 
 #[test]
@@ -2805,6 +2953,32 @@ fn spill_references_follow_the_current_spill_of_their_anchor() {
 }
 
 #[test]
+fn spill_references_shift_with_their_anchor_and_break_when_it_is_deleted() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 12);
+    store.set_formula(sheet, 2, 0, "=SEQUENCE(2)", 0);
+    store.set_formula(sheet, 0, 2, "=SUM(A3#)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 2), 3.0);
+
+    store.remove_rows(sheet, 1, 1);
+    store.recompute(sheet);
+    assert_eq!(
+        store.formula_source(sheet, 0, 2).as_deref(),
+        Some("=SUM(A2#)")
+    );
+    assert_close(number(&store, sheet, 0, 2), 3.0);
+
+    store.remove_rows(sheet, 1, 1);
+    store.recompute(sheet);
+    assert_eq!(
+        store.formula_source(sheet, 0, 2).as_deref(),
+        Some("=SUM(#REF!)")
+    );
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#REF!"));
+}
+
+#[test]
 fn a_spill_that_reads_a_later_one_cell_spill_sees_it() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(10, 10);
@@ -2857,6 +3031,23 @@ fn dirty_formula_work_survives_replacement_before_the_pass() {
 /// recalculates only when something it reads changed.
 mod volatile_recalculation {
     use super::*;
+
+    #[test]
+    fn moved_volatile_formulas_keep_recalculating_at_their_new_cells() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 2);
+        store.set_formula(sheet, 0, 0, "=RAND()", 0);
+        store.commit_sources();
+
+        store.insert_cols(sheet, 0, 1);
+        store.commit_sources();
+        let moved_draw = number(&store, sheet, 0, 1);
+        store.set_number(sheet, 1, 3, 1.0, 0);
+        store.commit_sources();
+
+        assert_ne!(number(&store, sheet, 0, 1), moved_draw);
+        assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_EMPTY);
+    }
 
     #[test]
     fn rand_and_randbetween_draw_inside_their_bounds_and_reject_invalid_ones() {
@@ -3067,6 +3258,51 @@ fn offset_indirect_errors_reject_invalid_references_and_propagate_input_errors()
 }
 
 #[test]
+fn offset_indirect_structural_edits_rebase_references_but_not_address_text() {
+    for edit_rows in [true, false] {
+        let mut store = CellStore::new();
+        let source = store.add_sheet(5, 5);
+        let report = store.add_sheet(2, 2);
+        store.set_sheet_name(source, "source", "Source");
+        store.set_number(source, 1, 1, 10.0, 0);
+        store.set_number(source, 2, 1, 30.0, 0);
+        store.set_number(source, 1, 2, 20.0, 0);
+        store.set_formula(report, 0, 0, "=OFFSET(Source!B2,0,0)", 0);
+        store.set_formula(report, 0, 1, "=INDIRECT(\"Source!B2\")", 0);
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 10.0);
+        if edit_rows {
+            store.add_rows(source, 1, 1);
+        } else {
+            store.insert_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 0.0);
+        if edit_rows {
+            store.remove_rows(source, 1, 1);
+        } else {
+            store.remove_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 10.0);
+        if edit_rows {
+            store.remove_rows(source, 1, 1);
+        } else {
+            store.remove_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_eq!(string(&store, report, 0, 0).as_deref(), Some("#REF!"));
+        assert_close(
+            number(&store, report, 0, 1),
+            if edit_rows { 30.0 } else { 20.0 },
+        );
+    }
+}
+
+#[test]
 fn offset_indirect_runtime_self_cycles_fail_and_recover_when_the_target_changes() {
     for (formula, initial_target, recovered_target) in [
         ("=INDIRECT(C1)", "A1", "B1"),
@@ -3110,6 +3346,27 @@ fn offset_indirect_runtime_mutual_cycles_propagate_and_recover() {
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 0), 7.0);
     assert_close(number(&store, sheet, 0, 3), 8.0);
+}
+
+#[test]
+fn offset_indirect_spill_obstructions_preserve_sources_and_clear_on_retry() {
+    for formula in ["=OFFSET(A1,0,0,2,1)", "=INDIRECT(\"A1:A2\")"] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_number(sheet, 1, 0, 9.0, 0);
+        store.set_number(sheet, 1, 2, 99.0, 0);
+        store.set_formula(sheet, 0, 2, formula, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#SPILL!"));
+        assert_close(number(&store, sheet, 1, 2), 99.0);
+        assert_close(number(&store, sheet, 1, 0), 9.0);
+        store.clear_cell(sheet, 1, 2, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 5.0);
+        assert_close(number(&store, sheet, 1, 2), 9.0);
+        assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some(formula));
+    }
 }
 
 #[test]
@@ -3353,6 +3610,28 @@ fn offset_indirect_merged_reads_do_not_report_a_false_cycle() {
 }
 
 #[test]
+fn offset_indirect_sheet_rename_and_removal_refresh_text_addresses() {
+    let mut store = CellStore::new();
+    let data = store.add_sheet(1, 1);
+    let report = store.add_sheet(2, 1);
+    store.set_sheet_name(data, "data", "Data");
+    store.set_sheet_name(report, "report", "Report");
+    store.set_number(data, 0, 0, 7.0, 0);
+    store.set_formula(report, 0, 0, "=INDIRECT(\"Data!A1\")", 0);
+    store.set_formula(report, 0, 1, "=INDIRECT(\"New!A1\")", 0);
+    store.recompute(report);
+    assert_close(number(&store, report, 0, 0), 7.0);
+    assert_eq!(string(&store, report, 0, 1).as_deref(), Some("#REF!"));
+
+    assert!(store.rename_sheet(data, "data", "New"));
+    assert_eq!(string(&store, report, 0, 0).as_deref(), Some("#REF!"));
+    assert_close(number(&store, report, 0, 1), 7.0);
+
+    assert!(store.remove_sheet(data));
+    assert_eq!(string(&store, report, 0, 1).as_deref(), Some("#REF!"));
+}
+
+#[test]
 fn offset_indirect_spills_with_evaluated_shapes_share_the_spill_budget_by_size() {
     // Shapes known only after evaluation must not charge the whole spill
     // budget each, or a few rows of them would turn into #NUM!.
@@ -3440,6 +3719,26 @@ mod reference_operators {
             store.formula_source(sheet, 0, 6).as_deref(),
             Some("=SUM(A1:C3 B2:D4)")
         );
+    }
+
+    #[test]
+    fn an_intersection_with_a_deleted_operand_parses_back_as_ref_error() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(4, 4);
+        store.set_sheet_name(data, "Data", "Data");
+        let main = grid_sheet(&mut store, 4);
+        store.set_sheet_name(main, "Main", "Main");
+        store.set_formula(main, 0, 6, "=SUM(Data!A1:C3 B2:D4)", 0);
+        store.recompute(main);
+
+        assert!(store.remove_sheet(data));
+        let source = store.formula_source(main, 0, 6).unwrap_or_default();
+        assert_eq!(source, "=SUM(#REF! B2:D4)");
+
+        // A reload parses the stored text again.
+        store.set_formula(main, 0, 6, &source, 0);
+        store.recompute(main);
+        assert_eq!(string(&store, main, 0, 6).as_deref(), Some("#REF!"));
     }
 
     #[test]
