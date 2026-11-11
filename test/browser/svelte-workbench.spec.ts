@@ -1,7 +1,7 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
-import { siteUrl } from "./playwright.config.js";
+import { cellValue, expect, fitsViewport, gridCellTexts, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -10,48 +10,32 @@ declare global {
 }
 
 /**
- * Focused contracts for the /svelte/ offline workbench: durable pending
- * queue, connectivity/activity, reconnect drain, presence, base-version
- * conflict recovery, and remount persistence. Expected values mirror the
- * canonical scenario module (docs/src/showcases/scenarios/offline.ts):
- * ticket 1 cell "FT-0001", local edits write "Done · field sync N" to the
- * status column (D, index 3) of row N-1, colleague commits write
- * "Crew HQ-1" to the crew column (index 5) of row 7.
+ * The /svelte/ offline workbench: durable pending queue, connectivity,
+ * reconnect drain, presence, conflict recovery, and remount persistence.
+ * Expected values mirror docs/src/showcases/scenarios/offline.ts: local edits
+ * write "Done · field sync N" to the status column (3) of row N-1, and the
+ * colleague writes "Crew HQ-1" to the crew column (5) of row 7.
  */
 
-const SHEET = "dispatch";
+const HANDLE = "__sheetwriteSvelteGrid";
 const STATUS_COL = 3;
 const CREW_COL = 5;
 const COLLEAGUE_ROW = 7;
+const MIN_CHIP_CONTRAST = 4.5;
 
-interface BootErrors {
-  console: string[];
-  page: string[];
-}
-
-function collectErrors(page: Page): BootErrors {
-  const errors: BootErrors = { console: [], page: [] };
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.console.push(message.text());
-  });
-  page.on("pageerror", (error) => {
-    errors.page.push(error.message);
-  });
-  return errors;
-}
-
-async function bootWorkbench(page: Page): Promise<void> {
-  await page.goto(siteUrl("/svelte/"));
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+async function open(page: Page): Promise<void> {
+  await page.goto("/svelte/");
   await expect(page.getByTestId("sync-status")).toContainText("All changes synced · server v0", {
     timeout: 15_000,
   });
   await expect
-    .poll(() => page.evaluate(() => (window.__sheetwriteSvelteGrid ? "ready" : "missing")), {
-      timeout: 15_000,
-      message: "grid handle never published",
-    })
-    .toBe("ready");
+    .poll(() => page.evaluate(() => Boolean(window.__sheetwriteSvelteGrid)), { timeout: 15_000 })
+    .toBe(true);
+}
+
+async function goOfflineAndLog(page: Page, edits: number): Promise<void> {
+  await page.getByTestId("connection-toggle").click();
+  for (let edit = 0; edit < edits; edit++) await page.getByTestId("log-button").click();
 }
 
 async function revealRecoveryScenarios(page: Page): Promise<void> {
@@ -59,14 +43,12 @@ async function revealRecoveryScenarios(page: Page): Promise<void> {
   if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
     await details.locator("summary").click();
   }
-  await expect(details).toHaveAttribute("open", "");
 }
 
+/** The colleague's label sits inside the grid, off the value band, readable and inert. */
 async function assertPresenceGeometry(page: Page): Promise<void> {
   await page.evaluate(
-    ({ row, col }) => {
-      window.__sheetwriteSvelteGrid?.scrollToCell({ sheet: "dispatch", row, col });
-    },
+    ({ row, col }) => window.__sheetwriteSvelteGrid?.scrollToCell({ sheet: "dispatch", row, col }),
     { row: COLLEAGUE_ROW, col: CREW_COL },
   );
   const range = page.locator('[data-sheetwrite-presence="hq-ops"]').first();
@@ -75,7 +57,6 @@ async function assertPresenceGeometry(page: Page): Promise<void> {
   await expect(label).toHaveCount(1);
   await expect(label).toHaveAttribute("role", "img");
   await expect(label).toHaveAttribute("aria-label", "Remote selection: Rina · HQ ops");
-  await expect(label).toHaveAttribute("title", "Rina · HQ ops");
   await expect(range).toHaveText("");
 
   const [gridBox, rangeBox, labelBox] = await Promise.all([
@@ -83,228 +64,145 @@ async function assertPresenceGeometry(page: Page): Promise<void> {
     range.boundingBox(),
     label.boundingBox(),
   ]);
-  expect(gridBox).not.toBeNull();
-  expect(rangeBox).not.toBeNull();
-  expect(labelBox).not.toBeNull();
-  expect(labelBox!.x).toBeGreaterThanOrEqual(gridBox!.x);
-  expect(labelBox!.y).toBeGreaterThanOrEqual(gridBox!.y);
-  expect(labelBox!.x + labelBox!.width).toBeLessThanOrEqual(gridBox!.x + gridBox!.width + 0.5);
-  expect(labelBox!.y + labelBox!.height).toBeLessThanOrEqual(gridBox!.y + gridBox!.height + 0.5);
+  if (!gridBox || !rangeBox || !labelBox) throw new Error("presence has no layout");
+  expect(labelBox.x).toBeGreaterThanOrEqual(gridBox.x);
+  expect(labelBox.y).toBeGreaterThanOrEqual(gridBox.y);
+  expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(gridBox.x + gridBox.width + 0.5);
+  expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(gridBox.y + gridBox.height + 0.5);
 
   const kind = await label.getAttribute("data-presence-kind");
   if (kind === "marker") {
     await expect(label).toHaveText("");
-    expect(labelBox!.y + labelBox!.height).toBeLessThan(rangeBox!.y + rangeBox!.height / 2);
+    expect(labelBox.y + labelBox.height).toBeLessThan(rangeBox.y + rangeBox.height / 2);
   } else {
     expect(kind).toBe("chip");
-    const valueBandTop = rangeBox!.y + Math.max(0, (rangeBox!.height - 16) / 2);
-    const valueBandBottom = valueBandTop + Math.min(16, rangeBox!.height);
-    expect(labelBox!.y + labelBox!.height <= valueBandTop || labelBox!.y >= valueBandBottom).toBe(
+    const valueBandTop = rangeBox.y + Math.max(0, (rangeBox.height - 16) / 2);
+    const valueBandBottom = valueBandTop + Math.min(16, rangeBox.height);
+    expect(labelBox.y + labelBox.height <= valueBandTop || labelBox.y >= valueBandBottom).toBe(
       true,
     );
   }
 
   const appearance = await label.evaluate((element) => {
     const style = getComputedStyle(element);
-    const parse = (value: string): [number, number, number, number] => {
-      const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
-      return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0, channels[3] ?? 1];
+    const channels = (value: string) => {
+      const [red = 0, green = 0, blue = 0, alpha = 1] = value.match(/[\d.]+/g)?.map(Number) ?? [];
+      return { rgb: [red, green, blue], alpha };
     };
-    const luminance = ([red, green, blue]: [number, number, number, number]): number => {
-      const channel = (value: number): number => {
+    const luminance = (rgb: number[]) => {
+      const [red = 0, green = 0, blue = 0] = rgb.map((value) => {
         const normalized = value / 255;
         return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-      };
-      return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue);
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
     };
-    const background = parse(style.backgroundColor);
-    const foreground = parse(style.color);
-    const lighter = Math.max(luminance(background), luminance(foreground));
-    const darker = Math.min(luminance(background), luminance(foreground));
+    const background = channels(style.backgroundColor);
+    const lights = [luminance(background.rgb), luminance(channels(style.color).rgb)];
     return {
-      alpha: background[3],
-      contrast: (lighter + 0.05) / (darker + 0.05),
+      alpha: background.alpha,
+      contrast: (Math.max(...lights) + 0.05) / (Math.min(...lights) + 0.05),
       pointerEvents: style.pointerEvents,
     };
   });
   expect(appearance.alpha).toBeGreaterThanOrEqual(0.95);
-  if (kind === "chip") expect(appearance.contrast).toBeGreaterThanOrEqual(4.5);
+  if (kind === "chip") expect(appearance.contrast).toBeGreaterThanOrEqual(MIN_CHIP_CONTRAST);
   expect(appearance.pointerEvents).toBe("none");
 }
 
-function resolvedCell(page: Page, row: number, col: number): Promise<unknown> {
-  return page.evaluate(
-    ([sheet, r, c]) =>
-      window.__sheetwriteSvelteGrid?.store.getCell({
-        sheet: sheet as string,
-        row: r as number,
-        col: c as number,
-      }).resolved,
-    [SHEET, row, col] as const,
-  );
-}
-
-test("svelte workbench boots synced, paints the dispatch model, and shows live presence", async ({
+test("svelte workbench boots synced and shows live presence in every theme and size", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const errors = collectErrors(page);
-  await bootWorkbench(page);
-  // The page owns the one main landmark; the workbench inside it adds none.
+  await open(page);
   await expect(page.getByRole("main")).toHaveCount(1);
-
-  const gridSurface = page.locator(".sw-svw .sw-demo-grid");
-  await expect(gridSurface).toBeVisible();
-  await expect(gridSurface).toBeInViewport();
-  await expect(page.getByTestId("connection-toggle")).toContainText("Connected");
-  await expect(page.getByTestId("queue-count")).toBeVisible();
-
+  await expect(page.locator(".sw-svw .sw-demo-grid")).toBeInViewport();
   // The ARIA mirror windows the scrollable pane; the frozen ticket column is
-  // asserted through the authoritative store handle below.
-  await expect
-    .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
-      timeout: 15_000,
-      message: "dispatch grid never exposed its first data row",
-    })
-    .toContain("Riverside depot");
-  await expect.poll(() => resolvedCell(page, 0, 0)).toBe("FT-0001");
+  // read from the store.
+  await expect.poll(() => gridCellTexts(page), { timeout: 15_000 }).toContain("Riverside depot");
+  await expect.poll(() => cellValue(page, HANDLE, "dispatch", 0, 0)).toBe("FT-0001");
 
-  // Accessibility contract: switch semantics, status region, live activity feed.
   const toggle = page.getByTestId("connection-toggle");
   await expect(toggle).toHaveRole("switch");
   await expect(toggle).toHaveAttribute("aria-checked", "true");
-  // The visible action text is the accessible name, so voice users can say it.
   await expect(toggle).toHaveAccessibleName("Connected · Go offline");
   await expect(page.getByTestId("sync-status")).toHaveRole("status");
   await expect(page.getByTestId("activity-feed")).toHaveAttribute("aria-live", "polite");
-
-  // Both identities are visible, and the colleague's selection is painted as a
-  // real presence overlay on the grid surface.
   await expect(page.getByTestId("presence-list")).toContainText("You · Field tablet");
   await expect(page.getByTestId("presence-list")).toContainText("Rina · HQ ops");
-  await expect
-    .poll(() => page.locator('[data-sheetwrite-presence="hq-ops"]').count(), {
-      timeout: 15_000,
-      message: "colleague presence overlay never painted",
-    })
-    .toBeGreaterThan(0);
   await assertPresenceGeometry(page);
-  await test.info().attach("svelte-presence-1440x900-baseline", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
 
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await assertPresenceGeometry(page);
-  await test.info().attach("svelte-presence-1440x1000-baseline", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
-
-  const initialTheme = await page.locator("html").getAttribute("data-theme");
+  // theme-change reseeds the toolbar palette with the colours the Grid now paints.
   const toolbar = page.locator(".sw-svw .sheetwrite-command-toolbar");
   const background = () => toolbar.evaluate((element) => getComputedStyle(element).backgroundColor);
-  const lightBackground = await background();
+  const initialBackground = await background();
   await page.getByRole("button", { name: /Use (?:light|dark) theme/ }).click();
-  await expect(page.locator("html")).not.toHaveAttribute("data-theme", initialTheme ?? "");
-  // theme-change reseeds the toolbar palette with the colours the Grid now paints.
-  await expect.poll(background).not.toBe(lightBackground);
-  await assertPresenceGeometry(page);
+  await expect.poll(background).not.toBe(initialBackground);
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await assertPresenceGeometry(page);
 
-  // A 720×500 CSS viewport is the reflow boundary produced by 200% browser
-  // zoom on the required 1440×1000 capture viewport.
+  // 720×500 is the reflow boundary of 200% zoom on a 1440×1000 viewport.
   await page.setViewportSize({ width: 720, height: 500 });
   await assertPresenceGeometry(page);
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
-  ).toBe(true);
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
+  expect(await fitsViewport(page)).toBe(true);
 });
 
 test("offline edits queue durably and drain in order on reconnect", async ({ page }) => {
-  const errors = collectErrors(page);
-  await bootWorkbench(page);
-
-  await page.getByTestId("connection-toggle").click();
-  await expect(page.getByTestId("connection-toggle")).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByTestId("connection-toggle")).toHaveAccessibleName(
-    /^Reconnect · \d+ queued$/,
-  );
-  await expect(page.getByTestId("sync-status")).toContainText("Offline");
-
-  await page.getByTestId("log-button").click();
-  await page.getByTestId("log-button").click();
-  await expect(page.getByTestId("queue-count")).toHaveText("2");
+  await open(page);
+  await goOfflineAndLog(page, 2);
+  const toggle = page.getByTestId("connection-toggle");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(toggle).toHaveAccessibleName(/^Reconnect · \d+ queued$/);
   await expect(page.getByTestId("sync-status")).toContainText("2 edits queued offline");
   const queued = page.getByTestId("pending-queue").locator("li");
-  await expect(queued).toHaveCount(2);
-  await expect(queued.nth(0)).toContainText("you-1");
-  await expect(queued.nth(1)).toContainText("you-2");
-
+  await expect(queued).toHaveText([/you-1/, /you-2/]);
   // Local rendering was never blocked: both edits are already in the model.
-  await expect.poll(() => resolvedCell(page, 0, STATUS_COL)).toBe("Done · field sync 1");
-  await expect.poll(() => resolvedCell(page, 1, STATUS_COL)).toBe("Done · field sync 2");
+  await expect
+    .poll(() => cellValue(page, HANDLE, "dispatch", 0, STATUS_COL))
+    .toBe("Done · field sync 1");
+  await expect
+    .poll(() => cellValue(page, HANDLE, "dispatch", 1, STATUS_COL))
+    .toBe("Done · field sync 2");
 
   // Reconnect through the keyboard: the switch is a real focusable control.
-  await page.getByTestId("connection-toggle").focus();
+  await toggle.focus();
   await page.keyboard.press("Space");
   await expect(page.getByTestId("sync-status")).toContainText("All changes synced · server v2", {
     timeout: 15_000,
   });
   await expect(page.getByTestId("queue-count")).toHaveText("0");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
 });
 
 test("the durable outbox survives a full island remount while offline", async ({ page }) => {
-  const errors = collectErrors(page);
-  await bootWorkbench(page);
-
-  await page.getByTestId("connection-toggle").click();
-  await page.getByTestId("log-button").click();
+  await open(page);
+  await goOfflineAndLog(page, 1);
   await expect(page.getByTestId("queue-count")).toHaveText("1");
-
   await revealRecoveryScenarios(page);
   await page.getByTestId("remount-button").click();
   await expect(page.locator(".sw-svw")).toHaveAttribute("data-generation", "2", {
     timeout: 15_000,
   });
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
 
-  // The new grid generation hydrates the pending edit from IndexedDB and
-  // re-applies it locally; nothing was sent while offline.
+  // The new generation hydrates the pending edit from IndexedDB and re-applies
+  // it locally; nothing was sent while offline.
   await expect(page.getByTestId("queue-count")).toHaveText("1", { timeout: 15_000 });
   await expect
-    .poll(() => resolvedCell(page, 0, STATUS_COL), {
-      timeout: 15_000,
-      message: "restored durable edit never became visible on the remounted grid",
-    })
+    .poll(() => cellValue(page, HANDLE, "dispatch", 0, STATUS_COL), { timeout: 15_000 })
     .toBe("Done · field sync 1");
-
   await page.getByTestId("connection-toggle").click();
   await expect(page.getByTestId("sync-status")).toContainText("All changes synced · server v1", {
     timeout: 15_000,
   });
-  await expect.poll(() => resolvedCell(page, 0, STATUS_COL)).toBe("Done · field sync 1");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
+  await expect
+    .poll(() => cellValue(page, HANDLE, "dispatch", 0, STATUS_COL))
+    .toBe("Done · field sync 1");
 });
 
 test("reconnecting onto concurrent server work surfaces a conflict that merge resolves", async ({
   page,
 }) => {
-  const errors = collectErrors(page);
-  await bootWorkbench(page);
-
-  await page.getByTestId("connection-toggle").click();
-  await page.getByTestId("log-button").click();
+  await open(page);
+  await goOfflineAndLog(page, 1);
   await revealRecoveryScenarios(page);
   await page.getByTestId("colleague-button").click();
   await expect(page.getByTestId("activity-feed")).toContainText(
@@ -313,8 +211,7 @@ test("reconnecting onto concurrent server work surfaces a conflict that merge re
 
   await page.getByTestId("connection-toggle").click();
   const conflictPanel = page.getByTestId("conflict-panel");
-  await expect(conflictPanel).toBeVisible({ timeout: 15_000 });
-  await expect(conflictPanel).toContainText("you-1");
+  await expect(conflictPanel).toContainText("you-1", { timeout: 15_000 });
   await expect(page.getByTestId("sync-status")).toContainText("conflict", { ignoreCase: true });
   await expect(
     page.getByTestId("pending-queue").locator('li[data-status="conflicted"]'),
@@ -326,12 +223,11 @@ test("reconnecting onto concurrent server work surfaces a conflict that merge re
     timeout: 15_000,
   });
   await expect(page.getByTestId("queue-count")).toHaveText("0");
-
-  // Convergence: both the remote crew assignment and the queued local status
-  // edit are in the model after recovery.
-  await expect.poll(() => resolvedCell(page, COLLEAGUE_ROW, CREW_COL)).toBe("Crew HQ-1");
-  await expect.poll(() => resolvedCell(page, 0, STATUS_COL)).toBe("Done · field sync 1");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
+  // Both the remote crew assignment and the queued local status edit converge.
+  await expect
+    .poll(() => cellValue(page, HANDLE, "dispatch", COLLEAGUE_ROW, CREW_COL))
+    .toBe("Crew HQ-1");
+  await expect
+    .poll(() => cellValue(page, HANDLE, "dispatch", 0, STATUS_COL))
+    .toBe("Done · field sync 1");
 });

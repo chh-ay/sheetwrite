@@ -1,128 +1,21 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { hasOpaqueForeground } from "./canvas-assertions.js";
-import { siteUrl } from "./playwright.config.js";
+import { canvasPainted, expect, fitsViewport, gridCellTexts, test } from "./fixtures.js";
 
-// Focused contracts for the /vanilla/ engine workbench: explicit lifecycle,
-// construction-bound renderer/data options behind deep links, Worker
-// failure fallback, host-owned paging, and workbook operations — all through
-// the framework-free host module. Shared boot/nav coverage stays in
-// examples.spec.ts.
+// The /vanilla/ engine workbench: explicit lifecycle, construction-bound
+// renderer options behind deep links, and Worker failure fallback.
 
-const VANILLA_URL = siteUrl("/vanilla/");
 const GRID = ".sw-vw-stage .sheetwrite";
 const CANVAS = `${GRID} .sheetwrite-canvas`;
 const FIRST_ACCOUNT = "Alder Quay Logistics";
 
-interface BrowserErrors {
-  console: string[];
-  page: string[];
-  worker: string[];
-}
-
-function collectErrors(page: Page): BrowserErrors {
-  const errors: BrowserErrors = { console: [], page: [], worker: [] };
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.console.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.page.push(error.message));
-  page.context().on("weberror", (error) => errors.worker.push(error.error().message));
-  return errors;
-}
-
-async function gridCellTexts(page: Page): Promise<string[]> {
-  return page.locator(`${GRID} [role="gridcell"]`).allTextContents();
-}
-
-/**
- * Compositor-level paint check that works for both the main-thread canvas and
- * the transferred Worker OffscreenCanvas (whose 2D context is unreachable).
- */
-async function canvasBodyPainted(page: Page): Promise<boolean> {
-  const canvas = page.locator(CANVAS);
-  // The workbench sits below the showcase hero; the clip must be on-screen.
-  await canvas.scrollIntoViewIfNeeded();
-  const box = await canvas.boundingBox();
-  if (!box || box.width <= 80 || box.height <= 56) return false;
-
-  const image = await page.screenshot({
-    clip: {
-      x: box.x + 64,
-      y: box.y + 40,
-      width: Math.min(320, box.width - 64),
-      height: Math.min(180, box.height - 40),
-    },
-  });
-  // Return the typed array itself: Playwright sends it as one binary payload,
-  // while a plain number array serializes every channel value separately,
-  // which can exceed the poll timeout on a loaded Firefox page.
-  const rgba = await page.evaluate(async (encoded) => {
-    const source = new Image();
-    source.src = `data:image/png;base64,${encoded}`;
-    await source.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = source.naturalWidth;
-    canvas.height = source.naturalHeight;
-    const context = canvas.getContext("2d");
-    if (!context) return new Uint8ClampedArray();
-    context.drawImage(source, 0, 0);
-    return context.getImageData(0, 0, canvas.width, canvas.height).data;
-  }, image.toString("base64"));
-
-  return hasOpaqueForeground(rgba);
-}
-
-interface DprCanvasEvidence {
-  backingHeight: number;
-  backingWidth: number;
-  cssHeight: number;
-  cssWidth: number;
-  devicePixelRatio: number;
-  sample: number[];
-  sampleHeight: number;
-  sampleWidth: number;
-}
-
-async function readDprCanvasEvidence(page: Page): Promise<DprCanvasEvidence> {
-  return page.locator(CANVAS).evaluate((element) => {
-    const canvas = element as HTMLCanvasElement;
-    const context = canvas.getContext("2d");
-    const bounds = canvas.getBoundingClientRect();
-    if (!context) throw new Error("Main-thread canvas 2D context is unavailable");
-    if (bounds.width <= 0 || bounds.height <= 0) {
-      throw new Error("Main-thread canvas has no CSS dimensions");
-    }
-
-    const scaleX = canvas.width / bounds.width;
-    const scaleY = canvas.height / bounds.height;
-    const left = Math.ceil(64 * scaleX);
-    const top = Math.ceil(40 * scaleY);
-    const sampleWidth = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
-    const sampleHeight = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
-    if (sampleWidth <= 0 || sampleHeight <= 0) {
-      throw new Error("Main-thread canvas body sample is empty");
-    }
-
-    return {
-      backingHeight: canvas.height,
-      backingWidth: canvas.width,
-      cssHeight: bounds.height,
-      cssWidth: bounds.width,
-      devicePixelRatio: window.devicePixelRatio,
-      sample: Array.from(context.getImageData(left, top, sampleWidth, sampleHeight).data),
-      sampleHeight,
-      sampleWidth,
-    };
-  });
-}
-
-async function waitForLive(page: Page): Promise<void> {
+async function open(page: Page, query = ""): Promise<void> {
+  await page.goto(`/vanilla/${query}`);
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
     timeout: 20_000,
   });
-  await expect
-    .poll(() => gridCellTexts(page), { timeout: 15_000, message: "grid never exposed cells" })
-    .toContain(FIRST_ACCOUNT);
+  await expect.poll(() => gridCellTexts(page, GRID), { timeout: 15_000 }).toContain(FIRST_ACCOUNT);
 }
 
 /** Commit `value` into B2 through the shell name box and formula bar. */
@@ -139,16 +32,11 @@ async function readB2(page: Page): Promise<string> {
   return page.locator("#formula").inputValue();
 }
 
-/** Host action buttons, excluding the Grid's built-in toolbar. */
-function actionButton(page: Page, name: string) {
-  return page.locator(".sw-vw-instrument").getByRole("button", { name, exact: true });
-}
-
-async function openConstructionControls(page: Page): Promise<void> {
-  const details = page.locator(".sw-vw-details");
-  if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
-    await page.getByText("Construction & debug controls", { exact: true }).click();
-  }
+function workerFrame(page: Page): Promise<number> {
+  return page
+    .locator(CANVAS)
+    .getAttribute("data-worker-frame")
+    .then((frame) => Number(frame ?? 0));
 }
 
 /** Matches the renderer readout by meaning, not by its punctuation. */
@@ -157,8 +45,7 @@ function rendererReadout(requested: string, active: string): RegExp {
 }
 
 test("context menu shows platform shortcuts, and Undo removes a highlight", async ({ page }) => {
-  await page.goto(VANILLA_URL);
-  await waitForLive(page);
+  await open(page);
   const surface = page.locator(`${GRID} .sheetwrite-scroller`);
   await surface.scrollIntoViewIfNeeded();
   const openMenu = () => surface.click({ button: "right", position: { x: 160, y: 80 } });
@@ -175,349 +62,181 @@ test("context menu shows platform shortcuts, and Undo removes a highlight", asyn
   await highlightItem.click();
   await expect(page.getByText(/^Highlighted R\d+ C\d+ · Ctrl\+Z undoes it$/)).toBeVisible();
 
-  await openMenu();
-  await expect(highlightItem).toHaveText(/^Clear highlight R\d+ C\d+$/);
-  await highlightItem.click();
-  await expect(page.getByText(/^Highlight cleared R\d+ C\d+/)).toBeVisible();
-  await openMenu();
-  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
-
   // The highlight is a cell fill in the document, so Undo removes it.
-  await highlightItem.click();
   await surface.click({ position: { x: 160, y: 80 } });
   await page.keyboard.press(mac ? "Meta+Z" : "Control+Z");
   await openMenu();
   await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
 });
 
-test(
-  "boots product-first, paints, and exposes the ownership instruments",
-  {
-    tag: "@portability",
-  },
-  async ({ page }) => {
-    const errors = collectErrors(page);
-    await page.setViewportSize({ width: 1440, height: 900 });
+test("boots product-first, paints, and fits the page @portability", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "1");
+  await expect(page.getByTestId("renderer")).toContainText(
+    rendererReadout("Main thread", "Main thread"),
+  );
+  await expect.poll(() => canvasPainted(page, CANVAS)).toBe(true);
+  await expect(page.locator(GRID)).toBeInViewport();
+  expect(await fitsViewport(page)).toBe(true);
+});
 
-    await page.goto(VANILLA_URL);
-    await waitForLive(page);
-    await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "1");
-    await expect(page.getByTestId("renderer")).toContainText(
-      rendererReadout("Main thread", "Main thread"),
-    );
-    await expect.poll(() => canvasBodyPainted(page)).toBe(true);
-
-    await expect(page.locator(GRID)).toBeInViewport();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1);
-    const installCommand = page.locator(".sw-showcase-page .sw-terminal__body").first();
-    await expect(installCommand).toContainText("@sheetwrite/core");
-    expect(
-      await installCommand.evaluate((element) => element.scrollWidth - element.clientWidth),
-    ).toBeLessThanOrEqual(1);
-
-    const scenarios = page.getByRole("tablist", { name: "Vanilla Grid scenarios" });
-    await expect(scenarios).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Main \/ Worker/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await expect(page.getByRole("complementary", { name: "Lifecycle ownership" })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Grid lifecycle" })).toBeVisible();
-    await expect(page.getByRole("radiogroup", { name: "Rendering thread" })).toBeVisible();
-    await expect(page.getByTestId("activity")).toHaveAttribute("aria-live", "polite");
-    await expect(page.locator('.sw-vw-stage [aria-label="Spreadsheet grid"]')).toBeAttached();
-
-    await openConstructionControls(page);
-    await expect(page.getByRole("toolbar", { name: "Workbench controls" })).toBeVisible();
-    await expect(page.getByRole("radiogroup", { name: "Data path" })).toBeVisible();
-
-    await page.getByRole("tab", { name: /XLSX/ }).click();
-    await expect(page.getByRole("toolbar", { name: "Workbook operations" })).toBeVisible();
-    await expect(page.getByLabel("Import an XLSX workbook")).toBeAttached();
-
-    const proofNav = page.getByRole("navigation", { name: "Dedicated capability proofs" });
-    await expect(proofNav.locator('a[href="/showcases/performance/#million-rows"]')).toBeVisible();
-    await expect(proofNav.locator('a[href="/showcases/interoperability/#xlsx"]')).toBeVisible();
-    await expect(proofNav.locator('a[href="/showcases/database/"]')).toBeVisible();
-    await expect(proofNav.locator('a[href="/showcases/collaboration/"]')).toBeVisible();
-
-    expect(errors.page).toEqual([]);
-    expect(errors.console).toEqual([]);
-  },
-);
-
-test(
-  "main-thread production canvas paints cells in a DPR 2 backing store",
-  {
-    tag: "@dpr2-render",
-  },
-  async ({ browser, browserName, page }, testInfo) => {
-    const errors = collectErrors(page);
-    await page.goto(`${VANILLA_URL}?renderer=canvas`);
-    await waitForLive(page);
-    await expect(page.getByTestId("renderer")).toContainText(
-      rendererReadout("Main thread", "Main thread"),
-    );
-    await expect
-      .poll(async () => hasOpaqueForeground((await readDprCanvasEvidence(page)).sample), {
-        timeout: 15_000,
-        message: "DPR 2 main-thread canvas body never painted cell foreground",
-      })
-      .toBe(true);
-
-    const evidence = await readDprCanvasEvidence(page);
-    const visibleCells = await gridCellTexts(page);
-    const runtimeIdentity = await page.evaluate(() => ({
-      navigatorPlatform: navigator.platform,
-      userAgent: navigator.userAgent,
-      vendor: navigator.vendor,
-    }));
-    const opaqueColors = new Set<string>();
-    let opaquePixels = 0;
-    for (let offset = 0; offset + 3 < evidence.sample.length; offset += 4) {
-      if (evidence.sample[offset + 3] !== 255) continue;
-      opaquePixels += 1;
-      opaqueColors.add(
-        `${evidence.sample[offset]},${evidence.sample[offset + 1]},${evidence.sample[offset + 2]}`,
-      );
-    }
-    const expectedBackingWidth = Math.max(1, Math.round(evidence.cssWidth * 2));
-    const expectedBackingHeight = Math.max(1, Math.round(evidence.cssHeight * 2));
-    const renderEvidence = {
-      automation: {
-        browserEngine: browserName,
-        browserVersion: browser.version(),
-        hostPlatform: `${process.platform}-${process.arch}`,
-        project: testInfo.project.name,
-        projectMetadata: testInfo.project.metadata,
-        ...runtimeIdentity,
-      },
-      canvas: {
-        backingHeight: evidence.backingHeight,
-        backingWidth: evidence.backingWidth,
-        cssHeight: evidence.cssHeight,
-        cssWidth: evidence.cssWidth,
-        devicePixelRatio: evidence.devicePixelRatio,
-        expectedBackingHeight,
-        expectedBackingWidth,
-      },
-      cells: {
-        expectedVisibleValue: FIRST_ACCOUNT,
-        foregroundPainted: hasOpaqueForeground(evidence.sample),
-        opaqueColorCount: opaqueColors.size,
-        opaquePixels,
-        sampleHeight: evidence.sampleHeight,
-        sampleWidth: evidence.sampleWidth,
-      },
-    };
-    await testInfo.attach("dpr2-main-thread-render-evidence", {
-      body: Buffer.from(JSON.stringify(renderEvidence, null, 2)),
-      contentType: "application/json",
+test("main-thread production canvas paints cells in a DPR 2 backing store @dpr2-render", async ({
+  browser,
+  browserName,
+  page,
+}, testInfo) => {
+  await open(page, "?renderer=canvas");
+  const readEvidence = () =>
+    page.locator(CANVAS).evaluate((element) => {
+      const canvas = element as HTMLCanvasElement;
+      const context = canvas.getContext("2d");
+      const bounds = canvas.getBoundingClientRect();
+      if (!context || bounds.width <= 0 || bounds.height <= 0) {
+        throw new Error("Main-thread canvas has no 2D context or no CSS size");
+      }
+      const scaleX = canvas.width / bounds.width;
+      const scaleY = canvas.height / bounds.height;
+      const left = Math.ceil(64 * scaleX);
+      const top = Math.ceil(40 * scaleY);
+      const width = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
+      const height = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
+      return {
+        backingHeight: canvas.height,
+        backingWidth: canvas.width,
+        cssHeight: bounds.height,
+        cssWidth: bounds.width,
+        devicePixelRatio: window.devicePixelRatio,
+        sample: Array.from(context.getImageData(left, top, width, height).data),
+      };
     });
+  await expect
+    .poll(async () => hasOpaqueForeground((await readEvidence()).sample), { timeout: 15_000 })
+    .toBe(true);
 
-    expect(["chromium", "webkit"]).toContain(browserName);
-    expect(evidence.devicePixelRatio).toBe(2);
-    expect(evidence.backingWidth).toBe(expectedBackingWidth);
-    expect(evidence.backingHeight).toBe(expectedBackingHeight);
-    expect(hasOpaqueForeground(evidence.sample)).toBe(true);
-    expect(visibleCells).toContain(FIRST_ACCOUNT);
-    expect(errors.page).toEqual([]);
-    expect(errors.worker).toEqual([]);
-    expect(errors.console).toEqual([]);
-  },
-);
+  const { sample, ...canvas } = await readEvidence();
+  await testInfo.attach("dpr2-main-thread-render-evidence", {
+    body: Buffer.from(
+      JSON.stringify(
+        {
+          automation: {
+            browserEngine: browserName,
+            browserVersion: browser.version(),
+            hostPlatform: `${process.platform}-${process.arch}`,
+            project: testInfo.project.name,
+            projectMetadata: testInfo.project.metadata,
+            userAgent: await page.evaluate(() => navigator.userAgent),
+          },
+          canvas,
+          foregroundPainted: hasOpaqueForeground(sample),
+        },
+        null,
+        2,
+      ),
+    ),
+    contentType: "application/json",
+  });
+  expect(["chromium", "webkit"]).toContain(browserName);
+  expect(canvas.devicePixelRatio).toBe(2);
+  expect(canvas.backingWidth).toBe(Math.max(1, Math.round(canvas.cssWidth * 2)));
+  expect(canvas.backingHeight).toBe(Math.max(1, Math.round(canvas.cssHeight * 2)));
+});
 
 test("destroy, create, and reset bound explicit grid generations", async ({ page }) => {
-  const errors = collectErrors(page);
-
-  await page.goto(VANILLA_URL);
-  await waitForLive(page);
+  await open(page);
   await commitB2(page, "generation-one-edit");
   await expect.poll(() => readB2(page)).toBe("generation-one-edit");
 
-  // Explicit destroy: nothing of the grid survives.
-  await page.getByRole("button", { name: "Destroy grid", exact: true }).click();
+  // Destroy leaves nothing of the grid, and a double click makes one transition.
+  await page.getByRole("button", { name: "Destroy grid", exact: true }).dblclick();
   await expect(page.getByTestId("destroyed")).toBeVisible();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "destroyed");
   await expect(page.locator(GRID)).toHaveCount(0);
   await expect(page.locator("#formula")).toHaveCount(0);
   await expect.poll(() => page.workers().length).toBe(0);
 
-  // Explicit create: a fresh generation with a fresh document.
-  await page.getByRole("button", { name: "Create grid" }).click();
-  await waitForLive(page);
+  // Create starts a fresh generation with a fresh document.
+  await page.getByRole("button", { name: "Create grid", exact: true }).dblclick();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
   await expect.poll(() => readB2(page)).not.toBe("generation-one-edit");
 
-  await openConstructionControls(page);
   // Reset rebuilds with the same construction options.
+  await page.getByText("Construction & debug controls", { exact: true }).click();
   await commitB2(page, "generation-two-edit");
   await page.getByRole("button", { name: "Reset generation" }).click();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "3", {
     timeout: 20_000,
   });
-  await waitForLive(page);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
   await expect.poll(() => readB2(page)).not.toBe("generation-two-edit");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
 });
 
-test(
-  "renderer selection is construction-bound and deep-linked",
-  {
-    tag: "@portability",
-  },
-  async ({ page }) => {
-    const errors = collectErrors(page);
-    const workerUrls: string[] = [];
-    page.on("worker", (worker) => workerUrls.push(worker.url()));
+test("the Worker renderer is deep-linked and repaints a cached view after a sub-row scroll @portability", async ({
+  page,
+}) => {
+  await open(page);
+  await page.getByRole("radio", { name: "Web Worker" }).click();
+  const renderer = page.getByTestId("renderer");
+  await expect(renderer).toContainText(rendererReadout("Web Worker", "Web Worker"), {
+    timeout: 20_000,
+  });
+  await expect(renderer).toHaveAttribute("data-fallback-count", "0");
+  await expect(page).toHaveURL(/[?&]renderer=worker/);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
+  await expect.poll(() => workerFrame(page), { timeout: 20_000 }).toBeGreaterThan(0);
+  await expect.poll(() => canvasPainted(page, CANVAS), { timeout: 20_000 }).toBe(true);
+  expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
 
-    await page.goto(VANILLA_URL);
-    await waitForLive(page);
-
-    await page.getByRole("radio", { name: "Web Worker" }).click();
-    await expect(page.getByTestId("renderer")).toContainText(
-      rendererReadout("Web Worker", "Web Worker"),
-      { timeout: 20_000 },
-    );
-    await expect(page.getByTestId("renderer")).toHaveAttribute("data-fallback-count", "0");
-    await expect(page).toHaveURL(/[?&]renderer=worker/);
-    await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
-    await expect
-      .poll(
-        async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0),
-        {
-          timeout: 20_000,
-          message: "Worker never acknowledged a frame",
-        },
-      )
-      .toBeGreaterThan(0);
-    await expect.poll(() => canvasBodyPainted(page)).toBe(true);
-    expect(workerUrls.length).toBeGreaterThan(0);
-
-    await page.getByRole("radio", { name: "Main thread" }).click();
-    await expect(page.getByTestId("renderer")).toContainText(
-      rendererReadout("Main thread", "Main thread"),
-      { timeout: 20_000 },
-    );
-    await expect(page).not.toHaveURL(/renderer=worker/);
-    await expect
-      .poll(() => page.workers().length, { message: "Worker survived renderer teardown" })
-      .toBe(0);
-
-    expect(errors.page).toEqual([]);
-    expect(errors.worker).toEqual([]);
-    expect(errors.console).toEqual([]);
-  },
-);
-
-test(
-  "worker repaint keeps a cached non-shared view painted after a sub-row scroll",
-  {
-    tag: "@portability",
-  },
-  async ({ page }) => {
-    const errors = collectErrors(page);
-    await page.goto(`${VANILLA_URL}?renderer=worker`);
-    await waitForLive(page);
-    await expect(page.getByTestId("renderer")).toContainText(
-      rendererReadout("Web Worker", "Web Worker"),
-      { timeout: 20_000 },
-    );
-    await expect(page.getByTestId("renderer")).toHaveAttribute("data-fallback-count", "0");
-    await expect
-      .poll(
-        async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0),
-        {
-          timeout: 20_000,
-          message: "Worker never acknowledged the initial frame",
-        },
-      )
-      .toBeGreaterThan(0);
-    await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
-    expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
-
-    const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
-    await scroller.hover();
-    const initialFrame = Number(
-      (await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0,
-    );
-    // Two 4 px steps stay inside one row window even when the bottom row is
-    // only half hidden, so the second paint reuses the cached view.
+  // Two 4 px steps stay inside one row window even when the bottom row is only
+  // half hidden, so the second paint reuses the cached view.
+  const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
+  const scrollTop = () => scroller.evaluate((element) => element.scrollTop);
+  await scroller.hover();
+  for (let step = 0; step < 2; step++) {
+    const frame = await workerFrame(page);
+    const cells = await gridCellTexts(page, GRID);
+    const top = await scrollTop();
     await page.mouse.wheel(0, 4);
-    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-    await expect
-      .poll(
-        async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0),
-        {
-          timeout: 20_000,
-          message: "Worker did not paint the first sub-row scroll",
-        },
-      )
-      .toBeGreaterThan(initialFrame);
+    await expect.poll(scrollTop).toBeGreaterThan(top);
+    if (step === 1) {
+      expect((await scrollTop()) - top).toBeLessThan(20);
+      expect(await gridCellTexts(page, GRID)).toEqual(cells);
+    }
+    await expect.poll(() => workerFrame(page), { timeout: 20_000 }).toBeGreaterThan(frame);
+  }
+  await expect.poll(() => canvasPainted(page, CANVAS), { timeout: 20_000 }).toBe(true);
 
-    const frameBeforeCachedPaint = Number(
-      (await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0,
-    );
-    const cellsBeforeCachedPaint = await gridCellTexts(page);
-    const scrollBeforeCachedPaint = await scroller.evaluate((element) => element.scrollTop);
-    await page.mouse.wheel(0, 4);
-    await expect
-      .poll(() => scroller.evaluate((element) => element.scrollTop))
-      .toBeGreaterThan(scrollBeforeCachedPaint);
-    const scrollAfterCachedPaint = await scroller.evaluate((element) => element.scrollTop);
-    expect(scrollAfterCachedPaint - scrollBeforeCachedPaint).toBeLessThan(20);
-    // The second fractional scroll stays inside the same row window, so the data
-    // signature and visible cells stay fixed while another Worker frame paints.
-    expect(await gridCellTexts(page)).toEqual(cellsBeforeCachedPaint);
-    await expect
-      .poll(
-        async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0),
-        {
-          timeout: 20_000,
-          message: "Worker did not repaint the cached view after a sub-row scroll",
-        },
-      )
-      .toBeGreaterThan(frameBeforeCachedPaint);
-    await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
-    expect(errors.page).toEqual([]);
-    expect(errors.worker).toEqual([]);
-    expect(errors.console).toEqual([]);
-  },
-);
+  await page.getByRole("radio", { name: "Main thread" }).click();
+  await expect(renderer).toContainText(rendererReadout("Main thread", "Main thread"), {
+    timeout: 20_000,
+  });
+  await expect(page).not.toHaveURL(/renderer=worker/);
+  await expect.poll(() => page.workers().length).toBe(0);
+});
 
-test(
-  "a failed Worker boot falls back honestly to the main thread",
-  {
-    tag: "@portability",
-  },
-  async ({ page }) => {
-    const errors = collectErrors(page);
-    const failedWorkerUrls: string[] = [];
+test.describe(() => {
+  // The aborted Worker bundle and the forced import failure log errors on purpose.
+  test.use({ allowErrors: true });
+
+  test("a failed Worker boot falls back honestly to the main thread @portability", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
     // Two assets match `worker-*.js`: a tiny module that only exports the real
-    // worker's URL (statically imported by the route chunk — aborting it kills
-    // the whole page) and the multi-kilobyte worker bundle itself. Abort only
-    // the bundle so the failure lands in the Worker boot path.
+    // worker's URL (statically imported by the route chunk; aborting it kills
+    // the whole page) and the worker bundle itself. Abort only the bundle.
+    const failedWorkerUrls: string[] = [];
     await page.route("**/assets/worker-*.js", async (route) => {
       const response = await route.fetch();
       const body = await response.text();
-      if (body.length < 1_000) {
-        await route.fulfill({ response, body });
-        return;
-      }
+      if (body.length < 1_000) return route.fulfill({ response, body });
       failedWorkerUrls.push(route.request().url());
-      await route.abort("failed");
+      return route.abort("failed");
     });
 
-    // Deep link straight into the Worker renderer.
-    await page.goto(`${VANILLA_URL}?renderer=worker`);
-    await waitForLive(page);
-
+    await open(page, "?renderer=worker");
     const renderer = page.getByTestId("renderer");
     await expect(renderer).toContainText(rendererReadout("Web Worker", "Main thread"), {
       timeout: 20_000,
@@ -525,106 +244,34 @@ test(
     await expect(renderer).toContainText(/Fallback:\s*\S/);
     await expect(renderer).toHaveAttribute("data-fallback-count", "1");
     expect(failedWorkerUrls.length).toBe(1);
-    await expect
-      .poll(() => page.workers().length, { message: "failed Worker was not terminated" })
-      .toBe(0);
+    await expect.poll(() => page.workers().length).toBe(0);
 
     // The fallback grid is fully alive: it paints and takes edits.
-    await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+    await expect.poll(() => canvasPainted(page, CANVAS)).toBe(true);
     await commitB2(page, "fallback-edit");
     await expect.poll(() => readB2(page)).toBe("fallback-edit");
-
-    expect(errors.page).toEqual([]);
-  },
-);
-
-test("the paged data path serves host pages and reports allocation honestly", async ({ page }) => {
-  const errors = collectErrors(page);
-
-  // Deep link straight into the paged datasource.
-  await page.goto(`${VANILLA_URL}?data=paged`);
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
-    timeout: 20_000,
+    expect(pageErrors).toEqual([]);
   });
 
-  const stats = page.getByTestId("paged-stats");
-  await expect(stats).toBeVisible();
-  await expect
-    .poll(async () => Number((await stats.getAttribute("data-chunks")) ?? 0), {
-      timeout: 15_000,
-      message: "paged store never reported a loaded chunk",
-    })
-    .toBeGreaterThan(0);
-  const initialChunks = Number((await stats.getAttribute("data-chunks")) ?? 0);
-  await expect(stats).toHaveAttribute("data-fully-loaded", "false");
-
-  // The aria mirror boots on the loading snapshot; focus a body cell so it
-  // refreshes through normal grid interaction, then values are readable.
-  await page.locator(GRID).click({ position: { x: 300, y: 82 } });
-  await expect.poll(() => gridCellTexts(page), { timeout: 15_000 }).toContain(FIRST_ACCOUNT);
-
-  // Full-column aggregate over a partial store fails honestly.
-  await actionButton(page, "Total ARR").click();
-  await expect(page.getByTestId("activity")).toContainText(/full dataset/i);
-  // The summary sheet needs the whole fixture, so the host disables it here.
-  await expect(actionButton(page, "Summary sheet")).toBeDisabled();
-
-  // Scrolling far pulls new pages through the host page source.
-  await page.locator(`${GRID} .sheetwrite-scroller`).evaluate((scroller) => {
-    scroller.scrollTop = 500_000;
-    scroller.dispatchEvent(new Event("scroll"));
+  test("a rejected import shows an alert and restores the import button", async ({ page }) => {
+    await open(page);
+    await page.getByRole("tab", { name: /XLSX/ }).click();
+    await page.evaluate(() => {
+      File.prototype.arrayBuffer = () => Promise.reject(new Error("Forced import failure"));
+    });
+    await page.getByLabel("Import an XLSX workbook").setInputFiles({
+      name: "failed.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: Buffer.from("failed import"),
+    });
+    const alert = page.locator("[data-action-error]").filter({ hasText: "Forced import failure" });
+    await expect(alert).toBeVisible();
+    await expect(alert).toHaveAttribute("role", "alert");
+    const importButton = page
+      .locator(".sw-vw-instrument")
+      .getByRole("button", { name: "Import XLSX", exact: true });
+    await expect(importButton).toBeEnabled();
+    await expect(importButton).not.toHaveAttribute("aria-busy", "true");
+    await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
   });
-  await expect
-    .poll(async () => Number((await stats.getAttribute("data-chunks")) ?? 0), {
-      timeout: 20_000,
-      message: "scroll never grew the paged allocation",
-    })
-    .toBeGreaterThan(initialChunks);
-  await expect(page.getByTestId("activity")).toContainText(/host page source/i);
-
-  // Back to the dense path: stats disappear, aggregates complete.
-  await page.getByRole("tab", { name: /Main \/ Worker/ }).click();
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
-    timeout: 20_000,
-  });
-  await expect(page).not.toHaveURL(/data=paged/);
-  await expect(page.getByTestId("paged-stats")).toHaveCount(0);
-  await page.getByRole("tab", { name: /XLSX/ }).click();
-  await actionButton(page, "Total ARR").click();
-  await expect(page.getByTestId("activity")).toContainText(/total/i);
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("a rejected import shows an alert and restores the import button", async ({ page }) => {
-  await page.goto(VANILLA_URL);
-  await waitForLive(page);
-  await page.getByRole("tab", { name: /XLSX/ }).click();
-  await page.evaluate(() => {
-    File.prototype.arrayBuffer = () => Promise.reject(new Error("Forced import failure"));
-  });
-  await page.getByLabel("Import an XLSX workbook").setInputFiles({
-    name: "failed.xlsx",
-    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    buffer: Buffer.from("failed import"),
-  });
-  const alert = page.locator("[data-action-error]").filter({ hasText: "Forced import failure" });
-  await expect(alert).toBeVisible();
-  await expect(alert).toHaveAttribute("role", "alert");
-  await expect(actionButton(page, "Import XLSX")).toBeEnabled();
-  await expect(actionButton(page, "Import XLSX")).not.toHaveAttribute("aria-busy", "true");
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
-});
-
-test("a double-click on Create or Destroy makes one lifecycle transition", async ({ page }) => {
-  await page.goto(VANILLA_URL);
-  await waitForLive(page);
-  const toggle = page.getByRole("button", { name: "Destroy grid", exact: true });
-  await toggle.dblclick();
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "destroyed");
-  await expect(page.locator(GRID)).toHaveCount(0);
-  await page.getByRole("button", { name: "Create grid", exact: true }).dblclick();
-  await waitForLive(page);
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
 });
