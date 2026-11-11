@@ -1,0 +1,391 @@
+/* Proposed shared showcase pattern (mockup). One frame from the header down:
+   the page column is the stage's width, up to 120rem, so every section shares
+   the stage's left and right edges. */
+/* Showcase pages use the 120rem frame everywhere, the site header included,
+   so the header, stage, band, text and code share one pair of edges. */
+:root:has(.sw-showcase__page, .sw-showcase-page__stage) {
+  --sw-page-max: 120rem;
+}
+
+.sw-showcase__stage {
+  --sw-stage-bleed: 0px;
+}
+
+.sw-showcase__section,
+.sw-showcase__code {
+  max-width: none;
+}
+
+/* ---- The band under the grid ---------------------------------------------- */
+/* Steps and the keyboard each take a full row of the band; other control
+   groups keep their auto-fit columns. */
+.sw-showcase__control-group:has(.sw-showcase__steps),
+.sw-showcase__control-group:has(.sw-showcase__keys) {
+  grid-column: 1 / -1;
+}
+
+.sw-showcase__steps {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sw-space-3);
+}
+
+.sw-showcase__steps li {
+  align-content: start;
+  padding: var(--sw-space-4) var(--sw-space-4) var(--sw-space-4) var(--sw-space-12);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-0);
+}
+
+.sw-showcase__steps li::before {
+  top: var(--sw-space-4);
+  left: var(--sw-space-4);
+}
+
+@media (min-width: 52rem) {
+  .sw-showcase__steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 88rem) {
+  .sw-showcase__steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* The keyboard model: one strip under the steps. */
+.sw-showcase__control-group:has(.sw-showcase__keys) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-5);
+  align-items: center;
+  padding-top: var(--sw-space-4);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-showcase__control-group:has(.sw-showcase__keys) > .sw-showcase__control-body {
+  display: contents;
+}
+
+.sw-showcase__keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-5);
+}
+
+.sw-showcase__keys dt {
+  min-width: 0;
+}
+
+/* ---- Text beside a picture, code beside what it uses ---------------------- */
+.mk-row {
+  display: grid;
+  gap: var(--sw-space-6);
+  align-items: start;
+}
+
+.mk-text {
+  max-width: var(--sw-measure-prose);
+}
+
+.mk-figure {
+  margin: 0;
+  padding: clamp(var(--sw-space-3), 2vw, var(--sw-space-6));
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.mk-aside {
+  display: grid;
+  gap: var(--sw-space-3);
+  align-content: start;
+  padding: var(--sw-space-5);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  font-size: var(--sw-text-small);
+}
+
+.mk-aside h3 {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.mk-aside ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-aside li code {
+  display: inline-block;
+  padding: var(--sw-space-1) var(--sw-space-2);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-sm);
+  background: var(--sw-code-bg);
+  color: var(--sw-code-function);
+}
+
+@media (min-width: 72rem) {
+  .mk-row {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--sw-space-8);
+  }
+
+  .mk-row > .mk-text {
+    grid-column: span 4;
+  }
+
+  .mk-row > .mk-figure {
+    grid-column: span 8;
+  }
+
+  .mk-row--code > .sw-showcase__code {
+    grid-column: span 8;
+  }
+
+  .mk-row--code > .mk-aside {
+    grid-column: span 4;
+    margin-top: var(--sw-space-12);
+  }
+}
+
+/* A section that shows controls (an expanded panel) gets half the row. */
+@media (min-width: 72rem) {
+  .mk-row:has(details) > .mk-text,
+  .mk-row:has(details) > .mk-figure {
+    grid-column: span 6;
+    max-width: none;
+  }
+}
+
+/* Very wide: the text gets a fifth column back. */
+@media (min-width: 100rem) {
+  .mk-row:not(:has(details)) > .mk-text {
+    grid-column: span 5;
+  }
+
+  .mk-row:not(:has(details)) > .mk-figure {
+    grid-column: span 7;
+  }
+}
+
+/* ---- Proof cards: a picture and the claim ---------------------------------- */
+.mk-proofs {
+  display: grid;
+  gap: var(--sw-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .mk-proofs > li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .mk-proofs > li::marker {
+  content: none;
+}
+
+.sw-prose .mk-proofs > li::before {
+  content: none;
+}
+
+.mk-proof {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: clip;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.mk-proof__art {
+  display: block;
+  height: 10rem;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+
+.mk-proof__body {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  align-content: start;
+  padding: var(--sw-space-4) var(--sw-space-5) var(--sw-space-5);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-body);
+}
+
+.mk-proof__body strong {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / 1.3 var(--sw-font-display);
+}
+
+.mk-proof__body p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+}
+
+@media (min-width: 40rem) {
+  .mk-proofs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mk-proofs > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .mk-proofs > li:last-child:nth-child(odd) .mk-proof {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .mk-proofs > li:last-child:nth-child(odd) .mk-proof__art {
+    border-right: var(--sw-border-width) solid var(--sw-border);
+    border-bottom: 0;
+  }
+}
+
+@media (min-width: 72rem) {
+  .mk-proofs {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .mk-proofs > li,
+  .mk-proofs > li:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
+  .mk-proofs > li:last-child:nth-child(odd) .mk-proof {
+    grid-template-columns: none;
+    grid-template-rows: auto 1fr;
+  }
+
+  .mk-proofs > li:last-child:nth-child(odd) .mk-proof__art {
+    border-right: 0;
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+  }
+
+  /* Five proofs: three, then two wider; four: two by two. */
+  .mk-proofs:has(> li:nth-child(5):last-child) > li:nth-child(n + 4),
+  .mk-proofs:has(> li:nth-child(4):last-child) > li {
+    grid-column: span 3;
+  }
+}
+
+@media (min-width: 110rem) {
+  .mk-proofs:has(> li:nth-child(5):last-child) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mk-proofs:has(> li:nth-child(5):last-child) > li:nth-child(n) {
+    grid-column: auto;
+  }
+
+  .mk-proofs:has(> li:nth-child(4):last-child) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mk-proofs:has(> li:nth-child(4):last-child) > li {
+    grid-column: auto;
+  }
+}
+
+/* ---- The library / host boundary as one diagram --------------------------- */
+.mk-boundary {
+  display: grid;
+  gap: var(--sw-space-4);
+  align-items: center;
+}
+
+.mk-boundary .sw-proofs-boundary__lane {
+  height: 100%;
+}
+
+.mk-seam {
+  width: min(100%, 20rem);
+  justify-self: center;
+}
+
+@media (min-width: 72rem) {
+  .mk-boundary {
+    grid-template-columns: minmax(0, 1fr) 18rem minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .mk-seam {
+    width: 100%;
+  }
+}
+
+/* ---- Framework workbenches: the instrument panel goes under the grid ------- */
+.sw-vw-workspace {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.sw-vw-instrument {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  align-items: start;
+  border-top: var(--sw-border-width) solid var(--sw-border);
+  border-left: 0 !important;
+}
+
+/* Long code: the first lines, then the whole file on request. */
+.mk-row--code .sw-showcase__code pre {
+  max-height: 26rem;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 80%, transparent);
+}
+
+.mk-more {
+  justify-self: start;
+}
+
+@media (min-width: 72rem) {
+  .mk-row--code > .mk-aside {
+    position: sticky;
+    top: var(--sw-space-8);
+  }
+}
+
+.sw-showcase-page__proof > .mk-proofs,
+.sw-showcase-page__proof .mk-proofs {
+  grid-column: 1 / -1;
+}
+
+.sw-vw-instrument > * {
+  align-content: start;
+}
+
+.sw-showcase-page__proof .mk-proofs > li {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* A section whose own content is one small control (a disclosure, a button)
+   doesn't sit beside a tall picture: the picture takes the full row under the
+   heading, and the control follows it. */
+.mk-row--stack > .mk-text {
+  grid-column: 1 / -1;
+  max-width: none;
+}
+
+.mk-row--stack .mk-figure {
+  margin-bottom: var(--sw-space-2);
+}
+
+.mk-row--stack .mk-text > :not(h2, .mk-figure) {
+  max-width: var(--sw-measure-prose);
+}

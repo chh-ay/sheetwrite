@@ -105,14 +105,14 @@ interface DiagramText {
 function Responsive(
   props: Readonly<{
     text: DiagramText;
-    wide: { height: number; draw: () => JSX.Element };
+    wide: { height: number; width?: number; draw: () => JSX.Element };
     narrow: { height: number; draw: () => JSX.Element };
   }>,
 ) {
   return (
     <div class="sw-art-diagram">
       <div class="sw-art-diagram__wide">
-        <DiagramArt {...props.text} height={props.wide.height} width={WIDE}>
+        <DiagramArt {...props.text} height={props.wide.height} width={props.wide.width ?? WIDE}>
           {props.wide.draw()}
         </DiagramArt>
       </div>
@@ -926,6 +926,180 @@ export function PagingDiagram() {
         ),
       }}
     />
+  );
+}
+
+const COMMAND_TEXT: DiagramText = {
+  hue: "green",
+  alt: "amber",
+  title: "One command model: the ribbon and your toolbar call the same grid actions",
+  description:
+    "A ribbon command and a button in your own toolbar both call grid.actions, which applies the command to the grid. Data › Refresh All reloads the saved query behind the Targets sheet.",
+};
+
+/** The spreadsheet app's command model: every caller goes through grid.actions. */
+export function CommandModelDiagram() {
+  return (
+    <Responsive
+      narrow={{
+        height: 388,
+        draw: () => (
+          <>
+            <Box
+              h={56}
+              lines={["Home › Editing › AutoSum"]}
+              title="Ribbon command"
+              w={164}
+              x={8}
+              y={8}
+            />
+            <Box h={56} lines={["Your own buttons"]} title="Your toolbar" w={164} x={188} y={8} />
+            <Arrow class="hue-line" x1={90} x2={160} y1={68} y2={92} />
+            <Arrow class="hue-line" x1={270} x2={200} y1={68} y2={92} />
+            <Box
+              class="hue-soft"
+              h={56}
+              lines={["The same methods"]}
+              title="grid.actions"
+              w={344}
+              x={8}
+              y={96}
+            />
+            <Arrow class="hue-line" x1={180} x2={180} y1={156} y2={172} />
+            <Box h={56} lines={["Applies the command"]} title="Grid" w={344} x={8} y={176} />
+            <Box
+              class="alt-soft"
+              h={56}
+              lines={["Data › Refresh All"]}
+              title="Refresh"
+              w={164}
+              x={8}
+              y={260}
+            />
+            <Arrow class="alt-line" x1={176} x2={186} y1={288} y2={288} />
+            <Box
+              h={56}
+              lines={["Reloads into Targets"]}
+              title="Saved query"
+              w={164}
+              x={188}
+              y={260}
+            />
+            <text class="caption" x={8} y={350}>
+              The Targets sheet is a saved query
+            </text>
+            <text class="caption" x={8} y={366}>
+              that Refresh All reloads.
+            </text>
+          </>
+        ),
+      }}
+      text={COMMAND_TEXT}
+      wide={{
+        height: 236,
+        width: 690,
+        draw: () => (
+          <>
+            <Box
+              h={56}
+              lines={["Home › Editing › AutoSum"]}
+              title="Ribbon command"
+              w={190}
+              x={10}
+              y={12}
+            />
+            <Box h={56} lines={["Your own buttons"]} title="Your toolbar" w={190} x={10} y={84} />
+            <Arrow class="hue-line" x1={204} x2={276} y1={40} y2={68} />
+            <Arrow class="hue-line" x1={204} x2={276} y1={112} y2={84} />
+            <Box
+              class="hue-soft"
+              h={56}
+              lines={["The same methods"]}
+              title="grid.actions"
+              w={170}
+              x={280}
+              y={48}
+            />
+            <Arrow class="hue-line" x1={454} x2={496} y1={76} y2={76} />
+            <Box h={56} lines={["Applies the command"]} title="Grid" w={170} x={500} y={48} />
+            <path class="rule" d="M10 162h670" />
+            <Box
+              class="alt-soft"
+              h={56}
+              lines={["Data › Refresh All"]}
+              title="Refresh"
+              w={190}
+              x={10}
+              y={172}
+            />
+            <Arrow class="alt-line" x1={204} x2={276} y1={200} y2={200} />
+            <Box
+              h={56}
+              lines={["Reloads the Targets sheet"]}
+              title="Saved query"
+              w={210}
+              x={280}
+              y={172}
+            />
+          </>
+        ),
+      }}
+    />
+  );
+}
+
+/** The library/host seam: the two interfaces the host implements and Sheetwrite calls. */
+export function BoundarySeam(
+  props: Readonly<{ interfaces: readonly (readonly [name: string, methods: readonly string[]])[] }>,
+) {
+  let y = 64;
+  const boxes = props.interfaces.map(([name, methods]) => {
+    const box = { name, methods, y, h: 40 + methods.length * 16 };
+    y += box.h + 24;
+    return box;
+  });
+  return (
+    <DiagramArt
+      alt="blue"
+      description={`Sheetwrite calls, and your host implements: ${props.interfaces
+        .map(([name, methods]) => `${name} (${methods.join(", ")})`)
+        .join("; ")}.`}
+      height={y + 8}
+      hue="red"
+      title="The seam between Sheetwrite and your host"
+      width={280}
+    >
+      <path class="ink-line dash faint" d={`M140 34V${y}`} />
+      <text class="caption strong" text-anchor="end" x={130} y={22}>
+        Sheetwrite calls
+      </text>
+      <text class="caption strong" x={150} y={22}>
+        your host implements
+      </text>
+      <For each={boxes}>
+        {(box) => (
+          <>
+            <path
+              class="hue-line"
+              d={`M4 ${box.y + box.h / 2}h22${head(26, box.y + box.h / 2, 0)}`}
+            />
+            <path
+              class="alt-line"
+              d={`M276 ${box.y + box.h / 2}h-22${head(254, box.y + box.h / 2, 180)}`}
+            />
+            <Box
+              class="hue-soft"
+              code={box.methods}
+              h={box.h}
+              title={box.name}
+              w={224}
+              x={28}
+              y={box.y}
+            />
+          </>
+        )}
+      </For>
+    </DiagramArt>
   );
 }
 
