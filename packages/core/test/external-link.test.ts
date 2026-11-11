@@ -141,7 +141,9 @@ describe("external workbook links", () => {
       // The engine holds a linked sheet from A1 to its last cell.
       withCell(999_999, 9, 1),
     ]) {
-      expect(() => linkedStore(links)).toThrow("invalid external link values");
+      expect(() => linkedStore(links)).toThrow(
+        expect.objectContaining({ code: "invalid-snapshot" }),
+      );
     }
   });
 });
