@@ -723,6 +723,8 @@ jobs:
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
       - name: Build production docs
         run: bun run --filter '@sheetwrite/docs-start' build:site
+      - name: Example XLSX isolation
+        run: bun scripts/verify-example-xlsx-isolation.ts
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
       - name: Upload production docs

@@ -330,7 +330,7 @@ impl Fit {
         if xs.len() != ys.len() {
             return Err(FormulaError::Na);
         }
-        let mut fit = Fit {
+        let mut fit = Self {
             count: 0.0,
             mean_x: 0.0,
             mean_y: 0.0,

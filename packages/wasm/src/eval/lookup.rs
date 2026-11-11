@@ -1278,8 +1278,8 @@ const NEXT_SMALLER: i32 = -1;
 const BINARY_ASCENDING: i32 = 2;
 
 impl CellStore {
-    /// LOOKUP(lookup_value, lookup_vector, [result_vector]) and
-    /// LOOKUP(lookup_value, array). The search finds the largest value at
+    /// `LOOKUP(lookup_value`, `lookup_vector`, [`result_vector`]) and
+    /// `LOOKUP(lookup_value`, array). The search finds the largest value at
     /// or below `lookup_value` in an ascending list. The array form
     /// searches the first row of an array wider than it is tall, and the
     /// first column otherwise, and returns the value at the same position

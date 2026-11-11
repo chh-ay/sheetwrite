@@ -450,8 +450,9 @@ impl BlockInputOrder {
 #[wasm_bindgen]
 impl CellStore {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> CellStore {
-        CellStore {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
             sheets: Vec::new(),
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
@@ -816,8 +817,8 @@ impl CellStore {
 
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
-        self.sheet_names[sheet] = name.to_string();
-        self.sheet_ids.insert(id.to_string(), sheet);
+        self.sheet_names[sheet] = name.to_owned();
+        self.sheet_ids.insert(id.to_owned(), sheet);
         self.sheet_lookup.insert(sheet_name_key(name), sheet);
     }
 
@@ -858,7 +859,7 @@ impl CellStore {
 
         self.rename_sheet_in_named_formulas(sheet as u32, name);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
-        self.sheet_names[sheet] = name.to_string();
+        self.sheet_names[sheet] = name.to_owned();
         self.sheet_lookup.insert(name_key, sheet);
         self.graph.invalidate();
 
@@ -1752,10 +1753,10 @@ impl CellStore {
             let kind = s.cells.source_kind_at(index);
             let source_payload = s.cells.source_payload_at(index);
             let source_string = payload_str_id(source_payload);
-            let string_id = if source_string != NO_STRING {
-                f64::from(source_string)
-            } else {
+            let string_id = if source_string == NO_STRING {
                 -1.0
+            } else {
+                f64::from(source_string)
             };
             let source = s.formulas.get(key, &self.formula_slots);
             let text = source
@@ -1842,10 +1843,10 @@ impl CellStore {
                 kind.push(s.cells.source_kind_at(index));
                 let source_payload = s.cells.source_payload_at(index);
                 let source_string = payload_str_id(source_payload);
-                payload.push(if source_string != NO_STRING {
-                    encode_str_id(strings.intern(self.strings.get(source_string)?))
-                } else {
+                payload.push(if source_string == NO_STRING {
                     source_payload
+                } else {
+                    encode_str_id(strings.intern(self.strings.get(source_string)?))
                 });
                 style.push(s.cells.style_at(index));
             }
@@ -2287,7 +2288,7 @@ impl CellStore {
             return CellOut {
                 kind: KIND_STRING,
                 num: 0.0,
-                string: Some(FormulaError::Loading.sentinel().to_string()),
+                string: Some(FormulaError::Loading.sentinel().to_owned()),
                 style: 0,
             };
         }
@@ -2310,7 +2311,7 @@ impl CellStore {
                 return CellOut {
                     kind: KIND_STRING,
                     num: 0.0,
-                    string: Some(error.sentinel().to_string()),
+                    string: Some(error.sentinel().to_owned()),
                     style: s.cells.style_at(index),
                 };
             }
@@ -2370,7 +2371,7 @@ impl CellStore {
         }
         let key = (scope, workbook_name_key(name));
         let definition = NamedRangeRef {
-            name: name.to_string(),
+            name: name.to_owned(),
             scope,
             sheet: sheet as u32,
             row_start: row_start as u32,
@@ -2512,8 +2513,8 @@ impl CellStore {
             });
         }
         let definition = TableDefinition {
-            id: id.to_string(),
-            name: name.to_string(),
+            id: id.to_owned(),
+            name: name.to_owned(),
             sheet: sheet as u32,
             row_start: row_start as u32,
             col_start: col_start as u32,
@@ -3507,10 +3508,7 @@ impl CellStore {
         }
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        metadata.add_payload(
-            std::mem::size_of::<CellStore>(),
-            std::mem::size_of::<CellStore>(),
-        );
+        metadata.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
         if self.iteration.is_some() {
             metadata.add_payload(size_of::<IterationLimits>(), size_of::<IterationLimits>());
         }
@@ -3865,7 +3863,7 @@ impl CellStore {
         formula_col: u32,
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
-            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_string()),
+            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned()),
             Err(error) => FormulaEntry::error(source, error),
         }
     }
@@ -4210,21 +4208,25 @@ impl CellOut {
 #[wasm_bindgen]
 impl CellOut {
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn kind(&self) -> u8 {
         self.kind
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn num(&self) -> f64 {
         self.num
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn string(&self) -> Option<String> {
         self.string.clone()
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn style(&self) -> u32 {
         self.style
     }

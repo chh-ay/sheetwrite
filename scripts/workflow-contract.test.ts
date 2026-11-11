@@ -95,6 +95,15 @@ describe("CI and release workflow contracts", () => {
     }
   });
 
+  it("checks the XLSX isolation of the examples in the production docs build", () => {
+    const steps = job("ci", "docs-build").steps ?? [];
+    const build = steps.findIndex((step) => step.name === "Build production docs");
+    const check = steps.findIndex((step) => step.name === "Example XLSX isolation");
+    expect(build).toBeGreaterThanOrEqual(0);
+    expect(check).toBeGreaterThan(build);
+    expect(steps[check]?.run).toBe("bun scripts/verify-example-xlsx-isolation.ts");
+  });
+
   it("deploys docs from the release commit only after its GitHub release", () => {
     const publish = job("release", "publish");
     const docs = job("release", "docs");
@@ -241,6 +250,21 @@ describe("CI and release workflow contracts", () => {
     }
     expect(exitCode({ DOCS_REQUIRED: "false", DOCS: "skipped", BROWSER: "skipped" })).toBe(0);
     expect(exitCode({ DOCS_REQUIRED: "false" })).not.toBe(0);
+  });
+
+  it("installs Chromium on the runners without the Ubuntu apt mirrors", () => {
+    // The runner image has Chromium's libraries; apt only added fonts, and a
+    // mirror outage failed every pull request.
+    const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
+      readonly scripts: Readonly<Record<string, string>>;
+    };
+    expect(manifest.scripts["browser:install:chromium"]).toBe("bun scripts/install-chromium.ts");
+    const installs = Object.values(workflows().ci.jobs).flatMap((ciJob) =>
+      (ciJob.steps ?? []).filter((step) => step.name === "Install Chromium"),
+    );
+    expect(installs.length).toBeGreaterThan(0);
+    for (const step of installs) expect(step.run).toBe("bun run browser:install:chromium");
+    expect(workflowSources.ci).not.toMatch(/--with-deps|install-deps|apt-get/);
   });
 
   it("rejects every missing Vercel credential before invoking the deployment CLI", () => {
