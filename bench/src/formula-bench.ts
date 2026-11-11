@@ -253,7 +253,14 @@ export function formulaWorkloadKey(workload: Pick<FormulaWorkloadResult, "id" | 
   return `workload=${workload.id};size=${workload.size}`;
 }
 
-export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
+/**
+ * The rows a capture of `mode` runs on the engine in `packages/<enginePackage>`:
+ * the closure rows run only on the full engine, which has those functions.
+ */
+export function expectedFormulaWorkloadKeys(
+  mode: BenchmarkMode,
+  enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
+): string[] {
   const smoke = mode === "smoke";
   const keys: string[] = [];
   for (const size of smoke ? [1_000] : FORMULA_SIZES) {
@@ -317,6 +324,13 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
   );
   keys.push(formulaWorkloadKey({ id: "spill-sequence-admission", size: smoke ? 1_000 : 100_000 }));
+  if (enginePackage === "formulas") {
+    for (const id of CLOSURE_ROW_IDS) {
+      for (const size of smoke ? [1_000] : CLOSURE_ROW_SIZES) {
+        keys.push(formulaWorkloadKey({ id, size }));
+      }
+    }
+  }
   return keys;
 }
 
@@ -362,6 +376,12 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "map-lambda",
+  "reduce-lambda",
+  "byrow-lambda",
+  "lambda-call",
+  "named-lambda",
+  "measure-pivot",
 ]);
 
 function legacyFormulaBaselineWorkloadKeys(): string[] {
@@ -482,6 +502,16 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return `12:${size + 1}`;
     case "spill-sequence-admission":
       return `1:${size}:0`;
+    case "map-lambda":
+    case "lambda-call":
+    case "named-lambda":
+      return size * CLOSURE_EDITED_SCALE + 1;
+    case "reduce-lambda":
+      return (CLOSURE_EDITED_SCALE * size * (size + 1)) / 2;
+    case "byrow-lambda":
+      return 2 * size * CLOSURE_EDITED_SCALE;
+    case "measure-pivot":
+      return measurePivotOutput(size);
     default:
       throw new Error(`formula benchmark has no expected output for workload=${id};size=${size}`);
   }
@@ -2331,6 +2361,225 @@ function bindingRowFixture(id: (typeof BINDING_ROW_IDS)[number], count: number):
   }
 }
 
+/**
+ * Full-engine rows for closures, which only that engine has: LAMBDA helpers
+ * over a range, a LAMBDA call in every row (written inline and through a
+ * defined name), and a data-model pivot whose measures run for every pivot
+ * cell. The timed edit reaches every call: the helpers and calls read `$C$1`,
+ * and the pivot's source changes in one row.
+ */
+const CLOSURE_ROW_IDS = [
+  "map-lambda",
+  "reduce-lambda",
+  "byrow-lambda",
+  "lambda-call",
+  "named-lambda",
+  "measure-pivot",
+] as const;
+const CLOSURE_ROW_SIZES = [10_000, 100_000] as const;
+const CLOSURE_SCALE = 2;
+const CLOSURE_EDITED_SCALE = 3;
+/** The defined name `named-lambda` calls. */
+const CLOSURE_NAME = "Affine";
+const CLOSURE_LAMBDA = "LAMBDA(x,s,x*s+1)";
+
+/**
+ * One helper formula in D1 over `count` rows: A and B hold 1…count and `$C$1`
+ * the scale the timed edit changes.
+ */
+function closureRangeFixture(
+  count: number,
+  formula: string,
+  check: (store: CellStore, sheet: number) => number,
+): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  for (const col of [0, 1]) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(count, (row) => row + 1),
+      0,
+    );
+  }
+  store.setNumber(sheet, 0, 2, CLOSURE_SCALE, 0);
+  store.setFormula(sheet, 0, 3, formula, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, CLOSURE_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => check(store, sheet),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: CLOSURE_SCALE }),
+  };
+}
+
+/** The columns of the `orders` table behind `measure-pivot`, and how each row fills them. */
+const ORDER_COLUMNS = ["region", "quarter", "amount", "qty"] as const;
+const ORDER_REGIONS = 25;
+const orderRegion = (row: number) => row % ORDER_REGIONS;
+const orderQuarter = (row: number) => (Math.floor(row / ORDER_REGIONS) % 4) + 1;
+const orderAmount = (row: number) => (row % 7) + 1;
+const orderQty = (row: number) => (row % 3) + 1;
+const ORDER_EDITED_AMOUNT = 101;
+
+/**
+ * The two measures: average price, and a region's share of its quarter, which
+ * removes the region filter with `CALCULATE(…,ALL(…))`.
+ */
+const ORDER_MEASURES = [
+  "=SUM(orders[amount])/SUM(orders[qty])",
+  "=SUM(orders[amount])/CALCULATE(SUM(orders[amount]),ALL(orders[region]))",
+] as const;
+
+/**
+ * The pivot's first cell (region `R0`, quarter 1) after the timed edit: the
+ * sum of its two measures.
+ */
+function measurePivotOutput(rows: number): number {
+  let amount = 0;
+  let qty = 0;
+  let quarterAmount = 0;
+  for (let row = 0; row < rows; row++) {
+    if (orderQuarter(row) !== 1) continue;
+    const value = row === 0 ? ORDER_EDITED_AMOUNT : orderAmount(row);
+    quarterAmount += value;
+    if (orderRegion(row) !== 0) continue;
+    amount += value;
+    qty += orderQty(row);
+  }
+  return amount / qty + amount / quarterAmount;
+}
+
+/**
+ * Table `orders` with `count` body rows on one sheet, and on another a model
+ * pivot over it: regions down, quarters across, both measures in each cell.
+ * The timed run changes the first order's amount, so every cell updates.
+ */
+function measurePivotFixture(count: number): TimedFixture {
+  // Only the full engine has pivots and measures.
+  const store = new CellStore() as unknown as InstanceType<formulas.EngineInstance["CellStore"]>;
+  const orders = store.addSheet(ORDER_COLUMNS.length, count + 1);
+  const output = store.addSheet(1 + 4 * ORDER_MEASURES.length, ORDER_REGIONS + 2);
+  for (const [col, header] of ORDER_COLUMNS.entries()) {
+    store.setString(orders, 0, col, header, 0);
+  }
+  for (let row = 0; row < count; row++) {
+    store.setString(orders, row + 1, 0, `R${orderRegion(row)}`, 0);
+  }
+  for (const [col, value] of [orderQuarter, orderAmount, orderQty].entries()) {
+    store.setColumnNumbers(orders, col + 1, 1, numericColumn(count, value), 0);
+  }
+  assert(
+    store.setTable(
+      "orders",
+      "orders",
+      orders,
+      0,
+      0,
+      count,
+      ORDER_COLUMNS.length - 1,
+      true,
+      false,
+      [...ORDER_COLUMNS],
+      [...ORDER_COLUMNS],
+    ),
+    "orders table set",
+  );
+  // Measure records: [id, homeTable, formula, "", name].
+  assert(
+    store.setRelationships(
+      ORDER_MEASURES.flatMap((formula, index) => [
+        `m${index}`,
+        "orders",
+        formula,
+        "",
+        `Measure ${index}`,
+      ]),
+    ),
+    "measures set",
+  );
+  // Pivot "pivot" from a model source (kind 3) over `orders`, every column a
+  // field by table and column string, anchored at A1: regions down, quarters
+  // across, each measure a value field; no filters, sorts or totals.
+  const strings = [
+    "pivot",
+    "orders",
+    ...ORDER_COLUMNS,
+    ...ORDER_MEASURES.map((_, index) => `m${index}`),
+  ];
+  const definition = [0, 3, 1, ORDER_COLUMNS.length];
+  for (const col of ORDER_COLUMNS.keys()) definition.push(1, 2 + col);
+  definition.push(0, 0, 1, 0, 1, 1, ORDER_MEASURES.length);
+  for (const index of ORDER_MEASURES.keys()) {
+    definition.push(2 + ORDER_COLUMNS.length + index, 7, -1);
+  }
+  definition.push(0, 0, 0);
+  assert(store.setPivots(output, new Float64Array(definition), strings), "pivot set");
+  store.recompute(orders);
+  const edit = (value: number) => {
+    store.setNumber(orders, 1, 2, value, 0);
+    store.recompute(orders);
+  };
+  return {
+    store,
+    run: () => edit(ORDER_EDITED_AMOUNT),
+    // Below the quarter labels and the measure names: region R0 in quarter 1.
+    check: () => numberAt(store, output, 2, 1) + numberAt(store, output, 2, 2),
+    dispose: () => store.free(),
+    restore: () => edit(orderAmount(0)),
+  };
+}
+
+function closureRowFixture(id: (typeof CLOSURE_ROW_IDS)[number], count: number): TimedFixture {
+  const last = (store: CellStore, sheet: number) => numberAt(store, sheet, count - 1, 1);
+  switch (id) {
+    case "map-lambda":
+      return closureRangeFixture(count, `=MAP(A1:A${count},LAMBDA(x,x*$C$1+1))`, (store, sheet) =>
+        numberAt(store, sheet, count - 1, 3),
+      );
+    case "reduce-lambda":
+      return closureRangeFixture(
+        count,
+        `=REDUCE(0,A1:A${count},LAMBDA(a,x,a+x*$C$1))`,
+        (store, sheet) => numberAt(store, sheet, 0, 3),
+      );
+    case "byrow-lambda":
+      return closureRangeFixture(
+        count,
+        `=BYROW(A1:B${count},LAMBDA(r,SUM(r)*$C$1))`,
+        (store, sheet) => numberAt(store, sheet, count - 1, 3),
+      );
+    case "lambda-call":
+      return shapeRowsFixture(
+        count,
+        numbersInA(),
+        (row) => `=${CLOSURE_LAMBDA}(A${row + 1},$C$1)`,
+        CLOSURE_SCALE,
+        CLOSURE_EDITED_SCALE,
+        last,
+      );
+    case "named-lambda":
+      return shapeRowsFixture(
+        count,
+        (store, sheet, rows) => {
+          numbersInA()(store, sheet, rows);
+          assert(store.setNamedFormula(CLOSURE_NAME, -1, `=${CLOSURE_LAMBDA}`), "LAMBDA name set");
+        },
+        (row) => `=${CLOSURE_NAME}(A${row + 1},$C$1)`,
+        CLOSURE_SCALE,
+        CLOSURE_EDITED_SCALE,
+        last,
+      );
+    case "measure-pivot":
+      return measurePivotFixture(count);
+  }
+}
+
 /** Even rows bind one name, odd rows bind three that build on each other. */
 function letManyFormula(row: number): string {
   const source = `A${row + 1}*$C$1`;
@@ -2523,6 +2772,13 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
     incrementalDependencyClosureFixture(range),
   );
   add("spill-sequence-admission", large, () => spillSequenceAdmissionFixture(large));
+  if (ENGINE_PACKAGE === "formulas") {
+    for (const id of CLOSURE_ROW_IDS) {
+      for (const size of smoke ? [1_000] : CLOSURE_ROW_SIZES) {
+        add(id, size, () => closureRowFixture(id, size));
+      }
+    }
+  }
   return workloads;
 }
 
@@ -3278,18 +3534,23 @@ export function formulaRegressionBaselineIdentity(baseline: FormulaBenchmarkResu
 
 /**
  * An older baseline may leave out expanded workloads. Every core workload must still be listed,
- * and no key outside the current full matrix is allowed.
+ * and no key outside the current full matrix of the baseline's engine is allowed.
  */
 function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): string[] {
   const observed = baseline.workloads.map(formulaWorkloadKey);
-  const candidates = [expectedFormulaWorkloadKeys("full"), legacyFormulaBaselineWorkloadKeys()];
+  const enginePackage =
+    baseline.source === undefined
+      ? ENGINE_PACKAGE
+      : formulaSourceEnginePackage(baseline.source.files);
+  const current = expectedFormulaWorkloadKeys("full", enginePackage);
+  const candidates = [current, legacyFormulaBaselineWorkloadKeys()];
   for (const expected of candidates) {
     if (expected.length === observed.length && expected.every((key) => observed.includes(key))) {
       return expected;
     }
   }
   const observedSet = new Set(observed);
-  const recognised = new Set(expectedFormulaWorkloadKeys("full"));
+  const recognised = new Set(current);
   const core = legacyFormulaBaselineWorkloadKeys();
   if (
     observed.length > 0 &&

@@ -299,6 +299,29 @@ heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
 `sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
 the 1.2 default until same-engine pairs calibrate them.
 
+Six rows (10K and 100K each) time closures. Only the full engine has LAMBDA,
+its helpers and data-model measures, so these rows are in the matrix only when
+`SHEETWRITE_BENCH_ENGINE=full`; the default engine's matrix is unchanged.
+
+- `map-lambda`, `reduce-lambda` and `byrow-lambda`: one formula over A1:A_n
+  (A1:B_n for BYROW): `=MAP(A1:A_n,LAMBDA(x,x*$C$1+1))`,
+  `=REDUCE(0,A1:A_n,LAMBDA(a,x,a+x*$C$1))` and
+  `=BYROW(A1:B_n,LAMBDA(r,SUM(r)*$C$1))`. The timed run changes `$C$1`.
+- `lambda-call` and `named-lambda`: one call per row,
+  `=LAMBDA(x,s,x*s+1)(A1,$C$1)`, and the same LAMBDA through the defined name
+  `Affine`, `=Affine(A1,$C$1)`. The timed run changes `$C$1`.
+- `measure-pivot`: table `orders` with n rows (25 regions, 4 quarters) and a
+  data-model pivot over it, regions down and quarters across, with two
+  measures: `=SUM(orders[amount])/SUM(orders[qty])` and a region's share of
+  its quarter through `CALCULATE(…,ALL(orders[region]))`. The timed run
+  changes one order's amount, so every pivot cell updates.
+
+On develop, every LAMBDA call copies the LAMBDA's formula tree with its
+arguments put in, once per element for the helpers, and a pivot update
+copies, for every cell, each measure's tree and the values of the columns it
+reads. Their ratio limits are the 1.2 default until same-engine pairs
+calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
