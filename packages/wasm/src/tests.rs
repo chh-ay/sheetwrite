@@ -3161,6 +3161,70 @@ fn iterative_calculation_rejects_limits_excel_does_not_accept() {
 }
 
 #[test]
+fn offset_indirect_scalar_contexts_and_reference_consumers_use_resolved_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 8);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_number(sheet, 0, 1, 0.0, 0);
+    store.set_string(sheet, 0, 2, "A1", 0);
+    let numeric_cases = [
+        ("=IFERROR(INDIRECT(\"A1\"),0)", 5.0),
+        ("=LET(v,INDIRECT(\"A1\"),IF(v>0,v,0))", 5.0),
+        ("=INDIRECT(INDIRECT(\"C1\"))", 5.0),
+        ("=OFFSET(A1,INDIRECT(\"B1\"),0)", 5.0),
+        ("=ROWS(OFFSET(A1,0,0,3,2))", 3.0),
+    ];
+    for (row, (formula, _)) in numeric_cases.iter().enumerate() {
+        store.set_formula(sheet, row + 1, 4, formula, 0);
+    }
+    store.set_formula(sheet, 1, 5, "=ISERROR(OFFSET(A1,0,0))", 0);
+    store.set_formula(sheet, 2, 5, "=IF(INDIRECT(\"A1\")>0,\"y\",\"n\")", 0);
+    store.recompute(sheet);
+    for (row, (formula, expected)) in numeric_cases.iter().enumerate() {
+        assert_eq!(number(&store, sheet, row + 1, 4), *expected, "{formula}");
+    }
+    assert_eq!(store.get_cell(sheet, 1, 5).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 1, 5), 0.0);
+    assert_eq!(string(&store, sheet, 2, 5).as_deref(), Some("y"));
+
+    #[cfg(feature = "analysis")]
+    {
+        let lambda_cases = [
+            ("=LAMBDA(r,OFFSET(A1,r,0))(0)", 5.0),
+            ("=LAMBDA(address,INDIRECT(address))(\"A1\")", 5.0),
+            ("=SUM(MAP({0;0},LAMBDA(r,OFFSET(A1,r,0))))", 10.0),
+        ];
+        for (row, (formula, _)) in lambda_cases.iter().enumerate() {
+            store.set_formula(sheet, row + 1, 6, formula, 0);
+        }
+
+        // Array helpers over a runtime reference spill its evaluated shape:
+        // A1:A2 is {5;0} and A1:B2 is {5,0;0,0}.
+        let spill_cases = [
+            ("=MAP(OFFSET(A1,0,0,2),LAMBDA(x,x*2))", [10.0, 0.0]),
+            ("=BYROW(OFFSET(A1,0,0,2,2),LAMBDA(r,SUM(r)))", [5.0, 0.0]),
+        ];
+        for (index, (formula, _)) in spill_cases.iter().enumerate() {
+            store.set_formula(sheet, 1 + index * 2, 7, formula, 0);
+        }
+
+        store.recompute(sheet);
+        for (row, (formula, expected)) in lambda_cases.iter().enumerate() {
+            assert_eq!(number(&store, sheet, row + 1, 6), *expected, "{formula}");
+        }
+        for (index, (formula, expected)) in spill_cases.iter().enumerate() {
+            let anchor = 1 + index * 2;
+            assert_eq!(number(&store, sheet, anchor, 7), expected[0], "{formula}");
+            assert_eq!(
+                number(&store, sheet, anchor + 1, 7),
+                expected[1],
+                "{formula}"
+            );
+        }
+    }
+}
+
+#[test]
 fn offset_indirect_one_cell_results_are_values_outside_the_spill_owner_budget() {
     const OWNER_LIMIT: usize = 2;
     const FORMULAS: usize = 6;
