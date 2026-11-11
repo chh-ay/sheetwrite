@@ -1,4 +1,5 @@
 import { type PopupPlacement, popupPosition } from "./menu-surface.js";
+import { checkStylePart } from "./style-parts.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";
@@ -312,6 +313,7 @@ export class SheetTabs {
     if (this.feedback) fragment.appendChild(this.createError(this.feedback));
 
     this.host.replaceChildren(fragment);
+    checkStylePart(tabstrip, "tabs", "The sheet tab bar");
     if (renameInput) {
       const placeholder = this.host.querySelector<HTMLElement>(
         `[data-rename-placeholder="${CSS.escape(renameInput.dataset.sheetId ?? "")}"]`,

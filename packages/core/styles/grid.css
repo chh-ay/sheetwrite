@@ -1,0 +1,188 @@
+/* @sheetwrite/core/styles/grid.css: the grid host, cell editor, data validation
+   lists, notes, action status and the theme variables. Every grid needs it. */
+
+/* Development builds read this to warn once when this part is missing. */
+.sheetwrite {
+  --sheetwrite-grid-ready: 1;
+}
+
+.sheetwrite {
+  --sheetwrite-font: 13px / 1.4 system-ui, sans-serif;
+  --sheetwrite-bg: #ffffff;
+  --sheetwrite-fg: #111111;
+  --sheetwrite-grid-line: #eeeeee;
+  --sheetwrite-header-bg: #f4ede1;
+  --sheetwrite-header-fg: #6b4a1f;
+  --sheetwrite-selection: #2563eb33;
+  --sheetwrite-selection-border: #2563eb;
+  --sheetwrite-search-match: #fff47580;
+  --sheetwrite-search-active: #fbbc04;
+  --sheetwrite-highlight: #e8f0fe99;
+  --sheetwrite-row-height: 28;
+
+  position: relative;
+  overflow: hidden;
+  font: var(--sheetwrite-font);
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  outline: none;
+}
+
+.sheetwrite-action-status {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10;
+  max-width: min(420px, calc(100% - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--sheetwrite-selection-border);
+  border-radius: 6px;
+  background: var(--sheetwrite-bg);
+  color: var(--sheetwrite-fg);
+  font: var(--sheetwrite-font);
+  box-shadow: 0 2px 8px #0002;
+}
+
+.sheetwrite-action-status[hidden] {
+  display: none;
+}
+
+[data-theme="dark"] .sheetwrite,
+.dark .sheetwrite {
+  --sheetwrite-bg: #0b0b0c;
+  --sheetwrite-fg: #e7e7e7;
+  --sheetwrite-grid-line: #26262a;
+  --sheetwrite-header-bg: #1a160f;
+  --sheetwrite-header-fg: #e8c98a;
+}
+
+.sheetwrite-scroller {
+  scrollbar-width: thin;
+  /* Allow native panning but suppress double-tap zoom so captured drags
+     (fill/resize/selection-extend) keep receiving pointermove. */
+  touch-action: pan-x pan-y;
+}
+
+.sheetwrite-editor {
+  position: absolute;
+  margin: 0;
+  border: 2px solid var(--sheetwrite-selection-border);
+  outline: none;
+  resize: none;
+  font: var(--sheetwrite-font);
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  padding: 0 4px;
+  box-sizing: border-box;
+  z-index: 3;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.sheetwrite-validation-list,
+.sheetwrite-validation-checkbox {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-selection-border);
+  border-radius: 6px;
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  font: var(--sheetwrite-font);
+  outline: none;
+}
+
+.sheetwrite-validation-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.sheetwrite-validation-option {
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sheetwrite-validation-option:hover,
+.sheetwrite-validation-option[aria-selected="true"] {
+  background: color-mix(in srgb, var(--sheetwrite-selection-border) 14%, transparent);
+}
+
+.sheetwrite-validation-checkbox {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.sheetwrite-canvas {
+  display: block;
+}
+
+.sheetwrite-overlay {
+  z-index: 1;
+}
+
+.sheetwrite-dom-overlay {
+  z-index: 2;
+}
+
+.sheetwrite-dom-cell-bounds > * {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+/* Cell notes (src/note-popover.ts): the hover card and the editor share one
+   look. Both are position: fixed under the grid host, so the widget variables
+   reach them and overflow cannot clip them. The amber edge matches the corner
+   mark the canvas paints on a noted cell. */
+.sheetwrite-note,
+.sheetwrite-note-editor {
+  z-index: 1001;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 240px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-left: 3px solid var(--sheetwrite-note-accent, #f59e0b);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+}
+
+.sheetwrite-note {
+  max-height: 240px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sheetwrite-note-editor {
+  width: 240px;
+  height: 120px;
+  resize: both;
+  outline: none;
+}
+
+.sheetwrite-note-editor:focus-visible {
+  border-color: var(--sheetwrite-selection-border, #2563eb);
+}
+
+@media (forced-colors: active) {
+  .sheetwrite-note,
+  .sheetwrite-note-editor {
+    border-color: CanvasText;
+  }
+
+  .sheetwrite-note-editor:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

@@ -321,10 +321,15 @@ async function verifyAdapterStylesheets(consumerRoot: string): Promise<void> {
            treeShaking: true,
            write: false,
            outdir: "stylesheet-probe",
+           // icons.css loads the icon sheet as a file; esbuild needs a loader for it.
+           loader: { ".svg": "file" },
          });
          const css = result.outputFiles.filter(file => file.path.endsWith(".css"));
          if (!css.some(file => file.text.includes(".sheetwrite"))) {
            throw new Error(framework + " packed stylesheet was removed by tree shaking");
+         }
+         if (!result.outputFiles.some(file => file.path.endsWith(".svg"))) {
+           throw new Error(framework + " packed stylesheet did not emit the icon sheet");
          }
        }`,
     ],
