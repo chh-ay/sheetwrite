@@ -4,6 +4,7 @@ import { initSheetwrite, type VersionedOperation } from "@sheetwrite/core";
 
 import {
   ShowcaseCollaborationServer,
+  type ShowcaseCommitRecord,
   ShowcaseLinkError,
   ShowcaseNetworkLink,
 } from "../src/showcases/collaboration-protocol.ts";
@@ -43,6 +44,24 @@ function commitRequest(clientMutationId: string, rows: readonly number[]) {
 }
 
 describe("showcase collaboration server", () => {
+  it("sequences single commits and reports applied, duplicate, and conflict acknowledgements", async () => {
+    const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
+    const records: ShowcaseCommitRecord[] = [];
+    cleanups.push(server.observeCommits((record) => records.push(record)));
+
+    expect(await server.commit(commitRequest("unit-m1", [0]))).toMatchObject({
+      status: "applied",
+      version: 1,
+    });
+    expect((await server.commit(commitRequest("unit-m1", [0]))).status).toBe("duplicate");
+    expect((await server.commit(commitRequest("unit-m2", [1]))).status).toBe("conflict");
+    expect(records.map(({ status, version }) => [status, version])).toEqual([
+      ["applied", 1],
+      ["duplicate", 1],
+      ["conflict", 1],
+    ]);
+  });
+
   it("sequences an atomic batch with each member's position, once, and applies a stale one nowhere", async () => {
     const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
     const link = new ShowcaseNetworkLink(server);

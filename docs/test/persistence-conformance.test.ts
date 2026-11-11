@@ -72,4 +72,25 @@ describe("persistence conformance", () => {
     expect(writerStats?.writes ?? 0).toBeGreaterThan(0);
     adapter.close();
   });
+
+  it("compacts on byte pressure alone", async () => {
+    const adapter = await ShowcaseIndexedDbAdapter.open(makePersistenceConformanceSnapshot(), {
+      databaseName: "sheetwrite-byte-compaction",
+      compaction: { maxTailRecords: 1_000, maxTailBytes: 1 },
+    });
+    const applied = await adapter.commit({
+      documentId: "persistence-conformance",
+      baseVersion: 0,
+      clientMutationId: "byte-compaction-m1",
+      operations: [
+        { op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 5 } },
+      ],
+    });
+    expect(applied.status).toBe("applied");
+    const stats = adapter.stats();
+    expect(stats.snapshotVersion).toBe(1);
+    expect(stats.currentVersion).toBe(1);
+    expect(stats.tailLength).toBe(0);
+    adapter.close();
+  });
 });
