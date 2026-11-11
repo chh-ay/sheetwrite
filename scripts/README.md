@@ -30,7 +30,8 @@ It is composed as `VERIFY_CI_NODES` in `scripts/workspace-tooling.ts` and runs, 
 order:
 
 1. Tooling contract tests, JavaScript dependency audit, `cargo test` for the default and `analysis` features, `cargo audit`
-2. Package builds
+2. Package builds. The four release cargo builds (`build:rust`) run at once first, so their
+   single-threaded link-time optimization overlaps; each package build then reuses its output
 3. Clean-export check, typechecks, lint, unit tests, example builds, Node ESM resolution
 4. Packed-consumer and bundler-consumer installs
 5. Public API check and benchmark smoke

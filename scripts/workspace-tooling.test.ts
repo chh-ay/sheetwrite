@@ -11,8 +11,10 @@ import {
   validateReleasePackageVersions,
 } from "./changeset-ci.js";
 import {
+  BUILD_NODES,
   COVERED_PACKAGE_TEST_ROOTS,
   PUBLISHABLE_PACKAGE_ORDER,
+  RUST_BUILD_NODES,
   TOOLING_TEST_PATHS,
   TYPECHECK_NODES,
   UNIT_TEST_PATHS,
@@ -189,6 +191,34 @@ describe("canonical workspace graph", () => {
     expect(paths.filter((path) => !path.startsWith("packages/"))).toEqual(
       UNIT_TEST_PATHS.filter((path) => path !== "packages"),
     );
+  });
+
+  it("runs one cargo build up front for each wasm-pack package build", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const wasmPackBuilds: string[] = [];
+    for await (const path of new Bun.Glob("packages/*/package.json").scan({ cwd: root })) {
+      const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
+        readonly scripts?: { readonly build?: string };
+      };
+      for (const command of manifest.scripts?.build?.split("&&") ?? []) {
+        if (command.includes("wasm-pack build")) wasmPackBuilds.push(command.trim());
+      }
+    }
+
+    expect(BUILD_NODES[0]?.command).toEqual(["bun", "scripts/workspace-tooling.ts", "build-rust"]);
+    expect(RUST_BUILD_NODES).toHaveLength(wasmPackBuilds.length);
+    // The full engine's wasm-pack build uses the target directory its cargo build fills.
+    expect(wasmPackBuilds).toContain(
+      "CARGO_TARGET_DIR=../wasm/target/analysis wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis",
+    );
+    const formulas = RUST_BUILD_NODES.find((node) => node.id === "cargo:@sheetwrite/formulas");
+    expect(formulas?.cwd).toBe("packages/wasm");
+    expect(formulas?.command.slice(-4)).toEqual([
+      "--features",
+      "analysis",
+      "--target-dir",
+      "target/analysis",
+    ]);
   });
 });
 
