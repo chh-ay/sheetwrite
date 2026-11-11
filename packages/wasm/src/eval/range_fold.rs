@@ -396,4 +396,43 @@ mod tests {
             Some("#NUM!")
         );
     }
+
+    /// A column with a cell of another kind is read cell by cell, and a
+    /// non-finite number fails every reduction, wherever it sits in the
+    /// column, as it does cell by cell.
+    #[test]
+    fn number_columns_with_other_kinds_or_infinity_match_the_cell_path() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(5, 50);
+        for row in 0..50 {
+            store.set_number(sheet, row, 0, row as f64, 0);
+            store.set_number(sheet, row, 1, row as f64, 0);
+        }
+        store.set_string(sheet, 10, 0, "text", 0);
+        store.set_number(sheet, 40, 1, f64::NEG_INFINITY, 0);
+        let sources = [
+            "=SUM(A1:A50)",
+            "=COUNT(A1:A50)",
+            "=COUNTA(A1:A50)",
+            "=MIN(A1:A50)",
+            "=SUM(B1:B50)",
+            "=AVERAGE(B1:B50)",
+            "=MAX(B1:B50)",
+            "=COUNT(B1:B50)",
+        ];
+        for (row, source) in sources.iter().enumerate() {
+            store.set_formula(sheet, row, 3, source, 0);
+        }
+        store.recompute(sheet);
+
+        let number = |row| store.get_cell(sheet, row, 3).num();
+        assert_eq!(number(0), (0..50).sum::<i32>() as f64 - 10.0);
+        assert_eq!(number(1), 49.0);
+        assert_eq!(number(2), 50.0);
+        assert_eq!(number(3), 0.0);
+        for row in 4..8 {
+            let error = store.get_cell(sheet, row, 3).string();
+            assert_eq!(error.as_deref(), Some("#NUM!"), "{}", sources[row]);
+        }
+    }
 }
