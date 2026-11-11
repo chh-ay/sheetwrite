@@ -129,6 +129,11 @@ test("sheet tabs rename, add and reorder by keyboard, and the host syncs every c
   await ordersOptions.focus();
   await page.keyboard.press("ArrowDown");
   await expect(renameOption).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(ordersOptions).toBeFocused();
+  await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("ArrowDown");
+  await expect(renameOption).toBeFocused();
   // A pointer press on a focused menu must not close it first (WebKit does not
   // focus pressed buttons).
   await renameOption.click();
