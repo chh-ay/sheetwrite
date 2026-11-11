@@ -29,6 +29,13 @@ export const TEST_FIXTURE_ISLANDS = {
         withProps(FormulasEngineFixture),
       ),
   },
+  "test-collaboration": {
+    source: "src/test-fixtures/collaboration/CollaborationFixture.tsx",
+    load: () =>
+      import("./collaboration/CollaborationFixture.js").then(({ CollaborationFixture }) =>
+        withProps(CollaborationFixture),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 export type TestFixtureIslandName = keyof typeof TEST_FIXTURE_ISLANDS;
