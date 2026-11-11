@@ -242,6 +242,36 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
+`let-many` (10K and 100K) puts a LET in every row, the way modern workbooks
+write them: even rows bind one name (`=LET(x,A1*$C$1,x+x+x)`), odd rows bind
+three that build on each other. The timed edit changes `$C$1`, so every LET
+recalculates. The other LET rows hold one LET over a 100K range, where LET
+itself is under 0.1% of the time. Here each LET evaluation's own cost
+shows: a LET formula took 2–5× the instructions of the same formula written
+without LET, with 18–34 heap allocations per evaluation. Its ratio limit is
+the 1.2 default until same-engine pairs calibrate it.
+
+`round-many`, `concat-many`, `offset-many` and `indirect-many` (10K and 100K)
+exist because the other rows did not exercise these shapes, so the gate could
+not see their cost. Each puts one formula per row, and every formula reads
+`$C$1`, which the timed edit changes. The shapes are
+`=ROUND(A1*$C$1,2)`, `=A1&" "&$C$1` over text cells, `=OFFSET(A1,$C$1,0)` and
+`=INDIRECT("A"&(ROW()+$C$1))`. Measured on develop before these rows existed
+(10K formulas, first recalculation, against a plain formula of the same
+shape), they took 3.3–11× the instructions, with 4–19 heap allocations per
+formula: ROUND 4,512 against 1,083, concatenation 4,596 against 1,405, OFFSET
+5,193 against 917, INDIRECT 10,137 against 917. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
+`let-calls` (10K and 100K) is `let-many` with function calls as bindings:
+even rows `=LET(x,ROUND(A1*$C$1,2),x+x+x)`, odd rows
+`=LET(x,SUM(A2*$C$1,1),y,ROUND(x/3,2),z,y*x,x+y+z)`. The other LET rows bind
+a function call in one formula only, where LET's own cost does not show.
+Measured natively before LETs resolved function-call bindings to slots, a
+100K recalculation of these formulas ran 1,398 M instructions, against 489 M
+once they did. Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
@@ -429,11 +459,18 @@ conditional rules), column queries (aggregate, sort, filter, search, distinct
 values, data edges), batched cell reads (`getCell`, `cellSnapshots`,
 `captureRange`, `persistedCellData`, `rangeStyleIds`) and formula range
 readers (ten families of eight formulas over ~100k-row ranges, recomputed after
-an edit). `src/reader-bench.ts` holds the 39 readers and their deterministic
+an edit). `src/reader-bench.ts` holds the 40 readers and their deterministic
 100,000-row fixtures. As with the formula gate, the harness always comes from
 the checkout that runs the gate; `--base` and `--candidate` (default: this
 checkout) only supply a built `packages/wasm/pkg`, so a 0.5.x base works
 without this benchmark code.
+
+`getWindow 1000x8 formula rule` exists because the other conditional window
+readers apply one formula rule to one column, so the gate barely exercised
+formula rules. Here one formula rule covers all eight columns, so every visible
+cell evaluates it. Measured on develop before this reader existed, a formula
+rule added 778 instructions and 2 heap allocations per visible cell to a
+window read that otherwise took 373 instructions per cell.
 
 Build a 0.5.x base once, in its own worktree (48b137c8 is the v0.5.4 release
 commit):
@@ -1099,7 +1136,7 @@ bench/
     gate-protocol.ts       # exact matrices, resource/stat checks, fingerprints
     generate-baseline.ts   # non-overwriting controlled candidate generation
     render-gate.ts         # exact full/smoke renderer gate policies
-    reader-bench.ts        # one-engine CellStore reader timing (39 readers)
+    reader-bench.ts        # one-engine CellStore reader timing (40 readers)
     reader-gate.ts         # paired ABBA reader gate and noise-floor writer
     verify.ts              # deterministic CI smoke orchestration and artifacts
   results/

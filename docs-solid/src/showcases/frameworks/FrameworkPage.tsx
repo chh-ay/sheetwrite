@@ -9,6 +9,7 @@ import corePackage from "../../../../packages/core/package.json" with { type: "j
 import { Icon } from "../../components/Icon.js";
 import { SiteTopbar } from "../../components/SiteTopbar.js";
 import { PackageCommand } from "../../islands/content.js";
+import { ProofCards } from "../layout/ProofPage.js";
 
 /*
  * The page around each framework workbench (/vanilla/, /react/, /vue/,
@@ -32,6 +33,8 @@ interface FrameworkPageProps {
   readonly description: string;
   readonly prompt: string;
   readonly proof: readonly FrameworkProof[];
+  /** A picture for each proof, by its title. */
+  readonly proofArt?: Readonly<Record<string, () => JSX.Element>>;
   readonly guide: string;
   readonly packageName: string;
   readonly sourcePath: string;
@@ -112,19 +115,7 @@ export function FrameworkPage(props: FrameworkPageProps) {
               and Grid APIs.
             </p>
           </header>
-          <ol>
-            <For each={props.proof}>
-              {(item, position) => (
-                <li>
-                  <span>{String(position() + 1).padStart(2, "0")}</span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.detail}</p>
-                  </div>
-                </li>
-              )}
-            </For>
-          </ol>
+          <ProofCards art={props.proofArt} points={props.proof} />
         </section>
 
         <footer class="sw-showcase-page__footer">

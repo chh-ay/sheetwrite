@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import mdx from "@mdx-js/rollup";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
@@ -106,6 +108,33 @@ type PageOutput = { code: string; map?: unknown } | undefined;
  * Compiling (and running Solid's compiler on) each page's markup there too
  * would double the build for output no page loads.
  */
+/**
+ * `import text from "./snippet.mdx?source"`: a snippet file's text, for the
+ * showcase layout's list of calls and its fold. A `?raw` import would still
+ * reach the MDX compiler; this module id ends in `.source`, so nothing else
+ * transforms it.
+ */
+function snippetSources(): Plugin {
+  const PREFIX = "\0snippet-source:";
+  return {
+    name: "docs-solid:snippet-sources",
+    enforce: "pre",
+    async resolveId(id, importer) {
+      if (!id.endsWith(".mdx?source")) return null;
+      const resolved = await this.resolve(id.slice(0, -"?source".length), importer, {
+        skipSelf: true,
+      });
+      return resolved === null ? null : `${PREFIX}${resolved.id}.source`;
+    },
+    async load(id) {
+      if (!id.startsWith(PREFIX)) return null;
+      const file = id.slice(PREFIX.length, -".source".length);
+      this.addWatchFile(file);
+      return `export default ${JSON.stringify(await readFile(file, "utf8"))};`;
+    },
+  };
+}
+
 function docsPages(): Plugin {
   const pages = mdx({
     ...DOCS_MDX_OPTIONS,
@@ -186,6 +215,7 @@ export default defineConfig({
   // The docs site's static files: favicon, llms.txt, the changelog feed, figures.
   publicDir: new URL("../docs/public/", import.meta.url).pathname,
   plugins: [
+    snippetSources(),
     docsPages(),
     expressiveCodeAssets(),
     formulaTables(),

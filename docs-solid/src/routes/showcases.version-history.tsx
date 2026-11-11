@@ -7,13 +7,16 @@ import {
   YOU,
 } from "@docs/showcases/scenarios/version-history.js";
 import VersionHistorySnippet from "@docs/showcases/snippets/version-history.mdx";
+import VersionHistorySnippetSource from "@docs/showcases/snippets/version-history.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { VersionsDiagram } from "../showcases/art/explain-diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { VersionHistoryStage } from "../showcases/version-history/VersionHistoryStage.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -25,6 +28,7 @@ export const Route = createFileRoute("/showcases/version-history")({
       "Edit a shared budget with a teammate, save named versions, compare a version with the current document by author, and restore a range or a sheet.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
@@ -37,7 +41,33 @@ function VersionHistoryShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "The code behind it", Snippet: VersionHistorySnippet }}
+        explain={
+          <ShowcaseSection
+            id="version-history-rules"
+            figure={<VersionsDiagram />}
+            title="How versions are kept"
+          >
+            <ul>
+              <li>
+                The document authority journals each committed change in the archive, with its
+                author. Edits that are not committed yet never reach a version.
+              </li>
+              <li>
+                Versions are stored in content-addressed chunks, so unchanged cells are shared
+                between them. A compare loads a small WASM kernel the first time it runs.
+              </li>
+              <li>
+                A restore is one undoable change and one synced transaction, so Sam's client
+                receives it like any other edit.
+              </li>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "The code behind it",
+          Snippet: VersionHistorySnippet,
+          source: VersionHistorySnippetSource,
+        }}
         eyebrow="Collaboration"
         facts={[
           { label: "Authors", value: `${authorName(YOU)}, ${authorName(SAM)}` },
@@ -67,24 +97,7 @@ function VersionHistoryShowcase() {
           </>
         }
         title="Save, compare and restore versions"
-      >
-        <ShowcaseSection id="version-history-rules" title="How versions are kept">
-          <ul>
-            <li>
-              The document authority journals each committed change in the archive, with its author.
-              Edits that are not committed yet never reach a version.
-            </li>
-            <li>
-              Versions are stored in content-addressed chunks, so unchanged cells are shared between
-              them. A compare loads a small WASM kernel the first time it runs.
-            </li>
-            <li>
-              A restore is one undoable change and one synced transaction, so Sam's client receives
-              it like any other edit.
-            </li>
-          </ul>
-        </ShowcaseSection>
-      </ShowcasePage>
+      ></ShowcasePage>
     </NoHydration>
   );
 }

@@ -4,10 +4,14 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { VANILLA_PROOF_ART } from "../showcases/art/proof-art.js";
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 import { VanillaWorkbench } from "../showcases/frameworks/vanilla/VanillaWorkbench.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
+import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
+import bandStylesheet from "../styles/showcases/workbench-band.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
 import vanillaStylesheet from "@docs/styles/vanilla-workbench.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
@@ -19,10 +23,13 @@ export const Route = createFileRoute("/vanilla")({
   head: () => ({
     meta: pageMeta("Vanilla engine workbench — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
       { rel: "stylesheet", href: vanillaStylesheet },
+      { rel: "stylesheet", href: bandStylesheet },
+      { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),
   component: VanillaRoute,
@@ -37,6 +44,7 @@ function VanillaRoute() {
         framework="vanilla"
         guide="/docs/frameworks/vanilla/"
         packageName="@sheetwrite/core"
+        proofArt={VANILLA_PROOF_ART}
         prompt="Edit a Close date cell, switch Main thread to Web Worker, then destroy and create the Grid. Host state shows each ownership boundary."
         proof={[
           {

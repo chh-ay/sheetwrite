@@ -145,7 +145,7 @@ function RootDocument(props: { children?: JSX.Element }) {
       <head>
         <HeadContent />
         {/* Sets the theme before first paint. */}
-        <ScriptOnce children={THEME_SCRIPT} />
+        <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
       </head>
       <body>
         <IconSprite />

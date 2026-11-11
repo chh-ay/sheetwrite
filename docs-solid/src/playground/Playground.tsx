@@ -1,8 +1,8 @@
 import { type CodeToken, tokenizeCode } from "@docs/lib/code-tokens.js";
+import type { ExampleError } from "@docs/playground/example-error.js";
 import { EDITOR_HINT, expectedResultHeight } from "@docs/playground/layout.js";
 import {
   type ConsoleEntry,
-  type ExampleError,
   followSiteTheme,
   frameDocument,
   runExample,
@@ -322,7 +322,9 @@ function ExampleFrame(props: ExampleFrameProps) {
     <iframe
       class="sw-playground__frame"
       onLoad={start}
-      ref={frame}
+      ref={(element) => {
+        frame = element;
+      }}
       // Scripts run so the example can; the frame cannot navigate the page or open windows.
       sandbox="allow-scripts allow-same-origin"
       srcdoc={frameSource}

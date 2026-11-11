@@ -645,32 +645,8 @@
   font-weight: var(--sw-weight-semibold);
 }
 
-/* What the scenario proves, and the lanes below: lists inside the prose
-   sections drop the prose markers and indents. */
-.sw-prose ol.sw-proofs-points {
-  display: grid;
-  gap: var(--sw-space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sw-prose .sw-proofs-points li {
-  display: grid;
-  gap: var(--sw-space-1);
-  max-width: none;
-  margin: 0;
-}
-
-.sw-proofs-points strong {
-  color: var(--sw-fg-strong);
-}
-
-.sw-proofs-points span {
-  color: var(--sw-fg-muted);
-}
-
-/* The ownership map: two lanes and the contract between them. */
+/* The ownership map: the library lane, the seam naming the interfaces
+   between them, then the host lane. */
 .sw-showcase__section.sw-proofs-boundary {
   max-width: none;
   gap: var(--sw-space-4);
@@ -685,9 +661,28 @@
 
 .sw-proofs-boundary__map {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: var(--sw-space-4);
-  align-items: stretch;
+  align-items: center;
+}
+
+.sw-proofs-boundary__map > .sw-proofs-boundary__lane {
+  height: 100%;
+}
+
+.sw-proofs-boundary__seam {
+  width: min(100%, 20rem);
+  justify-self: center;
+}
+
+@media (min-width: 72rem) {
+  .sw-proofs-boundary__map {
+    grid-template-columns: minmax(0, 1fr) 18rem minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .sw-proofs-boundary__seam {
+    width: 100%;
+  }
 }
 
 .sw-proofs-boundary__lane {
@@ -749,23 +744,12 @@
   color: var(--sw-fg-muted);
 }
 
-.sw-proofs-boundary__contract {
-  display: grid;
-  align-content: center;
-  margin: 0;
-}
-
 /* ---------- narrower widths ---------- */
 
 @media (max-width: 60rem) {
   .sw-dbx__diagnostics-body,
-  .sw-clb__advanced-body,
-  .sw-proofs-boundary__map {
+  .sw-clb__advanced-body {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-proofs-boundary__contract {
-    justify-items: center;
   }
 }
 

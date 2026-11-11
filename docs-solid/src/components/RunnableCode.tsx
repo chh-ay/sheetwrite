@@ -81,7 +81,12 @@ export function RunnableCode(rawProps: RunnableCodeProps) {
   };
 
   return (
-    <div class="sw-runnable" ref={block}>
+    <div
+      class="sw-runnable"
+      ref={(element) => {
+        block = element;
+      }}
+    >
       <Show
         when={example()}
         fallback={

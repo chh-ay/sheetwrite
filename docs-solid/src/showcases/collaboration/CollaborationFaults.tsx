@@ -9,7 +9,7 @@ import { actionPending, CLIENT_KEYS, engine, views } from "./state.js";
 /** Recovery drills and each client's full event log, after the code. */
 export function CollaborationFaults(props: Readonly<{ actors: Actors }>) {
   return (
-    <details class="sw-clb__advanced">
+    <details class="sw-clb__advanced" open>
       <summary>
         <Icon name="chevron-right" />
         Lose acknowledgements, hold broadcasts, and commit from the server

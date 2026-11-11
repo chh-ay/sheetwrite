@@ -26,6 +26,12 @@ declare module "*.svelte" {
 }
 
 /** A Markdown module compiled through Solid (vite.config.ts `docsPages`); it renders on the server. */
+/** A snippet file's text (vite.config.ts `snippetSources`). */
+declare module "*.mdx?source" {
+  const text: string;
+  export default text;
+}
+
 declare module "*.mdx" {
   import type { JSX } from "solid-js";
 

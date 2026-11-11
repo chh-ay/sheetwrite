@@ -7,6 +7,7 @@ import {
   SERIES_LENGTH,
 } from "@docs/showcases/scenarios/recalculation.js";
 import RecalculationSnippet from "@docs/showcases/snippets/recalculation.mdx";
+import RecalculationSnippetSource from "@docs/showcases/snippets/recalculation.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
@@ -41,7 +42,33 @@ function RecalculationShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "The code behind it", Snippet: RecalculationSnippet }}
+        explain={
+          <ShowcaseSection
+            id="recalculation-notes"
+            figure={<RecalculationDiagram />}
+            title="What the timings include"
+          >
+            <ul>
+              <li>
+                Last recalculation runs from the edit call until a dependent total is readable: the
+                engine marks the formulas that read the cell and calculates each once.
+              </li>
+              <li>
+                Frame painted adds the next frame the browser draws. Your device, browser and other
+                tabs change every number on this page.
+              </li>
+              <li>
+                The release benchmarks measure the same work on fixed machines; see the performance
+                pages for their results.
+              </li>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "The code behind it",
+          Snippet: RecalculationSnippet,
+          source: RecalculationSnippetSource,
+        }}
         eyebrow="Performance"
         facts={[
           { label: "Rows", value: ROWS.toLocaleString("en") },
@@ -83,25 +110,7 @@ function RecalculationShowcase() {
           </>
         }
         title={`Recalculate ${ROWS.toLocaleString("en")} formulas, live`}
-      >
-        <RecalculationDiagram />
-        <ShowcaseSection id="recalculation-notes" title="What the timings include">
-          <ul>
-            <li>
-              Last recalculation runs from the edit call until a dependent total is readable: the
-              engine marks the formulas that read the cell and calculates each once.
-            </li>
-            <li>
-              Frame painted adds the next frame the browser draws. Your device, browser and other
-              tabs change every number on this page.
-            </li>
-            <li>
-              The release benchmarks measure the same work on fixed machines; see the performance
-              pages for their results.
-            </li>
-          </ul>
-        </ShowcaseSection>
-      </ShowcasePage>
+      ></ShowcasePage>
     </NoHydration>
   );
 }

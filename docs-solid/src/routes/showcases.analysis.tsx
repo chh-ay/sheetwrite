@@ -9,14 +9,17 @@ import {
   STORY_ORDER_ROWS,
 } from "@docs/showcases/scenarios/orders-story.js";
 import AnalysisSetupSnippet from "@docs/showcases/snippets/analysis-setup.mdx";
+import AnalysisSetupSnippetSource from "@docs/showcases/snippets/analysis-setup.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
 import { AnalysisStage } from "../showcases/analysis/AnalysisStage.js";
+import { ChartReadsCellsDiagram } from "../showcases/art/explain-diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { ANALYSIS_WORKBOOK_TITLE } from "../showcases/scenarios/analysis.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
@@ -27,6 +30,7 @@ export const Route = createFileRoute("/showcases/analysis")({
       "A pivot table and a live chart over two years of orders. Edit an order and both update in place; rearrange the pivot from its field list.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
     ],
@@ -48,7 +52,24 @@ function AnalysisShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "How it is built", Snippet: AnalysisSetupSnippet }}
+        explain={
+          <ShowcaseSection
+            id="analysis-chart"
+            figure={<ChartReadsCellsDiagram />}
+            title="The chart reads cells"
+          >
+            <p>
+              The chart reads cells, not the pivot: point it at any range, and it redraws when those
+              cells change. Pivots over related tables and measures live on the{" "}
+              <a href="/showcases/data-model/">data model showcase</a>.
+            </p>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "How it is built",
+          Snippet: AnalysisSetupSnippet,
+          source: AnalysisSetupSnippetSource,
+        }}
         eyebrow="Analysis"
         facts={[
           { label: "Orders", value: STORY_ORDER_ROWS.toLocaleString("en") },
@@ -76,15 +97,7 @@ function AnalysisShowcase() {
         }
         task="A pivot table and a live chart over two years of orders. Edit any order and both update in place; rearrange the pivot from its field list."
         title="Pivot it, chart it, then change the data"
-      >
-        <ShowcaseSection id="analysis-chart" title="The chart reads cells">
-          <p>
-            The chart reads cells, not the pivot: point it at any range, and it redraws when those
-            cells change. Pivots over related tables and measures live on the{" "}
-            <a href="/showcases/data-model/">data model showcase</a>.
-          </p>
-        </ShowcaseSection>
-      </ShowcasePage>
+      ></ShowcasePage>
     </NoHydration>
   );
 }

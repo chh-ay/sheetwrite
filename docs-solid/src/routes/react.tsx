@@ -3,10 +3,14 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { FRAMEWORK_PROOF_ART } from "../showcases/art/proof-art.js";
 import { ReactWorkbenchIsland } from "../showcases/frameworks/FrameworkMount.js";
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
+import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
+import bandStylesheet from "../styles/showcases/workbench-band.css?url";
 import demoSelectStylesheet from "@docs/styles/demo-select.css?url";
 import reactWorkbenchStylesheet from "@docs/styles/react-workbench.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
@@ -19,12 +23,15 @@ export const Route = createFileRoute("/react")({
   head: () => ({
     meta: pageMeta("React analytics workbench — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
       // The workbench's Base UI selects (docs/src/showcases/ui/DemoSelect.tsx).
       { rel: "stylesheet", href: demoSelectStylesheet },
       { rel: "stylesheet", href: reactWorkbenchStylesheet },
+      { rel: "stylesheet", href: bandStylesheet },
+      { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),
   component: ReactRoute,
@@ -34,6 +41,7 @@ function ReactRoute() {
   return (
     <NoHydration>
       <FrameworkPage
+        proofArt={FRAMEWORK_PROOF_ART}
         description={description}
         eyebrow="REACT / CONTROLLED ANALYTICS"
         framework="react"
