@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun ../scripts/docs-cli.ts generate && bun --bun vite dev",
     "build": "bun ../scripts/docs-cli.ts check && bun run build:site",
-    "build:site": "bun ../scripts/docs-cli.ts generate && node node_modules/vite/bin/vite.js build && bun src/figures/og-images.ts && bun ../scripts/normalize-sitemap.ts dist/client && bunx pagefind --site dist/client",
+    "build:site": "bun ../scripts/docs-cli.ts generate && node node_modules/vite/bin/vite.js build && bun src/figures/og-images.ts dist/client && bun ../scripts/normalize-sitemap.ts dist/client && bunx pagefind --site dist/client",
     "preview": "bun --bun vite preview",
     "figures": "bun src/figures/capture.ts",
     "typecheck": "bun ../scripts/docs-cli.ts generate && node ../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
