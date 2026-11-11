@@ -212,7 +212,7 @@ function Card(props: Readonly<{ card: PreviewCard; framework?: boolean }>) {
       <a
         class={`sw-hub-launch${props.framework ? " sw-hub-launch--framework" : ""}`}
         data-owner={props.card.id}
-        href="#"
+        href={`/showcases/${props.card.id}/`}
         style={{ "--sw-hub-accent": `var(--sw-${props.card.hue})` }}
       >
         <span class="sw-hub-preview">{Art && <Art />}</span>
