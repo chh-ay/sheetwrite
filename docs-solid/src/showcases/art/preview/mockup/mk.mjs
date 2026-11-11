@@ -97,6 +97,17 @@ function transform({ parts, explain, diagram }) {
     code.before(row);
     prose.classList.add("mk-text");
     row.append(prose, el("figure", "mk-figure", parts[diagram]));
+    // A collapsed disclosure beside a picture shows its content instead.
+    for (const details of prose.querySelectorAll("details")) details.open = true;
+    // One small control beside a tall picture is a half-empty band: stack it.
+    const ownText = [...prose.children]
+      .filter((child) => child.tagName !== "H2")
+      .map((child) => child.innerText)
+      .join(" ");
+    if (ownText.trim().length < 200) {
+      row.classList.add("mk-row--stack");
+      prose.querySelector("h2")?.after(row.querySelector(".mk-figure"));
+    }
   }
   if (code) {
     const row = el("div", "mk-row mk-row--code");

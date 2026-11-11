@@ -1,9 +1,10 @@
 /* Proposed shared showcase pattern (mockup). One frame from the header down:
    the page column is the stage's width, up to 120rem, so every section shares
    the stage's left and right edges. */
-.sw-showcase__page {
+/* Showcase pages use the 120rem frame everywhere, the site header included,
+   so the header, stage, band, text and code share one pair of edges. */
+:root:has(.sw-showcase__page, .sw-showcase-page__stage) {
   --sw-page-max: 120rem;
-  --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
 }
 
 .sw-showcase__stage {
@@ -157,13 +158,22 @@
   }
 }
 
+/* A section that shows controls (an expanded panel) gets half the row. */
+@media (min-width: 72rem) {
+  .mk-row:has(details) > .mk-text,
+  .mk-row:has(details) > .mk-figure {
+    grid-column: span 6;
+    max-width: none;
+  }
+}
+
 /* Very wide: the text gets a fifth column back. */
 @media (min-width: 100rem) {
-  .mk-row > .mk-text {
+  .mk-row:not(:has(details)) > .mk-text {
     grid-column: span 5;
   }
 
-  .mk-row > .mk-figure {
+  .mk-row:not(:has(details)) > .mk-figure {
     grid-column: span 7;
   }
 }
@@ -180,6 +190,11 @@
 .sw-prose .mk-proofs > li {
   margin: 0;
   padding: 0;
+  list-style: none;
+}
+
+.sw-prose .mk-proofs > li::marker {
+  content: none;
 }
 
 .sw-prose .mk-proofs > li::before {
@@ -357,4 +372,20 @@
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* A section whose own content is one small control (a disclosure, a button)
+   doesn't sit beside a tall picture: the picture takes the full row under the
+   heading, and the control follows it. */
+.mk-row--stack > .mk-text {
+  grid-column: 1 / -1;
+  max-width: none;
+}
+
+.mk-row--stack .mk-figure {
+  margin-bottom: var(--sw-space-2);
+}
+
+.mk-row--stack .mk-text > :not(h2, .mk-figure) {
+  max-width: var(--sw-measure-prose);
 }
