@@ -10,126 +10,105 @@ import {
   type XlsxSourceSnapshot,
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
-import { deflateSync, strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { deflateSync, strToU8 } from "fflate";
 
 import { xlsxAddon } from "../src/index.js";
 import { packageProblems } from "./raw-opc.js";
-
-interface CorpusFixture {
-  file: string;
-  sha256: string;
-}
+import {
+  collectWarnings,
+  editParts,
+  fixture,
+  partNames,
+  partText,
+  patchEntries,
+} from "./workbook-fixtures.js";
 
 const corpus = (await Bun.file(
   new URL("fixtures/preserve-corpus.json", import.meta.url),
 ).json()) as {
-  fixtures: CorpusFixture[];
+  fixtures: { file: string; sha256: string }[];
 };
 const PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
-const EOCD_SIGNATURE = 0x06054b50;
-const EOCD_BYTES = 22;
-const CENTRAL_HEADER_BYTES = 46;
-const LOCAL_HEADER_BYTES = 30;
+const IMAGE = "xl/media/10000000000006450000032120C875D8.jpg";
+const DRAWING = "xl/drawings/drawing1.xml";
+type RetainedPart = XlsxSourceSnapshot["parts"][number];
 
-async function fixture(file: string): Promise<Uint8Array> {
+async function checkedFixture(file: string): Promise<Uint8Array> {
   const entry = corpus.fixtures.find((candidate) => candidate.file === file);
   if (!entry) throw new Error(`${file} is not in preserve-corpus.json`);
-  const bytes = new Uint8Array(
-    await Bun.file(new URL(`fixtures/${file}`, import.meta.url)).arrayBuffer(),
-  );
+  const bytes = await fixture(file);
   expect(new Bun.CryptoHasher("sha256").update(bytes).digest("hex")).toBe(entry.sha256);
   return bytes;
 }
 
-/** Compressed payload of every entry, read straight from the ZIP records. */
-function rawEntries(
-  bytes: Uint8Array,
-): Map<string, { method: number; crc32: number; data: Uint8Array }> {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let eocd = bytes.byteLength - EOCD_BYTES;
-  while (eocd >= 0 && view.getUint32(eocd, true) !== EOCD_SIGNATURE) eocd--;
-  const count = view.getUint16(eocd + 10, true);
-  let offset = view.getUint32(eocd + 16, true);
+/** Compression method, CRC and compressed payload of every entry, read straight from the ZIP records. */
+function rawEntries(bytes: Uint8Array) {
   const entries = new Map<string, { method: number; crc32: number; data: Uint8Array }>();
-  for (let index = 0; index < count; index++) {
-    const nameLength = view.getUint16(offset + 28, true);
-    const name = strFromU8(
-      bytes.subarray(offset + CENTRAL_HEADER_BYTES, offset + CENTRAL_HEADER_BYTES + nameLength),
-    );
-    const local = view.getUint32(offset + 42, true);
-    const start =
-      local +
-      LOCAL_HEADER_BYTES +
-      view.getUint16(local + 26, true) +
-      view.getUint16(local + 28, true);
+  patchEntries(bytes, ({ view, central, local, name }) => {
+    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     entries.set(name, {
-      method: view.getUint16(offset + 10, true),
-      crc32: view.getUint32(offset + 16, true),
-      data: bytes.subarray(start, start + view.getUint32(offset + 20, true)),
+      method: view.getUint16(central + 10, true),
+      crc32: view.getUint32(central + 16, true),
+      data: bytes.subarray(start, start + view.getUint32(central + 20, true)),
     });
-    offset +=
-      CENTRAL_HEADER_BYTES +
-      nameLength +
-      view.getUint16(offset + 30, true) +
-      view.getUint16(offset + 32, true);
-  }
+  });
+  expect(entries.size).toBeGreaterThan(0);
   return entries;
 }
 
-function withWarnings(): {
-  warnings: XlsxWorkbookWarning[];
-  onWarning: (warning: XlsxWorkbookWarning) => void;
-} {
-  const warnings: XlsxWorkbookWarning[] = [];
-  return { warnings, onWarning: (warning) => warnings.push(warning) };
-}
-
-function droppedTargets(warnings: readonly XlsxWorkbookWarning[]): string[] {
-  return warnings.flatMap((warning) =>
+const droppedTargets = (warnings: readonly XlsxWorkbookWarning[]) =>
+  warnings.flatMap((warning) =>
     warning.message.startsWith("Preserved XLSX part graph") && warning.part ? [warning.part] : [],
   );
-}
 
 /** Replace the value of the first stored cell, as a host editing persisted JSON would. */
 function editFirstCell(snapshot: WorkbookSnapshot, value: string): WorkbookSnapshot {
   const edited = structuredClone(snapshot);
-  const cell = edited.sheets.flatMap((sheet) => sheet.cells.flatMap((block) => block.cells))[0];
+  const cell = edited.sheets.flatMap((entry) => entry.cells.flatMap((block) => block.cells))[0];
   if (!cell) throw new Error("fixture has no cells");
   cell.value = { kind: "literal", value };
   return edited;
 }
 
-function storeOf(snapshot: WorkbookSnapshot): SheetwriteStore {
-  return SheetwriteStore.fromSnapshot(snapshot);
+/** A store over `bytes` with `patches` applied to its first sheet. */
+async function editedStore(bytes: Uint8Array, ...patches: ("value" | "addRows" | "removeSheet")[]) {
+  const store = SheetwriteStore.fromSnapshot(await fromXlsxWorkbook(bytes));
+  const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
+  store.applyTransaction({
+    patches: patches.map((patch) =>
+      patch === "value"
+        ? {
+            op: "set" as const,
+            addr: { sheet, row: 0, col: 0 },
+            value: { kind: "literal" as const, value: "edited" },
+          }
+        : patch === "addRows"
+          ? { op: "addRows" as const, sheet, at: 0, count: 1 }
+          : { op: "removeSheet" as const, sheet },
+    ),
+  });
+  return store;
 }
 
 /** The pivot sample with values shown as "% of total", which no pivot definition can hold. */
 const OPAQUE_PIVOT_SAMPLE = "preserve-ExcelPivotTableSample.xlsx (% of total)";
-
 /** The chart sample drawn in 3-D, which no chart definition can hold. */
 const OPAQUE_CHART_SAMPLE = "preserve-WithChart.xlsx (3-D line)";
 
 /** A corpus fixture, or a sample rewritten so its charts or pivots stay opaque parts. */
 async function load(file: string): Promise<Uint8Array> {
   if (file === OPAQUE_CHART_SAMPLE) {
-    const files = unzipSync(await fixture("preserve-WithChart.xlsx"));
-    const chart = "xl/charts/chart1.xml";
-    files[chart] = strToU8(
-      strFromU8(files[chart] ?? new Uint8Array()).replaceAll("c:lineChart>", "c:line3DChart>"),
-    );
-    return zipSync(files);
+    return editParts(await checkedFixture("preserve-WithChart.xlsx"), {
+      "xl/charts/chart1.xml": (xml) => xml.replaceAll("c:lineChart>", "c:line3DChart>"),
+    });
   }
-  if (file !== OPAQUE_PIVOT_SAMPLE) return fixture(file);
-  const files = unzipSync(await fixture("preserve-ExcelPivotTableSample.xlsx"));
-  for (const part of ["xl/pivotTables/pivotTable1.xml", "xl/pivotTables/pivotTable2.xml"]) {
-    files[part] = strToU8(
-      strFromU8(files[part] ?? new Uint8Array()).replace(
-        'baseItem="0"/>',
-        'baseItem="0" showDataAs="percentOfTotal"/>',
-      ),
-    );
-  }
-  return zipSync(files);
+  if (file !== OPAQUE_PIVOT_SAMPLE) return checkedFixture(file);
+  const share = (xml: string) =>
+    xml.replace('baseItem="0"/>', 'baseItem="0" showDataAs="percentOfTotal"/>');
+  return editParts(await checkedFixture("preserve-ExcelPivotTableSample.xlsx"), {
+    "xl/pivotTables/pivotTable1.xml": share,
+    "xl/pivotTables/pivotTable2.xml": share,
+  });
 }
 
 beforeAll(async () => {
@@ -137,12 +116,12 @@ beforeAll(async () => {
 });
 
 describe("XLSX unmodelled-part preservation", () => {
-  const unchanged: [string, string[]][] = [
+  it.each([
     [
       OPAQUE_CHART_SAMPLE,
       [
         "xl/charts/chart1.xml",
-        "xl/drawings/drawing1.xml",
+        DRAWING,
         "xl/drawings/_rels/drawing1.xml.rels",
         "xl/theme/theme1.xml",
       ],
@@ -156,10 +135,7 @@ describe("XLSX unmodelled-part preservation", () => {
         "xl/connections.xml",
       ],
     ],
-    [
-      "preserve-picture.xlsx",
-      ["xl/drawings/drawing1.xml", "xl/media/10000000000006450000032120C875D8.jpg"],
-    ],
+    ["preserve-picture.xlsx", [DRAWING, IMAGE]],
     ["preserve-SimpleMacro.xlsm", ["xl/vbaProject.bin"]],
     [
       "preserve-54399.xlsx",
@@ -171,61 +147,43 @@ describe("XLSX unmodelled-part preservation", () => {
       ],
     ],
     ["preserve-CustomXMLMappings.xlsx", ["xl/xmlMaps.xml", "xl/tables/tableSingleCells1.xml"]],
-  ];
-  for (const [file, parts] of unchanged) {
-    it(`keeps the compressed bytes of ${file} parts and a valid package on open and save`, async () => {
+  ])(
+    "keeps the compressed bytes of %s parts and a valid package on open and save",
+    async (file, parts) => {
       const original = await load(file);
       const snapshot = await fromXlsxWorkbook(original);
       const saved = await toXlsxWorkbook(snapshot);
-
       const before = rawEntries(original);
       const after = rawEntries(saved);
-      for (const part of parts) {
-        expect(after.get(part)).toEqual(before.get(part));
-      }
+      for (const part of parts) expect(after.get(part)).toEqual(before.get(part));
       expect(packageProblems(saved)).toEqual([]);
-
-      const reopened = await fromXlsxWorkbook(saved);
-      expect(reopened.workbook.xlsxSource?.parts.map((part) => part.name).sort()).toEqual(
-        snapshot.workbook.xlsxSource?.parts.map((part) => part.name).sort(),
-      );
-    });
-  }
+      const names = (entry: WorkbookSnapshot) =>
+        entry.workbook.xlsxSource?.parts.map((part) => part.name).sort();
+      expect(names(await fromXlsxWorkbook(saved))).toEqual(names(snapshot));
+    },
+  );
 
   it("writes pivot caches after calcPr with ids that resolve", async () => {
     const saved = await toXlsxWorkbook(await fromXlsxWorkbook(await load(OPAQUE_PIVOT_SAMPLE)));
-    const workbook = strFromU8(unzipSync(saved)["xl/workbook.xml"] ?? new Uint8Array());
-
-    expect(workbook).toMatch(
+    expect(partText(saved, "xl/workbook.xml")).toMatch(
       /<calcPr [^>]*\/><pivotCaches><pivotCache cacheId="\d+" r:id="rId\d+"\/>/,
     );
   });
 
   it("drops charts and pivots after a store edit on any sheet, with a warning", async () => {
     for (const [file, target] of [
-      [OPAQUE_CHART_SAMPLE, "xl/drawings/drawing1.xml"],
+      [OPAQUE_CHART_SAMPLE, DRAWING],
       [OPAQUE_PIVOT_SAMPLE, "xl/pivotCache/pivotCacheDefinition1.xml"],
     ] as const) {
-      const store = storeOf(await fromXlsxWorkbook(await load(file)));
-      const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
-      store.applyTransaction({
-        patches: [
-          {
-            op: "set",
-            addr: { sheet, row: 0, col: 0 },
-            value: { kind: "literal", value: "edited" },
-          },
-        ],
-      });
-      const { warnings, onWarning } = withWarnings();
-
+      const store = await editedStore(await load(file), "value");
+      const { warnings, onWarning } = collectWarnings();
       const saved = await toXlsxWorkbook(store, { onWarning });
-      const files = unzipSync(saved);
 
       expect(droppedTargets(warnings)).toContain(target);
-      expect(Object.keys(files).some((part) => /chart|pivot/i.test(part))).toBe(false);
-      expect(strFromU8(files["xl/workbook.xml"] ?? new Uint8Array())).not.toContain("pivotCaches");
+      expect(partNames(saved).some((part) => /chart|pivot/i.test(part))).toBe(false);
+      expect(partText(saved, "xl/workbook.xml")).not.toContain("pivotCaches");
       expect(packageProblems(saved)).toEqual([]);
+      store.dispose();
     }
   });
 
@@ -234,183 +192,145 @@ describe("XLSX unmodelled-part preservation", () => {
       ["preserve-SimpleMacro.xlsm", "xl/vbaProject.bin"],
       ["preserve-54399.xlsx", "customXml/item1.xml"],
     ] as const) {
-      const original = await fixture(file);
-      const store = storeOf(await fromXlsxWorkbook(original));
-      const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
-      store.applyTransaction({
-        patches: [
-          {
-            op: "set",
-            addr: { sheet, row: 0, col: 0 },
-            value: { kind: "literal", value: "edited" },
-          },
-          { op: "addRows", sheet, at: 0, count: 1 },
-        ],
-      });
-
+      const original = await checkedFixture(file);
+      const store = await editedStore(original, "value", "addRows");
       const saved = await toXlsxWorkbook(store);
-
-      expect(rawEntries(saved).get(part)).toEqual(rawEntries(original).get(part));
-      expect(rawEntries(saved).get("xl/theme/theme1.xml")).toEqual(
-        rawEntries(original).get("xl/theme/theme1.xml"),
-      );
+      for (const kept of [part, "xl/theme/theme1.xml"]) {
+        expect(rawEntries(saved).get(kept)).toEqual(rawEntries(original).get(kept));
+      }
       expect(packageProblems(saved)).toEqual([]);
+      store.dispose();
     }
   });
 
-  it("keeps images across value edits and drops them when their sheet's rows move", async () => {
-    const image = "xl/media/10000000000006450000032120C875D8.jpg";
-    const store = storeOf(await fromXlsxWorkbook(await fixture("preserve-picture.xlsx")));
-    const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
-    store.applyTransaction({
-      patches: [
-        { op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 7 } },
-      ],
-    });
+  it("keeps images across value edits and drops them when their sheet's rows move or the sheet goes", async () => {
+    const picture = await checkedFixture("preserve-picture.xlsx");
+    const store = await editedStore(picture, "value");
+    expect(partNames(await toXlsxWorkbook(store))).toContain(IMAGE);
+    store.dispose();
 
-    expect(unzipSync(await toXlsxWorkbook(store))[image]).toBeDefined();
-
-    store.applyTransaction({ patches: [{ op: "addRows", sheet, at: 0, count: 1 }] });
-    const { warnings, onWarning } = withWarnings();
-    const saved = await toXlsxWorkbook(store, { onWarning });
-
-    expect(unzipSync(saved)[image]).toBeUndefined();
-    expect(droppedTargets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
+    const moved = await editedStore(picture, "addRows");
+    const { warnings, onWarning } = collectWarnings();
+    const saved = await toXlsxWorkbook(moved, { onWarning });
+    expect(partNames(saved)).not.toContain(IMAGE);
+    expect(droppedTargets(warnings)).toEqual([DRAWING]);
     expect(packageProblems(saved)).toEqual([]);
-  });
+    moved.dispose();
 
-  it("drops a sheet's graphs when the sheet is removed", async () => {
-    const store = storeOf(await fromXlsxWorkbook(await fixture("preserve-picture.xlsx")));
-    const sheet = store.exportSnapshot().sheets[0]?.id ?? "";
-    store.applyTransaction({ patches: [{ op: "removeSheet", sheet }] });
-
-    const saved = await toXlsxWorkbook(store);
-
-    expect(Object.keys(unzipSync(saved)).some((part) => part.startsWith("xl/drawings/"))).toBe(
-      false,
-    );
-    expect(store.exportSnapshot().workbook.xlsxSource?.dropped).toEqual([
-      "xl/drawings/drawing1.xml",
-    ]);
-    expect(packageProblems(saved)).toEqual([]);
+    const removed = await editedStore(picture, "removeSheet");
+    const withoutSheet = await toXlsxWorkbook(removed);
+    expect(partNames(withoutSheet).some((part) => part.startsWith("xl/drawings/"))).toBe(false);
+    expect(removed.exportSnapshot().workbook.xlsxSource?.dropped).toEqual([DRAWING]);
+    expect(packageProblems(withoutSheet)).toEqual([]);
+    removed.dispose();
   });
 
   it("distinguishes formula source from a literal with identical text, including hydration", async () => {
-    const files = unzipSync(await load(OPAQUE_CHART_SAMPLE));
-    const part = "xl/worksheets/sheet1.xml";
-    const worksheet = files[part];
-    if (!worksheet) throw new Error("chart fixture has no first worksheet");
-    files[part] = strToU8(
-      strFromU8(worksheet).replace(
-        /<c\b[^>]*r="A1"[^>]*>[\s\S]*?<\/c>/,
-        '<c r="A1"><f>1+1</f><v>2</v></c>',
-      ),
-    );
-    const imported = await fromXlsxWorkbook(zipSync(files));
-    const formula = imported.sheets
-      .flatMap((sheet) => sheet.cells.flatMap((block) => block.cells))
-      .find((cell) => cell.value.kind === "formula" && cell.value.src === "=1+1");
-    expect(formula).toBeDefined();
-    const edited = structuredClone(imported);
+    const withFormula = editParts(await load(OPAQUE_CHART_SAMPLE), {
+      "xl/worksheets/sheet1.xml": (xml) =>
+        xml.replace(/<c\b[^>]*r="A1"[^>]*>[\s\S]*?<\/c>/, '<c r="A1"><f>1+1</f><v>2</v></c>'),
+    });
+    const edited = structuredClone(await fromXlsxWorkbook(withFormula));
     const cell = edited.sheets
-      .flatMap((sheet) => sheet.cells.flatMap((block) => block.cells))
+      .flatMap((entry) => entry.cells.flatMap((block) => block.cells))
       .find((candidate) => candidate.value.kind === "formula" && candidate.value.src === "=1+1");
     if (!cell) throw new Error("formula was not imported");
     cell.value = { kind: "literal", value: "=1+1" };
     for (const input of [edited, SheetwriteStore.fromSnapshot(edited)]) {
-      const saved = await toXlsxWorkbook(input);
-      expect(unzipSync(saved)["xl/charts/chart1.xml"]).toBeUndefined();
+      expect(partNames(await toXlsxWorkbook(input))).not.toContain("xl/charts/chart1.xml");
     }
   });
 
   it("keeps images when an untracked snapshot changes only cell values", async () => {
-    const imported = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
-    const saved = await toXlsxWorkbook(editFirstCell(imported, "changed"));
-    expect(unzipSync(saved)["xl/media/10000000000006450000032120C875D8.jpg"]).toBeDefined();
+    const imported = await fromXlsxWorkbook(await checkedFixture("preserve-picture.xlsx"));
+    expect(partNames(await toXlsxWorkbook(editFirstCell(imported, "changed")))).toContain(IMAGE);
   });
 
   it("fingerprints snapshots edited outside a store", async () => {
-    const snapshot = await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE));
-    const edited = editFirstCell(snapshot, "edited outside");
-
+    const edited = editFirstCell(
+      await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)),
+      "edited outside",
+    );
     for (const input of [edited, { exportSnapshot: () => edited }]) {
-      const { warnings, onWarning } = withWarnings();
+      const { warnings, onWarning } = collectWarnings();
       const saved = await toXlsxWorkbook(input, { onWarning });
-
-      expect(droppedTargets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
-      expect(unzipSync(saved)["xl/charts/chart1.xml"]).toBeUndefined();
+      expect(droppedTargets(warnings)).toEqual([DRAWING]);
+      expect(partNames(saved)).not.toContain("xl/charts/chart1.xml");
     }
   });
 
   it("reads a store-backed look-alike through the store, not its own snapshot", async () => {
-    const store = storeOf(await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)));
+    const store = SheetwriteStore.fromSnapshot(
+      await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)),
+    );
     const edited = editFirstCell(store.exportSnapshot(), "edited outside");
-
     const lookAlike = {
       store,
       getActiveSheet: () => edited.workbook.activeSheet,
       exportSnapshot: () => edited,
     };
     const saved = await toXlsxWorkbook(lookAlike);
-    const files = unzipSync(saved);
-
-    expect(files["xl/charts/chart1.xml"]).toBeDefined();
-    expect(Object.values(files).some((data) => strFromU8(data).includes("edited outside"))).toBe(
+    expect(partNames(saved)).toContain("xl/charts/chart1.xml");
+    expect(partNames(saved).some((part) => partText(saved, part).includes("edited outside"))).toBe(
       false,
     );
+    store.dispose();
   });
 
-  it("drops opaque graphs beyond maxPreservedBytes on import", async () => {
-    const { warnings, onWarning } = withWarnings();
-    const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"), {
-      onWarning,
+  it("drops graphs over maxPreservedBytes on import and on direct export instead of failing", async () => {
+    const picture = await checkedFixture("preserve-picture.xlsx");
+    const overLimit = expect.objectContaining({
+      part: DRAWING,
+      message: expect.stringContaining("maxPreservedBytes"),
+    });
+    const imported = collectWarnings();
+    const limited = await fromXlsxWorkbook(picture, {
+      onWarning: imported.onWarning,
       resourceLimits: { maxPreservedBytes: 4096 },
     });
-
-    expect(snapshot.workbook.xlsxSource?.graphs.map((graph) => graph.target)).toEqual([
+    expect(limited.workbook.xlsxSource?.graphs.map((graph) => graph.target)).toEqual([
       "docProps/core.xml",
     ]);
-    expect(warnings).toContainEqual(
-      expect.objectContaining({
-        part: "xl/drawings/drawing1.xml",
-        message: expect.stringContaining("maxPreservedBytes"),
-      }),
-    );
+    expect(imported.warnings).toContainEqual(overLimit);
+
+    const raised = await fromXlsxWorkbook(picture, {
+      resourceLimits: { maxPreservedBytes: 1024 * 1024 * 1024 },
+    });
+    const reloaded = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(raised)));
+    expect(partNames(await toXlsxWorkbook(reloaded))).toContain(IMAGE);
+    reloaded.dispose();
+    const exported = collectWarnings();
+    const saved = await toXlsxWorkbook(raised, {
+      onWarning: exported.onWarning,
+      resourceLimits: { maxPreservedBytes: 4096 },
+    });
+    expect(partNames(saved)).not.toContain(IMAGE);
+    expect(exported.warnings).toContainEqual(overLimit);
+    expect(packageProblems(saved)).toEqual([]);
   });
 
   it("drops persisted graphs whose bytes or relationships were tampered with", async () => {
-    const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
+    const snapshot = await fromXlsxWorkbook(await checkedFixture("preserve-picture.xlsx"));
     const source = snapshot.workbook.xlsxSource;
     if (!source) throw new Error("picture.xlsx kept no graphs");
-    const relationshipsTo = (target: string) =>
-      strToU8(
-        `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}"><Relationship Id="rId1" Type="${PACKAGE_RELATIONSHIPS}/image" Target="${target}"/></Relationships>`,
-      );
-    const withRelationships =
-      (relationships: Uint8Array) =>
-      (part: XlsxSourceSnapshot["parts"][number]): XlsxSourceSnapshot["parts"][number] => ({
-        ...part,
-        method: 8,
-        crc32: Bun.hash.crc32(relationships),
-        uncompressedSize: relationships.byteLength,
-        data: Buffer.from(deflateSync(relationships)).toString("base64"),
-      });
-    const tampered: [
-      string,
-      (part: XlsxSourceSnapshot["parts"][number]) => XlsxSourceSnapshot["parts"][number],
-    ][] = [
-      [
-        "xl/media/10000000000006450000032120C875D8.jpg",
-        (part) => ({ ...part, crc32: (part.crc32 + 1) >>> 0 }),
-      ],
-      [
-        "xl/drawings/_rels/drawing1.xml.rels",
-        withRelationships(relationshipsTo("../worksheets/sheet1.xml")),
-      ],
-      [
-        "xl/drawings/_rels/drawing1.xml.rels",
-        withRelationships(relationshipsTo("../../../../escaped.xml")),
-      ],
+    const relationshipsTo =
+      (target: string) =>
+      (part: RetainedPart): RetainedPart => {
+        const relationships = strToU8(
+          `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}"><Relationship Id="rId1" Type="${PACKAGE_RELATIONSHIPS}/image" Target="${target}"/></Relationships>`,
+        );
+        return {
+          ...part,
+          method: 8,
+          crc32: Bun.hash.crc32(relationships),
+          uncompressedSize: relationships.byteLength,
+          data: Buffer.from(deflateSync(relationships)).toString("base64"),
+        };
+      };
+    const tampered: [string, (part: RetainedPart) => RetainedPart][] = [
+      [IMAGE, (part) => ({ ...part, crc32: (part.crc32 + 1) >>> 0 })],
+      ["xl/drawings/_rels/drawing1.xml.rels", relationshipsTo("../worksheets/sheet1.xml")],
+      ["xl/drawings/_rels/drawing1.xml.rels", relationshipsTo("../../../../escaped.xml")],
     ];
     for (const [name, tamper] of tampered) {
       const persisted: WorkbookSnapshot = JSON.parse(JSON.stringify(snapshot));
@@ -418,84 +338,55 @@ describe("XLSX unmodelled-part preservation", () => {
         ...source,
         parts: source.parts.map((part) => (part.name === name ? tamper(part) : part)),
       };
-      const { warnings, onWarning } = withWarnings();
-
+      const { warnings, onWarning } = collectWarnings();
       const saved = await toXlsxWorkbook(persisted, { onWarning });
-
-      expect(droppedTargets(warnings)).toEqual(["xl/drawings/drawing1.xml"]);
-      expect(Object.keys(unzipSync(saved)).some((part) => part.startsWith("xl/media/"))).toBe(
-        false,
-      );
+      expect(droppedTargets(warnings)).toEqual([DRAWING]);
+      expect(partNames(saved).some((part) => part.startsWith("xl/media/"))).toBe(false);
       expect(packageProblems(saved)).toEqual([]);
     }
   });
 
   it("escapes a retained part's content type in the package content types", async () => {
-    const snapshot = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"));
+    const snapshot = await fromXlsxWorkbook(await checkedFixture("preserve-picture.xlsx"));
     const source = snapshot.workbook.xlsxSource;
     if (!source) throw new Error("picture.xlsx kept no graphs");
-    const drawing = "xl/drawings/drawing1.xml";
     const persisted: WorkbookSnapshot = JSON.parse(JSON.stringify(snapshot));
     persisted.workbook.xlsxSource = {
       ...source,
       parts: source.parts.map((part) =>
-        part.name === drawing ? { ...part, contentType: "application/x-a&b" } : part,
+        part.name === DRAWING ? { ...part, contentType: "application/x-a&b" } : part,
       ),
     };
 
     const saved = await toXlsxWorkbook(persisted);
-
-    const contentTypes = strFromU8(unzipSync(saved)["[Content_Types].xml"] ?? new Uint8Array());
-    expect(contentTypes).toContain(
-      `<Override PartName="/${drawing}" ContentType="application/x-a&amp;b"/>`,
+    expect(partText(saved, "[Content_Types].xml")).toContain(
+      `<Override PartName="/${DRAWING}" ContentType="application/x-a&amp;b"/>`,
     );
     const reopened = await fromXlsxWorkbook(saved);
-    expect(reopened.workbook.xlsxSource?.parts.find((part) => part.name === drawing)).toMatchObject(
-      { contentType: "application/x-a&b" },
+    expect(reopened.workbook.xlsxSource?.parts.find((part) => part.name === DRAWING)).toMatchObject(
+      {
+        contentType: "application/x-a&b",
+      },
     );
   });
 
   it("keeps charts and images through a JSON persistence reload of a store", async () => {
     for (const [file, part] of [
       [OPAQUE_CHART_SAMPLE, "xl/charts/chart1.xml"],
-      ["preserve-picture.xlsx", "xl/media/10000000000006450000032120C875D8.jpg"],
+      ["preserve-picture.xlsx", IMAGE],
     ] as const) {
-      const store = storeOf(await fromXlsxWorkbook(await load(file)));
+      const store = SheetwriteStore.fromSnapshot(await fromXlsxWorkbook(await load(file)));
       const persisted = JSON.parse(JSON.stringify(store.exportSnapshot())) as WorkbookSnapshot;
-      const { warnings, onWarning } = withWarnings();
-
+      store.dispose();
+      const { warnings, onWarning } = collectWarnings();
       const saved = await toXlsxWorkbook(SheetwriteStore.fromSnapshot(persisted), { onWarning });
-
-      expect(unzipSync(saved)[part]).toBeDefined();
+      expect(partNames(saved)).toContain(part);
       expect(droppedTargets(warnings)).toEqual([]);
     }
   });
 
-  it("drops sources over maxPreservedBytes on reload and direct export instead of failing", async () => {
-    const raised = { resourceLimits: { maxPreservedBytes: 1024 * 1024 * 1024 } };
-    const imported = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"), raised);
-    const image = "xl/media/10000000000006450000032120C875D8.jpg";
-
-    const reloaded = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(imported)));
-    expect(unzipSync(await toXlsxWorkbook(reloaded))[image]).toBeDefined();
-
-    const { warnings, onWarning } = withWarnings();
-    const saved = await toXlsxWorkbook(imported, {
-      onWarning,
-      resourceLimits: { maxPreservedBytes: 4096 },
-    });
-    expect(unzipSync(saved)[image]).toBeUndefined();
-    expect(warnings).toContainEqual(
-      expect.objectContaining({
-        part: "xl/drawings/drawing1.xml",
-        message: expect.stringContaining("maxPreservedBytes"),
-      }),
-    );
-    expect(packageProblems(saved)).toEqual([]);
-  });
-
   it("rejects retained part names that could escape or overwrite the package", async () => {
-    const snapshot = await fromXlsxWorkbook(await fixture("preserve-SimpleMacro.xlsm"));
+    const snapshot = await fromXlsxWorkbook(await checkedFixture("preserve-SimpleMacro.xlsm"));
     const source = snapshot.workbook.xlsxSource;
     if (!source) throw new Error("SimpleMacro.xlsm kept no graphs");
     for (const name of ["../evil.bin", "/xl/vbaProject.bin", "xl/a?b.bin", "xl/a&quot;.bin"]) {
@@ -506,10 +397,7 @@ describe("XLSX unmodelled-part preservation", () => {
           part.name === "xl/vbaProject.bin" ? { ...part, name } : part,
         ),
       };
-
-      const checked = validateWorkbookSnapshot(persisted);
-
-      expect(checked.ok).toBe(false);
+      expect(validateWorkbookSnapshot(persisted).ok).toBe(false);
     }
   });
 });

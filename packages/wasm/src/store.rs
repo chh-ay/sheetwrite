@@ -326,18 +326,6 @@ pub struct CellStore {
     #[cfg(feature = "analysis")]
     #[allow(clippy::box_collection)]
     pub(crate) relationships: Option<Box<Vec<relationships::Relationship>>>,
-    /// Formulas each recompute pass selected, summed over passes. Tests read
-    /// it to bound recalculation work, which no value can show.
-    #[cfg(test)]
-    pub(crate) recomputed_formulas: usize,
-    /// Changed-spill index nodes the stale runtime-reader check visited,
-    /// summed over passes. Tests read it to bound that check's work.
-    #[cfg(test)]
-    pub(crate) stale_reader_visits: usize,
-    /// Calls of the formula pass, summed. Tests read it to show which edit
-    /// barriers skip the pass, which no value can show.
-    #[cfg(test)]
-    pub(crate) formula_passes: usize,
 }
 
 /// Cell order of the flat input arrays of a packed block write.
@@ -424,12 +412,6 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             relationships: None,
             tables: HashMap::new(),
-            #[cfg(test)]
-            recomputed_formulas: 0,
-            #[cfg(test)]
-            stale_reader_visits: 0,
-            #[cfg(test)]
-            formula_passes: 0,
         }
     }
 
@@ -1039,6 +1021,11 @@ impl CellStore {
     /// Write one sparse mixed transaction/page/snapshot block without
     /// allocating by logical rectangle size. Inside `beginPageLoad`, dirty
     /// paged cells are skipped; otherwise the whole sparse write is preflighted.
+    ///
+    /// Text arrives packed, as in [`Self::set_block_packed`]: `text_buf` holds
+    /// the UTF-8 bytes of every `KIND_STRING` entry in entry order, and the
+    /// n-th string entry owns `text_offsets[n]..text_offsets[n + 1]`. A block
+    /// without strings passes an empty buffer and `&[0]`.
     #[wasm_bindgen(js_name = setSparseBlock)]
     #[expect(
         clippy::too_many_arguments,
@@ -1054,7 +1041,8 @@ impl CellStore {
         offsets: &[u32],
         kinds: &[u8],
         numbers: &[f64],
-        texts: Vec<String>,
+        text_buf: &[u8],
+        text_offsets: &[u32],
         styles: &[u32],
         formula_offsets: &[u32],
         formula_sources: Vec<String>,
@@ -1081,8 +1069,10 @@ impl CellStore {
             || cell_count > u32::MAX as usize
             || offsets.len() != kinds.len()
             || offsets.len() != numbers.len()
-            || offsets.len() != texts.len()
             || offsets.len() != styles.len()
+            || text_offsets.first() != Some(&0)
+            || text_offsets.last() != Some(&(text_buf.len() as u32))
+            || text_offsets.windows(2).any(|bounds| bounds[0] > bounds[1])
             || formula_offsets.len() != formula_sources.len()
             || reference_targets.len() != reference_offsets.len().saturating_mul(3)
             || start_row
@@ -1097,6 +1087,20 @@ impl CellStore {
             || cols - 1 > u32::MAX as usize - start_col
         {
             return BLOCK_INVALID;
+        }
+
+        let Ok(text) = std::str::from_utf8(text_buf) else {
+            return BLOCK_SOURCE_INVALID;
+        };
+        let string_entries = kinds
+            .iter()
+            .fold(0, |count, &kind| count + usize::from(kind == KIND_STRING));
+        if text_offsets.len() != string_entries + 1
+            || text_offsets
+                .iter()
+                .any(|&bound| !text.is_char_boundary(bound as usize))
+        {
+            return BLOCK_SOURCE_INVALID;
         }
 
         let mut destination_cells = Vec::with_capacity(offsets.len());
@@ -1182,11 +1186,18 @@ impl CellStore {
         // so the containment probe can be skipped for every edited cell.
         let has_sources = !source_offsets.is_empty();
 
-        for (index, text) in texts.iter().enumerate() {
-            if kinds[index] == KIND_STRING
-                && !(has_sources && source_offsets.contains(&offsets[index]))
-            {
-                string_ids[index] = self.intern(text);
+        let mut text_bounds = text_offsets.windows(2);
+        for (index, &kind) in kinds.iter().enumerate() {
+            if kind != KIND_STRING {
+                continue;
+            }
+            // The bounds were checked above: one per string entry, ascending,
+            // on character boundaries.
+            let Some(&[start, end]) = text_bounds.next() else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            if !(has_sources && source_offsets.contains(&offsets[index])) {
+                string_ids[index] = self.intern(&text[start as usize..end as usize]);
             }
         }
 

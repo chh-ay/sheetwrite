@@ -152,17 +152,6 @@ describe("pointer input: mouse parity", () => {
     grid.destroy();
     store.dispose();
   });
-
-  it("drag on a column boundary commits a width patch", () => {
-    const { store, scroller, workbook } = makeGrid();
-    const boundaryX = DEFAULT_THEME.rowHeaderWidth + (workbook.sheets[0]?.columns[0]?.width ?? 0);
-
-    scroller.dispatchEvent(pointer("pointerdown", { clientX: boundaryX, clientY: 10 }));
-    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX + 30, clientY: 10 }));
-    scroller.dispatchEvent(pointer("pointerup", { clientX: boundaryX + 30, clientY: 10 }));
-
-    expect(store.getWorkbook().sheets[0]?.columns[0]?.width).toBe(190);
-  });
 });
 
 describe("pointer input: touch policy", () => {

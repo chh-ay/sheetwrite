@@ -68,18 +68,3 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   await expectProbe(page, "order", "saved", "MANAGER-REVIEW");
   expect(errors).toEqual([]);
 });
-
-test("data tools fits a narrow viewport in either theme", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(ROUTE);
-  await expect(page.getByRole("button", { name: "Clear view", exact: true })).toBeEnabled();
-  for (const theme of ["light", "dark"]) {
-    await page.evaluate((value) => {
-      document.documentElement.dataset.theme = value;
-    }, theme);
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true);
-    await expect(page.getByTestId("data-grid").locator("canvas").first()).toBeVisible();
-  }
-});

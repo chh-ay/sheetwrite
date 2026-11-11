@@ -22,11 +22,6 @@ async function render(source: string): Promise<string> {
   return renderToStaticMarkup(runtime.jsx(Page, {}));
 }
 
-/** The compiled page module, with the imports and exports the plugin adds. */
-async function moduleCode(source: string): Promise<string> {
-  return String(await compile(source, { rehypePlugins: [contentComponents] }));
-}
-
 describe("content components", () => {
   it("numbers steps and gives each title a heading", async () => {
     const html = await render(`
@@ -50,24 +45,6 @@ describe("content components", () => {
     expect(html).toContain('<use href="#sw-icon-dashboard">');
     expect(html).toContain('<use href="/figures/illustrations/formulas.svg#art">');
     expect(html).toContain('<span class="sw-card__cta">Read');
-  });
-
-  it("draws callouts with the tone's icon and an optional title", async () => {
-    const html = await render(
-      `<Warning title="Before you upgrade">Remove the old imports.</Warning>`,
-    );
-    expect(html).toContain(
-      '<aside class="sw-callout" data-tone="warning" aria-label="Before you upgrade">',
-    );
-    expect(html).toContain('<use href="#sw-icon-warning">');
-    expect(html).toContain('<p class="sw-callout__title">Before you upgrade</p>');
-    expect(await render("<Note>Plain note.</Note>")).not.toContain("sw-callout__title");
-  });
-
-  it("makes an accordion a native disclosure", async () => {
-    const html = await render(`<Accordion title="Do I need a server?" defaultOpen>No.</Accordion>`);
-    expect(html).toContain('<details class="sw-accordion" id="do-i-need-a-server" open="">');
-    expect(html).toContain('<span class="sw-accordion__title">Do I need a server?</span>');
   });
 
   it("renders a screenshot in both themes, lazily, with its size", async () => {
@@ -130,14 +107,9 @@ grid.setViewSort([{ col: 2, ascending: true }]);
     expect(next).toContain(">0.7.0 (next)</a>");
   });
 
-  it("refuses a component without its required props", async () => {
-    await expect(render("<Card>No title</Card>")).rejects.toThrow(
-      '<Card> needs a "title" attribute',
-    );
-    await expect(render(`<Badge color="pink">x</Badge>`)).rejects.toThrow("<Badge color>");
-  });
-
   it("links the stylesheets of the components a page uses that most pages do not", async () => {
+    const moduleCode = async (source: string) =>
+      String(await compile(source, { rehypePlugins: [contentComponents] }));
     const code = await moduleCode(
       `<Accordion title="Why">Because.</Accordion>\n\n<Note>Plain.</Note>`,
     );

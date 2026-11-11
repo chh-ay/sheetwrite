@@ -2717,7 +2717,7 @@ export class StoreDataEngine {
     const offsets = new Uint32Array(cells.length);
     const kinds = new Uint8Array(cells.length);
     const numbers = new Float64Array(cells.length);
-    const texts: string[] = new Array(cells.length);
+    const literalTexts: string[] = [];
     const styles = new Uint32Array(cells.length);
     const formulaOffsets: number[] = [];
     const formulaSources: string[] = [];
@@ -2732,20 +2732,25 @@ export class StoreDataEngine {
       if (cell.value.kind === "formula") {
         formulaOffsets.push(cell.offset);
         formulaSources.push(cell.value.src);
-        texts[index] = "";
       } else if (cell.value.kind === "ref") {
         const targetHandle = this.sheets.handles.get(cell.value.target.sheet);
         if (targetHandle === undefined || !this.isCellInBounds(cell.value.target)) return false;
 
         referenceOffsets.push(cell.offset);
         referenceTargets.push(targetHandle, cell.value.target.row, cell.value.target.col);
-        texts[index] = "";
       } else {
         const value = cell.value.value;
         writeScalarWire(kinds, numbers, index, value);
-        texts[index] = typeof value === "string" ? value : "";
+        if (typeof value === "string") literalTexts.push(value);
       }
     }
+
+    // One UTF-8 buffer for the text cells, so a block does not cross the
+    // boundary as one JS string per cell.
+    let textBytes = 0;
+    for (const text of literalTexts) textBytes += text.length;
+    const packedText = new PackedTextBuffer(textBytes, literalTexts.length);
+    for (const text of literalTexts) packedText.add(text);
 
     this.noteRangeMutationFfi(cells.length);
 
@@ -2759,7 +2764,8 @@ export class StoreDataEngine {
         offsets,
         kinds,
         numbers,
-        texts,
+        packedText.packedBytes(),
+        packedText.offsets,
         styles,
         Uint32Array.from(formulaOffsets),
         formulaSources,

@@ -42,8 +42,6 @@ interface FakeOptions {
    * them then gets past setup, so a value test fails on the values it records.
    */
   readonly collectionMethods?: boolean;
-  /** The number format of each formula's case, keyed by formula. */
-  readonly numberFormats?: Readonly<Record<string, string>>;
 }
 
 /** What the runner asked the host to do, as the fake recorded it. */
@@ -177,7 +175,6 @@ function capture(
       kind: "formula",
       formula,
       target: "A1",
-      numberFormat: options.numberFormats?.[formula],
     })),
   };
 
@@ -195,15 +192,6 @@ describe("Excel Office Script runner", () => {
 
     expect(calculations).toEqual([CALCULATION_TYPE.fullRebuild]);
     expect(observations.map(({ result }) => result.value)).toEqual([1]);
-  });
-
-  it("applies a case's number format as one format string", () => {
-    const { numberFormats } = capture(
-      { "=1": { anchor: ONE } },
-      { collectionMethods: true, numberFormats: { "=1": "0.00%" } },
-    );
-
-    expect([...numberFormats]).toEqual([["Case0001!A1", "0.00%"]]);
   });
 
   it("tells text that looks like an error or a blank from real errors and blanks", () => {

@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import { makeColumnar, toAoA } from "../src/dataset.js";
 import {
+  type ScenarioId,
   WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
   WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
 } from "../src/render-protocol.js";
@@ -12,236 +13,139 @@ import {
   type ScrollObservation,
 } from "../src/render-scenarios.js";
 
-interface FakeEvidence {
+const ROWS = 200;
+const ROW_HEIGHT = 25;
+const MAXIMUM_TOP = 1_000;
+const MAXIMUM_LEFT = 500;
+const BYTES_PER_WINDOW_READ = 1_024;
+const ALLOCATIONS_PER_WINDOW_READ = 7;
+
+interface FakeFaults {
+  readonly corruptNavigation?: boolean;
+  /** Mirrors a competitor whose row removal overflows the stack above some size. */
+  readonly failRowRemoval?: boolean;
   readonly formattedSentinels?: readonly [string, string];
   readonly indexConstructions?: number;
   readonly candidatesExamined?: number;
 }
 
-class FakeAdapter implements RenderBenchAdapter {
-  readonly id = "sheetwrite" as const;
-  readonly initialRowCount: number;
-  readonly colCount = 5;
-  readonly values: unknown[][];
-  private readonly originalValues: unknown[][];
-  corruptNavigation = false;
-  /** Mirrors a competitor whose row removal overflows the stack above some size. */
-  failRowRemoval = false;
-  private mounted = true;
-  private selected: CellSelection | null = null;
-  private editing = false;
-  private top = 0;
-  private left = 0;
-  private readonly evidence: FakeEvidence;
-  private windowReadMode: "baseline" | "reuse-decoded-view-upper-bound" = "baseline";
-  private transferCounters = {
+type FakeAdapter = RenderBenchAdapter & { readonly values: unknown[][] };
+
+/**
+ * An in-memory grid for the scenarios below. The diagnostic-only scenarios
+ * (formula-dense, text-heavy, geometry) never run here, so their hooks are inert.
+ */
+function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
+  const values: unknown[][] = toAoA(makeColumnar(ROWS));
+  let selected: CellSelection | null = null;
+  let editing = false;
+  let top = 0;
+  let left = 0;
+  let isBaselineRead = true;
+  const transfer = {
     logicalFrames: 0,
     windowReadRequests: 0,
     logicalWindowReads: 0,
     copiedBytes: 0,
     outputAllocationEvents: 0,
   };
-
-  constructor(rows = 200, evidence: FakeEvidence = {}) {
-    const dataset = makeColumnar(rows);
-    this.initialRowCount = rows;
-    this.originalValues = toAoA(dataset);
-    this.values = this.originalValues.map((row) => [...row]);
-    this.evidence = evidence;
-  }
-
-  mount(_host: HTMLElement): void {
-    this.mounted = true;
-  }
-
-  isMountedAndAccessible(): boolean {
-    return this.mounted;
-  }
-
-  rowCount(): number {
-    return this.values.length;
-  }
-
-  cellValue(row: number, col: number): unknown {
-    return this.values[row]?.[col];
-  }
-
-  setCellValue(row: number, col: number, value: string | number | null): void {
-    const target = this.values[row];
+  const inert = () => {};
+  const setCellValue = (row: number, col: number, value: string | number | null) => {
+    const target = values[row];
     if (!target) throw new RangeError(`missing row ${row}`);
     target[col] = value;
-  }
-
-  selection(): CellSelection | null {
-    return this.selected;
-  }
-
-  editorOpen(): boolean {
-    return this.editing;
-  }
-
-  prepareScroll(axis: "top" | "left", startMiddle: boolean): void {
-    this.top = axis === "top" && startMiddle ? 500 : 0;
-    this.left = axis === "left" && startMiddle ? 250 : 0;
-  }
-
-  scrollBy(axis: "top" | "left", pixels: number): void {
-    if (axis === "top") this.top = Math.min(1_000, this.top + pixels);
-    else this.left = Math.min(500, this.left + pixels);
-    this.transferCounters.logicalFrames++;
-    this.transferCounters.windowReadRequests++;
-    if (this.windowReadMode === "baseline") {
-      this.transferCounters.logicalWindowReads++;
-      this.transferCounters.copiedBytes += 1_024;
-      this.transferCounters.outputAllocationEvents += 7;
-    }
-  }
-  scrollObservation(): ScrollObservation {
-    return {
-      top: this.top,
-      left: this.left,
-      maximumTop: 1_000,
-      maximumLeft: 500,
-      firstVisibleRow: Math.floor(this.top / 25),
+  };
+  const selection = () => {
+    if (!selected) throw new Error("no selection");
+    return selected;
+  };
+  return {
+    id: "sheetwrite",
+    initialRowCount: ROWS,
+    colCount: 5,
+    values,
+    mount: inert,
+    isMountedAndAccessible: () => true,
+    rowCount: () => values.length,
+    cellValue: (row, col) => values[row]?.[col],
+    setCellValue,
+    selection: () => selected,
+    editorOpen: () => editing,
+    prepareScroll: (axis, startMiddle) => {
+      top = axis === "top" && startMiddle ? MAXIMUM_TOP / 2 : 0;
+      left = axis === "left" && startMiddle ? MAXIMUM_LEFT / 2 : 0;
+    },
+    scrollBy: (axis, pixels) => {
+      if (axis === "top") top = Math.min(MAXIMUM_TOP, top + pixels);
+      else left = Math.min(MAXIMUM_LEFT, left + pixels);
+      transfer.logicalFrames++;
+      transfer.windowReadRequests++;
+      if (!isBaselineRead) return;
+      transfer.logicalWindowReads++;
+      transfer.copiedBytes += BYTES_PER_WINDOW_READ;
+      transfer.outputAllocationEvents += ALLOCATIONS_PER_WINDOW_READ;
+    },
+    scrollObservation: (): ScrollObservation => ({
+      top,
+      left,
+      maximumTop: MAXIMUM_TOP,
+      maximumLeft: MAXIMUM_LEFT,
+      firstVisibleRow: Math.floor(top / ROW_HEIGHT),
       devicePixelRatio: 1.25,
-    };
-  }
-
-  selectAndReveal(row: number, col: number): void {
-    this.selected = { row, col };
-  }
-
-  openEditor(): void {
-    this.editing = true;
-  }
-
-  closeEditor(): void {
-    this.editing = false;
-  }
-
-  editCommit(value: string): void {
-    if (!this.selected) throw new Error("no selection");
-    this.setCellValue(this.selected.row, this.selected.col, value);
-    this.editing = false;
-  }
-
-  moveSelection(direction: "down" | "right"): void {
-    if (!this.selected) throw new Error("no selection");
-    if (this.corruptNavigation) return;
-    this.selected = {
-      row: this.selected.row + (direction === "down" ? 1 : 0),
-      col: this.selected.col + (direction === "right" ? 1 : 0),
-    };
-  }
-
-  insertRows(at: number, count: number): void {
-    const rows = Array.from({ length: count }, () => [null, null, null, null, null]);
-    this.values.splice(at, 0, ...rows);
-  }
-
-  removeRows(at: number, count: number): void {
-    if (this.failRowRemoval) throw new RangeError("Maximum call stack size exceeded");
-    this.values.splice(at, count);
-  }
-
-  resetFormatResources(): void {}
-
-  repaint(): void {}
-
-  formattedSentinels(): readonly [string, string] {
-    return this.evidence.formattedSentinels ?? ["1,234.50", "Feb 29, 2024"];
-  }
-
-  formatResources() {
-    return {
+    }),
+    selectAndReveal: (row, col) => (selected = { row, col }),
+    openEditor: () => (editing = true),
+    closeEditor: () => (editing = false),
+    editCommit: (value) => {
+      setCellValue(selection().row, selection().col, value);
+      editing = false;
+    },
+    moveSelection: (direction) => {
+      const { row, col } = selection();
+      if (faults.corruptNavigation) return;
+      selected = direction === "down" ? { row: row + 1, col } : { row, col: col + 1 };
+    },
+    insertRows: (at, count) =>
+      values.splice(at, 0, ...Array.from({ length: count }, () => Array(5).fill(null))),
+    removeRows: (at, count) => {
+      if (faults.failRowRemoval) throw new RangeError("Maximum call stack size exceeded");
+      values.splice(at, count);
+    },
+    resetFormatResources: inert,
+    repaint: inert,
+    formattedSentinels: () => faults.formattedSentinels ?? ["1,234.50", "Feb 29, 2024"],
+    formatResources: () => ({
       compiledFormats: 2,
       numberFormatters: 1,
       dateTimeFormatters: 1,
       formatCacheEntries: 2,
       numberFormatterCacheEntries: 1,
       dateTimeFormatterCacheEntries: 1,
-    };
-  }
-
-  installFormulaDense(): void {
-    for (let row = 1; row <= Math.min(64, this.initialRowCount - 1); row++) {
-      for (let col = 1; col < this.colCount; col++) {
-        this.values[row]![col] = Number(this.values[row]![0]) + col;
-      }
-    }
-  }
-
-  clearFormulaDense(): void {
-    for (let row = 1; row <= Math.min(64, this.initialRowCount - 1); row++) {
-      for (let col = 1; col < this.colCount; col++) {
-        this.values[row]![col] = this.originalValues[row]![col];
-      }
-    }
-  }
-
-  installTextHeavy(rowCount: number): void {
-    for (let row = 1; row <= Math.min(rowCount, this.initialRowCount - 1); row++) {
-      for (let col = 1; col < this.colCount; col++) {
-        this.values[row]![col] = `diagnostic-long-${row}-${col}`;
-      }
-    }
-  }
-
-  clearTextHeavy(): void {
-    for (let row = 1; row < this.initialRowCount; row++) {
-      for (let col = 1; col < this.colCount; col++) {
-        this.values[row]![col] = this.originalValues[row]![col];
-      }
-    }
-  }
-
-  measureUnresizedMillionRowGeometry() {
-    return {
-      count: 1_000_000,
-      backingStoreBytes: 0,
-      totalHeight: 28_000_000,
-      middleRow: 500_000,
-      middleTop: 14_000_000,
-      lastRow: 999_999,
-      lastTop: 27_999_972,
-    };
-  }
-
-  installMergeHeavy(): void {}
-
-  clearMergeHeavy(): void {}
-
-  resetMergeResources(): void {}
-
-  mergeResources() {
-    return {
-      indexConstructions: this.evidence.indexConstructions ?? 1,
-      candidatesExamined: this.evidence.candidatesExamined ?? 4,
-    };
-  }
-
-  setWindowReadDiagnosticMode(mode: "baseline" | "reuse-decoded-view-upper-bound"): void {
-    this.windowReadMode = mode;
-  }
-
-  resetWindowTransferCounters(): void {
-    this.transferCounters.logicalFrames = 0;
-    this.transferCounters.windowReadRequests = 0;
-    this.transferCounters.logicalWindowReads = 0;
-    this.transferCounters.copiedBytes = 0;
-    this.transferCounters.outputAllocationEvents = 0;
-  }
-
-  windowTransferCounters() {
-    return { ...this.transferCounters };
-  }
-
-  destroy(): void {
-    this.mounted = false;
-  }
+    }),
+    installFormulaDense: inert,
+    clearFormulaDense: inert,
+    installTextHeavy: inert,
+    clearTextHeavy: inert,
+    measureUnresizedMillionRowGeometry: () => {
+      throw new Error("geometry scenarios are not exercised by this fake");
+    },
+    installMergeHeavy: inert,
+    clearMergeHeavy: inert,
+    resetMergeResources: inert,
+    mergeResources: () => ({
+      indexConstructions: faults.indexConstructions ?? 1,
+      candidatesExamined: faults.candidatesExamined ?? 4,
+    }),
+    setWindowReadDiagnosticMode: (mode) => (isBaselineRead = mode === "baseline"),
+    resetWindowTransferCounters: () => {
+      for (const key of Object.keys(transfer) as (keyof typeof transfer)[]) transfer[key] = 0;
+    },
+    windowTransferCounters: () => ({ ...transfer }),
+    destroy: inert,
+  };
 }
 
-const dataset = makeColumnar(200);
+const dataset = makeColumnar(ROWS);
 const options = {
   runId: "scenario-fixture",
   round: 1,
@@ -250,116 +154,100 @@ const options = {
   minimumSampleDurationMs: 0.01,
 } as const;
 
-describe("scenario correctness checkpoints", () => {
-  test("rejects a wrong canonical row count before timing", () => {
-    const adapter = new FakeAdapter();
-    adapter.values.pop();
-    const result = runRenderScenario(adapter, dataset, "arrow-down.top-left", options);
-    expect(result).toMatchObject({ status: "failed", stage: "validate" });
-    if (result.status !== "failed") throw new Error("expected failed result");
-    expect(result.message).toContain("canonical row count");
-    expect(result.partialSamples).toHaveLength(0);
-  });
+function run(scenarioId: ScenarioId, adapter = fakeAdapter()) {
+  return runRenderScenario(adapter, dataset, scenarioId, options);
+}
 
-  test("a corrupt adapter action becomes validation failure, never a fast success", () => {
-    const adapter = new FakeAdapter();
-    adapter.corruptNavigation = true;
-    const result = runRenderScenario(adapter, dataset, "arrow-down.top-left", options);
-    expect(result).toMatchObject({ status: "failed", stage: "validate" });
-    if (result.status !== "failed") throw new Error("expected failed result");
-    expect(result.message).toContain("moves one logical cell");
-    expect(result.partialSamples).toHaveLength(1);
-  });
+test.each([
+  [
+    "a wrong canonical row count before timing",
+    null,
+    "arrow-down.top-left",
+    "canonical row count",
+    0,
+  ],
+  [
+    "a corrupt action, never a fast success",
+    { corruptNavigation: true },
+    "arrow-down.top-left",
+    "moves one logical cell",
+    1,
+  ],
+  [
+    "a wrong formatter sentinel",
+    { formattedSentinels: ["wrong", "Feb 29, 2024"] },
+    "formatted-paint.top-left",
+    "fixed-decimal and named-date sentinels",
+    null,
+  ],
+  [
+    "a missing merge index",
+    { indexConstructions: 0 },
+    "merge-heavy.paint",
+    "prepares one revision index",
+    null,
+  ],
+  [
+    "a rebuilt merge index",
+    { indexConstructions: 2 },
+    "merge-heavy.paint",
+    "prepares one revision index",
+    null,
+  ],
+  ["no merge candidates", { candidatesExamined: 0 }, "merge-heavy.paint", "candidate", null],
+] as const)("fails validation for %s", (_label, faults, scenarioId, checkpoint, partialSamples) => {
+  const adapter = fakeAdapter(faults ?? {});
+  if (faults === null) adapter.values.pop();
+  const result = run(scenarioId, adapter);
+  if (result.status !== "failed") throw new Error("expected a failed result");
+  expect(result.stage).toBe("validate");
+  expect(result.message).toContain(checkpoint);
+  if (partialSamples !== null) expect(result.partialSamples).toHaveLength(partialSamples);
+});
 
-  test("names the failing step when a successful action cannot be undone", () => {
-    const adapter = new FakeAdapter();
-    adapter.failRowRemoval = true;
-    const result = runRenderScenario(adapter, dataset, "altering.insert-5-rows-top", options);
-    expect(result).toMatchObject({ status: "failed", stage: "measure" });
-    if (result.status !== "failed") throw new Error("expected failed result");
-    // The insert itself succeeded; only the untimed cleanup blew the stack, and
-    // the recorded failure must say so instead of blaming the measured action.
-    expect(result.errorClass).toBe("RangeError");
-    expect(result.message).toBe("cleanup step failed: Maximum call stack size exceeded");
+test("names the cleanup step when a successful action cannot be undone", () => {
+  // The insert succeeded; only the untimed cleanup overflowed the stack.
+  const result = run("altering.insert-5-rows-top", fakeAdapter({ failRowRemoval: true }));
+  expect(result).toMatchObject({
+    status: "failed",
+    stage: "measure",
+    errorClass: "RangeError",
+    message: "cleanup step failed: Maximum call stack size exceeded",
   });
+});
 
-  test("keeps one-pixel smooth scrolling inside the same logical window", () => {
-    const result = runRenderScenario(
-      new FakeAdapter(),
-      dataset,
-      "scroll-smooth.same-window",
-      options,
-    );
-    expect(result.status).toBe("success");
-    if (result.status !== "success") throw new Error(result.message);
-    expect(result.validation).toContainEqual(
-      expect.objectContaining({
-        checkpoint: "scroll-smooth.same-window keeps the logical row window",
-        passed: true,
-      }),
-    );
+test("keeps one-pixel smooth scrolling inside the same logical window", () => {
+  const result = run("scroll-smooth.same-window");
+  if (result.status !== "success") throw new Error(result.message);
+  expect(result.validation).toContainEqual(
+    expect.objectContaining({
+      checkpoint: "scroll-smooth.same-window keeps the logical row window",
+      passed: true,
+    }),
+  );
+});
+
+test("separates exact transfer counters from the pixel-data-invalid upper bound", () => {
+  const baseline = run(WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
+  const upperBound = run(WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID);
+  if (baseline.status !== "success" || upperBound.status !== "success") {
+    throw new Error("expected a successful transfer diagnostic pair");
+  }
+  expect(baseline.dataValidity).toBe("product-valid");
+  expect(baseline.windowTransfer).toMatchObject({
+    copiedBytesPerLogicalFrame: BYTES_PER_WINDOW_READ,
+    outputAllocationEventsPerLogicalFrame: ALLOCATIONS_PER_WINDOW_READ,
+    copiedBytesPerLogicalRead: BYTES_PER_WINDOW_READ,
+    outputAllocationEventsPerLogicalRead: ALLOCATIONS_PER_WINDOW_READ,
   });
-
-  test("separates exact transfer counters from the pixel-data-invalid upper bound", () => {
-    const baseline = runRenderScenario(
-      new FakeAdapter(),
-      dataset,
-      WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
-      options,
-    );
-    const upperBound = runRenderScenario(
-      new FakeAdapter(),
-      dataset,
-      WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
-      options,
-    );
-    expect(baseline.status).toBe("success");
-    expect(upperBound.status).toBe("success");
-    if (baseline.status !== "success" || upperBound.status !== "success") {
-      throw new Error("expected successful transfer diagnostic pair");
-    }
-    expect(baseline.dataValidity).toBe("product-valid");
-    expect(baseline.windowTransfer).toMatchObject({
-      copiedBytesPerLogicalFrame: 1_024,
-      outputAllocationEventsPerLogicalFrame: 7,
-      copiedBytesPerLogicalRead: 1_024,
-      outputAllocationEventsPerLogicalRead: 7,
-    });
-    expect(upperBound.dataValidity).toBe("pixel-data-invalid");
-    expect(upperBound.windowTransfer).toMatchObject({
-      logicalWindowReads: 0,
-      copiedBytes: 0,
-      outputAllocationEvents: 0,
-      copiedBytesPerLogicalRead: null,
-      outputAllocationEventsPerLogicalRead: null,
-    });
-    expect(upperBound.windowTransfer?.logicalFrames).toBe(upperBound.operationCount);
-    expect(upperBound.windowTransfer?.windowReadRequests).toBe(upperBound.operationCount);
-  });
-
-  test("rejects corrupt formatter and merge-index evidence", () => {
-    for (const [adapter, scenario, checkpoint] of [
-      [
-        new FakeAdapter(200, { formattedSentinels: ["wrong", "Feb 29, 2024"] }),
-        "formatted-paint.top-left",
-        "fixed-decimal and named-date sentinels",
-      ],
-      [
-        new FakeAdapter(200, { indexConstructions: 0 }),
-        "merge-heavy.paint",
-        "prepares one revision index",
-      ],
-      [
-        new FakeAdapter(200, { indexConstructions: 2 }),
-        "merge-heavy.paint",
-        "prepares one revision index",
-      ],
-      [new FakeAdapter(200, { candidatesExamined: 0 }), "merge-heavy.paint", "candidate"],
-    ] as const) {
-      const result = runRenderScenario(adapter, dataset, scenario, options);
-      expect(result).toMatchObject({ status: "failed", stage: "validate" });
-      if (result.status !== "failed") throw new Error("expected failed result");
-      expect(result.message).toContain(checkpoint);
-    }
+  expect(upperBound.dataValidity).toBe("pixel-data-invalid");
+  expect(upperBound.windowTransfer).toMatchObject({
+    logicalFrames: upperBound.operationCount,
+    windowReadRequests: upperBound.operationCount,
+    logicalWindowReads: 0,
+    copiedBytes: 0,
+    outputAllocationEvents: 0,
+    copiedBytesPerLogicalRead: null,
+    outputAllocationEventsPerLogicalRead: null,
   });
 });

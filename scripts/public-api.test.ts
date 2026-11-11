@@ -201,43 +201,28 @@ export interface AdapterProps extends OwnedHandlers, ExternalBase {
   });
 });
 describe("public API policy", () => {
-  it("rejects untyped error payloads and direct built-in Error subclasses", async () => {
+  it("rejects untyped error payloads, Error subclasses and ambiguous re-exports", async () => {
     const root = await fixture(
       `${canonicalDeclarations}
 /** Untyped operational failure. */
 export interface OperationalFailure { error: unknown; }
 /** Non-canonical public exception. */
-export class LegacyFailure extends RangeError {}`,
+export class LegacyFailure extends RangeError {}
+export * from "./left.js";
+export * from "./right.js";`,
+      {
+        "left.d.ts": "export interface Duplicate { left: true }\n",
+        "right.d.ts": "export interface Duplicate { right: true }\n",
+      },
     );
     const { issues } = await analyzePublicApi(root);
-    expect(issues).toContainEqual(
-      expect.objectContaining({
-        code: "unstable-error-contract",
-        symbol: "OperationalFailure",
-      }),
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "unstable-error-contract", symbol: "OperationalFailure" }),
+        expect.objectContaining({ code: "unstable-error-contract", symbol: "LegacyFailure" }),
+        expect.objectContaining({ code: "duplicate-export" }),
+      ]),
     );
-    expect(issues).toContainEqual(
-      expect.objectContaining({
-        code: "unstable-error-contract",
-        symbol: "LegacyFailure",
-      }),
-    );
-  });
-
-  it("rejects ambiguous duplicate re-exports", async () => {
-    const root = await fixture(
-      `${canonicalDeclarations}\nexport * from "./left.js";\nexport * from "./right.js";\n`,
-    );
-    await writeFile(
-      join(root, "packages/core/left.d.ts"),
-      "export interface Duplicate { left: true }\n",
-    );
-    await writeFile(
-      join(root, "packages/core/right.d.ts"),
-      "export interface Duplicate { right: true }\n",
-    );
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual(expect.objectContaining({ code: "duplicate-export" }));
   });
 
   it("writes one export and signature digest per line and reads them back", async () => {
@@ -280,60 +265,30 @@ export class LegacyFailure extends RangeError {}`,
     await expect(readPublicApiBaseline(root)).rejects.toThrow("not one export per line");
   });
 
-  it("reports unlisted, removed and changed exports", async () => {
-    const { manifest } = await analyzePublicApi(await fixture());
-    const baseline = baselineFromManifest(manifest);
-    expect(checkPublicApiBaseline(manifest, baseline)).toEqual([]);
+  it("reports unlisted, removed and changed signatures but not documentation edits", async () => {
+    const baseline = baselineFromManifest((await analyzePublicApi(await fixture())).manifest);
+    const issuesAfter = async (from: string, to: string) =>
+      checkPublicApiBaseline(
+        (await analyzePublicApi(await fixture(canonicalDeclarations.replace(from, to)))).manifest,
+        baseline,
+      ).map((issue) => [issue.code, issue.symbol]);
 
-    const renamed = await analyzePublicApi(
-      await fixture(
-        canonicalDeclarations.replace("interface DataSource", "interface DataProvider"),
-      ),
-    );
-    expect(
-      checkPublicApiBaseline(renamed.manifest, baseline).map((issue) => [issue.code, issue.symbol]),
-    ).toEqual([
+    expect(await issuesAfter("interface DataSource", "interface DataProvider")).toEqual([
       ["unlisted-export", "DataProvider"],
       ["removed-export", "DataSource"],
     ]);
-  });
-
-  it("detects optionality, union and generic-constraint drift but not documentation edits", async () => {
-    const baseline = baselineFromManifest((await analyzePublicApi(await fixture())).manifest);
-    const mutations: Array<[string, string]> = [
-      [
-        canonicalDeclarations.replace("getRows(request: unknown)", "getRows?(request: unknown)"),
-        "DataSource",
-      ],
-      [
-        canonicalDeclarations.replace(
-          'export type DocumentOp = { op: "set" };',
-          'export type DocumentOp = { op: "set" } | { op: "clear" };',
-        ),
-        "DocumentOp",
-      ],
-      [
-        canonicalDeclarations.replace(
-          "Box<T extends string = string>",
-          "Box<T extends string | number = string>",
-        ),
-        "Box",
-      ],
-    ];
-    for (const [declarations, symbol] of mutations) {
-      const { manifest } = await analyzePublicApi(await fixture(declarations));
-      expect(checkPublicApiBaseline(manifest, baseline)).toContainEqual(
-        expect.objectContaining({ code: "changed-signature", symbol }),
-      );
+    for (const [from, to, symbol] of [
+      ["getRows(request: unknown)", "getRows?(request: unknown)", "DataSource"],
+      ['{ op: "set" };', '{ op: "set" } | { op: "clear" };', "DocumentOp"],
+      ["Box<T extends string = string>", "Box<T extends string | number = string>", "Box"],
+    ] as const) {
+      expect(await issuesAfter(from, to)).toContainEqual(["changed-signature", symbol]);
     }
-    const redocumented = await analyzePublicApi(
-      await fixture(
-        canonicalDeclarations.replace(
-          "/** Canonical document operation. */",
-          "/** Changed document operation. */",
-        ),
+    expect(
+      await issuesAfter(
+        "/** Canonical document operation. */",
+        "/** Changed document operation. */",
       ),
-    );
-    expect(checkPublicApiBaseline(redocumented.manifest, baseline)).toEqual([]);
+    ).toEqual([]);
   }, 20_000);
 });
