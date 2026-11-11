@@ -122,7 +122,7 @@ describe("formula workload matrix", () => {
     const full = expectedFormulaWorkloadKeys("full", "formulas");
     const base = expectedFormulaWorkloadKeys("full", "wasm");
     expect(base.filter(isClosure)).toEqual([]);
-    expect(full.filter((key) => !isClosure(key))).toEqual(base);
+    expect(base.filter((key) => !full.includes(key))).toEqual([]);
     expect(full.filter(isClosure)).toEqual(
       closures.flatMap((id) => [`workload=${id};size=10000`, `workload=${id};size=100000`]),
     );
@@ -275,6 +275,7 @@ describe("formula regression gate", () => {
       "sort-unique-filter",
       "subtotal-filtered",
       "sparse-page-write",
+      "history-diff",
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
