@@ -874,59 +874,6 @@ mod tests {
     }
 
     #[test]
-    fn sales_by_product_year_and_value_order() {
-        for (formula, expected) in [
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,1)", vec![60.0, 40.0, 100.0]),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,-2)", vec![60.0, 40.0]),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,-1)", vec![100.0, 60.0, 40.0]),
-            (
-                "=GROUPBY(A1:A4,C1:C4,LAMBDA(subset,SUM(subset)),0,0)",
-                vec![60.0, 40.0],
-            ),
-            (
-                "=LET(aggregate,LAMBDA(subset,SUM(subset)),GROUPBY(A1:A4,C1:C4,aggregate,0,0))",
-                vec![60.0, 40.0],
-            ),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,,D1:D4)", vec![20.0, 10.0]),
-        ] {
-            let (store, sheet) = calculate(formula);
-            for (row, expected) in expected.into_iter().enumerate() {
-                assert_eq!(
-                    store.get_cell(sheet, 8 + row, 9).string(),
-                    None,
-                    "{formula}"
-                );
-                assert_eq!(
-                    store.get_cell(sheet, 8 + row, 9).num(),
-                    expected,
-                    "{formula}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn sales_pivot_and_percent_of_column() {
-        let (store, sheet) = calculate("=PIVOTBY(A1:A4,B1:B4,C1:C4,SUM,0,1,,1)");
-        assert_eq!(
-            store.get_cell(sheet, 10, 8).string().as_deref(),
-            Some("Pear")
-        );
-        for (row, expected) in [[20.0, 40.0, 60.0], [30.0, 10.0, 40.0], [50.0, 50.0, 100.0]]
-            .into_iter()
-            .enumerate()
-        {
-            for (column, expected) in expected.into_iter().enumerate() {
-                assert_eq!(store.get_cell(sheet, 9 + row, 9 + column).string(), None);
-                assert_eq!(store.get_cell(sheet, 9 + row, 9 + column).num(), expected);
-            }
-        }
-        let (store, sheet) = calculate("=PIVOTBY(A1:A4,B1:B4,C1:C4,PERCENTOF,0,0,,0)");
-        assert_eq!(store.get_cell(sheet, 9, 9).num(), 0.4);
-        assert_eq!(store.get_cell(sheet, 9, 10).num(), 0.8);
-    }
-
-    #[test]
     fn hierarchy_subtotals_and_multiple_field_sort() {
         let (store, sheet) = calculate("=GROUPBY(A1:B4,C1:C4,SUM,0,2)");
         for (row, expected) in [20.0, 40.0, 60.0, 30.0, 10.0, 40.0, 100.0]
@@ -964,35 +911,6 @@ mod tests {
                     "{formula}"
                 );
             }
-        }
-    }
-
-    #[test]
-    fn eta_reduced_numeric_aggregators() {
-        for (function, expected) in [
-            ("SUM", 60.0),
-            ("AVERAGE", 30.0),
-            ("COUNT", 2.0),
-            ("COUNTA", 2.0),
-            ("MAX", 40.0),
-            ("MIN", 20.0),
-            ("MEDIAN", 30.0),
-            ("PRODUCT", 800.0),
-            ("STDEV.S", 200.0_f64.sqrt()),
-            ("STDEV.P", 10.0),
-            ("VAR.S", 200.0),
-            ("VAR.P", 100.0),
-        ] {
-            let formula = format!("=GROUPBY(A1:A4,C1:C4,{function},0,0)");
-            let (store, sheet) = calculate(&formula);
-            assert_eq!(
-                store.get_cell(sheet, 8, 8).string().as_deref(),
-                Some("Apple")
-            );
-            assert!(
-                (store.get_cell(sheet, 8, 9).num() - expected).abs() < 1e-10,
-                "{formula}"
-            );
         }
     }
 

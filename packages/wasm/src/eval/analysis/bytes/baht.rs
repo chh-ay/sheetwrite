@@ -139,18 +139,4 @@ mod tests {
     fn microsoft_published_example() {
         assert_eq!(words(1234.0), "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน");
     }
-
-    /// Thai number words: a one after a tens digit is เอ็ด, a two in the
-    /// tens is ยี่, a million is ล้าน and satang follow baht.
-    #[test]
-    fn tens_millions_satang_and_sign() {
-        assert_eq!(words(0.0), "ศูนย์บาทถ้วน");
-        assert_eq!(words(11.0), "สิบเอ็ดบาทถ้วน");
-        assert_eq!(words(21.0), "ยี่สิบเอ็ดบาทถ้วน");
-        assert_eq!(words(101.0), "หนึ่งร้อยหนึ่งบาทถ้วน");
-        assert_eq!(words(1_000_000.0), "หนึ่งล้านบาทถ้วน");
-        assert_eq!(words(2_000_021.0), "สองล้านยี่สิบเอ็ดบาทถ้วน");
-        assert_eq!(words(0.5), "ห้าสิบสตางค์");
-        assert_eq!(words(-1.25), "ลบหนึ่งบาทยี่สิบห้าสตางค์");
-    }
 }

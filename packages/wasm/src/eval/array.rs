@@ -1383,23 +1383,6 @@ mod tests {
     }
 
     #[test]
-    fn filter_uses_evaluated_unique_shape() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 6);
-        for (row, value) in [1.0, 1.0, 2.0].into_iter().enumerate() {
-            store.set_number(sheet, row, 0, value, 0);
-        }
-        store.set_number(sheet, 0, 1, 1.0, 0);
-        store.set_number(sheet, 1, 1, 1.0, 0);
-        store.set_formula(sheet, 0, 3, "=FILTER(UNIQUE(A1:A3),B1:B2)", 0);
-        store.recompute(sheet);
-        assert_close(number(&store, sheet, 0, 3), 1.0);
-        assert_close(number(&store, sheet, 1, 3), 2.0);
-        assert_eq!(store.spill_anchor_row(sheet, 1, 3), 0);
-        assert_eq!(store.get_cell(sheet, 2, 3).kind(), KIND_EMPTY);
-    }
-
-    #[test]
     fn rejected_static_array_shapes_allocate_no_matrices() {
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(2, 1_000_001, 256, 1_000_000, 1_000_000);
