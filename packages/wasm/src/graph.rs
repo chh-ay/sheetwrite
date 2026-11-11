@@ -1079,7 +1079,7 @@ impl FormulaGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::{DirtyCells, DirtyRect, SheetFormulas};
+    use super::DirtyCells;
     use crate::store::CellStore;
 
     /// Every occupied formula slot is the formula indexed at its location,

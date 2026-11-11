@@ -803,7 +803,6 @@ const _: () = assert!(FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize);
 #[cfg(test)]
 mod formula_entry_tests {
     use super::*;
-    use std::mem::size_of;
 
     #[test]
     fn formula_entry_flags_preserve_independent_metadata() {
