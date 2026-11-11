@@ -853,6 +853,10 @@ impl CellStore {
     /// sheet. A zero `limit` returns every value; otherwise the scan stops at
     /// `limit` values.
     #[wasm_bindgen(js_name = distinctValuesInRows)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars"
+    )]
     pub fn distinct_values_in_rows(
         &self,
         sheet: usize,
