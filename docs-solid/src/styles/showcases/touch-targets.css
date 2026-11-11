@@ -1,6 +1,7 @@
 /*
  * Phones: every control on a showcase or workbench page is at least 44 px in
- * both directions. The grid's own chrome (`.sheetwrite`) keeps its density.
+ * both directions. The grid's own chrome (the grid, ribbon, formula bar and
+ * sheet tabs: every `sheetwrite-*` element) keeps its density.
  */
 @media (max-width: 39.99rem) {
   :is(.sw-showcase, .sw-showcase-page)
@@ -12,28 +13,34 @@
       .sw-button,
       .sw-link-arrow,
       input:not([type="checkbox"], [type="radio"], [type="file"], [type="hidden"])
-    ):not(.sheetwrite *) {
+    ):not([class*="sheetwrite"], [class*="sheetwrite"] *) {
     min-height: 2.75rem;
   }
 
-  :is(.sw-showcase, .sw-showcase-page) :is(.sw-button, .sw-icon-button, button):not(.sheetwrite *) {
+  :is(.sw-showcase, .sw-showcase-page)
+    :is(.sw-button, .sw-icon-button, button):not([class*="sheetwrite"], [class*="sheetwrite"] *) {
     min-width: 2.75rem;
   }
 
   /* A checkbox or switch is pressed through its label. */
   :is(.sw-showcase, .sw-showcase-page)
-    label:has(> input:is([type="checkbox"], [type="radio"])):not(.sheetwrite *) {
+    label:has(> input:is([type="checkbox"], [type="radio"])):not(
+      [class*="sheetwrite"],
+      [class*="sheetwrite"] *
+    ) {
     display: inline-flex;
     align-items: center;
     min-height: 2.75rem;
   }
 
-  :is(.sw-showcase, .sw-showcase-page) .sw-link-arrow:not(.sheetwrite *) {
+  :is(.sw-showcase, .sw-showcase-page)
+    .sw-link-arrow:not([class*="sheetwrite"], [class*="sheetwrite"] *) {
     display: inline-flex;
     align-items: center;
   }
 
-  :is(.sw-showcase, .sw-showcase-page) .sw-icon-button:not(.sheetwrite *) {
+  :is(.sw-showcase, .sw-showcase-page)
+    .sw-icon-button:not([class*="sheetwrite"], [class*="sheetwrite"] *) {
     min-height: 2.75rem;
   }
 }
