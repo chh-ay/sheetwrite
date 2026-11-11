@@ -2090,7 +2090,8 @@ fn host_source_hydration_obstructs_spills_without_erasing_the_source() {
             &[0],
             &[KIND_NUMBER],
             &[99.0],
-            vec![String::new()],
+            &[],
+            &[0],
             &[0],
             &[],
             Vec::new(),
@@ -2370,7 +2371,8 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
             &[0],
             &[KIND_NUMBER],
             &[4.0],
-            vec![String::new()],
+            &[],
+            &[0],
             &[1],
             &[],
             Vec::new(),
@@ -2415,6 +2417,63 @@ fn persisted_cell_data_stays_sparse_at_one_billion_rows() {
 }
 
 #[test]
+fn sparse_block_reads_packed_text_for_string_entries_only() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 4);
+    let text = "héllo日本";
+    let split = "héllo".len() as u32;
+
+    // Entries in offset order 3, 0, 1: a string, a number, a string.
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            4,
+            1,
+            &[3, 0, 1],
+            &[KIND_STRING, KIND_NUMBER, KIND_STRING],
+            &[0.0, 7.0, 0.0],
+            text.as_bytes(),
+            &[0, split, text.len() as u32],
+            &[0, 0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        0
+    );
+    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("héllo"));
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("日本"));
+
+    // A bound inside a multi-byte character is rejected before any write.
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            4,
+            1,
+            &[1, 2],
+            &[KIND_STRING, KIND_STRING],
+            &[0.0, 0.0],
+            "é".as_bytes(),
+            &[0, 1, 2],
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        2
+    );
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("日本"));
+    assert_eq!(string(&store, sheet, 2, 0), None);
+}
+
+#[test]
 fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);
@@ -2429,7 +2488,8 @@ fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
             &[0, 5],
             &[KIND_NUMBER, KIND_EMPTY],
             &[9.0, 0.0],
-            vec![String::new(), String::new()],
+            &[],
+            &[0],
             &[0, 0],
             &[],
             Vec::new(),
@@ -3796,7 +3856,8 @@ mod formula_dependency_epoch {
                 &[0],
                 &[KIND_EMPTY],
                 &[0.0],
-                vec![String::new()],
+                &[],
+                &[0],
                 &[0],
                 &[0],
                 vec!["=A1+B1+2".into()],
