@@ -70,8 +70,6 @@ use array::dynamic_recompute_within_limit;
 pub(crate) use criteria::sum_range_extent;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 use date::host_clock_serial;
-#[cfg(test)]
-pub(crate) use date::set_test_clock;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{
     collect_affected_formulas, direct_readers, seed_additional_depth_errors,
