@@ -189,7 +189,7 @@
   min-width: 0;
   min-height: 0;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  align-items: stretch;
+  align-items: start;
   overflow: visible;
   background: var(--sw-surface-0);
 }
