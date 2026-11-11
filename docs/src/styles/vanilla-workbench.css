@@ -1,6 +1,5 @@
 /* The Vanilla workbench uses the shared site tokens. */
 .sw-vw {
-  --sw-vw-instrument-width: 22rem;
   display: grid;
   min-height: 38rem;
   grid-template-rows: auto auto;
@@ -144,21 +143,20 @@
   outline-offset: 2px;
 }
 
-/* Product stage first, ownership instrument adjacent. The grid stage keeps a
-   fixed height: a taller instrument must not stretch the grid, or its visible
-   rows would change with the instrument's content. */
+/* The grid takes the stage's full width; the ownership instrument is a band
+   under it. */
 .sw-vw-workspace {
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) var(--sw-vw-instrument-width);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
 .sw-vw-gridstage {
   display: grid;
-  min-height: 0;
+  min-height: 31rem;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-right: 1px solid var(--sw-border-strong);
+  border-bottom: 1px solid var(--sw-border-strong);
   background: var(--sw-surface-1);
 }
 
@@ -348,11 +346,12 @@
   line-height: 1.5;
 }
 
-/* Adjacent lifecycle instrument */
+/* The lifecycle instrument: its sections in as many columns as fit. */
 .sw-vw-instrument {
-  display: flex;
+  display: grid;
   min-height: 0;
-  flex-direction: column;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  align-items: start;
   background: var(--sw-surface-0);
 }
 
@@ -783,10 +782,6 @@
 /* The header look (padding, gradient, h2 scale) belongs to the shared
    workbench-stage.css; this file only supplies the page's own chrome. */
 @media (max-width: 64rem) {
-  .sw-vw-workspace {
-    grid-template-columns: minmax(0, 1fr) 17rem;
-  }
-
   .sw-vw-scenarios {
     grid-template-columns: 1fr;
     gap: var(--sw-space-2);
@@ -821,16 +816,6 @@
 
   .sw-vw-tab span {
     display: none;
-  }
-
-  .sw-vw-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-vw-gridstage {
-    min-height: 31rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--sw-border-strong);
   }
 
   .sw-vw-stagewrap {

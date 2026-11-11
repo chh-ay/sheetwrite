@@ -1,5 +1,4 @@
 .sw-rwb {
-  --sw-rwb-rail-width: calc(var(--sw-space-4) * 15);
   --sw-rwb-grid-mobile-height: calc(var(--sw-space-4) * 22);
   --sw-rwb-strong-rule: 0.125rem;
 }
@@ -171,24 +170,26 @@
   border-inline-start: 1px solid var(--sw-border);
 }
 
-/* Grid and causal evidence are adjacent, but the Grid retains most of the area. */
+/* The Grid takes the stage's full width; the causal evidence is a band under
+   it, its sections in as many columns as fit. */
 .sw-rwb-workspace {
   display: grid;
-  min-height: 32rem;
-  grid-template-columns: minmax(0, 68.75rem) minmax(var(--sw-rwb-rail-width), 1fr);
+  grid-template-rows: minmax(32rem, auto) auto;
+  grid-template-columns: minmax(0, 1fr);
   background: var(--sw-surface-1);
 }
 
 .sw-rwb-workspace > .sw-demo-grid {
   min-height: 0;
-  border-inline-end: 1px solid var(--sw-border-strong);
+  border-bottom: 1px solid var(--sw-border-strong);
 }
 
 .sw-rwb-state {
-  display: flex;
+  display: grid;
   min-width: 0;
   min-height: 0;
-  flex-direction: column;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  align-items: start;
   overflow: visible;
   background: var(--sw-surface-0);
 }
@@ -590,20 +591,11 @@
   }
 
   .sw-rwb-workspace {
-    grid-template-columns: minmax(0, 1fr);
-    min-height: 0;
+    grid-template-rows: auto auto;
   }
 
   .sw-rwb-workspace > .sw-demo-grid {
     min-height: var(--sw-rwb-grid-mobile-height);
-    border-right: 0;
-    border-bottom: 1px solid var(--sw-border-strong);
-  }
-
-  .sw-rwb-state {
-    overflow: visible;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .sw-rwb-kpis {

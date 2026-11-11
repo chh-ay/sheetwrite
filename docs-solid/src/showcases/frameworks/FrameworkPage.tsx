@@ -73,7 +73,7 @@ export function FrameworkPage(props: FrameworkPageProps) {
   const detailsId = `${props.framework}-runtime-details`;
 
   return (
-    <div class="sw-showcase-frame">
+    <div class="sw-showcase-frame sw-showcase-frame--workbench">
       <SiteTopbar pathname="/showcases/" />
       <main class="sw-showcase-page" data-framework={props.framework} id="main-content">
         <header class="sw-capability-hero">

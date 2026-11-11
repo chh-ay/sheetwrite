@@ -11,7 +11,6 @@ import { VanillaWorkbench } from "../showcases/frameworks/vanilla/VanillaWorkben
 import artStylesheet from "../art/art.css?url";
 import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
-import bandStylesheet from "../styles/showcases/workbench-band.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
 import vanillaStylesheet from "@docs/styles/vanilla-workbench.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
@@ -28,7 +27,6 @@ export const Route = createFileRoute("/vanilla")({
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
       { rel: "stylesheet", href: vanillaStylesheet },
-      { rel: "stylesheet", href: bandStylesheet },
       { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),

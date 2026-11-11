@@ -124,11 +124,11 @@
   content: "";
 }
 
-/* ---- Workspace: the board first, its evidence beside it ----------------- */
+/* ---- Workspace: the board at full width, its evidence in a band under it -- */
 
 .sw-svw .sw-demo-workspace {
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) 22rem;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   background: var(--sw-surface-1);
 }
@@ -172,13 +172,15 @@
   white-space: nowrap;
 }
 
+/* The rail's panels in as many columns as fit. */
 .sw-svw-rail {
-  display: flex;
+  display: grid;
   min-width: 0;
-  flex-direction: column;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  align-items: start;
   padding: 0;
   overflow: visible;
-  border-left: 1px solid var(--sw-border-strong);
+  border-top: 1px solid var(--sw-border-strong);
   background: var(--sw-surface-0);
 }
 
@@ -186,18 +188,12 @@
 .sw-svw-rail > details {
   min-width: 0;
   padding: var(--sw-space-3);
+  border-right: 1px solid var(--sw-border);
   border-bottom: 1px solid var(--sw-border);
 }
 
 .sw-svw-rail > :last-child {
   border-bottom: 0;
-}
-
-/* The two list panels absorb the rail's slack so the column ends flush with
-   the board; the mission card and the recovery tools stay their own size. */
-.sw-svw .sw-svw-outbox,
-.sw-svw .sw-svw-feed {
-  flex: 1 1 auto;
 }
 
 .sw-svw-mission {
@@ -565,26 +561,11 @@
 
 /* ---- Narrow screens ----------------------------------------------------- */
 
-@media (max-width: 68rem) {
-  .sw-svw .sw-demo-workspace {
-    grid-template-columns: minmax(0, 1fr) 19rem;
-  }
-}
-
 @media (max-width: 48rem) {
   /* Stacked: a fixed viewport floor would only pad the page, and the rail
      keeps normal flow below the board. */
   .sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__viewport {
     min-height: 0;
-  }
-
-  .sw-svw .sw-demo-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-svw-rail {
-    border-top: 1px solid var(--sw-border-strong);
-    border-left: 0;
   }
 
   .sw-svw-gridstage {

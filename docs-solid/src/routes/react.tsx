@@ -10,7 +10,6 @@ import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 import artStylesheet from "../art/art.css?url";
 import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
-import bandStylesheet from "../styles/showcases/workbench-band.css?url";
 import demoSelectStylesheet from "@docs/styles/demo-select.css?url";
 import reactWorkbenchStylesheet from "@docs/styles/react-workbench.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
@@ -30,7 +29,6 @@ export const Route = createFileRoute("/react")({
       // The workbench's Base UI selects (docs/src/showcases/ui/DemoSelect.tsx).
       { rel: "stylesheet", href: demoSelectStylesheet },
       { rel: "stylesheet", href: reactWorkbenchStylesheet },
-      { rel: "stylesheet", href: bandStylesheet },
       { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),
