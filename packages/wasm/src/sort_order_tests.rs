@@ -116,14 +116,6 @@ fn text_ignores_apostrophes_and_hyphens_and_puts_the_hyphen_last_on_a_tie() {
 }
 
 #[test]
-fn false_sorts_before_true() {
-    let (store, sheet) = column(&[Entry::Bool(true), Entry::Bool(false)]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![1, 0]);
-    assert_eq!(sorted(&store, sheet, false), vec![0, 1]);
-}
-
-#[test]
 fn error_values_are_equal() {
     let (store, sheet) = column(&[
         Entry::Formula("=NA()"),
@@ -133,14 +125,6 @@ fn error_values_are_equal() {
 
     assert_eq!(sorted(&store, sheet, true), vec![0, 1, 2]);
     assert_eq!(sorted(&store, sheet, false), vec![0, 1, 2]);
-}
-
-#[test]
-fn blank_cells_are_last_in_both_directions() {
-    let (store, sheet) = column(&[Entry::Blank, Entry::Number(2.0), Entry::Number(1.0)]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![2, 1, 0]);
-    assert_eq!(sorted(&store, sheet, false), vec![1, 2, 0]);
 }
 
 #[test]

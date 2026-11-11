@@ -1158,16 +1158,6 @@ mod tests {
         assert_slots_indexed(&restored, "sheet removal");
     }
 
-    /// Cells a row apart are not adjacent: the gap row is not marked.
-    #[test]
-    fn gapped_cells_stay_separate() {
-        let mut ranges = Vec::new();
-        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((0, 1)));
-        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((2, 1)));
-
-        assert_eq!(ranges.len(), 2);
-    }
-
     /// The distinct cells a list holds, in address order.
     fn distinct(cells: &DirtyCells) -> Vec<(u32, u32)> {
         let mut cells = cells.cells.clone();

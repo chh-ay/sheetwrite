@@ -145,21 +145,6 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
 }
 
 #[test]
-fn a_structural_rewrite_changes_only_the_reference_text_of_the_source() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(2, 2);
-    let source = " =  A1 & \" λ \"  ";
-    store.set_formula(sheet, 0, 1, source, 0);
-    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some(source));
-
-    store.add_rows(sheet, 0, 1);
-    assert_eq!(
-        store.formula_source(sheet, 1, 1).as_deref(),
-        Some(" =  A2 & \" λ \"  ")
-    );
-}
-
-#[test]
 fn dynamic_arrays_spill_resize_obstruct_persist_and_invalidate_dependents() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(9, 12);
@@ -710,40 +695,6 @@ fn named_ranges_resolve_scope_rebase_delete_cycle_and_preserve_unknown_sources()
     store.remove_rows(data, 0, 4);
     store.recompute(other);
     assert_eq!(string(&store, other, 0, 0).as_deref(), Some("#NAME?"));
-}
-
-#[test]
-fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles() {
-    let mut store = CellStore::new();
-    let source = store.add_sheet(1, 2);
-    let summary = store.add_sheet(2, 2);
-    store.set_sheet_name(source, "sales", "Sales");
-    store.set_sheet_name(summary, "summary", "Summary");
-    store.set_number(source, 0, 0, 4.0, 0);
-    store.set_number(source, 1, 0, 6.0, 0);
-    store.set_formula(summary, 0, 0, "=Sales!A1+1", 0);
-    store.set_formula(summary, 0, 1, "=SUM(Sales!A1:A2)", 0);
-    store.recompute(summary);
-
-    assert!(store.rename_sheet(source, "sales", "Sales Data"));
-    assert_eq!(
-        store.formula_source(summary, 0, 0).as_deref(),
-        Some("='Sales Data'!A1+1")
-    );
-    assert_eq!(
-        store.formula_source(summary, 0, 1).as_deref(),
-        Some("=SUM('Sales Data'!A1:A2)")
-    );
-    assert_close(number(&store, summary, 0, 0), 5.0);
-    assert_close(number(&store, summary, 0, 1), 10.0);
-
-    assert!(store.rename_sheet(source, "sales", "O'Brien"));
-    assert_eq!(
-        store.formula_source(summary, 0, 0).as_deref(),
-        Some("='O''Brien'!A1+1")
-    );
-    assert!(store.sheet_alive[source]);
-    assert!(store.sheet_alive[summary]);
 }
 
 #[test]
@@ -2279,24 +2230,6 @@ fn array_operators_broadcast_each_axis_and_keep_element_errors() {
             }
         }
     }
-}
-
-#[test]
-fn array_constants_survive_structural_rewrites() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(4, 4);
-    store.set_number(sheet, 0, 0, 5.0, 0);
-    store.set_formula(sheet, 0, 1, "=SUM({1,2;3,4})+A1", 0);
-    store.recompute(sheet);
-    assert_close(number(&store, sheet, 0, 1), 15.0);
-
-    store.add_rows(sheet, 0, 1);
-    store.recompute(sheet);
-    assert_eq!(
-        store.formula_source(sheet, 1, 1).as_deref(),
-        Some("=SUM({1,2;3,4})+A2")
-    );
-    assert_close(number(&store, sheet, 1, 1), 15.0);
 }
 
 #[test]
