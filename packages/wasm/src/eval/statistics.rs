@@ -584,6 +584,25 @@ mod tests {
     }
 
     #[test]
+    fn rank_requires_the_target_in_both_orders() {
+        let data = vec![Value::number(5.0), Value::number(3.0), Value::number(1.0)];
+        assert_eq!(
+            result(Func::RankEq, &[scalar(3.0), data.clone()]),
+            Value::number(2.0)
+        );
+        assert_eq!(
+            result(Func::RankEq, &[scalar(3.0), data.clone(), scalar(1.0)],),
+            Value::number(2.0)
+        );
+        for order in [0.0, 1.0] {
+            assert_eq!(
+                result(Func::RankEq, &[scalar(4.0), data.clone(), scalar(order)],),
+                Value::Error(FormulaError::Na)
+            );
+        }
+    }
+
+    #[test]
     fn conditional_extremes_share_criteria_and_require_equal_shapes() {
         let target = vec![Value::number(-4.0), Value::number(8.0), Value::number(3.0)];
         let groups = vec![
