@@ -13,18 +13,26 @@ pub(crate) use transfer::ColumnBuffers;
 /// A borrowed scalar view; null and error remain distinct from every typed value.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value<'a> {
+    /// An empty cell.
     Null,
+    /// A cell error, named by its stable code such as `conversion`.
     Error(&'a str),
+    /// A finite number.
     Number(f64),
+    /// A true or false value.
     Logical(bool),
+    /// A UTF-8 string.
     Text(&'a str),
+    /// Whole days since 1970-01-01.
     Date(i32),
+    /// Microseconds since 1970-01-01T00:00:00.
     DateTime(i64),
 }
 
 impl Value<'_> {
     /// Nulls and errors inherit their column's type rather than inventing one.
-    pub fn column_type(self) -> Option<ColumnType> {
+    #[must_use]
+    pub const fn column_type(self) -> Option<ColumnType> {
         match self {
             Self::Null | Self::Error(_) => None,
             Self::Number(_) => Some(ColumnType::Number),
@@ -59,6 +67,7 @@ pub struct Column {
 
 impl Column {
     /// Creates an empty column; appended values must match its declared type.
+    #[must_use]
     pub fn new(spec: ColumnSpec) -> Self {
         let payload = match spec.column_type {
             ColumnType::Number => Payload::Numbers(Vec::new()),
@@ -79,22 +88,25 @@ impl Column {
     }
 
     /// Stable identity used by plans; rename never changes it.
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.spec.id
     }
 
     /// Display name used by source fields and exported table headers.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.spec.name
     }
 
     /// The fixed payload type; mixed columns carry their own lane tags.
-    pub fn column_type(&self) -> ColumnType {
+    #[must_use]
+    pub const fn column_type(&self) -> ColumnType {
         self.spec.column_type
     }
 
     /// Physical row count, before any batch-level selection.
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.valid.len()
     }
 
@@ -111,12 +123,13 @@ impl Column {
             return Err(Diagnostic::new("type"));
         }
 
-        let value = match value {
-            Value::Number(number) if !number.is_finite() => Value::Error("conversion"),
-            other => other,
+        let stored = if matches!(value, Value::Number(number) if !number.is_finite()) {
+            Value::Error("conversion")
+        } else {
+            value
         };
 
-        let error_index = if let Value::Error(code) = value {
+        let error_index = if let Value::Error(code) = stored {
             let index = self.intern_error(code)?;
             Some(index)
         } else {
@@ -124,28 +137,28 @@ impl Column {
         };
 
         match &mut self.payload {
-            Payload::Numbers(values) => values.push(if let Value::Number(value) = value {
-                value
+            Payload::Numbers(values) => values.push(if let Value::Number(number) = stored {
+                number
             } else {
                 0.0
             }),
-            Payload::Logical(values) => values.push(matches!(value, Value::Logical(true)))?,
-            Payload::Texts(values) => values.push(if let Value::Text(value) = value {
-                value
+            Payload::Logical(values) => values.push(matches!(stored, Value::Logical(true)))?,
+            Payload::Texts(values) => values.push(if let Value::Text(text) = stored {
+                text
             } else {
                 ""
             })?,
-            Payload::Dates(values) => values.push(if let Value::Date(value) = value {
-                value
+            Payload::Dates(values) => values.push(if let Value::Date(days) = stored {
+                days
             } else {
                 0
             }),
-            Payload::DateTimes(values) => values.push(if let Value::DateTime(value) = value {
-                value
+            Payload::DateTimes(values) => values.push(if let Value::DateTime(micros) = stored {
+                micros
             } else {
                 0
             }),
-            Payload::Mixed(values) => values.push(value, error_index)?,
+            Payload::Mixed(values) => values.push(stored, error_index)?,
         }
 
         if let Some(code) = error_index {
@@ -153,8 +166,8 @@ impl Column {
         }
 
         self.valid
-            .push(!matches!(value, Value::Null | Value::Error(_)))?;
-        self.errors.push(matches!(value, Value::Error(_)))?;
+            .push(!matches!(stored, Value::Null | Value::Error(_)))?;
+        self.errors.push(matches!(stored, Value::Error(_)))?;
 
         Ok(())
     }
@@ -184,11 +197,12 @@ impl Column {
     }
 
     fn error_code(&self, row: usize) -> Result<&str, Diagnostic> {
-        let row = flat_index(row)?;
+        let flat_row = flat_index(row)?;
         let index = self
             .error_records
-            .binary_search_by_key(&row, |record| record.0)
-            .map_err(|_| Diagnostic::new("error-code"))?;
+            .binary_search_by_key(&flat_row, |record| record.0)
+            .ok()
+            .ok_or_else(|| Diagnostic::new("error-code"))?;
         let code = row_index(at(&self.error_records, index)?.1)?;
 
         Ok(at(&self.error_codes, code)?.as_str())
@@ -235,6 +249,7 @@ impl Batch {
     }
 
     /// Ordered physical columns; use `value` to apply the logical row selection.
+    #[must_use]
     pub fn columns(&self) -> &[Column] {
         &self.columns
     }
@@ -314,17 +329,27 @@ pub(crate) fn compare(left: Value<'_>, right: Value<'_>) -> Ordering {
         (Value::Null, Value::Null) => Ordering::Equal,
         (Value::Null, _) => Ordering::Less,
         (_, Value::Null) => Ordering::Greater,
-        (Value::Number(left), Value::Number(right)) => {
-            left.partial_cmp(&right).unwrap_or(Ordering::Equal)
+        (Value::Number(left_number), Value::Number(right_number)) => {
+            match left_number.partial_cmp(&right_number) {
+                Some(order) => order,
+                None => Ordering::Equal,
+            }
         }
-        (Value::Logical(left), Value::Logical(right)) => left.cmp(&right),
-        (Value::Text(left), Value::Text(right)) => left.encode_utf16().cmp(right.encode_utf16()),
-        (Value::Date(left), Value::Date(right)) => left.cmp(&right),
-        (Value::DateTime(left), Value::DateTime(right)) => left.cmp(&right),
+        (Value::Logical(left_logical), Value::Logical(right_logical)) => {
+            left_logical.cmp(&right_logical)
+        }
+        (Value::Text(left_text), Value::Text(right_text)) => {
+            left_text.encode_utf16().cmp(right_text.encode_utf16())
+        }
+        (Value::Date(left_days), Value::Date(right_days)) => left_days.cmp(&right_days),
+        (Value::DateTime(left_micros), Value::DateTime(right_micros)) => {
+            left_micros.cmp(&right_micros)
+        }
         _ => type_rank(left).cmp(&type_rank(right)),
     }
 }
-fn type_rank(value: Value<'_>) -> u8 {
+
+const fn type_rank(value: Value<'_>) -> u8 {
     match value {
         Value::Null => 0,
         Value::Error(_) => 1,
@@ -341,19 +366,20 @@ fn type_rank(value: Value<'_>) -> u8 {
 /// so the float formatter is linked once.
 #[inline(never)]
 pub(crate) fn number_text_family(out: &mut String, value: f64) {
-    let _ = write!(out, "{value}");
+    // Writing to a String cannot fail.
+    _ = write!(out, "{value}");
 }
 
 /// Formatting is invariant so refresh does not depend on the host's locale.
 pub(crate) fn formatted(value: Value<'_>) -> Option<String> {
     match value {
-        Value::Text(value) => Some(value.to_owned()),
-        Value::Number(value) => {
+        Value::Text(text) => Some(text.to_owned()),
+        Value::Number(number) => {
             let mut text = String::new();
-            number_text_family(&mut text, value);
+            number_text_family(&mut text, number);
             Some(text)
         }
-        Value::Logical(value) => Some(value.to_string()),
+        Value::Logical(logical) => Some(logical.to_string()),
         Value::Date(days) => crate::calendar::format_date(days),
         Value::DateTime(micros) => crate::calendar::format_datetime(micros),
         Value::Null | Value::Error(_) => None,

@@ -52,31 +52,5 @@
     "unreachable_pub": 29
   },
   "history": {},
-  "queries": {
-    "clippy::allow_attributes_without_reason": 3,
-    "clippy::derive_partial_eq_without_eq": 2,
-    "clippy::disallowed_methods": 12,
-    "clippy::doc_markdown": 7,
-    "clippy::let_underscore_must_use": 3,
-    "clippy::map_err_ignore": 18,
-    "clippy::match_same_arms": 1,
-    "clippy::missing_const_for_fn": 23,
-    "clippy::must_use_candidate": 9,
-    "clippy::naive_bytecount": 1,
-    "clippy::or_fun_call": 21,
-    "clippy::shadow_reuse": 84,
-    "clippy::shadow_same": 3,
-    "clippy::single_match_else": 1,
-    "clippy::too_many_arguments": 5,
-    "clippy::too_many_lines": 11,
-    "clippy::type_complexity": 20,
-    "clippy::unwrap_used": 2,
-    "clippy::use_self": 21,
-    "clippy::wildcard_enum_match_arm": 28,
-    "missing_debug_implementations": 9,
-    "missing_docs": 126,
-    "redundant_imports": 1,
-    "unnameable_types": 10,
-    "unreachable_pub": 39
-  }
+  "queries": {}
 }

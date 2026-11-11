@@ -1,12 +1,18 @@
 //! Exported M must read back to the same plans, and unsupported M must stay text.
 
-#![allow(clippy::indexing_slicing)]
+#![allow(
+    clippy::indexing_slicing,
+    reason = "a fixture index past the end fails the test, which is what it should do"
+)]
 
-use super::{emit_section, import_section, MQuery, MSource, MSourceKind};
+use super::{emit_section, import_section, Loss, MQuery, MSource, MSourceKind};
 use crate::plan::{
     Aggregate, AggregateOp, ColumnSpec, ColumnType, CompareOp, ErrorPolicy, JoinKind, Literal,
     OutputColumn, Predicate, Step,
 };
+
+/// Member, reason and detail of one unsupported member.
+type ReasonRow<'a> = (&'a str, &'a str, &'a str);
 
 fn column(name: &str, column_type: ColumnType) -> ColumnSpec {
     ColumnSpec {
@@ -28,13 +34,87 @@ fn query(
         name: name.to_owned(),
         source: MSource {
             kind,
-            source_id: locator.unwrap_or(name).to_owned(),
+            source_id: locator.map_or_else(|| name.to_owned(), str::to_owned),
             locator: locator.map(str::to_owned),
             columns,
         },
         steps,
         output: None,
     }
+}
+
+/// One step of every kind, over the sales columns.
+fn sales_steps() -> Vec<Step> {
+    vec![
+        Step::Filter {
+            predicate: Predicate::And {
+                predicates: vec![
+                    Predicate::Compare {
+                        column: String::from("Total"),
+                        op: CompareOp::Gte,
+                        value: Literal::Number(-2.5),
+                    },
+                    Predicate::Not {
+                        predicate: Box::new(Predicate::Or {
+                            predicates: vec![
+                                Predicate::IsNull {
+                                    column: String::from("Region"),
+                                },
+                                Predicate::Contains {
+                                    column: String::from("Region"),
+                                    text: String::from("x\"#(y"),
+                                },
+                            ],
+                        }),
+                    },
+                ],
+            },
+        },
+        Step::ChangeType {
+            column: String::from("Total"),
+            column_type: ColumnType::Text,
+            on_error: ErrorPolicy::Null,
+        },
+        Step::Join {
+            input: String::from("Regions"),
+            keys: vec![(String::from("Region"), String::from("Code"))],
+            join: JoinKind::Left,
+        },
+        Step::Rename {
+            columns: vec![(String::from("Day"), String::from("Date"))],
+        },
+        Step::Group {
+            keys: vec![String::from("Region")],
+            aggregates: vec![
+                Aggregate {
+                    id: String::from("Rows"),
+                    name: String::from("Rows"),
+                    op: AggregateOp::CountRows,
+                    column: None,
+                },
+                Aggregate {
+                    id: String::from("Latest"),
+                    name: String::from("Latest"),
+                    op: AggregateOp::Max,
+                    column: Some(String::from("Day")),
+                },
+            ],
+        },
+        Step::Unpivot {
+            columns: vec![String::from("Rows")],
+            attribute: OutputColumn {
+                id: String::from("Field"),
+                name: String::from("Field"),
+            },
+            value: OutputColumn {
+                id: String::from("Value"),
+                name: String::from("Value"),
+            },
+        },
+        Step::Select {
+            columns: vec![String::from("Field"), String::from("Value")],
+        },
+    ]
 }
 
 /// Queries whose identities equal their names, so an import must reproduce them exactly.
@@ -64,76 +144,7 @@ fn fixtures() -> Vec<MQuery> {
             column("Total", ColumnType::Number),
             column("Day", ColumnType::Date),
         ],
-        vec![
-            Step::Filter {
-                predicate: Predicate::And {
-                    predicates: vec![
-                        Predicate::Compare {
-                            column: String::from("Total"),
-                            op: CompareOp::Gte,
-                            value: Literal::Number(-2.5),
-                        },
-                        Predicate::Not {
-                            predicate: Box::new(Predicate::Or {
-                                predicates: vec![
-                                    Predicate::IsNull {
-                                        column: String::from("Region"),
-                                    },
-                                    Predicate::Contains {
-                                        column: String::from("Region"),
-                                        text: String::from("x\"#(y"),
-                                    },
-                                ],
-                            }),
-                        },
-                    ],
-                },
-            },
-            Step::ChangeType {
-                column: String::from("Total"),
-                column_type: ColumnType::Text,
-                on_error: ErrorPolicy::Null,
-            },
-            Step::Join {
-                input: String::from("Regions"),
-                keys: vec![(String::from("Region"), String::from("Code"))],
-                join: JoinKind::Left,
-            },
-            Step::Rename {
-                columns: vec![(String::from("Day"), String::from("Date"))],
-            },
-            Step::Group {
-                keys: vec![String::from("Region")],
-                aggregates: vec![
-                    Aggregate {
-                        id: String::from("Rows"),
-                        name: String::from("Rows"),
-                        op: AggregateOp::CountRows,
-                        column: None,
-                    },
-                    Aggregate {
-                        id: String::from("Latest"),
-                        name: String::from("Latest"),
-                        op: AggregateOp::Max,
-                        column: Some(String::from("Day")),
-                    },
-                ],
-            },
-            Step::Unpivot {
-                columns: vec![String::from("Rows")],
-                attribute: OutputColumn {
-                    id: String::from("Field"),
-                    name: String::from("Field"),
-                },
-                value: OutputColumn {
-                    id: String::from("Value"),
-                    name: String::from("Value"),
-                },
-            },
-            Step::Select {
-                columns: vec![String::from("Field"), String::from("Value")],
-            },
-        ],
+        sales_steps(),
     );
     let host = query(
         "Budget",
@@ -197,21 +208,16 @@ fn exported_sections_import_to_the_same_plans() {
 #[test]
 fn reported_differences_name_their_query_and_step() {
     let section = emit_section(&fixtures());
-    let codes: Vec<(usize, Option<usize>, &str)> = section
-        .losses
-        .iter()
-        .map(|loss| (loss.query, loss.step, loss.code))
-        .collect();
+    let reported = |query, step, code| section.losses.contains(&Loss { query, step, code });
 
-    assert!(codes.contains(&(0, None, "member-name")));
-    assert!(codes.contains(&(0, Some(1), "error-policy-scope")));
-    assert!(codes.contains(&(2, None, "host-source")));
+    assert!(reported(0, None, "member-name"));
+    assert!(reported(0, Some(1), "error-policy-scope"));
+    assert!(reported(2, None, "host-source"));
     assert_eq!(section.members[0], "Sales_report");
 }
 
-#[test]
-fn workbook_queries_from_m_documentation_forms_import() {
-    let text = r#"section Section1;
+/// Workbook queries in the forms the M documentation shows, plus members outside the subset.
+const WORKBOOK_SECTION: &str = r#"section Section1;
 
 shared Orders = let
     Source = Excel.CurrentWorkbook(){[Name="Orders"]}[Content],
@@ -240,6 +246,10 @@ shared Joined = let
 in
     Merged;
 "#;
+
+#[test]
+fn workbook_queries_from_m_documentation_forms_import() {
+    let text = WORKBOOK_SECTION;
     let (queries, unsupported) = import_section(text).unwrap();
 
     assert_eq!(queries.len(), 1);
@@ -282,7 +292,7 @@ in
         )
     );
 
-    let reasons: Vec<(&str, &str, &str)> = unsupported
+    let reasons: Vec<ReasonRow<'_>> = unsupported
         .iter()
         .map(|entry| (entry.member.as_str(), entry.reason, entry.detail.as_str()))
         .collect();
@@ -326,13 +336,13 @@ fn query_lists_round_trip_through_host_lanes() {
 
     let mut writer = super::PlanWriter::default();
     super::encode_queries(&queries, &mut writer);
-    let writer = writer.finish();
+    let lanes = writer.finish();
     let decoded = super::decode_queries(
         crate::plan_wire::PlanWire {
-            codes: &writer.codes,
-            numbers: &writer.numbers,
-            text: &writer.text,
-            offsets: &writer.offsets,
+            codes: &lanes.codes,
+            numbers: &lanes.numbers,
+            text: &lanes.text,
+            offsets: &lanes.offsets,
         },
         &crate::plan::Limits::default(),
     )
@@ -340,14 +350,14 @@ fn query_lists_round_trip_through_host_lanes() {
 
     assert_eq!(format!("{decoded:?}"), format!("{queries:?}"));
 
-    let mut padded = writer.codes.clone();
+    let mut padded = lanes.codes.clone();
     padded.push(0);
     let issue = super::decode_queries(
         crate::plan_wire::PlanWire {
             codes: &padded,
-            numbers: &writer.numbers,
-            text: &writer.text,
-            offsets: &writer.offsets,
+            numbers: &lanes.numbers,
+            text: &lanes.text,
+            offsets: &lanes.offsets,
         },
         &crate::plan::Limits::default(),
     )

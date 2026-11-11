@@ -2,7 +2,7 @@
 //!
 //! Only `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SS[.fraction]` are accepted, so a refresh never
 //! depends on a locale or a guessed layout. The day-count arithmetic is the civil-from-days
-//! method by Howard Hinnant: https://howardhinnant.github.io/date_algorithms.html
+//! method by Howard Hinnant: <https://howardhinnant.github.io/date_algorithms.html>
 
 use std::fmt::Write;
 
@@ -23,13 +23,15 @@ const MAX_FOUR_DIGIT_YEAR: i64 = 9_999;
 /// Days in each month of a common year; February gains a day in leap years.
 const MONTH_DAYS: [u32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-fn is_leap(year: i64) -> bool {
+const fn is_leap(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
 fn days_in_month(year: i64, month: u32) -> u32 {
-    let index = usize::try_from(month.saturating_sub(1)).unwrap_or(usize::MAX);
-    let days = MONTH_DAYS.get(index).copied().unwrap_or(0);
+    let days = usize::try_from(month.saturating_sub(1))
+        .ok()
+        .and_then(|index| MONTH_DAYS.get(index).copied())
+        .unwrap_or_default();
 
     if month == 2 && is_leap(year) {
         days + 1
@@ -40,9 +42,10 @@ fn days_in_month(year: i64, month: u32) -> u32 {
 
 /// Whole days from 1970-01-01 for a valid proleptic Gregorian date.
 fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = year.div_euclid(YEARS_PER_ERA);
-    let year_of_era = year - era * YEARS_PER_ERA;
+    // The count runs from March, so January and February belong to the year before.
+    let march_year = if month <= 2 { year - 1 } else { year };
+    let era = march_year.div_euclid(YEARS_PER_ERA);
+    let year_of_era = march_year - era * YEARS_PER_ERA;
     let shifted_month = i64::from((month + 9) % 12);
     let day_of_year = (153 * shifted_month + 2) / 5 + i64::from(day) - 1;
     let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
@@ -69,8 +72,8 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 
     (
         year,
-        u32::try_from(month).unwrap_or(0),
-        u32::try_from(day).unwrap_or(0),
+        u32::try_from(month).unwrap_or_default(),
+        u32::try_from(day).unwrap_or_default(),
     )
 }
 
