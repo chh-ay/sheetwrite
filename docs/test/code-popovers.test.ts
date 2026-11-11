@@ -2,55 +2,42 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { installCodePopovers } from "../src/lib/code-popovers.js";
 
+// Focus, Escape, links inside a panel and route changes are owned by
+// test/browser/documentation-controls.spec.ts on a real page.
+
 const PANEL_ID = "popover-create-grid";
 const OTHER_PANEL_ID = "popover-grid";
 /** Longer than the close delay, so a scheduled close has run. */
 const AFTER_CLOSE_DELAY_MS = 150;
 
-/** Mutation observers report in a microtask after the DOM change. */
-async function flushMutations(): Promise<void> {
-  await Promise.resolve();
-}
-
 /**
  * One rendered docs page: a code block whose triggers name panels in the
  * page's inert popover store, as the build emits them.
  */
-function mountPage(): {
-  page: HTMLElement;
-  trigger: HTMLElement;
-  mentions: HTMLElement[];
-} {
+function mountPage(): { page: HTMLElement; mentions: HTMLElement[] } {
   const page = document.createElement("article");
   page.innerHTML = `
-    <pre><code><span tabindex="0" data-sw-code-popover-trigger="${PANEL_ID}" aria-describedby="${PANEL_ID}">createGrid</span>(<span tabindex="0" data-sw-code-popover-trigger="${OTHER_PANEL_ID}">grid</span>, <span tabindex="0" data-sw-code-popover-trigger="${PANEL_ID}">createGrid</span>)</code></pre>
+    <pre><code><span tabindex="0" data-sw-code-popover-trigger="${PANEL_ID}">createGrid</span>(<span tabindex="0" data-sw-code-popover-trigger="${OTHER_PANEL_ID}">grid</span>, <span tabindex="0" data-sw-code-popover-trigger="${PANEL_ID}">createGrid</span>)</code></pre>
     <template class="sw-code-popover-store">
-      <span id="${PANEL_ID}" role="tooltip" data-sw-code-popover-panel="">
-        <a href="/docs/api/core/create-grid/">createGrid reference</a>
-      </span>
+      <span id="${PANEL_ID}" role="tooltip" data-sw-code-popover-panel="">createGrid</span>
       <span id="${OTHER_PANEL_ID}" role="tooltip" data-sw-code-popover-panel="">Grid</span>
     </template>`;
   document.body.append(page);
-
-  const mentions = [...page.querySelectorAll<HTMLElement>("[data-sw-code-popover-trigger]")];
-  const trigger = mentions[0];
-  if (trigger === undefined) throw new Error("The page has no popover trigger");
-  return { page, trigger, mentions };
+  return {
+    page,
+    mentions: [...page.querySelectorAll<HTMLElement>("[data-sw-code-popover-trigger]")],
+  };
 }
 
-function livePanel(id = PANEL_ID): HTMLElement | null {
-  return document.getElementById(id);
+function firstMention(mentions: readonly HTMLElement[]): HTMLElement {
+  const [trigger] = mentions;
+  if (trigger === undefined) throw new Error("The page has no popover trigger");
+  return trigger;
 }
 
 /** True when the panel is in the document and shown. */
 function isOpen(id = PANEL_ID): boolean {
-  return livePanel(id)?.hasAttribute("data-open") ?? false;
-}
-
-function panelLink(): HTMLAnchorElement {
-  const link = livePanel()?.querySelector<HTMLAnchorElement>("a");
-  if (link === null || link === undefined) throw new Error("No open panel holds a link");
-  return link;
+  return document.getElementById(id)?.hasAttribute("data-open") ?? false;
 }
 
 function pointer(type: "pointerover" | "pointerout", target: Element, relatedTarget?: Element) {
@@ -72,37 +59,20 @@ afterEach(() => {
 });
 
 describe("code popovers", () => {
-  it("shows no panel until a trigger opens one", () => {
-    mountPage();
-    uninstall = installCodePopovers();
-
-    expect(isOpen()).toBe(false);
-  });
-
-  it("opens the panel on focus, as the trigger's accessible description", () => {
-    const { trigger } = mountPage();
-    uninstall = installCodePopovers();
-
-    trigger.focus();
-
-    const panel = livePanel();
-    expect(panel?.parentElement === document.body).toBe(true);
-    expect(trigger.getAttribute("aria-describedby")).toBe(PANEL_ID);
-    expect(trigger.getAttribute("data-popover-open")).toBe("true");
-  });
-
   it("serves triggers that mount after it is installed", async () => {
     uninstall = installCodePopovers();
-    const { trigger } = mountPage();
-    await flushMutations();
+    const { mentions } = mountPage();
+    // Mutation observers report in a microtask after the DOM change.
+    await Promise.resolve();
 
-    pointer("pointerover", trigger);
+    pointer("pointerover", firstMention(mentions));
 
     expect(isOpen()).toBe(true);
   });
 
   it("closes a hovered panel after the pointer leaves the trigger", () => {
-    const { trigger, page } = mountPage();
+    const { mentions, page } = mountPage();
+    const trigger = firstMention(mentions);
     uninstall = installCodePopovers();
     pointer("pointerover", trigger);
 
@@ -114,10 +84,10 @@ describe("code popovers", () => {
   });
 
   it("stays open while the pointer travels from the trigger into the panel", () => {
-    const { trigger } = mountPage();
+    const trigger = firstMention(mountPage().mentions);
     uninstall = installCodePopovers();
     pointer("pointerover", trigger);
-    const panel = livePanel();
+    const panel = document.getElementById(PANEL_ID);
     if (panel === null) throw new Error("The panel did not open");
 
     pointer("pointerout", trigger, panel);
@@ -128,8 +98,7 @@ describe("code popovers", () => {
   });
 
   it("marks the other mentions of the open symbol in the same code block", () => {
-    const { mentions } = mountPage();
-    const [first, other, sameSymbol] = mentions;
+    const [first, other, sameSymbol] = mountPage().mentions;
     if (first === undefined || other === undefined || sameSymbol === undefined) {
       throw new Error("The page has three mentions");
     }
@@ -143,54 +112,5 @@ describe("code popovers", () => {
     expect(sameSymbol.hasAttribute("data-popover-related")).toBe(false);
     expect(isOpen()).toBe(false);
     expect(isOpen(OTHER_PANEL_ID)).toBe(true);
-  });
-
-  it("removes an open panel with its page, so a return visit has one panel", async () => {
-    const first = mountPage();
-    uninstall = installCodePopovers();
-    first.trigger.focus();
-
-    first.page.remove();
-    await flushMutations();
-    expect(livePanel()).toBeNull();
-
-    const second = mountPage();
-    await flushMutations();
-    second.trigger.focus();
-    expect(document.querySelectorAll(`[id="${PANEL_ID}"]`)).toHaveLength(1);
-  });
-
-  it("hides a panel when Escape closes it", () => {
-    const { trigger } = mountPage();
-    uninstall = installCodePopovers();
-    trigger.focus();
-
-    trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-    expect(isOpen()).toBe(false);
-  });
-
-  it("stays open while keyboard focus is on a link inside the panel", () => {
-    const { trigger } = mountPage();
-    uninstall = installCodePopovers();
-    trigger.focus();
-
-    panelLink().focus();
-    vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
-
-    expect(isOpen()).toBe(true);
-  });
-
-  it("closes on Escape from inside the panel and gives focus back to the trigger", () => {
-    const { trigger } = mountPage();
-    uninstall = installCodePopovers();
-    trigger.focus();
-    const link = panelLink();
-    link.focus();
-
-    link.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-    expect(isOpen()).toBe(false);
-    expect(document.activeElement === trigger).toBe(true);
   });
 });

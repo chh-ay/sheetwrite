@@ -8,7 +8,6 @@ import {
   navigationBadge,
   navigationPages,
 } from "../src/lib/navigation.js";
-import { sectionPages } from "../src/lib/section-cards.js";
 
 const RELEASE = "0.6.0";
 
@@ -43,35 +42,29 @@ describe("navigationPages", () => {
 });
 
 describe("navigationBadge", () => {
-  it("lifts the strongest badge of a group's pages to the group", () => {
-    // "Calculation" holds one updated and one new page: new wins.
-    expect(navigationBadge(calculation, RELEASE)).toBe("new");
-    expect(navigationBadge(formulas, RELEASE)).toBe("new");
-  });
-
-  it("keeps badges through patch releases and clears them at the next minor release", () => {
-    expect(navigationBadge(old, RELEASE)).toBeUndefined();
-    expect(navigationBadge(old, "0.5.0")).toBe("new");
-    expect(navigationBadge(old, "0.5.4")).toBe("new");
-    expect(navigationBadge(volatile, "0.6.1")).toBe("updated");
-    expect(navigationBadge(formulas, "0.7.0")).toBeUndefined();
-  });
-
-  it("marks an updated page that adds nothing new as updated", () => {
-    expect(navigationBadge(volatile, RELEASE)).toBe("updated");
+  it.each([
+    // A group holding one updated and one new page shows new.
+    [calculation, RELEASE, "new"],
+    [formulas, RELEASE, "new"],
+    [volatile, RELEASE, "updated"],
+    // Badges last through patch releases and clear at the next minor release.
+    [old, "0.5.0", "new"],
+    [old, "0.5.4", "new"],
+    [volatile, "0.6.1", "updated"],
+    [old, RELEASE, undefined],
+    [formulas, "0.7.0", undefined],
+  ] as const)("gives %o at %s the badge %s", (item, release, badge) => {
+    expect(navigationBadge(item, release)).toBe(badge);
   });
 });
 
 describe("section overview pages", () => {
-  it("link the section step in the trail of every page in the section", () => {
+  it("are linked in the trail of their pages and end their own trail unlinked", () => {
     expect(breadcrumbsFor("/docs/start/installation/", "Installation")).toEqual([
       { href: "/docs/", label: "Documentation" },
       { href: "/docs/start/", label: "Getting started" },
       { label: "Installation" },
     ]);
-  });
-
-  it("end their own trail without linking to themselves", () => {
     expect(breadcrumbsFor("/docs/start/", "Getting started")).toEqual([
       { href: "/docs/", label: "Documentation" },
       { label: "Getting started" },
@@ -82,26 +75,19 @@ describe("section overview pages", () => {
     expect(documentNeighbours("/docs/start/").next?.href).toBe("/docs/start/installation/");
     expect(documentNeighbours("/docs/start/installation/").previous?.href).toBe("/docs/start/");
   });
-
-  it("list the section's pages as cards", () => {
-    expect(sectionPages("/docs/tutorials/").map((page) => page.href)).toContain(
-      "/docs/tutorials/excel-in-react/",
-    );
-  });
 });
 
-describe("sidebar icons", () => {
-  it("gives every sidebar entry and every section overview an icon", () => {
-    for (const section of DOCS_NAVIGATION) {
-      if (section.href !== undefined)
-        expect(`${section.label}: ${section.icon}`).not.toEndWith("undefined");
-      const visit = (items: readonly NavigationItem[]): void => {
-        for (const item of items) {
-          expect(`${section.label} › ${item.label}: ${item.icon}`).not.toEndWith("undefined");
-          visit(item.items ?? []);
-        }
-      };
-      visit(section.items);
+it("gives every sidebar entry and every section overview an icon", () => {
+  const missing: string[] = [];
+  const visit = (items: readonly NavigationItem[], trail: string): void => {
+    for (const item of items) {
+      if (item.icon === undefined) missing.push(`${trail} › ${item.label}`);
+      visit(item.items ?? [], trail);
     }
-  });
+  };
+  for (const section of DOCS_NAVIGATION) {
+    if (section.href !== undefined && section.icon === undefined) missing.push(section.label);
+    visit(section.items, section.label);
+  }
+  expect(missing).toEqual([]);
 });

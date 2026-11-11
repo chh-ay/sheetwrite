@@ -60,46 +60,8 @@ it("leaves a page without runnable fences as it is", () => {
   expect(tree.children).toEqual([plain]);
 });
 
-it("wraps a fence in a disclosure together with the disclosure and its notes", () => {
-  const runnable = fence("compile runnable");
-  const opener: Node = { type: "raw", value: "<details>\n<summary>Full setup</summary>" };
-  const closer: Node = { type: "raw", value: "</details>" };
-  const before: Node = { type: "element", tagName: "p", children: [] };
-  const note: Node = { type: "element", tagName: "p", children: [] };
-  const tree: Node = {
-    type: "root",
-    children: [
-      before,
-      { type: "text", value: "\n" },
-      opener,
-      { type: "text", value: "\n" },
-      runnable,
-      { type: "text", value: "\n" },
-      note,
-      closer,
-    ],
-  };
-  runnableCodeBlocks()(tree);
-
-  // The component import leads the tree.
-  const [, kept, , wrapper] = tree.children ?? [];
-  expect(kept).toBe(before);
-  expect(wrapper).toEqual({
-    type: "mdxJsxFlowElement",
-    name: "RunnableCode",
-    attributes: [{ type: "mdxJsxAttribute", name: "disclosed", value: null }],
-    children: [
-      opener,
-      { type: "text", value: "\n" },
-      runnable,
-      { type: "text", value: "\n" },
-      note,
-      closer,
-    ],
-  });
-  expect(tree.children).toHaveLength(4);
-});
-
+// Wrapping a fence together with its "Full setup" disclosure is owned by the
+// runnable feature pages in test/browser/docs-page-features.spec.ts.
 it("leaves a disclosure with two code blocks to its fences", () => {
   const runnable = fence("compile runnable");
   const other = fence("compile");

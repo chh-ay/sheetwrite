@@ -4,6 +4,8 @@ import { createRowBridge, type CommitReason, type DocumentOp } from "@sheetwrite
 
 import { applyHostProjection, type HostEntity } from "../src/showcases/host-rows-store.js";
 
+// Pasted and cleared ARR cells are owned by test/browser/host-owned-rows.spec.ts.
+
 const COLUMNS = [
   { key: "name" as const, title: "Account" },
   { key: "amount" as const, title: "ARR", type: "number" as const },
@@ -12,30 +14,14 @@ const COLUMNS = [
   { key: "stage" as const, title: "Stage" },
 ];
 
-const ROWS: HostEntity[] = [
-  {
-    id: "account-001",
-    name: "Alder Quay",
-    amount: 120_000,
-    region: "North",
-    owner: "Ada Chen",
-    stage: "Renewal",
-  },
-  {
-    id: "account-002",
-    name: "Beacon Ridge",
-    amount: 75_000,
-    region: "South",
-    owner: "Lin Patel",
-    stage: "Proposal",
-  },
-];
-
-const ARR_CELLS = {
-  sheet: "sheet1",
-  start: { row: 0, col: 1 },
-  end: { row: 1, col: 1 },
-};
+const ROWS: HostEntity[] = ["001", "002"].map((suffix, index) => ({
+  id: `account-${suffix}`,
+  name: `Account ${suffix}`,
+  amount: (index + 1) * 100_000,
+  region: "North",
+  owner: "Ada Chen",
+  stage: "Renewal",
+}));
 
 function project(operations: DocumentOp[], commitReason: CommitReason): Map<string, HostEntity> {
   const bridge = createRowBridge({
@@ -44,57 +30,38 @@ function project(operations: DocumentOp[], commitReason: CommitReason): Map<stri
     getRowId: (row) => row.id,
   });
   const projection = bridge.reconcile({ status: "accepted", operations, commitReason });
-  const store = applyHostProjection(new Map(ROWS.map((row) => [row.id, row])), projection);
-  return store;
+  return applyHostProjection(new Map(ROWS.map((row) => [row.id, row])), projection);
 }
 
+const literal = (value: string | number) => ({ kind: "literal" as const, value });
+
 describe("host account store", () => {
-  it.each([
-    ["paste", "paste"],
-    ["fill", "fill"],
-    ["range", "api"],
-  ] as const)("applies a %s write to every account it covers", (_kind, commitReason) => {
-    const store = project(
-      [
-        {
-          op: "setRange",
-          range: ARR_CELLS,
-          cells: [
-            { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 90_000 } },
-            { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: 60_000 } },
-          ],
-        },
-      ],
-      commitReason,
-    );
+  it.each(["fill", "api"] as const)(
+    "applies a %s range write to every account it covers",
+    (reason) => {
+      const range = { sheet: "sheet1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } };
+      const store = project(
+        [
+          {
+            op: "setRange",
+            range,
+            cells: [
+              { rowOffset: 0, colOffset: 0, value: literal(90_000) },
+              { rowOffset: 1, colOffset: 0, value: literal(60_000) },
+            ],
+          },
+        ],
+        reason,
+      );
 
-    expect(store.get("account-001")?.amount).toBe(90_000);
-    expect(store.get("account-002")?.amount).toBe(60_000);
-  });
-
-  it("clears the cleared values of each account", () => {
-    const store = project(
-      [
-        {
-          op: "clearRange",
-          range: { sheet: "sheet1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } },
-        },
-      ],
-      "api",
-    );
-
-    expect(store.get("account-002")).toMatchObject({ name: "", amount: 0 });
-    expect(store.get("account-001")?.amount).toBe(120_000);
-  });
+      expect([...store.values()].map((row) => row.amount)).toEqual([90_000, 60_000]);
+    },
+  );
 
   it("keeps a numeric ARR when a text value or a formula arrives", () => {
     const store = project(
       [
-        {
-          op: "set",
-          addr: { sheet: "sheet1", row: 0, col: 1 },
-          value: { kind: "literal", value: "n/a" },
-        },
+        { op: "set", addr: { sheet: "sheet1", row: 0, col: 1 }, value: literal("n/a") },
         {
           op: "set",
           addr: { sheet: "sheet1", row: 1, col: 1 },
@@ -104,7 +71,6 @@ describe("host account store", () => {
       "api",
     );
 
-    expect(store.get("account-001")?.amount).toBe(120_000);
-    expect(store.get("account-002")?.amount).toBe(75_000);
+    expect([...store.values()].map((row) => row.amount)).toEqual([100_000, 200_000]);
   });
 });
