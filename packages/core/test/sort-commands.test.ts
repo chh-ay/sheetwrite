@@ -62,6 +62,17 @@ function setup() {
   return { grid, store, column, focus };
 }
 
+it("quick sort moves the cells of the current region and keeps its header", () => {
+  const { grid, column, focus } = setup();
+  focus(2, 1);
+
+  expect(grid.sortBy(1, true).status).toBe("applied");
+
+  expect(column(0)).toEqual(["Name", "apple", "fig", "pear"]);
+  expect(column(1)).toEqual(["Qty", 1, 2, 3]);
+  expect(column(3)).toEqual(["keep", "x", "y", "z"]);
+});
+
 it("one undo restores the cells after a quick sort", () => {
   const { grid, column, focus } = setup();
   focus(1, 0);

@@ -143,6 +143,20 @@ describe("SheetwriteStore", () => {
     store.dispose();
   });
 
+  it("returns a row-major bulk window without per-cell reads", () => {
+    const store = new SheetwriteStore(makeWorkbook(50), makeColumnarData(50));
+    const view = store.getVisibleWindow("s1", { start: 3, end: 6 }, [0, 1, 2]);
+    expect(view.rows).toEqual({ start: 3, end: 6 });
+    expect(view.values.length).toBe(3 * 3); // 3 rows x 3 cols, row-major
+    expect(view.values[0]).toBe("Customer 3");
+    expect(view.values[1]).toBe(30.5);
+    expect(view.values[2]).toBe("Phnom Penh");
+    expect(view.values[3]).toBe("Customer 4");
+    expect(view.styleIds.length).toBe(9);
+    expect(view.ffiOutputBytes).toBeGreaterThan(0);
+    expect(Reflect.get(view, "ffiOutputAllocationEvents")).toBe(1);
+  });
+
   it("keeps ref shadows live in windows, queries, and formulas", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     store.applyTransaction({
@@ -262,6 +276,24 @@ describe("SheetwriteStore", () => {
     ).toBe(1);
     expect(events.every((event) => !("dirty" in event))).toBe(true);
     store.dispose();
+  });
+
+  it("emits a change event carrying old and new values for rollback", () => {
+    const store = new SheetwriteStore(makeWorkbook(5));
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "old" } }],
+    });
+    let captured: ChangeEvent | null = null;
+    store.on("change", (e) => {
+      captured = e;
+    });
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "new" } }],
+    });
+    expect(captured).not.toBeNull();
+    const change = captured!.changes[0]!;
+    expect(change.oldValue).toEqual({ kind: "literal", value: "old" });
+    expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
   for (const operation of ["setBlock", "setRange", "clearRange"] as const) {
@@ -496,6 +528,20 @@ describe("SheetwriteStore", () => {
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!");
     expect(store.getCell({ sheet: "summary", row: 1, col: 0 }).resolved).toBe(7);
+  });
+
+  it("frees disposed stores so a fresh store still reads correctly after churn", () => {
+    for (let i = 0; i < 20; i++) {
+      const churn = new SheetwriteStore(makeWorkbook(1000), makeColumnarData(1000));
+      expect(churn.getCell(addr(500, 0)).resolved).toBe("Customer 500");
+      churn.dispose();
+    }
+
+    const store = new SheetwriteStore(makeWorkbook(1000), makeColumnarData(1000));
+    expect(store.getCell(addr(500, 1)).resolved).toBe(5000.5);
+    expect(store.aggregate("s1", 1, "sum")).toBe(4995500);
+
+    store.dispose();
   });
 
   it("preserves boolean literals and formulas through windows, queries, and snapshots", () => {
@@ -861,6 +907,39 @@ describe("stable formula sheet identity", () => {
     });
     expect(store.renameSheetFormulaIdentity("source", "Sales")).toBe(true);
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Sales!A1+1");
+    store.dispose();
+  });
+
+  it("tombstones removed handles and repairs transitive dependencies", () => {
+    const workbook = lifecycleWorkbook();
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "source", row: 0, col: 0 },
+          value: { kind: "literal", value: 4 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 0 },
+          value: { kind: "formula", src: "=Sales!A1+1" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 1 },
+          value: { kind: "formula", src: "=A1+1" },
+        },
+      ],
+    });
+    expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(6);
+
+    expect(store.removeSheetFormulaIdentity("source")).toBe(true);
+
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe("#REF!");
+    expect(store.removeSheetFormulaIdentity("source")).toBe(false);
     store.dispose();
   });
 });
@@ -1693,6 +1772,44 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
     expect(store.getWorkbook().sheets.map((candidate) => candidate.id)).toEqual(["s1"]);
     store.dispose();
   }
+});
+
+it("keeps lifecycle names aligned when rename collides with another sheet id", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "renameSheet", sheet: "s1", name: "s2" },
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s3",
+          name: "Sheet 1",
+          order: 2,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s3", row: 0, col: 0 },
+        value: { kind: "literal", value: "unsafe" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
+  expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
+    ["s1", "s2"],
+    ["s2", "Second"],
+    ["s3", "Sheet 1"],
+  ]);
+  expect(store.getCell({ sheet: "s3", row: 0, col: 0 }).resolved).toBe("unsafe");
+  store.dispose();
 });
 
 describe("validation, protection, and notes metadata", () => {

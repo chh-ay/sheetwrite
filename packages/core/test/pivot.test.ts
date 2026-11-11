@@ -279,6 +279,27 @@ describe("pivot document operations", () => {
     grid.redo();
     expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
   });
+
+  it("checks anchor ownership in document-operation order", () => {
+    const grid = mountGrid([]);
+    grid.applyTransaction({
+      patches: [
+        { op: "setPivot", sheet: "report", pivot: rangePivot() },
+        { op: "setPivot", sheet: "report", pivot: rangePivot({ id: "second" }) },
+      ],
+    });
+    expect(grid.getPivots()).toEqual([]);
+    expect(grid.setPivot(rangePivot()).status).toBe("applied");
+    expect(
+      grid.applyTransaction({
+        patches: [
+          { op: "removePivot", sheet: "report", id: "p-range" },
+          { op: "setPivot", sheet: "report", pivot: rangePivot({ id: "second" }) },
+        ],
+      }).status,
+    ).toBe("applied");
+    expect(grid.getPivots().map((pivot) => pivot.id)).toEqual(["second"]);
+  });
 });
 
 describe("pivot structural rewrites", () => {
@@ -689,6 +710,25 @@ describe("pivot engine boundary on the default engine", () => {
       // The store still accepts changes after the release.
       expect(store.removePivot("p-range").status).toBe("applied");
       expect(store.getPivots()).toEqual([]);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("accepts a write into a pivot's output when an earlier patch in the batch removes it", () => {
+    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
+    const store = new SheetwriteStore(structuredClone(workbook([pivot])));
+    const addr = { sheet: "report", row: 3, col: 2 };
+    try {
+      const outcome = store.applyTransaction({
+        patches: [
+          { op: "removePivot", sheet: "report", id: pivot.id },
+          { op: "set", addr, value: { kind: "literal", value: 7 } },
+        ],
+      });
+
+      expect(outcome.status === "applied" && outcome.transaction.patches.length).toBe(2);
+      expect(store.getCell(addr).resolved).toBe(7);
     } finally {
       store.dispose();
     }
