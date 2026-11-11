@@ -41,9 +41,9 @@ impl CellStore {
             return Vec::new();
         }
         let mut walk = ReadWalk::new(data, &self.formula_slots, handle, max_cells);
-        let end_row = end_row.min(data.cells.row_count());
+        let clamped_end_row = end_row.min(data.cells.row_count());
         for &col in cols {
-            for row in start_row..end_row {
+            for row in start_row..clamped_end_row {
                 if let Some(key) = cell_key(row, col as usize) {
                     walk.visit(key);
                 }
@@ -79,10 +79,10 @@ impl<'a> ReadWalk<'a> {
     }
 
     fn visit(&mut self, key: CellKey) {
-        let key = self.data.spill.owner(key).unwrap_or(key);
+        let owner_key = self.data.spill.owner(key).unwrap_or(key);
 
-        if self.data.formulas.contains(key) && self.visited.insert(key) {
-            self.pending.push(key);
+        if self.data.formulas.contains(owner_key) && self.visited.insert(owner_key) {
+            self.pending.push(owner_key);
         }
     }
 

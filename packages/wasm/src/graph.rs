@@ -158,7 +158,7 @@ impl DirtyCells {
             }
 
             if self.cells.len() > start {
-                ascending &= last.is_none_or(|last| last < key);
+                ascending &= last.is_none_or(|last_key| last_key < key);
             }
             self.cells.push(key);
         }
@@ -250,9 +250,9 @@ pub(crate) fn offset_or_search<T>(
     offset: u32,
     key_of: impl Fn(&T) -> u32,
 ) -> Option<usize> {
-    let offset = offset as usize;
-    if items.get(offset).is_some_and(|item| key_of(item) == key) {
-        return Some(offset);
+    let position = offset as usize;
+    if items.get(position).is_some_and(|item| key_of(item) == key) {
+        return Some(position);
     }
 
     // Loads look up each new address before it is added; past the end is a miss.
@@ -367,7 +367,12 @@ impl SheetFormulas {
         let first_band = pages.first()?.band;
         let page = offset_or_search(pages, band, band.wrapping_sub(first_band), |page| page.band)?;
         let cells = &pages.get(page)?.cells;
-        let offset = offset_or_search(cells, row, row % FORMULA_INDEX_PAGE_ROWS, |&(row, _)| row)?;
+        let offset = offset_or_search(
+            cells,
+            row,
+            row % FORMULA_INDEX_PAGE_ROWS,
+            |&(cell_row, _)| cell_row,
+        )?;
         cells.get(offset).map(|&(_, id)| id)
     }
 
@@ -466,10 +471,10 @@ impl SheetFormulas {
                 column
             }
         };
-        let Some(column) = self.columns.get_mut(column) else {
+        let Some(formula_column) = self.columns.get_mut(column) else {
             return false;
         };
-        let pages = &mut column.pages;
+        let pages = &mut formula_column.pages;
         let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
         let page = match insert_position(pages, band, |page| page.band) {
             Ok(page) => page,
@@ -501,10 +506,10 @@ impl SheetFormulas {
                 page
             }
         };
-        let Some(page) = pages.get_mut(page) else {
+        let Some(formula_page) = pages.get_mut(page) else {
             return false;
         };
-        let cells = &mut page.cells;
+        let cells = &mut formula_page.cells;
         let Err(offset) = insert_position(cells, key.0, |&(row, _)| row) else {
             return false;
         };
@@ -543,17 +548,17 @@ impl SheetFormulas {
         slots: &mut FormulaStore,
     ) -> (Option<FormulaEntry>, Option<FormulaId>) {
         match (self.id(key), entry) {
-            (Some(id), Some(entry)) => {
+            (Some(id), Some(new_entry)) => {
                 self.volatile_count -= usize::from(slots.is_volatile(id));
                 self.subtotal_count -= usize::from(slots.is_subtotal(id));
-                let previous = slots.replace(id, entry);
+                let previous = slots.replace(id, new_entry);
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
                 (previous, Some(id))
             }
             (Some(id), None) => (self.remove_id(key, id, slots), Some(id)),
-            (None, Some(entry)) => {
-                let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), entry) else {
+            (None, Some(new_entry)) => {
+                let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), new_entry) else {
                     return (None, None);
                 };
                 // `key` holds no formula (`self.id(key)` is `None` above), so
@@ -630,12 +635,12 @@ impl SheetFormulas {
     ) {
         self.move_entries(slots, |(row, col), entry| {
             entry.shift_rows(at, i64::from(count), sheet, sheet);
-            let row = if row >= at {
+            let moved_row = if row >= at {
                 row.saturating_add(count)
             } else {
                 row
             };
-            Some((row, col))
+            Some((moved_row, col))
         });
     }
 
@@ -668,12 +673,12 @@ impl SheetFormulas {
     ) {
         self.move_entries(slots, |(row, col), entry| {
             entry.shift_cols(at, i64::from(count), sheet, sheet);
-            let col = if col >= at {
+            let moved_col = if col >= at {
                 col.saturating_add(count)
             } else {
                 col
             };
-            Some((row, col))
+            Some((row, moved_col))
         });
     }
 
@@ -1017,7 +1022,9 @@ impl FormulaGraph {
     ) {
         let unchanged = match (&previous, next) {
             (None, None) => true,
-            (Some(previous), Some(next)) => DepIndex::dependency_graph_unchanged(previous, next),
+            (Some(old_entry), Some(new_entry)) => {
+                DepIndex::dependency_graph_unchanged(old_entry, new_entry)
+            }
             _ => false,
         };
         if unchanged {
@@ -1169,8 +1176,8 @@ mod tests {
     }
 
     /// The distinct cells a list holds, in address order.
-    fn distinct(cells: &DirtyCells) -> Vec<(u32, u32)> {
-        let mut cells = cells.cells.clone();
+    fn distinct(dirty: &DirtyCells) -> Vec<(u32, u32)> {
+        let mut cells = dirty.cells.clone();
         cells.sort_unstable();
         cells.dedup();
         cells
