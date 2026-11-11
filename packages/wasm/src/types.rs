@@ -139,6 +139,13 @@ pub(crate) enum Value {
     Error(FormulaError),
 }
 
+// Every cell value, argument and array element is a `Value`: a larger
+// `Value` grows every evaluation buffer. Change these only with a measurement.
+#[cfg(target_arch = "wasm32")]
+const _: () = assert!(std::mem::size_of::<Value>() == 16);
+#[cfg(not(target_arch = "wasm32"))]
+const _: () = assert!(std::mem::size_of::<Value>() == 24);
+
 impl Value {
     pub(crate) fn number(value: f64) -> Self {
         if value.is_finite() {
@@ -420,6 +427,12 @@ pub(crate) struct FormulaEntry {
     // independent predicates. Keep this private to prevent invalid encodings.
     flags: u16,
 }
+
+// One per stored formula, in every workbook's formula table.
+#[cfg(target_arch = "wasm32")]
+const _: () = assert!(std::mem::size_of::<FormulaEntry>() == 88);
+#[cfg(not(target_arch = "wasm32"))]
+const _: () = assert!(std::mem::size_of::<FormulaEntry>() == 144);
 
 impl FormulaEntry {
     const ERROR_MASK: u16 = 0x0f;
