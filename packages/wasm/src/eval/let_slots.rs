@@ -373,6 +373,10 @@ impl LetFrame {
     ///
     /// The caller must use the reference only while the LET that bound `slot`
     /// is being evaluated; see the type's safety notes.
+    #[allow(
+        unsafe_code,
+        reason = "LET bindings point into the formula's own tree; a safe version is not yet measured on both machines"
+    )]
     pub(crate) unsafe fn binding<'tree>(&self, slot: u32) -> Option<&'tree Ast> {
         let index = self.resolved_base? + slot as usize;
         let pointer = *self.bindings.get(index)?;

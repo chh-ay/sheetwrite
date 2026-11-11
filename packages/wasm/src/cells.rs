@@ -617,7 +617,12 @@ impl CellStorage {
     /// # Safety
     /// `i` must be in-bounds for the dense cell vectors.
     #[inline]
+    #[allow(
+        unsafe_code,
+        reason = "skips the bounds check in the numeric sort comparator of query.rs; the safe version is not yet measured on both machines"
+    )]
     pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
+        // SAFETY: the caller keeps `i` in bounds, as `# Safety` requires.
         unsafe { *self.payload.get_unchecked(i) }
     }
 
