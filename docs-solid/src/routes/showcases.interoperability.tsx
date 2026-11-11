@@ -11,7 +11,7 @@ import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
 import {
   ADVERSARIAL_FIXTURES,
   POSITIVE_FIXTURES,
-} from "../showcases/scenarios/interoperability.js";
+} from "../showcases/scenarios/interop-fixtures.js";
 import InteroperabilitySnippet from "../showcases/snippets/interoperability.mdx";
 
 import stylesheet from "../styles/showcases/interoperability.css?url";

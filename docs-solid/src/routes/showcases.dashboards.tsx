@@ -1,5 +1,5 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { ORDER_ROWS } from "@docs/showcases/scenarios/dashboards.js";
+import { ORDER_ROWS, REGIONS } from "@docs/showcases/scenarios/dashboards.js";
 import DashboardsSnippet from "@docs/showcases/snippets/dashboards.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
@@ -44,7 +44,15 @@ function DashboardsShowcase() {
         ]}
         guide={{ href: "/docs/features/analysis/dashboards/", label: "Read the dashboards guide" }}
         id="dashboards"
-        stage={<Island component={DashboardsStage} name="showcase-dashboards" props={{}} />}
+        stage={
+          <Island
+            component={DashboardsStage}
+            name="showcase-dashboards"
+            props={{
+              firstRegion: REGIONS[0],
+            }}
+          />
+        }
         task={
           <>
             Filter a dashboard of KPI cards, a PivotChart and a pivot with its slicers, then move,

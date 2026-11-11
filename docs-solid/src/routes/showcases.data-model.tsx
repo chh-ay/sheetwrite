@@ -1,5 +1,13 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { ORDER_ROWS, RELATIONSHIPS } from "@docs/showcases/scenarios/data-model.js";
+import {
+  ORDER_ROWS,
+  PENDING_SNAPSHOT,
+  PIVOT_ROWS_USED,
+  RELATIONSHIPS,
+  ROW_FIELDS,
+  type RowFieldId,
+  UNKNOWN_PRODUCT,
+} from "@docs/showcases/scenarios/data-model.js";
 import DataModelSnippet from "@docs/showcases/snippets/data-model.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
@@ -40,7 +48,21 @@ function DataModelShowcase() {
         ]}
         guide={{ href: "/docs/features/analysis/data-model/", label: "Read the data model guide" }}
         id="data-model"
-        stage={<Island component={DataModelStage} name="showcase-data-model" props={{}} />}
+        stage={
+          <Island
+            component={DataModelStage}
+            name="showcase-data-model"
+            props={{
+              pending: PENDING_SNAPSHOT,
+              rowFields: (Object.keys(ROW_FIELDS) as RowFieldId[]).map((id) => ({
+                value: id,
+                label: ROW_FIELDS[id].label,
+              })),
+              unknownProduct: UNKNOWN_PRODUCT,
+              rowsUsed: PIVOT_ROWS_USED,
+            }}
+          />
+        }
         task={
           <>
             Pivot orders by a column of a related table, with a measure that recalculates in every

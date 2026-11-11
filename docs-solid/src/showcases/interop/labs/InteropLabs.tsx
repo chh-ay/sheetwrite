@@ -1,7 +1,7 @@
 import { createSignal, For, type JSX, onMount } from "solid-js";
 
 import { Icon, type IconName } from "../../../components/Icon.js";
-import { ADVERSARIAL_FIXTURES, POSITIVE_FIXTURES } from "../../scenarios/interoperability.js";
+import { ADVERSARIAL_FIXTURES, POSITIVE_FIXTURES } from "../../scenarios/interop-fixtures.js";
 import {
   abortReport,
   attacksRunAt,

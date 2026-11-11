@@ -1,5 +1,5 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { FAMILIES, FUNCTION_NAMES } from "@docs/showcases/scenarios/functions.js";
+import { FAMILIES, FAMILY_ROWS_USED, FUNCTION_NAMES } from "@docs/showcases/scenarios/functions.js";
 import FunctionsSnippet from "@docs/showcases/snippets/functions.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
@@ -27,6 +27,17 @@ export const Route = createFileRoute("/showcases/functions")({
   component: FunctionsShowcase,
 });
 
+/** What the panel shows of a family. */
+function familyChoice(family: (typeof FAMILIES)[number]) {
+  return {
+    id: family.id,
+    label: family.label,
+    summary: family.summary,
+    firstInput: family.inputs[0],
+    formulaNames: family.formulas.map((formula) => formula.name),
+  };
+}
+
 function FunctionsShowcase() {
   return (
     <NoHydration>
@@ -40,7 +51,17 @@ function FunctionsShowcase() {
         ]}
         guide={{ href: "/docs/reference/formula-functions/", label: "Browse every function" }}
         id="functions"
-        stage={<Island component={FunctionsStage} name="showcase-functions" props={{}} />}
+        stage={
+          <Island
+            component={FunctionsStage}
+            name="showcase-functions"
+            props={{
+              families: FAMILIES.map(familyChoice),
+              firstFamily: familyChoice(FAMILIES[0]),
+              rowsUsed: FAMILY_ROWS_USED,
+            }}
+          />
+        }
         task={
           <>
             Pick a family of Excel functions that 0.7.0 adds, change an input, and watch each result

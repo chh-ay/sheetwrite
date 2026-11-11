@@ -2,7 +2,8 @@ import { For, onMount, Show } from "solid-js";
 
 import { Icon } from "../../../components/Icon.js";
 import { pendingProps } from "../../../lib/use-action.js";
-import { ADVERSARIAL_FIXTURES, type RejectionReport } from "../../scenarios/interoperability.js";
+import { ADVERSARIAL_FIXTURES } from "../../scenarios/interop-fixtures.js";
+import type { RejectionReport } from "../../scenarios/interoperability.js";
 import {
   abortReport,
   actionPending,

@@ -1,5 +1,11 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { FORMULA_COUNT, LOOKUPS, ROWS } from "@docs/showcases/scenarios/recalculation.js";
+import {
+  FORMULA_COUNT,
+  LOOKUPS,
+  PRICE_CHANGE_CELL,
+  ROWS,
+  SERIES_LENGTH,
+} from "@docs/showcases/scenarios/recalculation.js";
 import RecalculationSnippet from "@docs/showcases/snippets/recalculation.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
@@ -53,7 +59,19 @@ function RecalculationShowcase() {
           label: "How the engine recalculates",
         }}
         id="recalculation"
-        stage={<Island component={RecalculationStage} name="showcase-recalculation" props={{}} />}
+        stage={
+          <Island
+            component={RecalculationStage}
+            name="showcase-recalculation"
+            props={{
+              rows: ROWS,
+              lookups: LOOKUPS,
+              formulaCount: FORMULA_COUNT,
+              seriesLength: SERIES_LENGTH,
+              priceChangeCell: PRICE_CHANGE_CELL,
+            }}
+          />
+        }
         task={
           <>
             Change one cell that {ROWS.toLocaleString("en")} formulas read, or move{" "}

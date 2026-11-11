@@ -1,9 +1,7 @@
-import {
-  FAMILIES,
-  FAMILY_ROWS_USED,
-  type FamilyId,
-  type FunctionsScenario,
-  type FunctionsSnapshot,
+import type {
+  FamilyId,
+  FunctionsScenario,
+  FunctionsSnapshot,
 } from "@docs/showcases/scenarios/functions.js";
 import { createSignal, Show } from "solid-js";
 
@@ -13,11 +11,25 @@ import { ShowcaseControlGroup, ShowcaseReadout, ShowcaseStage } from "../layout/
 import { createLiveScenario, createScenarioAction } from "../lib/live-scenario.js";
 import { ControlActions, ControlButton, DemoGrid } from "../ui/feature-controls.js";
 
-type Family = (typeof FAMILIES)[number];
-type ScenarioAction = ReturnType<typeof createScenarioAction<FunctionsScenario>>;
+/** One family as the panel shows it. */
+export interface FunctionFamilyChoice {
+  readonly id: FamilyId;
+  readonly label: string;
+  readonly summary: string;
+  readonly firstInput: { readonly label: string; readonly value: string | number };
+  readonly formulaNames: readonly string[];
+}
 
-const familyOf = (id: FamilyId | undefined): Family =>
-  FAMILIES.find((family) => family.id === id) ?? FAMILIES[0];
+/** Props of {@link FunctionsStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
+export interface FunctionsStageProps {
+  readonly families: readonly FunctionFamilyChoice[];
+  /** The family shown before the scenario reports one. */
+  readonly firstFamily: FunctionFamilyChoice;
+  readonly rowsUsed: number;
+}
+
+type Family = FunctionFamilyChoice;
+type ScenarioAction = ReturnType<typeof createScenarioAction<FunctionsScenario>>;
 
 /** A typed number stays a number; anything else is text, as a cell entry would be. */
 const parsedInput = (text: string) =>
@@ -25,7 +37,7 @@ const parsedInput = (text: string) =>
 
 /** The first input of the shown family, set as typing into B2 would. */
 function InputForm(props: { readonly family: Family; readonly action: ScenarioAction }) {
-  const first = () => props.family.inputs[0];
+  const first = () => props.family.firstInput;
   const [draft, setDraft] = createSignal("");
   return (
     <form
@@ -63,7 +75,9 @@ function InputForm(props: { readonly family: Family; readonly action: ScenarioAc
 }
 
 /** The functions showcase's island: one sheet per family, its input and live results. */
-export function FunctionsStage() {
+export function FunctionsStage(props: FunctionsStageProps) {
+  const familyOf = (id: FamilyId | undefined): Family =>
+    props.families.find((family) => family.id === id) ?? props.firstFamily;
   const live = createLiveScenario<FunctionsScenario, FunctionsSnapshot>(() =>
     import("./boot.js").then(({ createFunctionsScenario }) => createFunctionsScenario),
   );
@@ -71,8 +85,7 @@ export function FunctionsStage() {
   const family = () => familyOf(live.snapshot()?.family);
   // Before the engine is ready, each row holds its place with "…".
   const results = () =>
-    live.snapshot()?.results ??
-    family().formulas.map((entry) => ({ name: entry.name, value: "…" }));
+    live.snapshot()?.results ?? family().formulaNames.map((name) => ({ name, value: "…" }));
 
   return (
     <ShowcaseStage
@@ -85,7 +98,7 @@ export function FunctionsStage() {
               onChange={(value) =>
                 void action.run("The family", (current) => current.showFamily(value as FamilyId))
               }
-              options={FAMILIES.map((entry) => ({ label: entry.label, value: entry.id }))}
+              options={props.families.map((entry) => ({ label: entry.label, value: entry.id }))}
               value={family().id}
             />
           </ShowcaseControlGroup>
@@ -115,7 +128,7 @@ export function FunctionsStage() {
           <DemoGrid
             host={live.host}
             label="Function workbook"
-            rows={FAMILY_ROWS_USED}
+            rows={props.rowsUsed}
             testId="functions-grid"
           />
           <ActionError error={live.error()} />

@@ -1,9 +1,7 @@
-import {
-  FEED_BATCH_ROWS,
-  type QueriesScenario,
-  type QueriesSnapshot,
-  REPORT_ROWS_USED,
-  type StatusFilter,
+import type {
+  QueriesScenario,
+  QueriesSnapshot,
+  StatusFilter,
 } from "@docs/showcases/scenarios/queries.js";
 import { Match, Switch } from "solid-js";
 
@@ -40,7 +38,14 @@ function RefreshStatus(props: { readonly snapshot: QueriesSnapshot | null }) {
 }
 
 /** The queries showcase's island: the report workbook, its saved queries and refresh. */
-export function QueriesStage() {
+/** Props of {@link QueriesStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
+export interface QueriesStageProps {
+  /** Orders each "new orders" press adds to the feed. */
+  readonly batchRows: number;
+  readonly rowsUsed: number;
+}
+
+export function QueriesStage(props: QueriesStageProps) {
   const live = createLiveScenario<QueriesScenario, QueriesSnapshot>(() =>
     import("./boot.js").then(({ createQueriesScenario }) => createQueriesScenario),
   );
@@ -71,7 +76,7 @@ export function QueriesStage() {
                 icon="plus"
                 onClick={() => void action.run("New orders", (current) => current.addOrders())}
               >
-                {FEED_BATCH_ROWS.toLocaleString("en")} new orders arrive
+                {props.batchRows.toLocaleString("en")} new orders arrive
               </ControlButton>
             </ControlActions>
             <ShowcaseReadout
@@ -145,7 +150,7 @@ export function QueriesStage() {
           <DemoGrid
             host={live.host}
             label="Report workbook"
-            rows={REPORT_ROWS_USED}
+            rows={props.rowsUsed}
             testId="queries-grid"
           />
           <ActionError error={live.error()} />

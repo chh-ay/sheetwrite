@@ -118,12 +118,19 @@ function CollaborationShowcase() {
           <Island
             component={CollaborationStage}
             name="showcase-collaboration"
-            props={{ demoLabel: `${COLLABORATION_PAGE.title} live scenario` }}
+            props={{
+              demoLabel: `${COLLABORATION_PAGE.title} live scenario`,
+              actors: COLLABORATION_ACTORS,
+            }}
           />
         }
       >
         <ShowcaseSection id="collaboration-faults" title="Protocol faults">
-          <Island component={CollaborationFaults} name="showcase-collaboration-faults" props={{}} />
+          <Island
+            component={CollaborationFaults}
+            name="showcase-collaboration-faults"
+            props={{ actors: COLLABORATION_ACTORS }}
+          />
         </ShowcaseSection>
       </ProofPage>
     </NoHydration>

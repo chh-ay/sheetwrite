@@ -1,5 +1,11 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { authorName, BASELINE_NAME, SAM, YOU } from "@docs/showcases/scenarios/version-history.js";
+import {
+  authorName,
+  BASELINE_NAME,
+  BUDGET_ROWS_USED,
+  SAM,
+  YOU,
+} from "@docs/showcases/scenarios/version-history.js";
 import VersionHistorySnippet from "@docs/showcases/snippets/version-history.mdx";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
@@ -44,7 +50,15 @@ function VersionHistoryShowcase() {
         }}
         id="version-history"
         stage={
-          <Island component={VersionHistoryStage} name="showcase-version-history" props={{}} />
+          <Island
+            component={VersionHistoryStage}
+            name="showcase-version-history"
+            props={{
+              baselineName: BASELINE_NAME,
+              teammate: authorName(SAM),
+              rowsUsed: BUDGET_ROWS_USED,
+            }}
+          />
         }
         task={
           <>

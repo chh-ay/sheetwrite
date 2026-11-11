@@ -1,8 +1,5 @@
 import { isRepeatClick } from "@docs/lib/action-guard.js";
-import {
-  COLLABORATION_ACTORS,
-  type ShowcaseActor,
-} from "@docs/showcases/collaboration-protocol.js";
+import type { ShowcaseActor } from "@docs/showcases/collaboration-protocol.js";
 import { For, type JSX, onCleanup, onMount, Show } from "solid-js";
 
 import { Icon } from "../../components/Icon.js";
@@ -44,8 +41,11 @@ function formatDuration(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms.toFixed(0)} ms`;
 }
 
-const actorOf = (key: ClientKey): ShowcaseActor =>
-  key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+/** Ana and Bram, in client order. */
+export type Actors = readonly [ShowcaseActor, ShowcaseActor];
+
+const actorOf = (actors: Actors, key: ClientKey): ShowcaseActor =>
+  key === "a" ? actors[0] : actors[1];
 
 type ChallengePhase = "initial" | "offline" | "queued" | "reconnecting" | "resolved";
 
@@ -116,13 +116,13 @@ function BatchReportView(props: Readonly<{ report: BatchReport }>) {
 }
 
 /** Where each client is against the server head. */
-function ConvergenceReadout() {
+function ConvergenceReadout(props: Readonly<{ actors: Actors }>) {
   const clientsAtHead = () => CLIENT_KEYS.filter(atHead).length;
   return (
     <ShowcaseReadout
       items={[
         ...CLIENT_KEYS.map((key) => ({
-          label: actorOf(key).displayName,
+          label: actorOf(props.actors, key).displayName,
           get value() {
             const pending = views[key].syncState?.pendingCount ?? 0;
             const version = views[key].syncState?.serverVersion ?? 0;
@@ -146,7 +146,7 @@ function ConvergenceReadout() {
 }
 
 /** The side panel: stress drills, the offline reconnect, convergence and the server log. */
-function ProtocolControls() {
+function ProtocolControls(props: Readonly<{ actors: Actors }>) {
   const stormBusy = () => chaos()?.phase === "storm" || chaos()?.phase === "settling";
   const ready = () => status() === "ready";
   const phase = challengePhase;
@@ -242,7 +242,7 @@ function ProtocolControls() {
         </ol>
       </ShowcaseControlGroup>
       <ShowcaseControlGroup title="Convergence">
-        <ConvergenceReadout />
+        <ConvergenceReadout actors={props.actors} />
       </ShowcaseControlGroup>
       <ShowcaseControlGroup title="Server decisions">
         <ol aria-live="polite" class="sw-clb__server-log" data-testid="clb-server-log">
@@ -366,6 +366,8 @@ function ClientPanel(props: Readonly<ClientPanelProps>) {
 /** Props of {@link CollaborationStage}. */
 export interface CollaborationStageProps {
   readonly demoLabel: string;
+  /** The two collaborators, from the route: the island imports no protocol code before its grid loads. */
+  readonly actors: Actors;
 }
 
 /** The collaboration showcase's island: two live clients, one server, and the drills. */
@@ -389,16 +391,16 @@ export function CollaborationStage(props: CollaborationStageProps) {
 
   return (
     <ShowcaseStage
-      controls={<ProtocolControls />}
+      controls={<ProtocolControls actors={props.actors} />}
       demo={
         <section aria-label="Collaboration protocol showcase" class="sw-clb" data-state={status()}>
           <ActionError error={actionError() ?? chaosError()} />
           <div class="sw-clb__workbench">
             <For each={CLIENT_KEYS}>
               {(key) => (
-                <ClientPanel actor={actorOf(key)} slug={key} view={views[key]}>
+                <ClientPanel actor={actorOf(props.actors, key)} slug={key} view={views[key]}>
                   <div
-                    aria-label={`${actorOf(key).displayName}'s workbook`}
+                    aria-label={`${actorOf(props.actors, key).displayName}'s workbook`}
                     class="sw-clb__grid"
                     data-testid={`clb-${key}-grid`}
                     ref={(element) => {

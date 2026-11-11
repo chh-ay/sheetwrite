@@ -1,11 +1,7 @@
-import {
-  authorName,
-  BASELINE_NAME,
-  BUDGET_ROWS_USED,
-  type ChangeReading,
-  type HistoryScenario,
-  type HistorySnapshot,
-  SAM,
+import type {
+  ChangeReading,
+  HistoryScenario,
+  HistorySnapshot,
 } from "@docs/showcases/scenarios/version-history.js";
 import { For, Show } from "solid-js";
 
@@ -19,10 +15,24 @@ import {
 import { createLiveScenario, createScenarioAction } from "../lib/live-scenario.js";
 import { ControlActions, ControlButton, DemoGrid } from "../ui/feature-controls.js";
 
-function ChangeList(props: { readonly changes: readonly ChangeReading[] }) {
+/** Props of {@link VersionHistoryStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
+export interface VersionHistoryStageProps {
+  /** The approved version every compare starts from. */
+  readonly baselineName: string;
+  /** The teammate who edits from the second client. */
+  readonly teammate: string;
+  readonly rowsUsed: number;
+}
+
+function ChangeList(props: {
+  readonly changes: readonly ChangeReading[];
+  readonly baselineName: string;
+}) {
   return (
     <Show
-      fallback={<ShowcaseStatus tone="neutral">No changes since {BASELINE_NAME}</ShowcaseStatus>}
+      fallback={
+        <ShowcaseStatus tone="neutral">No changes since {props.baselineName}</ShowcaseStatus>
+      }
       when={props.changes.length > 0}
     >
       <ol class="sw-feature-changes" data-testid="history-changes">
@@ -43,20 +53,20 @@ function ChangeList(props: { readonly changes: readonly ChangeReading[] }) {
 }
 
 /** The version history showcase's island: a shared budget, its versions and restores. */
-export function VersionHistoryStage() {
+export function VersionHistoryStage(props: VersionHistoryStageProps) {
   const live = createLiveScenario<HistoryScenario, HistorySnapshot>(() =>
     import("./boot.js").then(({ createVersionHistoryScenario }) => createVersionHistoryScenario),
   );
   const action = createScenarioAction(live.scenario);
   // Before the archive opens, the row its baseline version fills waits with "…".
-  const versions = () => live.snapshot()?.versions ?? [{ label: BASELINE_NAME, author: "…" }];
+  const versions = () => live.snapshot()?.versions ?? [{ label: props.baselineName, author: "…" }];
 
   return (
     <ShowcaseStage
       controls={
         <>
           <ShowcaseControlGroup
-            description={`You edit in the grid. ${authorName(SAM)} edits the same document from a second client.`}
+            description={`You edit in the grid. ${props.teammate} edits the same document from a second client.`}
             title="Edit the budget"
           >
             <ControlActions>
@@ -72,7 +82,7 @@ export function VersionHistoryStage() {
                 icon="users"
                 onClick={() => void action.run("Sam's edit", (current) => current.editAsSam())}
               >
-                {authorName(SAM)} cuts Travel in Q3–Q4
+                {props.teammate} cuts Travel in Q3–Q4
               </ControlButton>
             </ControlActions>
             <ShowcaseReadout
@@ -119,7 +129,7 @@ export function VersionHistoryStage() {
           </ShowcaseControlGroup>
           <ShowcaseControlGroup
             description="Changed cells, before and after, and who changed each."
-            title={`Compare with ${BASELINE_NAME}`}
+            title={`Compare with ${props.baselineName}`}
           >
             <ControlActions>
               <ControlButton
@@ -134,11 +144,11 @@ export function VersionHistoryStage() {
               </ControlButton>
             </ControlActions>
             <Show when={live.snapshot()?.changes}>
-              {(changes) => <ChangeList changes={changes()} />}
+              {(changes) => <ChangeList baselineName={props.baselineName} changes={changes()} />}
             </Show>
           </ShowcaseControlGroup>
           <ShowcaseControlGroup
-            description={`Bring back part of ${BASELINE_NAME} as one undoable change for everyone.`}
+            description={`Bring back part of ${props.baselineName} as one undoable change for everyone.`}
             title="Restore"
           >
             <ControlActions>
@@ -166,7 +176,7 @@ export function VersionHistoryStage() {
           <DemoGrid
             host={live.host}
             label="Budget workbook"
-            rows={BUDGET_ROWS_USED}
+            rows={props.rowsUsed}
             testId="history-grid"
           />
           <ActionError error={live.error()} />

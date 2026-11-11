@@ -6,7 +6,7 @@ import {
   type InteropFixture,
   POSITIVE_FIXTURES,
   PRODUCER_MATRIX,
-} from "../../scenarios/interoperability.js";
+} from "../../scenarios/interop-fixtures.js";
 import { actionPending, digests, fixtureLoad, run } from "../state.js";
 import { CopyValue, LabAnswer, LabFigure } from "./LabParts.js";
 import { nf } from "./vault-data.js";

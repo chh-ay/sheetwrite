@@ -3,7 +3,7 @@ import { createSignal, For, Show } from "solid-js";
 
 import { Icon } from "../../../components/Icon.js";
 import { pendingProps } from "../../../lib/use-action.js";
-import { INTEROP_INJECTION_TEXT } from "../../scenarios/interoperability.js";
+import { INTEROP_INJECTION_TEXT } from "../../scenarios/interop-fixtures.js";
 import {
   actionPending,
   csvPreview,
