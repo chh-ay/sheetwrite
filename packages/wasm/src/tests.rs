@@ -285,6 +285,51 @@ fn spill_ownership_budget_is_store_wide_atomic_and_released() {
 }
 
 #[test]
+fn text_functions_surface_string_and_boolean_values() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 16);
+    let formulas = [
+        (0, r#"="Hello ""Q""""#),
+        (1, r#"=LEN("Hello")"#),
+        (2, r#"=LEFT("abcdef",3)"#),
+        (3, r#"=RIGHT("abcdef",3)"#),
+        (4, r#"=MID("abcdef",2,3)"#),
+        (5, r#"=CONCAT("A",1,TRUE)"#),
+        (6, r#"=CONCATENATE("x","y")"#),
+        (7, r#"=UPPER("MiX")"#),
+        (8, r#"=LOWER("MiX")"#),
+        (9, r#"=TRIM("  a   b  ")"#),
+        (10, r#"=TEXT(12.345,"0.00")"#),
+        (11, r#"=EXACT("Hi","Hi")"#),
+        (12, r#"=EXACT("Hi","hi")"#),
+    ];
+    for (row, src) in formulas {
+        store.set_formula(sheet, row, 0, src, 0);
+    }
+    store.recompute(sheet);
+
+    assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_STRING);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("Hello \"Q\""));
+
+    let length = store.get_cell(sheet, 1, 0);
+    assert_eq!((length.kind(), length.num()), (KIND_FORMULA, 5.0));
+
+    assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("abc"));
+    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("def"));
+    assert_eq!(string(&store, sheet, 4, 0).as_deref(), Some("bcd"));
+    assert_eq!(string(&store, sheet, 5, 0).as_deref(), Some("A1TRUE"));
+    assert_eq!(string(&store, sheet, 6, 0).as_deref(), Some("xy"));
+    assert_eq!(string(&store, sheet, 7, 0).as_deref(), Some("MIX"));
+    assert_eq!(string(&store, sheet, 8, 0).as_deref(), Some("mix"));
+    assert_eq!(string(&store, sheet, 9, 0).as_deref(), Some("a b"));
+    assert_eq!(string(&store, sheet, 10, 0).as_deref(), Some("12.35"));
+    assert_eq!(store.get_cell(sheet, 11, 0).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 11, 0), 1.0);
+    assert_eq!(store.get_cell(sheet, 12, 0).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 12, 0), 0.0);
+}
+
+#[test]
 fn builtin_argument_errors_and_numeric_boundaries_propagate_without_panics() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(48, 1);
@@ -1200,6 +1245,58 @@ fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
     assert!(store.clear_range(sheet, 1, 2, 1, 2, true, false));
     store.recompute(sheet);
     assert_eq!(store.get_cell(sheet, 2, 2).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn many_scalar_writes_before_a_bulk_write_recompute_every_reader() {
+    // More written cells than registered formulas and read keys make the
+    // pass scan the registered sources instead of walking each small
+    // dirty rectangle cell by cell.
+    const WRITTEN_ROWS: usize = 300;
+    const ROW_STEP: usize = 3;
+    const BULK_ROWS: usize = 50;
+    const SCALAR_COL: usize = 2;
+    const BULK_COL: usize = 0;
+    const FORMULA_COL: usize = 4;
+    const INITIAL_VALUE: f64 = 1.0;
+    const WRITTEN_VALUE: f64 = 4.0;
+    const BULK_VALUE: f64 = 3.0;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, WRITTEN_ROWS * ROW_STEP + 1);
+    let other = store.add_sheet(2, 2);
+    store.set_sheet_name(sheet, "source", "Source");
+    for index in 0..WRITTEN_ROWS {
+        store.set_number(sheet, index * ROW_STEP, SCALAR_COL, INITIAL_VALUE, 0);
+    }
+    store.set_formula(sheet, 0, FORMULA_COL, "=C4*2", 0);
+    store.set_formula(sheet, 1, FORMULA_COL, "=SUM(C1:C900)", 0);
+    store.set_formula(sheet, 2, FORMULA_COL, "=SUM(A1:A50)", 0);
+    store.set_formula(other, 0, 0, "=Source!C7+1", 0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 0, FORMULA_COL), INITIAL_VALUE * 2.0);
+
+    // Reverse order keeps the dirty cells from arriving as one sorted run.
+    for index in (0..WRITTEN_ROWS).rev() {
+        store.set_number(sheet, index * ROW_STEP, SCALAR_COL, WRITTEN_VALUE, 0);
+    }
+
+    // A scalar written into the formula column is a dirty formula reader too.
+    store.set_formula(sheet, 3, FORMULA_COL, "=C10+1", 0);
+    store.set_column_numbers(sheet, BULK_COL, 0, &[BULK_VALUE; BULK_ROWS], 0);
+    store.commit_sources();
+
+    assert_close(number(&store, sheet, 0, FORMULA_COL), WRITTEN_VALUE * 2.0);
+    assert_close(
+        number(&store, sheet, 1, FORMULA_COL),
+        WRITTEN_VALUE * WRITTEN_ROWS as f64,
+    );
+    assert_close(
+        number(&store, sheet, 2, FORMULA_COL),
+        BULK_VALUE * BULK_ROWS as f64,
+    );
+    assert_close(number(&store, sheet, 3, FORMULA_COL), WRITTEN_VALUE + 1.0);
+    assert_close(number(&store, other, 0, 0), WRITTEN_VALUE + 1.0);
 }
 
 #[test]
@@ -3222,6 +3319,41 @@ fn offset_indirect_scalar_contexts_and_reference_consumers_use_resolved_cells() 
             );
         }
     }
+}
+
+#[test]
+fn offset_indirect_let_scopes_and_runtime_spill_readers_follow_current_values() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(24, 20);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_formula(sheet, 1, 0, "=LET(x,RAND(),SUM(OFFSET(A1,0,0))+x-x)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 5.0);
+
+    store.set_number(sheet, 0, 0, 10.0, 0);
+    store.set_formula(sheet, 0, 2, "=LET(n,5,n+SUM(OFFSET(A1,0,0)))", 0);
+    store.set_formula(sheet, 0, 23, "=LET(a,1,b,C1,SEQUENCE(a+b))", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 10.0);
+    assert_close(number(&store, sheet, 0, 2), 15.0);
+    assert_close(number(&store, sheet, 15, 23), 16.0);
+    assert_eq!(store.get_cell(sheet, 16, 23).kind(), KIND_EMPTY);
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_formula(sheet, 0, 0, "=INDIRECT(\"C1:C3\")", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(3)", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 0)),
+        [1.0, 2.0, 3.0]
+    );
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(3,1,10)", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 0)),
+        [10.0, 11.0, 12.0]
+    );
 }
 
 #[test]
