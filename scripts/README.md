@@ -56,7 +56,9 @@ engines, not system libraries. Jobs outside the Playwright image install
 Chromium without apt and start it once; only if it cannot start do they
 install its system packages.
 The production browser suite runs in three shards with two workers each.
-Required CI waits for every shard. Pull requests do not deploy docs.
+Required CI waits for every shard. The production docs job also checks that
+the examples load the XLSX backend only through lazy imports
+(`verify-example-xlsx-isolation.ts`). Pull requests do not deploy docs.
 
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are
 not always script names — `audit:javascript` is `bun scripts/dependency-audit.ts`,
