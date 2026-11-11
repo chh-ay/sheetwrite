@@ -134,25 +134,182 @@ struct ColumnRuns {
     runs: Vec<OwnedRun>,
 }
 
-/// Vacated runs a sheet keeps beyond its live ones before [`SpillState::compact`]
-/// drops them.
+/// Vacated runs a sheet keeps beyond its live ones before
+/// [`OwnerRuns::drop_vacant_runs`] drops them.
 const VACANT_RUN_SLACK: usize = 64;
+
+/// The cells installed spills own, by column (sorted, only columns that hold
+/// runs): runs sorted by row that never overlap. A cell belongs to the live
+/// run that covers it; a cell a source write detached is cut out of its run.
+/// One run per column of a spill replaces one map entry per cell.
+#[derive(Debug, Default)]
+struct OwnerRuns {
+    columns: Vec<ColumnRuns>,
+    /// Cells the live runs cover, anchors included.
+    owned_cells: usize,
+    /// Vacated runs still in `columns`.
+    vacant_runs: usize,
+}
+
+impl OwnerRuns {
+    /// The anchor of the live run that covers `cell`.
+    fn owner(&self, cell: CellKey) -> Option<CellKey> {
+        let column = self.runs(cell.1)?;
+        let after = column.partition_point(|run| run.row_start <= cell.0);
+        let run = column.get(after.checked_sub(1)?)?;
+        (run.is_live() && run.row_end >= cell.0).then_some(run.anchor)
+    }
+
+    /// Room for one more run in each column from `col_start` to `col_end`.
+    fn reserve_runs(&mut self, col_start: u32, col_end: u32) -> bool {
+        for col in col_start..=col_end {
+            match self.columns.binary_search_by_key(&col, |column| column.col) {
+                Ok(at) => {
+                    let Some(column) = self.columns.get_mut(at) else {
+                        return false;
+                    };
+                    if column.runs.try_reserve(1).is_err() {
+                        return false;
+                    }
+                }
+                Err(at) => {
+                    let mut runs = Vec::new();
+                    if runs.try_reserve(1).is_err() || self.columns.try_reserve(1).is_err() {
+                        return false;
+                    }
+                    self.columns.insert(at, ColumnRuns { col, runs });
+                }
+            }
+        }
+        true
+    }
+
+    /// Gives `anchor` the rows from its own row to `row_end` in column `col`.
+    /// A vacated run over exactly those rows is taken in place; otherwise the
+    /// rows are cut from whatever covered them and a new run is inserted.
+    fn own(&mut self, col: u32, anchor: CellKey, row_end: u32) {
+        let row_start = anchor.0;
+        let run = OwnedRun {
+            row_start,
+            row_end,
+            anchor,
+        };
+        let Some(column) = runs_mut(&mut self.columns, col) else {
+            return;
+        };
+        let at = column.partition_point(|other| other.row_start < row_start);
+        if let Some(slot) = column.get_mut(at) {
+            if !slot.is_live() && slot.row_start == row_start && slot.row_end == row_end {
+                *slot = run;
+                self.vacant_runs -= 1;
+                self.owned_cells += run.rows();
+                return;
+            }
+        }
+
+        self.cut(col, row_start, row_end);
+        let Some(column) = runs_mut(&mut self.columns, col) else {
+            return;
+        };
+        let at = column.partition_point(|other| other.row_start < row_start);
+        column.insert(at, run);
+        self.owned_cells += run.rows();
+    }
+
+    /// Marks the runs of `anchor` in column `col` between `row_start` and
+    /// `row_end` vacant.
+    fn vacate(&mut self, col: u32, anchor: CellKey, row_start: u32, row_end: u32) {
+        let Some(column) = runs_mut(&mut self.columns, col) else {
+            return;
+        };
+        let first = column.partition_point(|run| run.row_end < row_start);
+        for run in column[first..]
+            .iter_mut()
+            .take_while(|run| run.row_start <= row_end)
+        {
+            if run.anchor == anchor {
+                self.owned_cells -= run.rows();
+                self.vacant_runs += 1;
+                run.anchor = OwnedRun::VACANT;
+            }
+        }
+    }
+
+    /// Removes rows `row_start..=row_end` of column `col` from every run:
+    /// live runs keep what lies outside them, vacated runs that meet them are
+    /// dropped.
+    fn cut(&mut self, col: u32, row_start: u32, row_end: u32) {
+        let Some(column) = runs_mut(&mut self.columns, col) else {
+            return;
+        };
+        let first = column.partition_point(|run| run.row_end < row_start);
+        let last = column.partition_point(|run| run.row_start <= row_end);
+        if first >= last {
+            return;
+        }
+
+        let mut kept = Vec::new();
+        for run in &column[first..last] {
+            if !run.is_live() {
+                self.vacant_runs -= 1;
+                continue;
+            }
+            let cut_start = run.row_start.max(row_start);
+            let cut_end = run.row_end.min(row_end);
+            self.owned_cells -= (cut_end - cut_start) as usize + 1;
+            if run.row_start < row_start {
+                kept.push(OwnedRun {
+                    row_end: row_start - 1,
+                    ..*run
+                });
+            }
+            if run.row_end > row_end {
+                kept.push(OwnedRun {
+                    row_start: row_end + 1,
+                    ..*run
+                });
+            }
+        }
+        column.splice(first..last, kept);
+    }
+
+    /// Drops vacated runs once they outnumber the live ones by the slack.
+    fn drop_vacant_runs(&mut self) {
+        if self.vacant_runs > VACANT_RUN_SLACK && self.vacant_runs > self.live_runs() {
+            for column in &mut self.columns {
+                column.runs.retain(|run| run.is_live());
+            }
+            self.columns.retain(|column| !column.runs.is_empty());
+            self.vacant_runs = 0;
+        }
+    }
+
+    fn live_runs(&self) -> usize {
+        self.columns
+            .iter()
+            .map(|column| column.runs.len())
+            .sum::<usize>()
+            - self.vacant_runs
+    }
+
+    fn runs(&self, col: u32) -> Option<&Vec<OwnedRun>> {
+        let at = self
+            .columns
+            .binary_search_by_key(&col, |column| column.col)
+            .ok()?;
+        self.columns.get(at).map(|column| &column.runs)
+    }
+}
 
 #[derive(Default)]
 pub(crate) struct SpillState {
     /// Attempted spill bounds remain registered even while obstructed so clearing
     /// a blocker invalidates the owning anchor.
     ranges: FxHashMap<CellKey, SpillRange>,
-    /// The cells installed spills own, by column (sorted, only columns that
-    /// hold runs): runs sorted by row that never overlap. A cell belongs to
-    /// the live run that covers it; a cell a source write detached is cut out
-    /// of its run. One run per column of a spill replaces one map entry per
-    /// cell.
-    columns: Vec<ColumnRuns>,
-    /// Cells the live runs cover, anchors included.
-    owned_cells: usize,
-    /// Vacated runs still in `columns`.
-    vacant_runs: usize,
+    /// The cells installed spills own ([`OwnerRuns`]). Boxed and created by
+    /// the first installed spill, so a sheet without spills keeps one
+    /// pointer.
+    owners: Option<Box<OwnerRuns>>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     blockers: Vec<SpillBlocker>,
 }
@@ -162,23 +319,17 @@ impl SpillState {
     /// detach and can skip every spill lookup.
     #[inline]
     pub(crate) fn is_empty(&self) -> bool {
-        self.ranges.is_empty() && self.owned_cells == 0
+        self.ranges.is_empty() && self.owners.is_none()
     }
 
-    pub(crate) const fn owner_count(&self) -> usize {
-        self.owned_cells
+    pub(crate) fn owner_count(&self) -> usize {
+        self.owners.as_ref().map_or(0, |owners| owners.owned_cells)
     }
 
     /// The anchor of the installed spill that owns `cell`.
     #[inline]
     pub(crate) fn owner(&self, cell: CellKey) -> Option<CellKey> {
-        if self.owned_cells == 0 {
-            return None;
-        }
-        let column = self.runs(cell.1)?;
-        let after = column.partition_point(|run| run.row_start <= cell.0);
-        let run = column.get(after.checked_sub(1)?)?;
-        (run.is_live() && run.row_end >= cell.0).then_some(run.anchor)
+        self.owners.as_deref()?.owner(cell)
     }
 
     /// The attempted range of `anchor`, installed or obstructed.
@@ -273,8 +424,10 @@ impl SpillState {
             dirty.extend(self.clear(anchor, cells));
             self.ranges.remove(&anchor);
         }
-        for col in rect.col_start..=rect.col_end {
-            self.cut(col, rect.row_start, rect.row_end);
+        if let Some(owners) = self.owners.as_deref_mut() {
+            for col in rect.col_start..=rect.col_end {
+                owners.cut(col, rect.row_start, rect.row_end);
+            }
         }
         self.compact(cells);
 
@@ -298,7 +451,7 @@ impl SpillState {
     /// Whether a source rectangle can replace its spill cells without cutting
     /// an installed spill away from its anchor.
     pub(crate) fn admits_source_range(&self, r0: usize, c0: usize, r1: usize, c1: usize) -> bool {
-        if self.owned_cells == 0 {
+        if self.owners.is_none() {
             return true;
         }
 
@@ -384,8 +537,10 @@ impl SpillState {
                 removed(cell, value);
             }
         }
-        for col in range.anchor.1..=range.col_end {
-            self.vacate(col, anchor, range.anchor.0, range.row_end);
+        if let Some(owners) = self.owners.as_deref_mut() {
+            for col in range.anchor.1..=range.col_end {
+                owners.vacate(col, anchor, range.anchor.0, range.row_end);
+            }
         }
     }
 
@@ -420,7 +575,9 @@ impl SpillState {
             self.ranges.remove(&cell);
             changed
         } else {
-            self.cut(cell.1, cell.0, cell.0);
+            if let Some(owners) = self.owners.as_deref_mut() {
+                owners.cut(cell.1, cell.0, cell.0);
+            }
             Vec::new()
         };
 
@@ -501,7 +658,10 @@ impl SpillState {
     /// Reserves run and calculated-slot room for every output of `range`.
     /// Failure leaves the attempt registered and compacts what was reserved.
     pub(crate) fn reserve(&mut self, range: SpillRange, cells: &mut CellStorage) -> bool {
-        let reserved = self.reserve_runs(range.anchor.1, range.col_end)
+        let reserved = self
+            .owners
+            .get_or_insert_with(Box::default)
+            .reserve_runs(range.anchor.1, range.col_end)
             && cells.reserve_derived(
                 range.anchor.0 as usize,
                 range.anchor.1 as usize,
@@ -514,30 +674,6 @@ impl SpillState {
         }
 
         reserved
-    }
-
-    /// Room for one more run in each column from `col_start` to `col_end`.
-    fn reserve_runs(&mut self, col_start: u32, col_end: u32) -> bool {
-        for col in col_start..=col_end {
-            match self.columns.binary_search_by_key(&col, |column| column.col) {
-                Ok(at) => {
-                    let Some(column) = self.columns.get_mut(at) else {
-                        return false;
-                    };
-                    if column.runs.try_reserve(1).is_err() {
-                        return false;
-                    }
-                }
-                Err(at) => {
-                    let mut runs = Vec::new();
-                    if runs.try_reserve(1).is_err() || self.columns.try_reserve(1).is_err() {
-                        return false;
-                    }
-                    self.columns.insert(at, ColumnRuns { col, runs });
-                }
-            }
-        }
-        true
     }
 
     /// Installs an admitted, reserved `range`: every cell becomes owned by the
@@ -556,8 +692,9 @@ impl SpillState {
         let rows = (range.row_end - anchor.0) as usize + 1;
         let mut changed = Vec::with_capacity((rows * cols).saturating_sub(1));
 
+        let owners = self.owners.get_or_insert_with(Box::default);
         for col in anchor.1..=range.col_end {
-            self.own(col, anchor, range.row_end);
+            owners.own(col, anchor, range.row_end);
         }
         for row_offset in 0..rows {
             for col_offset in 0..cols {
@@ -577,134 +714,31 @@ impl SpillState {
         changed
     }
 
-    /// Gives `anchor` the rows from its own row to `row_end` in column `col`.
-    /// A vacated run over exactly those rows is taken in place; otherwise the
-    /// rows are cut from whatever covered them and a new run is inserted.
-    fn own(&mut self, col: u32, anchor: CellKey, row_end: u32) {
-        let row_start = anchor.0;
-        let run = OwnedRun {
-            row_start,
-            row_end,
-            anchor,
-        };
-        let Some(column) = runs_mut(&mut self.columns, col) else {
-            return;
-        };
-        let at = column.partition_point(|other| other.row_start < row_start);
-        if let Some(slot) = column.get_mut(at) {
-            if !slot.is_live() && slot.row_start == row_start && slot.row_end == row_end {
-                *slot = run;
-                self.vacant_runs -= 1;
-                self.owned_cells += run.rows();
-                return;
-            }
-        }
-
-        self.cut(col, row_start, row_end);
-        let Some(column) = runs_mut(&mut self.columns, col) else {
-            return;
-        };
-        let at = column.partition_point(|other| other.row_start < row_start);
-        column.insert(at, run);
-        self.owned_cells += run.rows();
-    }
-
-    /// Marks the runs of `anchor` in column `col` between `row_start` and
-    /// `row_end` vacant.
-    fn vacate(&mut self, col: u32, anchor: CellKey, row_start: u32, row_end: u32) {
-        let Some(column) = runs_mut(&mut self.columns, col) else {
-            return;
-        };
-        let first = column.partition_point(|run| run.row_end < row_start);
-        for run in column[first..]
-            .iter_mut()
-            .take_while(|run| run.row_start <= row_end)
-        {
-            if run.anchor == anchor {
-                self.owned_cells -= run.rows();
-                self.vacant_runs += 1;
-                run.anchor = OwnedRun::VACANT;
-            }
-        }
-    }
-
-    /// Removes rows `row_start..=row_end` of column `col` from every run:
-    /// live runs keep what lies outside them, vacated runs that meet them are
-    /// dropped.
-    fn cut(&mut self, col: u32, row_start: u32, row_end: u32) {
-        let Some(column) = runs_mut(&mut self.columns, col) else {
-            return;
-        };
-        let first = column.partition_point(|run| run.row_end < row_start);
-        let last = column.partition_point(|run| run.row_start <= row_end);
-        if first >= last {
-            return;
-        }
-
-        let mut kept = Vec::new();
-        for run in &column[first..last] {
-            if !run.is_live() {
-                self.vacant_runs -= 1;
-                continue;
-            }
-            let cut_start = run.row_start.max(row_start);
-            let cut_end = run.row_end.min(row_end);
-            self.owned_cells -= (cut_end - cut_start) as usize + 1;
-            if run.row_start < row_start {
-                kept.push(OwnedRun {
-                    row_end: row_start - 1,
-                    ..*run
-                });
-            }
-            if run.row_end > row_end {
-                kept.push(OwnedRun {
-                    row_start: row_end + 1,
-                    ..*run
-                });
-            }
-        }
-        column.splice(first..last, kept);
-    }
-
     /// Releases run storage after spills shrink, and empty calculated chunks.
     pub(crate) fn compact(&mut self, cells: &mut CellStorage) {
-        if self.owned_cells == 0 {
-            self.columns = Vec::new();
-            self.vacant_runs = 0;
-        } else if self.vacant_runs > VACANT_RUN_SLACK && self.vacant_runs > self.live_runs() {
-            for column in &mut self.columns {
-                column.runs.retain(|run| run.is_live());
-            }
-            self.columns.retain(|column| !column.runs.is_empty());
-            self.vacant_runs = 0;
+        if self
+            .owners
+            .as_ref()
+            .is_some_and(|owners| owners.owned_cells == 0)
+        {
+            self.owners = None;
+        } else if let Some(owners) = self.owners.as_deref_mut() {
+            owners.drop_vacant_runs();
         }
         cells.compact_calculated();
-    }
-
-    fn live_runs(&self) -> usize {
-        self.columns
-            .iter()
-            .map(|column| column.runs.len())
-            .sum::<usize>()
-            - self.vacant_runs
-    }
-
-    fn runs(&self, col: u32) -> Option<&Vec<OwnedRun>> {
-        let at = self
-            .columns
-            .binary_search_by_key(&col, |column| column.col)
-            .ok()?;
-        self.columns.get(at).map(|column| &column.runs)
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         stats
             .owner_mut(SPILL_RANGES)
             .add_hash_table::<CellKey, SpillRange>(self.ranges.len(), self.ranges.capacity());
-        let owners = stats.owner_mut(SPILL_OWNERS);
-        owners.add_vec::<ColumnRuns>(self.columns.len(), self.columns.capacity());
-        for column in &self.columns {
-            owners.add_vec::<OwnedRun>(column.runs.len(), column.runs.capacity());
+        if let Some(runs) = self.owners.as_deref() {
+            let owners = stats.owner_mut(SPILL_OWNERS);
+            owners.add_vec::<OwnerRuns>(1, 1);
+            owners.add_vec::<ColumnRuns>(runs.columns.len(), runs.columns.capacity());
+            for column in &runs.columns {
+                owners.add_vec::<OwnedRun>(column.runs.len(), column.runs.capacity());
+            }
         }
         stats
             .owner_mut(SPILL_BLOCKERS)
@@ -723,8 +757,9 @@ impl SpillState {
         }
 
         let live = self
-            .columns
+            .owners
             .iter()
+            .flat_map(|owners| owners.columns.iter())
             .flat_map(|column| column.runs.iter().map(move |run| (column.col, run)))
             .filter(|(_, run)| run.is_live());
         out.usize(live.clone().count());
@@ -768,7 +803,8 @@ impl SpillState {
             };
             // Columns and their runs were written in order; anything else
             // would break the binary searches.
-            let in_order = match state.columns.last() {
+            let owners = state.owners.get_or_insert_with(Box::default);
+            let in_order = match owners.columns.last() {
                 Some(last) if last.col == col => last
                     .runs
                     .last()
@@ -779,14 +815,14 @@ impl SpillState {
             if !in_order || run.row_end < run.row_start || !run.is_live() || col >= SHEET_COLS {
                 return Err("invalid spill ownership transfer".into());
             }
-            match state.columns.last_mut() {
+            match owners.columns.last_mut() {
                 Some(last) if last.col == col => last.runs.push(run),
-                _ => state.columns.push(ColumnRuns {
+                _ => owners.columns.push(ColumnRuns {
                     col,
                     runs: vec![run],
                 }),
             }
-            state.owned_cells += run.rows();
+            owners.owned_cells += run.rows();
         }
 
         for _ in 0..input.count()? {

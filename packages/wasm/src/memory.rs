@@ -196,11 +196,11 @@ mod tests {
         store.recompute(sheet);
 
         // Ownership is one run per spilled column, whatever the spill's
-        // height: one column record and its one run.
+        // height: the boxed run table, one column record and its one run.
         let materialized = store.memory_stats();
         assert_eq!(owner(&materialized, SPILL_RANGES).2, 1);
-        assert_eq!(owner(&materialized, SPILL_OWNERS).2, 2);
-        assert!(owner(&materialized, SPILL_OWNERS).0 <= 128);
+        assert_eq!(owner(&materialized, SPILL_OWNERS).2, 3);
+        assert!(owner(&materialized, SPILL_OWNERS).0 <= 160);
         assert_eq!(owner(&materialized, SPILL_BLOCKERS).2, 0);
 
         // A source write inside the spill obstructs it: the anchor keeps its
@@ -212,7 +212,7 @@ mod tests {
         assert_eq!(owner(&obstructed, SPILL_OWNERS), (0, 0, 0));
         store.clear_cell(sheet, 500, 1, 0);
         store.recompute(sheet);
-        assert_eq!(owner(&store.memory_stats(), SPILL_OWNERS).2, 2);
+        assert_eq!(owner(&store.memory_stats(), SPILL_OWNERS).2, 3);
 
         assert!(store.set_spill_blockers(sheet, &[1, 1, 1, 1]));
         store.recompute(sheet);
