@@ -3814,9 +3814,9 @@ impl CellStore {
     }
 
     /// Resolve the sheet names of a parsed formula to stable handles.
-    fn resolve_sheets(&self, ast: Ast) -> Result<Ast, FormulaError> {
-        resolve_sheet_refs(
-            ast,
+    fn resolve_sheets(&self, mut ast: Ast) -> Result<Ast, FormulaError> {
+        crate::calc::resolve_sheet_refs_in_place(
+            &mut ast,
             &|name| {
                 self.sheet_ids
                     .get(name)
@@ -3825,7 +3825,8 @@ impl CellStore {
             },
             &|span| place_span(span, &self.tab_order()),
         )
-        .map_err(|_| FormulaError::Ref)
+        .map_err(|_| FormulaError::Ref)?;
+        Ok(ast)
     }
 
     fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
@@ -4087,7 +4088,7 @@ impl CellStore {
             return;
         }
         let mut users = Box::<BindingUsers>::default();
-        for (id, _) in self.formula_slots.occupied() {
+        for id in self.sheets.iter().flat_map(|sheet| sheet.formulas.ids()) {
             if let Some(ast) = self.formula_slots.get(id).and_then(|entry| entry.ast.as_ref()) {
                 collect_binding_uses(ast, id, &mut users);
             }
