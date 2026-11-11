@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 
 import type {
   GridAdapterEventHandlers,
@@ -152,6 +152,84 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
   afterEach(() => restoreStubs());
 
   describe(`${adapter} shared lifecycle contract`, () => {
+    it("aborts pending summary, clipboard and save work when the framework unmounts", async () => {
+      const clipboardRead = Promise.withResolvers<string>();
+      const savedBytes = Promise.withResolvers<Uint8Array>();
+      const saveStarted = Promise.withResolvers<AbortSignal | undefined>();
+      const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+      const errors = spyOn(console, "error").mockImplementation(() => undefined);
+      const warnings = spyOn(console, "warn").mockImplementation(() => undefined);
+      const reportedErrors: unknown[] = [];
+      let callbacksAfterUnmount = 0;
+      let isUnmounted = false;
+      const observeCallback = () => {
+        if (isUnmounted) callbacksAfterUnmount += 1;
+      };
+      const workbook = makeConformanceWorkbook();
+      const sheet = present(workbook.sheets[0], "sheet");
+      // Large enough that summarizing the selection is still pending at unmount.
+      sheet.rowCount = 100_000;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { readText: () => clipboardRead.promise },
+      });
+      // The test's exporter stands in for any installed one, which it puts back.
+      const installedTableExport = xlsxTableExportBackend();
+      setXlsxTableExportBackend({
+        name: "pending-unmount-save",
+        toXlsxTable(_workbook, _store, options) {
+          saveStarted.resolve(options?.signal);
+          return savedBytes.promise;
+        },
+      });
+      let mounted: MountedAdapter | undefined;
+      try {
+        mounted = await mount({
+          workbook,
+          presentation: "data-grid",
+          fallbackLabel: "Loading",
+          onReady: observeCallback,
+          onGridChange: observeCallback,
+          onSelectionChange: observeCallback,
+          onExportError: (event) => reportedErrors.push(event),
+        });
+        const grid = present(mounted.getPublishedGrid(), "grid");
+        grid.actions.exportXlsx();
+        const saveSignal = await saveStarted.promise;
+        grid.setSelection({
+          kind: "range",
+          range: {
+            sheet: sheet.id,
+            start: { row: 0, col: 0 },
+            end: { row: sheet.rowCount - 1, col: 0 },
+          },
+        });
+        const summary = grid.summarizeSelection().then(observeCallback, (error: unknown) => error);
+        const paste = grid.actions.paste();
+        grid.actions.find();
+        await mounted.unmount();
+        mounted = undefined;
+        isUnmounted = true;
+        expect(saveSignal?.aborted).toBe(true);
+        clipboardRead.resolve("late clipboard");
+        savedBytes.reject(new Error("late save failure"));
+        expect(await summary).toMatchObject({ name: "AbortError" });
+        expect(await paste).toBe("empty");
+        await Bun.sleep(0);
+        expect(callbacksAfterUnmount).toBe(0);
+        expect(reportedErrors).toHaveLength(0);
+        expect(errors).toHaveBeenCalledTimes(0);
+        expect(warnings).toHaveBeenCalledTimes(0);
+      } finally {
+        await mounted?.unmount();
+        setXlsxTableExportBackend(installedTableExport);
+        if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+        else Reflect.deleteProperty(navigator, "clipboard");
+        errors.mockRestore();
+        warnings.mockRestore();
+      }
+    });
+
     it("shares fallback, current-error, retry, stale-generation and pending-option semantics", async () => {
       // WASM initialization is process-wide, so the probe needs a fresh process.
       const root = new URL("../", import.meta.url).pathname;
