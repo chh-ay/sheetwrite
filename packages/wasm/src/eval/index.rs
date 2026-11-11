@@ -111,7 +111,7 @@ impl CellStore {
         matrix
             .get(rows.start, cols.start)
             .cloned()
-            .unwrap_or(Value::Error(FormulaError::Ref))
+            .map_or(Value::Error(FormulaError::Ref), |value| value)
     }
 
     /// INDEX as an array expression: every selected cell.

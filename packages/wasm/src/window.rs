@@ -137,8 +137,8 @@ impl CellStore {
                 break;
             };
 
-            let num = nums.get(i).copied().unwrap_or(0.0);
-            let flag = flags.get(i).copied().unwrap_or(0);
+            let num = nums.get(i).copied().unwrap_or_default();
+            let flag = flags.get(i).copied().unwrap_or_default();
             let match_case = flag & 1 != 0;
 
             let pred = match kind {
@@ -159,7 +159,7 @@ impl CellStore {
                     ast: formula_asts
                         .get(i)
                         .and_then(Clone::clone)
-                        .unwrap_or(Ast::InvalidRef),
+                        .map_or(Ast::InvalidRef, |value| value),
                     anchor_row: r0,
                     anchor_col: c0,
                 },
@@ -291,7 +291,7 @@ impl CellStore {
         let cond_matches = cond_matches_for_window(
             self,
             sheet,
-            |ri| rows.get(ri).copied().unwrap_or(u32::MAX),
+            |ri| rows.get(ri).copied().map_or(u32::MAX, |value| value),
             cols,
             &cells,
         );

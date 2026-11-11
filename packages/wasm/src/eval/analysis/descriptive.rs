@@ -246,7 +246,7 @@ fn percentile_exclusive(mut numbers: Vec<f64>, fraction: f64) -> NumberResult {
         .iter()
         .min_by(|left, right| left.total_cmp(right))
         .copied()
-        .unwrap_or(base);
+        .map_or(base, |value| value);
     Ok(base + (rank - lower as f64) * (next - base))
 }
 

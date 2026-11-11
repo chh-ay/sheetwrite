@@ -153,7 +153,7 @@ fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value 
         KIND_NUMBER => Value::number(payload_num(payload)),
         KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
             .map(Value::text)
-            .unwrap_or(Value::Error(FormulaError::Ref)),
+            .map_or(Value::Error(FormulaError::Ref), |value| value),
         KIND_BOOL => Value::Bool(payload_num(payload) != 0.0),
         _ => Value::Blank,
     }
@@ -193,7 +193,7 @@ pub(crate) fn settled_cell_value(
         sheet
             .cells
             .calculated_cell_at(index)
-            .unwrap_or((KIND_EMPTY, 0))
+            .map_or((KIND_EMPTY, 0), |value| value)
     } else {
         (source_kind, sheet.cells.source_payload_at(index))
     };
@@ -1316,7 +1316,11 @@ impl CellStore {
             return Vec::new();
         }
 
-        let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
+        let first = matrix
+            .values
+            .first()
+            .cloned()
+            .map_or(Value::Blank, |value| value);
         results.pull(id, first);
         let strings = &mut self.strings;
         data.spill.install(range, &mut data.cells, |offset| {
@@ -1528,7 +1532,9 @@ impl CellStore {
         // payload directly instead of resolving the overlay a second time.
         let source_kind = s.cells.source_kind_at(i);
         let (kind, payload) = if source_kind == KIND_EMPTY {
-            s.cells.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
+            s.cells
+                .calculated_cell_at(i)
+                .map_or((KIND_EMPTY, 0), |value| value)
         } else {
             (source_kind, s.cells.source_payload_at(i))
         };
@@ -1554,7 +1560,8 @@ impl CellStore {
                     // the calculated slot, so no source-error lookup is needed.
                     return match s.cells.calculated_cell_at(i) {
                         Some((KIND_FORMULA, payload)) => Value::Error(
-                            FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref),
+                            FormulaError::from_slot(payload)
+                                .map_or(FormulaError::Ref, |value| value),
                         ),
                         Some((kind, payload)) => literal_cell_value(&self.strings, kind, payload),
                         None => Value::number(s.cells.num_at(i)),
@@ -1611,7 +1618,8 @@ impl CellStore {
         pass.results.visiting.remove(id);
         pass.results.pull(id, result.clone());
         if self.iteration.is_some() {
-            self.finish_runtime_formula(key, pass).unwrap_or(result)
+            self.finish_runtime_formula(key, pass)
+                .map_or(result, |value| value)
         } else {
             result
         }
@@ -1649,7 +1657,11 @@ impl CellStore {
                         self.eval_ast(ast, sheet, pass, depth + 1)
                     }
                 }
-                None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
+                None => Value::Error(
+                    entry
+                        .source_error()
+                        .map_or(FormulaError::Value, |value| value),
+                ),
             },
             None => Value::Number(0.0),
         }
@@ -1688,7 +1700,9 @@ impl CellStore {
 
         match ast {
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            Ast::BoundMatrix { values, .. } => {
+                values.first().cloned().map_or(Value::Blank, |value| value)
+            }
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(pattern) => Value::text(pattern.text()),
             #[cfg(feature = "analysis")]
@@ -1706,7 +1720,9 @@ impl CellStore {
             Ast::Str(text) => Value::text(text.as_str()),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
-            Ast::Array { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            Ast::Array { values, .. } => {
+                values.first().cloned().map_or(Value::Blank, |value| value)
+            }
             Ast::Cell(row, col, _) => {
                 self.eval_at(sheet, *row as usize, *col as usize, pass, depth + 1)
             }
@@ -1805,7 +1821,7 @@ impl CellStore {
             ) => {
                 match self
                     .eval_dynamic_array(ast, sheet, pass, depth + 1)
-                    .unwrap_or(Err(FormulaError::Value))
+                    .map_or(Err(FormulaError::Value), |value| value)
                 {
                     Ok(matrix) => matrix.into_first(),
                     Err(error) => Value::Error(error),

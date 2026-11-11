@@ -426,7 +426,7 @@ impl CellStore {
         }
 
         placement.restart();
-        let formula_sheet = key.0.unwrap_or(NO_SHEET);
+        let formula_sheet = key.0.map_or(NO_SHEET, |value| value);
         let target = self.expand(definition, key.clone(), formula_sheet, placement)?;
         let shared = !placement.positional.get()
             && !placement.sheet_bound.get()
@@ -442,7 +442,7 @@ impl CellStore {
         if self.defined_names.is_empty() {
             return None;
         }
-        let (row, col) = crate::eval::current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
         match self.name_target(name, sheet as u32, &NamePlacement::new(row, col))? {
             NameTarget::Formula(formula) => Some(formula),
             NameTarget::Range(_) | NameTarget::Reference(_) => None,

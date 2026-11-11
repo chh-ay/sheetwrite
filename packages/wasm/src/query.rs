@@ -2,7 +2,8 @@
 
 use std::cell::Cell;
 use std::cmp::Ordering;
-use std::collections::HashSet;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
@@ -88,7 +89,7 @@ enum ValueSet<'a> {
         /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
         /// equality can match.
         numbers: Vec<u64>,
-        texts: HashSet<&'a str>,
+        texts: FxHashSet<&'a str>,
         /// Picked booleans, as the two bits above.
         bools: u8,
     },
@@ -109,7 +110,7 @@ impl<'a> ValueSet<'a> {
         numbers.sort_unstable();
         numbers.dedup();
 
-        let mut texts = HashSet::with_capacity(picked_texts.len());
+        let mut texts = FxHashSet::with_capacity_and_hasher(picked_texts.len(), FxBuildHasher);
         let mut bools = 0u8;
 
         for picked in picked_texts {
@@ -586,7 +587,7 @@ impl CellStore {
             return self.sort_rows(
                 sheet,
                 cols[0] as usize,
-                ascending.first().copied().unwrap_or(1) != 0,
+                ascending.first().copied().map_or(1, |value| value) != 0,
             );
         }
         if cols.iter().any(|&col| col as usize >= data.cells.n_cols()) {
@@ -637,7 +638,7 @@ impl CellStore {
                 let order = keys.compare(
                     key * row_count + left as usize,
                     key * row_count + right as usize,
-                    ascending.get(key).copied().unwrap_or(1) != 0,
+                    ascending.get(key).copied().map_or(1, |value| value) != 0,
                 );
                 if order != Ordering::Equal {
                     return order;
@@ -681,8 +682,8 @@ impl CellStore {
         for i in 0..cols.len() {
             num_offsets.push(no);
             text_offsets.push(to);
-            no = no.saturating_add(num_counts.get(i).copied().unwrap_or(0) as usize);
-            to = to.saturating_add(text_counts.get(i).copied().unwrap_or(0) as usize);
+            no = no.saturating_add(num_counts.get(i).copied().unwrap_or_default() as usize);
+            to = to.saturating_add(text_counts.get(i).copied().unwrap_or_default() as usize);
         }
         let mut cache_index = vec![usize::MAX; kinds.len()];
         let mut match_caches = Vec::with_capacity(kinds.iter().filter(|&&kind| kind == 1).count());
@@ -704,8 +705,8 @@ impl CellStore {
                 value_sets.push(ValueSet::Linear);
                 continue;
             }
-            let num_count = num_counts.get(i).copied().unwrap_or(0) as usize;
-            let text_count = text_counts.get(i).copied().unwrap_or(0) as usize;
+            let num_count = num_counts.get(i).copied().unwrap_or_default() as usize;
+            let text_count = text_counts.get(i).copied().unwrap_or_default() as usize;
             let picked_numbers = value_nums
                 .get(num_offsets[i]..num_offsets[i] + num_count)
                 .unwrap_or_default();
@@ -721,9 +722,10 @@ impl CellStore {
                 let kind = resolved_kind(data, index, &self.formula_slots);
                 let matches = match kinds[i] {
                     0 => {
-                        let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
-                        let nc = num_counts.get(i).copied().unwrap_or(0) as usize;
-                        let tc = text_counts.get(i).copied().unwrap_or(0) as usize;
+                        let mut hit =
+                            kind == 0 && flags.get(i).copied().unwrap_or_default() & 1 != 0;
+                        let nc = num_counts.get(i).copied().unwrap_or_default() as usize;
+                        let tc = text_counts.get(i).copied().unwrap_or_default() as usize;
                         match &value_sets[i] {
                             ValueSet::Linear => {
                                 if kind == 1 {
@@ -732,7 +734,7 @@ impl CellStore {
                                     {
                                         hit |= value_nums
                                             .get(num_offsets[i]..num_offsets[i] + nc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .contains(&value);
                                     }
                                 } else if kind == 2 {
@@ -744,7 +746,7 @@ impl CellStore {
                                     ) {
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .iter()
                                             .any(|picked| picked == text);
                                     }
@@ -759,7 +761,7 @@ impl CellStore {
                                         };
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .iter()
                                             .any(|picked| picked == expected);
                                     }
@@ -806,26 +808,26 @@ impl CellStore {
                         let needle = value_texts
                             .get(text_offsets[i])
                             .map(String::as_str)
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         cell_matches_text(
                             data,
                             self,
                             index,
                             needle,
-                            flags.get(i).copied().unwrap_or(0) == 0,
+                            flags.get(i).copied().unwrap_or_default() == 0,
                             false,
                             &mut match_caches[cache_index[i]],
                         )
                     }
                     2 => {
                         numeric_cell_value(data, index, &self.formula_slots).is_some_and(|value| {
-                            match flags.get(i).copied().unwrap_or(0) {
-                                0 => value > nums.get(i).copied().unwrap_or(0.0),
-                                1 => value >= nums.get(i).copied().unwrap_or(0.0),
-                                2 => value < nums.get(i).copied().unwrap_or(0.0),
-                                3 => value <= nums.get(i).copied().unwrap_or(0.0),
-                                4 => value == nums.get(i).copied().unwrap_or(0.0),
-                                _ => value != nums.get(i).copied().unwrap_or(0.0),
+                            match flags.get(i).copied().unwrap_or_default() {
+                                0 => value > nums.get(i).copied().unwrap_or_default(),
+                                1 => value >= nums.get(i).copied().unwrap_or_default(),
+                                2 => value < nums.get(i).copied().unwrap_or_default(),
+                                3 => value <= nums.get(i).copied().unwrap_or_default(),
+                                4 => value == nums.get(i).copied().unwrap_or_default(),
+                                _ => value != nums.get(i).copied().unwrap_or_default(),
                             }
                         })
                     }
@@ -852,7 +854,7 @@ impl CellStore {
             return out;
         }
         let text_at = |index: usize| {
-            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or("")
+            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or_default()
         };
         // Stored text carries a pool id that stands for its value, so the scan
         // dedupes it through one bit per id instead of hashing the characters.
@@ -864,7 +866,7 @@ impl CellStore {
         loop {
             out = DistinctColumn::default();
             let mut stamps = PoolIdStamps::new();
-            let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
+            let mut seen: FxHashSet<DistinctKey<'_>> = FxHashSet::default();
             let mut needs_content = false;
             for row in 0..data.cells.row_count() {
                 let index = col * data.cells.row_count() + row;
@@ -872,7 +874,7 @@ impl CellStore {
                 let fresh = match kind {
                     1 => seen.insert(DistinctKey::Number(
                         numeric_cell_value(data, index, &self.formula_slots)
-                            .unwrap_or(0.0)
+                            .unwrap_or_default()
                             .to_bits(),
                     )),
                     2 if pooled => match data.cells.str_id_at(index) {
@@ -884,7 +886,7 @@ impl CellStore {
                     },
                     2 => seen.insert(DistinctKey::Text(text_at(index))),
                     3 => seen.insert(DistinctKey::Bool(
-                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false),
+                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
                     )),
                     _ => seen.insert(DistinctKey::Blank),
                 };
@@ -893,11 +895,13 @@ impl CellStore {
                 }
                 out.kinds.push(kind);
                 if kind == 1 {
-                    out.numbers
-                        .push(numeric_cell_value(data, index, &self.formula_slots).unwrap_or(0.0));
+                    out.numbers.push(
+                        numeric_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
+                    );
                 } else if kind == 3 {
                     out.numbers.push(
-                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false) {
+                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default()
+                        {
                             1.0
                         } else {
                             0.0
@@ -1329,7 +1333,9 @@ fn sort_finite_number_column_comparison(
                 )
             }
         };
-        let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
+        let ord = left
+            .partial_cmp(&right)
+            .map_or(Ordering::Equal, |value| value);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
             a.cmp(&b)
@@ -1522,7 +1528,7 @@ impl<'a> ComparableCell<'a> {
                 }
             }
             KIND_STRING => Self::pool_text(strings, sheet.cells.str_id_at(index))
-                .unwrap_or(ComparableCell::Empty),
+                .map_or(ComparableCell::Empty, |value| value),
             _ => ComparableCell::Empty,
         }
     }
@@ -1554,7 +1560,9 @@ impl<'a> ComparableCell<'a> {
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
             KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-            KIND_STRING => Self::pool_text(strings, payload_str_id(payload)).unwrap_or(Self::Empty),
+            KIND_STRING => {
+                Self::pool_text(strings, payload_str_id(payload)).map_or(Self::Empty, |value| value)
+            }
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
@@ -1567,7 +1575,9 @@ impl<'a> ComparableCell<'a> {
                     KIND_EMPTY => Self::Empty,
                     KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
                     KIND_STRING => Self::pool_text(strings, payload_str_id(payload))
-                        .unwrap_or(Self::Number(OrderedNumber(payload_num(payload)))),
+                        .map_or(Self::Number(OrderedNumber(payload_num(payload))), |value| {
+                            value
+                        }),
                     _ => Self::Number(OrderedNumber(payload_num(payload))),
                 }
             }
@@ -1734,7 +1744,7 @@ impl SortKeys {
         } else if class_left == CLASS_NUMBER {
             let a = f64::from_bits(self.values[left]);
             let b = f64::from_bits(self.values[right]);
-            a.partial_cmp(&b).unwrap_or(Ordering::Equal)
+            a.partial_cmp(&b).map_or(Ordering::Equal, |value| value)
         } else {
             self.values[left].cmp(&self.values[right])
         };
@@ -1754,7 +1764,9 @@ impl Eq for OrderedNumber {}
 
 impl Ord for OrderedNumber {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.partial_cmp(&other.0).unwrap_or(Ordering::Equal)
+        self.0
+            .partial_cmp(&other.0)
+            .map_or(Ordering::Equal, |value| value)
     }
 }
 

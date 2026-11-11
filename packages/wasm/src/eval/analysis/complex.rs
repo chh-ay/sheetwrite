@@ -192,7 +192,7 @@ impl Suffix {
     }
 
     fn letter(&self) -> char {
-        self.0.unwrap_or(DEFAULT_SUFFIX)
+        self.0.map_or(DEFAULT_SUFFIX, |value| value)
     }
 }
 
@@ -323,7 +323,7 @@ fn scale(number: Complex, factor: f64) -> Complex {
 
 /// The complex number argument at `index` and its suffix.
 fn argument(values: &FuncAccumulator, index: usize) -> Result<(Complex, Suffix), FormulaError> {
-    let value = values.arg_value(index).unwrap_or(&Value::Blank);
+    let value = values.arg_value(index).map_or(&Value::Blank, |value| value);
     let (number, suffix) = parse_value(value)?;
 
     Ok((number, Suffix(suffix)))

@@ -54,7 +54,7 @@ impl EvalMatrix {
         std::mem::take(&mut self.values)
             .into_iter()
             .next()
-            .unwrap_or(Value::Blank)
+            .map_or(Value::Blank, |value| value)
     }
 }
 

@@ -520,8 +520,8 @@ fn networkdays(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 }
 
 fn interval_has_leap_day(start: i64, end: i64) -> bool {
-    let (start_year, _, _) = date_parts(start as f64).unwrap_or((0, 0, 0));
-    let (end_year, _, _) = date_parts(end as f64).unwrap_or((0, 0, 0));
+    let (start_year, _, _) = date_parts(start as f64).unwrap_or_default();
+    let (end_year, _, _) = date_parts(end as f64).unwrap_or_default();
     (start_year..=end_year).any(|year| {
         is_leap_year(year)
             && exact_date(year, 2, 29)

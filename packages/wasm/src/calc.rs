@@ -993,7 +993,7 @@ fn parse_col(letters: &str) -> Option<u32> {
 /// Parse an A1 token like `B12` or `$B$12`, preserving absolute markers.
 pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let col_abs = token.starts_with('$');
-    let token = token.strip_prefix('$').unwrap_or(token);
+    let token = token.strip_prefix('$').map_or(token, |value| value);
 
     let mut letters_end = 0;
 
@@ -1012,7 +1012,7 @@ pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let letters = &token[..letters_end];
     let row_token = &token[letters_end..];
     let row_abs = row_token.starts_with('$');
-    let digits = row_token.strip_prefix('$').unwrap_or(row_token);
+    let digits = row_token.strip_prefix('$').map_or(row_token, |value| value);
 
     if digits.is_empty() || !digits.chars().all(|ch| ch.is_ascii_digit()) {
         return None;
@@ -1058,7 +1058,7 @@ impl AreaEnd {
         }
 
         let absolute = name.starts_with('$');
-        let bare = name.strip_prefix('$').unwrap_or(name);
+        let bare = name.strip_prefix('$').map_or(name, |value| value);
         if bare.bytes().all(|byte| byte.is_ascii_alphabetic()) {
             let col = parse_col(bare).filter(|&col| col < SHEET_COLS)?;
             return Some(Self::Column(col, absolute));
@@ -2206,7 +2206,7 @@ pub(crate) fn external_name_key(text: &str) -> Option<String> {
     let qualifier = qualifier
         .strip_prefix('\'')
         .and_then(|inner| inner.strip_suffix('\''))
-        .unwrap_or(qualifier);
+        .map_or(qualifier, |value| value);
     let key = if let Some(start) = qualifier.rfind('[') {
         format!("{}!{name}", &qualifier[start..])
     } else {
@@ -2248,7 +2248,10 @@ pub fn parse(src: &str) -> Result<Ast, String> {
 
 /// [`parse`], with the resolution steps the formula needs.
 pub(crate) fn parse_with_features(src: &str) -> Result<(Ast, ParseFeatures), String> {
-    let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
+    let trimmed = src
+        .trim()
+        .strip_prefix('=')
+        .map_or(src.trim(), |value| value);
     let mut parser = Parser {
         cursor: Cursor::over_text(trimmed),
         features: ParseFeatures::default(),

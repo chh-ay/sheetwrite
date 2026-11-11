@@ -1,6 +1,6 @@
 //! Bounded grouping and pivot aggregation for the full engine.
+use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
@@ -43,7 +43,7 @@ struct Context<'a, 'p> {
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
     work: usize,
-    sums: HashMap<(usize, usize, usize), Value>,
+    sums: FxHashMap<(usize, usize, usize), Value>,
 }
 impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
@@ -140,7 +140,7 @@ impl Axis {
             rows: Vec::new(),
             parent: None,
         }];
-        let mut buckets: HashMap<Vec<KeyPart>, Vec<usize>> = HashMap::new();
+        let mut buckets: FxHashMap<Vec<KeyPart>, Vec<usize>> = FxHashMap::default();
         // Every included row belongs to the root and one group per prefix.
         let membership_width = fields.cols + 1;
         let mut memberships = vec![
@@ -264,7 +264,7 @@ impl Axis {
                         .iter()
                         .find(|code| code.unsigned_abs() as usize == field + 1)
                         .copied()
-                        .unwrap_or(1);
+                        .map_or(1, |value| value);
                     let order = compare_group_values(&left_fields[field], &right_fields[field]);
                     if order != Ordering::Equal {
                         // Compare each sibling's full aggregate, not the value
@@ -449,7 +449,7 @@ pub(crate) fn bound(
         let bound = store
             .dynamic_array_bound(expression, sheet, pass)
             .transpose()?
-            .unwrap_or(cells);
+            .map_or(cells, |value| value);
         Ok(if bound > cells {
             (bound, bound)
         } else {
@@ -559,7 +559,7 @@ pub(crate) fn evaluate_matrix(
         pass,
         depth,
         work: 0,
-        sums: HashMap::new(),
+        sums: FxHashMap::default(),
     };
     let row_fields = context.matrix(&arguments[0])?;
     let col_fields = if is_pivot {
@@ -655,7 +655,7 @@ pub(crate) fn evaluate_matrix(
             .as_ref()
             .map(|matrix| bool_from_value(&matrix.values[row]))
             .transpose()?
-            .unwrap_or(true)
+            .is_none_or(|value| value)
         {
             included.push(row);
         }
@@ -708,7 +708,7 @@ pub(crate) fn evaluate_matrix(
         relationship == 0,
         &row_aggregates,
     )?;
-    let mut intersections: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+    let mut intersections: FxHashMap<(usize, usize), Vec<usize>> = FxHashMap::default();
     if let Some(columns) = &mut columns {
         let mut col_aggregates = Vec::with_capacity(columns.groups.len());
         for group in &columns.groups {
@@ -817,10 +817,14 @@ pub(crate) fn evaluate_matrix(
                     2 => (rows.grand, columns.grand),
                     3 => (
                         row_group,
-                        columns.groups[col_group].parent.unwrap_or(columns.grand),
+                        columns.groups[col_group]
+                            .parent
+                            .map_or(columns.grand, |value| value),
                     ),
                     4 => (
-                        rows.groups[row_group].parent.unwrap_or(rows.grand),
+                        rows.groups[row_group]
+                            .parent
+                            .map_or(rows.grand, |value| value),
                         col_group,
                     ),
                     _ => unreachable!(),

@@ -85,7 +85,10 @@ pub(crate) fn push_collation_key(text: &str, arena: &mut Vec<u8>) -> bool {
             continue;
         }
 
-        let folded = character.to_lowercase().next().unwrap_or(character);
+        let folded = character
+            .to_lowercase()
+            .next()
+            .map_or(character, |value| value);
         let [_, high, middle, low] = u32::from(folded).to_be_bytes();
         arena.extend_from_slice(&[OTHER_CHARACTER_LEAD, high, middle, low]);
     }

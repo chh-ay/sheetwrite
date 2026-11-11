@@ -202,7 +202,7 @@ fn aggregate(
         "DSUM" => total,
         "DAVERAGE" if count != 0 => total / count as f64,
         "DAVERAGE" => return Value::Error(FormulaError::DivZero),
-        "DMAX" | "DMIN" => extreme.unwrap_or(0.0),
+        "DMAX" | "DMIN" => extreme.unwrap_or_default(),
         "DPRODUCT" => {
             if count == 0 {
                 0.0

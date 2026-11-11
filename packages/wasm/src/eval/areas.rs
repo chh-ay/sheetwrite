@@ -213,7 +213,7 @@ impl CellStore {
             // A resolvable intersection never reaches here: it is one range.
             Ast::Func(Func::Intersect, operands) => Err(intersection_range(operands, sheet)
                 .err()
-                .unwrap_or(FormulaError::Value)),
+                .map_or(FormulaError::Value, |value| value)),
             Ast::InvalidRef => Err(FormulaError::Ref),
             _ => Err(FormulaError::Value),
         }

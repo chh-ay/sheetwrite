@@ -568,7 +568,7 @@ fn sort_by(
             is_descending: order == -1.0,
         });
     }
-    let sorts_rows = sorts_rows.unwrap_or(true);
+    let sorts_rows = sorts_rows.is_none_or(|value| value);
     let item_count = if sorts_rows { source.rows } else { source.cols };
     // A comparison sort reads about n·log2(n) pairs per key.
     let comparisons = item_count
@@ -644,7 +644,7 @@ fn wrap(
             } else {
                 col * rows + row
             };
-            values.push(source.values.get(position).unwrap_or(&pad))?;
+            values.push(source.values.get(position).map_or(&pad, |value| value))?;
         }
     }
     Ok(EvalMatrix::new(rows, cols, values.values))
@@ -680,7 +680,7 @@ fn expand(
     let pad = evaluation.pad(3);
     for row in 0..rows {
         for col in 0..cols {
-            values.push(source.get(row, col).unwrap_or(&pad))?;
+            values.push(source.get(row, col).map_or(&pad, |value| value))?;
         }
     }
     Ok(EvalMatrix::new(rows, cols, values.values))

@@ -182,7 +182,7 @@ fn base(values: &FuncAccumulator) -> Result<String, FormulaError> {
 
         digits.push(
             char::from_digit(digit, radix)
-                .unwrap_or('0')
+                .map_or('0', |value| value)
                 .to_ascii_uppercase(),
         );
         rest /= u64::from(radix);

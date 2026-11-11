@@ -254,7 +254,7 @@ fn pivot_row(matrix: &[f64], dimension: usize, col: usize) -> usize {
                 .abs()
                 .total_cmp(&matrix[second * dimension + col].abs())
         })
-        .unwrap_or(col)
+        .map_or(col, |value| value)
 }
 
 fn swap_rows(matrix: &mut [f64], dimension: usize, first: usize, second: usize) {

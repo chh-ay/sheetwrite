@@ -212,11 +212,11 @@ impl<'a> RangeReader<'a> {
             .data
             .cells
             .calculated_cell_at(index)
-            .unwrap_or((KIND_EMPTY, 0))
+            .map_or((KIND_EMPTY, 0), |value| value)
         {
-            (KIND_FORMULA, payload) => {
-                Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
-            }
+            (KIND_FORMULA, payload) => Value::Error(
+                FormulaError::from_slot(payload).map_or(FormulaError::Value, |value| value),
+            ),
             (kind, payload) => super::literal_cell_value(&self.store.strings, kind, payload),
         }
     }

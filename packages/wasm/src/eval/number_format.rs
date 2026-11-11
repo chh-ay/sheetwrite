@@ -135,7 +135,7 @@ impl Decimal {
 
     /// The digits before the decimal point, without leading zeros.
     fn integer_digits(&self) -> String {
-        let point = usize::try_from(self.point).unwrap_or(0);
+        let point = usize::try_from(self.point).unwrap_or_default();
         let kept = point.min(self.digits.len());
         let mut text = String::with_capacity(point);
         text.push_str(&self.digits[..kept]);
@@ -145,10 +145,10 @@ impl Decimal {
 
     /// The digits after the decimal point, without trailing zeros.
     fn fraction_digits(&self) -> String {
-        let point = usize::try_from(self.point).unwrap_or(0);
+        let point = usize::try_from(self.point).unwrap_or_default();
         let mut text = String::new();
         push_zeros(&mut text, self.point.min(0).unsigned_abs() as usize);
-        text.push_str(self.digits.get(point..).unwrap_or(""));
+        text.push_str(self.digits.get(point..).unwrap_or_default());
         text
     }
 }
@@ -349,7 +349,7 @@ fn resolve_commas(section: &mut Section<'_>) {
         .tokens
         .iter()
         .position(|token| matches!(token, Token::Point | Token::Exponent { .. }))
-        .unwrap_or(section.tokens.len());
+        .map_or(section.tokens.len(), |value| value);
     let last_digit = section.tokens[..integer_end]
         .iter()
         .rposition(|token| matches!(token, Token::Digit(_)));
@@ -560,7 +560,7 @@ fn write_tokens(section: &Section<'_>, layout: &Layout, digits: &Digits<'_>, tex
         match token {
             Token::Digit(_) if in_exponent => {
                 if !exponent_written {
-                    let width = layout.exponent_digits.unwrap_or(1);
+                    let width = layout.exponent_digits.map_or(1, |value| value);
                     push_exponent_digits(digits.exponent, width, text);
                     exponent_written = true;
                 }

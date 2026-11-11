@@ -461,7 +461,8 @@ fn choose_bracket(
 }
 
 fn bracket_distance(bracket: RootBracket, initial_x: f64) -> f64 {
-    let estimate = secant_candidate(bracket).unwrap_or((bracket.low_x + bracket.high_x) * 0.5);
+    let estimate =
+        secant_candidate(bracket).map_or((bracket.low_x + bracket.high_x) * 0.5, |value| value);
     (estimate - initial_x).abs()
 }
 
@@ -485,7 +486,7 @@ fn solve_bracket(
         let upper_third = bracket.high_x - width / 3.0;
         let candidate = secant_candidate(bracket)
             .filter(|candidate| *candidate >= lower_third && *candidate <= upper_third)
-            .unwrap_or((bracket.low_x + bracket.high_x) * 0.5);
+            .map_or((bracket.low_x + bracket.high_x) * 0.5, |value| value);
         let candidate_sample = sample(candidate)?;
         if candidate_sample.converged() {
             return rate_from_x(candidate);

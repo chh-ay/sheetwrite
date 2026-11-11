@@ -398,7 +398,7 @@ fn formula_metadata(ast: &Ast, formula_sheet: u32, contains_let: bool) -> (ReadS
         return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
     }
     let expanded = expand_let_reachable_ast(ast).ok();
-    let metadata = expanded.as_ref().unwrap_or(ast);
+    let metadata = expanded.as_ref().map_or(ast, |value| value);
     (
         ReadSet::from_ast(metadata, formula_sheet),
         ast_is_volatile(metadata),
@@ -901,6 +901,10 @@ const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
+    #[allow(
+        clippy::disallowed_types,
+        reason = "keys are already hashes of the text, so the hasher passes them through unchanged"
+    )]
     lookup:
         std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
     pub(crate) epoch: u32,

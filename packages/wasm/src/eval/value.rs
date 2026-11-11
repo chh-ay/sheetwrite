@@ -29,7 +29,7 @@ pub(super) fn cached_formula_value(
     match kind {
         KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
             .map(Value::text)
-            .unwrap_or(Value::Error(FormulaError::Ref)),
+            .map_or(Value::Error(FormulaError::Ref), |value| value),
         KIND_BOOL => Value::Bool(payload_num(payload) != 0.0),
         KIND_EMPTY => Value::Blank,
         KIND_NUMBER => Value::number(payload_num(payload)),

@@ -20,7 +20,7 @@ impl CellStore {
     /// batch; otherwise this call does.
     #[wasm_bindgen(js_name = setHiddenRows)]
     pub fn set_hidden_rows(&mut self, sheet: usize, manual: &[u32], filtered: &[u32]) -> bool {
-        if !self.sheet_alive.get(sheet).copied().unwrap_or(false) {
+        if !self.sheet_alive.get(sheet).copied().unwrap_or_default() {
             return false;
         }
 

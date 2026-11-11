@@ -207,7 +207,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         Func::False if values.arg_count() == 0 => Value::Bool(false),
         Func::And | Func::Or | Func::Xor => logical_reduce(func, values),
         Func::Not if values.arg_count() == 1 => {
-            match bool_from_value(values.arg_value(0).unwrap_or(&Value::Blank)) {
+            match bool_from_value(values.arg_value(0).map_or(&Value::Blank, |value| value)) {
                 Ok(value) => Value::Bool(!value),
                 Err(error) => Value::Error(error),
             }
@@ -294,7 +294,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::UniChar
         | Func::Proper
         | Func::NumberValue => {
-            text::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+            text::apply(func, values).map_or(Value::Error(FormulaError::Value), |value| value)
         }
         Func::Date
         | Func::DateValue
@@ -314,7 +314,9 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Workday
         | Func::NetworkDays
         | Func::YearFrac
-        | Func::Days360 => date::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
+        | Func::Days360 => {
+            date::apply(func, values).map_or(Value::Error(FormulaError::Value), |value| value)
+        }
         Func::Median
         | Func::ModeSngl
         | Func::Large
@@ -357,7 +359,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
 
 #[inline(never)]
 fn math_family(func: Func, values: &FuncAccumulator) -> EvalResult {
-    math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+    math::apply(func, values).map_or(Value::Error(FormulaError::Value), |value| value)
 }
 
 #[inline(never)]
@@ -372,12 +374,12 @@ fn numeral_family(func: Func, values: &FuncAccumulator) -> EvalResult {
 
 #[inline(never)]
 fn statistics_family(func: Func, values: &FuncAccumulator) -> EvalResult {
-    statistics::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+    statistics::apply(func, values).map_or(Value::Error(FormulaError::Value), |value| value)
 }
 
 #[inline(never)]
 fn financial_family(func: Func, values: &FuncAccumulator) -> EvalResult {
-    financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+    financial::apply(func, values).map_or(Value::Error(FormulaError::Value), |value| value)
 }
 
 fn logical_reduce(func: Func, values: &FuncAccumulator) -> Value {

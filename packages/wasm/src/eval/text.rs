@@ -353,10 +353,10 @@ fn replace(values: &FuncAccumulator) -> Value {
         Err(error) => return Value::Error(error),
     };
     // A start past the end appends the replacement, as in Excel.
-    let start_byte = code_point_byte_offset(&text, start).unwrap_or(text.len());
+    let start_byte = code_point_byte_offset(&text, start).map_or(text.len(), |value| value);
     let end_byte = code_point_byte_offset(&text[start_byte..], count)
         .map(|offset| start_byte + offset)
-        .unwrap_or(text.len());
+        .map_or(text.len(), |value| value);
     let mut output = String::new();
     if let Err(error) = checked_push(&mut output, &text[..start_byte])
         .and_then(|_| checked_push(&mut output, &replacement))

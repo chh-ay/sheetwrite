@@ -105,7 +105,7 @@ fn mode_sngl(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     }
     if run_count > best_count {
         best_count = run_count;
-        best_value = *numbers.last().unwrap_or(&best_value);
+        best_value = *numbers.last().map_or(&best_value, |value| value);
     }
     if best_count < 2 {
         Err(FormulaError::Na)
@@ -295,7 +295,7 @@ fn counted_extreme(values: &FuncAccumulator, is_maximum: bool) -> Result<f64, Fo
         numbers.iter().copied().reduce(f64::min)
     };
 
-    Ok(extreme.unwrap_or(0.0))
+    Ok(extreme.unwrap_or_default())
 }
 
 fn counted_variance(
@@ -525,7 +525,7 @@ fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
             Value::Text(_) | Value::Bool(_) | Value::Blank => {}
         }
     }
-    Value::number(result.unwrap_or(0.0))
+    Value::number(result.unwrap_or_default())
 }
 
 #[cfg(test)]

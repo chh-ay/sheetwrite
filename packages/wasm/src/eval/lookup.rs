@@ -252,7 +252,7 @@ pub(super) fn find_match(
     // from the first search; a list read once keeps the plain scan.
     let use_index = state.is_some();
     let mut single = SearchState::default();
-    let state = state.unwrap_or(&mut single);
+    let state = state.map_or(&mut single, |value| value);
     if search_mode.abs() == 2 && !state.sorted_ok(list, search_mode)? {
         return Ok(None);
     }
@@ -1058,7 +1058,7 @@ impl CellStore {
                         } else {
                             table.cell(self, result_index, found)
                         };
-                        cell.unwrap_or(Value::Error(FormulaError::Ref))
+                        cell.map_or(Value::Error(FormulaError::Ref), |value| value)
                     })
             }
             Func::XLookup => {
@@ -1089,7 +1089,7 @@ impl CellStore {
                 ) {
                     Ok(Some(index)) => Ok(result
                         .value(self, index)
-                        .unwrap_or(Value::Error(FormulaError::Ref))),
+                        .map_or(Value::Error(FormulaError::Ref), |value| value)),
                     Ok(None) => Ok(optional_ast(args, 3)
                         .map_or(Value::Error(FormulaError::Na), |arg| scalar(arg, pass))),
                     Err(error) => Err(error),

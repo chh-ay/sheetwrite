@@ -123,7 +123,7 @@ impl Date {
     /// The date serial, or NaN for a date after the last Excel date.
     #[inline(never)]
     pub(crate) fn serial(self) -> f64 {
-        date_serial(self.year, self.month, self.day).unwrap_or(f64::NAN)
+        date_serial(self.year, self.month, self.day).map_or(f64::NAN, |value| value)
     }
 
     pub(crate) fn month(self) -> i64 {
