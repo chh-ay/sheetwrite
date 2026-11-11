@@ -392,6 +392,9 @@ describe("createSpreadsheetShell", () => {
 
     shell.setTheme({ bg: "#123456" });
     expect(shell.element.style.getPropertyValue("--sheetwrite-widget-bg")).toBe("#123456");
+    shell.setActiveSheet("s2");
+    expect(shell.grid.getActiveSheet()).toBe("s2");
+
     shell.destroy();
   });
 });
