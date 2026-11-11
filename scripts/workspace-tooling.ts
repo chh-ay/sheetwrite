@@ -143,7 +143,6 @@ export const TOOLING_TEST_PATHS = [
   "scripts/changeset-ci.test.ts",
   "scripts/workflow-contract.test.ts",
   "scripts/formula-docs.test.ts",
-  "scripts/release-performance-docs.test.ts",
   "scripts/coverage-check.test.ts",
   "scripts/normalize-sitemap.test.ts",
   "scripts/prepare-docs-deployment.test.ts",

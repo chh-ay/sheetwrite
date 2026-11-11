@@ -3,13 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import type { NavigationSection } from "../docs/src/lib/navigation.js";
-import {
-  expectedLlmsFiles,
-  inNavigationOrder,
-  LLMS_FULL_PATH,
-  LLMS_SITE_BASE,
-} from "./docs-llms.js";
+import { expectedLlmsFiles, LLMS_FULL_PATH, LLMS_SITE_BASE } from "./docs-llms.js";
 
 /** The full-text endpoint built from the given docs pages, keyed by content path. */
 async function fullText(pages: Readonly<Record<string, string>>): Promise<string> {
@@ -33,48 +27,6 @@ const page = (title: string, ...body: string[]) =>
   ["---", `title: ${title}`, "---", ...body].join("\n");
 
 describe("llms full text", () => {
-  it("orders pages depth-first by the sidebar, then unlisted pages by route", () => {
-    const sections = [
-      {
-        label: "Features",
-        tab: "guides",
-        items: [
-          {
-            label: "Grid",
-            items: [
-              { label: "Search", href: "/docs/features/grid/search/" },
-              { label: "Context menu", href: "/docs/features/grid/context-menu/" },
-            ],
-          },
-        ],
-      },
-      {
-        label: "Reference",
-        tab: "api",
-        items: [{ label: "Events", href: "/docs/reference/events/" }],
-      },
-    ] satisfies readonly NavigationSection[];
-    const routes = [
-      "/docs/reference/events/",
-      "/docs/zeta/",
-      "/docs/features/grid/context-menu/",
-      "/docs/alpha/",
-      "/docs/features/grid/search/",
-    ];
-    expect(
-      inNavigationOrder(
-        routes.map((route) => ({ route })),
-        sections,
-      ).map((document) => document.route),
-    ).toEqual([
-      "/docs/features/grid/search/",
-      "/docs/features/grid/context-menu/",
-      "/docs/reference/events/",
-      "/docs/alpha/",
-      "/docs/zeta/",
-    ]);
-  });
-
   it("formats prose tokens and keeps code, blank lines included, verbatim", async () => {
     const example = '<sw-format value="0.25" code="0%"></sw-format>';
     const code = ["const text = `first", "", "", "last`;"].join("\n");

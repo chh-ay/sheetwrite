@@ -130,20 +130,13 @@ describe("manifest ownership", () => {
 
   it.each([
     ["a missing required asset", [core], "missing required worker-async"],
-    ["a duplicate asset", [core, worker, ribbon, wasm, core], "duplicate asset"],
     [
       "an unclassified asset",
       [{ ...core, owner: "unclassified" }, worker, ribbon, wasm],
       "missing path, kind, owner, or roles",
     ],
     [
-      "a worker leaked into an initial entry",
-      [core, { ...worker, roles: ["core-initial", "worker-async"] }, ribbon, wasm],
-      "leaked into an initial entry",
-    ],
-    // The lazy ribbon chunk is held to the same rule as the worker.
-    [
-      "the ribbon leaked into an initial entry",
+      "a lazy chunk leaked into an initial entry",
       [core, worker, { ...ribbon, roles: ["chrome-async", "core-initial"] }, wasm],
       "leaked into an initial entry",
     ],

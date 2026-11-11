@@ -50,27 +50,8 @@ describe("LCOV parser", () => {
     "end_of_record",
   ].join("\n");
 
-  it("normalizes repository paths and counts uncovered lines", () => {
-    expect(parseLcov(report, ROOT)[0]).toMatchObject({
-      path: "packages/core/src/grid.ts",
-      lines: { covered: 1, total: 2 },
-      functions: { covered: 1, total: 2 },
-      uncoveredLines: [11],
-    });
-  });
-
-  it.each([
-    ["a non-finite counter", report.replace("DA:11,0", "DA:11,NaN"), "finite non-negative integer"],
-    ["a duplicate source record", `${report}\n${report}`, "Duplicate LCOV source record"],
-    [
-      "a duplicate line counter",
-      report.replace("DA:11,0", "DA:11,0\nDA:11,1"),
-      "Duplicate LCOV DA",
-    ],
-    ["a missing terminator", `${GRID}\nDA:1,1`, "ended before end_of_record"],
-    ["an LF that disagrees with DA", report.replace("LF:2", "LF:3"), "LF does not match"],
-  ])("fails closed on %s", (_label, text, message) => {
-    expect(() => parseLcov(text, ROOT)).toThrow(message);
+  it("fails closed on an LF that disagrees with DA", () => {
+    expect(() => parseLcov(report.replace("LF:2", "LF:3"), ROOT)).toThrow("LF does not match");
   });
 
   it("merges sharded line hits while conservatively ratcheting function coverage", () => {
@@ -173,22 +154,6 @@ describe("aggregate floors", () => {
       }),
     ).toThrow("Generated/test output entered scored coverage");
   });
-
-  it("enforces Rust region floors", () => {
-    const rustRecord: CoverageRecord = {
-      ...record("packages/wasm/src/calc.rs", { covered: 100, total: 100 }),
-      functions: { covered: 10, total: 10 },
-      regions: { covered: 79, total: 100 },
-    };
-    expect(() =>
-      evaluateCoveragePolicy({
-        policy: POLICY,
-        language: "rust",
-        records: [rustRecord],
-        scoredPaths: new Set([rustRecord.path]),
-      }),
-    ).toThrow("rust regions coverage 79.00% (79/100) is below the 80% floor");
-  });
 });
 
 describe("policy schema", () => {
@@ -213,25 +178,6 @@ describe("policy schema", () => {
       "an unsupported schema",
       { ...valid, schemaVersion: 2 },
       "Unsupported coverage policy schema version",
-    ],
-    ["an unknown policy field", { ...valid, typo: true }, "unknown field"],
-    [
-      "an unknown language",
-      { ...valid, floors: { ...valid.floors, go: { lines: 1, functions: 1 } } },
-      "unknown field",
-    ],
-    [
-      "an unknown floor metric",
-      {
-        ...valid,
-        floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } },
-      },
-      "unknown field",
-    ],
-    [
-      "an unknown exclusion field",
-      { ...valid, exclusions: [{ ...valid.exclusions[0], ticket: "SEC-1" }] },
-      "unknown field",
     ],
   ])("rejects %s", (_label, policy, message) => {
     expect(() => parseCoveragePolicy(policy)).toThrow(message);

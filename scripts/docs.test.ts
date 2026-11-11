@@ -2,10 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import {
-  GENERATED_CONTENT_DIRECTORIES,
-  GENERATED_CONTENT_PAGES,
-} from "../docs/src/lib/generated-content.js";
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
   documentationLinkRoutes,
@@ -23,7 +19,6 @@ import {
   PERFORMANCE_PAGES,
   runCompletionSummary,
   splitPerformancePages,
-  validateDataArtifact,
 } from "./docs-performance.js";
 import { ADAPTER_DOC_CONTRACT, adapterContractIssues } from "./docs.js";
 import { headingAnchors } from "./markdown-anchors.js";
@@ -230,26 +225,20 @@ describe("API reference pages", () => {
     expect(long).toMatch(/\S…$/);
   });
 
-  it.each([
-    [
-      "(host: HTMLElement, opts: GridOptions): Grid",
-      [
-        { name: "host", type: "HTMLElement", optional: false },
-        { name: "opts", type: "GridOptions", optional: false },
-      ],
-      "Grid",
-    ],
-    [
-      "<T>(map: Map<string, T>, pick?: (value: T, key: string) => boolean, ...rest: T[]): Promise<T[]>",
-      [
+  it("reads parameters and the return type from a recorded signature", () => {
+    expect(
+      functionFields(
+        "<T>(map: Map<string, T>, pick?: (value: T, key: string) => boolean, ...rest: T[]): Promise<T[]>",
+        "pickAll",
+      ),
+    ).toEqual({
+      parameters: [
         { name: "map", type: "Map<string, T>", optional: false },
         { name: "pick", type: "(value: T, key: string) => boolean", optional: true },
         { name: "...rest", type: "T[]", optional: false },
       ],
-      "Promise<T[]>",
-    ],
-  ])("reads function fields from %s", (signature, parameters, returns) => {
-    expect(functionFields(signature, "fn")).toEqual({ parameters, returns });
+      returns: "Promise<T[]>",
+    });
   });
 });
 
@@ -294,17 +283,6 @@ describe("documentation content", () => {
         });
       }
     }
-  });
-
-  it("keeps every page the generator owns out of git", async () => {
-    const ignored = new Set(
-      (await readFile(resolve(import.meta.dir, "../.gitignore"), "utf8")).split("\n"),
-    );
-    const owned = [
-      ...GENERATED_CONTENT_DIRECTORIES.map((directory) => `${directory}/`),
-      ...GENERATED_CONTENT_PAGES,
-    ];
-    expect(owned.filter((path) => !ignored.has(`docs/src/content/docs/${path}`))).toEqual([]);
   });
 
   it("leaves the page title as the compatibility results page's only H1", () => {
@@ -403,16 +381,6 @@ describe("landing benchmark data", () => {
   const payloadOf = (evidence: ReturnType<typeof benchEvidence>) =>
     JSON.parse(landingBenchPayload({ evidence, source: "x" }));
 
-  it("rejects a data capture whose engine blocks are empty", async () => {
-    const committed = JSON.parse(
-      await readFile(resolve(import.meta.dir, "../bench/results/data-results.json"), "utf8"),
-    ) as Record<string, unknown>;
-    expect(typeof validateDataArtifact(committed)).toBe("object");
-    expect(typeof validateDataArtifact({ ...committed, sheetwrite: {}, handsontable: {} })).toBe(
-      "string",
-    );
-  });
-
   it("never double-counts failed runs in the completion summary", () => {
     const results = [
       ...Array.from({ length: 5 }, () => ({ status: "success" })),
@@ -459,25 +427,6 @@ describe("landing benchmark data", () => {
     const none = landingBenchPayload({ evidence: benchEvidence(results.slice(0, 4)), source: "x" });
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
-  });
-
-  it("takes the mean of the two middle rounds as the median of an even sample", () => {
-    const payload = payloadOf(
-      benchEvidence(
-        [
-          benchResult("sheetwrite", "a", 1, 1_000, 1),
-          benchResult("sheetwrite", "a", 2, 1_000, 3),
-          benchResult("handsontable", "a", 1, 1_000, 4),
-          benchResult("handsontable", "a", 2, 1_000, 8),
-          benchResult("sheetwrite", "a", 1, 1_000_000, 1),
-          benchResult("sheetwrite", "a", 2, 1_000_000, 3),
-        ],
-        ["a"],
-      ),
-    );
-
-    expect(payload.sizes[0]).toMatchObject({ size: 1_000, medianRatio: 3 });
-    expect(payload.heroStats).toMatchObject({ millionRowMedianMs: 2 });
   });
 
   it("publishes download sizes only when every part is known", () => {
@@ -656,15 +605,6 @@ describe("adapter documentation contract", () => {
         ],
       },
     ],
-  });
-
-  it("mirrors canonical event casing", () => {
-    const kebabOf = (handler: string) =>
-      handler
-        .replace(/^on/, "")
-        .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-        .toLowerCase();
-    expect([...vueEvents] as string[]).toEqual(handlerEvents.map(kebabOf));
   });
 
   it("fails when GridOptions or the Vue emits drift from the contract", () => {

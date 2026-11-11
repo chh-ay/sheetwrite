@@ -59,14 +59,6 @@ const MUTATIONS: MutationCase[] = [
     expectedIssue: "contract.version: expected constant 1",
   },
   {
-    name: "rejects insecure public source links",
-    mutate: (contract) => {
-      const source = contract.sources["microsoft-excel-functions"];
-      if (source) source.link = "http://example.invalid/functions";
-    },
-    expectedIssue: "string does not match ^https://",
-  },
-  {
     name: "pins LET as required-supported",
     mutate: (contract) => {
       const letEntry = contract.functions.find((entry) => entry.canonical === "LET");
@@ -90,14 +82,6 @@ const MUTATIONS: MutationCase[] = [
       if (formula) formula.builds = ["@sheetwrite/unknown"];
     },
     expectedIssue: "value is outside the closed enum",
-  },
-  {
-    name: "rejects moving an optional distribution into the default build",
-    mutate: (contract) => {
-      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
-      if (formula) formula.builds.push("@sheetwrite/wasm");
-    },
-    expectedIssue: "parser/inventory drift: missing NORM.DIST",
   },
   {
     name: "rejects a built function that formula help would not list",

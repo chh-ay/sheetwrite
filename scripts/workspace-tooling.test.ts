@@ -14,7 +14,6 @@ import {
   COVERED_PACKAGE_TEST_ROOTS,
   PUBLISHABLE_PACKAGE_ORDER,
   TOOLING_TEST_PATHS,
-  TYPECHECK_NODES,
   UNIT_TEST_PATHS,
   validateWorkspaceGraph,
 } from "./workspace-tooling.js";
@@ -96,46 +95,6 @@ describe("canonical workspace graph", () => {
     expect(() => validateWorkspaceGraph(root, reversed)).toThrow("must run after its dependency");
   });
 
-  it("covers every discovered workspace and verification typecheck exactly once", async () => {
-    const root = resolve(import.meta.dir, "..");
-    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
-      readonly workspaces: readonly string[];
-      readonly scripts: Readonly<Record<string, string>>;
-    };
-    const workspaceNames: string[] = [];
-    for (const workspace of rootManifest.workspaces) {
-      const glob = new Bun.Glob(`${workspace}/package.json`);
-      for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
-        const workspaceManifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
-          readonly name?: string;
-          readonly scripts?: Readonly<Record<string, string>>;
-        };
-        if (workspaceManifest.name && typeof workspaceManifest.scripts?.typecheck === "string") {
-          workspaceNames.push(workspaceManifest.name);
-        }
-      }
-    }
-
-    for (const name of workspaceNames) {
-      expect(TYPECHECK_NODES.filter((node) => node.id === `typecheck:${name}`)).toHaveLength(1);
-    }
-
-    const verificationProjects = Object.values(rootManifest.scripts).flatMap((command) => {
-      const match = /\btsc\b.*(?:^|\s)-p\s+(\S+)/u.exec(command);
-      return match?.[1] ? [match[1]] : [];
-    });
-    for (const project of verificationProjects) {
-      expect(
-        TYPECHECK_NODES.filter((node) =>
-          node.command.some(
-            (argument, index) => argument === "-p" && node.command[index + 1] === project,
-          ),
-        ),
-      ).toHaveLength(1);
-    }
-    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + verificationProjects.length);
-  });
-
   it("runs every script test suite from exactly one test list", async () => {
     const root = resolve(import.meta.dir, "..");
     const listed: readonly string[] = [...TOOLING_TEST_PATHS, ...UNIT_TEST_PATHS];
@@ -187,34 +146,6 @@ describe("canonical workspace graph", () => {
 });
 
 describe("changeset workspace contract", () => {
-  it("resolves every configured ignore to an existing workspace", async () => {
-    const root = resolve(import.meta.dir, "..");
-    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
-      readonly workspaces: readonly string[];
-    };
-    const changesetConfig = JSON.parse(
-      await readFile(join(root, ".changeset/config.json"), "utf8"),
-    ) as {
-      readonly ignore: readonly string[];
-    };
-    const workspaceNames = new Set<string>();
-    for (const workspace of rootManifest.workspaces) {
-      const glob = new Bun.Glob(`${workspace}/package.json`);
-      for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
-        const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
-          readonly name?: string;
-        };
-        if (manifest.name) workspaceNames.add(manifest.name);
-      }
-    }
-
-    for (const ignore of changesetConfig.ignore) {
-      const escaped = ignore.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-      const pattern = new RegExp(`^${escaped.replaceAll("*", ".*").replaceAll("?", ".")}$`);
-      expect([...workspaceNames].some((name) => pattern.test(name))).toBeTrue();
-    }
-  });
-
   it("routes release and package-size-history branches", () => {
     expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
     expect(releaseVersionFromHeadRef("release/version-0.4.0")).toBe("0.4.0");

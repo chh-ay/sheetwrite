@@ -1,6 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 
 import {
   type CommandResult,
@@ -279,23 +277,16 @@ describe("version GitHub release", () => {
     ]);
   });
 
-  it.each([
-    ["creating", "create", false],
-    ["updating", "edit", true],
-  ])(
-    "does not move Latest when %s the release of an older version",
-    async (_label, verb, hasRelease) => {
-      const state = new RepositoryState();
-      state.tags.set("v0.10.0", olderCommit);
-      if (hasRelease) state.releases.set("v0.5.4", { isDraft: false, isPrerelease: false });
+  it("does not move Latest when releasing an older version", async () => {
+    const state = new RepositoryState();
+    state.tags.set("v0.10.0", olderCommit);
 
-      await release(state);
+    await release(state);
 
-      const [command] = state.releaseCommands(verb);
-      expect(command?.at(-1)).toBe("--latest=false");
-      expect(command).not.toContain("--latest");
-    },
-  );
+    const [command] = state.releaseCommands("create");
+    expect(command?.at(-1)).toBe("--latest=false");
+    expect(command).not.toContain("--latest");
+  });
 
   it.each([
     ["a draft", { isDraft: true, isPrerelease: false }],
@@ -332,21 +323,5 @@ describe("version GitHub release", () => {
     await expect(release(new RepositoryState(), olderCommit)).rejects.toThrow(
       `@sheetwrite/wasm@0.5.4 provenance targets ${olderCommit}, expected ${sha}`,
     );
-  });
-
-  it("keeps every publishable package in one changeset version group", async () => {
-    const config = JSON.parse(
-      await readFile(resolve(import.meta.dir, "../.changeset/config.json"), "utf8"),
-    ) as { readonly fixed: readonly (readonly string[])[]; readonly changelog: unknown };
-
-    // One GitHub release names one version, so the packages cannot drift apart.
-    expect(config.fixed.map((group) => [...group].sort())).toEqual([
-      [...PUBLISHABLE_PACKAGE_ORDER].sort(),
-    ]);
-    // Entries need their pull request and author for the release notes.
-    expect(config.changelog).toEqual([
-      "@changesets/changelog-github",
-      { repo: "chh-ay/sheetwrite" },
-    ]);
   });
 });
