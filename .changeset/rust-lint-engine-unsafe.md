@@ -1,4 +1,4 @@
 ---
 ---
 
-Read string-pool text and sort numeric columns in the engine without `unsafe` code.
+Sort short number columns in the engine without `unsafe` code.
