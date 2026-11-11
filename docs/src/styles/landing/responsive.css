@@ -135,3 +135,65 @@
     translate: none;
   }
 }
+
+/* Phone touch targets: every control takes at least 44 × 44 px. Links and
+   small buttons that keep their look get the rest as an invisible, centred
+   area (the layout does not move); tabs, footer links, the copy button and
+   the numbers' disclosure grow, because a neighbour sits too close. */
+@media (max-width: 42rem) {
+  :is(
+    .sw-hero-app__replay,
+    .sw-reel__pause,
+    .sw-lp-more,
+    .sw-lp-facts > a,
+    .sw-lp-new a,
+    .sw-lp-head a
+  ) {
+    position: relative;
+  }
+  :is(
+    .sw-hero-app__replay,
+    .sw-reel__pause,
+    .sw-lp-more,
+    .sw-lp-facts > a,
+    .sw-lp-new a,
+    .sw-lp-head a
+  )::after {
+    position: absolute;
+    top: min(0px, calc(50% - 22px));
+    right: min(0px, calc(50% - 22px));
+    bottom: min(0px, calc(50% - 22px));
+    left: min(0px, calc(50% - 22px));
+    content: "";
+  }
+  .sw-code-tabs__list button {
+    min-height: 44px;
+  }
+  /* The story's link and the pause button sit on two rows here; the link
+     grows, and the button's area clears it. */
+  .sw-reel__copy a {
+    display: flex;
+    width: fit-content;
+    min-height: 44px;
+    align-items: center;
+  }
+  .sw-reel__pause {
+    margin: var(--sw-space-3) 0 0;
+  }
+  .sw-landing .expressive-code .copy button {
+    width: 44px;
+    height: 44px;
+  }
+  .sw-landing .speed-story__details > summary {
+    min-height: 44px;
+  }
+  .sw-landing-footer__nav div {
+    gap: 0;
+  }
+  .sw-landing-footer__nav a {
+    display: flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+}

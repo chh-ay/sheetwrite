@@ -12,6 +12,7 @@ import { pivotsAvailable } from "../panels/panel-loader.js";
 import { menuButton, type PanelMenuItem } from "../panels/panel-menu.js";
 import { scalarLabel } from "../panels/pivot-model.js";
 import { Scope } from "../scope.js";
+import { checkStylePart } from "../style-parts.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartRenderer, MountedChart } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -88,6 +89,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   root.className = "sheetwrite-dashboard";
   root.hidden = true;
   viewport.appendChild(root);
+  checkStylePart(root, "dashboard", "The dashboard");
 
   let sheet: SheetId | null = null;
   let readOnly = false;
@@ -130,6 +132,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const hosts = root.querySelectorAll<HTMLElement>("[data-chart-id]");
     if (hosts.length === 0) return;
     chartRenderer = createChartRenderer(grid.store);
+    if (chartRenderer !== null) checkStylePart(root, "charts", "The dashboard's charts");
     for (const host of hosts) {
       const id = host.dataset.chartId ?? "";
       if (chartRenderer === null) {

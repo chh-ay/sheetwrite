@@ -46,6 +46,8 @@ const grid = createGrid(document.querySelector("#grid")!, {
 
 Framework users should normally install only `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte` and import that package's `styles.css`; the adapters initialize WASM automatically.
 
+`styles.css` imports every part of the stylesheet. To ship less CSS, import only the parts your grid uses from `@sheetwrite/core/styles/` (`grid.css` first); see [Stylesheet parts](https://www.sheetwrite.dev/docs/features/formatting/styles/#stylesheet-parts).
+
 ## New in 0.6.0
 
 - **Ribbon.** Set `config.ribbon: true`, or `ribbon: true` in the shell, to get an Excel-style ribbon with Home, Insert, Data and View tabs. Groups shrink, then fold into dropdowns, as the grid narrows. The ribbon loads as its own chunk, so grids without a ribbon do not download it. New `GridActions` include `setBorders`, `setFontFamily`, `setNumberFormat`, `mergeAndCenter`, `autoSum` and `freezePanes`. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/).

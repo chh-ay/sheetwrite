@@ -855,7 +855,8 @@ html:has(.sw-nav-dialog[open]) {
     .sw-page-actions .sw-button,
     .sw-runnable__actions .sw-button,
     .sw-terminal__copy,
-    .sw-document__colophon a
+    .sw-document__colophon a,
+    .sw-release-strip a
   ) {
     position: relative;
   }
@@ -863,6 +864,7 @@ html:has(.sw-nav-dialog[open]) {
     .sw-page-actions .sw-button,
     .sw-runnable__actions .sw-button,
     .sw-terminal__copy,
+    .sw-release-strip a,
     .sw-document__colophon a
   )::after {
     position: absolute;
@@ -879,6 +881,22 @@ html:has(.sw-nav-dialog[open]) {
   }
   .sw-terminal__tabs button {
     min-width: 44px;
+  }
+  /* The 44 px tabs take the gaps' place, and the prompt glyph leaves the bar,
+     so the tabs and Copy fit a phone's column; a narrower one wraps Copy to
+     its own row instead of pushing it past the edge. */
+  .sw-terminal__tabs {
+    gap: 0;
+  }
+  .sw-terminal__bar {
+    flex-wrap: wrap;
+    gap: 0 var(--sw-space-2);
+  }
+  .sw-terminal__icon {
+    display: none;
+  }
+  .sw-tabs__list [role="tab"] {
+    min-height: 44px;
   }
   .sw-toc-inline > summary {
     min-height: 44px;

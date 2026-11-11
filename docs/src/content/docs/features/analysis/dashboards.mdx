@@ -167,6 +167,10 @@ A chart plots every value field of its pivot unless `pivotValues` lists the ones
 
 A KPI card (`kind: "kpi"`) shows its measure's value, large, in the filter context of the dashboard's slicers: each slicer whose table the measure's home table reaches filters it, as it filters a pivot over that table. `title` replaces the measure name as the caption, and `numberFormat` is the Excel format code of the value; absent shows it as General. A card needs the full engine, as measures do.
 
+## Styles
+
+The dashboard view needs `@sheetwrite/core/styles/dashboard.css`, PivotCharts need `@sheetwrite/core/styles/charts.css`, and the KPI card and slicer forms need `@sheetwrite/core/styles/panels.css`. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## XLSX
 
 Excel has no dashboard sheet. `toXlsxWorkbook(grid)` writes each dashboard as a worksheet with the same name. Each worksheet column stands for one grid column, and each row for one grid row. Each item writes its values from the top-left cell of its box:

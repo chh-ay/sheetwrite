@@ -82,6 +82,10 @@ interface SearchResult {
 | `clearSearch()` | Drop the current search and clear its highlights. |
 | `replaceCurrent(replacement)` / `replaceAll(replacement)` | Replace literal text/number matches through undoable transactions. |
 
+## Styles
+
+The find bar needs `@sheetwrite/core/styles/find.css`. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Edge cases and limits
 
 - An active search picks up matches that a value edit adds or removes, without scrolling.
