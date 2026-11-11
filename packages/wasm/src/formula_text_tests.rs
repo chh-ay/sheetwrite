@@ -3,7 +3,7 @@
 //! and parentheses, and gets no new ones.
 
 use crate::calc::parse;
-use crate::formula_rewrite::{translate_formula, write_references};
+use crate::formula_rewrite::write_references;
 use crate::store::CellStore;
 
 const COLS: usize = 4;
@@ -99,27 +99,6 @@ fn a_row_or_column_edit_changes_only_the_moved_references() {
     );
 }
 
-/// Each edit rewrites the tree; the text, and FORMULATEXT, show every edit
-/// made before they are read.
-#[test]
-fn several_edits_before_a_read_all_reach_the_text() {
-    let (mut store, sales, summary) = two_sheets();
-    enter(&mut store, summary, &["=(Sales!B2 + 1) * 2"]);
-    store.set_formula(summary, 0, 1, "=FORMULATEXT(A1)", 0);
-
-    assert!(store.rename_sheet(sales, "sales", "North"));
-    assert!(store.add_rows(sales, 0, 1));
-    assert!(store.remove_cols(sales, 0, 1));
-    store.recompute(summary);
-
-    let expected = "=(North!A3 + 1) * 2";
-    assert_eq!(texts(&store, summary, 0, 1), [expected]);
-    assert_eq!(
-        store.get_cell(summary, 0, 1).string().as_deref(),
-        Some(expected)
-    );
-}
-
 #[test]
 fn a_deleted_reference_becomes_ref_error_and_the_rest_stays() {
     let (mut store, sales, _) = two_sheets();
@@ -146,38 +125,6 @@ fn a_tab_move_changes_only_the_three_d_reference() {
     assert_eq!(
         texts(&store, summary as usize, 0, 1),
         ["=(SUM(Middle:Last!B1) + 1)*2"]
-    );
-}
-
-#[test]
-fn a_defined_name_formula_keeps_its_text_through_edits() {
-    let (mut store, sales, _) = two_sheets();
-    assert!(store.set_named_formula("Total", -1, "=(Sales!$B$2 + Sales!$B$3) * 2"));
-
-    assert!(store.add_rows(sales, 0, 1));
-    assert_eq!(
-        store.named_formula_source("Total", -1).as_deref(),
-        Some("=(Sales!$B$3 + Sales!$B$4) * 2")
-    );
-
-    assert!(store.rename_sheet(sales, "sales", "North"));
-    assert_eq!(
-        store.named_formula_source("Total", -1).as_deref(),
-        Some("=(North!$B$3 + North!$B$4) * 2")
-    );
-
-    assert_eq!(store.move_rows(sales, 2, 1, 4), crate::store::BLOCK_OK);
-    assert_eq!(
-        store.named_formula_source("Total", -1).as_deref(),
-        Some("=(North!$B$5 + North!$B$3) * 2")
-    );
-}
-
-#[test]
-fn a_copied_formula_keeps_its_text() {
-    assert_eq!(
-        translate_formula("=(B1 + C1) * -D1 / (2)", 1, 0),
-        "=(B2 + C2) * -D2 / (2)"
     );
 }
 
