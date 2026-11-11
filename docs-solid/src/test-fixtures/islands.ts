@@ -50,6 +50,13 @@ export const TEST_FIXTURE_ISLANDS = {
         withProps(PrefetchFixture),
       ),
   },
+  "test-framework-lifecycle": {
+    source: "src/test-fixtures/framework-lifecycle/FrameworkLifecycleFixture.tsx",
+    load: () =>
+      import("./framework-lifecycle/FrameworkLifecycleFixture.js").then(
+        ({ FrameworkLifecycleFixture }) => withProps(FrameworkLifecycleFixture),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 export type TestFixtureIslandName = keyof typeof TEST_FIXTURE_ISLANDS;
