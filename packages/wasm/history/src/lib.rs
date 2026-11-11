@@ -32,6 +32,7 @@ struct Page {
     before_col: Vec<u32>,
     flags: Vec<u8>,
     author: Vec<u32>,
+    authored: bool,
 }
 
 impl Page {
@@ -47,6 +48,7 @@ impl Page {
         self.before_col.clear();
         self.flags.clear();
         self.author.clear();
+        self.authored = false;
     }
 }
 
@@ -378,10 +380,11 @@ impl DiffKernel {
 impl DiffKernel {
     /// Proto: last authors of the page, one sweep over the log per sheet.
     fn finish_page(&mut self) {
-        let len = self.page.flags.len();
-        if self.page.author.len() == len {
+        if self.page.authored {
             return;
         }
+        self.page.authored = true;
+        let len = self.page.flags.len();
         let mut authors = vec![NONE; len];
         let mut order: Vec<u32> = (0..len as u32).collect();
         order.sort_unstable_by_key(|&i| (self.page.sheet[i as usize], self.page.row[i as usize], self.page.col[i as usize]));
