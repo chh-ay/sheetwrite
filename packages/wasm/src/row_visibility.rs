@@ -50,12 +50,12 @@ impl RowVisibility {
             filtered: parse_runs(filtered)?,
         };
 
-        let next = (!next.manual.is_empty() || !next.filtered.is_empty()).then(|| Box::new(next));
-        if self.0 == next {
+        let stored = (!next.manual.is_empty() || !next.filtered.is_empty()).then(|| Box::new(next));
+        if self.0 == stored {
             return Some(false);
         }
 
-        self.0 = next;
+        self.0 = stored;
         Some(true)
     }
 

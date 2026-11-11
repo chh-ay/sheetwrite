@@ -343,8 +343,8 @@ impl CellStore {
                 continue;
             };
             out.bool(scope.is_some());
-            if let Some(scope) = scope {
-                out.u32(*scope);
+            if let Some(scope_sheet) = scope {
+                out.u32(*scope_sheet);
             }
 
             out.text(key);
@@ -364,8 +364,8 @@ impl CellStore {
         );
         for (scope, name, source) in self.named_formula_sources() {
             out.bool(scope.is_some());
-            if let Some(scope) = scope {
-                out.u32(scope);
+            if let Some(scope_sheet) = scope {
+                out.u32(scope_sheet);
             }
             out.text(name);
             out.text(source);

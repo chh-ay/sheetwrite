@@ -318,9 +318,9 @@ fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
                 else {
                     continue;
                 };
-                let name = strip_prefix(name);
-                let lambda = name.eq_ignore_ascii_case("LAMBDA");
-                if !lambda && !name.eq_ignore_ascii_case("LET") {
+                let bare_name = strip_prefix(name);
+                let lambda = bare_name.eq_ignore_ascii_case("LAMBDA");
+                if !lambda && !bare_name.eq_ignore_ascii_case("LET") {
                     continue;
                 }
                 let Some(body) = frame.arguments.last() else {
