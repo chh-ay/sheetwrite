@@ -950,11 +950,29 @@ html:has(.sw-nav-dialog[open]) {
   .sw-prose .api-member-index > summary {
     min-height: 44px;
   }
-  /* A symbol's "See also" list: one link per row, each 44 px tall. */
-  .sw-prose .api-layout__body > ul > li > a {
+  /* A link that is a whole list item or paragraph ("See also", next steps,
+     "Read the notes", from markLinkRows in vite.config.ts), and a release's
+     version link: 44 px rows. */
+  .sw-prose .sw-link-row,
+  .sw-docs .sw-prose .sw-update__version a {
     display: inline-flex;
+    min-width: 44px;
     min-height: 44px;
     align-items: center;
+  }
+  /* A field's type link sits in its code token: the head row is 44 px tall
+     and the link's target fills it, without growing the token. */
+  .sw-prose .api-field__head {
+    min-height: 44px;
+    align-items: center;
+  }
+  .sw-prose .api-field__type a {
+    position: relative;
+  }
+  .sw-prose .api-field__type a::after {
+    position: absolute;
+    inset: -13px -6px;
+    content: "";
   }
   .fig-range-row__name {
     min-height: 44px;
