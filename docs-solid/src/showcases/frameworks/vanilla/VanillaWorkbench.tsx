@@ -689,6 +689,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                     onChange={(event) => toggleReadOnly(event.currentTarget.checked)}
                     type="checkbox"
                   />
+                  <span aria-hidden="true" class="sw-vw-toggle__track" />
                   Read-only
                 </label>
               </div>

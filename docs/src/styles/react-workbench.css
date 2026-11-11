@@ -528,9 +528,7 @@
 .sw-rwb-workflow__import input,
 .sw-rwb .sw-rwb-workflow__import input:disabled {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: calc(-1 * var(--sw-border-width));
   opacity: 0;
   cursor: pointer;
 }

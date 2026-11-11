@@ -745,20 +745,32 @@
   cursor: pointer;
 }
 
+/* The checkbox covers the whole label, so the label's full size is the target;
+   the track beside the text draws the switch. */
+.sw-vw-toggle {
+  position: relative;
+}
+
 .sw-vw-toggle input {
+  position: absolute;
+  inset: -1px;
+  margin: 0;
   appearance: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.sw-vw-toggle__track {
   position: relative;
   flex: none;
   width: 2.25rem;
   height: 1.25rem;
-  margin: 0;
   border: 1px solid var(--sw-border-strong);
   border-radius: var(--sw-radius-pill);
   background: var(--sw-surface-2);
-  cursor: pointer;
 }
 
-.sw-vw-toggle input::before {
+.sw-vw-toggle__track::before {
   content: "";
   position: absolute;
   top: 2px;
@@ -769,12 +781,12 @@
   background: var(--sw-fg-muted);
 }
 
-.sw-vw-toggle input:checked {
+.sw-vw-toggle input:checked + .sw-vw-toggle__track {
   border-color: var(--sw-accent-strong);
   background: var(--sw-accent-strong);
 }
 
-.sw-vw-toggle input:checked::before {
+.sw-vw-toggle input:checked + .sw-vw-toggle__track::before {
   left: calc(100% - 1rem);
   background: var(--sw-accent-ink);
 }
