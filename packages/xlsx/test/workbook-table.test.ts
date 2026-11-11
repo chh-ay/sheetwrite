@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import type { WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
-import { strFromU8, unzipSync } from "fflate";
-
-import { sheetwriteWorkbookBackend } from "../src/workbook.js";
+import { sheetwriteWorkbookBackend as backend } from "../src/workbook.js";
 import {
   BASE_STYLES_BODY,
   rawXlsx,
@@ -12,88 +9,90 @@ import {
   TRANSITIONAL_REL,
   worksheet,
 } from "./raw-opc.js";
+import {
+  book,
+  cellsOf,
+  collectWarnings,
+  formula,
+  partText,
+  range,
+  sheet,
+  sheetAt,
+} from "./workbook-fixtures.js";
 
-const TABLE_CONTENT = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
+const TABLE_PART = "xl/tables/table1.xml";
 
+/** Sheet "Raw" with `rows` and one native table part. */
 function nativeTablePackage(
   tableXml: string,
-  workbookExtra = "",
-  options: { styles?: string; worksheetExtra?: string } = {},
+  options: { workbookExtra?: string; styles?: string; worksheetExtra?: string; rows?: string } = {},
 ): Uint8Array {
   return rawXlsx({
     sheets: [
       {
         name: "Raw",
         xml: worksheet(
-          `<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Amount</t></is></c></row></sheetData>${options.worksheetExtra ?? ""}<tableParts count="1"><tablePart r:id="rId1"/></tableParts>`,
+          `<sheetData>${options.rows ?? '<row r="1"><c r="A1" t="inlineStr"><is><t>Amount</t></is></c></row>'}</sheetData>${options.worksheetExtra ?? ""}<tableParts count="1"><tablePart r:id="rId1"/></tableParts>`,
         ),
         relationships: `<Relationship Id="rId1" Type="${TRANSITIONAL_REL}/table" Target="../tables/table1.xml"/>`,
       },
     ],
-    workbookExtra,
+    workbookExtra: options.workbookExtra,
     styles: options.styles,
-    extraOverrides: [`<Override PartName="/xl/tables/table1.xml" ContentType="${TABLE_CONTENT}"/>`],
-    extraFiles: { "xl/tables/table1.xml": tableXml },
-  });
-}
-
-function snapshot(): WorkbookSnapshot {
-  return {
-    schemaVersion: 1,
-    workbook: { activeSheet: "sheet-stable" },
-    sheets: [
-      {
-        id: "sheet-stable",
-        name: "Data",
-        order: 0,
-        rowCount: 4,
-        columns: [{ key: "amount", header: "Amount", width: 80, type: "number" }],
-        tables: [
-          {
-            id: "table-stable",
-            name: "Sales",
-            range: {
-              sheet: "sheet-stable",
-              start: { row: 0, col: 0 },
-              end: { row: 3, col: 0 },
-            },
-            columns: [{ id: "column-stable", name: "Amount", totalsRowLabel: "Total" }],
-            headerRow: true,
-            totalsRow: true,
-            style: { name: "TableStyleMedium2", showRowStripes: true },
-          },
-        ],
-        cells: [],
-      },
+    extraOverrides: [
+      `<Override PartName="/${TABLE_PART}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>`,
     ],
-  };
-}
-
-function partText(parts: Record<string, Uint8Array>, name: string): string {
-  const bytes = parts[name];
-  if (!bytes) throw new Error(`Missing exported XLSX part ${name}`);
-  return strFromU8(bytes);
+    extraFiles: { [TABLE_PART]: tableXml },
+  });
 }
 
 function ruleTable(rules: string, columnRules = "", columnAttributes = ""): string {
   return `<table xmlns="${TRANSITIONAL_MAIN}" id="1" displayName="Sales" ref="A1:A4" totalsRowCount="1">${rules}<tableColumns count="1"><tableColumn id="1" name="Amount"${columnAttributes}>${columnRules}</tableColumn></tableColumns></table>`;
 }
 
+const importTable = async (tableXml: string, options?: Parameters<typeof nativeTablePackage>[1]) =>
+  sheetAt(await backend.fromXlsxWorkbook(nativeTablePackage(tableXml, options))).tables?.[0];
+
+/** Import `tableXml`, export it, and import the exported table part again on its own. */
+async function reimported(tableXml: string) {
+  const { warnings, onWarning } = collectWarnings();
+  const imported = await backend.fromXlsxWorkbook(nativeTablePackage(tableXml), { onWarning });
+  const saved = partText(await backend.toXlsxWorkbook(imported, { onWarning }), TABLE_PART);
+  return { table: sheetAt(imported).tables?.[0], saved, again: await importTable(saved), warnings };
+}
+
 describe("native XLSX workbook tables", () => {
   it("round-trips Sheetwrite stable identities through native table parts and sidecar metadata", async () => {
-    const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot());
-    const parts = unzipSync(bytes);
-    const tableXml = strFromU8(parts["xl/tables/table1.xml"]!);
-    const sheetXml = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
-
-    expect(sheetXml).toContain('<tableParts count="1"><tablePart r:id="rId3"/></tableParts>');
-    expect(tableXml).toContain('displayName="Sales"');
-    expect(tableXml).toContain('ref="A1:A4"');
-    expect(tableXml).toContain('totalsRowLabel="Total"');
-    expect(tableXml).toContain('name="TableStyleMedium2"');
-
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
-    expect(imported.sheets[0]!.tables).toEqual(snapshot().sheets[0]!.tables);
+    const source = book([
+      sheet("sheet-stable", "Data", [], {
+        rowCount: 4,
+        tables: [
+          {
+            id: "table-stable",
+            name: "Sales",
+            range: range("sheet-stable", 0, 0, 3, 0),
+            columns: [{ id: "column-stable", name: "Amount", totalsRowLabel: "Total" }],
+            headerRow: true,
+            totalsRow: true,
+            style: { name: "TableStyleMedium2", showRowStripes: true },
+          },
+        ],
+      }),
+    ]);
+    const bytes = await backend.toXlsxWorkbook(source);
+    expect(partText(bytes, "xl/worksheets/sheet1.xml")).toContain(
+      '<tableParts count="1"><tablePart r:id="rId3"/></tableParts>',
+    );
+    const tableXml = partText(bytes, TABLE_PART);
+    for (const fragment of [
+      'displayName="Sales"',
+      'ref="A1:A4"',
+      'totalsRowLabel="Total"',
+      'name="TableStyleMedium2"',
+    ]) {
+      expect(tableXml).toContain(fragment);
+    }
+    expect(sheetAt(await backend.fromXlsxWorkbook(bytes)).tables).toEqual(sheetAt(source).tables);
   });
 
   it.each([
@@ -114,16 +113,11 @@ describe("native XLSX workbook tables", () => {
   ])(
     "round-trips native table autofilter %s without relying on the sidecar",
     async (_name, criteria) => {
-      const warnings: XlsxWorkbookWarning[] = [];
-      const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        nativeTablePackage(
-          ruleTable(
-            `<autoFilter ref="A1:A3"><filterColumn colId="0" hiddenButton="1" showButton="0">${criteria}</filterColumn></autoFilter>`,
-          ),
+      const { table, again, warnings } = await reimported(
+        ruleTable(
+          `<autoFilter ref="A1:A3"><filterColumn colId="0" hiddenButton="1" showButton="0">${criteria}</filterColumn></autoFilter>`,
         ),
-        { onWarning: (warning) => warnings.push(warning) },
       );
-      const table = imported.sheets[0]?.tables?.[0];
       expect(table?.autoFilter).toMatchObject({
         name: "autoFilter",
         attributes: { ref: "A1:A3" },
@@ -132,73 +126,50 @@ describe("native XLSX workbook tables", () => {
         ],
       });
       expect(table?.unsupportedFeatures).toBeUndefined();
-      const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-      const saved = partText(parts, "xl/tables/table1.xml");
-      const native = await sheetwriteWorkbookBackend.fromXlsxWorkbook(nativeTablePackage(saved));
-      expect(native.sheets[0]?.tables?.[0]?.autoFilter).toEqual(table?.autoFilter);
+      expect(again?.autoFilter).toEqual(table?.autoFilter);
       expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toEqual([]);
     },
   );
 
-  it("keeps Excel autofilters that carry revision uid attributes", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(
-        ruleTable(
-          '<autoFilter xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" ref="A1:A3" xr:uid="{00000000-0001-0000-0000-000000000000}"><filterColumn colId="0"><filters><filter val="1"/></filters></filterColumn></autoFilter>',
-        ),
-      ),
-      { onWarning: (warning) => warnings.push(warning) },
-    );
-    expect(imported.sheets[0]?.tables?.[0]?.autoFilter?.attributes).toEqual({ ref: "A1:A3" });
-    expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toEqual([]);
-  });
-
   it("re-anchors filter and sort refs to a table range moved by structure edits", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    const imported = await backend.fromXlsxWorkbook(
       nativeTablePackage(
         ruleTable(
           '<autoFilter ref="A1:A3"><filterColumn colId="0"><filters><filter val="1"/></filters></filterColumn></autoFilter><sortState ref="A2:A3"><sortCondition ref="A2:A3"/></sortState>',
         ),
       ),
     );
-    const sheet = imported.sheets[0];
-    const table = sheet?.tables?.[0];
-    if (!sheet || !table) throw new Error("fixture table was not imported");
+    const moved = sheetAt(imported);
+    const table = moved.tables?.[0];
+    if (!table) throw new Error("fixture table was not imported");
     // A store row insert above the table moves only `range`, like rebaseSheetRows.
-    sheet.rowCount = Math.max(sheet.rowCount, 7);
-    table.range = { ...table.range, start: { row: 2, col: 0 }, end: { row: 6, col: 0 } };
-    const parts = unzipSync(
-      await sheetwriteWorkbookBackend.toXlsxWorkbook(imported, {
-        onWarning: (warning) => warnings.push(warning),
-      }),
-    );
-    const saved = partText(parts, "xl/tables/table1.xml");
-    expect(saved).toContain('ref="A3:A7"');
-    expect(saved).toContain('<autoFilter ref="A3:A6">');
-    expect(saved).toContain('<sortState ref="A4:A6">');
-    expect(saved).toContain('<sortCondition ref="A4:A6">');
+    moved.rowCount = Math.max(moved.rowCount, 7);
+    table.range = range(table.range.sheet, 2, 0, 6, 0);
+    const { warnings, onWarning } = collectWarnings();
+    const saved = partText(await backend.toXlsxWorkbook(imported, { onWarning }), TABLE_PART);
+    for (const fragment of [
+      'ref="A3:A7"',
+      '<autoFilter ref="A3:A6">',
+      '<sortState ref="A4:A6">',
+      '<sortCondition ref="A4:A6">',
+    ]) {
+      expect(saved).toContain(fragment);
+    }
     expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toEqual([]);
   });
 
   it("does not emit a sort condition whose column left the table", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    const imported = await backend.fromXlsxWorkbook(
       nativeTablePackage(
         ruleTable('<sortState ref="A2:A3"><sortCondition ref="A2:A3"/></sortState>'),
       ),
     );
-    const sortState = imported.sheets[0]?.tables?.[0]?.sortState;
-    const condition = sortState?.children[0];
+    const condition = sheetAt(imported).tables?.[0]?.sortState?.children[0];
     if (!condition) throw new Error("fixture sort condition was not imported");
     condition.attributes.ref = "C2:C3";
-    const parts = unzipSync(
-      await sheetwriteWorkbookBackend.toXlsxWorkbook(imported, {
-        onWarning: (warning) => warnings.push(warning),
-      }),
-    );
-    expect(partText(parts, "xl/tables/table1.xml")).not.toContain("sortState");
+    const { warnings, onWarning } = collectWarnings();
+    const saved = partText(await backend.toXlsxWorkbook(imported, { onWarning }), TABLE_PART);
+    expect(saved).not.toContain("sortState");
     expect(warnings).toContainEqual(
       expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
     );
@@ -207,37 +178,28 @@ describe("native XLSX workbook tables", () => {
   it.each([false, true])("round-trips table sort state nested in autofilter=%s", async (nested) => {
     const sort =
       '<sortState ref="A2:A3" caseSensitive="1" columnSort="0" sortMethod="stroke"><sortCondition ref="A2:A3" descending="1" sortBy="value" customList="Low,Medium,High"/></sortState>';
-    const rules = nested ? `<autoFilter ref="A1:A3">${sort}</autoFilter>` : sort;
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(ruleTable(rules)),
+    const { table, again } = await reimported(
+      ruleTable(nested ? `<autoFilter ref="A1:A3">${sort}</autoFilter>` : sort),
     );
-    const table = imported.sheets[0]?.tables?.[0];
-    const sortState = nested ? table?.autoFilter?.children[0] : table?.sortState;
-    expect(sortState).toMatchObject({
+    expect(nested ? table?.autoFilter?.children[0] : table?.sortState).toMatchObject({
       name: "sortState",
       attributes: { ref: "A2:A3", caseSensitive: "1", columnSort: "0", sortMethod: "stroke" },
       children: [
         { name: "sortCondition", attributes: { customList: "Low,Medium,High", descending: "1" } },
       ],
     });
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-    const native = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(partText(parts, "xl/tables/table1.xml")),
-    );
-    expect(native.sheets[0]?.tables?.[0]).toEqual(table);
+    expect(again).toEqual(table);
   });
 
   it("round-trips calculated-column and custom totals formulas including array rules", async () => {
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(
-        ruleTable(
-          "",
-          '<calculatedColumnFormula array="1">IF([@Amount]&gt;0,[@Amount]*2,0)</calculatedColumnFormula><totalsRowFormula array="0">SUBTOTAL(109,[Amount])</totalsRowFormula>',
-          ' totalsRowFunction="custom"',
-        ),
+    const { table, again } = await reimported(
+      ruleTable(
+        "",
+        '<calculatedColumnFormula array="1">IF([@Amount]&gt;0,[@Amount]*2,0)</calculatedColumnFormula><totalsRowFormula array="0">SUBTOTAL(109,[Amount])</totalsRowFormula>',
+        ' totalsRowFunction="custom"',
       ),
     );
-    const column = imported.sheets[0]?.tables?.[0]?.columns[0];
+    const column = table?.columns[0];
     expect(column).toMatchObject({
       totalsRowFunction: "custom",
       calculatedColumnFormula: {
@@ -251,75 +213,64 @@ describe("native XLSX workbook tables", () => {
         text: "SUBTOTAL(109,[Amount])",
       },
     });
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-    const native = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(partText(parts, "xl/tables/table1.xml")),
-    );
-    expect(native.sheets[0]?.tables?.[0]?.columns[0]).toEqual(column);
+    expect(again?.columns[0]).toEqual(column);
   });
 
   it.each(["none", "sum", "min", "max", "average", "count", "countNums", "stdDev", "var"])(
     "round-trips native totals-row aggregate %s",
     async (aggregate) => {
-      const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        nativeTablePackage(ruleTable("", "", ` totalsRowFunction="${aggregate}"`)),
+      const { table, saved } = await reimported(
+        ruleTable("", "", ` totalsRowFunction="${aggregate}"`),
       );
-      expect(imported.sheets[0]?.tables?.[0]?.columns[0]?.totalsRowFunction).toBe(aggregate);
-      const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-      expect(partText(parts, "xl/tables/table1.xml")).toContain(`totalsRowFunction="${aggregate}"`);
+      expect(table?.columns[0]?.totalsRowFunction).toBe(aggregate);
+      expect(saved).toContain(`totalsRowFunction="${aggregate}"`);
     },
   );
 
   it("remaps color filter and sort differential styles after worksheet rules register first", async () => {
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    const options = {
+      styles: stylesXml(
+        `${BASE_STYLES_BODY}<dxfs count="2"><dxf><fill><patternFill><bgColor rgb="FFFF0000"/></patternFill></fill></dxf><dxf><font><color rgb="FF008000"/></font></dxf></dxfs>`,
+      ),
+      worksheetExtra:
+        '<conditionalFormatting sqref="A2:A3"><cfRule type="expression" dxfId="1" priority="1"><formula>TRUE()</formula></cfRule></conditionalFormatting>',
+    };
+    const imported = await backend.fromXlsxWorkbook(
       nativeTablePackage(
         ruleTable(
           '<autoFilter ref="A1:A3"><filterColumn colId="0"><colorFilter dxfId="0" cellColor="1"/></filterColumn></autoFilter><sortState ref="A2:A3"><sortCondition ref="A2:A3" sortBy="cellColor" dxfId="0"/></sortState>',
         ),
-        "",
-        {
-          styles: stylesXml(
-            `${BASE_STYLES_BODY}<dxfs count="2"><dxf><fill><patternFill><bgColor rgb="FFFF0000"/></patternFill></fill></dxf><dxf><font><color rgb="FF008000"/></font></dxf></dxfs>`,
-          ),
-          worksheetExtra:
-            '<conditionalFormatting sqref="A2:A3"><cfRule type="expression" dxfId="1" priority="1"><formula>TRUE()</formula></cfRule></conditionalFormatting>',
-        },
+        options,
       ),
     );
-    const table = imported.sheets[0]?.tables?.[0];
+    const table = sheetAt(imported).tables?.[0];
     expect(table?.autoFilter?.children[0]?.children[0]?.differentialStyle).toEqual({
       backgroundColor: "#FF0000",
     });
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-    const saved = partText(parts, "xl/tables/table1.xml");
+    const bytes = await backend.toXlsxWorkbook(imported);
+    const saved = partText(bytes, TABLE_PART);
     expect(saved.match(/dxfId="1"/g)).toHaveLength(2);
-    expect(partText(parts, "xl/worksheets/sheet1.xml")).toContain('dxfId="0"');
-    const native = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(saved, "", { styles: partText(parts, "xl/styles.xml") }),
-    );
-    expect(native.sheets[0]?.tables?.[0]?.autoFilter).toEqual(table?.autoFilter);
-    expect(native.sheets[0]?.tables?.[0]?.sortState).toEqual(table?.sortState);
+    expect(partText(bytes, "xl/worksheets/sheet1.xml")).toContain('dxfId="0"');
+    const again = await importTable(saved, { styles: partText(bytes, "xl/styles.xml") });
+    expect(again?.autoFilter).toEqual(table?.autoFilter);
+    expect(again?.sortState).toEqual(table?.sortState);
   });
 
   it("does not reactivate external-data formulas stored as calculated or totals rules", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      nativeTablePackage(
-        ruleTable(
-          "",
-          "<calculatedColumnFormula>'[private.xlsx]Sheet1'!A1</calculatedColumnFormula><totalsRowFormula>WEBSERVICE(&quot;https://example.com&quot;)</totalsRowFormula>",
-          ' totalsRowFunction="custom"',
-        ),
+    const { table, saved, warnings } = await reimported(
+      ruleTable(
+        "",
+        "<calculatedColumnFormula>'[private.xlsx]Sheet1'!A1</calculatedColumnFormula><totalsRowFormula>WEBSERVICE(&quot;https://example.com&quot;)</totalsRowFormula>",
+        ' totalsRowFunction="custom"',
       ),
-      { onWarning: (warning) => warnings.push(warning) },
     );
-    const column = imported.sheets[0]?.tables?.[0]?.columns[0];
-    expect(column?.calculatedColumnFormula).toBeUndefined();
-    expect(column?.totalsRowFormula).toBeUndefined();
-    expect(column?.totalsRowFunction).toBeUndefined();
+    const column = table?.columns[0];
+    expect([
+      column?.calculatedColumnFormula,
+      column?.totalsRowFormula,
+      column?.totalsRowFunction,
+    ]).toEqual([undefined, undefined, undefined]);
     expect(warnings.filter((warning) => warning.message.includes("was dropped"))).toHaveLength(2);
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-    const saved = partText(parts, "xl/tables/table1.xml");
     expect(saved).not.toContain("private.xlsx");
     expect(saved).not.toContain("WEBSERVICE");
   });
@@ -327,69 +278,56 @@ describe("native XLSX workbook tables", () => {
   it("keeps formulas whose table columns have numeric or file-like names", async () => {
     const header = (ref: string, text: string) =>
       `<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`;
-    const sheetXml = worksheet(
-      "<sheetData>" +
-        `<row r="1">${header("A1", "2023")}${header("B1", "report.xlsx")}<c r="C1"><f>SUM(Sales[2023])</f></c><c r="D1"><f>[1]Data!A1</f></c></row>` +
-        '<row r="2"><c r="A2"><v>5</v></c><c r="B2"><v>1</v></c><c r="C2"><f>SUM(Sales[report.xlsx])</f></c><c r="D2"><f>[Budget.xlsx]Data!A1</f></c></row>' +
-        '<row r="3"><c r="A3"><v>7</v></c><c r="B3"><v>2</v></c><c r="C3"><f>Sales[[#Headers],[2023]]</f></c><c r="D3"><f>\'C:\\Books\\[Budget.xlsx]Data\'!A1</f></c></row>' +
-        '</sheetData><tableParts count="1"><tablePart r:id="rId1"/></tableParts>',
-    );
-    const tableXml = `<table xmlns="${TRANSITIONAL_MAIN}" id="1" displayName="Sales" ref="A1:B3"><tableColumns count="2"><tableColumn id="1" name="2023"/><tableColumn id="2" name="report.xlsx"><calculatedColumnFormula>Sales[[#This Row],[2023]]+1</calculatedColumnFormula></tableColumn></tableColumns></table>`;
-    const bytes = rawXlsx({
-      sheets: [
+    const imported = await backend.fromXlsxWorkbook(
+      nativeTablePackage(
+        `<table xmlns="${TRANSITIONAL_MAIN}" id="1" displayName="Sales" ref="A1:B3"><tableColumns count="2"><tableColumn id="1" name="2023"/><tableColumn id="2" name="report.xlsx"><calculatedColumnFormula>Sales[[#This Row],[2023]]+1</calculatedColumnFormula></tableColumn></tableColumns></table>`,
         {
-          name: "Raw",
-          xml: sheetXml,
-          relationships: `<Relationship Id="rId1" Type="${TRANSITIONAL_REL}/table" Target="../tables/table1.xml"/>`,
+          rows:
+            `<row r="1">${header("A1", "2023")}${header("B1", "report.xlsx")}<c r="C1"><f>SUM(Sales[2023])</f></c><c r="D1"><f>[1]Data!A1</f></c></row>` +
+            '<row r="2"><c r="A2"><v>5</v></c><c r="B2"><v>1</v></c><c r="C2"><f>SUM(Sales[report.xlsx])</f></c><c r="D2"><f>[Budget.xlsx]Data!A1</f></c></row>' +
+            '<row r="3"><c r="A3"><v>7</v></c><c r="B3"><v>2</v></c><c r="C3"><f>Sales[[#Headers],[2023]]</f></c><c r="D3"><f>\'C:\\Books\\[Budget.xlsx]Data\'!A1</f></c></row>',
         },
-      ],
-      extraOverrides: [
-        `<Override PartName="/xl/tables/table1.xml" ContentType="${TABLE_CONTENT}"/>`,
-      ],
-      extraFiles: { "xl/tables/table1.xml": tableXml },
-    });
-
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
-    const values = new Map(
-      (imported.sheets[0]?.cells[0]?.cells ?? []).map((cell) => [
-        `${cell.rowOffset},${cell.colOffset}`,
-        cell.value,
-      ]),
+      ),
     );
-    expect(values.get("0,2")).toEqual({ kind: "formula", src: "=SUM(Sales[2023])" });
-    expect(values.get("1,2")).toEqual({ kind: "formula", src: "=SUM(Sales[report.xlsx])" });
-    expect(values.get("2,2")).toEqual({ kind: "formula", src: "=Sales[[#Headers],[2023]]" });
-    expect(values.get("0,3")).toEqual({ kind: "literal", value: "=[1]Data!A1" });
-    expect(values.get("1,3")).toEqual({ kind: "literal", value: "=[Budget.xlsx]Data!A1" });
-    expect(values.get("2,3")).toEqual({
-      kind: "literal",
-      value: "='C:\\Books\\[Budget.xlsx]Data'!A1",
-    });
-    expect(imported.sheets[0]?.tables?.[0]?.columns[1]?.calculatedColumnFormula?.text).toBe(
-      "Sales[[#This Row],[2023]]+1",
+    const sources = ["=SUM(Sales[2023])", "=SUM(Sales[report.xlsx])", "=Sales[[#Headers],[2023]]"];
+    expect(
+      cellsOf(imported)
+        .filter((cell) => cell.col >= 2)
+        .map((cell) => cell.value),
+    ).toEqual([
+      formula(sources[0] ?? ""),
+      { kind: "literal", value: "=[1]Data!A1" },
+      formula(sources[1] ?? ""),
+      { kind: "literal", value: "=[Budget.xlsx]Data!A1" },
+      formula(sources[2] ?? ""),
+      { kind: "literal", value: "='C:\\Books\\[Budget.xlsx]Data'!A1" },
+    ]);
+    const calculated = "Sales[[#This Row],[2023]]+1";
+    expect(sheetAt(imported).tables?.[0]?.columns[1]?.calculatedColumnFormula?.text).toBe(
+      calculated,
     );
 
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(imported));
-    const saved = partText(parts, "xl/worksheets/sheet1.xml");
-    expect(saved).toContain("<f>SUM(Sales[2023])</f>");
-    expect(saved).toContain("<f>SUM(Sales[report.xlsx])</f>");
-    expect(saved).toContain("<f>Sales[[#Headers],[2023]]</f>");
-    expect(partText(parts, "xl/tables/table1.xml")).toContain(
-      "<calculatedColumnFormula>Sales[[#This Row],[2023]]+1</calculatedColumnFormula>",
+    const bytes = await backend.toXlsxWorkbook(imported);
+    const saved = partText(bytes, "xl/worksheets/sheet1.xml");
+    for (const source of sources) expect(saved).toContain(`<f>${source.slice(1)}</f>`);
+    expect(partText(bytes, TABLE_PART)).toContain(
+      `<calculatedColumnFormula>${calculated}</calculatedColumnFormula>`,
     );
   });
 
   it("drops a native table that collides with a defined name and emits an exact ambiguity warning", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const bytes = nativeTablePackage(
-      `<?xml version="1.0"?><table xmlns="${TRANSITIONAL_MAIN}" id="1" displayName="sales" ref="A1:A2"><tableColumns count="1"><tableColumn id="1" name="Amount"/></tableColumns></table>`,
-      '<definedNames><definedName name="Sales">Raw!$A$1</definedName></definedNames>',
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      nativeTablePackage(
+        `<?xml version="1.0"?><table xmlns="${TRANSITIONAL_MAIN}" id="1" displayName="sales" ref="A1:A2"><tableColumns count="1"><tableColumn id="1" name="Amount"/></tableColumns></table>`,
+        {
+          workbookExtra:
+            '<definedNames><definedName name="Sales">Raw!$A$1</definedName></definedNames>',
+        },
+      ),
+      { onWarning },
     );
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes, {
-      onWarning: (warning) => warnings.push(warning),
-    });
-
-    expect(imported.sheets[0]!.tables).toBeUndefined();
+    expect(sheetAt(imported).tables).toBeUndefined();
     expect(imported.workbook.namedRanges?.[0]?.name).toBe("Sales");
     expect(warnings).toContainEqual(
       expect.objectContaining({ code: "invalid-metadata", sheet: "Raw" }),

@@ -1,79 +1,63 @@
 import { beforeAll, expect, it } from "bun:test";
 
-import {
-  type DashboardExport,
-  initSheetwrite,
-  type WorkbookSnapshot,
-  type XlsxWorkbookWarning,
-} from "@sheetwrite/core";
-import { strFromU8, unzipSync } from "fflate";
+import { type DashboardExport, initSheetwrite, type WorkbookSnapshot } from "@sheetwrite/core";
 
-import { sheetwriteWorkbookBackend } from "../src/index.js";
+import { sheetwriteWorkbookBackend as backend } from "../src/index.js";
+import {
+  book,
+  collectWarnings,
+  partNames,
+  partText,
+  range,
+  sheet,
+  sheetNamed,
+} from "./workbook-fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
+const CHART = {
+  id: "chart",
+  kind: "column" as const,
+  title: "By region",
+  anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+  series: [],
+  pivot: "by-region",
+};
+
 /** Orders on Data, and the dashboard Dash with a pivot, a slicer, a chart and a KPI card. */
 function snapshot(): WorkbookSnapshot {
-  const text = (row: number, col: number, value: string | number) => ({
-    rowOffset: row,
-    colOffset: col,
-    value: { kind: "literal" as const, value },
-  });
-  return {
-    schemaVersion: 1,
-    workbook: {
-      activeSheet: "data",
-      dataModel: {
-        relationships: [],
-        measures: [
-          { id: "total", name: "Total", table: "orders", formula: "=SUM(Orders[Amount])" },
+  return book(
+    [
+      sheet(
+        "data",
+        "Data",
+        [
+          ["Region", "Amount"],
+          ["East", 1],
+          ["West", 2],
         ],
-      },
-    },
-    sheets: [
-      {
-        id: "data",
-        name: "Data",
-        order: 0,
-        rowCount: 3,
-        columns: ["a", "b"].map((key) => ({ key, header: key, width: 80, type: "text" as const })),
-        tables: [
-          {
-            id: "orders",
-            name: "Orders",
-            range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
-            columns: [
-              { id: "region", name: "Region" },
-              { id: "amount", name: "Amount" },
-            ],
-            headerRow: true,
-            totalsRow: false,
-          },
-        ],
-        cells: [
-          {
-            startRow: 0,
-            startCol: 0,
-            rowCount: 3,
-            colCount: 2,
-            cells: [
-              text(0, 0, "Region"),
-              text(0, 1, "Amount"),
-              text(1, 0, "East"),
-              text(1, 1, 1),
-              text(2, 0, "West"),
-              text(2, 1, 2),
-            ],
-          },
-        ],
-      },
-      {
-        id: "dash",
-        name: "Dash",
-        order: 1,
+        {
+          tables: [
+            {
+              id: "orders",
+              name: "Orders",
+              range: range("data", 0, 0, 2, 1),
+              columns: [
+                { id: "region", name: "Region" },
+                { id: "amount", name: "Amount" },
+              ],
+              headerRow: true,
+              totalsRow: false,
+            },
+          ],
+        },
+      ),
+      sheet("dash", "Dash", [], {
         kind: "dashboard",
+        rowCount: 0,
+        columns: [],
         dashboard: {
           items: [
             { id: "sales", box: { x: 0, y: 0, w: 4, h: 4 }, kind: "pivot", pivot: "by-region" },
@@ -88,8 +72,6 @@ function snapshot(): WorkbookSnapshot {
             { id: "chart-item", box: { x: 0, y: 4, w: 6, h: 8 }, kind: "chart", chart: "chart" },
           ],
         },
-        rowCount: 0,
-        columns: [],
         pivots: [
           {
             id: "by-region",
@@ -101,131 +83,108 @@ function snapshot(): WorkbookSnapshot {
             values: [{ field: 1, aggregation: "SUM", numberFormat: "0.00" }],
           },
         ],
-        charts: [
-          {
-            id: "chart",
-            kind: "column",
-            title: "By region",
-            anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 },
-            series: [],
-            pivot: "by-region",
-          },
-        ],
-        cells: [],
-      },
+        charts: [CHART],
+      }),
     ],
-  };
+    {
+      dataModel: {
+        relationships: [],
+        measures: [
+          { id: "total", name: "Total", table: "orders", formula: "=SUM(Orders[Amount])" },
+        ],
+      },
+    },
+  );
 }
 
 /** What core computes for Dash with the West slicer: the static values of each item. */
-function content(chart: WorkbookSnapshot["sheets"][number]["charts"]): DashboardExport[] {
-  const definition = chart?.[0];
-  if (definition === undefined) throw new Error("the fixture has a chart");
-  return [
-    {
-      sheet: "dash",
-      items: [
-        {
-          id: "sales",
-          cells: [["By region"], ["Region", "Sum of Amount"], ["West", 2], ["Total", 2]],
-          numberFormats: [[null], [null, null], [null, "0.00"], [null, "0.00"]],
+const DASHBOARDS: DashboardExport[] = [
+  {
+    sheet: "dash",
+    items: [
+      {
+        id: "sales",
+        cells: [["By region"], ["Region", "Sum of Amount"], ["West", 2], ["Total", 2]],
+        numberFormats: [[null], [null, null], [null, "0.00"], [null, "0.00"]],
+      },
+      { id: "region", cells: [["Region"], ["West"]], numberFormats: [[null], [null]] },
+      { id: "kpi", cells: [["Total"], [2]], numberFormats: [[null], [null]] },
+      {
+        id: "chart-item",
+        cells: [],
+        numberFormats: [],
+        chart: {
+          chart: CHART,
+          series: [
+            {
+              name: "Sum of Amount",
+              values: [2],
+              categories: ["West"],
+              categoryLevels: [],
+              numberFormats: ["0.00"],
+              categoryFormats: [null],
+              numberLocale: null,
+              truncated: false,
+              referenceError: false,
+            },
+          ],
         },
-        { id: "region", cells: [["Region"], ["West"]], numberFormats: [[null], [null]] },
-        { id: "kpi", cells: [["Total"], [2]], numberFormats: [[null], [null]] },
-        {
-          id: "chart-item",
-          cells: [],
-          numberFormats: [],
-          chart: {
-            chart: definition,
-            series: [
-              {
-                name: "Sum of Amount",
-                values: [2],
-                categories: ["West"],
-                categoryLevels: [],
-                numberFormats: ["0.00"],
-                categoryFormats: [null],
-                numberLocale: null,
-                truncated: false,
-                referenceError: false,
-              },
-            ],
-          },
-        },
-      ],
-    },
-  ];
-}
+      },
+    ],
+  },
+];
 
-async function exported(dashboards?: DashboardExport[]) {
-  const warnings: XlsxWorkbookWarning[] = [];
-  const input = snapshot();
-  const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(
-    input,
-    { onWarning: (warning) => warnings.push(warning) },
-    dashboards ? { dashboards } : undefined,
-  );
-  return { bytes, warnings, files: unzipSync(bytes) };
-}
+it("writes a dashboard as a worksheet of its values and a chart, and opens it as the same dashboard", async () => {
+  const { warnings, onWarning } = collectWarnings();
+  const bytes = await backend.toXlsxWorkbook(snapshot(), { onWarning }, { dashboards: DASHBOARDS });
 
-it("writes a dashboard as a worksheet of its values and a chart that reads the pivot item's cells", async () => {
-  const { files, warnings } = await exported(content(snapshot().sheets[1]?.charts));
-
-  const sheet = strFromU8(files["xl/worksheets/sheet2.xml"] ?? new Uint8Array());
+  const xml = partText(bytes, "xl/worksheets/sheet2.xml");
   // Each item starts at its box: the pivot at A1, the slicer at E1, the KPI card at G1.
-  const inline = (ref: string, value: string) =>
-    new RegExp(`<c r="${ref}"[^>]*t="inlineStr"[^>]*><is><t[^>]*>${value}</t></is></c>`, "u");
-  expect(sheet).toMatch(inline("A1", "By region"));
-  expect(sheet).toMatch(inline("A3", "West"));
-  expect(sheet).toMatch(/<c r="B3"[^>]*><v>2<\/v><\/c>/u);
-  expect(sheet).toMatch(inline("E1", "Region"));
-  expect(sheet).toMatch(inline("E2", "West"));
-  expect(sheet).toMatch(inline("G1", "Total"));
-  expect(sheet).toMatch(/<c r="G2"[^>]*><v>2<\/v><\/c>/u);
-  // No native pivot: the dashboard's pivot stays in metadata.
-  expect(Object.keys(files).filter((name) => name.startsWith("xl/pivotTables/"))).toEqual([]);
-
+  for (const [ref, value] of [
+    ["A1", "By region"],
+    ["A3", "West"],
+    ["E1", "Region"],
+    ["E2", "West"],
+    ["G1", "Total"],
+  ]) {
+    expect(xml).toMatch(
+      new RegExp(`<c r="${ref}"[^>]*t="inlineStr"[^>]*><is><t[^>]*>${value}</t></is></c>`, "u"),
+    );
+  }
+  expect(xml).toMatch(/<c r="B3"[^>]*><v>2<\/v><\/c>/u);
+  expect(xml).toMatch(/<c r="G2"[^>]*><v>2<\/v><\/c>/u);
+  // No native pivot: the dashboard's pivot stays in metadata, so the chart is not a PivotChart.
+  expect(partNames(bytes).filter((name) => name.startsWith("xl/pivotTables/"))).toEqual([]);
+  const chartPart = partNames(bytes).find((name) => name.startsWith("xl/charts/")) ?? "";
+  const chart = partText(bytes, chartPart);
   // The chart reads West and 2 where the pivot item wrote them, with the values as its cache.
-  const chartPart = Object.keys(files).find((name) => name.startsWith("xl/charts/"));
-  const chart = strFromU8(files[chartPart ?? ""] ?? new Uint8Array());
   expect(chart).toContain(
     '<c:cat><c:strRef><c:f>&apos;Dash&apos;!$A$3:$A$3</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>West</c:v></c:pt></c:strCache></c:strRef></c:cat>',
   );
   expect(chart).toContain(
     '<c:val><c:numRef><c:f>&apos;Dash&apos;!$B$3:$B$3</c:f><c:numCache><c:formatCode>0.00</c:formatCode><c:ptCount val="1"/><c:pt idx="0"><c:v>2</c:v></c:pt></c:numCache></c:numRef></c:val>',
   );
-  // The dashboard has no native pivot, so the chart is not a PivotChart in Excel.
   expect(chart).not.toContain("<c:pivotSource>");
-
   expect(warnings.map((warning) => warning.message)).toEqual([
     "Dashboard sheets were written as worksheets of their current values and charts; they are interactive only in Sheetwrite",
   ]);
-});
 
-it("opens an exported dashboard as the same dashboard, without its static values", async () => {
-  const { bytes } = await exported(content(snapshot().sheets[1]?.charts));
-  const warnings: XlsxWorkbookWarning[] = [];
-  const reopened = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes, {
-    onWarning: (warning) => warnings.push(warning),
-  });
-
-  const dash = reopened.sheets.find((sheet) => sheet.name === "Dash");
-  const authored = snapshot().sheets[1];
-  expect(dash).toMatchObject({
+  const reopenWarnings = collectWarnings();
+  const reopened = await backend.fromXlsxWorkbook(bytes, { onWarning: reopenWarnings.onWarning });
+  const authored = sheetNamed(snapshot(), "Dash");
+  expect(sheetNamed(reopened, "Dash")).toMatchObject({
     kind: "dashboard",
     rowCount: 0,
     columns: [],
     cells: [],
-    dashboard: authored?.dashboard,
-    pivots: authored?.pivots,
-    charts: authored?.charts,
+    dashboard: authored.dashboard,
+    pivots: authored.pivots,
+    charts: authored.charts,
   });
-  expect(warnings).toEqual([]);
+  expect(reopenWarnings.warnings).toEqual([]);
 });
 
 it("writes an empty worksheet for a dashboard exported without computed values", async () => {
-  const { files } = await exported();
-  const sheet = strFromU8(files["xl/worksheets/sheet2.xml"] ?? new Uint8Array());
-  expect(sheet).not.toContain("<c ");
+  const bytes = await backend.toXlsxWorkbook(snapshot());
+  expect(partText(bytes, "xl/worksheets/sheet2.xml")).not.toContain("<c ");
 });

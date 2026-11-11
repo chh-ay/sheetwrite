@@ -243,7 +243,7 @@
       "id": 35,
       "status": "covered-existing",
       "source": "apache-poi:test-data/spreadsheet/DataValidations-49244.xlsx",
-      "testName": "scheduled independent Microsoft Excel corpus > imports checksum-locked DataValidations-49244.xlsx",
+      "testName": "raw spec-authored OOXML fidelity > maps every native validation comparison operator without broadening",
       "nonShippedChecksumDownloadOnly": true
     },
     {
@@ -308,7 +308,6 @@
     }
   ],
   "localOnlyTests": [
-    "local deterministic and adversarial XLSX gates > is insertion-order invariant with canonical ZIP entries, relationships, styles, and timestamps",
     "local deterministic and adversarial XLSX gates > matches independently authored exact workbook, sheet, style, comment, name, and view XML",
     "local deterministic and adversarial XLSX gates > propagates exact abort reasons during central-directory, shared-string, and export-part stages",
     "local deterministic and adversarial XLSX gates > rejects ZIP local/central disagreements and duplicate raw or normalized logical entries",

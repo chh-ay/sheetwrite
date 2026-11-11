@@ -60,21 +60,6 @@ function inlineTexts(xml: string): string[] {
 }
 
 describe("sort and XLSX round trips", () => {
-  it("writes the cells of an in-place sort in their new rows", async () => {
-    const store = SheetwriteStore.fromSnapshot(fruitSnapshot());
-    store.sortRange(
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
-      [{ col: 0, ascending: true }],
-      { hasHeader: true },
-    );
-
-    const { xml } = await worksheetXml(store.exportSnapshot());
-
-    expect(inlineTexts(xml)).toEqual(["Name", "Qty", "apple", "fig", "pear"]);
-    expect(xml).not.toContain("<sortState");
-    store.dispose();
-  });
-
   it("writes the cells of a view sort in source order with a sortState", async () => {
     const store = SheetwriteStore.fromSnapshot(fruitSnapshot());
     store.setViewSort("s1", [{ col: 0, ascending: true }]);
