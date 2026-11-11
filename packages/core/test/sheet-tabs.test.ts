@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { POPUP_VIEWPORT_MARGIN } from "../src/menu-surface.js";
 import { type SheetTabRecord, SheetTabs, type SheetTabsOptions } from "../src/sheet-tabs.js";
 import type { SheetLifecycleResult } from "../src/types/grid.js";
+import { pressLikeWebKit } from "./fixtures.js";
 
 const SHEETS: readonly SheetTabRecord[] = [
   { id: "a", name: "Sales" },
@@ -470,6 +471,36 @@ describe("SheetTabs", () => {
       "add",
       "unhide:hidden",
     ]);
+  });
+
+  it("keeps its menus open for a press on a choice that does not focus the choice", () => {
+    const actions: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onHide: (id) => {
+        actions.push(`hide:${id}`);
+        return applied(id);
+      },
+      onUnhide: (id) => {
+        actions.push(`unhide:${id}`);
+        return applied(id);
+      },
+    });
+    tabs.update([...SHEETS, { id: "hidden", name: "Hidden", visibility: "hidden" }], "b");
+
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Options for Sales sheet"]',
+    )!;
+    trigger.focus();
+    key(trigger, "ArrowDown");
+    pressLikeWebKit(host.querySelector<HTMLButtonElement>('[aria-label="Hide Sales sheet"]')!);
+
+    const unhide = host.querySelector<HTMLButtonElement>('[aria-label="Unhide sheet"]')!;
+    unhide.click();
+    pressLikeWebKit(host.querySelector('[aria-label="Hidden sheets"]')!.querySelector("button")!);
+
+    expect(actions).toEqual(["hide:b", "unhide:hidden"]);
   });
 
   it("supports pointer drag reorder and maps drops to workbook indexes through hidden sheets", () => {

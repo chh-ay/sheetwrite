@@ -10,10 +10,10 @@ import {
 
 import { HighlightedCode } from "../components/HighlightedCode.js";
 import { type CodeToken, tokenizeCode } from "../lib/code-tokens.js";
+import type { ExampleError } from "./example-error.js";
 import { EDITOR_HINT, expectedResultHeight } from "./layout.js";
 import {
   type ConsoleEntry,
-  type ExampleError,
   followSiteTheme,
   frameDocument,
   runExample,

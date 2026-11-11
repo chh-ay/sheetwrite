@@ -1,4 +1,5 @@
 import { formatValue } from "./console-format.js";
+import { type ExampleError, exampleError, SOURCE_NAME } from "./example-error.js";
 import { type PlaygroundRuntime, RUNTIME_KEY } from "./runtime-contract.js";
 // A worker bundle is built on its own, so the engine and packages the frame
 // loads never join the page's chunks.
@@ -18,13 +19,6 @@ export interface ConsoleEntry {
   readonly text: string;
 }
 
-/** An error of the example, at its line in the example when the stack names it. */
-export interface ExampleError {
-  readonly name: string;
-  readonly message: string;
-  readonly line: number | undefined;
-}
-
 /** Where a run reports to. */
 export interface ExampleReporter {
   console(entry: ConsoleEntry): void;
@@ -34,15 +28,6 @@ export interface ExampleReporter {
 type ConsoleLevel = "log" | "info" | "warn" | "error" | "debug";
 const CONSOLE_LEVELS: readonly ConsoleLevel[] = ["log", "info", "warn", "error", "debug"];
 
-/** The example's file name in stack traces and compile errors. */
-const SOURCE_NAME = "example.ts";
-/** A stack frame in the example: `example.ts:<line>:<column>`. */
-const SOURCE_LOCATION = /example\.ts:(\d+):\d+/;
-/**
- * Lines before the example's first line in the function that runs it: the two
- * lines every engine puts before a `Function` body, then the async wrapper.
- */
-const WRAPPER_LINES = 3;
 /** Compiles TypeScript to JavaScript; imports become `require` calls the frame answers. */
 async function compile(code: string): Promise<string> {
   const { transform } = await import("sucrase");
@@ -59,24 +44,6 @@ function requiredSpecifiers(compiled: string): string[] {
     (match) => match[2] ?? "",
   );
   return [...new Set(specifiers)];
-}
-
-/** The example line a stack trace or compile error points at. */
-function exampleLine(text: string | undefined, offset: number): number | undefined {
-  const match = SOURCE_LOCATION.exec(text ?? "");
-  if (match?.[1] === undefined) return undefined;
-  const line = Number.parseInt(match[1], 10) - offset;
-  return line >= 1 ? line : undefined;
-}
-
-/** An error from the frame. Its realm differs from the page's, so it is read by shape. */
-function exampleError(reason: unknown): ExampleError {
-  if (typeof reason === "object" && reason !== null && "message" in reason) {
-    const name = "name" in reason && typeof reason.name === "string" ? reason.name : "Error";
-    const stack = "stack" in reason && typeof reason.stack === "string" ? reason.stack : undefined;
-    return { name, message: String(reason.message), line: exampleLine(stack, WRAPPER_LINES) };
-  }
-  return { name: "Error", message: String(reason), line: undefined };
 }
 
 /** A compile error: Sucrase ends its message with the position, as `(line:column)`. */

@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
+import { assertIconSheetEmitted } from "../icon-sheet.mjs";
 import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
@@ -291,13 +292,21 @@ for (const file of rolesByFile.keys()) {
     throw new Error(`Vite manifest asset is missing from output: ${file}`);
 }
 
-const stylesheets = publicFiles.filter((path) => path.endsWith(".css"));
-const css = (
-  await Promise.all(stylesheets.map((path) => readFile(resolve(root, path), "utf8")))
-).join("\n");
-if (!css.includes(".sheetwrite")) {
+const stylesheets = await Promise.all(
+  publicFiles
+    .filter((path) => path.endsWith(".css"))
+    .map(async (path) => ({ path, text: await readFile(resolve(root, path), "utf8") })),
+);
+if (!stylesheets.some(({ text }) => text.includes(".sheetwrite"))) {
   throw new Error("Packed adapter stylesheets did not resolve canonical core CSS");
 }
+await assertIconSheetEmitted({
+  bundler: "Vite",
+  stylesheets,
+  resolveUrl: (url, path) =>
+    url.startsWith("/") ? resolve(root, `.${url}`) : resolve(root, dirname(path), url),
+  packagedSheet: resolve("node_modules/@sheetwrite/core/styles/icons.svg"),
+});
 const javascript = publicFiles.filter((path) => path.endsWith(".js"));
 const browserGraph = (
   await Promise.all(javascript.map((path) => readFile(resolve(root, path), "utf8")))

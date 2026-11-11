@@ -298,8 +298,11 @@ test("@portability native tabs expose the complete accessible worksheet lifecycl
   await page.keyboard.press("Escape");
   await expect(ordersOptions).toBeFocused();
   await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
-  await ordersOptions.click();
-  await page.getByRole("menuitem", { name: "Rename Orders sheet" }).click();
+  // A pointer press on a focused menu must not close it first (WebKit does not
+  // focus pressed buttons).
+  await page.keyboard.press("ArrowDown");
+  await expect(renameOption).toBeFocused();
+  await renameOption.click();
   const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
   await editor.fill("Suppliers");
   await editor.press("Enter");
