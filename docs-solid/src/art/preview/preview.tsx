@@ -370,7 +370,7 @@ function Parts() {
 function DocParts() {
   const marks: readonly SectionMarkName[] = ["guides", "api", "formulas", "changelog"];
   const parts: readonly (readonly [string, () => JSX.Element])[] = [
-    ...Object.entries(DOCS_CARD_ART).map(([id, Art]) => [`card:${id}`, Art] as const),
+    ...Object.entries(DOCS_CARD_ART).map(([id, Art]) => [`card:${id}`, () => <Art />] as const),
     ...Object.entries(DOCS_DIAGRAMS).map(
       ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
     ),

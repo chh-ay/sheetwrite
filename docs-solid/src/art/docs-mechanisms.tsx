@@ -1,6 +1,6 @@
 // Diagrams for the docs sections that explain how something works: one per
 // mechanism, beside the section's text. Every label comes from that section.
-import { For, type JSX } from "solid-js";
+import { For, type JSX, Show } from "solid-js";
 
 import { head, Panel, Sheet } from "./Art.js";
 import { Arrow, Box, type DiagramText, NARROW, Responsive } from "./diagram-kit.js";
@@ -16,7 +16,7 @@ interface FlowStep {
   readonly tone?: string;
 }
 
-/** A side outcome drawn under one step, reached by its own arrow. */
+/** A side outcome of one step, drawn across the row below and reached by its own arrow. */
 interface FlowBranch {
   readonly from: number;
   readonly step: FlowStep;
@@ -27,25 +27,44 @@ const stepHeight = (step: FlowStep) =>
   34 + ((step.lines?.length ?? 0) + (step.code?.length ?? 0)) * 16 + 6;
 const rowHeight = (steps: readonly FlowStep[]) => Math.max(...steps.map(stepHeight));
 
+/** Caption characters that fit across the small-screen layout. */
+const NARROW_NOTE_CHARS = 46;
+
+/** Splits a caption into lines of at most `max` characters, breaking between words. */
+function wrapWords(text: string, max: number): string[] {
+  const lines: string[] = [];
+  for (const word of text.split(" ")) {
+    const last = lines.at(-1);
+    if (last !== undefined && last.length + 1 + word.length <= max)
+      lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word);
+  }
+  return lines;
+}
+
 /**
- * A left-to-right flow of steps, with optional outcomes under some steps; on
- * small screens the steps run top to bottom and the outcomes follow them.
+ * A left-to-right flow of steps, with an optional outcome of one step across
+ * the row below; on small screens the steps run top to bottom and the outcome
+ * follows them.
  */
 function FlowDiagram(
   props: Readonly<{
     text: DiagramText;
     steps: readonly FlowStep[];
-    branches?: readonly FlowBranch[];
+    branch?: FlowBranch;
     note?: string;
   }>,
 ) {
-  const branches = () => props.branches ?? [];
   const width = () => (COLUMN - 16 - (props.steps.length - 1) * 18) / props.steps.length;
   const mainHeight = () => rowHeight(props.steps);
-  const branchHeight = () =>
-    branches().length === 0 ? 0 : rowHeight(branches().map((branch) => branch.step));
+  const branchHeight = () => (props.branch === undefined ? 0 : stepHeight(props.branch.step));
   const wideHeight = () =>
-    8 + mainHeight() + (branches().length === 0 ? 0 : 40 + branchHeight()) + (props.note ? 36 : 12);
+    8 +
+    mainHeight() +
+    (props.branch === undefined ? 0 : 40 + branchHeight()) +
+    (props.note ? 36 : 12);
+  const noteLines = () =>
+    props.note === undefined ? [] : wrapWords(props.note, NARROW_NOTE_CHARS);
   const narrowLayout = () => {
     let y = 4;
     const steps = props.steps.map((step) => {
@@ -53,12 +72,20 @@ function FlowDiagram(
       y += placed.h + 26;
       return placed;
     });
-    const outcomes = branches().map((branch) => {
-      const placed = { branch, y, h: stepHeight(branch.step) };
-      y += placed.h + 14;
-      return placed;
-    });
-    return { steps, outcomes, height: y + (props.note ? 40 : 0) };
+    const outcome =
+      props.branch === undefined
+        ? undefined
+        : { branch: props.branch, y, h: stepHeight(props.branch.step) };
+    if (outcome !== undefined) y += outcome.h + 14;
+    // The last box's lower edge: each placement above added its box and the gap after it.
+    const bottom = y - (outcome === undefined ? 26 : 14);
+    const notes = noteLines().length;
+    return {
+      steps,
+      outcome,
+      noteBaseline: bottom + 24,
+      height: bottom + (notes === 0 ? 8 : 24 + (notes - 1) * 18 + 10),
+    };
   };
   return (
     <Responsive
@@ -91,31 +118,16 @@ function FlowDiagram(
                 </>
               )}
             </For>
-            <For each={narrowLayout().outcomes}>
-              {(placed) => (
-                <>
-                  <path
-                    class={placed.branch.arrow ?? "alt-line"}
-                    d={`M14 ${placed.y - 8}v${placed.h / 2 + 8}h12${head(26, placed.y + placed.h / 2, 0)}`}
-                  />
-                  <Box
-                    class={placed.branch.step.tone ?? "alt-soft"}
-                    code={placed.branch.step.code}
-                    h={placed.h}
-                    lines={placed.branch.step.lines}
-                    title={placed.branch.step.title}
-                    w={NARROW - 36}
-                    x={30}
-                    y={placed.y}
-                  />
-                </>
+            <Show when={narrowLayout().outcome}>
+              {(outcome) => <NarrowOutcome {...outcome()} />}
+            </Show>
+            <For each={noteLines()}>
+              {(line, index) => (
+                <text class="caption" x={4} y={narrowLayout().noteBaseline + index() * 18}>
+                  {line}
+                </text>
               )}
             </For>
-            {props.note && (
-              <text class="caption" x={4} y={narrowLayout().height - 16}>
-                {props.note}
-              </text>
-            )}
           </>
         ),
       }}
@@ -150,29 +162,27 @@ function FlowDiagram(
                 </>
               )}
             </For>
-            <For each={branches()}>
-              {(branch) => (
-                <>
-                  <Arrow
-                    class={branch.arrow ?? "alt-line"}
-                    x1={8 + branch.from * (width() + 18) + width() / 2}
-                    x2={8 + branch.from * (width() + 18) + width() / 2}
-                    y1={12 + mainHeight()}
-                    y2={44 + mainHeight()}
-                  />
-                  <Box
-                    class={branch.step.tone ?? "alt-soft"}
-                    code={branch.step.code}
-                    h={branchHeight()}
-                    lines={branch.step.lines}
-                    title={branch.step.title}
-                    w={width()}
-                    x={8 + branch.from * (width() + 18)}
-                    y={48 + mainHeight()}
-                  />
-                </>
-              )}
-            </For>
+            {props.branch && (
+              <>
+                <Arrow
+                  class={props.branch.arrow ?? "alt-line"}
+                  x1={8 + props.branch.from * (width() + 18) + width() / 2}
+                  x2={8 + props.branch.from * (width() + 18) + width() / 2}
+                  y1={12 + mainHeight()}
+                  y2={44 + mainHeight()}
+                />
+                <Box
+                  class={props.branch.step.tone ?? "alt-soft"}
+                  code={props.branch.step.code}
+                  h={branchHeight()}
+                  lines={props.branch.step.lines}
+                  title={props.branch.step.title}
+                  w={COLUMN - 16}
+                  x={8}
+                  y={48 + mainHeight()}
+                />
+              </>
+            )}
             {props.note && (
               <text class="caption" x={8} y={wideHeight() - 12}>
                 {props.note}
@@ -185,17 +195,39 @@ function FlowDiagram(
   );
 }
 
-/** A labelled mini grid: a panel with a cell grid and a caption above. */
+/** The narrow layout's outcome: an elbow from the steps' spine into an indented box. */
+function NarrowOutcome(props: Readonly<{ branch: FlowBranch; y: number; h: number }>) {
+  return (
+    <>
+      <path
+        class={props.branch.arrow ?? "alt-line"}
+        d={`M14 ${props.y - 8}v${props.h / 2 + 8}h12${head(26, props.y + props.h / 2, 0)}`}
+      />
+      <Box
+        class={props.branch.step.tone ?? "alt-soft"}
+        code={props.branch.step.code}
+        h={props.h}
+        lines={props.branch.step.lines}
+        title={props.branch.step.title}
+        w={NARROW - 36}
+        x={30}
+        y={props.y}
+      />
+    </>
+  );
+}
+
+/** A labelled mini grid: a panel with a two-column cell grid, room for notes beside it. */
 function GridPanel(
   props: Readonly<{ x: number; y: number; title: string; children?: JSX.Element }>,
 ) {
   return (
     <>
-      <Panel h={196} w={330} x={props.x} y={props.y} />
+      <Panel h={172} w={330} x={props.x} y={props.y} />
       <text class="heading" x={props.x + 14} y={props.y + 24}>
         {props.title}
       </text>
-      <Sheet ch={22} cols={4} cw={60} head={14} rows={5} x={props.x + 14} y={props.y + 36} />
+      <Sheet ch={22} cols={2} cw={60} head={14} rows={5} x={props.x + 14} y={props.y + 36} />
       {props.children}
     </>
   );
@@ -225,7 +257,7 @@ function SpillPanel(props: Readonly<{ x: number; y: number; blocked: boolean }>)
           <text class="small strong" x={x() + 6} y={y() + 59}>
             text
           </text>
-          <text class="caption" x={x() + 74} y={y() + 15}>
+          <text class="caption" x={x() + 136} y={y() + 15}>
             no partial result
           </text>
         </>
@@ -245,10 +277,10 @@ function SpillPanel(props: Readonly<{ x: number; y: number; blocked: boolean }>)
             )}
           </For>
           <rect class="hue-line dash" height={88} width={60} x={x()} y={y()} />
-          <text class="small hue-text" x={x() + 74} y={y() + 15}>
+          <text class="small hue-text" x={x() + 136} y={y() + 15}>
             =SEQUENCE(4)
           </text>
-          <text class="caption" x={x() + 74} y={y() + 59}>
+          <text class="caption" x={x() + 136} y={y() + 59}>
             A1# is this range
           </text>
         </>
@@ -262,17 +294,17 @@ export function SpillDiagram() {
   return (
     <Responsive
       narrow={{
-        height: 412,
+        height: 364,
         draw: () => (
           <>
             <SpillPanel blocked={false} x={14} y={4} />
-            <SpillPanel blocked x={14} y={210} />
+            <SpillPanel blocked x={14} y={186} />
           </>
         ),
       }}
       text={SPILL_TEXT}
       wide={{
-        height: 206,
+        height: 184,
         width: COLUMN,
         draw: () => (
           <>
@@ -303,7 +335,7 @@ export function LoadingDiagram() {
       </text>
       <rect class="hue-soft" height={44} rx={4} width={140} x={x + 14} y={y + 40} />
       <text class="small strong" x={x + 22} y={y + 58}>
-        rows in memory
+        B1
       </text>
       <text class="small" x={x + 22} y={y + 74}>
         =SUM(B900:B910)
@@ -323,16 +355,23 @@ export function LoadingDiagram() {
         {loaded ? "loaded" : "not loaded yet"}
       </text>
       <path class={loaded ? "hue-line" : "rule dash"} d={`M${x + 84} ${y + 116}v-28`} />
+      <path
+        class={loaded ? "hue-line" : "rule"}
+        d={`M${x + 156} ${y + 62}h16${head(x + 174, y + 62, 0)}`}
+      />
       <rect
         class={loaded ? "alt-soft" : "error-soft"}
-        height={36}
+        height={44}
         rx={6}
         width={140}
         x={x + 176}
-        y={y + 44}
+        y={y + 40}
       />
-      <text class="small strong" x={x + 188} y={y + 66}>
-        {loaded ? "1,250 (calculated)" : "#LOADING!"}
+      <text class="small" x={x + 188} y={y + 58}>
+        B1 shows
+      </text>
+      <text class="small strong" x={x + 188} y={y + 74}>
+        {loaded ? "1,250" : "#LOADING!"}
       </text>
     </>
   );
@@ -388,13 +427,7 @@ export function ErrorFlowDiagram() {
 export function VolatileDiagram() {
   return (
     <FlowDiagram
-      branches={[
-        {
-          from: 0,
-          step: { title: "No cell changes", lines: ["Nothing recalculates"], tone: "panel" },
-          arrow: "rule dash",
-        },
-      ]}
+      note="A transaction without cell changes recalculates nothing."
       steps={[
         { title: "A transaction", lines: ["that changes cells"], tone: "hue-soft" },
         {
@@ -544,14 +577,24 @@ const RECOVERY_GROUPS = [
   ],
   ["Load the pages", ["IncompleteDataError"], "hue-soft"],
   ["Drain pending work", ["SyncPendingCapacityError"], "hue-soft"],
-  ["Read the cause or code", ["PersistenceError", "IndexedDbPendingCommit…"], "panel"],
+  [
+    "Read the cause or code",
+    ["PersistenceError", "IndexedDbPending", "  CommitStorageError"],
+    "panel",
+  ],
   ["The grid keeps working", ["renderer-fallback", "worker → canvas"], "panel"],
 ] as const;
+
+/** Where each group's box starts on small screens, and (last) where the stack ends. */
+const RECOVERY_NARROW_TOPS = RECOVERY_GROUPS.reduce<number[]>(
+  (tops, [, code]) => [...tops, (tops.at(-1) ?? 0) + 34 + code.length * 16 + 6 + 10],
+  [0],
+);
 
 /** Error handling › Recovery by boundary. */
 export function RecoveryDiagram() {
   const text: DiagramText = {
-    hue: "red",
+    hue: "blue",
     alt: "amber",
     title: "What each error asks you to do",
     description:
@@ -560,7 +603,7 @@ export function RecoveryDiagram() {
   return (
     <Responsive
       narrow={{
-        height: 540,
+        height: 8 + (RECOVERY_NARROW_TOPS.at(-1) ?? 0),
         draw: () => (
           <For each={RECOVERY_GROUPS}>
             {([title, code, tone], index) => (
@@ -572,7 +615,7 @@ export function RecoveryDiagram() {
                 title={title}
                 w={352}
                 x={4}
-                y={4 + [0, 92, 184, 236, 288, 356][index()]}
+                y={4 + (RECOVERY_NARROW_TOPS[index()] ?? 0)}
               />
             )}
           </For>
@@ -591,8 +634,8 @@ export function RecoveryDiagram() {
                 h={88}
                 lines={[]}
                 title={title}
-                w={222}
-                x={8 + (index() % 3) * 236}
+                w={220}
+                x={8 + (index() % 3) * 234}
                 y={6 + Math.floor(index() / 3) * 104}
               />
             )}
@@ -635,9 +678,6 @@ export function VirtualScrollDiagram() {
         class="ink-line dash"
         d={`M${x + 40} ${y + 22}L${x + (narrow ? 120 : 140)} ${y + 22}M${x + 40} ${y + 202}L${x + (narrow ? 120 : 140)} ${y + 132}`}
       />
-      <text class="small" x={x + (narrow ? 50 : 54)} y={y + 120}>
-        ScaledScroll
-      </text>
       <text class="caption" x={x + (narrow ? 120 : 140)} y={y + 152}>
         measured by a probe,
       </text>
@@ -674,10 +714,14 @@ export function VirtualScrollDiagram() {
   return (
     <Responsive
       narrow={{
-        height: 420,
+        height: 424,
         draw: () => (
           <>
             {draw(14, 4, true)}
+            <Arrow class="hue-line" x1={34} x2={34} y1={210} y2={234} />
+            <text class="small" x={44} y={226}>
+              ScaledScroll
+            </text>
             {window(14, 236)}
           </>
         ),
@@ -689,7 +733,7 @@ export function VirtualScrollDiagram() {
         draw: () => (
           <>
             {draw(8, 4, false)}
-            <path class="hue-line" d={`M48 118h400${head(448, 118, 0)}`} />
+            <Arrow class="hue-line" label="ScaledScroll" x1={194} x2={452} y1={77} y2={112} />
             {window(460, 30)}
           </>
         ),
@@ -735,17 +779,13 @@ export function LiveOrResetDiagram() {
       "theme, readOnly, config, overscan and minColumns update the current grid in place, as do callbacks and sizing. Changing the identity of workbook, data, datasource, datasourceStorage, presentation, editors, protectionResolver, mutationPolicy or transactionResourceLimits makes a new generation with reason input-reset; renderer, workerUrl or renderers make one with reason renderer-reset.",
   };
   const columns = [
+    ["Updated in place", ["theme", "readOnly", "config", "overscan", "minColumns"], "hue-soft"],
     [
-      "Live: same generation",
-      ["theme", "readOnly", "config", "overscan", "minColumns"],
-      "hue-soft",
-    ],
-    [
-      "New generation: input-reset",
+      "New one: input-reset",
       ["workbook", "data", "datasource", "presentation", "editors …"],
       "alt-soft",
     ],
-    ["New generation: renderer-reset", ["renderer", "workerUrl", "renderers"], "alt-soft"],
+    ["New one: renderer-reset", ["renderer", "workerUrl", "renderers"], "alt-soft"],
   ] as const;
   return (
     <Responsive
@@ -762,7 +802,7 @@ export function LiveOrResetDiagram() {
                 title={title}
                 w={352}
                 x={4}
-                y={4 + [0, 132, 264][index()]}
+                y={4 + index() * 132}
               />
             )}
           </For>
@@ -781,8 +821,8 @@ export function LiveOrResetDiagram() {
                 h={120}
                 lines={[]}
                 title={title}
-                w={222}
-                x={8 + index() * 236}
+                w={220}
+                x={8 + index() * 234}
                 y={6}
               />
             )}
@@ -865,17 +905,15 @@ export function CsvInjectionDiagram() {
 export function StreamingImportDiagram() {
   return (
     <FlowDiagram
-      branches={[
-        {
-          from: 1,
-          arrow: "error-line dash",
-          step: {
-            title: "signal aborts",
-            lines: ["Rejects with signal.reason;", "no partial snapshot"],
-            tone: "error-soft",
-          },
+      branch={{
+        from: 1,
+        arrow: "error-line dash",
+        step: {
+          title: "signal aborts",
+          lines: ["Rejects with signal.reason; nothing partial"],
+          tone: "error-soft",
         },
-      ]}
+      }}
       note="The snapshot holds every imported cell: streaming bounds parsing, not the document."
       steps={[
         {
@@ -939,29 +977,24 @@ export function KeptPartsDiagram() {
 export function WorkerRenderingDiagram() {
   return (
     <FlowDiagram
-      branches={[
-        {
-          from: 0,
-          arrow: "error-line dash",
-          step: {
-            title: "Construction throws",
-            lines: ["CanvasRenderer on the", "main thread"],
-            code: ["renderer-fallback"],
-            tone: "error-soft",
-          },
+      branch={{
+        from: 0,
+        arrow: "error-line dash",
+        step: {
+          title: "Construction throws",
+          lines: ["CanvasRenderer paints on the main thread"],
+          code: ["renderer-fallback, once"],
+          tone: "error-soft",
         },
-      ]}
+      }}
+      note="The canvas moves with transferControlToOffscreen."
       steps={[
         {
           title: "Construct the Worker",
           lines: ["First, before the", "canvas is transferred"],
           tone: "hue-soft",
         },
-        {
-          title: "Transfer the canvas",
-          code: ["transferControlToOffscreen"],
-          lines: ["to the worker"],
-        },
+        { title: "Transfer the canvas", lines: ["Its control moves", "to the worker"] },
         {
           title: "Post each window",
           code: ["VisibleWindowView"],
@@ -1031,25 +1064,28 @@ export function AriaMirrorDiagram() {
       <rect class="hue-tint" height={54} width={138} x={x} y={y + 50} />
       <rect class="hue-line" height={54} width={138} x={x} y={y + 50} />
       <text class="small" x={x} y={y + 142}>
-        rows 40–42 in view
+        data rows 40–42
+      </text>
+      <text class="small" x={x} y={y + 158}>
+        index = row + 2
       </text>
     </>
   );
   return (
     <Responsive
       narrow={{
-        height: 340,
+        height: 356,
         draw: () => (
           <>
             {visible(110, 4)}
-            <Arrow class="hue-line" x1={180} x2={180} y1={156} y2={176} />
-            {mirror(4, 182, 352)}
+            <Arrow class="hue-line" x1={180} x2={180} y1={172} y2={192} />
+            {mirror(4, 198, 352)}
           </>
         ),
       }}
       text={text}
       wide={{
-        height: 164,
+        height: 172,
         width: COLUMN,
         draw: () => (
           <>
@@ -1100,29 +1136,24 @@ export function FormulaReadsDiagram() {
 export function IterationDiagram() {
   return (
     <FlowDiagram
-      branches={[
-        {
-          from: 2,
-          step: {
-            title: "Readers of the cycle",
-            lines: ["Calculate once,", "after it settles"],
-            tone: "panel",
-          },
-          arrow: "hue-line",
-        },
-      ]}
       steps={[
         {
           title: "Start",
-          lines: ["From the values shown;", "#CYCLE! starts at 0"],
+          lines: ["From the values", "shown; #CYCLE!", "starts at 0"],
           tone: "hue-soft",
         },
-        { title: "One pass", lines: ["Cycle cells in row order,", "each reads the newest"] },
+        {
+          title: "One pass",
+          lines: ["Cycle cells in row", "order, each reads", "the newest values"],
+        },
         {
           title: "Stop",
-          code: ["maxChange", "maxIterations"],
-          lines: ["No value moved more than", "or the pass limit"],
+          lines: ["Nothing moved more", "than maxChange, or", "maxIterations ran"],
           tone: "alt-soft",
+        },
+        {
+          title: "Then its readers",
+          lines: ["Formulas that read", "the cycle calculate", "once, after it settles"],
         },
       ]}
       text={{
@@ -1152,7 +1183,7 @@ export function RulePrecedenceDiagram() {
       </text>
       <rect class="panel" height={40} rx={6} width={w} x={x} y={y + 22} />
       <text
-        class="strong"
+        class="hue-text"
         style={{
           "font-family": "var(--sw-font-body)",
           "font-size": "15px",
@@ -1164,7 +1195,7 @@ export function RulePrecedenceDiagram() {
       >
         {styled.italic ? "Revenue: bold, italic" : "Revenue: bold"}
       </text>
-      <text class="small" x={x} y={y + 80}>
+      <text class="small" text-anchor="end" x={x + w - 12} y={y + 47}>
         color from rule 1
       </text>
     </>
@@ -1196,26 +1227,26 @@ export function RulePrecedenceDiagram() {
   return (
     <Responsive
       narrow={{
-        height: 404,
+        height: 330,
         draw: () => (
           <>
             {rules(4, 4, 352)}
-            {outcome(4, 170, 352, "Both match: styles merge", { italic: true })}
-            {outcome(4, 270, 352, "stopIfTrue on rule 1", { italic: false })}
+            {outcome(4, 168, 352, "Both match: styles merge", { italic: true })}
+            {outcome(4, 248, 352, "stopIfTrue on rule 1", { italic: false })}
           </>
         ),
       }}
       text={text}
       wide={{
-        height: 170,
+        height: 160,
         width: COLUMN,
         draw: () => (
           <>
-            {rules(8, 4, 200)}
-            <Arrow class="hue-line" x1={214} x2={250} y1={80} y2={50} />
-            <Arrow class="hue-line" x1={214} x2={250} y1={80} y2={128} />
-            {outcome(256, 4, 260, "Both match: styles merge", { italic: true })}
-            {outcome(256, 82, 260, "stopIfTrue on rule 1", { italic: false })}
+            {rules(8, 4, 220)}
+            <Arrow class="hue-line" x1={234} x2={270} y1={80} y2={48} />
+            <Arrow class="hue-line" x1={234} x2={270} y1={80} y2={126} />
+            {outcome(276, 4, 416, "Both match: styles merge", { italic: true })}
+            {outcome(276, 82, 416, "stopIfTrue on rule 1", { italic: false })}
           </>
         ),
       }}
@@ -1227,17 +1258,15 @@ export function RulePrecedenceDiagram() {
 export function PendingCommitsDiagram() {
   return (
     <FlowDiagram
-      branches={[
-        {
-          from: 3,
-          step: {
-            title: "Conflicts and failures",
-            lines: ["Kept for explicit", "host recovery"],
-            tone: "error-soft",
-          },
-          arrow: "error-line dash",
+      branch={{
+        from: 3,
+        step: {
+          title: "Conflicts and failures",
+          lines: ["Kept for explicit host recovery"],
+          tone: "error-soft",
         },
-      ]}
+        arrow: "error-line dash",
+      }}
       steps={[
         {
           title: "1 · Persist",
@@ -1249,7 +1278,7 @@ export function PendingCommitsDiagram() {
         { title: "4 · Remove", lines: ["Only after applied", "or duplicate"], tone: "alt-soft" },
       ]}
       text={{
-        hue: "red",
+        hue: "blue",
         alt: "green",
         title: "What durable pending commits do",
         description:
@@ -1322,8 +1351,8 @@ export function ImportContractsDiagram() {
                 h={114}
                 lines={[input]}
                 title={index() === 2 ? "Table" : "Workbook"}
-                w={222}
-                x={8 + index() * 236}
+                w={220}
+                x={8 + index() * 234}
                 y={6}
               />
             )}
