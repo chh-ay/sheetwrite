@@ -80,39 +80,45 @@ impl<'a> RangeView<'a> {
             return Value::Error(FormulaError::Loading);
         }
 
-        let index = self.data.cells.idx(sheet_row, sheet_col);
-        let literal = LiteralSources::new(self.data, self.depth)
-            .and_then(|sources| sources.value_at(&self.store.strings, index));
+        let literals = LiteralSources::new(self.data, self.depth);
+        self.loaded_value(literals, sheet_row, sheet_col, pass)
+    }
+
+    /// The value of a loaded cell at a sheet `row` and `col`: its literal
+    /// when `literals` holds one, otherwise its evaluated formula.
+    fn loaded_value(
+        &self,
+        literals: Option<LiteralSources<'_>>,
+        row: usize,
+        col: usize,
+        pass: &mut EvalPass<'_>,
+    ) -> Value {
+        let index = self.data.cells.idx(row, col);
+        let literal = literals.and_then(|sources| sources.value_at(&self.store.strings, index));
         match literal {
             Some(value) => value,
             None => self
                 .store
-                .eval_at(self.sheet, sheet_row, sheet_col, pass, self.depth + 1),
+                .eval_at(self.sheet, row, col, pass, self.depth + 1),
         }
     }
 
-    /// Every cell of the view, read column by column into one row-major
-    /// matrix. Fails with `#NUM!` when the values and their stored text exceed
-    /// the array byte budget, and with `#LOADING!` when any cell isn't loaded.
+    /// Every cell of the view in one row-major matrix. Fails with `#NUM!`
+    /// when the values and their stored text exceed the array byte budget, and
+    /// with `#LOADING!` when any cell isn't loaded.
     pub(super) fn materialize(&self, pass: &mut EvalPass<'_>) -> Result<EvalMatrix, FormulaError> {
         let total = self.rows * self.cols;
         self.check_text_budget(total)?;
 
-        let mut values = vec![Value::Blank; total];
-        for col in 0..self.cols {
-            for row in 0..self.rows {
-                if !self
-                    .data
-                    .cells
-                    .is_loaded(self.row_start + row, self.col_start + col)
-                {
+        let literals = LiteralSources::new(self.data, self.depth);
+        let mut values = Vec::with_capacity(total);
+        for row in self.row_start..self.row_start + self.rows {
+            for col in self.col_start..self.col_start + self.cols {
+                if !self.data.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
 
-                let value = self.cell(row, col, pass);
-                if let Some(slot) = values.get_mut(row * self.cols + col) {
-                    *slot = value;
-                }
+                values.push(self.loaded_value(literals, row, col, pass));
             }
         }
         Ok(EvalMatrix::new(self.rows, self.cols, values))
