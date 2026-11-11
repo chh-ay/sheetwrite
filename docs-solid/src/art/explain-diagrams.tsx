@@ -1,5 +1,6 @@
 // Diagrams for the showcases' "how it works" sections, one per page, each
 // beside the section it explains. Every label comes from the section's text.
+import { REGIONS } from "@docs/showcases/scenarios/dashboards.js";
 import { For } from "solid-js";
 
 import { Bar, head, Panel, Sheet } from "./Art.js";
@@ -166,9 +167,8 @@ const DASHBOARD_TILES = [
   ["KPI card", "A measure in the", "slicers' filter context"],
 ] as const;
 
-/** The slicer panel: a title and four region chips, two selected. */
+/** The slicer panel: a title and the dashboard's four region chips, two selected. */
 function SlicerPanel(props: Readonly<{ x: number; y: number; w: number; columns: number }>) {
-  const regions = ["North", "South", "East", "West"] as const;
   const chipWidth = () => (props.w - 24 - (props.columns - 1) * 8) / props.columns;
   return (
     <>
@@ -176,7 +176,7 @@ function SlicerPanel(props: Readonly<{ x: number; y: number; w: number; columns:
       <text class="heading" x={props.x + 12} y={props.y + 22}>
         Slicer: Region
       </text>
-      <For each={regions}>
+      <For each={REGIONS}>
         {(region, index) => (
           <Chip
             class={index() < 2 ? "hue-soft" : "panel"}
