@@ -64,7 +64,11 @@ function Note(props: Readonly<{ x: number; y: number; text: string; class?: stri
         x={props.x}
         y={props.y}
       />
-      <text class="small strong" x={props.x + 8} y={props.y + 13}>
+      <text
+        class={props.class === "hue" ? "small on-hue" : "small strong"}
+        x={props.x + 8}
+        y={props.y + 13}
+      >
         {props.text}
       </text>
     </>
@@ -364,4 +368,204 @@ export const VANILLA_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
   "Construction-bound truth": ConstructionArt,
   "Host-owned paging": HostPagingArt,
   "Honest Worker fallback": WorkerFallbackArt,
+};
+
+/** A small database cylinder whose top-left is (x, y). */
+function Cylinder(props: Readonly<{ x: number; y: number; w: number; h: number }>) {
+  const rx = () => props.w / 2;
+  return (
+    <>
+      <path
+        class="panel"
+        d={`M${props.x} ${props.y + 8}v${props.h - 16}a${rx()} 8 0 0 0 ${props.w} 0V${props.y + 8}`}
+      />
+      <ellipse class="hue-soft" cx={props.x + rx()} cy={props.y + 8} rx={rx()} ry={8} />
+    </>
+  );
+}
+
+/** Two writers on the same base: one serialized queue accepts the first, the stale one gets a conflict. */
+function AtomicSequencingArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Note class="hue-soft" text="A · base v5" x={12} y={30} />
+      <Note class="alt-soft" text="B · base v5" x={12} y={92} />
+      <path
+        class="ink-line"
+        d={`M104 40c20 0 24 26 40 30${head(144, 70, 15)}M104 102c20 0 24-20 40-24${head(144, 78, -15)}`}
+      />
+      <rect class="panel" height={52} rx={8} width={74} x={148} y={48} />
+      <text class="small strong" text-anchor="middle" x={185} y={66}>
+        one queue
+      </text>
+      <For each={[0, 1, 2]}>
+        {(index) => (
+          <rect class="hue-tint" height={12} rx={3} width={16} x={160 + index * 18} y={76} />
+        )}
+      </For>
+      <Message class="hue-line" from={222} to={246} y={60} />
+      <Note class="hue" text="v6" x={250} y={51} />
+      <Message class="error-line" from={222} to={246} y={92} />
+      <Note class="error-soft" text="conflict" x={250} y={83} />
+      <text class="small" x={12} y={146}>
+        stale writers recover; nothing is lost
+      </text>
+    </CardArt>
+  );
+}
+
+/** A retry with the same mutation id gets the original version back; one record is stored. */
+function IdempotentRetryArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Lanes
+        lanes={[
+          [48, "Client"],
+          [196, "Adapter"],
+        ]}
+      />
+      <Message class="hue-line" from={48} label="commit m7" to={196} y={48} />
+      <path class="error-line dash" d="M196 72H110" />
+      <path class="error-line" d="M100 66l10 10M110 66l-10 10" />
+      <Message class="hue-line" from={48} label="retry m7" to={196} y={100} />
+      <Message from={196} label="duplicate · v6" to={48} y={128} />
+      <Cylinder h={68} w={60} x={250} y={44} />
+      <rect class="hue" height={12} rx={3} width={40} x={260} y={74} />
+      <text class="small" text-anchor="middle" x={280} y={128}>
+        m7 × 1
+      </text>
+    </CardArt>
+  );
+}
+
+/** The operation tail grows to a bound, then folds into one compacted snapshot record. */
+function BoundedStorageArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <rect class="hue-soft" height={46} rx={6} width={78} x={14} y={22} />
+      <text class="small strong" x={24} y={42}>
+        snapshot
+      </text>
+      <text class="small" x={24} y={58}>
+        compacted
+      </text>
+      <For each={[0, 1, 2, 3, 4, 5]}>
+        {(index) => (
+          <rect class="alt-soft" height={30} rx={4} width={18} x={110 + index * 24} y={30} />
+        )}
+      </For>
+      <path class="hue-line" d={`M190 66c0 24-70 24-104 8${head(88, 72, -160)}`} />
+      <text class="small" x={14} y={112}>
+        records
+      </text>
+      <rect class="soft" height={8} rx={4} width={200} x={74} y={104} />
+      <rect class="hue" height={8} rx={4} width={176} x={74} y={104} />
+      <path class="error-line" d="M250 98v20" />
+      <text class="small" x={14} y={138}>
+        bytes
+      </text>
+      <rect class="soft" height={8} rx={4} width={200} x={74} y={130} />
+      <rect class="hue" height={8} rx={4} width={110} x={74} y={130} />
+      <path class="error-line" d="M250 124v20" />
+    </CardArt>
+  );
+}
+
+/** A reload brings committed state and the durable pending queue back from IndexedDB, once. */
+function ReloadRecoveryArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Cylinder h={84} w={70} x={16} y={34} />
+      <text class="small" text-anchor="middle" x={51} y={142}>
+        IndexedDB
+      </text>
+      <path class="hue-line" d={`M96 76h56${head(152, 76, 0)}`} />
+      <path class="hue-line" d="M120 58a12 12 0 1 1 -2 -10" />
+      <path class="hue-line" d={head(116, 48, -60)} />
+      <rect class="panel" height={96} rx={8} width={140} x={160} y={28} />
+      <rect class="soft" height={14} rx={6} width={138.5} x={160.75} y={28.75} />
+      <rect class="hue-soft" height={22} rx={5} width={116} x={172} y={50} />
+      <text class="small strong" x={180} y={65}>
+        committed state
+      </text>
+      <rect class="alt-soft" height={22} rx={5} width={116} x={172} y={80} />
+      <text class="small strong" x={180} y={95}>
+        pending queue
+      </text>
+      <Note class="hue" text="exactly once" x={182} y={130} />
+    </CardArt>
+  );
+}
+
+/** Clearing 100,000 cells and undoing once: one compressed restoreBlock commit, one version. */
+function LargeUndoArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Sheet ch={12} cols={4} cw={18} rows={6} x={14} y={24} />
+      <text class="small" x={14} y={118}>
+        100,000 cells
+      </text>
+      <path class="hue-line" d={`M96 60h28${head(124, 60, 0)}`} />
+      <text class="small hue-text" text-anchor="middle" x={110} y={50}>
+        undo
+      </text>
+      <rect class="hue-soft" height={40} rx={8} width={104} x={130} y={40} />
+      <text class="small strong" x={140} y={58}>
+        restoreBlock
+      </text>
+      <text class="small" x={140} y={72}>
+        one commit
+      </text>
+      <text class="small" x={248} y={42}>
+        bytes
+      </text>
+      <rect class="alt" height={10} rx={3} width={58} x={248} y={50} />
+      <rect class="hue" height={10} rx={3} width={14} x={248} y={66} />
+      <Note class="panel" text="1 step · 1 version" x={130} y={98} />
+    </CardArt>
+  );
+}
+
+/** An undo over the transaction limit is rejected and dropped; older history stays undoable. */
+function OversizedUndoArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <text class="small" x={14} y={24}>
+        history
+      </text>
+      <rect class="error-soft" height={20} rx={4} width={96} x={14} y={32} />
+      <path class="error-line" d="M20 42h84" />
+      <For each={[0, 1, 2]}>
+        {(index) => (
+          <rect class="hue-soft" height={20} rx={4} width={96} x={14} y={58 + index * 24} />
+        )}
+      </For>
+      <text class="small" x={14} y={146}>
+        older steps stay
+      </text>
+      <rect class="soft" height={10} rx={5} width={150} x={140} y={40} />
+      <rect class="error-soft" height={10} rx={5} width={150} x={140} y={40} />
+      <path class="ink-line" d="M200 32v26" />
+      <text class="small" x={204} y={70}>
+        limit 128 bytes
+      </text>
+      <rect class="alt-soft" height={42} rx={8} width={160} x={136} y={86} />
+      <text class="small strong" x={146} y={104}>
+        mutation-rejected
+      </text>
+      <text class="small" x={146} y={119}>
+        resource-limit issue
+      </text>
+    </CardArt>
+  );
+}
+
+/** Proof pictures by proof title, for the database showcase. */
+export const DATABASE_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
+  "Atomic sequencing": AtomicSequencingArt,
+  "Idempotent retries": IdempotentRetryArt,
+  "Bounded storage": BoundedStorageArt,
+  "Reload recovery": ReloadRecoveryArt,
+  "Large undo": LargeUndoArt,
+  "Oversized undo": OversizedUndoArt,
 };
