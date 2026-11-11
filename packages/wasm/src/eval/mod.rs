@@ -1885,7 +1885,7 @@ impl CellStore {
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
             let name = analysis::name(id);
-            if let Some(family) = analysis::family(name) {
+            if let Some(family) = Some(analysis::family(id)) {
                 if let Some(hooks) = &family.array {
                     if (hooks.produces_array)(name, args) {
                         return match (hooks.evaluate)(self, name, args, sheet, pass, depth)
@@ -2066,9 +2066,9 @@ impl CellStore {
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
             let name = analysis::name(id);
-            let result = match name {
-                "SUMSQ" => analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1),
-                "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => analysis::math::streamed_paired_squares(
+            let result = match id {
+                analysis::SUMSQ_ID => analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1),
+                analysis::SUMX2MY2_ID | analysis::SUMX2PY2_ID | analysis::SUMXMY2_ID => analysis::math::streamed_paired_squares(
                     self,
                     name,
                     args,

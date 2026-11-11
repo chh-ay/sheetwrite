@@ -357,23 +357,30 @@ pub(crate) fn names() -> impl Iterator<Item = &'static str> {
         .flat_map(|family| family.names.iter().copied())
 }
 
-pub(super) fn family(name: &str) -> Option<&'static Family> {
-    FAMILIES
-        .iter()
-        .find(|family| family.names.binary_search(&name).is_ok())
+pub(super) fn family(id: u16) -> &'static Family {
+    &FAMILIES[usize::from(id >> FAMILY_SHIFT)]
 }
 
-pub(super) fn evaluate_scalar(name: &str, values: &FuncAccumulator) -> EvalResult {
-    family(name)
-        .and_then(|family| family.evaluate)
+pub(super) fn evaluate_scalar(id: u16, values: &FuncAccumulator) -> EvalResult {
+    family(id)
+        .evaluate
         .map_or(Value::Error(FormulaError::Name), |evaluate| {
-            evaluate(name, values)
+            evaluate(name(id), values)
         })
 }
 
-pub(super) fn treats_cell_as_reference(name: &str) -> bool {
-    family(name).is_some_and(|family| family.reference_cells.contains(&name))
+pub(super) fn treats_cell_as_reference(id: u16) -> bool {
+    let name = name(id);
+    family(id)
+        .reference_cells
+        .iter()
+        .any(|candidate| std::ptr::eq(*candidate, name) || *candidate == name)
 }
+
+pub(crate) const SUMSQ_ID: u16 = known_id("SUMSQ");
+pub(crate) const SUMX2MY2_ID: u16 = known_id("SUMX2MY2");
+pub(crate) const SUMX2PY2_ID: u16 = known_id("SUMX2PY2");
+pub(crate) const SUMXMY2_ID: u16 = known_id("SUMXMY2");
 
 /// Whether the function reads every sheet of a 3-D reference.
 pub(crate) fn accepts_sheet_span(id: u16) -> bool {
