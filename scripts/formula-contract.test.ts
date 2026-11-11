@@ -9,6 +9,15 @@ const INVENTORY = JSON.parse(
   readFileSync(resolve(ROOT, "test/conformance/formula-contract.inventory.json"), "utf8"),
 ) as MutableContract;
 
+/** Every spelling (canonical name and aliases) of the functions in one build. */
+function spellingsIn(build: string): Set<string> {
+  return new Set(
+    INVENTORY.functions
+      .filter((entry) => entry.builds.includes(build))
+      .flatMap((entry) => [entry.canonical, ...entry.aliases]),
+  );
+}
+
 interface MutableFunction {
   canonical: string;
   aliases: string[];
@@ -59,6 +68,14 @@ const MUTATIONS: MutationCase[] = [
     expectedIssue: "contract.version: expected constant 1",
   },
   {
+    name: "rejects insecure public source links",
+    mutate: (contract) => {
+      const source = contract.sources["microsoft-excel-functions"];
+      if (source) source.link = "http://example.invalid/functions";
+    },
+    expectedIssue: "string does not match ^https://",
+  },
+  {
     name: "pins LET as required-supported",
     mutate: (contract) => {
       const letEntry = contract.functions.find((entry) => entry.canonical === "LET");
@@ -84,6 +101,14 @@ const MUTATIONS: MutationCase[] = [
     expectedIssue: "value is outside the closed enum",
   },
   {
+    name: "rejects moving an optional distribution into the default build",
+    mutate: (contract) => {
+      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
+      if (formula) formula.builds.push("@sheetwrite/wasm");
+    },
+    expectedIssue: "parser/inventory drift: missing NORM.DIST",
+  },
+  {
     name: "rejects a built function that formula help would not list",
     mutate: (contract) => {
       const formula = contract.functions.find((entry) => entry.canonical === "POW");
@@ -97,8 +122,18 @@ describe("formula capability contract", () => {
   test("validates the checked-in schema, inventory, parser, assist, and evidence paths", async () => {
     const result = await validateFormulaContractRepository(ROOT);
     expect(result.issues).toEqual([]);
-    // The other counts come from the inventory itself; this one is the pinned contract.
-    expect(result.summary.requiredSupported).toBe(100);
+    // Counts come from the inventory, so pull requests that add different
+    // functions do not edit the same lines here.
+    const parserSpellings = spellingsIn("@sheetwrite/wasm");
+    const formulasSpellings = spellingsIn("@sheetwrite/formulas");
+    expect(result.summary).toEqual({
+      functions: INVENTORY.functions.length,
+      requiredSupported: 100,
+      unsupportedCategories: INVENTORY.unsupportedCategories.length,
+      parserSpellings: parserSpellings.size,
+      assistSpellings: new Set([...parserSpellings, ...formulasSpellings]).size,
+      formulasSpellings: formulasSpellings.size,
+    });
   });
 
   for (const mutation of MUTATIONS) {

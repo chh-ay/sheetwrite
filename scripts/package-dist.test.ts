@@ -96,6 +96,29 @@ describe("published declarations", () => {
       await rejection(assertPublishedDeclarations(root, [...REACHABLE, "dist/internal.d.ts"])),
     ).toContain("unreachable dist/internal.d.ts");
   });
+
+  it("rejects a reached declaration that is not published", async () => {
+    const { "dist/style.d.ts": _style, ...withoutStyle } = TYPED_PACKAGE;
+    const root = await writePackage(withoutStyle);
+
+    expect(
+      await rejection(
+        assertPublishedDeclarations(
+          root,
+          REACHABLE.filter((file) => file !== "dist/style.d.ts"),
+        ),
+      ),
+    ).toContain("missing dist/cell.d.ts -> ../dist/style.js");
+  });
+
+  it("leaves source-typed packages to their framework tooling", async () => {
+    const root = await writePackage({
+      "package.json": JSON.stringify({ exports: { ".": { types: "./src/index.ts" } } }),
+      "src/index.ts": "export const value = 1;\n",
+    });
+
+    await assertPublishedDeclarations(root, ["src/index.ts", "src/Grid.svelte.d.ts"]);
+  });
 });
 
 describe("built declaration pruning", () => {

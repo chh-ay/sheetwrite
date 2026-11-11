@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import {
   type CommandResult,
@@ -38,12 +40,6 @@ function changelog(name: string, groups: Readonly<Record<string, readonly string
 }
 
 const changelogs: Readonly<Record<string, string>> = {
-  ...Object.fromEntries(
-    PUBLISHABLE_PACKAGE_ORDER.map((name) => [
-      name,
-      changelog(name, { "Patch Changes": [provenance, dependencyUpdate] }),
-    ]),
-  ),
   "@sheetwrite/core": changelog("@sheetwrite/core", {
     "Minor Changes": [pivots],
     "Patch Changes": [provenance, dependencyUpdate],
@@ -63,10 +59,15 @@ const changelogs: Readonly<Record<string, string>> = {
       provenance,
     ],
   }),
-  // A dependency update under its own heading leaves no section behind.
+  "@sheetwrite/queries": changelog("@sheetwrite/queries", {
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
   "@sheetwrite/xlsx": changelog("@sheetwrite/xlsx", {
     "Minor Changes": [dependencyUpdate],
     "Patch Changes": [provenance],
+  }),
+  "@sheetwrite/charts": changelog("@sheetwrite/charts", {
+    "Patch Changes": [provenance, dependencyUpdate],
   }),
   "@sheetwrite/react": changelog("@sheetwrite/react", {
     "Patch Changes": [
@@ -76,7 +77,9 @@ const changelogs: Readonly<Record<string, string>> = {
       dependencyUpdate,
     ],
   }),
-  // Entry order within a section does not matter for the shared group.
+  "@sheetwrite/vue": changelog("@sheetwrite/vue", {
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
   "@sheetwrite/svelte": changelog("@sheetwrite/svelte", {
     "Patch Changes": [dependencyUpdate, provenance],
   }),
@@ -277,16 +280,23 @@ describe("version GitHub release", () => {
     ]);
   });
 
-  it("does not move Latest when releasing an older version", async () => {
-    const state = new RepositoryState();
-    state.tags.set("v0.10.0", olderCommit);
+  it.each([
+    ["creating", "create", false],
+    ["updating", "edit", true],
+  ])(
+    "does not move Latest when %s the release of an older version",
+    async (_label, verb, hasRelease) => {
+      const state = new RepositoryState();
+      state.tags.set("v0.10.0", olderCommit);
+      if (hasRelease) state.releases.set("v0.5.4", { isDraft: false, isPrerelease: false });
 
-    await release(state);
+      await release(state);
 
-    const [command] = state.releaseCommands("create");
-    expect(command?.at(-1)).toBe("--latest=false");
-    expect(command).not.toContain("--latest");
-  });
+      const [command] = state.releaseCommands(verb);
+      expect(command?.at(-1)).toBe("--latest=false");
+      expect(command).not.toContain("--latest");
+    },
+  );
 
   it.each([
     ["a draft", { isDraft: true, isPrerelease: false }],
@@ -323,5 +333,21 @@ describe("version GitHub release", () => {
     await expect(release(new RepositoryState(), olderCommit)).rejects.toThrow(
       `@sheetwrite/wasm@0.5.4 provenance targets ${olderCommit}, expected ${sha}`,
     );
+  });
+
+  it("keeps every publishable package in one changeset version group", async () => {
+    const config = JSON.parse(
+      await readFile(resolve(import.meta.dir, "../.changeset/config.json"), "utf8"),
+    ) as { readonly fixed: readonly (readonly string[])[]; readonly changelog: unknown };
+
+    // One GitHub release names one version, so the packages cannot drift apart.
+    expect(config.fixed.map((group) => [...group].sort())).toEqual([
+      [...PUBLISHABLE_PACKAGE_ORDER].sort(),
+    ]);
+    // Entries need their pull request and author for the release notes.
+    expect(config.changelog).toEqual([
+      "@changesets/changelog-github",
+      { repo: "chh-ay/sheetwrite" },
+    ]);
   });
 });

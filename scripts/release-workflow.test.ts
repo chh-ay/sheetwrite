@@ -101,6 +101,26 @@ describe("manual package release workflow", () => {
     }
   });
 
+  it("publishes only artifacts from successful CI without repeating its gates", async () => {
+    const source = await readFile(workflowPath, "utf8");
+    const commands = Object.values((await workflow()).jobs ?? {})
+      .flatMap((job) => job.steps ?? [])
+      .flatMap((step) => (step.run ? [step.run] : []))
+      .join("\n");
+    expect(source).toContain("scripts/release-preflight.ts");
+    expect(commands).toContain("gh run download");
+    expect(commands).toContain("canonical-release-artifacts");
+    expect(commands).toContain("scripts/release-publish.ts");
+    expect(commands).toContain("scripts/release-github.ts");
+    expect(commands).not.toMatch(
+      /verify:ci|verify:release-quality|test:coverage|test:browser|release:prepare|release-verify\.ts|install-wasm-pack|browser:install/,
+    );
+    // Publication uses npm trusted publishing, never a stored token.
+    expect(source).not.toMatch(
+      /secrets\.(?:NODE_AUTH_TOKEN|NPM_TOKEN)|changeset publish|release-stage/,
+    );
+  });
+
   it("takes artifacts only from the newest passed develop push CI run of the commit", () => {
     const repository = "chh-ay/sheetwrite";
     const rejected = [

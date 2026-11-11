@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
 import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 
 const fixtureRoots: string[] = [];
@@ -126,7 +127,7 @@ describe("prebuilt docs deployment", () => {
     );
   });
 
-  it.each(["pagefind/pagefind-entry.json"])(
+  it.each(["pagefind/pagefind-entry.json", "404.html"])(
     "preserves the previous deployment when %s is missing",
     async (path) => {
       const root = await fixture();
@@ -154,9 +155,57 @@ describe("prebuilt docs deployment", () => {
       expect(await readFile(join(root, "outside/private.txt"), "utf8")).toBe("must not deploy");
     },
   );
+
+  it("serves directory indexes and assets with the site fallback for unknown URLs", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    for (const [url, contents] of [
+      ["/", builtFiles["index.html"]],
+      ["/docs/", builtFiles["docs/index.html"]],
+      ["/docs", builtFiles["docs/index.html"]],
+      ["/docs/start/installation/", builtFiles["docs/start/installation/index.html"]],
+      ["/docs/start/installation", builtFiles["docs/start/installation/index.html"]],
+      ["/docs/index.html", builtFiles["docs/index.html"]],
+      ["/assets/client.wasm", builtFiles["assets/client.wasm"]],
+      ["/sitemap.xml", builtFiles["sitemap.xml"]],
+      ["/pagefind/pagefind-entry.json", builtFiles["pagefind/pagefind-entry.json"]],
+    ] as const) {
+      expect((await requestPackagedFile(root, url))?.body).toEqual(Buffer.from(contents));
+    }
+    for (const url of ["/missing", "/docs/missing/", "/assets/missing.js"]) {
+      const response = await requestPackagedFile(root, url);
+      expect(response?.body).toEqual(Buffer.from(builtFiles["404.html"]));
+      expect(response?.status).toBe(404);
+    }
+  });
+
+  it("caches only content-hashed files as immutable", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    const cacheControl = async (url: string) =>
+      (await requestPackagedFile(root, url))?.headers["cache-control"];
+    for (const url of [
+      "/assets/client.wasm",
+      "/pagefind/fragment/en_020da39.pf_fragment",
+      "/pagefind/pagefind.en_6e131784e9.pf_meta",
+    ]) {
+      expect(await cacheControl(url)).toBe("public, max-age=31536000, immutable");
+    }
+    // Stable URLs must revalidate, or a deployment would serve stale pages and search entries.
+    for (const url of [
+      "/",
+      "/docs/",
+      "/docs/start/installation/",
+      "/sitemap.xml",
+      "/pagefind/pagefind-entry.json",
+    ]) {
+      expect(await requestPackagedFile(root, url)).not.toBeNull();
+      expect(await cacheControl(url)).toBeUndefined();
+    }
+  });
 });
 
-describe("routing", () => {
+describe("feed type", () => {
   it("serves the changelog feed as RSS", async () => {
     const root = await fixture();
     await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
@@ -167,5 +216,33 @@ describe("routing", () => {
     expect(
       (await requestPackagedFile(root, "/sitemap.xml"))?.headers["content-type"],
     ).toBeUndefined();
+  });
+});
+
+describe("moved docs pages", () => {
+  it("redirects every old address, with or without its trailing slash, to its new page", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    const moved = Object.entries(MOVED_PAGES);
+    expect(moved.length).toBeGreaterThan(0);
+    for (const [from, page] of moved) {
+      for (const pathname of [from, from.slice(0, -1)]) {
+        const response = await requestPackagedFile(root, pathname);
+        expect(response?.status).toBe(308);
+        expect(response?.headers.Location).toBe(page.to);
+      }
+    }
+  });
+
+  it("redirects every merged showcase to the showcase that holds its story now", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
+      for (const pathname of [from, from.slice(0, -1)]) {
+        const response = await requestPackagedFile(root, pathname);
+        expect(response?.status).toBe(308);
+        expect(response?.headers.Location).toBe(to);
+      }
+    }
   });
 });

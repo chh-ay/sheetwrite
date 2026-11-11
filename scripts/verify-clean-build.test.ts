@@ -50,6 +50,22 @@ describe("clean-build export validation", () => {
     ]);
   });
 
+  it("checks export targets inside fallback arrays, as the release check does", async () => {
+    const root = await exportFixture();
+    await writeFile(
+      join(root, "packages/core/dist/index.d.ts"),
+      "export declare const ready: boolean;\n",
+    );
+    await writeFile(
+      join(root, "packages/core/package.json"),
+      `${JSON.stringify({
+        name: "@sheetwrite/core",
+        exports: { ".": ["./dist/index.js", "./dist/fallback.js"] },
+      })}\n`,
+    );
+    expect(() => validateExportTargets(root)).toThrow("@sheetwrite/core:./dist/fallback.js");
+  });
+
   it("refuses a workspace that already contains generated output", async () => {
     const root = await exportFixture();
     expect(() => assertGeneratedOutputsAbsent(root)).toThrow("packages/core/dist");

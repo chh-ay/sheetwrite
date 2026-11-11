@@ -130,6 +130,12 @@ describe("manifest ownership", () => {
 
   it.each([
     ["a missing required asset", [core], "missing required worker-async"],
+    ["a duplicate asset", [core, worker, ribbon, wasm, core], "duplicate asset"],
+    [
+      "a worker leaked into an initial entry",
+      [core, { ...worker, roles: ["core-initial", "worker-async"] }, ribbon, wasm],
+      "leaked into an initial entry",
+    ],
     [
       "an unclassified asset",
       [{ ...core, owner: "unclassified" }, worker, ribbon, wasm],

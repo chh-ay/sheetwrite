@@ -38,6 +38,7 @@ function section(kind: number, content: readonly number[]): number[] {
 /** Valid modules exercise code and name sections, including an imported index. */
 function moduleWithBodies(
   functions: readonly { name: string; bytes: number }[],
+  includeNames = true,
 ): Uint8Array<ArrayBuffer> {
   const importedFunctions = 1;
   const names = functions.flatMap((entry, index) => [
@@ -57,12 +58,14 @@ function moduleWithBodies(
     ...section(SECTION_IMPORT, [1, ...string("host"), ...string("noop"), IMPORT_FUNCTION, 0]),
     ...section(SECTION_FUNCTION, [...u32(functions.length), ...functions.map(() => 0)]),
     ...section(SECTION_CUSTOM, [...string("keep"), 42]),
-    ...section(SECTION_CUSTOM, [
-      ...string("name"),
-      ...functionNames,
-      ...u32(functions.length),
-      ...names,
-    ]),
+    ...(includeNames
+      ? section(SECTION_CUSTOM, [
+          ...string("name"),
+          ...functionNames,
+          ...u32(functions.length),
+          ...names,
+        ])
+      : []),
     ...section(SECTION_CODE, [...u32(functions.length), ...bodies]),
   ]);
   expect(WebAssembly.validate(bytes)).toBe(true);
@@ -77,9 +80,42 @@ describe("optimized WASM function budget", () => {
     expect(() => checkWasmFunctionSizes(bytes)).toThrow("CellStore::eval_ast");
   });
 
+  it("allows the budget boundary and removes only names without changing other bytes", () => {
+    const bytes = moduleWithBodies([
+      { name: "CellStore::eval_ast", bytes: WASM_FUNCTION_BUDGET_BYTES },
+    ]);
+    const { wasm, largestFunctions } = checkWasmFunctionSizes(bytes);
+    expect(largestFunctions).toEqual([
+      { name: "CellStore::eval_ast", bytes: WASM_FUNCTION_BUDGET_BYTES },
+    ]);
+
+    const module = new WebAssembly.Module(new Uint8Array(wasm));
+    expect(WebAssembly.Module.customSections(module, "name")).toHaveLength(0);
+    expect(WebAssembly.Module.customSections(module, "keep")).toEqual([Uint8Array.of(42).buffer]);
+
+    expect(wasm).toEqual(
+      moduleWithBodies([{ name: "CellStore::eval_ast", bytes: WASM_FUNCTION_BUDGET_BYTES }], false),
+    );
+  });
+
+  it("reports the ten largest bodies in descending order", () => {
+    const bytes = moduleWithBodies(
+      Array.from({ length: 13 }, (_, index) => ({ name: `function_${index}`, bytes: index + 2 })),
+    );
+    const { largestFunctions } = checkWasmFunctionSizes(bytes);
+    expect(largestFunctions).toHaveLength(10);
+    expect(largestFunctions[0]).toEqual({ name: "function_12", bytes: 14 });
+    expect(largestFunctions[9]).toEqual({ name: "function_3", bytes: 5 });
+  });
+
   it("fails closed when a build drops names before the guard", () => {
     const bytes = moduleWithBodies([{ name: "small", bytes: BODY_FRAMING_BYTES }]);
     const { wasm } = checkWasmFunctionSizes(bytes);
     expect(() => checkWasmFunctionSizes(wasm)).toThrow();
+  });
+
+  it("rejects a truncated code section instead of accepting its advertised body size", () => {
+    const bytes = moduleWithBodies([{ name: "small", bytes: BODY_FRAMING_BYTES }]);
+    expect(() => checkWasmFunctionSizes(bytes.subarray(0, bytes.length - 1))).toThrow();
   });
 });

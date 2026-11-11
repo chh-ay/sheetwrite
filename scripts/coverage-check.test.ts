@@ -38,29 +38,36 @@ function record(
 }
 
 describe("LCOV parser", () => {
-  const GRID = "SF:packages/core/src/grid.ts";
-  const report = [
-    GRID,
-    "FNF:2",
-    "FNH:1",
-    "DA:10,2",
-    "DA:11,0",
-    "LF:2",
-    "LH:1",
-    "end_of_record",
-  ].join("\n");
-
-  it("fails closed on an LF that disagrees with DA", () => {
-    expect(() => parseLcov(report.replace("LF:2", "LF:3"), ROOT)).toThrow("LF does not match");
+  it("normalizes repository paths and rejects a one-line malformed/non-finite counter", () => {
+    const report = [
+      "TN:",
+      "SF:packages/core/src/grid.ts",
+      "FNF:2",
+      "FNH:1",
+      "DA:10,2",
+      "DA:11,0",
+      "LF:2",
+      "LH:1",
+      "end_of_record",
+    ].join("\n");
+    expect(parseLcov(report, ROOT)[0]).toMatchObject({
+      path: "packages/core/src/grid.ts",
+      lines: { covered: 1, total: 2 },
+      functions: { covered: 1, total: 2 },
+      uncoveredLines: [11],
+    });
+    expect(() => parseLcov(report.replace("DA:11,0", "DA:11,NaN"), ROOT)).toThrow(
+      "finite non-negative integer",
+    );
   });
 
   it("merges sharded line hits while conservatively ratcheting function coverage", () => {
     const first = parseLcov(
-      `${GRID}\nFNF:3\nFNH:1\nDA:10,2\nDA:11,0\nLF:2\nLH:1\nend_of_record`,
+      "SF:packages/core/src/grid.ts\nFNF:3\nFNH:1\nDA:10,2\nDA:11,0\nLF:2\nLH:1\nend_of_record",
       ROOT,
     );
     const second = parseLcov(
-      `${GRID}\nFNF:4\nFNH:2\nDA:10,0\nDA:11,3\nDA:12,1\nLF:3\nLH:2\nend_of_record`,
+      "SF:packages/core/src/grid.ts\nFNF:4\nFNH:2\nDA:10,0\nDA:11,3\nDA:12,1\nLF:3\nLH:2\nend_of_record",
       ROOT,
     );
     expect(mergeLcovRecords([first, second])).toMatchObject([
@@ -71,6 +78,34 @@ describe("LCOV parser", () => {
         uncoveredLines: [],
       },
     ]);
+  });
+
+  it("rejects duplicate source records and duplicate line counters", () => {
+    const source = [
+      "SF:packages/core/src/grid.ts",
+      "FNF:0",
+      "FNH:0",
+      "DA:1,1",
+      "LF:1",
+      "LH:1",
+      "end_of_record",
+    ].join("\n");
+    expect(() => parseLcov(`${source}\n${source}`, ROOT)).toThrow("Duplicate LCOV source record");
+    expect(() => parseLcov(source.replace("DA:1,1", "DA:1,1\nDA:1,0"), ROOT)).toThrow(
+      "Duplicate LCOV DA",
+    );
+  });
+
+  it("fails closed on a missing terminator and counters inconsistent with DA", () => {
+    expect(() => parseLcov("SF:packages/core/src/grid.ts\nDA:1,1", ROOT)).toThrow(
+      "ended before end_of_record",
+    );
+    expect(() =>
+      parseLcov(
+        "SF:packages/core/src/grid.ts\nFNF:0\nFNH:0\nDA:1,1\nLF:2\nLH:1\nend_of_record",
+        ROOT,
+      ),
+    ).toThrow("LF does not match");
   });
 });
 
@@ -154,6 +189,22 @@ describe("aggregate floors", () => {
       }),
     ).toThrow("Generated/test output entered scored coverage");
   });
+
+  it("enforces Rust region floors", () => {
+    const rustRecord: CoverageRecord = {
+      ...record("packages/wasm/src/calc.rs", { covered: 100, total: 100 }),
+      functions: { covered: 10, total: 10 },
+      regions: { covered: 79, total: 100 },
+    };
+    expect(() =>
+      evaluateCoveragePolicy({
+        policy: POLICY,
+        language: "rust",
+        records: [rustRecord],
+        scoredPaths: new Set([rustRecord.path]),
+      }),
+    ).toThrow("rust regions coverage 79.00% (79/100) is below the 80% floor");
+  });
 });
 
 describe("policy schema", () => {
@@ -163,24 +214,34 @@ describe("policy schema", () => {
     exclusions: [{ path: "packages/core/src/types.ts", reason: "Type-only module" }],
   };
 
-  it.each([
-    [
-      "an unjustified exclusion",
-      { ...valid, exclusions: [{ path: "packages/core/src/types.ts", reason: "" }] },
-      "reason must be non-empty",
-    ],
-    [
-      "a missing floor",
-      { ...valid, floors: { ...valid.floors, rust: { lines: 80 } } },
-      "Coverage rust floor functions must be an integer percentage",
-    ],
-    [
-      "an unsupported schema",
-      { ...valid, schemaVersion: 2 },
+  it("rejects unjustified exclusions, missing floors, and unsupported schema versions", () => {
+    expect(() =>
+      parseCoveragePolicy({
+        ...valid,
+        exclusions: [{ path: "packages/core/src/types.ts", reason: "" }],
+      }),
+    ).toThrow("reason must be non-empty");
+    expect(() =>
+      parseCoveragePolicy({ ...valid, floors: { ...valid.floors, rust: { lines: 80 } } }),
+    ).toThrow("Coverage rust floor functions must be an integer percentage");
+    expect(() => parseCoveragePolicy({ ...valid, schemaVersion: 2 })).toThrow(
       "Unsupported coverage policy schema version",
-    ],
-  ])("rejects %s", (_label, policy, message) => {
-    expect(() => parseCoveragePolicy(policy)).toThrow(message);
+    );
+  });
+
+  it("fails closed on unknown policy, floor, and exclusion fields", () => {
+    const cases = [
+      { ...valid, typo: true },
+      { ...valid, floors: { ...valid.floors, go: { lines: 1, functions: 1 } } },
+      {
+        ...valid,
+        floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } },
+      },
+      { ...valid, exclusions: [{ ...valid.exclusions[0], ticket: "SEC-1" }] },
+    ];
+    for (const value of cases) {
+      expect(() => parseCoveragePolicy(value)).toThrow("unknown field");
+    }
   });
 });
 
