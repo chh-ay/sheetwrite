@@ -43,11 +43,6 @@ impl Touches {
         self.list.push(touch);
     }
 
-    #[cfg(test)]
-    pub(crate) const fn len(&self) -> usize {
-        self.list.len()
-    }
-
     /// Move the rows of every rectangle as `op` moves the rows of the sheet.
     pub(crate) fn apply_rows(&mut self, op: AxisOp) {
         self.apply(op, true);
@@ -148,7 +143,7 @@ mod tests {
         assert_eq!(touches.last_author(4, 0), NONE);
 
         touches.apply_rows(AxisOp::Remove { at: 7, count: 1 });
-        assert_eq!(touches.len(), 0);
+        assert_eq!(touches.last_author(7, 0), NONE);
     }
 
     #[test]

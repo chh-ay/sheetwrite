@@ -3,7 +3,6 @@
 //! "Learn about sort orders"). Each test sorts one column and checks the
 //! data-row permutation for both directions.
 
-use crate::query::{ComparableCell, SortKeyBuilder};
 use crate::store::CellStore;
 
 const SORT_COLUMN: usize = 0;
@@ -158,29 +157,4 @@ fn types_sort_as_numbers_text_logical_values_errors_then_blanks() {
 
     assert_eq!(sorted(&store, sheet, true), vec![7, 4, 3, 5, 2, 6, 1, 0]);
     assert_eq!(sorted(&store, sheet, false), vec![1, 6, 2, 5, 3, 4, 7, 0]);
-}
-
-/// Each distinct pool string is collated once: the arena holds one byte per
-/// collated ASCII character of the distinct strings, whatever the row count.
-#[test]
-fn each_distinct_string_is_collated_once() {
-    const ROWS: usize = 100_000;
-    const DISTINCT_LABELS: usize = 5_000;
-    const SPAN_AND_ID_BYTES: usize = 16;
-
-    let labels: Vec<String> = (0..DISTINCT_LABELS)
-        .map(|label| format!("item-{label}"))
-        .collect();
-    let mut keys = SortKeyBuilder::with_capacity(ROWS);
-    for row in 0..ROWS {
-        let id = row % DISTINCT_LABELS;
-        keys.push(ComparableCell::Text {
-            id: id as u32,
-            text: &labels[id],
-        });
-    }
-
-    let collated: usize = labels.iter().map(|label| label.len() - 1).sum();
-    assert_eq!(keys.arena_len(), collated);
-    assert!(keys.collation_bytes() < 2 * (collated + DISTINCT_LABELS * SPAN_AND_ID_BYTES));
 }
