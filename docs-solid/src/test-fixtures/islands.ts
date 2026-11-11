@@ -43,6 +43,13 @@ export const TEST_FIXTURE_ISLANDS = {
         withProps(GridMemoryFixture),
       ),
   },
+  "test-prefetch": {
+    source: "src/test-fixtures/prefetch/PrefetchFixture.tsx",
+    load: () =>
+      import("./prefetch/PrefetchFixture.js").then(({ PrefetchFixture }) =>
+        withProps(PrefetchFixture),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 export type TestFixtureIslandName = keyof typeof TEST_FIXTURE_ISLANDS;
