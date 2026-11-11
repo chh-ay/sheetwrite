@@ -22,6 +22,13 @@ export const TEST_FIXTURE_ISLANDS = {
     source: "src/test-fixtures/xlsx/XlsxFixture.tsx",
     load: () => import("./xlsx/XlsxFixture.js").then(({ XlsxFixture }) => withProps(XlsxFixture)),
   },
+  "test-formulas-engine": {
+    source: "src/test-fixtures/formulas-engine/FormulasEngineFixture.tsx",
+    load: () =>
+      import("./formulas-engine/FormulasEngineFixture.js").then(({ FormulasEngineFixture }) =>
+        withProps(FormulasEngineFixture),
+      ),
+  },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 export type TestFixtureIslandName = keyof typeof TEST_FIXTURE_ISLANDS;
