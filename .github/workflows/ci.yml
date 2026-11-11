@@ -455,11 +455,6 @@ jobs:
           bun scripts/install-wasm-pack.ts
       - name: Validate compatibility test set
         run: bun run compatibility:validate
-      - name: Timing probe (temporary)
-        run: |
-          rustup component list --installed
-          time bun scripts/workspace-tooling.ts build-rust
-          time bun run build:packages
       - name: Build and pack once
         run: bun run release:prepare -- --mode release --output test-results/release-artifacts
       - name: Verify local compatibility results
