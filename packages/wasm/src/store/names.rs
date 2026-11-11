@@ -708,6 +708,7 @@ fn reference_target(
 fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
     match ast {
         Ast::Name(name) => names.push(name),
+        Ast::LetName { name, .. } => names.push(name),
         Ast::UnknownFunc(name, args) => {
             names.push(name);
             for arg in args {

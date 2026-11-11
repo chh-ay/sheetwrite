@@ -758,6 +758,15 @@ pub enum Ast {
         slot: u32,
         expression: Box<Ast>,
     },
+    /// A use, or the binding name, of a LET binding resolved when the formula
+    /// was entered. The name stays for writing the formula back; `slot`
+    /// numbers the binding within the outermost resolved LET, and evaluation
+    /// reads the binding's expression from the LET itself instead of a copy
+    /// (`eval::let_slots`).
+    LetName {
+        slot: u32,
+        name: Box<str>,
+    },
     /// An array constant such as `{1,2;3,4}`: row-major values with `cols`
     /// values in each row.
     Array {
@@ -796,6 +805,7 @@ impl Ast {
             Ast::BoundMatrix { .. } => false,
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(_) => false,
+            Ast::LetName { .. } => false,
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)
@@ -833,6 +843,7 @@ impl Ast {
             Ast::BoundMatrix { .. } => false,
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(_) => false,
+            Ast::LetName { .. } => false,
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)
@@ -866,6 +877,7 @@ impl Ast {
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(_) => {}
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
+            Ast::LetName { name, .. } => out.add_payload(name.len(), name.len()),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
             // A shared expansion is counted once, by the store's cache that
             // also holds it; an expansion only this formula holds is its own.
@@ -2868,6 +2880,7 @@ fn translate_relative_refs_inner(
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
+        | Ast::LetName { .. }
         | Ast::NamedRange(_)
         | Ast::NamedFormula(_)
         | Ast::UnresolvedStructured(_)
@@ -3361,6 +3374,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         Ast::Str(value) => write_text(value, out),
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
+        Ast::LetName { name, .. } => out.push_str(name),
         Ast::NamedRange(named) => out.push_str(&named.name),
         Ast::NamedFormula(named) => out.push_str(&named.name),
         Ast::UnresolvedStructured(reference) => write_structured_ref(

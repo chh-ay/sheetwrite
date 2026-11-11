@@ -611,10 +611,20 @@ pub(crate) struct FormulaResults {
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
     lookups: crate::eval::LookupStates,
-    /// Boxed, so the pass workspace the store keeps between passes grows by
-    /// one pointer, not by the whole table.
+    /// Pass state most passes never use. Boxed and created on first use, so
+    /// the workspace the store keeps between passes grows by one pointer, and
+    /// dropped with the pass.
+    scratch: Option<Box<PassScratch>>,
+}
+
+/// The pass state [`FormulaResults`] keeps behind one pointer.
+#[derive(Default)]
+struct PassScratch {
+    /// LET slot values and resolved bindings.
+    let_frame: crate::eval::LetFrame,
+    /// The regex programs this pass compiled.
     #[cfg(feature = "analysis")]
-    regexes: Option<Box<PassRegexes>>,
+    regexes: PassRegexes,
 }
 
 /// Compiled regex programs one pass keeps at once. Formulas that alternate
@@ -820,8 +830,9 @@ impl FormulaResults {
         pattern: &str,
         insensitive: bool,
     ) -> Option<std::rc::Rc<regex_lite::Regex>> {
-        self.regexes
+        self.scratch
             .as_ref()?
+            .regexes
             .entries
             .iter()
             .flatten()
@@ -838,7 +849,7 @@ impl FormulaResults {
         insensitive: bool,
         regex: std::rc::Rc<regex_lite::Regex>,
     ) {
-        let table = self.regexes.get_or_insert_with(Box::default);
+        let table = &mut self.scratch.get_or_insert_with(Box::default).regexes;
         table.entries[table.next] = Some(PassRegex {
             pattern: pattern.to_owned(),
             insensitive,
@@ -847,12 +858,31 @@ impl FormulaResults {
         table.next = (table.next + 1) % PASS_REGEX_CAPACITY;
     }
 
-    /// Exchanges this workspace's regex programs with `other`'s. A nested
-    /// evaluation with its own workspace borrows the pass programs this way
-    /// and gives them back when it ends.
+    /// Exchanges this workspace's pass scratch with `other`'s. A nested
+    /// evaluation with its own workspace borrows the pass's regex programs and
+    /// LET frame this way and gives them back when it ends. Its LETs use slots
+    /// above those in use and drop them before it returns, so the frame comes
+    /// back as it was lent.
     #[cfg(feature = "analysis")]
-    pub(crate) fn swap_regexes(&mut self, other: &mut FormulaResults) {
-        std::mem::swap(&mut self.regexes, &mut other.regexes);
+    pub(crate) fn swap_scratch(&mut self, other: &mut FormulaResults) {
+        std::mem::swap(&mut self.scratch, &mut other.scratch);
+    }
+
+    /// The LET slot frame of this pass, once a LET has created it.
+    pub(crate) fn let_frame(&self) -> Option<&crate::eval::LetFrame> {
+        self.scratch.as_deref().map(|scratch| &scratch.let_frame)
+    }
+
+    /// The LET slot frame of this pass to update, once a LET has created it.
+    pub(crate) fn existing_let_frame_mut(&mut self) -> Option<&mut crate::eval::LetFrame> {
+        self.scratch
+            .as_deref_mut()
+            .map(|scratch| &mut scratch.let_frame)
+    }
+
+    /// The LET slot frame of this pass, created on first use.
+    pub(crate) fn let_frame_mut(&mut self) -> &mut crate::eval::LetFrame {
+        &mut self.scratch.get_or_insert_with(Box::default).let_frame
     }
 
     /// Clears this pass's pulled results and any bits left set. A finished
@@ -873,10 +903,7 @@ impl FormulaResults {
         self.range_sums.sums.clear();
         self.range_sums.last = None;
         self.lookups.clear();
-        #[cfg(feature = "analysis")]
-        {
-            self.regexes = None;
-        }
+        self.scratch = None;
     }
 
     /// Release wide result buffers before saving the cleared primary work space.
@@ -920,6 +947,9 @@ impl FormulaResults {
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
+        if let Some(frame) = self.let_frame() {
+            frame.add_memory_stats(formulas);
+        }
         formulas.add_vec::<u32>(
             self.range_sums.slots.len(),
             self.range_sums.slots.capacity(),

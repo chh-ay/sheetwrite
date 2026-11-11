@@ -304,6 +304,7 @@ impl ReadSet {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
+            | Ast::LetName { .. }
             | Ast::UnresolvedStructured(_)
             | Ast::Num(_)
             | Ast::Array { .. } => {}
@@ -390,8 +391,10 @@ fn ast_contains_spill_ref(ast: &Ast) -> bool {
     }
 }
 
-fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
-    if !ast_contains_let(ast) {
+/// The reads and volatility of `ast`; `contains_let` is
+/// [`ast_contains_let`] of it, which the caller may need too.
+fn formula_metadata(ast: &Ast, formula_sheet: u32, contains_let: bool) -> (ReadSet, bool) {
+    if !contains_let {
         return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
     }
     let expanded = expand_let_reachable_ast(ast).ok();
@@ -493,7 +496,7 @@ impl FormulaEntry {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
 
-    pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
+    pub(crate) fn parsed_source(mut ast: Ast, sheet: u32, source: String) -> Self {
         // A formula of values, cells and operators has no function, range,
         // name or array: every flag below stays clear, and its reads are the
         // only metadata that needs a walk.
@@ -506,7 +509,8 @@ impl FormulaEntry {
             };
         }
 
-        let (reads, volatile) = formula_metadata(&ast, sheet);
+        let contains_let = ast_contains_let(&ast);
+        let (reads, volatile) = formula_metadata(&ast, sheet, contains_let);
 
         let mut entry = Self {
             flags: 0,
@@ -519,6 +523,11 @@ impl FormulaEntry {
         entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
         entry.set_produces_array(crate::eval::ast_produces_array(&ast));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
+        // The flags and reads above come from the tree as written; resolving
+        // LET names afterwards changes how it evaluates, not what it reads.
+        if contains_let && !entry.has_spill_refs() {
+            crate::eval::resolve_let_names(&mut ast);
+        }
         entry.ast = Some(ast);
 
         entry
@@ -528,11 +537,17 @@ impl FormulaEntry {
     /// AST is rebuilt; deriving its reads again would discard runtime reads.
     #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn transferred_source(
-        ast: Option<Ast>,
+        mut ast: Option<Ast>,
         source: String,
         reads: ReadSet,
         is_reference: bool,
     ) -> Self {
+        if let Some(ast) = ast
+            .as_mut()
+            .filter(|ast| ast_contains_let(ast) && !ast_contains_spill_ref(ast))
+        {
+            crate::eval::resolve_let_names(ast);
+        }
         let mut entry = Self {
             ast,
             source,
@@ -622,7 +637,7 @@ impl FormulaEntry {
             return false;
         }
 
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
         self.reads = reads;
 
         // A plain reference has no source text: its tree is the target.
@@ -696,7 +711,7 @@ impl FormulaEntry {
 
         // A relinked reference writes the same text, so the source stays as
         // the user wrote it instead of being written again from the tree.
-        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
         self.reads = reads;
         self.set_volatile(volatile);
         true
