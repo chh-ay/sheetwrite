@@ -10,14 +10,18 @@
   --art-alt-tint: color-mix(in srgb, var(--art-alt) 16%, var(--sw-surface-1));
   --art-loaded: color-mix(in srgb, var(--art-hue) 34%, var(--sw-surface-1));
 
+  color: var(--sw-fg-muted);
+}
+
+/* Box defaults at zero specificity, so the box a page puts the art in wins. */
+:where(.sw-art) {
   display: block;
   width: 100%;
   height: 100%;
   background: var(--sw-surface-0);
-  color: var(--sw-fg-muted);
 }
 
-.sw-art--diagram {
+:where(.sw-art--diagram) {
   height: auto;
   background: none;
 }

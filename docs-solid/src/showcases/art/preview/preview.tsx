@@ -18,6 +18,7 @@ import {
   DIAGRAMS,
   RecalculationDiagram,
 } from "../diagrams.js";
+import { DOCS_CARD_ART, DOCS_DIAGRAMS } from "../docs-art.js";
 import {
   ChartReadsCellsDiagram,
   DashboardDiagram,
@@ -37,6 +38,7 @@ import {
   FRAMEWORK_PROOF_ART,
   VANILLA_PROOF_ART,
 } from "../proof-art.js";
+import { SectionMark, type SectionMarkName } from "../section-marks.js";
 
 const params = new URLSearchParams(location.search);
 if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
@@ -363,6 +365,34 @@ function Parts() {
   );
 }
 
-const views: Record<string, () => JSX.Element> = { hub: Hub, diagrams: Diagrams, parts: Parts };
+/** Every docs picture, each under a `data-part` name, for the docs mockups. */
+function DocParts() {
+  const marks: readonly SectionMarkName[] = ["guides", "api", "formulas", "changelog"];
+  const parts: readonly (readonly [string, () => JSX.Element])[] = [
+    ...Object.entries(DOCS_CARD_ART).map(([id, Art]) => [`card:${id}`, Art] as const),
+    ...Object.entries(DOCS_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...marks.map((name) => [`mark:${name}`, () => <SectionMark name={name} />] as const),
+  ];
+  return (
+    <main>
+      <For each={parts}>
+        {([name, Part]) => (
+          <div data-part={name}>
+            <Part />
+          </div>
+        )}
+      </For>
+    </main>
+  );
+}
+
+const views: Record<string, () => JSX.Element> = {
+  hub: Hub,
+  diagrams: Diagrams,
+  parts: Parts,
+  docparts: DocParts,
+};
 const root = document.getElementById("root");
 if (root) render(views[params.get("view") ?? "hub"] ?? Hub, root);
