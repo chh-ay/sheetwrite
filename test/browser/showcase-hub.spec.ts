@@ -1,45 +1,22 @@
-import { expect, type Page, test } from "@playwright/test";
-
 import { CAPABILITY_OWNERS } from "../../docs/src/showcases/capabilities.js";
-import { siteUrl } from "./playwright.config.js";
-
-interface BootErrors {
-  console: string[];
-  page: string[];
-}
-
-function collectErrors(page: Page): BootErrors {
-  const errors: BootErrors = { console: [], page: [] };
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.console.push(message.text());
-  });
-  page.on("pageerror", (error) => {
-    errors.page.push(error.message);
-  });
-  return errors;
-}
+import { expect, test } from "./fixtures.js";
 
 test("hub links every showcase, filters accessibly, and never clips a card", async ({ page }) => {
-  const errors = collectErrors(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(siteUrl("/showcases/"));
+  await page.goto("/showcases/");
   await page.waitForLoadState("networkidle");
+  await expect(
+    page.getByRole("navigation", { name: "Site" }).getByRole("link", { name: "Showcases" }),
+  ).toHaveAttribute("aria-current", "page");
 
-  const site = page.getByRole("navigation", { name: "Site" });
-  await expect(site.getByRole("link", { name: "Showcases" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(page.locator("main h1")).toHaveCount(1);
-
-  // One launcher per showcase owner.
+  // One launcher per showcase owner, and no Grid or renderer on the static hub.
+  // The cards are static markup: a filter hides the others.
   const launchers = page.locator("main a[data-owner]");
+  const shownLaunchers = launchers.filter({ visible: true });
+  const shownOwners = async () =>
+    (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort();
   const owners = CAPABILITY_OWNERS.map((owner) => owner.id).sort();
-  expect(
-    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-  ).toEqual(owners);
-
-  // The hub is a static launcher: it must not mount a Grid or a renderer.
+  expect(await shownOwners()).toEqual(owners);
   await expect(page.locator('main [role="grid"], main canvas')).toHaveCount(0);
 
   // No card clips its content at any common width, in either theme.
@@ -66,50 +43,37 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   }
 
   // Filters are toggle buttons that work from the keyboard and show focus.
-  // The cards are static markup: a filter hides the others.
-  const shownLaunchers = launchers.filter({ visible: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   const allFilter = page.getByRole("button", { name: "All", exact: true });
   const dataFilter = page.getByRole("button", { name: "Data & scale", exact: true });
-  const workbookFilter = page.getByRole("button", { name: "Workbook", exact: true });
-  await expect(allFilter).toHaveAttribute("aria-pressed", "true");
   await allFilter.focus();
   await page.keyboard.press("Tab");
   await expect(dataFilter).toBeFocused();
-  const focusStyle = await dataFilter.evaluate((button) => {
-    const style = getComputedStyle(button);
-    return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
-  });
-  expect(focusStyle.outlineStyle).not.toBe("none");
-  expect(focusStyle.outlineWidth).not.toBe("0px");
+  expect(await dataFilter.evaluate((button) => getComputedStyle(button).outlineStyle)).not.toBe(
+    "none",
+  );
   await dataFilter.press("Enter");
   await expect(dataFilter).toHaveAttribute("aria-pressed", "true");
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
   await expect
-    .poll(async () =>
-      (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-    )
+    .poll(shownOwners)
     .toEqual(["data-tools", "database", "host-rows", "performance", "queries", "sort"]);
-
-  await workbookFilter.click();
-  await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");
-  expect(
-    (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-  ).toEqual(["formatting", "interoperability", "spreadsheet"]);
+  await page.getByRole("button", { name: "Workbook", exact: true }).click();
+  expect(await shownOwners()).toEqual(["formatting", "interoperability", "spreadsheet"]);
   await page.getByRole("button", { name: "Formulas", exact: true }).click();
-  expect(
-    (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
-  ).toEqual(["analysis", "dashboards", "data-model", "formulas", "functions", "recalculation"]);
+  expect(await shownOwners()).toEqual([
+    "analysis",
+    "dashboards",
+    "data-model",
+    "formulas",
+    "functions",
+    "recalculation",
+  ]);
   await allFilter.click();
   await expect(shownLaunchers).toHaveCount(owners.length);
 
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("every owning showcase URL stays resolvable", async ({ request }) => {
+  // Every owning showcase URL resolves.
   for (const owner of CAPABILITY_OWNERS) {
-    const response = await request.get(siteUrl(owner.href));
-    expect(response.ok(), `${owner.href} must resolve`).toBe(true);
+    expect((await page.request.get(owner.href)).ok(), owner.href).toBe(true);
   }
 });

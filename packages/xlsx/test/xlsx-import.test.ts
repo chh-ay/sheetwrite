@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import type { Workbook, WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import {
   formatNumber,
   fromXlsxTable,
@@ -9,228 +8,120 @@ import {
   SheetwriteStore,
   toXlsxTable,
   toXlsxWorkbook,
-  XlsxResourceError,
+  type WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 import { xlsxAddon } from "../src/index.js";
-import { rawXlsx, stylesXml, worksheet } from "./raw-opc.js";
-
-const FIXTURES = new URL("./fixtures/", import.meta.url);
-const FIXED_ZIP_TIME = new Date(1980, 0, 1);
+import { BASE_STYLES_BODY, rawXlsx, stylesXml, worksheet } from "./raw-opc.js";
+import {
+  block,
+  book,
+  collectWarnings,
+  fixture,
+  formula,
+  partText,
+  range,
+  sheet,
+  sheetAt,
+  styleAt,
+  valuesOf,
+} from "./workbook-fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
-async function fixture(name: string): Promise<Uint8Array> {
-  return new Uint8Array(await Bun.file(new URL(name, FIXTURES)).arrayBuffer());
-}
-
-function workbook(): Workbook {
-  return {
-    activeSheet: "s",
-    sheets: [
-      {
-        id: "s",
-        name: "S",
-        rowCount: 3,
-        columns: [
-          { key: "name", header: "Name", width: 80, type: "text" },
-          { key: "amount", header: "Amount", width: 80, type: "number" },
-        ],
-      },
-    ],
-  };
-}
-
+/** Two sheets with every workbook feature the codec writes natively. */
 function roundTripWorkbook(): WorkbookSnapshot {
+  const amounts = range("inputs", 0, 1, 1, 1);
+  const inputs = block([[45_000, 4], [45_001.5, 6], ["Merged note"]]);
+  const styledCell = inputs.cells[1];
+  if (styledCell) {
+    styledCell.style = {
+      bold: true,
+      color: "#112233",
+      backgroundColor: "#DDEEFF",
+      align: "right",
+      wrap: true,
+      border: { all: { color: "#334455", width: 2, style: "dashed" } },
+    };
+  }
   return {
-    schemaVersion: 1,
+    ...book(
+      [
+        sheet("inputs", "Inputs", [], {
+          rowCount: 3,
+          columns: [
+            {
+              key: "when",
+              header: "When",
+              width: 111,
+              type: "date",
+              numberFormat: "mmm d, yyyy h:mm AM/PM",
+              numberLocale: "en-US",
+              headerStyle: { bold: true, backgroundColor: "#EEEEEE" },
+              cellStyle: { align: "center" },
+            },
+            {
+              key: "amount",
+              header: "Amount",
+              width: 88,
+              type: "currency",
+              numberFormat: '$#,##0.00;[Red]($#,##0.00);"-"',
+            },
+          ],
+          frozenRows: 1,
+          frozenCols: 1,
+          rowMeta: [[1, { height: 31, hidden: true }]],
+          merges: [{ r0: 2, c0: 0, r1: 2, c1: 1 }],
+          conditionalFormats: [
+            {
+              range: amounts,
+              when: { kind: "greaterThan", value: 5 },
+              style: { backgroundColor: "#FFEEAA" },
+            },
+          ],
+          rowGroups: [{ start: 0, end: 1, collapsed: false }],
+          validationRules: [
+            {
+              id: "amount-range",
+              range: amounts,
+              condition: { kind: "number", min: 0, max: 10 },
+              policy: "reject",
+              helpText: "Enter an amount from 0 to 10",
+            },
+          ],
+          protectedRanges: [{ id: "locked-date", range: range("inputs", 0, 0, 1, 0) }],
+          notes: [{ addr: { sheet: "inputs", row: 1, col: 0 }, text: "Imported source date" }],
+          sortKeys: [{ col: 1, ascending: false }],
+          filters: [[1, { kind: "compare", op: "gte", value: 1 }]],
+          cells: [inputs],
+        }),
+        sheet(
+          "calc",
+          "Calc",
+          [
+            [formula("=SUM(Inputs!B1:B2)")],
+            [{ kind: "ref", target: { sheet: "inputs", row: 0, col: 1 } }],
+          ],
+          {
+            columns: [
+              { key: "result", header: "Result", width: 100, type: "number", numberFormat: "0.00" },
+            ],
+          },
+        ),
+      ],
+      { activeSheet: "calc", namedRanges: [{ name: "InputAmounts", range: amounts }] },
+    ),
     documentId: "xlsx-round-trip",
     version: 7,
-    workbook: {
-      activeSheet: "calc",
-      namedRanges: [
-        {
-          name: "InputAmounts",
-          range: {
-            sheet: "inputs",
-            start: { row: 0, col: 1 },
-            end: { row: 1, col: 1 },
-          },
-        },
-      ],
-    },
-    sheets: [
-      {
-        id: "inputs",
-        name: "Inputs",
-        order: 0,
-        rowCount: 3,
-        columns: [
-          {
-            key: "when",
-            header: "When",
-            width: 111,
-            type: "date",
-            numberFormat: "mmm d, yyyy h:mm AM/PM",
-            numberLocale: "en-US",
-            headerStyle: { bold: true, backgroundColor: "#EEEEEE" },
-            cellStyle: { align: "center" },
-          },
-          {
-            key: "amount",
-            header: "Amount",
-            width: 88,
-            type: "currency",
-            numberFormat: '$#,##0.00;[Red]($#,##0.00);"-"',
-          },
-        ],
-        frozenRows: 1,
-        frozenCols: 1,
-        rowMeta: [[1, { height: 31, hidden: true }]],
-        merges: [{ r0: 2, c0: 0, r1: 2, c1: 1 }],
-        conditionalFormats: [
-          {
-            range: {
-              sheet: "inputs",
-              start: { row: 0, col: 1 },
-              end: { row: 1, col: 1 },
-            },
-            when: { kind: "greaterThan", value: 5 },
-            style: { backgroundColor: "#FFEEAA" },
-          },
-        ],
-        rowGroups: [{ start: 0, end: 1, collapsed: false }],
-        validationRules: [
-          {
-            id: "amount-range",
-            range: {
-              sheet: "inputs",
-              start: { row: 0, col: 1 },
-              end: { row: 1, col: 1 },
-            },
-            condition: { kind: "number", min: 0, max: 10 },
-            policy: "reject",
-            helpText: "Enter an amount from 0 to 10",
-          },
-        ],
-        protectedRanges: [
-          {
-            id: "locked-date",
-            range: {
-              sheet: "inputs",
-              start: { row: 0, col: 0 },
-              end: { row: 1, col: 0 },
-            },
-          },
-        ],
-        notes: [
-          {
-            addr: { sheet: "inputs", row: 1, col: 0 },
-            text: "Imported source date",
-          },
-        ],
-        sortKeys: [{ col: 1, ascending: false }],
-        filters: [[1, { kind: "compare", op: "gte", value: 1 }]],
-        cells: [
-          {
-            startRow: 0,
-            startCol: 0,
-            rowCount: 3,
-            colCount: 2,
-            cells: [
-              { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 45_000 } },
-              {
-                rowOffset: 0,
-                colOffset: 1,
-                value: { kind: "literal", value: 4 },
-                style: {
-                  bold: true,
-                  color: "#112233",
-                  backgroundColor: "#DDEEFF",
-                  align: "right",
-                  wrap: true,
-                  border: { all: { color: "#334455", width: 2, style: "dashed" } },
-                },
-              },
-              { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: 45_001.5 } },
-              { rowOffset: 1, colOffset: 1, value: { kind: "literal", value: 6 } },
-              { rowOffset: 2, colOffset: 0, value: { kind: "literal", value: "Merged note" } },
-            ],
-          },
-        ],
-      },
-      {
-        id: "calc",
-        name: "Calc",
-        order: 1,
-        rowCount: 2,
-        columns: [
-          { key: "result", header: "Result", width: 100, type: "number", numberFormat: "0.00" },
-        ],
-        cells: [
-          {
-            startRow: 0,
-            startCol: 0,
-            rowCount: 2,
-            colCount: 1,
-            cells: [
-              { rowOffset: 0, colOffset: 0, value: { kind: "formula", src: "=SUM(Inputs!B1:B2)" } },
-              {
-                rowOffset: 1,
-                colOffset: 0,
-                value: { kind: "ref", target: { sheet: "inputs", row: 0, col: 1 } },
-              },
-            ],
-          },
-        ],
-      },
-    ],
   };
-}
-
-function manualWorkbook(
-  sheetXml: string,
-  extras: { sharedStrings?: string; sheetRelationships?: string } = {},
-): Uint8Array {
-  const overrides = [
-    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
-    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
-    ...(extras.sharedStrings
-      ? [
-          '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>',
-        ]
-      : []),
-  ];
-  const files: Record<string, Uint8Array> = {
-    "[Content_Types].xml": strToU8(
-      `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${overrides.join("")}</Types>`,
-    ),
-    "_rels/.rels": strToU8(
-      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-    ),
-    "xl/workbook.xml": strToU8(
-      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="External" sheetId="1" r:id="rId1"/></sheets></workbook>',
-    ),
-    "xl/_rels/workbook.xml.rels": strToU8(
-      `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>${extras.sharedStrings ? '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>' : ""}</Relationships>`,
-    ),
-    "xl/worksheets/sheet1.xml": strToU8(sheetXml),
-  };
-  if (extras.sharedStrings) files["xl/sharedStrings.xml"] = strToU8(extras.sharedStrings);
-  if (extras.sheetRelationships)
-    files["xl/worksheets/_rels/sheet1.xml.rels"] = strToU8(extras.sheetRelationships);
-  return zipSync(files, { level: 6, mtime: FIXED_ZIP_TIME });
 }
 
 describe("independent XLSX corpus", () => {
   it("imports LibreOffice-native formulas, styles, validations, comments, merges, and views", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await fromXlsxWorkbook(await fixture("libreoffice-rich.xlsx"), {
-      onWarning: (warning) => warnings.push(warning),
-    });
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await fromXlsxWorkbook(await fixture("libreoffice-rich.xlsx"), { onWarning });
     expect(warnings).toContainEqual(
       expect.objectContaining({
         code: "rich-text",
@@ -240,100 +131,72 @@ describe("independent XLSX corpus", () => {
     );
     expect(imported.workbook.activeSheet).toBe("calc");
     expect(imported.workbook.namedRanges).toEqual([
-      {
-        name: "InputAmounts",
-        range: {
-          sheet: "inputs",
-          start: { row: 1, col: 0 },
-          end: { row: 3, col: 0 },
-        },
-      },
+      { name: "InputAmounts", range: range("inputs", 1, 0, 3, 0) },
     ]);
-    expect(imported.sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
-      ["inputs", "Inputs"],
-      ["calc", "Calc"],
-      ["hidden", "Hidden"],
+    expect(imported.sheets.map(({ id, name, visibility }) => [id, name, visibility])).toEqual([
+      ["inputs", "Inputs", undefined],
+      ["calc", "Calc", undefined],
+      ["hidden", "Hidden", "hidden"],
     ]);
-    expect(imported.sheets[2]!.visibility).toBe("hidden");
-    const inputs = imported.sheets[0]!;
+    const inputs = sheetAt(imported);
     expect([inputs.frozenRows, inputs.frozenCols]).toEqual([1, 1]);
     expect(inputs.merges).toContainEqual({ r0: 1, c0: 3, r1: 1, c1: 4 });
-    const currencyFormat = inputs.columns[1]!.numberFormat;
-    expect(inputs.columns[1]).toMatchObject({
-      type: "currency",
-      numberFormat: expect.stringContaining("$#,##0.00"),
-    });
-    expect(inputs.columns[4]!.visible).toBe(false);
-    expect({
-      format: currencyFormat,
-      rendered: formatNumber(2, currencyFormat),
-    }).toEqual({
-      format: expect.stringContaining("$#,##0.00"),
-      rendered: "$2.00",
-    });
+    const currency = inputs.columns[1];
+    expect(currency?.type).toBe("currency");
+    expect(currency?.numberFormat).toContain("$#,##0.00");
+    expect(formatNumber(2, currency?.numberFormat ?? "")).toBe("$2.00");
+    expect(inputs.columns[4]?.visible).toBe(false);
     expect(inputs.validationRules?.[0]).toMatchObject({
-      range: {
-        sheet: "inputs",
-        start: { row: 1, col: 0 },
-        end: { row: 3, col: 0 },
-      },
+      range: range("inputs", 1, 0, 3, 0),
       condition: { kind: "number", min: 0, max: 10 },
     });
     expect(inputs.notes).toEqual([
-      {
-        addr: { sheet: "inputs", row: 1, col: 2 },
-        text: "LibreOffice-authored note",
-      },
+      { addr: { sheet: "inputs", row: 1, col: 2 }, text: "LibreOffice-authored note" },
     ]);
-    const styled = inputs.cells[0]!.cells.find(
-      (cell) => cell.rowOffset === 1 && cell.colOffset === 2,
-    );
-    expect(styled?.style).toMatchObject({
+    const dotted = { color: "#334455", style: "dotted" };
+    expect(styleAt(imported, 1, 2)).toMatchObject({
       bold: true,
       color: "#112233",
       backgroundColor: "#DDEEFF",
       align: "center",
-      border: {
-        top: { color: "#334455", style: "dotted" },
-        right: { color: "#334455", style: "dotted" },
-        bottom: { color: "#334455", style: "dotted" },
-        left: { color: "#334455", style: "dotted" },
-      },
+      border: { top: dotted, right: dotted, bottom: dotted, left: dotted },
     });
-    expect(imported.sheets[1]!.cells[0]!.cells.map((cell) => cell.value)).toEqual([
-      { kind: "formula", src: "=SUM(Inputs!A2:A4)" },
-      { kind: "formula", src: "=Inputs!B2+Inputs!B3" },
+    expect(valuesOf(imported, 1)).toEqual([
+      formula("=SUM(Inputs!A2:A4)"),
+      formula("=Inputs!B2+Inputs!B3"),
     ]);
   });
 });
 
 describe("table XLSX interchange", () => {
   it("round-trips values, empty cells, and reserved or duplicate headers", async () => {
-    const source = workbook();
-    source.sheets[0]!.columns = [
-      { key: "a", header: "__proto__", width: 80, type: "text" },
-      { key: "b", header: "__proto__", width: 80, type: "number" },
-      { key: "c", header: "constructor", width: 80, type: "text" },
-    ];
-    const store = new SheetwriteStore(source);
-    store.applyTransaction({
-      patches: [
+    const store = new SheetwriteStore({
+      activeSheet: "s",
+      sheets: [
         {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "first" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 1 },
-          value: { kind: "literal", value: 42.5 },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 2, col: 2 },
-          value: { kind: "literal", value: "third" },
+          id: "s",
+          name: "S",
+          rowCount: 3,
+          columns: [
+            { key: "a", header: "__proto__", width: 80, type: "text" },
+            { key: "b", header: "__proto__", width: 80, type: "number" },
+            { key: "c", header: "constructor", width: 80, type: "text" },
+          ],
         },
       ],
+    });
+    store.applyTransaction({
+      patches: (
+        [
+          [0, 0, "first"],
+          [0, 1, 42.5],
+          [2, 2, "third"],
+        ] as const
+      ).map(([row, col, value]) => ({
+        op: "set" as const,
+        addr: { sheet: "s", row, col },
+        value: { kind: "literal" as const, value },
+      })),
     });
     const data = await fromXlsxTable(await toXlsxTable(store.getWorkbook(), store));
     expect(Object.getPrototypeOf(data.columns)).toBeNull();
@@ -348,94 +211,77 @@ describe("table XLSX interchange", () => {
 describe("workbook OOXML fidelity", () => {
   it("is byte-deterministic and preserves supported workbook semantics", async () => {
     const source = roundTripWorkbook();
-    const warnings: XlsxWorkbookWarning[] = [];
-    const first = await toXlsxWorkbook(source, { onWarning: (warning) => warnings.push(warning) });
-    const second = await toXlsxWorkbook(source);
-    expect(first).toEqual(second);
+    const { warnings, onWarning } = collectWarnings();
+    const first = await toXlsxWorkbook(source, { onWarning });
+    expect(first).toEqual(await toXlsxWorkbook(source));
     expect(warnings.map((warning) => warning.code)).toEqual([
       "unsupported-feature",
       "unsupported-feature",
     ]);
-    const parts = unzipSync(first);
-    expect(strFromU8(parts["xl/workbook.xml"]!)).toContain('fullCalcOnLoad="1"');
-    expect(strFromU8(parts["xl/workbook.xml"]!)).toContain('name="InputAmounts"');
-    const inputsXml = strFromU8(parts["xl/worksheets/sheet1.xml"]!);
-    expect(inputsXml).toContain('<mergeCell ref="A3:B3"/>');
-    expect(inputsXml).toContain('state="frozen"');
-    expect(inputsXml).toContain('type="decimal"');
-    expect(inputsXml).toContain("<conditionalFormatting");
-    expect(strFromU8(parts["xl/styles.xml"]!)).toContain("<dxfs count=");
-    expect(strFromU8(parts["xl/comments1.xml"]!)).toContain("Imported source date");
-    expect(strFromU8(parts["xl/worksheets/sheet2.xml"]!)).toContain("SUM(Inputs!B1:B2)");
+    const workbookXml = partText(first, "xl/workbook.xml");
+    expect(workbookXml).toContain('fullCalcOnLoad="1"');
+    expect(workbookXml).toContain('name="InputAmounts"');
+    const inputsXml = partText(first, "xl/worksheets/sheet1.xml");
+    for (const fragment of [
+      '<mergeCell ref="A3:B3"/>',
+      'state="frozen"',
+      'type="decimal"',
+      "<conditionalFormatting",
+    ]) {
+      expect(inputsXml).toContain(fragment);
+    }
+    expect(partText(first, "xl/styles.xml")).toContain("<dxfs count=");
+    expect(partText(first, "xl/comments1.xml")).toContain("Imported source date");
+    expect(partText(first, "xl/worksheets/sheet2.xml")).toContain("SUM(Inputs!B1:B2)");
 
     const imported = await fromXlsxWorkbook(first);
-    expect(imported.documentId).toBe("xlsx-round-trip");
-    expect(imported.version).toBe(7);
+    expect([imported.documentId, imported.version]).toEqual(["xlsx-round-trip", 7]);
     expect(imported.workbook).toEqual(source.workbook);
-    expect(imported.sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
+    expect(imported.sheets.map(({ id, name }) => [id, name])).toEqual([
       ["inputs", "Inputs"],
       ["calc", "Calc"],
     ]);
-    const inputs = imported.sheets[0]!;
-    expect(inputs.columns).toEqual(source.sheets[0]!.columns);
-    expect(inputs.frozenRows).toBe(1);
-    expect(inputs.frozenCols).toBe(1);
-    expect(inputs.rowMeta).toEqual([[1, { height: 31, hidden: true }]]);
-    expect(inputs.merges).toEqual(source.sheets[0]!.merges);
-    expect(inputs.validationRules).toEqual(source.sheets[0]!.validationRules);
-    expect(inputs.notes).toEqual(source.sheets[0]!.notes);
-    expect(inputs.conditionalFormats).toEqual(source.sheets[0]!.conditionalFormats);
-    expect(inputs.rowGroups).toEqual(source.sheets[0]!.rowGroups);
-    expect(inputs.protectedRanges).toEqual(source.sheets[0]!.protectedRanges);
-    expect(inputs.filters).toEqual(source.sheets[0]!.filters);
-    expect(inputs.sortKeys).toEqual(source.sheets[0]!.sortKeys);
-    expect(inputs.cells[0]!.cells[1]!.style).toMatchObject({
+    // Every sheet field the source sets, other than its cells, comes back exactly.
+    const { cells: _cells, ...expected } = sheetAt(source);
+    const inputs = sheetAt(imported);
+    expect(
+      Object.fromEntries(Object.keys(expected).map((key) => [key, Reflect.get(inputs, key)])),
+    ).toEqual(expected);
+    const dashed = { color: "#334455", width: 2, style: "dashed" };
+    expect(styleAt(imported, 0, 1)).toMatchObject({
       bold: true,
       color: "#112233",
       backgroundColor: "#DDEEFF",
       align: "right",
       wrap: true,
-      border: {
-        top: { color: "#334455", width: 2, style: "dashed" },
-        right: { color: "#334455", width: 2, style: "dashed" },
-        bottom: { color: "#334455", width: 2, style: "dashed" },
-        left: { color: "#334455", width: 2, style: "dashed" },
-      },
+      border: { top: dashed, right: dashed, bottom: dashed, left: dashed },
     });
-    expect(imported.sheets[1]!.cells[0]!.cells.map((cell) => cell.value)).toEqual([
-      { kind: "formula", src: "=SUM(Inputs!B1:B2)" },
-      { kind: "ref", target: { sheet: "inputs", row: 0, col: 1 } },
-    ]);
+    expect(valuesOf(imported, 1)).toEqual(valuesOf(source, 1));
   });
 
   it("expands independently authored shared formula slaves", async () => {
-    const bytes = await fixture("shared-formula.xlsx");
-    const imported = await fromXlsxWorkbook(bytes);
-    expect(
-      imported.sheets[0]!.cells[0]!.cells.filter((cell) => cell.colOffset === 1).map(
-        (cell) => cell.value,
-      ),
-    ).toEqual([
-      { kind: "formula", src: "=A1*2" },
-      { kind: "formula", src: "=A2*2" },
-      { kind: "formula", src: "=A3*2" },
-    ]);
-    expect(
-      imported.sheets[0]!.cells[0]!.cells.filter((cell) => cell.colOffset === 0).map(
-        (cell) => cell.value,
-      ),
-    ).toEqual([
+    const imported = await fromXlsxWorkbook(await fixture("shared-formula.xlsx"));
+    expect(valuesOf(imported)).toEqual([
       { kind: "literal", value: 1 },
+      formula("=A1*2"),
       { kind: "literal", value: 2 },
+      formula("=A2*2"),
       { kind: "literal", value: 3 },
+      formula("=A3*2"),
     ]);
   });
 
   it("applies column styles declared after the sheet data", async () => {
     const styles = stylesXml(
-      '<fonts count="2"><font/><font><b/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
+      BASE_STYLES_BODY.replace(
+        '<fonts count="1"><font/></fonts>',
+        '<fonts count="2"><font/><font><b/></font></fonts>',
+      ).replace(
+        /<cellXfs[\s\S]*<\/cellXfs>/,
+        '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
+      ),
     );
-    const warnings: string[] = [];
+    const { warnings, onWarning } = collectWarnings();
     const imported = await fromXlsxWorkbook(
       rawXlsx({
         styles,
@@ -447,14 +293,11 @@ describe("workbook OOXML fidelity", () => {
           },
         ],
       }),
-      { onWarning: (warning) => warnings.push(warning.code) },
+      { onWarning },
     );
-    expect(imported.sheets[0]?.cells[0]?.cells[0]?.style).toEqual({
-      bold: true,
-      verticalAlign: "bottom",
-    });
+    expect(styleAt(imported, 0, 0)).toEqual({ bold: true, verticalAlign: "bottom" });
     // Rows read before the late styles are styled again without reporting their warnings twice.
-    expect(warnings).toEqual(["unsupported-cell-value"]);
+    expect(warnings.map((warning) => warning.code)).toEqual(["unsupported-cell-value"]);
   });
 });
 
@@ -475,69 +318,49 @@ describe("bounded and corrupt XLSX inputs", () => {
       ["deep-xml.xlsx", "maxXmlDepth"],
       ["compression-ratio.xlsx", "maxCompressionRatio"],
     ] as const) {
-      try {
-        await fromXlsxWorkbook(await fixture(file));
-        throw new Error(`Expected ${file} to fail`);
-      } catch (error) {
-        expect(error).toBeInstanceOf(XlsxResourceError);
-        expect(error).toMatchObject({
-          code: "xlsx-resource-limit",
-          resource,
-          operation: "xlsx-import",
-        });
-      }
+      await expect(fromXlsxWorkbook(await fixture(file)), file).rejects.toMatchObject({
+        code: "xlsx-resource-limit",
+        resource,
+        operation: "xlsx-import",
+      });
     }
   });
 
   it("validates the shared table/workbook resource contract before codec allocation", async () => {
     const positive = await fixture("sheetwrite-libreoffice-positive.xlsx");
-    for (const operation of [
-      () => fromXlsxWorkbook(positive, { resourceLimits: { maxInputBytes: 16 } }),
-      () => fromXlsxTable(positive, { resourceLimits: { maxInputBytes: 16 } }),
-    ]) {
-      try {
-        await operation();
-        throw new Error("Expected input limit to fail");
-      } catch (error) {
-        expect(error).toBeInstanceOf(XlsxResourceError);
-        expect(error).toMatchObject({
-          resource: "maxInputBytes",
-          actual: positive.byteLength,
-          limit: 16,
-        });
-      }
+    const tooLarge = {
+      code: "xlsx-resource-limit",
+      resource: "maxInputBytes",
+      actual: positive.byteLength,
+      limit: 16,
+    };
+    const inputLimit = { resourceLimits: { maxInputBytes: 16 } };
+    await expect(fromXlsxWorkbook(positive, inputLimit)).rejects.toMatchObject(tooLarge);
+    await expect(fromXlsxTable(positive, inputLimit)).rejects.toMatchObject(tooLarge);
+    for (const [resource, options] of [
+      ["maxCells", { maxCells: 0 }],
+      ["maxXmlDepth", { resourceLimits: { maxXmlDepth: 1.5 } }],
+      ["maxRowsPerSheet", { resourceLimits: { maxRowsPerSheet: Number.MAX_SAFE_INTEGER + 1 } }],
+    ] as const) {
+      await expect(fromXlsxWorkbook(positive, options)).rejects.toMatchObject({
+        code: "xlsx-invalid-options",
+        context: { resource },
+      });
     }
-    await expect(fromXlsxWorkbook(positive, { maxCells: 0 })).rejects.toMatchObject({
-      code: "xlsx-invalid-options",
-      context: { resource: "maxCells" },
-    });
-    await expect(
-      fromXlsxWorkbook(positive, { resourceLimits: { maxXmlDepth: 1.5 } }),
-    ).rejects.toMatchObject({ code: "xlsx-invalid-options", context: { resource: "maxXmlDepth" } });
-    await expect(
-      fromXlsxWorkbook(positive, {
-        resourceLimits: { maxRowsPerSheet: Number.MAX_SAFE_INTEGER + 1 },
-      }),
-    ).rejects.toMatchObject({
-      code: "xlsx-invalid-options",
-      context: { resource: "maxRowsPerSheet" },
-    });
     await expect(
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlTextBytes: 4 } }),
-    ).rejects.toThrow(XlsxResourceError);
+    ).rejects.toMatchObject({ code: "xlsx-resource-limit" });
     await expect(
       fromXlsxWorkbook(
-        manualWorkbook(
-          '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2:C3"/><sheetData/></worksheet>',
-        ),
+        rawXlsx({ sheets: [{ xml: worksheet('<dimension ref="A1:B2:C3"/><sheetData/>') }] }),
       ),
     ).rejects.toMatchObject({
       code: "xlsx-import-failed",
       message: expect.stringMatching(/A1:B2:C3/),
     });
-    await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toThrow(
-      XlsxResourceError,
-    );
+    await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toMatchObject({
+      code: "xlsx-resource-limit",
+    });
     const controller = new AbortController();
     controller.abort(new Error("cancelled workbook import"));
     await expect(fromXlsxWorkbook(positive, { signal: controller.signal })).rejects.toThrow(

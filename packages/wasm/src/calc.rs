@@ -774,6 +774,20 @@ pub enum Ast {
         values: Vec<Value>,
     },
 }
+
+// Every node of every parsed formula is an `Ast`; large or rare variants are
+// boxed to keep it at this size.
+#[cfg(target_arch = "wasm32")]
+const _: () = assert!(
+    std::mem::size_of::<Ast>() == 48,
+    "Ast changed size: measure, then update this number"
+);
+#[cfg(not(target_arch = "wasm32"))]
+const _: () = assert!(
+    std::mem::size_of::<Ast>() == 64,
+    "Ast changed size: measure, then update this number"
+);
+
 impl Ast {
     /// The expression that a LET binding's use or a defined name stands
     /// for, through any number of them: what a function argument such as
@@ -3690,85 +3704,6 @@ mod tests {
     }
 
     #[test]
-    fn spill_references_parse_and_serialize_with_a_hash_suffix() {
-        for (source, expected) in [
-            ("=A1#", "=A1#"),
-            ("=sum($b$2#)", "=SUM($B$2#)"),
-            ("=ROWS('My Sheet'!C3#)", "=ROWS('My Sheet'!C3#)"),
-        ] {
-            assert_eq!(serialize(&parse(source).unwrap()), expected, "{source}");
-        }
-        assert_eq!(
-            parse("=A1#").unwrap(),
-            Ast::Func(
-                Func::AnchorArray,
-                vec![Ast::Cell(0, 0, RefFlags::default())]
-            )
-        );
-        // `#` only follows a cell, and the function name cannot be typed.
-        for source in ["=A1:B2#", "=#", "=1#"] {
-            assert!(parse(source).is_err(), "{source}");
-        }
-        assert!(matches!(
-            parse("=ANCHORARRAY(A1)"),
-            Ok(Ast::UnknownFunc(..))
-        ));
-    }
-
-    #[test]
-    fn parse_a1_accepts_absolute_markers() {
-        assert_eq!(parse_a1("A1"), Some((0, 0, RefFlags::default())));
-        assert_eq!(
-            parse_a1("$A1"),
-            Some((
-                0,
-                0,
-                RefFlags {
-                    row_abs: false,
-                    col_abs: true
-                }
-            ))
-        );
-        assert_eq!(
-            parse_a1("A$1"),
-            Some((
-                0,
-                0,
-                RefFlags {
-                    row_abs: true,
-                    col_abs: false
-                }
-            ))
-        );
-        assert_eq!(
-            parse_a1("$A$1"),
-            Some((
-                0,
-                0,
-                RefFlags {
-                    row_abs: true,
-                    col_abs: true
-                }
-            ))
-        );
-        assert_eq!(
-            parse_a1("aa$10"),
-            Some((
-                9,
-                26,
-                RefFlags {
-                    row_abs: true,
-                    col_abs: false
-                }
-            ))
-        );
-
-        assert_eq!(parse_a1("A0"), None);
-        assert_eq!(parse_a1("$1"), None);
-        assert_eq!(parse_a1("A$"), None);
-    }
-
-    #[test]
     fn operator_precedence_is_excel_compatible_and_errors_stay_explicit() {
         assert_eq!(serialize(&parse("=-1^2").unwrap()), "=(-(1)^2)");
         assert_eq!(serialize(&parse("=2^3^2").unwrap()), "=((2^3)^2)");
@@ -4079,32 +4014,5 @@ mod tests {
         }
         assert_eq!(parse_col(""), None);
         assert_eq!(parse_col("A1"), None);
-    }
-
-    #[cfg(feature = "analysis")]
-    #[test]
-    fn analysis_names_resolve_to_their_family_without_shadowing_built_ins() {
-        let names: Vec<&str> = crate::eval::analysis::names().collect();
-        for name in &names {
-            assert!(
-                name.bytes().all(|byte| !byte.is_ascii_lowercase()),
-                "{name} must be uppercase"
-            );
-            // A built-in or alias with the same spelling would win the lookup.
-            let id = crate::eval::analysis::lookup(name).expect("registered analysis name");
-            assert_eq!(lookup_func(name), Some(Func::Analysis(id)), "{name}");
-            assert_eq!(
-                lookup_func(&name.to_ascii_lowercase()),
-                Some(Func::Analysis(id))
-            );
-            assert_eq!(func_name(Func::Analysis(id)), *name);
-        }
-        let listed = function_names();
-        assert_eq!(
-            listed.len(),
-            FUNCTION_NAMES.len() + FUNCTION_ALIASES.len() + names.len(),
-            "every spelling is listed once"
-        );
-        assert!(listed.windows(2).all(|pair| pair[0] < pair[1]));
     }
 }

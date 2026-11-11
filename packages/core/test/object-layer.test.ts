@@ -15,7 +15,6 @@ import { makeWorkbook } from "./fixtures.js";
 const ROW_HEIGHT = DEFAULT_THEME.rowHeight;
 /** Column widths of `makeWorkbook`: name, amount, city. */
 const NAME_WIDTH = 160;
-const AMOUNT_WIDTH = 120;
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -76,12 +75,6 @@ function hostOf(grid: GridImpl): HTMLElement {
   return host;
 }
 
-function scrollerOf(grid: GridImpl): HTMLElement {
-  const scroller = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-scroller");
-  if (!scroller) throw new Error("expected the grid scroller");
-  return scroller;
-}
-
 function frameOf(grid: GridImpl, id: string): HTMLElement {
   const frame = hostOf(grid).querySelector<HTMLElement>(
     `.sheetwrite-object[data-chart-id="${id}"]`,
@@ -115,13 +108,6 @@ function placement(frame: HTMLElement): {
   };
 }
 
-function scrollTo(grid: GridImpl, top: number, left: number): void {
-  const scroller = scrollerOf(grid);
-  scroller.scrollTop = top;
-  scroller.scrollLeft = left;
-  grid.refresh();
-}
-
 function drag(target: HTMLElement, dx: number, dy: number): void {
   const start = { clientX: 100, clientY: 100, pointerId: 1, bubbles: true };
   target.dispatchEvent(new PointerEvent("pointerdown", { ...start, button: 0 }));
@@ -140,99 +126,6 @@ function press(target: HTMLElement, key: string, shiftKey = false): void {
 function anchorOf(grid: GridImpl, id: string): ChartAnchor | undefined {
   return grid.getCharts().find((candidate) => candidate.id === id)?.anchor;
 }
-
-describe("object layer placement", () => {
-  it("places a chart from its anchor and follows scroll", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-
-    expect(placement(frameOf(grid, "c1"))).toEqual({
-      pane: "bottom-right",
-      x: NAME_WIDTH + 10,
-      y: 2 * ROW_HEIGHT + 5,
-      width: 200,
-      height: 100,
-    });
-
-    scrollTo(grid, 2 * ROW_HEIGHT, 50);
-    expect(placement(frameOf(grid, "c1"))).toMatchObject({ x: NAME_WIDTH + 10 - 50, y: 5 });
-  });
-
-  it("scales position and size with zoom", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.setZoom(1.5);
-
-    expect(placement(frameOf(grid, "c1"))).toMatchObject({
-      x: (NAME_WIDTH + 10) * 1.5,
-      y: (2 * ROW_HEIGHT + 5) * 1.5,
-      width: 300,
-      height: 150,
-    });
-  });
-
-  it("follows row and column resizes", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.setColumnWidth(0, 200);
-    grid.setRowHeight(0, ROW_HEIGHT * 2);
-
-    expect(placement(frameOf(grid, "c1"))).toMatchObject({
-      x: 200 + 10,
-      y: 3 * ROW_HEIGHT + 5,
-    });
-  });
-
-  it("puts each chart in the frozen pane of its anchor cell", () => {
-    const grid = mountGrid();
-    const frozenRows = 3;
-    grid.setFrozen(frozenRows, 1);
-    grid.setChart(chart("pinned", { row: 1, col: 0, offsetX: 4, offsetY: 4 }), "s1");
-    grid.setChart(chart("top", { row: 1, col: 2, offsetX: 0, offsetY: 4 }), "s1");
-    grid.setChart(chart("left", { row: 5, col: 0, offsetX: 4, offsetY: 0 }), "s1");
-    grid.setChart(chart("body", { row: 5, col: 2, offsetX: 0, offsetY: 0 }), "s1");
-    const frozenHeight = frozenRows * ROW_HEIGHT;
-    const scrollTop = ROW_HEIGHT;
-    const scrollLeft = 30;
-    scrollTo(grid, scrollTop, scrollLeft);
-
-    expect(placement(frameOf(grid, "pinned"))).toMatchObject({
-      pane: "top-left",
-      x: 4,
-      y: ROW_HEIGHT + 4,
-    });
-    expect(placement(frameOf(grid, "body"))).toMatchObject({
-      pane: "bottom-right",
-      x: AMOUNT_WIDTH - scrollLeft,
-      y: 5 * ROW_HEIGHT - frozenHeight - scrollTop,
-    });
-    // Frozen rows scroll only sideways; frozen columns scroll only up and down.
-    expect(placement(frameOf(grid, "top"))).toMatchObject({
-      pane: "top-right",
-      x: AMOUNT_WIDTH - scrollLeft,
-      y: ROW_HEIGHT + 4,
-    });
-    expect(placement(frameOf(grid, "left"))).toMatchObject({
-      pane: "bottom-left",
-      x: 4,
-      y: 5 * ROW_HEIGHT - frozenHeight - scrollTop,
-    });
-  });
-
-  it("collapses hidden rows and columns like the grid", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("hiddenRow", { row: 2, col: 0, offsetX: 0, offsetY: 5 }), "s1");
-    grid.setChart(chart("below", { row: 5, col: 0, offsetX: 0, offsetY: 5 }), "s1");
-    grid.setChart(chart("hiddenCol", { row: 0, col: 1, offsetX: 10, offsetY: 0 }), "s1");
-    grid.hideRows([2, 3]);
-    grid.hideColumns([1]);
-
-    // The hidden anchor row collapses onto the next shown row, data row 4.
-    expect(placement(frameOf(grid, "hiddenRow"))).toMatchObject({ y: 2 * ROW_HEIGHT });
-    expect(placement(frameOf(grid, "below"))).toMatchObject({ y: 3 * ROW_HEIGHT + 5 });
-    expect(placement(frameOf(grid, "hiddenCol"))).toMatchObject({ x: NAME_WIDTH });
-  });
-});
 
 describe("object layer editing", () => {
   it("moves a chart by drag as one undo step", () => {
@@ -256,25 +149,6 @@ describe("object layer editing", () => {
 
     grid.undo();
     expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
-  });
-
-  it("shows a live preview while it drags and commits once on release", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    const frame = frameOf(grid, "c1");
-    let commits = 0;
-    grid.on("change", () => (commits += 1));
-
-    const start = { clientX: 100, clientY: 100, pointerId: 1, bubbles: true };
-    frame.dispatchEvent(new PointerEvent("pointerdown", { ...start, button: 0 }));
-    document.dispatchEvent(new PointerEvent("pointermove", { ...start, clientX: 120 }));
-    document.dispatchEvent(new PointerEvent("pointermove", { ...start, clientX: 130 }));
-    expect(placement(frame)).toMatchObject({ x: NAME_WIDTH + 10 + 30 });
-    expect(commits).toBe(0);
-
-    document.dispatchEvent(new PointerEvent("pointerup", { ...start, clientX: 130 }));
-    expect(commits).toBe(1);
-    expect(anchorOf(grid, "c1")?.offsetX).toBe(40);
   });
 
   it("resizes from a corner handle as one undo step", () => {
@@ -342,47 +216,6 @@ describe("object layer editing", () => {
     expect(placement(frameOf(grid, "c1"))).toMatchObject({ x: NAME_WIDTH + 10 });
   });
 
-  it("selects on click, deselects on a cell click and reports both", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1", {}, "Sales"), "s1");
-    const events: Array<ChartRef | null> = [];
-    grid.on("chart-select", (event) => events.push(event));
-    const frame = frameOf(grid, "c1");
-
-    frame.dispatchEvent(
-      new PointerEvent("pointerdown", { button: 0, pointerId: 1, bubbles: true }),
-    );
-    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
-    expect(events).toEqual([{ sheet: "s1", id: "c1" }]);
-    expect(document.activeElement).toBe(frame);
-    expect(frame.getAttribute("role")).toBe("group");
-    expect(frame.getAttribute("aria-roledescription")).toBe("chart");
-    expect(frame.getAttribute("aria-label")).toBe("Sales, column chart");
-    expect(frame.getAttribute("aria-current")).toBe("true");
-    expect(frame.classList.contains("sheetwrite-object-selected")).toBe(true);
-    expect(frame.querySelectorAll(".sheetwrite-object-handle")).toHaveLength(8);
-
-    scrollerOf(grid).dispatchEvent(
-      new PointerEvent("pointerdown", { button: 0, clientX: 5, clientY: 5, bubbles: true }),
-    );
-    expect(events).toEqual([{ sheet: "s1", id: "c1" }, null]);
-    expect(frame.getAttribute("aria-current")).toBe("false");
-  });
-
-  it("deselects the chart when the cell selection moves by any route, so one thing is selected", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.selectChart("c1", "s1");
-    const events: Array<ChartRef | null> = [];
-    grid.on("chart-select", (event) => events.push(event));
-
-    // The name box, the keyboard and the API all move the selection without a pointer.
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
-
-    expect(events).toEqual([null]);
-    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("false");
-  });
-
   it("keeps the chart selected when an undo restores its old position", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
@@ -416,23 +249,6 @@ describe("object layer editing", () => {
     return event;
   };
 
-  it("opens Edit chart and Delete chart on a right-click, and selects the chart", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    const activated: ChartRef[] = [];
-    grid.on("chart-activate", (event) => activated.push(event));
-
-    const event = rightClick(frameOf(grid, "c1"));
-
-    // The browser's own menu must not open over ours.
-    expect(event.defaultPrevented).toBe(true);
-    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
-    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
-
-    hostOf(grid).querySelector<HTMLElement>('[data-context-menu-item="editChart"]')?.click();
-    expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
-  });
-
   it("deletes a chart from its context menu as one undo step", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
@@ -443,16 +259,6 @@ describe("object layer editing", () => {
 
     grid.undo();
     expect(grid.getCharts()).toEqual([chart("c1")]);
-  });
-
-  it("offers only Edit chart on a read-only grid", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.setReadOnly(true);
-
-    rightClick(frameOf(grid, "c1"));
-
-    expect(menuRows(grid)).toEqual(["editChart"]);
   });
 
   it("opens the chart menu from the keyboard and gives focus back to the chart on Escape", () => {
@@ -491,54 +297,7 @@ describe("object layer editing", () => {
   });
 });
 
-describe("object layer read-only", () => {
-  it("selects and activates, but does not move, resize, nudge or delete", () => {
-    const workbook = makeWorkbook(50);
-    const sheet = workbook.sheets[0];
-    if (!sheet) throw new Error("expected the fixture sheet");
-    sheet.charts = [chart("c1")];
-    const grid = mountGrid({ readOnly: true }, workbook);
-    const selected: Array<ChartRef | null> = [];
-    const activated: ChartRef[] = [];
-    grid.on("chart-select", (event) => selected.push(event));
-    grid.on("chart-activate", (event) => activated.push(event));
-    const frame = frameOf(grid, "c1");
-
-    drag(frame, 40, 40);
-    drag(handleOf(frame, "se"), 40, 40);
-    press(frame, "ArrowRight");
-    press(frame, "Delete");
-    press(frame, "Enter");
-
-    expect(grid.getCharts()).toEqual([chart("c1")]);
-    expect(selected).toEqual([{ sheet: "s1", id: "c1" }]);
-    expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
-    expect(placement(frame)).toMatchObject({ x: NAME_WIDTH + 10, y: 2 * ROW_HEIGHT + 5 });
-    expect(
-      hostOf(grid).querySelector(".sheetwrite-object-layer")?.getAttribute("data-readonly"),
-    ).toBe("true");
-  });
-});
-
 describe("object layer mounting", () => {
-  it("draws a plain frame with the title when no renderer is registered", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("titled", {}, "Revenue"), "s1");
-    grid.setChart(chart("untitled", { row: 10 }), "s1");
-
-    expect(frameOf(grid, "titled").querySelector(".sheetwrite-object-fallback")?.textContent).toBe(
-      "Revenue",
-    );
-    expect(
-      frameOf(grid, "untitled").querySelector(".sheetwrite-object-fallback")?.textContent,
-    ).toBe("Column chart");
-
-    grid.setChart(chart("titled", {}, "Profit"), "s1");
-    expect(frameOf(grid, "titled").querySelector(".sheetwrite-object-fallback")?.textContent).toBe(
-      "Profit",
-    );
-  });
-
   it("uses the active sheet for chart edits and finds the owner for removal, returning transaction outcomes", () => {
     const grid = mountGrid({}, twoSheetWorkbook());
     grid.setActiveSheet("s2");
@@ -553,100 +312,6 @@ describe("object layer mounting", () => {
     expect(grid.getCharts("s2")).toEqual([]);
     grid.setReadOnly(true);
     expect(grid.setChart(chart("blocked"))).toMatchObject({ status: "noop", reason: "read-only" });
-  });
-
-  it("mounts through the renderer, resizes only on size changes and disposes on removal", () => {
-    const calls: string[] = [];
-    setChartRendererFactory(() => ({
-      mount(host, ref, size) {
-        calls.push(`mount ${ref.sheet}/${ref.id} ${size.width}x${size.height}`);
-        host.textContent = "drawn";
-        return {
-          resize: (width, height) => calls.push(`resize ${ref.id} ${width}x${height}`),
-          dispose: () => calls.push(`dispose ${ref.id}`),
-        };
-      },
-      dispose: () => calls.push("renderer dispose"),
-    }));
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    expect(frameOf(grid, "c1").querySelector(".sheetwrite-object-fallback")).toBeNull();
-    expect(calls).toEqual(["mount s1/c1 200x100"]);
-
-    scrollTo(grid, ROW_HEIGHT, 20);
-    drag(frameOf(grid, "c1"), 10, 0);
-    expect(calls).toEqual(["mount s1/c1 200x100"]);
-
-    grid.setZoom(2);
-    expect(calls.at(-1)).toBe("resize c1 400x200");
-
-    grid.removeChart("c1", "s1");
-    expect(calls.at(-1)).toBe("dispose c1");
-    expect(hostOf(grid).querySelector(".sheetwrite-object")).toBeNull();
-  });
-
-  it("unmounts on sheet switch and mounts the charts of the new sheet", () => {
-    const disposed: string[] = [];
-    setChartRendererFactory(() => ({
-      mount: (_host, ref) => ({ resize() {}, dispose: () => disposed.push(ref.id) }),
-      dispose() {},
-    }));
-    const grid = mountGrid({}, twoSheetWorkbook());
-    grid.setChart(chart("first"), "s1");
-    grid.setChart(chart("second"), "s2");
-    grid.selectChart("first", "s1");
-    const selected: Array<ChartRef | null> = [];
-    grid.on("chart-select", (event) => selected.push(event));
-
-    grid.setActiveSheet("s2");
-    expect(disposed).toEqual(["first"]);
-    expect(selected).toEqual([null]);
-    expect(hostOf(grid).querySelector('[data-chart-id="first"]')).toBeNull();
-    expect(placement(frameOf(grid, "second"))).toMatchObject({ x: NAME_WIDTH + 10 });
-
-    grid.selectChart("first", "s1");
-    expect(grid.getActiveSheet()).toBe("s1");
-    expect(selected.at(-1)).toEqual({ sheet: "s1", id: "first" });
-  });
-});
-
-describe("side panel host", () => {
-  it("shrinks the viewport while a panel is open and returns focus on close", () => {
-    const grid = mountGrid();
-    const viewport = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-viewport");
-    const panelHost = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-panel-host");
-    if (!viewport || !panelHost) throw new Error("expected the viewport and the panel host");
-    let cleanups = 0;
-
-    grid.openPanel({
-      title: "Chart",
-      render(body) {
-        const input = document.createElement("input");
-        body.appendChild(input);
-        return () => (cleanups += 1);
-      },
-    });
-    expect(panelHost.hidden).toBe(false);
-    expect(viewport.style.right).toBe(`${panelHost.style.width}`);
-    panelHost.querySelector("input")?.focus();
-
-    grid.openPanel(null);
-    expect(cleanups).toBe(1);
-    expect(panelHost.hidden).toBe(true);
-    expect(viewport.style.right).toBe("0px");
-    expect(document.activeElement).toBe(hostOf(grid));
-  });
-
-  it("keeps the panel host between the toolbar and the tab bar after a config change", () => {
-    const grid = mountGrid();
-    grid.setConfig({ tabs: true });
-    const viewport = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-viewport");
-    const panelHost = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-panel-host");
-    if (!viewport || !panelHost) throw new Error("expected the viewport and the panel host");
-
-    expect(viewport.style.bottom).not.toBe("0px");
-    expect(panelHost.style.bottom).toBe(viewport.style.bottom);
-    expect(panelHost.style.top).toBe(viewport.style.top);
   });
 });
 

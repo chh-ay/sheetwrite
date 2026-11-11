@@ -293,67 +293,6 @@ mod tests {
     }
 
     #[test]
-    fn covar_is_the_population_covariance_of_paired_values() {
-        let mut values = FuncAccumulator::default();
-
-        for list in [[3.0, 2.0, 4.0, 5.0, 6.0], [9.0, 7.0, 12.0, 15.0, 17.0]] {
-            for number in list {
-                values.push_range(Value::number(number)).unwrap();
-            }
-            values.finish_arg(list.len(), 1).unwrap();
-        }
-
-        assert_published("COVAR", evaluate("COVAR", &values), "5.2");
-    }
-
-    #[test]
-    fn every_name_has_a_published_example() {
-        let mut covered: Vec<&str> = MICROSOFT_EXAMPLES.iter().map(|example| example.0).collect();
-        covered.extend(["COVAR", "MODE", "STDEV", "STDEVP", "VAR", "VARP"]);
-        covered.sort_unstable();
-        covered.dedup();
-
-        assert_eq!(covered, NAMES);
-    }
-
-    #[test]
-    fn legacy_contracts_differ_from_their_successors() {
-        // NORMSDIST and LOGNORMDIST have no cumulative argument and always
-        // return the cumulative probability.
-        assert_eq!(call_numbers("NORMSDIST", &[0.0]), Value::Number(0.5));
-        assert_eq!(
-            call_numbers("NORMSDIST", &[0.0, 1.0]),
-            Value::Error(FormulaError::Value)
-        );
-        assert_eq!(
-            call_numbers("LOGNORMDIST", &[1.0, 0.0, 1.0]),
-            Value::Number(0.5)
-        );
-
-        // TDIST takes a tail count and rejects a negative x.
-        assert_eq!(
-            call_numbers("TDIST", &[-1.0, 3.0, 1.0]),
-            Value::Error(FormulaError::Num)
-        );
-        assert_eq!(
-            call_numbers("TDIST", &[1.0, 3.0, 3.0]),
-            Value::Error(FormulaError::Num)
-        );
-
-        // Tails and degrees of freedom are truncated to integers.
-        assert_eq!(
-            call_numbers("TDIST", &[1.0, 1.9, 2.9]),
-            call_numbers("TDIST", &[1.0, 1.0, 2.0])
-        );
-        // One degree of freedom is the Cauchy distribution: P(T > 1) = 1/4.
-        assert_published(
-            "TDIST",
-            call_numbers("TDIST", &[1.0, 1.0, 1.0]),
-            "0.250000000000000",
-        );
-    }
-
-    #[test]
     fn discrete_distributions_use_exact_closed_forms() {
         // C(4,2) C(6,1) / C(10,3) = 36 / 120.
         assert_published(

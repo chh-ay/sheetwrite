@@ -1,43 +1,31 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
-import { siteUrl } from "./playwright.config.js";
-
-const ROUTE = siteUrl("/showcases/dashboards/");
-
-const controls = (page: Page) => page.getByRole("complementary", { name: "Controls" });
-const item = (page: Page, id: string) => page.getByTestId(`dashboard-item-${id}`);
-/** The Revenue KPI card's value, as the dashboard draws it. */
-const revenueCard = (page: Page) =>
-  page
+test("a slicer filters the dashboard and each change is one undo step", async ({ page }) => {
+  await page.goto("/showcases/dashboards/");
+  const controls = page.getByRole("complementary", { name: "Controls" });
+  const item = (id: string) => page.getByTestId(`dashboard-item-${id}`);
+  // The Revenue KPI card's value, as the dashboard draws it.
+  const revenueCard = page
     .getByTestId("dashboard-grid")
     .locator(".sheetwrite-dashboard-kpi")
     .filter({ hasText: /^\$/ })
     .first();
-
-test("a slicer filters the dashboard and each change is one undo step", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto(ROUTE);
-  await expect(revenueCard(page)).toHaveText(/^\$[\d,]+$/, { timeout: 30_000 });
-  const allRegions = (await revenueCard(page).textContent()) ?? "";
+  await expect(revenueCard).toHaveText(/^\$[\d,]+$/, { timeout: 30_000 });
+  const allRegions = (await revenueCard.textContent()) ?? "";
 
   // The slicer narrows the KPI card it filters; undo brings every region back.
-  await controls(page)
-    .getByRole("button", { name: /in the Region slicer/ })
-    .click();
+  await controls.getByRole("button", { name: /in the Region slicer/ }).click();
   await expect(page.getByTestId("dashboard-region-selection")).toHaveText("Americas");
-  await expect(revenueCard(page)).not.toHaveText(allRegions);
-  await controls(page).getByRole("button", { name: "Undo" }).click();
+  await expect(revenueCard).not.toHaveText(allRegions);
+  await controls.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByTestId("dashboard-region-selection")).toHaveText("Every region");
-  await expect(revenueCard(page)).toHaveText(allRegions);
+  await expect(revenueCard).toHaveText(allRegions);
 
-  await controls(page).getByRole("button", { name: "Swap the chart and the pivot" }).click();
-  await expect(item(page, "channel-pivot")).toHaveText(/^col 1, row 4/);
-  await expect(item(page, "region-chart")).toHaveText(/^col 7, row 4/);
-
-  await controls(page).getByRole("button", { name: "Add a product pivot" }).click();
-  await expect(item(page, "product-pivot")).toBeVisible();
-  await controls(page).getByRole("button", { name: "Undo" }).click();
-  await expect(item(page, "product-pivot")).toHaveCount(0);
-  expect(errors).toEqual([]);
+  await controls.getByRole("button", { name: "Swap the chart and the pivot" }).click();
+  await expect(item("channel-pivot")).toHaveText(/^col 1, row 4/);
+  await expect(item("region-chart")).toHaveText(/^col 7, row 4/);
+  await controls.getByRole("button", { name: "Add a product pivot" }).click();
+  await expect(item("product-pivot")).toBeVisible();
+  await controls.getByRole("button", { name: "Undo" }).click();
+  await expect(item("product-pivot")).toHaveCount(0);
 });

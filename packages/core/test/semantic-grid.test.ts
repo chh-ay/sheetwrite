@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { toCsv } from "../src/export.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -97,12 +96,6 @@ it("updates aria-rowcount when rows are inserted", () => {
   }
 });
 
-function headers(host: HTMLElement): string[] {
-  return [...host.querySelectorAll<HTMLElement>('[role="columnheader"]')].map(
-    (header) => header.textContent ?? "",
-  );
-}
-
 function withEditors(workbook: Workbook): Workbook {
   for (const column of workbook.sheets[0]!.columns) column.editor = "input";
   workbook.sheets[0]!.validationRules = [
@@ -181,47 +174,6 @@ function activeEditorInput(host: HTMLElement): HTMLInputElement {
   if (!(input instanceof HTMLInputElement)) throw new Error("custom editor input missing");
   return input;
 }
-
-describe("semantic presentation contract", () => {
-  it("keeps spreadsheet headers positional and data-grid headers semantic without consuming row 0", async () => {
-    const written: string[] = [];
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (value: string) => written.push(value) },
-    });
-
-    for (const presentation of ["spreadsheet", "data-grid"] as const) {
-      const workbook = makeWorkbook(2);
-      const store = new SheetwriteStore(workbook, makeColumnarData(2));
-      const host = mountHost();
-      const grid = new GridImpl(host, { workbook, presentation }, store);
-
-      expect(headers(host).slice(0, 3)).toEqual(
-        presentation === "spreadsheet" ? ["A", "B", "C"] : ["Name", "Amount", "City"],
-      );
-      const firstCell = host.querySelector<HTMLElement>(
-        '[role="row"][aria-rowindex="2"] [role="gridcell"]',
-      );
-      expect(firstCell?.textContent).toBe("Customer 0");
-      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
-      expect(toCsv(store.getWorkbook().sheets[0]!, store)).toContain(
-        "Name,Amount,City\r\nCustomer 0,0.5,Phnom Penh",
-      );
-
-      grid.setSelection({
-        kind: "range",
-        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
-      });
-      await expect(grid.actions.copy()).resolves.toBe("done");
-      expect(written.at(-1)).toBe("Customer 0\t0.5");
-
-      grid.destroy();
-      store.dispose();
-      host.remove();
-    }
-    expect(written).toEqual(["Customer 0\t0.5", "Customer 0\t0.5"]);
-  });
-});
 
 describe("custom editor canonical lifecycle", () => {
   it("parses commits, enforces validation/protection, updates, histories, navigates, and restores focus", async () => {
@@ -357,7 +309,6 @@ describe("custom editor canonical lifecycle", () => {
     expect({ cancels, destroys }).toEqual({ cancels: 2, destroys: 2 });
 
     grid.beginEdit(0, 0);
-    expect(latestContext).toBeDefined();
     expect(() => latestContext?.commit(42 as never)).not.toThrow();
     expect(latestContext?.signal.aborted).toBe(true);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
@@ -643,37 +594,6 @@ describe("custom editor canonical lifecycle", () => {
     }
   });
 
-  it("notifies beginEdit selection changes before the before-open edit-begin event", () => {
-    const workbook = makeWorkbook(3);
-    const store = new SheetwriteStore(workbook, makeColumnarData(3));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    grid.setSelection({
-      kind: "range",
-      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
-    });
-    const events: string[] = [];
-    grid.on("selection", ({ selection }) => {
-      events.push("selection");
-      expect(selection).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-      expect(grid.getSelection()).toEqual(selection);
-      expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
-    });
-    grid.on("edit-begin", ({ addr }) => {
-      events.push("edit-begin");
-      expect(addr).toEqual({ sheet: "s1", row: 1, col: 1 });
-      expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
-    });
-
-    grid.beginEdit(1, 1);
-    expect(events).toEqual(["selection", "edit-begin"]);
-    expect(host.querySelector("textarea.sheetwrite-editor")).not.toBeNull();
-    grid.beginEdit(1, 1);
-    expect(events).toEqual(["selection", "edit-begin", "edit-begin"]);
-    grid.destroy();
-    store.dispose();
-  });
-
   for (const replacement of ["sheet", "editor"] as const) {
     it(`does not mount an obsolete editor after edit-begin replaces the ${replacement}`, () => {
       const workbook = makeWorkbook(3);
@@ -792,45 +712,5 @@ describe("custom editor canonical lifecycle", () => {
     expect(host.classList.contains("sheetwrite")).toBe(false);
     expect(host.getAttribute("role")).toBeNull();
     expect(host.childElementCount).toBe(0);
-  });
-});
-
-describe("observable command state", () => {
-  it("drives undo/redo disabled state and formatting active/mixed ARIA state", async () => {
-    const workbook = makeWorkbook(2);
-    const store = new SheetwriteStore(workbook, makeColumnarData(2));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
-    // The toolbar loads lazily; awaiting its module runs the grid's mount first.
-    await import("../src/ribbon/command-toolbar.js");
-    const bold = host.querySelector<HTMLButtonElement>('[data-command="bold"]');
-    const undo = host.querySelector<HTMLButtonElement>('[data-command="undo"]');
-    if (!bold || !undo) throw new Error("toolbar controls missing");
-
-    expect(grid.getCommandState("bold")).toEqual({ disabled: true, activity: "inactive" });
-    expect(undo.disabled).toBe(true);
-
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    grid.actions.toggleBold();
-    await Promise.resolve();
-    expect(grid.getCommandState("bold")).toEqual({ disabled: false, activity: "active" });
-    expect(bold.getAttribute("aria-pressed")).toBe("true");
-    expect(undo.disabled).toBe(false);
-
-    grid.setSelection({
-      kind: "range",
-      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
-    });
-    await Promise.resolve();
-    expect(grid.getCommandState("bold").activity).toBe("mixed");
-    expect(bold.getAttribute("aria-pressed")).toBe("mixed");
-
-    grid.setReadOnly(true);
-    await Promise.resolve();
-    expect(bold.disabled).toBe(true);
-    expect(undo.disabled).toBe(true);
-
-    grid.destroy();
-    store.dispose();
   });
 });

@@ -1,9 +1,37 @@
 //! Checked flat buffers shared by typed columns and the WASM transfer format.
 
+use std::num::TryFromIntError;
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
+
 use crate::plan::Diagnostic;
 
 const BITS_PER_BYTE: usize = 8;
 const MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
+
+/// The UTF-8 bytes and row end offsets of a [`Texts`] lane, in transfer order.
+pub(crate) type TextParts = (Vec<u8>, Vec<u32>);
+
+impl From<TryFromIntError> for Diagnostic {
+    /// An index that does not fit its target integer is past a resource limit.
+    fn from(_: TryFromIntError) -> Self {
+        Self::limit()
+    }
+}
+
+impl From<FromUtf8Error> for Diagnostic {
+    /// Host text that is not valid UTF-8 is rejected as a whole.
+    fn from(_: FromUtf8Error) -> Self {
+        Self::new("utf8")
+    }
+}
+
+impl From<Utf8Error> for Diagnostic {
+    /// Host text that is not valid UTF-8 is rejected as a whole.
+    fn from(_: Utf8Error) -> Self {
+        Self::new("utf8")
+    }
+}
 
 /// Bounds failures stay diagnostics rather than compiler-generated panic paths.
 pub(crate) fn at<T>(values: &[T], index: usize) -> Result<&T, Diagnostic> {
@@ -19,12 +47,20 @@ pub(crate) fn at_mut<T>(values: &mut [T], index: usize) -> Result<&mut T, Diagno
 
 /// Host u32 indexes are checked before becoming native pointer-sized indexes.
 pub(crate) fn row_index(row: u32) -> Result<usize, Diagnostic> {
-    usize::try_from(row).map_err(|_| Diagnostic::limit())
+    Ok(usize::try_from(row)?)
 }
 
 /// All persisted row, lane, and UTF-8 positions fit the same flat u32 format.
 pub(crate) fn flat_index(index: usize) -> Result<u32, Diagnostic> {
-    u32::try_from(index).map_err(|_| Diagnostic::limit())
+    Ok(u32::try_from(index)?)
+}
+
+/// Lengths written for the host saturate at `u32::MAX`, which every decoder rejects.
+pub(crate) fn saturating_u32(value: usize) -> u32 {
+    match u32::try_from(value) {
+        Ok(narrow) => narrow,
+        Err(_) => u32::MAX,
+    }
 }
 
 /// A packed row mask: bit i is row i, with low bits first in each byte.
@@ -75,7 +111,7 @@ impl Bits {
     }
 
     /// Physical bit count does not include padding in the last byte.
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.len
     }
 
@@ -108,24 +144,27 @@ impl Texts {
             return Err(Diagnostic::limit());
         }
 
-        let bytes = String::from_utf8(bytes).map_err(|_| Diagnostic::new("utf8"))?;
+        let text = String::from_utf8(bytes)?;
         if offsets.first() != Some(&0)
-            || offsets.last().copied().map(row_index).transpose()? != Some(bytes.len())
+            || offsets.last().copied().map(row_index).transpose()? != Some(text.len())
         {
             return Err(Diagnostic::new("shape"));
         }
 
         let mut previous = 0;
-        for offset in &offsets {
-            let offset = row_index(*offset)?;
-            if offset < previous || !bytes.is_char_boundary(offset) {
+        for &host_offset in &offsets {
+            let offset = row_index(host_offset)?;
+            if offset < previous || !text.is_char_boundary(offset) {
                 return Err(Diagnostic::new("shape"));
             }
 
             previous = offset;
         }
 
-        Ok(Self { bytes, offsets })
+        Ok(Self {
+            bytes: text,
+            offsets,
+        })
     }
 
     /// Every appended string ends on UTF-8 boundaries and within the u32 byte limit.
@@ -139,9 +178,9 @@ impl Texts {
             return Err(Diagnostic::limit());
         }
 
-        let end = flat_index(end)?;
+        let end_offset = flat_index(end)?;
         self.bytes.push_str(value);
-        self.offsets.push(end);
+        self.offsets.push(end_offset);
         Ok(())
     }
 
@@ -155,12 +194,12 @@ impl Texts {
     }
 
     /// The final offset is a sentinel, not an additional string.
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.offsets.len().saturating_sub(1)
     }
 
     /// Moves both lanes together so the byte ranges cannot drift from the offsets.
-    pub(crate) fn into_parts(self) -> (Vec<u8>, Vec<u32>) {
+    pub(crate) fn into_parts(self) -> TextParts {
         (self.bytes.into_bytes(), self.offsets)
     }
 }
