@@ -611,19 +611,12 @@ impl CellStorage {
         payload_str_id(self.resolved_payload_at(i))
     }
 
-    /// Reads the source payload without checking calculated values.
+    /// The source payloads of dense cells `range`, without calculated values;
+    /// `None` when the range is outside the dense vectors.
     /// Literal kinds cannot have a calculated value; formulas must resolve it.
-    ///
-    /// # Safety
-    /// `i` must be in-bounds for the dense cell vectors.
     #[inline]
-    #[allow(
-        unsafe_code,
-        reason = "skips the bounds check in the numeric sort comparator of query.rs; the safe version is not yet measured on both machines"
-    )]
-    pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
-        // SAFETY: the caller keeps `i` in bounds, as `# Safety` requires.
-        unsafe { *self.payload.get_unchecked(i) }
+    pub(crate) fn dense_payloads(&self, range: std::ops::Range<usize>) -> Option<&[u64]> {
+        self.payload.get(range)
     }
 
     #[inline]

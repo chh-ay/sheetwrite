@@ -1334,24 +1334,23 @@ fn sort_finite_number_column_comparison(
         start = run.end;
     }
 
-    order.sort_unstable_by(|&a, &b| {
-        #[allow(unsafe_code, reason = "calls `payload_unchecked`; see its reason")]
-        let (left, right) = if sheet.cells.is_paged() {
-            (
-                sheet.cells.num_at(base + a as usize),
-                sheet.cells.num_at(base + b as usize),
+    // Paged storage keeps no dense payloads; its rows go through `num_at`.
+    let dense_payloads = if sheet.cells.is_paged() {
+        None
+    } else {
+        sheet.cells.dense_payloads(base..end)
+    };
+    let value_at_row = |row: u32| {
+        let index = row as usize;
+        dense_payloads
+            .and_then(|payloads| payloads.get(index))
+            .map_or_else(
+                || sheet.cells.num_at(base + index),
+                |&bits| f64::from_bits(bits),
             )
-        } else {
-            // SAFETY: This is dense storage. Every row in `order` is below
-            // row_count, so base + row stays within this column's payload
-            // buffer, whose range is base..base + row_count.
-            unsafe {
-                (
-                    f64::from_bits(sheet.cells.payload_unchecked(base + a as usize)),
-                    f64::from_bits(sheet.cells.payload_unchecked(base + b as usize)),
-                )
-            }
-        };
+    };
+    order.sort_unstable_by(|&a, &b| {
+        let (left, right) = (value_at_row(a), value_at_row(b));
         let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
