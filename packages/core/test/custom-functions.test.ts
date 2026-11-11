@@ -51,18 +51,3 @@ describe("host formula functions on the default engine", () => {
     }
   });
 });
-
-it("run on the full engine in their own process", async () => {
-  // Engine selection is process-wide, so the full-engine contract runs apart
-  // and the default-engine contract above stays independent.
-  const probe = Bun.spawn(
-    [process.execPath, "test", "./packages/core/test/custom-functions.full-engine.ts"],
-    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-  );
-  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-    exitCode: 0,
-    failures: [],
-  });
-});

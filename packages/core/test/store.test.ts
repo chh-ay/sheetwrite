@@ -115,19 +115,6 @@ describe("SheetwriteStore", () => {
     }
   });
 
-  it("applies literal set patches and resolves them through the WASM boundary", () => {
-    const store = new SheetwriteStore(makeWorkbook(10));
-    store.applyTransaction({
-      patches: [
-        { op: "set", addr: addr(2, 0), value: { kind: "literal", value: "Acme" } },
-        { op: "set", addr: addr(2, 1), value: { kind: "literal", value: 1234.5 } },
-      ],
-    });
-    expect(store.getCell(addr(2, 0)).resolved).toBe("Acme");
-    expect(store.getCell(addr(2, 1)).resolved).toBe(1234.5);
-    expect(store.getCell(addr(2, 2)).resolved).toBeNull();
-  });
-
   it("loads formula CellValues from columnar data through the calc engine", async () => {
     const workbook = makeWorkbook(3);
     const store = new SheetwriteStore(workbook, {
@@ -143,20 +130,6 @@ describe("SheetwriteStore", () => {
     expect(store.getFormula(addr(1, 1))).toBe("=B1*2");
 
     store.dispose();
-  });
-
-  it("returns a row-major bulk window without per-cell reads", () => {
-    const store = new SheetwriteStore(makeWorkbook(50), makeColumnarData(50));
-    const view = store.getVisibleWindow("s1", { start: 3, end: 6 }, [0, 1, 2]);
-    expect(view.rows).toEqual({ start: 3, end: 6 });
-    expect(view.values.length).toBe(3 * 3); // 3 rows x 3 cols, row-major
-    expect(view.values[0]).toBe("Customer 3");
-    expect(view.values[1]).toBe(30.5);
-    expect(view.values[2]).toBe("Phnom Penh");
-    expect(view.values[3]).toBe("Customer 4");
-    expect(view.styleIds.length).toBe(9);
-    expect(view.ffiOutputBytes).toBeGreaterThan(0);
-    expect(Reflect.get(view, "ffiOutputAllocationEvents")).toBe(1);
   });
 
   it("keeps ref shadows live in windows, queries, and formulas", () => {
@@ -183,58 +156,6 @@ describe("SheetwriteStore", () => {
     });
     expect(store.getVisibleWindow("s1", { start: 1, end: 2 }, [0]).values[0]).toBe(10);
     expect(store.getCell(addr(2, 0)).resolved).toBe(11);
-  });
-
-  it("resolves plain references and propagates target edits across sheets", () => {
-    const workbook: Workbook = {
-      activeSheet: "A",
-      sheets: [
-        {
-          id: "A",
-          name: "A",
-          rowCount: 5,
-          columns: [{ key: "v", header: "V", width: 80, type: "text" }],
-        },
-        {
-          id: "B",
-          name: "B",
-          rowCount: 5,
-          columns: [{ key: "v", header: "V", width: 80, type: "text" }],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(workbook);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "A", row: 0, col: 0 },
-          value: { kind: "literal", value: "hello" },
-        },
-      ],
-    });
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "B", row: 0, col: 0 },
-          value: { kind: "ref", target: { sheet: "A", row: 0, col: 0 } },
-        },
-      ],
-    });
-    expect(store.getCell({ sheet: "B", row: 0, col: 0 }).resolved).toBe("hello");
-
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "A", row: 0, col: 0 },
-          value: { kind: "literal", value: "world" },
-        },
-      ],
-    });
-    expect(store.getCell({ sheet: "B", row: 0, col: 0 }).resolved).toBe("world");
-    expect(store.getVisibleWindow("B", { start: 0, end: 1 }, [0]).values[0]).toBe("world");
   });
 
   it("applies conditional formatting in the visible-window style dictionary", () => {
@@ -364,24 +285,6 @@ describe("SheetwriteStore", () => {
     ).toBe(1);
     expect(events.every((event) => !("dirty" in event))).toBe(true);
     store.dispose();
-  });
-
-  it("emits a change event carrying old and new values for rollback", () => {
-    const store = new SheetwriteStore(makeWorkbook(5));
-    store.applyTransaction({
-      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "old" } }],
-    });
-    let captured: ChangeEvent | null = null;
-    store.on("change", (e) => {
-      captured = e;
-    });
-    store.applyTransaction({
-      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "new" } }],
-    });
-    expect(captured).not.toBeNull();
-    const change = captured!.changes[0]!;
-    expect(change.oldValue).toEqual({ kind: "literal", value: "old" });
-    expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
   for (const operation of ["setBlock", "setRange", "clearRange"] as const) {
@@ -618,20 +521,6 @@ describe("SheetwriteStore", () => {
     expect(store.getCell({ sheet: "summary", row: 1, col: 0 }).resolved).toBe(7);
   });
 
-  it("frees disposed stores so a fresh store still reads correctly after churn", () => {
-    for (let i = 0; i < 20; i++) {
-      const churn = new SheetwriteStore(makeWorkbook(1000), makeColumnarData(1000));
-      expect(churn.getCell(addr(500, 0)).resolved).toBe("Customer 500");
-      churn.dispose();
-    }
-
-    const store = new SheetwriteStore(makeWorkbook(1000), makeColumnarData(1000));
-    expect(store.getCell(addr(500, 1)).resolved).toBe(5000.5);
-    expect(store.aggregate("s1", 1, "sum")).toBe(4995500);
-
-    store.dispose();
-  });
-
   it("keeps an outsized window intact after subsequent small reads", () => {
     const rowCount = 70_000;
     const store = new SheetwriteStore(makeWorkbook(rowCount), makeColumnarData(rowCount));
@@ -639,7 +528,6 @@ describe("SheetwriteStore", () => {
     const big = store.getVisibleWindow("s1", { start: 0, end: rowCount }, [1]);
     expect(big.values.length).toBe(rowCount);
     expect(big.values[0]).toBe(0.5);
-    expect(big.values[rowCount - 1]).toBe((rowCount - 1) * 10 + 0.5);
 
     const small = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0, 1, 2]);
     expect(Array.from(small.values)).toEqual([

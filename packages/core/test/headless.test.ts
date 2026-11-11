@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellAddress, ChangeEvent } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountGridWithData, mountHost } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
@@ -27,14 +27,6 @@ afterEach(() => {
   restoreStubs();
   globalThis.requestAnimationFrame = originalRaf;
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 const A = (row: number, col: number): CellAddress => ({ sheet: "s1", row, col });
 
@@ -121,10 +113,7 @@ describe("grid.styleRange", () => {
   // Contract: merge `style` over every cell of the rect as ONE undoable
   // transaction; preserve formulas; `null` clears cell styles.
   it("clears cell styles when passed null", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, grid } = mountGridWithData(5);
 
     const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
     grid.styleRange(range, { bold: true, color: "#123456" });
@@ -243,10 +232,7 @@ describe("grid.styleRange", () => {
 
 describe("grid.setColumnWidth (public geometry API)", () => {
   it("setColumnWidth commits an undoable width change", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, grid } = mountGridWithData(10);
 
     const before = store.getWorkbook().sheets[0]!.columns[0]!.width;
 

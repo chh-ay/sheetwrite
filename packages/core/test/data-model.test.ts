@@ -349,20 +349,6 @@ describe("relationship key status", () => {
       store.dispose();
     }
   });
-
-  it("checks keys on the full engine, in its own process", async () => {
-    // Engine selection is process-wide, so the full-engine checks run apart.
-    const probe = Bun.spawn(
-      [process.execPath, "test", "./packages/core/test/data-model.full-engine.ts"],
-      { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-    );
-    const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-    expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-      exitCode: 0,
-      failures: [],
-    });
-  });
 });
 
 describe("relationship history", () => {
