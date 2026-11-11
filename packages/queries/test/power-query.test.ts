@@ -72,6 +72,21 @@ test("saved queries round-trip through Power Query M", () => {
   });
 });
 
+test("unsupported members keep their original text and reason", () => {
+  const section = 'section Section1;\n\nshared Files = Folder.Files("C:\\\\data");\n';
+  const imported = codec.decode(section);
+
+  expect(imported.queries).toEqual([]);
+  expect(imported.unsupported).toEqual([
+    {
+      member: "Files",
+      reason: "expression",
+      detail: "Folder.Files",
+      text: 'shared Files = Folder.Files("C:\\\\data");',
+    },
+  ]);
+});
+
 test("a document that is not a Section1 section fails as a query error", () => {
   expect(() => codec.decode("section Other;")).toThrow(QueryError);
 });

@@ -117,6 +117,30 @@ function sectionOf(files: Record<string, Uint8Array>): string | undefined {
   return undefined;
 }
 
+describe("Power Query export", () => {
+  test("writes the mashup, a connection and a query table for each output", async () => {
+    const warnings: Warnings = [];
+    const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), options(warnings, true)));
+
+    expect(sectionOf(files)).toBe(codec.encode([sales]).section);
+    expect(text(files["xl/connections.xml"])).toContain("Location=Sales;");
+    expect(text(files["xl/tables/table1.xml"])).toContain('tableType="queryTable"');
+    expect(Object.keys(files)).toContain("xl/queryTables/queryTable1.xml");
+    expect(
+      warnings.filter((warning) => warning.code === "query-loss").map((warning) => warning.message),
+    ).toEqual(["Query sales differs in Excel: conversion-culture"]);
+  });
+
+  test("writes values only and reports it when no codec is given", async () => {
+    const warnings: Warnings = [];
+    const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), options(warnings, false)));
+
+    expect(sectionOf(files)).toBeUndefined();
+    expect(files["xl/connections.xml"]).toBeUndefined();
+    expect(warnings).toContainEqual(expect.objectContaining({ code: "query-loss" }));
+  });
+});
+
 describe("Power Query round trip", () => {
   test("keeps an unchanged mashup byte-for-byte and its table binding on the next save", async () => {
     const first = await backend.toXlsxWorkbook(snapshot(), options([], true));
@@ -125,7 +149,6 @@ describe("Power Query round trip", () => {
     const original = unzipSync(first);
     const item = Object.keys(original).find(isMashupItem) ?? "";
 
-    expect(sectionOf(original)).toBe(codec.encode([sales]).section);
     expect(second[item]).toEqual(original[item]);
     expect(second["xl/connections.xml"]).toEqual(original["xl/connections.xml"]);
     expect(text(second["xl/tables/table1.xml"])).toContain('tableType="queryTable"');
