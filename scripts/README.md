@@ -54,7 +54,9 @@ identify their keys. Bun caches contain downloads, not `node_modules`, and
 every job still installs with the frozen lockfile. Browser caches contain
 engines, not system libraries; installation still checks host dependencies.
 The production browser suite runs in three shards with two workers each.
-Required CI waits for every shard. Pull requests do not deploy docs.
+Required CI waits for every shard. The production docs job also checks that
+the examples load the XLSX backend only through lazy imports
+(`verify-example-xlsx-isolation.ts`). Pull requests do not deploy docs.
 
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are
 not always script names — `audit:javascript` is `bun scripts/dependency-audit.ts`,
