@@ -47,8 +47,8 @@ fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     }
 }
 
-/// VDB(cost, salvage, life, start_period, end_period, [factor],
-/// [no_switch]). A fraction of a period takes the same fraction of that
+/// VDB(cost, salvage, life, `start_period`, `end_period`, [factor],
+/// [`no_switch`]). A fraction of a period takes the same fraction of that
 /// period's depreciation.
 fn variable_declining_balance(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 5, 7)?;
@@ -192,7 +192,7 @@ impl Asset {
     }
 }
 
-/// AMORDEGRC and AMORLINC(cost, date_purchased, first_period, salvage,
+/// AMORDEGRC and AMORLINC(cost, `date_purchased`, `first_period`, salvage,
 /// period, rate, [basis]). The actual/360 basis is `#NUM!`.
 fn french_depreciation(values: &FuncAccumulator, is_degressive: bool) -> NumberResult {
     require_arity(values, 6, 7)?;

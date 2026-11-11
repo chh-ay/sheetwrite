@@ -274,7 +274,7 @@ mod tests {
         }
         store.commit_sources();
 
-        let two = |first: &str, second: &str| vec![first.to_string(), second.to_string()];
+        let two = |first: &str, second: &str| vec![first.to_owned(), second.to_owned()];
         assert!(store.set_table(
             "orders",
             "Orders",

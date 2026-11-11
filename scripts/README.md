@@ -30,7 +30,8 @@ It is composed as `VERIFY_CI_NODES` in `scripts/workspace-tooling.ts` and runs, 
 order:
 
 1. Tooling contract tests, JavaScript dependency audit, `cargo test` for the default and `analysis` features, `cargo audit`
-2. Package builds
+2. Package builds. The four release cargo builds (`build:rust`) run at once first, so their
+   single-threaded link-time optimization overlaps; each package build then reuses its output
 3. Clean-export check, typechecks, lint, unit tests, example builds, Node ESM resolution
 4. Packed-consumer and bundler-consumer installs
 5. Public API check and benchmark smoke
@@ -52,9 +53,13 @@ suite runs once. Package consumers still verify the same canonical tarballs. Rus
 separate for release and coverage profiles; tool versions and build inputs
 identify their keys. Bun caches contain downloads, not `node_modules`, and
 every job still installs with the frozen lockfile. Browser caches contain
-engines, not system libraries; installation still checks host dependencies.
+engines, not system libraries. Jobs outside the Playwright image install
+Chromium without apt and start it once; only if it cannot start do they
+install its system packages.
 The production browser suite runs in three shards with two workers each.
-Required CI waits for every shard. Pull requests do not deploy docs.
+Required CI waits for every shard. The production docs job also checks that
+the examples load the XLSX backend only through lazy imports
+(`verify-example-xlsx-isolation.ts`). Pull requests do not deploy docs.
 
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are
 not always script names — `audit:javascript` is `bun scripts/dependency-audit.ts`,

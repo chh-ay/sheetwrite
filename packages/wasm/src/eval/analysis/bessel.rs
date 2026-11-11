@@ -192,7 +192,7 @@ const I1_LARGE: [f64; 9] = [
 
 /// K0 and K1: series in (x/2)^2 up to 2, and series in 2/x times
 /// e^-x / sqrt(x) above (formulas 9.8.5 to 9.8.8). The constant term of
-/// K0_SMALL is -gamma.
+/// `K0_SMALL` is -gamma.
 const K0_SMALL: [f64; 7] = [
     -EULER_GAMMA,
     0.422_784_20,
@@ -315,7 +315,7 @@ fn first_kind_base(order: u32, x: f64) -> f64 {
     }
 }
 
-/// J_n(x) for x >= 0. The upward recurrence is stable while x is above the
+/// `J_n(x)` for x >= 0. The upward recurrence is stable while x is above the
 /// order; below it, the downward recurrence runs from a high order and is
 /// normalized by J0 + 2 (J2 + J4 + ...) = 1.
 fn first_kind(order: u32, x: f64) -> f64 {
@@ -382,7 +382,7 @@ fn modified_first_kind_base(order: u32, x: f64) -> f64 {
     polynomial(coefficients, I_SCALE / x) * x.exp() / x.sqrt()
 }
 
-/// I_n(x) for x >= 0: the downward recurrence, scaled so that its order 0
+/// `I_n(x)` for x >= 0: the downward recurrence, scaled so that its order 0
 /// value is I0.
 fn modified_first_kind(order: u32, x: f64) -> f64 {
     if order <= 1 {

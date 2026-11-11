@@ -54,6 +54,44 @@ export const PACKAGE_BUILD_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_O
   packageNode(name, "build"),
 );
 
+/** Builds a Rust crate the way `wasm-pack build` does. */
+const cargoReleaseNode = (id: string, cwd: string, ...extra: string[]): CommandNode => ({
+  id,
+  command: ["cargo", "build", "--lib", "--release", "--target", WASM_TARGET, ...extra],
+  cwd,
+});
+
+/**
+ * The cargo builds inside the wasm-pack package builds. `build` runs them all
+ * at once first, so their single-threaded link-time optimization stages
+ * overlap; each wasm-pack build then finds its cargo output up to date. Each
+ * command must stay equal to the one its wasm-pack build runs, or that build
+ * compiles again (slower, but the output is the same). The full engine
+ * (`@sheetwrite/formulas`) builds into its own target directory, so it does not
+ * wait for the lock of the default engine's.
+ */
+export const RUST_BUILD_NODES: readonly CommandNode[] = [
+  cargoReleaseNode("cargo:@sheetwrite/wasm", "packages/wasm"),
+  cargoReleaseNode("cargo:@sheetwrite/wasm/history", "packages/wasm/history"),
+  cargoReleaseNode(
+    "cargo:@sheetwrite/formulas",
+    "packages/wasm",
+    "--features",
+    "analysis",
+    "--target-dir",
+    "target/analysis",
+  ),
+  cargoReleaseNode("cargo:@sheetwrite/queries", "packages/queries/engine"),
+];
+
+const RUST_BUILD_NODE: CommandNode = {
+  id: "build:rust",
+  command: ["bun", "scripts/workspace-tooling.ts", "build-rust"],
+};
+
+/** Every package build: the Rust builds together, then each package in order. */
+export const BUILD_NODES: readonly CommandNode[] = [RUST_BUILD_NODE, ...PACKAGE_BUILD_NODES];
+
 export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_ORDER.map(
   (name) => packageNode(name, "typecheck"),
 );
@@ -302,7 +340,7 @@ export const RELEASE_QUALITY_NODES: readonly CommandNode[] = [
 
 export const VERIFY_CI_NODES: readonly CommandNode[] = [
   ...PRE_BUILD_VERIFICATION_NODES,
-  ...PACKAGE_BUILD_NODES,
+  ...BUILD_NODES,
   ...POST_BUILD_QUALITY_NODES,
   {
     id: "verify:packed",
@@ -424,10 +462,21 @@ export async function runNodes(root: string, nodes: readonly CommandNode[]): Pro
   for (const node of nodes) await executeNode(root, node);
 }
 
+/** Runs independent nodes at once and fails after all of them finish. */
+async function runConcurrentNodes(root: string, nodes: readonly CommandNode[]): Promise<void> {
+  const results = await Promise.allSettled(nodes.map((node) => executeNode(root, node)));
+  const failures = results.flatMap((result) =>
+    result.status === "rejected" ? [String(result.reason)] : [],
+  );
+  if (failures.length > 0) throw new Error(failures.join("\n"));
+}
+
 function nodesForMode(mode: string, root: string): readonly CommandNode[] {
   switch (mode) {
     case "build":
-      return PACKAGE_BUILD_NODES;
+      return BUILD_NODES;
+    case "build-rust":
+      return RUST_BUILD_NODES;
     case "build-examples":
       return EXAMPLE_BUILD_NODES;
     case "test-tooling":
@@ -467,7 +516,8 @@ export async function main(
     }
     return;
   }
-  await runNodes(root, nodes);
+  if (mode === "build-rust") await runConcurrentNodes(root, nodes);
+  else await runNodes(root, nodes);
 }
 
 if (import.meta.main) {
