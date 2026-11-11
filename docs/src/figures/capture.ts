@@ -40,6 +40,8 @@ interface Shot {
   size: ShotSize;
   /** `items`: keep only the dashboard's items, with the dashboard's 12 px margin. */
   crop?: "items";
+  /** With `crop: "items"`, the titles of the items to keep; every item by default. */
+  cropItems?: readonly string[];
   query: Record<string, string>;
   steps?: (page: Page) => Promise<void>;
 }
@@ -64,9 +66,30 @@ async function selectRows(page: Page, rows: number) {
 }
 
 const SHOTS: readonly Shot[] = [
-  // Panel size: shown at about its own width in the docs column, so its labels stay
+  // The dashboard hero, cropped to the items so the chart and the pivot show
+  // whole. Shown at about its own width in the docs column, so its labels stay
   // at their 12 px and up.
-  { name: "dashboard", size: "panel", query: { sheet: "dashboard", ribbon: "compact" } },
+  {
+    name: "dashboard",
+    size: "dashboard",
+    query: { sheet: "dashboard", ribbon: "compact" },
+    crop: "items",
+  },
+  // The 0.7.0 Dashboards highlight: the Region slicer narrowed to APAC, and the
+  // PivotChart and pivot it filters, so the card does not repeat the hero.
+  {
+    name: "dashboard-filtered",
+    size: "dashboardRow",
+    query: { sheet: "dashboard", ribbon: "compact" },
+    crop: "items",
+    cropItems: ["Revenue by month", "Revenue by product"],
+    steps: async (page) => {
+      const slicer = page.locator(".sheetwrite-dashboard-slicer");
+      for (const region of ["APAC", "Americas", "EMEA"])
+        await slicer.getByRole("button", { name: region, exact: true }).click();
+      await settle(page);
+    },
+  },
   // The tablet version of the dashboard hero: the KPI cards beside the chart,
   // cropped to the items.
   {
@@ -165,16 +188,41 @@ const STAGE_HEIGHT_FOR_CROP = 1000;
 /** The dashboard view's padding around its items. */
 const DASHBOARD_MARGIN = 12;
 
-/** The box around every dashboard item, with the dashboard's margin. */
-async function itemsBox(page: Page) {
+/** The box around the named dashboard items (every item by default), with the dashboard's margin. */
+async function itemsBox(page: Page, titles?: readonly string[]) {
   const boxes = await page
     .locator(".sheetwrite-dashboard-item")
-    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().toJSON()));
+    .evaluateAll(
+      (items, wanted) =>
+        items
+          .filter(
+            (item) =>
+              wanted === null ||
+              wanted.includes(
+                item.querySelector(".sheetwrite-dashboard-item-title")?.textContent ?? "",
+              ),
+          )
+          .map((item) => item.getBoundingClientRect().toJSON()),
+      titles ?? null,
+    );
+  if (boxes.length !== (titles?.length ?? boxes.length) || boxes.length === 0) {
+    throw new Error(`The dashboard has no items titled ${titles?.join(", ")}`);
+  }
   const left = Math.min(...boxes.map((box) => box.left)) - DASHBOARD_MARGIN;
   const top = Math.min(...boxes.map((box) => box.top)) - DASHBOARD_MARGIN;
   const right = Math.max(...boxes.map((box) => box.right)) + DASHBOARD_MARGIN;
   const bottom = Math.max(...boxes.map((box) => box.bottom)) + DASHBOARD_MARGIN;
   return { x: left, y: top, width: Math.round(right - left), height: Math.round(bottom - top) };
+}
+
+/** Hides every dashboard item but the named ones. */
+async function hideOtherItems(page: Page, titles: readonly string[]) {
+  await page.locator(".sheetwrite-dashboard-item").evaluateAll((items, kept) => {
+    for (const item of items) {
+      const title = item.querySelector(".sheetwrite-dashboard-item-title")?.textContent ?? "";
+      if (!kept.includes(title)) (item as HTMLElement).style.visibility = "hidden";
+    }
+  }, titles);
 }
 
 /** Two frames after the last change, so a panel's open transition has drawn. */
@@ -225,7 +273,10 @@ async function capture(shot: Shot, origin: string, scratch: string) {
         await shot.steps?.(page);
         const png = join(scratch, `${shot.name}-${theme}-${scale}x.png`);
         if (shot.crop === "items") {
-          const clip = await itemsBox(page);
+          const clip = await itemsBox(page, shot.cropItems);
+          // The crop's margin reaches into the neighbouring items; hide them, so
+          // it shows the dashboard's background as an all-items crop does.
+          if (shot.cropItems !== undefined) await hideOtherItems(page, shot.cropItems);
           const expected = SHOT_SIZES[shot.size];
           if (clip.width !== expected.width || clip.height !== expected.height) {
             throw new Error(`${shot.name} crops to ${clip.width}×${clip.height}, not its size`);
