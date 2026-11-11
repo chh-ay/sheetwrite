@@ -68,7 +68,7 @@ Use `WorkbookSnapshot` plus `validateWorkbookSnapshot()` at persistence boundari
 | `sync.sendNext()` / `sync.retry(id)` | Host-controlled sends. Retries keep the original ID. |
 | `sync.subscribe(source)` | Accepts a transport-neutral callback source and validates strict version order. |
 
-Snapshot hydration and transaction paste write source-free sparse blocks column by column on dense sheets without spills. Formula and reference sources keep their source-replacement rules; datasource page loads still preserve local dirty edits, and a dirty-capacity rejection leaves the whole block unchanged.
+Loading a snapshot, editing or pasting cells, and loading datasource pages write plain values (numbers, text, `TRUE`/`FALSE` and blanks) one column at a time, so large loads and pastes are faster. Writes that include formulas or cell references, sheets that show spilled formula results, and datasources with `datasourceStorage.mode: "paged"` still write one cell at a time. On a paged datasource, a page that arrives later never overwrites cells you edited, and an edit that would go over `dirtyCellLimit` is rejected without writing any of its cells.
 
 Use `MemoryPersistenceAdapter` as an executable, server-sequenced reference, not as durable storage. Adapter methods accept `AbortSignal`. Transport failures use `PersistenceError`, while version conflicts are typed commit responses that keep local work.
 
