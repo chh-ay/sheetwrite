@@ -1847,7 +1847,7 @@ impl PagedStorage {
 
 #[cfg(test)]
 mod tests {
-    use super::{PagedStorage, DIRTY_BLOCK_ROWS};
+    use super::{Directory, PagedStorage, DIRTY_BLOCK_ROWS, NONE};
     use crate::transfer::{Reader, Writer};
     use crate::types::{KIND_EMPTY, KIND_NUMBER};
 
@@ -1864,6 +1864,27 @@ mod tests {
 
     fn is_resident(storage: &PagedStorage, page: usize, col: usize) -> bool {
         storage.clean_loaded(page * ROWS, col)
+    }
+
+    #[test]
+    fn directory_frees_a_leaf_when_its_last_block_clears_and_reuses_it() {
+        let mut directory = Directory::default();
+        directory.set(2, 1000, 7);
+        directory.set(2, 1001, 8);
+        assert_eq!(directory.get(2, 1000), 7);
+        assert_eq!(directory.get(2, 999), NONE);
+        assert_eq!(directory.get(1, 1000), NONE);
+
+        directory.clear(2, 1000);
+        assert_eq!(directory.get(2, 1001), 8);
+        directory.clear(2, 1001);
+        assert_eq!(directory.get(2, 1001), NONE);
+        assert_eq!(directory.free_leaves, vec![0]);
+
+        directory.set(0, 5, 9);
+        assert_eq!(directory.get(0, 5), 9);
+        assert_eq!(directory.leaf_ids, vec![1]);
+        assert!(directory.free_leaves.is_empty());
     }
 
     #[test]

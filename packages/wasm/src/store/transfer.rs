@@ -428,6 +428,144 @@ impl CellStore {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "analysis")]
+    #[test]
+    fn pivot_memory_transfer_rebuilds_from_resent_definition_without_formula_sources() {
+        use crate::store::tests::{PivotPayload, SUM};
+
+        const KEY: usize = 0;
+        const VALUE: usize = 1;
+        let mut original = CellStore::new();
+        let source = original.add_sheet(2, 10);
+        let output = original.add_sheet(4, 10);
+        original.set_string(source, 0, KEY, "Key", 0);
+        original.set_string(source, 0, VALUE, "Value", 0);
+        original.set_string(source, 1, KEY, "A", 0);
+        original.set_number(source, 1, VALUE, 7.0, 0);
+        let definition = PivotPayload {
+            source,
+            last_row: 1,
+            last_col: VALUE,
+            rows: &[KEY],
+            value_field: VALUE,
+            aggregations: &[SUM],
+            ..PivotPayload::default()
+        }
+        .numbers();
+        assert!(original.set_pivots(output, &definition, vec!["pivot".into()]));
+        original.recompute_changed();
+        assert_eq!(original.get_cell(output, 1, 1).num(), 7.0);
+
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).expect("same-build transfer");
+
+        assert!(replacement.sheets[output].formulas.is_empty());
+        assert_eq!(replacement.formula_source(output, 0, 0), None);
+
+        assert!(replacement.set_pivots(output, &definition, vec!["pivot".into()]));
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(output, 1, 1).num(), 7.0);
+
+        replacement.set_number(source, 1, VALUE, 11.0, 0);
+        replacement.recompute_changed();
+
+        assert_eq!(replacement.get_cell(output, 1, 1).num(), 11.0);
+    }
+
+    #[test]
+    fn memory_transfer_preserves_cached_results_and_rebuilds_dependencies() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 5);
+        original.set_number(0, 0, 0, 41.0, 7);
+        original.set_formula(0, 0, 1, "=A1+1", 3);
+        original.set_formula(0, 1, 1, "=NOW()", 0);
+        original.recompute_changed();
+
+        let cached_time = original.get_cell(0, 1, 1).num();
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).unwrap();
+
+        assert_eq!(replacement.get_cell(0, 0, 0).style(), 7);
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 42.0);
+        assert_eq!(
+            replacement.get_cell(0, 1, 1).num().to_bits(),
+            cached_time.to_bits()
+        );
+
+        replacement.set_number(0, 0, 0, 99.0, 7);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
+        assert_eq!(original.get_cell(0, 0, 1).num(), 42.0);
+    }
+
+    #[test]
+    fn memory_transfer_keeps_hidden_rows_and_the_subtotals_that_read_them() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 4);
+        for (row, value) in [1.0, 2.0, 4.0].into_iter().enumerate() {
+            original.set_number(0, row, 0, value, 0);
+        }
+        original.set_formula(0, 0, 1, "=SUBTOTAL(109,A1:A3)", 0);
+        original.recompute_changed();
+        assert!(original.set_hidden_rows(0, &[0, 0], &[2, 2]));
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(0, 1, 0, 8.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 8.0);
+
+        assert!(replacement.set_hidden_rows(0, &[], &[]));
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 13.0);
+    }
+
+    #[test]
+    fn memory_transfer_keeps_the_tab_order_of_three_d_references() {
+        let mut original = CellStore::new();
+        for (name, value) in [("First", 1.0), ("Middle", 10.0), ("Last", 100.0)] {
+            let sheet = original.add_sheet(1, 1);
+            original.set_sheet_name(sheet, name, name);
+            original.set_number(sheet, 0, 0, value, 0);
+        }
+        let summary = original.add_sheet(1, 1);
+        original.set_sheet_name(summary, "Summary", "Summary");
+        assert!(original.set_sheet_order(&[0, 2, 1, 3]));
+        original.set_formula(summary, 0, 0, "=SUM(First:Last!A1)", 0);
+        original.recompute_changed();
+        assert_eq!(original.get_cell(summary, 0, 0).num(), 101.0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        replacement.set_number(1, 0, 0, 20.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(summary, 0, 0).num(), 101.0);
+        assert!(replacement.set_sheet_order(&[0, 1, 2, 3]));
+        assert_eq!(replacement.get_cell(summary, 0, 0).num(), 121.0);
+    }
+
+    #[test]
+    fn memory_transfer_continues_the_random_sequence_and_volatile_set() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 1);
+        original.set_formula(0, 0, 1, "=RAND()", 0);
+        original.recompute_changed();
+        let cached_draw = original.get_cell(0, 0, 1).num();
+
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).unwrap();
+        for store in [&mut original, &mut replacement] {
+            store.set_number(0, 0, 0, 1.0, 0);
+            store.recompute_changed();
+        }
+
+        let next_draw = original.get_cell(0, 0, 1).num();
+        assert_ne!(next_draw, cached_draw);
+        assert_eq!(
+            replacement.get_cell(0, 0, 1).num().to_bits(),
+            next_draw.to_bits()
+        );
+    }
+
     #[test]
     fn memory_transfer_keeps_iterative_calculation() {
         let mut original = CellStore::new();

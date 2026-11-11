@@ -246,6 +246,27 @@ fn pivot_fields_report_source_headers_and_types() {
 }
 
 #[test]
+fn pivot_min_max_and_distinct_remove_old_contributions() {
+    let (mut store, source, output) = fixture(12);
+    install(&mut store, source, output, 12, &[MIN, MAX, DISTINCT_COUNT]);
+    assert_eq!(store.get_cell(output, 2, 1).num(), 6.0);
+    assert_eq!(store.get_cell(output, 2, 2).num(), 12.0);
+    assert_eq!(store.get_cell(output, 2, 3).num(), 2.0);
+
+    store.set_number(source, 6, SALES, 12.0, 0);
+    store.recompute(source);
+    assert_eq!(store.get_cell(output, 2, 1).num(), 12.0);
+    assert_eq!(store.get_cell(output, 2, 2).num(), 12.0);
+    assert_eq!(store.get_cell(output, 2, 3).num(), 1.0);
+
+    store.set_number(source, 12, SALES, 5.0, 0);
+    store.recompute(source);
+    assert_eq!(store.get_cell(output, 2, 1).num(), 5.0);
+    assert_eq!(store.get_cell(output, 2, 2).num(), 12.0);
+    assert_eq!(store.get_cell(output, 2, 3).num(), 2.0);
+}
+
+#[test]
 fn pivot_blocker_retry_and_own_source_overlap() {
     let (mut store, source, output) = fixture(12);
     store.set_number(output, 2, 1, 99.0, 0);
@@ -354,6 +375,41 @@ fn pivot_structural_edits_shift_and_clamp_the_anchor() {
     );
 }
 
+#[test]
+fn pivot_aggregations_match_pivotby_with_shared_keys_and_totals() {
+    for (aggregation, function) in [
+        (SUM, "SUM"),
+        (COUNT, "COUNT"),
+        (AVERAGE, "AVERAGE"),
+        (MIN, "MIN"),
+        (MAX, "MAX"),
+        (COUNTA, "COUNTA"),
+    ] {
+        let (mut store, source, output) = fixture(12);
+        install(&mut store, source, output, 12, &[aggregation]);
+        let formula_sheet = store.add_sheet(10, 20);
+        store.set_sheet_name(source, "source", "Source");
+
+        store.set_formula(
+            formula_sheet,
+            0,
+            0,
+            &format!("=PIVOTBY(Source!A2:A13,Source!B2:B13,Source!C2:C13,{function},0,1,,1)"),
+            0,
+        );
+        store.recompute(formula_sheet);
+
+        for row in 0..3 {
+            for col in 0..4 {
+                let pivot = store.get_cell(output, row + 2, col + 1);
+                let formula = store.get_cell(formula_sheet, row + 1, col + 1);
+                assert_eq!(pivot.string(), formula.string(), "{function}, {row}, {col}");
+                assert_eq!(pivot.num(), formula.num(), "{function}, {row}, {col}");
+            }
+        }
+    }
+}
+
 /// Whether `a` and `b` are at most `ulps` adjacent numbers apart.
 fn within_ulps(a: f64, b: f64, ulps: u64) -> bool {
     a == b || (a.signum() == b.signum() && a.to_bits().abs_diff(b.to_bits()) <= ulps)
@@ -443,6 +499,138 @@ fn pivot_sums_stay_exact_through_edits_and_match_pivotby() {
 }
 
 #[test]
+fn pivot_text_key_labels_follow_first_remaining_row_like_pivotby() {
+    let (mut store, source, output) = fixture(6);
+    for (row, key) in ["apple", "Pear", "zebra", "pear", "Apple", "Pear"]
+        .into_iter()
+        .enumerate()
+    {
+        store.set_string(source, row + 1, REGION, key, 0);
+    }
+    store.commit_sources();
+    install(&mut store, source, output, 6, &[SUM]);
+    let formula_sheet = store.add_sheet(10, 20);
+    store.set_sheet_name(source, "source", "Source");
+    store.set_formula(
+        formula_sheet,
+        0,
+        0,
+        "=PIVOTBY(Source!A2:A7,Source!B2:B7,Source!C2:C7,SUM,0,1,,1)",
+        0,
+    );
+    store.recompute(formula_sheet);
+
+    let assert_parity = |store: &CellStore, step: &str| {
+        for row in 0..6 {
+            for col in 0..5 {
+                let pivot = store.get_cell(output, row + 2, col);
+                let formula = store.get_cell(formula_sheet, row + 1, col);
+                assert_eq!(pivot.string(), formula.string(), "{step}, {row}, {col}");
+                assert_eq!(pivot.num(), formula.num(), "{step}, {row}, {col}");
+            }
+        }
+    };
+    assert_parity(&store, "build");
+
+    // The donor row leaves: the next remaining row names the group.
+    store.set_string(source, 1, REGION, "banana", 0);
+    store.recompute(source);
+    assert_parity(&store, "donor left");
+
+    // A lower row joins with other casing and names the group.
+    store.set_string(source, 2, REGION, "PEAR", 0);
+    store.recompute(source);
+    store.set_string(source, 1, REGION, "aPPLE", 0);
+    store.recompute(source);
+    assert_parity(&store, "lower row joined");
+
+    // The donor row changes only its casing.
+    store.set_string(source, 1, REGION, "APPLE", 0);
+    store.recompute(source);
+    assert_parity(&store, "donor recased");
+}
+
+#[test]
+fn pivot_donor_key_edit_moves_its_row_between_groups() {
+    let (mut store, source, output) = fixture(12);
+    install(&mut store, source, output, 12, &[SUM]);
+    let fresh = store.add_sheet(32, 22);
+    let total_col = store.pivot_status(output)[STATUS_COLS] as usize - 1;
+    let (region_0_row, region_1_row) = (2, 3);
+    let region_total = |store: &CellStore, row| store.get_cell(output, row, total_col).num();
+    let (region_0, region_1) = (
+        region_total(&store, region_0_row),
+        region_total(&store, region_1_row),
+    );
+
+    // Row 1 is the first member, so the label row, of region 1 and quarter 1.
+    // Both groups keep other rows with the same key.
+    store.set_number(source, 1, REGION, 0.0, 0);
+    store.set_number(source, 1, QUARTER, 0.0, 0);
+    store.recompute(source);
+
+    // Row 1 sells 1.
+    assert_eq!(region_total(&store, region_0_row), region_0 + 1.0);
+    assert_eq!(region_total(&store, region_1_row), region_1 - 1.0);
+    assert_matches_fresh_build(
+        &mut store,
+        output,
+        fresh,
+        &fixture_pivot(source, 12, &[SUM]).numbers(),
+        "donor key edit",
+    );
+}
+
+#[test]
+fn pivot_batch_moving_label_rows_together_keeps_groups_consistent() {
+    let (mut store, source, output) = fixture(6);
+    for (row, key) in ["apple", "apple", "Pear", "pear", "Apple", "Pear"]
+        .into_iter()
+        .enumerate()
+    {
+        store.set_string(source, row + 1, REGION, key, 0);
+    }
+    store.commit_sources();
+    install(&mut store, source, output, 6, &[SUM]);
+    let row_labels = |store: &CellStore| -> Vec<_> {
+        (2..6)
+            .map(|row| store.get_cell(output, row, 0).string())
+            .collect()
+    };
+
+    // One pass moves the label row and the next member of `apple` together.
+    store.set_string(source, 1, REGION, "banana", 0);
+    store.set_string(source, 2, REGION, "BANANA", 0);
+    store.recompute(source);
+
+    assert_eq!(
+        row_labels(&store),
+        [
+            Some("Apple".into()),
+            Some("banana".into()),
+            Some("Pear".into()),
+            Some("Total".into())
+        ]
+    );
+
+    // One pass moves both `banana` rows away, emptying that group after its
+    // label row left. The group must leave its hash chain under its own key.
+    store.set_string(source, 1, REGION, "kiwi", 0);
+    store.set_string(source, 2, REGION, "KIWI", 0);
+    store.recompute(source);
+
+    assert_eq!(
+        row_labels(&store),
+        [
+            Some("Apple".into()),
+            Some("kiwi".into()),
+            Some("Pear".into()),
+            Some("Total".into())
+        ]
+    );
+}
+
+#[test]
 fn pivot_status_reports_no_output_when_a_source_cell_blocks_the_anchor() {
     let (mut store, source, output) = fixture(12);
     store.set_number(output, 0, 0, 5.0, 0);
@@ -494,6 +682,24 @@ fn pivot_memory_stats_release_cache_when_definition_is_removed() {
     // only that most of the cache was released, not its exact size.
     assert!(metadata(&store) < retained - cache_bytes / 2);
     assert_eq!(store.get_cell(output, 2, 1).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn pivot_cross_sheet_formula_source_updates_from_external_input() {
+    let (mut store, source, output) = fixture(12);
+    let input = store.add_sheet(1, 1);
+    store.set_sheet_name(input, "input", "Input");
+    store.set_number(input, 0, 0, 20.0, 0);
+    store.set_formula(source, 6, SALES, "=Input!A1", 0);
+    store.recompute_changed();
+    install(&mut store, source, output, 12, &[SUM]);
+    assert_eq!(store.get_cell(output, 2, 1).num(), 32.0);
+
+    store.set_number(input, 0, 0, 40.0, 0);
+    store.recompute(input);
+
+    assert_eq!(store.get_cell(source, 6, SALES).num(), 40.0);
+    assert_eq!(store.get_cell(output, 2, 1).num(), 52.0);
 }
 
 #[test]
@@ -1252,6 +1458,40 @@ fn related_pivot_key_failures_recover_and_missing_relationships_show_ref() {
     assert_eq!(fixture.store.pivot_status(fixture.regions)[0], ref_error);
 }
 
+#[test]
+fn related_pivot_output_over_a_related_table_spills() {
+    let mut fixture = RelatedFixture::new(31);
+    let payload = PivotPayload {
+        source: fixture.flat,
+        last_row: 31,
+        last_col: 3,
+        rows: &[0],
+        value_field: 1,
+        aggregations: &[SUM],
+        anchor: (2, 1),
+        ..PivotPayload::default()
+    }
+    .numbers();
+    let mut model = payload;
+    model.splice(1..7, [3.0, 1.0, 2.0, 2.0, 3.0, 4.0, 5.0]);
+    let strings = ["related", "orders", "regions", "name", "orders", "amount"];
+    assert!(fixture
+        .store
+        .set_pivots(fixture.regions, &model, strings.map(String::from).to_vec()));
+    fixture.store.recompute_changed();
+
+    let status = fixture.store.pivot_status(fixture.regions);
+    assert_eq!(status[STATUS_ERROR], FormulaError::Spill.slot() as u32 + 1);
+    assert_eq!(
+        fixture
+            .store
+            .get_cell(fixture.regions, 2, 1)
+            .string()
+            .as_deref(),
+        Some("Region 1")
+    );
+}
+
 /// The fixture with named sheets, its SUM pivot at A1 of `Output`, and a
 /// `Report` sheet for formulas that read the pivot.
 fn pivot_data_fixture() -> (CellStore, usize, usize) {
@@ -1268,6 +1508,49 @@ fn report_cell(store: &mut CellStore, report: usize, formula: &str) -> CellOut {
     store.set_formula(report, 0, 0, formula, 0);
     store.recompute(report);
     store.get_cell(report, 0, 0)
+}
+
+/// GETPIVOTDATA reads the value cell that the field and item pairs name,
+/// as on Microsoft's GETPIVOTDATA page: the data field by its source name or
+/// its caption, the pivot by any cell of its output, and the pairs in any
+/// order. Row `r` of the fixture is in region `r % 2` and quarter `r % 3`
+/// and sells `r`.
+#[test]
+fn getpivotdata_reads_the_value_cell_of_the_named_items() {
+    let (mut store, _, report) = pivot_data_fixture();
+    let cases: &[(&str, f64)] = &[
+        // Every row: 1 + 2 + ... + 12.
+        ("=GETPIVOTDATA(\"Sales\",Output!A1)", 78.0),
+        ("=GETPIVOTDATA(\"Sum of Sales\",Output!$C$4)", 78.0),
+        ("=GETPIVOTDATA(\"sales\",Output!B2)", 78.0),
+        // Odd rows: 1 + 3 + 5 + 7 + 9 + 11.
+        ("=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)", 36.0),
+        // Rows divisible by 3: 3 + 6 + 9 + 12.
+        ("=GETPIVOTDATA(\"Sales\",Output!A1,\"quarter\",0)", 30.0),
+        // Odd rows in quarter 2: 5 + 11, with the pairs in either order.
+        (
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1,\"Quarter\",2)",
+            16.0,
+        ),
+        (
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Quarter\",2,\"Region\",1)",
+            16.0,
+        ),
+        // A date item is its serial: 1900-01-02 is 2, so quarter 2 is
+        // 2 + 5 + 8 + 11.
+        (
+            "=GETPIVOTDATA(\"Sales\",Output!A1,\"Quarter\",DATE(1900,1,2))",
+            26.0,
+        ),
+    ];
+
+    for &(formula, expected) in cases {
+        assert_eq!(
+            report_cell(&mut store, report, formula).num(),
+            expected,
+            "{formula}"
+        );
+    }
 }
 
 /// Microsoft's page: a pivot reference that holds no pivot, an item or
