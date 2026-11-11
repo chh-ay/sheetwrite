@@ -8,7 +8,7 @@ use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
-/// SplitMix64 increment and output mixers (Steele, Lea and Flood, 2014).
+/// `SplitMix64` increment and output mixers (Steele, Lea and Flood, 2014).
 const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
 const MIX_MULTIPLIER_1: u64 = 0xBF58_476D_1CE4_E5B9;
 const MIX_MULTIPLIER_2: u64 = 0x94D0_49BB_1331_11EB;
@@ -22,7 +22,7 @@ const UNIT_SCALE: f64 = 1.0 / (1u64 << UNIT_BITS) as f64;
 #[cfg(not(target_arch = "wasm32"))]
 const NATIVE_SEED: u64 = 0x5EED_5EED_5EED_5EED;
 
-/// SplitMix64: one word of state, a handful of integer operations per draw,
+/// `SplitMix64`: one word of state, a handful of integer operations per draw,
 /// and a full 2^64 period. Any seed is valid, including zero, because the
 /// state advances by an odd constant before mixing. It is not a
 /// cryptographic generator; spreadsheet RAND makes no such promise.
@@ -60,7 +60,7 @@ pub(crate) struct RandomSource(Cell<SplitMix64>);
 
 impl RandomSource {
     /// Each WASM instance seeds itself from the host, so two workbooks do not
-    /// share one sequence. `Math.random` gives 53 bits; SplitMix64 spreads
+    /// share one sequence. `Math.random` gives 53 bits; `SplitMix64` spreads
     /// them over the whole state on the first draw.
     #[cfg(target_arch = "wasm32")]
     pub(crate) fn from_host() -> Self {

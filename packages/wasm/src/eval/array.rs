@@ -1,7 +1,9 @@
 //! Bounded dynamic-array evaluation for FILTER, SORT, UNIQUE, and direct ranges.
 
 use std::cmp::Ordering;
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::hash_map::DefaultHasher;
+
+use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
@@ -812,7 +814,7 @@ impl CellStore {
         let item_count = if by_col { array.cols } else { array.rows };
 
         // Store collision chains in insertion order, without an allocation per hash.
-        let mut buckets: HashMap<u64, (usize, usize)> = HashMap::new();
+        let mut buckets: FxHashMap<u64, (usize, usize)> = FxHashMap::default();
         let mut representatives: Vec<(usize, usize, Option<usize>)> =
             Vec::with_capacity(item_count);
         let mut comparisons = 0usize;
@@ -899,7 +901,7 @@ impl CellStore {
         Ok(EvalMatrix::new(source.cols, source.rows, values))
     }
 
-    /// TRIMRANGE(range, [trim_rows], [trim_cols]): the range without its
+    /// TRIMRANGE(range, [`trim_rows`], [`trim_cols`]): the range without its
     /// leading and trailing blank rows and columns. Each trim argument is 0
     /// (none), 1 (leading), 2 (trailing) or 3 (both, the default). A range
     /// with no value left is `#REF!`, as in Excel.

@@ -173,8 +173,8 @@ impl CellStore {
 
         let key = (scope, workbook_name_key(name));
         let definition = Definition {
-            name: name.to_string(),
-            source: source.to_string(),
+            name: name.to_owned(),
+            source: source.to_owned(),
             positional: is_positional(&ast),
             ast,
             resolved: None,
@@ -229,7 +229,7 @@ impl CellStore {
         // `#REF!`, as in Excel.
         name.contains('!').then(|| {
             NameTarget::Formula(Rc::new(NamedFormulaRef {
-                name: name.to_string(),
+                name: name.to_owned(),
                 expression: Ast::InvalidRef,
                 nodes: 1,
             }))
@@ -442,7 +442,7 @@ impl CellStore {
         if self.defined_names.is_empty() {
             return None;
         }
-        let (row, col) = crate::eval::current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
         match self.name_target(name, sheet as u32, &NamePlacement::new(row, col))? {
             NameTarget::Formula(formula) => Some(formula),
             NameTarget::Range(_) | NameTarget::Reference(_) => None,
@@ -654,7 +654,7 @@ fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
         expression
     };
     NamedFormulaRef {
-        name: name.to_string(),
+        name: name.to_owned(),
         expression,
         nodes,
     }
@@ -694,7 +694,7 @@ fn reference_target(
         _ => return None,
     };
     Some(NamedRangeRef {
-        name: name.to_string(),
+        name: name.to_owned(),
         scope,
         sheet,
         row_start,

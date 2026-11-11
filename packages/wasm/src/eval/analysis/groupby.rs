@@ -1,6 +1,6 @@
 //! Bounded grouping and pivot aggregation for the full engine.
+use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
@@ -43,7 +43,7 @@ struct Context<'a, 'p> {
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
     work: usize,
-    sums: HashMap<(usize, usize, usize), Value>,
+    sums: FxHashMap<(usize, usize, usize), Value>,
 }
 impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
@@ -140,7 +140,7 @@ impl Axis {
             rows: Vec::new(),
             parent: None,
         }];
-        let mut buckets: HashMap<Vec<KeyPart>, Vec<usize>> = HashMap::new();
+        let mut buckets: FxHashMap<Vec<KeyPart>, Vec<usize>> = FxHashMap::default();
         // Every included row belongs to the root and one group per prefix.
         let membership_width = fields.cols + 1;
         let mut memberships = vec![
@@ -559,7 +559,7 @@ pub(crate) fn evaluate_matrix(
         pass,
         depth,
         work: 0,
-        sums: HashMap::new(),
+        sums: FxHashMap::default(),
     };
     let row_fields = context.matrix(&arguments[0])?;
     let col_fields = if is_pivot {
@@ -708,7 +708,7 @@ pub(crate) fn evaluate_matrix(
         relationship == 0,
         &row_aggregates,
     )?;
-    let mut intersections: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+    let mut intersections: FxHashMap<(usize, usize), Vec<usize>> = FxHashMap::default();
     if let Some(columns) = &mut columns {
         let mut col_aggregates = Vec::with_capacity(columns.groups.len());
         for group in &columns.groups {

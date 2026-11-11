@@ -421,13 +421,13 @@ impl CellStore {
         let source = if a1 {
             text.as_str()
         } else {
-            converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or((0, 0))) {
+            converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or_default()) {
                 Ok(converted) => converted,
                 Err(error) => return self.indirect_named_reference(&text, sheet).ok_or(error),
             };
             &converted
         };
-        let (row, col) = current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(source, sheet as u32, row, col);
         entry
             .ast
@@ -452,7 +452,7 @@ impl CellStore {
             }
             None => (sheet, text),
         };
-        let (row, col) = current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             ast @ (Ast::NamedRange(_) | Ast::Structured(_)) => range_from_ast(ast, sheet),

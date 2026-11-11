@@ -7,7 +7,7 @@
 //! source-replacement path that packed block writes use, so this module does
 //! not depend on how the store keeps formulas.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use wasm_bindgen::prelude::*;
 
@@ -22,7 +22,7 @@ use crate::types::{cell_key, AbsCellKey, FormulaEntry, KIND_EMPTY, KIND_FORMULA}
 type MovedSlots = Vec<(u8, u64, u32)>;
 
 /// The sources of moved formula and reference cells, keyed by target cell.
-type MovedSources = HashMap<(u32, u32), FormulaEntry>;
+type MovedSources = FxHashMap<(u32, u32), FormulaEntry>;
 
 /// Status of a permutation that moves part of a spill range, which Excel
 /// rejects with "You can't change part of an array."
@@ -312,7 +312,7 @@ impl CellStore {
         let mut slots = Vec::with_capacity(block.rows);
         for col in block.start_col..block.start_col + block.cols {
             slots.clear();
-            let mut sources = HashMap::new();
+            let mut sources = FxHashMap::default();
             for (target, &source) in order.iter().enumerate() {
                 let row_delta = if adjust {
                     target as i32 - source as i32
@@ -357,7 +357,7 @@ impl CellStore {
         let mut columns = Vec::with_capacity(order.len());
         for (target, &source) in order.iter().enumerate() {
             let mut slots = Vec::with_capacity(rows);
-            let mut sources = HashMap::new();
+            let mut sources = FxHashMap::default();
             for row in 0..rows {
                 self.read_moved_cell(
                     sheet,

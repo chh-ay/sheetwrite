@@ -90,13 +90,12 @@ fn compile_criteria(
             if let Value::Error(error) = value {
                 return Err(*error);
             }
-            let database_column = match columns[column] {
-                Some(database_column) => database_column,
-                None => {
-                    let database_column = field_column(headers, &criteria.values[column])?;
-                    columns[column] = Some(database_column);
-                    database_column
-                }
+            let database_column = if let Some(database_column) = columns[column] {
+                database_column
+            } else {
+                let database_column = field_column(headers, &criteria.values[column])?;
+                columns[column] = Some(database_column);
+                database_column
             };
             conditions.push((database_column, database_criterion(value)?));
         }
@@ -203,7 +202,7 @@ fn aggregate(
         "DSUM" => total,
         "DAVERAGE" if count != 0 => total / count as f64,
         "DAVERAGE" => return Value::Error(FormulaError::DivZero),
-        "DMAX" | "DMIN" => extreme.unwrap_or(0.0),
+        "DMAX" | "DMIN" => extreme.unwrap_or_default(),
         "DPRODUCT" => {
             if count == 0 {
                 0.0

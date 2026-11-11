@@ -137,8 +137,8 @@ impl CellStore {
                 break;
             };
 
-            let num = nums.get(i).copied().unwrap_or(0.0);
-            let flag = flags.get(i).copied().unwrap_or(0);
+            let num = nums.get(i).copied().unwrap_or_default();
+            let flag = flags.get(i).copied().unwrap_or_default();
             let match_case = flag & 1 != 0;
 
             let pred = match kind {
@@ -408,7 +408,7 @@ fn local_error_index(
     let slot = &mut slots[error.slot()];
     if *slot < 0 {
         *slot = strings.len() as i32;
-        strings.push(error.sentinel().to_string());
+        strings.push(error.sentinel().to_owned());
     }
     *slot
 }
@@ -638,16 +638,19 @@ fn align_to_8(value: usize) -> Option<usize> {
 #[wasm_bindgen]
 impl WindowView {
     #[wasm_bindgen(js_name = stringPoolEpoch)]
+    #[must_use]
     pub fn string_pool_epoch(&self) -> u32 {
         self.string_pool_epoch
     }
 
     #[wasm_bindgen(getter, js_name = nRows)]
+    #[must_use]
     pub fn n_rows(&self) -> u32 {
         self.n_rows
     }
 
     #[wasm_bindgen(getter, js_name = nCols)]
+    #[must_use]
     pub fn n_cols(&self) -> u32 {
         self.n_cols
     }

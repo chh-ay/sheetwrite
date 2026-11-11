@@ -149,7 +149,7 @@ impl RowVisibility {
 
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         let (manual, filtered) = self.0.as_deref().map_or((&[][..], &[][..]), |runs| {
-            (&runs.manual[..], &runs.filtered[..])
+            ((&*runs.manual), (&*runs.filtered))
         });
         for runs in [manual, filtered] {
             out.usize(runs.len());

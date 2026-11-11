@@ -1,7 +1,9 @@
 //! Spill admission needs known-empty destinations as well as loaded inputs.
 //! Windowed datasources must request both beyond the visible window.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
+
+use rustc_hash::FxHashSet;
 
 use wasm_bindgen::prelude::*;
 
@@ -57,7 +59,7 @@ struct ReadWalk<'a> {
     slots: &'a FormulaStore,
     handle: u32,
     remaining_cells: usize,
-    visited: HashSet<CellKey>,
+    visited: FxHashSet<CellKey>,
     pending: Vec<CellKey>,
     /// Half-open row intervals per column, unsorted until `into_rectangles`.
     rows_by_col: BTreeMap<u32, Vec<(u32, u32)>>,
@@ -70,7 +72,7 @@ impl<'a> ReadWalk<'a> {
             slots,
             handle,
             remaining_cells: max_cells,
-            visited: HashSet::new(),
+            visited: FxHashSet::default(),
             pending: Vec::new(),
             rows_by_col: BTreeMap::new(),
         }

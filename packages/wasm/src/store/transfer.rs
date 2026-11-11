@@ -11,7 +11,7 @@ use crate::types::{CellRange, ReadSet};
 
 const STORE_TAG: u32 = 0x32524d53;
 
-fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
+fn write_names(out: &mut Writer, names: &FxHashMap<String, usize>) {
     out.usize(names.len());
     for (name, &handle) in names {
         out.text(name);
@@ -35,7 +35,7 @@ fn sheet_handle(input: &mut Reader<'_>, sheets: usize) -> TransferResult<u32> {
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
-fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<String, usize>> {
+fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<FxHashMap<String, usize>> {
     (0..input.count()?)
         .map(|_| Ok((input.text()?, sheet_handle(input, sheets)? as usize)))
         .collect()
@@ -116,7 +116,7 @@ impl CellStore {
             } else {
                 Some(
                     self.resolve_formula_ast(&source, sheet, row, col)
-                        .map_err(|_| "invalid transferred formula".to_string())?,
+                        .map_err(|_| "invalid transferred formula".to_owned())?,
                 )
             }
         } else {
@@ -181,7 +181,7 @@ impl CellStore {
                 let handle = sheet_handle(&mut input, sheets)?;
                 let index = handle as usize;
                 if !store.sheet_alive[index] || std::mem::replace(&mut placed[index], true) {
-                    return Err("invalid transferred tab order".to_string());
+                    return Err("invalid transferred tab order".to_owned());
                 }
                 Ok(handle)
             })
@@ -419,7 +419,8 @@ impl CellStore {
     /// Import into a fresh instance; failure never mutates the source store.
     #[cfg(target_arch = "wasm32")]
     #[wasm_bindgen(js_name = importMemoryState)]
-    pub fn import_memory_state(bytes: js_sys::Uint8Array) -> CellStore {
+    #[must_use]
+    pub fn import_memory_state(bytes: js_sys::Uint8Array) -> Self {
         Self::read_memory_state(bytes).unwrap_or_else(|error| wasm_bindgen::throw_str(&error))
     }
 }

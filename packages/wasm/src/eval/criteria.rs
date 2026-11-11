@@ -314,7 +314,7 @@ impl IfExtreme {
     }
 
     pub(super) fn finish(self) -> Value {
-        Value::number(self.found.unwrap_or(0.0))
+        Value::number(self.found.unwrap_or_default())
     }
 }
 

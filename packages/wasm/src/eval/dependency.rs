@@ -101,7 +101,7 @@ impl ExactBand {
             .sources
             .get(source)
             .map_or(start, |&(_, end)| end as usize);
-        self.readers.get(start..end).unwrap_or(&[])
+        self.readers.get(start..end).unwrap_or_default()
     }
 
     fn edges(&self) -> impl Iterator<Item = (u32, &[FormulaId])> + '_ {
@@ -288,7 +288,7 @@ impl DepIndex {
             .range_groups
             .get(group)
             .map_or(start, |group| group.end as usize);
-        self.range_readers.get(start..end).unwrap_or(&[])
+        self.range_readers.get(start..end).unwrap_or_default()
     }
 
     pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
@@ -571,8 +571,10 @@ impl DepIndex {
             while removed.next_if(|run| run[0].0 < group.range).is_some() {}
             let removed_run = removed
                 .next_if(|run| run[0].0 == group.range)
-                .unwrap_or(&[]);
-            let added_run = added.next_if(|run| run[0].0 == group.range).unwrap_or(&[]);
+                .unwrap_or_default();
+            let added_run = added
+                .next_if(|run| run[0].0 == group.range)
+                .unwrap_or_default();
 
             let end = group.end as usize;
             let kept = readers.len();
