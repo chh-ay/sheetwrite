@@ -427,13 +427,13 @@ function PerformanceArt() {
     ys.map((y) => `M${from} ${y}H${to}`).join("");
   return (
     <CardArt alt="blue" hue="amber">
-      <path class="tiles" d={rowsAt([30, 50, 70, 90, 110, 130, 150, 170], 20, 296)} />
-      <path class="tiles tiles-loaded" d={rowsAt([70, 90, 110, 130], 80, 236)} />
-      <path class="tiles tiles-shown" d={rowsAt([90, 110], 100, 176)} />
-      <rect class="hue-line" height={46} rx={4} stroke-width={2.5} width={88} x={93} y={77} />
-      <rect class="panel" height={156} rx={3} width={8} x={304} y={22} />
-      <rect class="hue" height={10} rx={3} width={8} x={304} y={92} />
-      <text x={20} y={194}>
+      <path class="tiles" d={rowsAt([26, 46, 66, 86, 106, 126, 146, 166], 20, 296)} />
+      <path class="tiles tiles-loaded" d={rowsAt([66, 86, 106, 126], 80, 236)} />
+      <path class="tiles tiles-shown" d={rowsAt([86, 106], 100, 176)} />
+      <rect class="hue-line" height={46} rx={4} stroke-width={2.5} width={88} x={93} y={73} />
+      <rect class="panel" height={156} rx={3} width={8} x={304} y={18} />
+      <rect class="hue" height={10} rx={3} width={8} x={304} y={88} />
+      <text x={20} y={186}>
         1,000,000 × 1,000
       </text>
     </CardArt>

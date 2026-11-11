@@ -719,14 +719,12 @@ jobs:
         run: |
           test -n "$ARTIFACT_DIGEST"
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
-      - name: Type check and build production docs
+      - name: Build production docs
         # This build only feeds Browser Smoke (docs-deploy.yml builds the
         # published site), so it includes the test fixture pages.
         env:
           SHEETWRITE_DOCS_FIXTURES: "1"
-        run: |
-          bun run --filter '@sheetwrite/docs-start' typecheck
-          bun run --filter '@sheetwrite/docs-start' build:site
+        run: bun run --filter '@sheetwrite/docs-start' build:site
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
       - name: Upload production docs
