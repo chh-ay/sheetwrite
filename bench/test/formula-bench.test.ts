@@ -247,6 +247,7 @@ describe("formula regression gate", () => {
       "sort-unique-filter",
       "subtotal-filtered",
       "sparse-page-write",
+      "history-diff",
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",

@@ -322,6 +322,33 @@ samples with inlined frames, at the sizes the rows first had (1,000 lookups,
 
 Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
 
+Six rows time grouping, pivots, analysis functions and the version-history
+diff, which no other row reaches. The first five run on the full engine only,
+since the default engine has none of these functions; the default engine's
+matrix leaves them out.
+
+- `groupby-sum` (100K source rows): `=GROUPBY(A1:B…,C1:C…,SUM,0,2)` over
+  region text (10 values) and product text (100 values, each in one region),
+  with subtotals. The timed run edits the first amount.
+- `pivotby-percentof` (50K source rows): `=PIVOTBY(…,PERCENTOF,0,2,,1,,,2)`
+  over the same keys by quarter, as shares of the grand total. 70K rows
+  already pass PIVOTBY's work budget and give `#NUM!`.
+- `pivot-rebuild` (100K source rows): the pivot benchmark's pivot (three row
+  fields, one column field, SUM and AVERAGE) installed with `setPivots` and
+  recalculated; restoring removes it.
+- `getpivotdata-many` (1K cells): `GETPIVOTDATA` cells that each name one of
+  the 100 groups of a pivot over 10K rows. GETPIVOTDATA is volatile, so the
+  timed edit of an unrelated cell recalculates all of them.
+- `analysis-calls` (10K formulas): SUMSQ, AGGREGATE, FORECAST.LINEAR and
+  TEXTBEFORE in one formula per row, all reading the edited `$C$1`.
+- `history-diff` (100K cells, both engines): the version-history diff kernel
+  from the engine's checkout, on the version-history benchmark's 5,000 × 20
+  sheet with 12,000 logged writes. The timed run creates a kernel, logs the
+  writes and compares both versions until its page of 1,000 changes is full.
+  The engine's window bytes are captured at setup, so it times the kernel.
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
