@@ -408,6 +408,15 @@
   }
 }
 
+/* Five groups share one row on wide screens rather than leave a fifth alone
+   on a second row. */
+@media (min-width: 72rem) {
+  .sw-showcase__controls:has(> :nth-child(5):last-child) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: var(--sw-space-6);
+  }
+}
+
 /* The grid host inside a demo: tall enough to work in, never taller than the
    viewport below the header. */
 .sw-showcase__grid {
@@ -421,6 +430,15 @@
   margin: 0;
   font-size: var(--sw-text-small);
   line-height: var(--sw-leading-ui);
+}
+
+/* A long readout takes two columns in the wide band, so its group stays as
+   tall as the groups beside it. */
+@media (min-width: 72rem) {
+  .sw-showcase__readout:has(> :nth-child(7)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sw-space-6);
+  }
 }
 
 .sw-showcase__readout > div {

@@ -23,6 +23,15 @@
   list-style: none;
 }
 
+/* Two columns in the wide band, so the recipes are no taller than the groups
+   beside them. */
+@media (min-width: 72rem) {
+  .sw-fx-recipes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sw-space-2);
+  }
+}
+
 .sw-fx-recipes .sw-button {
   justify-content: flex-start;
   width: 100%;

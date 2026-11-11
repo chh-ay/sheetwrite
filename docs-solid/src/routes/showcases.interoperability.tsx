@@ -8,7 +8,7 @@ import { Island } from "../islands/Island.js";
 import { InteropStage } from "../showcases/interop/InteropStage.js";
 import { InteropLabs } from "../showcases/interop/labs/InteropLabs.js";
 import { SpillProof } from "../showcases/interop/SpillProof.js";
-import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import {
   ADVERSARIAL_FIXTURES,
   POSITIVE_FIXTURES,
@@ -45,8 +45,25 @@ function InteroperabilityShowcase() {
           title: "The code behind it",
           Snippet: InteroperabilitySnippet,
           source: InteroperabilitySnippetSource,
-          figure: <InteropFlowDiagram />,
         }}
+        explain={
+          <ShowcaseSection
+            figure={<InteropFlowDiagram />}
+            id="interoperability-flow"
+            title="Where a file goes, and where it stops"
+          >
+            <p>
+              An XLSX file goes through unzip with limits, then XML parsing, into a workbook the
+              grid shows. A hostile or oversized file stops at unzip or parsing with a typed error,{" "}
+              <code>xlsx-import-failed</code> or <code>xlsx-resource-limit</code>, and nothing is
+              imported.
+            </p>
+            <p>
+              Export writes XLSX, CSV or TSV. Import and export both list anything not kept, by code
+              and cell.
+            </p>
+          </ShowcaseSection>
+        }
         eyebrow="Spreadsheet interoperability"
         facts={[
           { label: "Source workbooks", value: POSITIVE_FIXTURES.length.toLocaleString("en") },

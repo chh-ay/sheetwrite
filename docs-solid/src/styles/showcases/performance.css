@@ -400,6 +400,39 @@
   overflow-wrap: anywhere;
 }
 
+/* Each diagnostic section, as the page's other explanation rows: the title
+   across, then the explanation beside its controls (4 / 8 columns). */
+@media (min-width: 72rem) {
+  .sw-sp-section {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--sw-space-8);
+    align-items: start;
+  }
+
+  .sw-sp-resource-copy {
+    display: contents;
+  }
+
+  .sw-sp-section > h2,
+  .sw-sp-resource-copy > h2 {
+    grid-column: 1 / -1;
+  }
+
+  .sw-sp-section > p,
+  .sw-sp-resource-copy > p {
+    grid-row: 2 / span 3;
+    grid-column: 1 / span 4;
+    margin-top: 0;
+  }
+
+  .sw-sp-section > :is(details, .sw-sp-resource-panel) {
+    grid-column: 5 / -1;
+    max-width: none;
+    margin: 0 0 var(--sw-sp-space-3);
+  }
+}
+
 .sw-sp-page button,
 .sw-sp-page input {
   font: inherit;
@@ -547,10 +580,6 @@
   margin-top: var(--sw-sp-space-2);
   border: var(--sw-sp-line) solid var(--sw-border);
   border-radius: var(--sw-radius-md);
-}
-
-#resources {
-  display: block;
 }
 
 .sw-sp-resource-copy {

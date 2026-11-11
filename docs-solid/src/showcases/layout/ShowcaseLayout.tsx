@@ -129,8 +129,12 @@ function CodeFactValue(props: { readonly value: string }) {
   );
 }
 
-/** Code longer than this folds to its first lines, with a control to show it all. */
-const FOLDED_LINES = 26;
+/**
+ * Code longer than this folds to about its first 26 lines (26rem in
+ * showcase-layout.css), with a control to show it all; shorter code shows
+ * whole rather than hide a few lines behind the control.
+ */
+const FOLDED_LINES = 34;
 /** At most this many calls are listed beside the code. */
 const LISTED_CALLS = 8;
 /** A call the snippet makes: a Grid method, a factory, an init, a constructed class, or a subscription. */

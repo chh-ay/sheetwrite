@@ -16,7 +16,7 @@ import { NoHydration } from "solid-js/web";
 
 import { PagingDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { PerformanceDiagnostics } from "../showcases/performance/PerformanceDiagnostics.js";
 import { PerformanceStage } from "../showcases/performance/PerformanceStage.js";
 import PerformanceSnippet from "../showcases/snippets/performance.mdx";
@@ -252,8 +252,20 @@ function PerformanceShowcase() {
           title: "The code behind it",
           Snippet: PerformanceSnippet,
           source: PerformanceSnippetSource,
-          figure: <PagingDiagram />,
         }}
+        explain={
+          <ShowcaseSection
+            figure={<PagingDiagram />}
+            id="performance-paging"
+            title="What stays loaded"
+          >
+            <p>
+              Rows load in pages. The pages in view and the ones near them stay in memory, within a
+              budget for unedited pages. Pages further away are evicted, and your page provider
+              fetches them again when you scroll back.
+            </p>
+          </ShowcaseSection>
+        }
         eyebrow="Data and scale"
         facts={[
           { label: "Rows", value: SCALE_ROWS.toLocaleString("en") },
