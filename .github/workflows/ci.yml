@@ -263,13 +263,8 @@ jobs:
         run: cargo test --manifest-path packages/wasm/Cargo.toml
       - name: Rust tests under coverage
         run: bun run test:coverage:rust
-      - name: List coverage binaries and profiles
-        if: always()
-        run: |
-          ls -la packages/wasm/target/llvm-cov-target/debug/deps | grep -E 'sheetwrite_wasm-[0-9a-f]+$|regex_|wildcard' || true
-          ls -la packages/wasm/target/llvm-cov-target/ || true
       - name: Upload coverage evidence on failure
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rust-coverage-failure-evidence

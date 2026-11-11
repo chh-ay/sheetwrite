@@ -274,7 +274,10 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
     const crateRawRoot = `${rawRoot}/${crate.name}`;
     await mkdir(resolve(root, crateRawRoot), { recursive: true });
 
-    // Each independent crate owns its instrumented target and raw reports.
+    // Each independent crate owns its instrumented target and raw reports. CI
+    // restores the target from a cache, and `--no-report` keeps old profiles
+    // and test binaries, which the report would merge: remove them first.
+    await run(["cargo", "llvm-cov", "clean", "--workspace", ...common], root);
     await run(["cargo", "llvm-cov", ...common, ...crate.testArguments, "--no-report"], root);
     await run(
       [
