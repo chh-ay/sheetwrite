@@ -864,7 +864,7 @@ impl SheetFormulas {
         }
     }
 
-    /// Count the sparse index here; entries are owned by FormulaStore.
+    /// Count the sparse index here; entries are owned by `FormulaStore`.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
         formulas.add_vec::<FormulaColumn>(self.columns.len(), self.columns.capacity());
@@ -1260,7 +1260,7 @@ mod tests {
             }
         }
 
-        let mut expected = keys.clone();
+        let mut expected = keys;
         expected.sort_unstable();
         expected.dedup();
         assert_eq!(distinct(&cells), expected);

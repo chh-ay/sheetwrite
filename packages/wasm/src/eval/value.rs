@@ -117,7 +117,7 @@ pub(super) fn text_from_value(value: &Value) -> Result<String, FormulaError> {
         Value::Number(value) if value.is_finite() => Ok(general_text(*value)),
         Value::Number(_) => Err(FormulaError::Num),
         Value::Text(text) => Ok(text.to_string()),
-        Value::Bool(value) => Ok(bool_text(*value).to_string()),
+        Value::Bool(value) => Ok(bool_text(*value).to_owned()),
         Value::Error(error) => Err(*error),
         Value::Blank => Ok(String::new()),
     }

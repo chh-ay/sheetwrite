@@ -463,7 +463,7 @@ impl CellStore {
         let needle = if case_insensitive {
             query.to_lowercase()
         } else {
-            query.to_string()
+            query.to_owned()
         };
         if needle.is_empty() {
             return Vec::new();

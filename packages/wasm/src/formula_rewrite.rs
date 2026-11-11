@@ -75,7 +75,7 @@ fn rewrite_own_sheet(source: &str, columns: bool, change: AxisChange) -> String 
 #[wasm_bindgen(js_name = renameStructuredReference)]
 pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: &str) -> String {
     let Some(lexemes) = lex(source) else {
-        return source.to_string();
+        return source.to_owned();
     };
 
     let mut out = String::with_capacity(source.len());
@@ -179,7 +179,7 @@ impl Reference {
 /// accepts, so it is returned unchanged.
 fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> String {
     let Some(lexemes) = lex(source) else {
-        return source.to_string();
+        return source.to_owned();
     };
 
     let mut out = String::with_capacity(source.len());

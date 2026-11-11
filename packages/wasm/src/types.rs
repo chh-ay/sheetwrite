@@ -81,34 +81,34 @@ impl FormulaError {
 
     pub(crate) fn sentinel(self) -> &'static str {
         match self {
-            FormulaError::Cycle => "#CYCLE!",
-            FormulaError::DivZero => "#DIV/0!",
-            FormulaError::Ref => "#REF!",
-            FormulaError::Num => "#NUM!",
-            FormulaError::Value => "#VALUE!",
-            FormulaError::Name => "#NAME?",
-            FormulaError::Na => "#N/A",
-            FormulaError::Spill => "#SPILL!",
-            FormulaError::Calc => "#CALC!",
-            FormulaError::Loading => "#LOADING!",
-            FormulaError::Null => "#NULL!",
+            Self::Cycle => "#CYCLE!",
+            Self::DivZero => "#DIV/0!",
+            Self::Ref => "#REF!",
+            Self::Num => "#NUM!",
+            Self::Value => "#VALUE!",
+            Self::Name => "#NAME?",
+            Self::Na => "#N/A",
+            Self::Spill => "#SPILL!",
+            Self::Calc => "#CALC!",
+            Self::Loading => "#LOADING!",
+            Self::Null => "#NULL!",
         }
     }
 
     /// Dense slot index for per-window scratch tables.
     pub(crate) fn slot(self) -> usize {
         match self {
-            FormulaError::Cycle => 0,
-            FormulaError::DivZero => 1,
-            FormulaError::Ref => 2,
-            FormulaError::Num => 3,
-            FormulaError::Value => 4,
-            FormulaError::Name => 5,
-            FormulaError::Na => 6,
-            FormulaError::Spill => 7,
-            FormulaError::Calc => 8,
-            FormulaError::Loading => 9,
-            FormulaError::Null => 10,
+            Self::Cycle => 0,
+            Self::DivZero => 1,
+            Self::Ref => 2,
+            Self::Num => 3,
+            Self::Value => 4,
+            Self::Name => 5,
+            Self::Na => 6,
+            Self::Spill => 7,
+            Self::Calc => 8,
+            Self::Loading => 9,
+            Self::Null => 10,
         }
     }
 
@@ -142,14 +142,14 @@ pub(crate) enum Value {
 impl Value {
     pub(crate) fn number(value: f64) -> Self {
         if value.is_finite() {
-            Value::Number(value)
+            Self::Number(value)
         } else {
-            Value::Error(FormulaError::Num)
+            Self::Error(FormulaError::Num)
         }
     }
 
     pub(crate) fn text(text: impl Into<Rc<str>>) -> Self {
-        Value::Text(text.into())
+        Self::Text(text.into())
     }
 }
 
@@ -569,7 +569,7 @@ impl FormulaEntry {
         let ast = Ast::AbsCell(
             SheetRef {
                 handle: target.sheet,
-                name: target_name.to_string(),
+                name: target_name.to_owned(),
                 quoted: false,
             },
             target.row,
@@ -614,7 +614,7 @@ impl FormulaEntry {
     pub(crate) fn error(source: &str, error: FormulaError) -> Self {
         let mut entry = Self {
             ast: None,
-            source: source.to_string(),
+            source: source.to_owned(),
             reads: ReadSet::default(),
             flags: 0,
         };
@@ -816,7 +816,7 @@ mod formula_entry_tests {
                     0,
                 )
             } else {
-                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_string())
+                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_owned())
             };
 
             for (volatile, spill_refs, produces_array) in [
@@ -863,7 +863,7 @@ pub(crate) enum InternSlot {
 }
 
 /// The intern map's keys are already 64-bit string hashes; re-hashing them
-/// through SipHash on every probe is unnecessary. This hasher passes the key
+/// through `SipHash` on every probe is unnecessary. This hasher passes the key
 /// through untouched.
 #[derive(Default)]
 pub(crate) struct IdentityHasher(u64);

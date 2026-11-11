@@ -100,12 +100,11 @@ impl Decimal {
         while self.digits.ends_with('9') {
             self.digits.pop();
         }
-        match self.digits.pop() {
-            Some(digit) => self.digits.push(char::from(digit as u8 + 1)),
-            None => {
-                self.digits.push('1');
-                self.point += 1;
-            }
+        if let Some(digit) = self.digits.pop() {
+            self.digits.push(char::from(digit as u8 + 1))
+        } else {
+            self.digits.push('1');
+            self.point += 1;
         }
     }
 
@@ -660,7 +659,7 @@ mod tests {
         ] {
             assert_eq!(
                 format_number(number, code),
-                Ok(Some(expected.to_string())),
+                Ok(Some(expected.to_owned())),
                 "{code}"
             );
         }

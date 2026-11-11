@@ -161,7 +161,7 @@ fn radix_arg(values: &FuncAccumulator, index: usize) -> Result<u32, FormulaError
     Ok(radix as u32)
 }
 
-/// BASE(number, radix, [min_length]): the digits of an integer from 0 to
+/// BASE(number, radix, [`min_length`]): the digits of an integer from 0 to
 /// 2^53 - 1, in upper case, padded with zeros to `min_length` (0 to 255).
 fn base(values: &FuncAccumulator) -> Result<String, FormulaError> {
     require_arity(values, 2, 3)?;

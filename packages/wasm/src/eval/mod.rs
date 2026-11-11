@@ -1012,12 +1012,13 @@ impl CellStore {
                             // pass fail before reading their ranges.
                             evaluated.and_then(|matrix| {
                                 let excess = matrix.values.len().saturating_sub(bound);
-                                match dynamic_recompute_within_limit(spill_work, excess) {
-                                    Some(total) => spill_work = total,
-                                    None => {
-                                        spill_work = usize::MAX;
-                                        return Err(FormulaError::Num);
-                                    }
+                                if let Some(total) =
+                                    dynamic_recompute_within_limit(spill_work, excess)
+                                {
+                                    spill_work = total
+                                } else {
+                                    spill_work = usize::MAX;
+                                    return Err(FormulaError::Num);
                                 }
                                 Ok(matrix)
                             })
@@ -1726,15 +1727,14 @@ impl CellStore {
                     .results
                     .let_frame()
                     .and_then(|frame| frame.expanded_value(*slot));
-                match known {
-                    Some(value) => value,
-                    None => {
-                        let value = self.eval_ast(expression, sheet, pass, depth);
-                        if let Some(frame) = pass.results.existing_let_frame_mut() {
-                            frame.remember_expanded(*slot, value.clone());
-                        }
-                        value
+                if let Some(value) = known {
+                    value
+                } else {
+                    let value = self.eval_ast(expression, sheet, pass, depth);
+                    if let Some(frame) = pass.results.existing_let_frame_mut() {
+                        frame.remember_expanded(*slot, value.clone());
                     }
+                    value
                 }
             }
             Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),

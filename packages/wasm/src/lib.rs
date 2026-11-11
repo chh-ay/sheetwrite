@@ -106,6 +106,7 @@ pub use window::WindowView;
 /// Names accepted by the full engine, including aliases.
 #[cfg(feature = "analysis")]
 #[wasm_bindgen::prelude::wasm_bindgen(js_name = functionNames)]
+#[must_use]
 pub fn function_names() -> Vec<String> {
     calc::function_names()
 }

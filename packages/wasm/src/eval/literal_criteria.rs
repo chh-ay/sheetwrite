@@ -314,7 +314,7 @@ impl CellStore {
             test.mask_column(strings, column, &mut mask, index == 0);
         }
 
-        if let CriteriaFold::Count = fold {
+        if matches!(fold, CriteriaFold::Count) {
             let count: u64 = mask.iter().map(|word| u64::from(word.count_ones())).sum();
             return Value::number(count as f64);
         }

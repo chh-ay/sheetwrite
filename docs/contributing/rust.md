@@ -136,3 +136,18 @@ row (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
 The pull request lists the gate results, the Brotli size of each engine and
 the largest function sizes. Changes to `unsafe` or to the layout of a hot type
 also report native instruction counts on Linux (the Mac has no counter).
+
+A change that should not alter generated code (renames, types, docs,
+attributes, visibility) can skip the gate when it is shown to be
+code-neutral. Build both engines before and after (`bun run build` in
+`packages/wasm` and in `packages/formulas`), then compare each packaged
+`.wasm`:
+
+```bash
+bun scripts/wasm-compare.ts <before>/sheetwrite_wasm_bg.wasm <after>/sheetwrite_wasm_bg.wasm
+```
+
+It passes when the code section is byte-identical and the data section keeps
+its length: the only data bytes that may differ are the line and column
+numbers of panic locations, which move with source lines. Put its output in
+the pull request. Any other difference goes through the gate.
