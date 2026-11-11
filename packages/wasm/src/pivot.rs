@@ -1111,6 +1111,22 @@ impl PivotLayout {
     }
 }
 
+/// Proto: names equal without case, allocating only for non-ASCII text.
+fn same_name(left: &str, right: &str) -> bool {
+    if left.is_ascii() && right.is_ascii() {
+        return left.eq_ignore_ascii_case(right);
+    }
+    left.to_lowercase() == right.to_lowercase()
+}
+
+/// Proto: [`field_name`] borrowed for text headers.
+fn field_name_cow(header: &Value, field: usize) -> std::borrow::Cow<'_, str> {
+    match header {
+        Value::Text(text) if !text.is_empty() => std::borrow::Cow::Borrowed(&**text),
+        _ => std::borrow::Cow::Owned(field_name(header, field)),
+    }
+}
+
 /// The name of a source field: its header, or `ColumnN` for a blank header.
 pub(crate) fn field_name(header: &Value, field: usize) -> String {
     match header {
@@ -1900,6 +1916,22 @@ impl PivotCache {
         })
     }
 
+    /// Proto: whether `wanted` names value field `slot`, without building its caption.
+    fn caption_is(&self, slot: usize, wanted: &str) -> bool {
+        let value = &self.outputs[slot];
+        if let Some(name) = &value.name {
+            return same_name(name, wanted);
+        }
+        let aggregation = value.aggregation.caption();
+        let field = field_name_cow(&self.headers[value.field], value.field);
+        wanted.len() == aggregation.len() + 4 + field.len()
+            && wanted.is_char_boundary(aggregation.len())
+            && same_name(aggregation, &wanted[..aggregation.len()])
+            && wanted[aggregation.len()..].starts_with(" of ")
+            && same_name(&field, &wanted[aggregation.len() + 4..])
+            || (!wanted.is_ascii() && same_name(&self.value_caption(slot), wanted))
+    }
+
     /// `GETPIVOTDATA`: the value cell of `data_field` in the row and column
     /// groups that `items` name. `data_field` is a value field's caption, or
     /// the source field it aggregates. Each item names a row or column field
@@ -1916,25 +1948,22 @@ impl PivotCache {
         measure_value: &dyn Fn(usize) -> Value,
     ) -> Result<Value, FormulaError> {
         let definition = &self.definition;
-        let wanted = data_field.to_lowercase();
         let slot = (0..self.outputs.len())
             .find(|&slot| {
                 let value = &self.outputs[slot];
-                self.value_caption(slot).to_lowercase() == wanted
+                self.caption_is(slot, data_field)
                     || (value.measure.is_none()
-                        && field_name(&self.headers[value.field], value.field).to_lowercase()
-                            == wanted)
+                        && same_name(&field_name_cow(&self.headers[value.field], value.field), data_field))
             })
             .ok_or(FormulaError::Ref)?;
 
         let row_group = self.named_group(&self.row_axis, &definition.rows, items)?;
         let col_group = self.named_group(&self.col_axis, &definition.columns, items)?;
         let named = items.iter().filter(|(field, _)| {
-            let field = field.to_lowercase();
             let on = |fields: &[usize]| {
                 fields
                     .iter()
-                    .any(|&index| field_name(&self.headers[index], index).to_lowercase() == field)
+                    .any(|&index| same_name(&field_name_cow(&self.headers[index], index), field))
             };
             on(&definition.rows) || on(&definition.columns)
         });
@@ -1976,10 +2005,10 @@ impl PivotCache {
         let mut group = ROOT;
         let mut ended = false;
         for &field in fields {
-            let name = field_name(&self.headers[field], field).to_lowercase();
+            let name = field_name_cow(&self.headers[field], field);
             let mut matching = items
                 .iter()
-                .filter(|(item_field, _)| item_field.to_lowercase() == name);
+                .filter(|(item_field, _)| same_name(&name, item_field));
             let Some((_, item)) = matching.next() else {
                 ended = true;
                 continue;
