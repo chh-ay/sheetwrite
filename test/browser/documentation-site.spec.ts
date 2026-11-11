@@ -99,7 +99,7 @@ test("site root serves the product landing with its search and social metadata",
     ['meta[name="twitter:image:alt"]', SOCIAL_IMAGE_ALT],
     ['meta[property="og:image:width"]', "1200"],
     ['meta[property="og:image:height"]', "630"],
-  ]) {
+  ] as const) {
     await expect(page.locator(selector)).toHaveAttribute("content", content);
   }
   const socialImageDimensions = await page.evaluate(async () => {
@@ -235,7 +235,7 @@ test("documentation search resolves symbols to their anchors and leaves out test
   for (const [term, href] of [
     ["applyTransaction", "/docs/api/core/grid/#applytransaction"],
     ["SnapshotValidationError", "/docs/api/core/snapshot-validation-error/"],
-  ]) {
+  ] as const) {
     const { dialog, input } = await openSearch(page);
     await input.pressSequentially(term, { delay: 20 });
     const match = dialog.locator(`a[href='${href}']`).first();
