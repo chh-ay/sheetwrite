@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
   DATASOURCE_MAX_ACTIVE_REQUESTS,
+  DATASOURCE_PREFETCH_MAX_BYTES,
+  DATASOURCE_PREFETCH_MAX_ROWS,
   DatasourceController,
   type DatasourceControllerOptions,
 } from "../src/datasource-controller.js";
@@ -439,6 +441,79 @@ describe("DatasourceController revision retention", () => {
     expect(store.getPagedStats("s1").allocatedBytes).toBeLessThanOrEqual(cacheBytes);
 
     controller.destroy();
+    store.dispose();
+  });
+
+  it("bounds combined ahead and behind ownership for wide large viewports and sheet edges", () => {
+    const workbook = makeWorkbook(2_000);
+    workbook.sheets[0]!.columns = Array.from({ length: 200 }, (_, column) => ({
+      key: `c${column}`,
+      header: `C${column}`,
+      width: 100,
+      type: "text" as const,
+    }));
+    const store = new SheetwriteStore(workbook);
+    let now = 0;
+    const controller = newTestController(
+      {
+        datasource: () => Promise.withResolvers<DataSourcePage>().promise,
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 2_000,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      2_000,
+    );
+    const allColumns = Array.from({ length: 200 }, (_, column) => column);
+    const assertBounded = () => {
+      const telemetry = controller.getTelemetry();
+      expect(telemetry.activeSpeculativeRows).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_ROWS);
+      expect(telemetry.activeSpeculativeRows * 200 * 16).toBeLessThanOrEqual(
+        DATASOURCE_PREFETCH_MAX_BYTES,
+      );
+    };
+
+    controller.updateViewport(0, 600, allColumns);
+    assertBounded();
+    now = 16.7;
+    controller.updateViewport(600, 1_200, allColumns);
+    assertBounded();
+    now = 33.4;
+    controller.updateViewport(1_900, 2_000, allColumns);
+    assertBounded();
+    now = 50.1;
+    controller.updateViewport(1_200, 1_800, allColumns);
+    assertBounded();
+
+    expect(
+      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.tile-state"),
+    ).toMatchObject({
+      measurement: "hash-capacity-v1",
+      entries: expect.any(Number),
+      allocatedBytes: expect.any(Number),
+    });
+    expect(
+      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.tile-state")!
+        .entries,
+    ).toBeLessThan(200 * (DATASOURCE_MAX_ACTIVE_REQUESTS + 2));
+    expect(
+      controller
+        .getResourceOwners()
+        .find((owner) => owner.owner === "js.datasource.pending-requests")!.entries,
+    ).toBeGreaterThan(0);
+
+    controller.destroy();
+    expect(
+      controller
+        .getResourceOwners()
+        .every((owner) => owner.logicalBytes === 0 && owner.entries === 0),
+    ).toBe(true);
+    // Destroy above proves every datasource owner releases its retained state.
     store.dispose();
   });
 
