@@ -154,7 +154,6 @@ export const TOOLING_TEST_PATHS = [
 
 export const UNIT_TEST_PATHS = [
   "packages",
-  "test/browser/canvas-assertions.test.ts",
   "scripts/public-api.test.ts",
   "scripts/conformance.test.ts",
   "scripts/conformance-excel-runner.test.ts",
