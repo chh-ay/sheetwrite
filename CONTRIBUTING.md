@@ -39,6 +39,8 @@ Merged changesets update one version pull request. Merging it does not publish. 
 
 If the GitHub release step fails after npm publication, re-run that failed "Publish npm packages" run. Do not start a new run from a later `develop` commit to repair it, because only packages published from the release commit go into the release. The rerun finds the versions on npm, creates the missing tags, and creates or updates `v<version>`.
 
+Before a release, two local checks repeat the release path on your machine. `bun run release:verify` builds the canonical tarballs into `test-results/release-artifacts` (or, with `-- --artifacts <directory>`, verifies tarballs built before), and then runs the dependency audit, the packed and bundler consumers and the size report against them. `bun run release:audit` verifies the tarballs already in `test-results/release-artifacts`, runs only the dependency audit, and writes its evidence to `test-results/dependency-audit`.
+
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
 
 The landing page's first-load size comes from the committed `scripts/size-report.json`. It is release evidence: the package size history pull request that publication opens refreshes it from the CI run of the published commit, so pull requests do not commit it.

@@ -403,10 +403,6 @@ function nodesForMode(mode: string): readonly CommandNode[] {
       return UNIT_TEST_NODES;
     case "typecheck-packages":
       return PACKAGE_TYPECHECK_NODES;
-    case "typecheck-examples":
-      return EXAMPLE_TYPECHECK_NODES;
-    case "typecheck-bench":
-      return BENCH_TYPECHECK_NODES;
     case "typecheck":
       return TYPECHECK_NODES;
     case "verify-ci":
