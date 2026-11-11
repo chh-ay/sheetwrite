@@ -10,6 +10,7 @@ import solid from "vite-plugin-solid";
 
 import { formulaTables } from "../docs/src/lib/formula-tables.ts";
 import { perfFigureMarkup } from "../docs/src/lib/perf-figure-markup.ts";
+import { SITE_URL } from "../docs/src/lib/seo.ts";
 import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "../docs/vite.config.ts";
 import { SOLID_MDX_OPTIONS } from "./src/lib/recma-solid-elements.ts";
 import { rehypeDocsPictures } from "./src/lib/rehype-docs-pictures.ts";
@@ -229,7 +230,11 @@ export default defineConfig({
         ...SHOWCASE_PAGES.map((path) => ({ path })),
         // Static hosts serve /404.html for every URL without a page; the
         // deployment fallback supplies the 404 status for unknown URLs.
-        { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },
+        {
+          path: "/404/",
+          prerender: { enabled: true, outputPath: "/404.html" },
+          sitemap: { exclude: true },
+        },
         // The framework lifecycle fixture is one dynamic route; the test build
         // prerenders a page per framework (the filter below drops them otherwise).
         ...["react", "vue", "svelte"].map((framework) => ({
@@ -244,6 +249,8 @@ export default defineConfig({
         // Every static route is discovered; the fixtures only in a test build.
         filter: (page) => BUILD_FIXTURES || !page.path.startsWith("/test/"),
       },
+      // scripts/normalize-sitemap.ts trims it to canonical page URLs after the build.
+      sitemap: { enabled: true, host: SITE_URL },
     }),
     solid({ ssr: true, extensions: [".md", ".mdx"], exclude: REACT_WORKBENCH_FILES }),
     ...frameworkWorkbenches(),

@@ -43,4 +43,17 @@
     .sw-icon-button:not([class*="sheetwrite"], [class*="sheetwrite"] *) {
     min-height: 2.75rem;
   }
+
+  /* Fixed-size icon buttons and links that act as controls. */
+  :is(.sw-showcase, .sw-showcase-page) .sw-lab-copy {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  :is(.sw-showcase, .sw-showcase-page)
+    :is(.sw-vw-proofs a, .sw-rwb-workflow__link, .sw-rwb-workflow__import) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
 }

@@ -27,6 +27,7 @@ import {
   makeCollaborationUsageSnapshot,
 } from "@docs/showcases/collaboration-seed.js";
 import { USAGE_RANGE, USAGE_TOTAL_CELL } from "@docs/showcases/scenarios/durable-usage.js";
+import { siteGridTheme } from "@docs/showcases/site-grid-theme.js";
 import {
   type ChangeEvent,
   createGridFromSnapshot,
@@ -437,6 +438,7 @@ export function createCollaborationEngine(
     host.replaceChildren();
     const grid = createGridFromSnapshot(host, snapshot, {
       presentation: "data-grid",
+      theme: siteGridTheme(),
       config: {
         contextMenu: [
           { action: "copy", label: "Copy shared value" },
@@ -1042,7 +1044,7 @@ export function createCollaborationEngine(
   };
 
   const stopTheme = observeSiteTheme(() => {
-    for (const key of CLIENT_KEYS) clients[key]?.grid.replaceTheme({});
+    for (const key of CLIENT_KEYS) clients[key]?.grid.replaceTheme(siteGridTheme());
   });
 
   // The page owns one boot session; reset starts the next generation.
