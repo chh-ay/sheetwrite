@@ -197,6 +197,9 @@
 .sw-art text {
   fill: currentColor;
   font: 600 11px/1 var(--sw-font-mono);
+  /* Lay text out at the drawing's real scale: Chromium otherwise measures it
+     at a rounded font size, so a long label reports a wider box than it has. */
+  text-rendering: geometricPrecision;
 }
 .sw-art .small {
   font-size: 10px;

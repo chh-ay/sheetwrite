@@ -11,3 +11,13 @@
   > :last-child {
   margin-bottom: 0;
 }
+
+/* Wide screens give the reading column and the outline explicit columns
+   (site-shell.css). An island's root is the grid item, not its wrapper, so it
+   gets the reading column too: without it, a page still streaming in places
+   the root in the outline's free cell, and it jumps once the article arrives. */
+@media (min-width: 88rem) {
+  .sw-document > [data-island] > * {
+    grid-column: 1;
+  }
+}
