@@ -113,6 +113,32 @@ impl Context<'_, '_> {
     }
 }
 
+/// Proto: hash of (parent group, key) with the grouping's case folding, without copies.
+fn level_hash(parent: usize, value: &Value) -> Result<u64, FormulaError> {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = rustc_hash::FxHasher::default();
+    parent.hash(&mut hasher);
+    match value {
+        Value::Blank | Value::Bool(false) => 0u8.hash(&mut hasher),
+        Value::Number(number) if *number == 0.0 => 0u8.hash(&mut hasher),
+        Value::Number(number) if number.is_finite() => {
+            1u8.hash(&mut hasher);
+            number.to_bits().hash(&mut hasher);
+        }
+        Value::Number(_) => return Err(FormulaError::Num),
+        Value::Text(text) if text.is_empty() => 0u8.hash(&mut hasher),
+        Value::Text(text) => {
+            2u8.hash(&mut hasher);
+            for c in text.chars().flat_map(char::to_lowercase) {
+                (if c == 'ς' { 'σ' } else { c }).hash(&mut hasher);
+            }
+        }
+        Value::Bool(true) => 3u8.hash(&mut hasher),
+        Value::Error(error) => return Err(*error),
+    }
+    Ok(hasher.finish())
+}
+
 struct Group {
     fields: Vec<Value>,
     rows: Vec<usize>,
@@ -140,7 +166,7 @@ impl Axis {
             rows: Vec::new(),
             parent: None,
         }];
-        let mut buckets: HashMap<Vec<KeyPart>, Vec<usize>> = HashMap::new();
+        let mut buckets: rustc_hash::FxHashMap<u64, Vec<usize>> = rustc_hash::FxHashMap::default();
         // Every included row belongs to the root and one group per prefix.
         let membership_width = fields.cols + 1;
         let mut memberships = vec![
@@ -150,11 +176,8 @@ impl Axis {
                 .checked_mul(membership_width)
                 .ok_or(FormulaError::Num)?
         ];
-        // Reuse the lookup key; only a new bucket needs an owned copy.
-        let mut key = Vec::with_capacity(fields.cols);
         for &row in included {
             groups[0].rows.push(row);
-            key.clear();
             let mut parent = 0;
             for width in 1..=fields.cols {
                 let values = &fields.values[row * fields.cols..row * fields.cols + width];
@@ -167,12 +190,15 @@ impl Axis {
                     .ok_or(FormulaError::Num)
                 })?;
                 context.charge(width.checked_add(text_work).ok_or(FormulaError::Num)?)?;
-                key.push(key_part(&values[width - 1])?);
+                let hash = level_hash(parent, &values[width - 1])?;
                 let mut found = None;
-                if let Some(bucket) = buckets.get(&key) {
+                if let Some(bucket) = buckets.get(&hash) {
                     for &group in bucket {
                         context.charge(width)?;
-                        if compare_fields(&groups[group].fields, values) == Ordering::Equal {
+                        if groups[group].parent == Some(parent)
+                            && compare_group_values(&groups[group].fields[width - 1], &values[width - 1])
+                                == Ordering::Equal
+                        {
                             found = Some(group);
                             break;
                         }
@@ -185,7 +211,7 @@ impl Axis {
                         rows: Vec::new(),
                         parent: Some(parent),
                     });
-                    buckets.entry(key.clone()).or_default().push(index);
+                    buckets.entry(hash).or_default().push(index);
                     index
                 });
                 groups[group].rows.push(row);
@@ -708,7 +734,8 @@ pub(crate) fn evaluate_matrix(
         relationship == 0,
         &row_aggregates,
     )?;
-    let mut intersections: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+    let column_groups = columns.as_ref().map_or(0, |axis| axis.groups.len());
+    let mut intersections: Vec<Vec<usize>> = Vec::new();
     if let Some(columns) = &mut columns {
         let mut col_aggregates = Vec::with_capacity(columns.groups.len());
         for group in &columns.groups {
@@ -731,14 +758,12 @@ pub(crate) fn evaluate_matrix(
             true,
             &col_aggregates,
         )?;
+        intersections.resize_with(rows.groups.len() * column_groups, Vec::new);
         for &row in &included {
             for &row_group in rows.memberships(row) {
                 for &col_group in columns.memberships(row) {
                     context.charge(1)?;
-                    intersections
-                        .entry((row_group, col_group))
-                        .or_default()
-                        .push(row);
+                    intersections[row_group * column_groups + col_group].push(row);
                 }
             }
         }
@@ -809,7 +834,7 @@ pub(crate) fn evaluate_matrix(
         if let Some(columns) = &columns {
             for (col_position, &col_group) in columns.order.iter().enumerate() {
                 let subset = intersections
-                    .get(&(row_group, col_group))
+                    .get(row_group * column_groups + col_group)
                     .map_or(&[][..], Vec::as_slice);
                 let denominator = match relative {
                     0 => (rows.grand, col_group),
@@ -826,7 +851,7 @@ pub(crate) fn evaluate_matrix(
                     _ => unreachable!(),
                 };
                 let total_rows = intersections
-                    .get(&denominator)
+                    .get(denominator.0 * column_groups + denominator.1)
                     .map_or(&[][..], Vec::as_slice);
                 for column in 0..values.cols {
                     output[offset + rows.width + col_position * values.cols + column] =
