@@ -108,16 +108,18 @@ may exceed 75,000 bytes (JavaScriptCore stops optimizing functions near
   first.
 - **Kind and wrapper, rare large variants boxed.** When one variant is much
   larger than the others, box it so it doesn't widen every value.
-- **Pin the size of hot types.** `Value`, `Ast`, `FormulaEntry` and the cell
-  payload types carry a compile-time assertion next to their definition:
+- **Pin the size of hot types.** Put a compile-time assertion next to the
+  definition of every hot type (`Value`, `Ast`, `FormulaEntry`, the per-cell
+  slots of paged storage), like the one on `FormulaSlot`:
 
   ```rust
   const _: () = assert!(std::mem::size_of::<FormulaSlot>() == std::mem::size_of::<Option<FormulaEntry>>());
   ```
 
   A pull request that changes one of these sizes says why and shows the gate.
-- **`u32` index types with a niche.** Formula, sheet and pool ids are `u32`
-  newtypes that leave one value unused, so `Option<Id>` is four bytes.
+- **`u32` index types with a niche.** Give each kind of id (formulas, sheets,
+  pool strings) its own `u32` type that leaves one value unused, so
+  `Option<Id>` stays four bytes and ids of different kinds cannot be mixed up.
 - **Inline-capacity lists from measurements.** Choose the inline size of a
   small list from measured lengths and write them in a comment (for example
   "p90: 2 arguments").
@@ -129,7 +131,8 @@ may exceed 75,000 bytes (JavaScriptCore stops optimizing functions near
 ## Measuring
 
 A change that touches evaluation passes the formula gate on Linux and on the
-Mac, two rounds of seven pairs each (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
+Mac, with both engines: two A/B rounds and one A/A round of seven pairs per
+row (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
 The pull request lists the gate results, the Brotli size of each engine and
 the largest function sizes. Changes to `unsafe` or to the layout of a hot type
-also report instruction counts on both machines.
+also report native instruction counts on Linux (the Mac has no counter).
