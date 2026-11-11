@@ -1,9 +1,9 @@
 import type { Page } from "@playwright/test";
 
-import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
+import { expect, test, waitForHydration } from "./fixtures.js";
 
-// The Try it playground on runnable examples (run, edit, error, reset) and
-// the changelog feed.
+// The Try it playground on runnable examples (run, edit, error, reset), the
+// page actions and the changelog feed.
 
 /** The engine loads on the first run; a cold run can take a few seconds in CI. */
 const RUN_TIMEOUT_MS = 30_000;
@@ -25,7 +25,7 @@ test("Try it runs the example, reruns an edit, reports an error at its line, and
   await page.goto("/docs/start/first-grid/");
   await waitForHydration(page);
   // Nothing of the playground loads before the reader asks for it.
-  expect(scripts.filter((path) => /Playground|run-example|sucrase/i.test(path))).toEqual([]);
+  expect(scripts.filter((path) => PLAYGROUND_SCRIPT.test(path))).toEqual([]);
 
   await page.getByRole("button", { name: "Try it" }).first().click();
   const playground = page.getByRole("region", { name: "Complete first grid" });
@@ -125,6 +125,29 @@ test("a page without a runnable example loads none of the playground", async ({ 
   expect(scripts.filter((path) => PLAYGROUND_SCRIPT.test(path))).toEqual([]);
 });
 
+test("page actions edit the source file and report a problem with the page", async ({ page }) => {
+  await page.goto("/docs/start/first-grid/");
+  await expect(page.getByRole("link", { name: "Edit on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/chh-ay/sheetwrite/edit/develop/docs/src/content/docs/start/first-grid.mdx",
+  );
+  const report = new URL(
+    (await page.getByRole("link", { name: "Report a problem" }).getAttribute("href")) ?? "",
+  );
+  expect(`${report.origin}${report.pathname}`).toBe(
+    "https://github.com/chh-ay/sheetwrite/issues/new",
+  );
+  // The documentation form adds the documentation labels.
+  expect(report.searchParams.get("template")).toBe("documentation.yml");
+  expect(report.searchParams.get("pages")).toBe(
+    "Your first grid: https://www.sheetwrite.dev/docs/start/first-grid/",
+  );
+  // A generated page has no source file to edit.
+  await page.goto("/docs/api/core/");
+  await expect(page.getByRole("link", { name: "Report a problem" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Edit on GitHub" })).toHaveCount(0);
+});
+
 test("the changelog links its RSS feed in the served head", async ({ page, request }) => {
   await page.goto("/docs/releases/");
   await expect(page.getByRole("link", { name: "changelog RSS feed" })).toHaveAttribute(
@@ -132,10 +155,8 @@ test("the changelog links its RSS feed in the served head", async ({ page, reque
     "/changelog/rss.xml",
   );
   // Feed readers read the served HTML: the link is in its head, not only in the hydrated page.
-  const html = await (await request.get(siteUrl("/docs/releases/"))).text();
-  expect(html.slice(0, html.indexOf("</head>"))).toContain(
-    '<link rel="alternate" type="application/rss+xml"',
-  );
+  const html = await (await request.get("/docs/releases/")).text();
+  expect(html.slice(0, html.indexOf("</head>"))).toContain('type="application/rss+xml"');
   const feed = await request.get("/changelog/rss.xml");
   expect(feed.ok()).toBe(true);
   expect(feed.headers()["content-type"]).toMatch(/xml/);

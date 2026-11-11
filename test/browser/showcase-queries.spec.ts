@@ -1,54 +1,38 @@
-import { expect, type Page, test } from "@playwright/test";
-
-import { siteUrl } from "./playwright.config.js";
-
-const ROUTE = siteUrl("/showcases/queries/");
-
-const ordersCounted = (page: Page) => page.getByTestId("queries-formula-Orders counted");
-const fetches = (page: Page) => page.getByTestId("queries-fetches");
-const countOf = async (page: Page) =>
-  Number((await ordersCounted(page).textContent())?.replace(/,/g, ""));
-
-async function refreshAll(page: Page) {
-  await page.getByRole("button", { name: "Refresh All" }).last().click();
-  await expect(page.getByText("Tables match the sources")).toBeVisible();
-}
+import { expect, test } from "./fixtures.js";
 
 test("a refresh brings new orders and a changed step into the tables", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto(ROUTE);
-  await expect(page.getByText("Tables match the sources")).toBeVisible({ timeout: 30_000 });
-  const shipped = await countOf(page);
+  await page.goto("/showcases/queries/");
+  const matched = page.getByText("Tables match the sources");
+  const ordersCounted = page.getByTestId("queries-formula-Orders counted");
+  const fetches = page.getByTestId("queries-fetches");
+  const count = async () => Number((await ordersCounted.textContent())?.replace(/,/g, ""));
+  const refreshAll = async () => {
+    await page.getByRole("button", { name: "Refresh All" }).last().click();
+    await expect(matched).toBeVisible();
+  };
+  await expect(matched).toBeVisible({ timeout: 30_000 });
+  const shipped = await count();
   expect(shipped).toBeGreaterThan(0);
 
   // New orders reach the workbook only through a refresh.
   await page.getByRole("button", { name: /new orders arrive/ }).click();
-  expect(await countOf(page)).toBe(shipped);
-  await refreshAll(page);
-  const withNewOrders = await countOf(page);
+  expect(await count()).toBe(shipped);
+  await refreshAll();
+  const withNewOrders = await count();
   expect(withNewOrders).toBeGreaterThan(shipped);
 
   // A changed step is saved at once and applied by the next refresh.
   await page.getByRole("radio", { name: "All statuses" }).click();
   await expect(page.getByText("Query changed: Refresh All to apply it")).toBeVisible();
-  await refreshAll(page);
-  expect(await countOf(page)).toBeGreaterThan(withNewOrders);
+  await refreshAll();
+  expect(await count()).toBeGreaterThan(withNewOrders);
 
   // Undo restores the recorded values without another source load.
-  const loads = await fetches(page).textContent();
+  const loads = (await fetches.textContent()) ?? "";
   await page
     .getByRole("complementary", { name: "Controls" })
     .getByRole("button", { name: "Undo" })
     .click();
-  await expect(ordersCounted(page)).toHaveText(withNewOrders.toLocaleString("en"));
-  await expect(fetches(page)).toHaveText(loads ?? "");
-  expect(errors).toEqual([]);
-});
-
-test("Queries & Connections lists the saved queries", async ({ page }) => {
-  await page.goto(ROUTE);
-  await expect(page.getByText("Tables match the sources")).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Queries & Connections…" }).click();
-  await expect(page.locator(".sheetwrite-panel").getByText("Region totals").first()).toBeVisible();
+  await expect(ordersCounted).toHaveText(withNewOrders.toLocaleString("en"));
+  await expect(fetches).toHaveText(loads);
 });

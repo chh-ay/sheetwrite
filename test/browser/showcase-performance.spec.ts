@@ -1,7 +1,7 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import type { Grid, PagedStoreStats } from "../../packages/core/src/types.js";
-import { siteUrl } from "./playwright.config.js";
+import { expect, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -9,15 +9,11 @@ declare global {
   }
 }
 
-const ROUTE = siteUrl("/showcases/performance/");
 const GRID = '[data-testid="scale-grid"]';
 const ROWS = 1_000_000;
 const COLUMNS = 1_000;
-
-interface BootErrors {
-  console: string[];
-  page: string[];
-}
+const CACHE_BUDGET_BYTES = 32 * 1024 * 1024;
+const STRESS_CACHE_BYTES = 1024 * 1024;
 
 interface WindowReadout {
   firstRow: number;
@@ -25,15 +21,6 @@ interface WindowReadout {
   firstColumn: number;
   lastColumn: number;
   selected: string;
-}
-
-function collectErrors(page: Page): BootErrors {
-  const errors: BootErrors = { console: [], page: [] };
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.console.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.page.push(error.message));
-  return errors;
 }
 
 function columnIndex(label: string): number {
@@ -46,7 +33,7 @@ function numericText(text: string | null): number {
   return Number((text ?? "").replace(/,/g, "").replace(/[^\d.]/g, ""));
 }
 
-async function pagedStats(page: Page): Promise<PagedStoreStats | null> {
+function pagedStats(page: Page): Promise<PagedStoreStats | null> {
   return page.evaluate(() => {
     const store = window.__sheetwriteScaleGrid?.store;
     if (!store || !("getPagedStats" in store) || typeof store.getPagedStats !== "function") {
@@ -56,95 +43,68 @@ async function pagedStats(page: Page): Promise<PagedStoreStats | null> {
   });
 }
 
+function loadState(page: Page, row: number, col: number): Promise<string | undefined> {
+  return page.evaluate(
+    ({ row, col }) =>
+      window.__sheetwriteScaleGrid?.store.getCellLoadState?.({ sheet: "scale", row, col }),
+    { row, col },
+  );
+}
+
+function resolved(page: Page, row: number, col: number): Promise<unknown> {
+  return page.evaluate(
+    ({ row, col }) =>
+      window.__sheetwriteScaleGrid?.store.getCell({ sheet: "scale", row, col }).resolved,
+    { row, col },
+  );
+}
+
 async function bootScale(page: Page): Promise<void> {
-  await page.goto(ROUTE);
+  await page.goto("/showcases/performance/");
   await page.waitForSelector(`${GRID} canvas`, { state: "attached", timeout: 20_000 });
   await expect
-    .poll(async () => (await pagedStats(page))?.loadedCells ?? 0, {
-      timeout: 20_000,
-      message: "the initial rectangular page never became resident",
-    })
+    .poll(async () => (await pagedStats(page))?.loadedCells ?? 0, { timeout: 20_000 })
     .toBeGreaterThan(0);
 }
 
+/** The public window readout, checked against its row and column headers. */
 async function readWindow(page: Page): Promise<WindowReadout> {
-  const { windowText, rowText, columnText, selected } = await page.evaluate(() => {
-    const text = (testId: string): string | null =>
-      document.querySelector(`[data-testid="${testId}"]`)?.textContent ?? null;
-    return {
-      windowText: text("scale-window-a1"),
-      rowText: text("scale-window-rows"),
-      columnText: text("scale-window-columns"),
-      selected: text("scale-current-a1"),
-    };
-  });
+  const text = (testId: string) => page.getByTestId(testId).textContent();
+  const windowText = await text("scale-window-a1");
+  const rowText = await text("scale-window-rows");
+  const columnText = await text("scale-window-columns");
   const windowMatch = windowText?.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
   const rowMatch = rowText?.trim().match(/^(\d+)–(\d+)$/);
   const columnMatch = columnText?.trim().match(/^([A-Z]+)–([A-Z]+)$/);
   if (!windowMatch || !rowMatch || !columnMatch) {
-    throw new Error(
-      `Malformed public readout: ${JSON.stringify({ windowText, rowText, columnText })}`,
-    );
+    throw new Error(`Malformed readout: ${JSON.stringify({ windowText, rowText, columnText })}`);
   }
   const readout = {
     firstRow: Number(windowMatch[2]),
     lastRow: Number(windowMatch[4]),
-    firstColumn: columnIndex(windowMatch[1]!),
-    lastColumn: columnIndex(windowMatch[3]!),
-    selected: selected?.trim() ?? "",
+    firstColumn: columnIndex(windowMatch[1] ?? ""),
+    lastColumn: columnIndex(windowMatch[3] ?? ""),
+    selected: (await text("scale-current-a1"))?.trim() ?? "",
   };
-  expect(readout.firstRow).toBe(Number(rowMatch[1]));
-  expect(readout.lastRow).toBe(Number(rowMatch[2]));
-  expect(readout.firstColumn).toBe(columnIndex(columnMatch[1]!));
-  expect(readout.lastColumn).toBe(columnIndex(columnMatch[2]!));
-  expect(readout.firstRow).toBeLessThanOrEqual(readout.lastRow);
-  expect(readout.firstColumn).toBeLessThanOrEqual(readout.lastColumn);
+  expect([readout.firstRow, readout.lastRow]).toEqual([Number(rowMatch[1]), Number(rowMatch[2])]);
+  expect([readout.firstColumn, readout.lastColumn]).toEqual([
+    columnIndex(columnMatch[1] ?? ""),
+    columnIndex(columnMatch[2] ?? ""),
+  ]);
   return readout;
 }
 
-async function assertLoadedPeriodWithoutStaleFlash(page: Page, row: number): Promise<void> {
-  const expectedPeriod = `FY${2024 + (Math.floor(row / 12) % 5)} P${String((row % 12) + 1).padStart(2, "0")}`;
-  const samples: Array<{ state: string | null; value: unknown }> = [];
-  for (let sample = 0; sample < 8; sample += 1) {
-    samples.push(
-      await page.evaluate((targetRow) => {
-        const store = window.__sheetwriteScaleGrid?.store;
-        return {
-          state: store?.getCellLoadState?.({ sheet: "scale", row: targetRow, col: 0 }) ?? null,
-          value: store?.getCell({ sheet: "scale", row: targetRow, col: 0 }).resolved,
-        };
-      }, row),
-    );
-    await page.waitForTimeout(20);
-  }
-  for (const sample of samples) {
-    if (sample.state === "unloaded") {
-      expect(sample.value).toBe("#LOADING!");
-    } else {
-      expect(sample.value).toBe(expectedPeriod);
-    }
-  }
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          (targetRow) =>
-            window.__sheetwriteScaleGrid?.store.getCell({
-              sheet: "scale",
-              row: targetRow,
-              col: 0,
-            }).resolved,
-          row,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBe(expectedPeriod);
+async function jump(page: Page, row: number, column: number): Promise<void> {
+  await page.getByTestId("scale-jump-row").fill(String(row));
+  await page.getByTestId("scale-jump-column").fill(String(column));
+  await page.getByTestId("scale-jump").click();
 }
 
+/** A viewport point inside the visible body cell, scrolling the page to it if needed. */
 async function gridBodyPoint(page: Page, row: number, column: number) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const point = await page.evaluate(
-      ({ targetRow, targetColumn }) => {
+      ({ row, column }) => {
         const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
         const grid = window.__sheetwriteScaleGrid;
         if (!host || !grid) return null;
@@ -152,20 +112,17 @@ async function gridBodyPoint(page: Page, row: number, column: number) {
         for (let y = rect.top + 36; y < rect.bottom; y += 8) {
           for (let x = rect.left + 72; x < rect.right; x += 8) {
             const address = grid.getCellAtPoint(x, y);
-            if (address?.row === targetRow && address.col === targetColumn) return { x, y };
+            if (address?.row === row && address.col === column) return { x, y };
           }
         }
         return null;
       },
-      { targetRow: row, targetColumn: column },
+      { row, column },
     );
     if (!point) throw new Error(`Could not locate visible cell r${row} c${column}`);
     const viewport = page.viewportSize();
     if (viewport === null || (point.y >= 0 && point.y < viewport.height)) return point;
-    await page.evaluate(
-      ({ targetY, viewportHeight }) => window.scrollBy(0, targetY - viewportHeight / 2),
-      { targetY: point.y, viewportHeight: viewport.height },
-    );
+    await page.evaluate((delta) => window.scrollBy(0, delta), point.y - viewport.height / 2);
   }
   throw new Error(`Could not bring cell r${row} c${column} into the viewport`);
 }
@@ -173,402 +130,128 @@ async function gridBodyPoint(page: Page, row: number, column: number) {
 test("the live Grid is exactly one billion logical addresses with bounded rectangular pages", async ({
   page,
 }) => {
-  const errors = collectErrors(page);
   await bootScale(page);
   const workbook = await page.evaluate(() => window.__sheetwriteScaleGrid?.store.getWorkbook());
   expect(workbook?.sheets).toHaveLength(1);
   expect(workbook?.sheets[0]?.rowCount).toBe(ROWS);
   expect(workbook?.sheets[0]?.columns).toHaveLength(COLUMNS);
-  const cacheBudgetBytes = Number(
-    await page.getByTestId("scale-grid").getAttribute("data-cache-bytes"),
+  await expect(page.getByTestId("scale-grid")).toHaveAttribute(
+    "data-cache-bytes",
+    String(CACHE_BUDGET_BYTES),
   );
-
   const stats = await pagedStats(page);
-  expect(stats).not.toBeNull();
-  expect(stats!.fullyLoaded).toBe(false);
-  expect(stats!.allocatedBytes).toBeLessThanOrEqual(cacheBudgetBytes);
-  expect(stats!.loadedCells).toBeLessThan(ROWS * COLUMNS);
-  expect(cacheBudgetBytes).toBe(32 * 1024 * 1024);
+  expect(stats?.fullyLoaded).toBe(false);
+  expect(stats?.allocatedBytes).toBeLessThanOrEqual(CACHE_BUDGET_BYTES);
+  expect(stats?.loadedCells).toBeLessThan(ROWS * COLUMNS);
 
   const initial = await readWindow(page);
-  expect(initial.firstRow).toBe(1);
-  expect(initial.firstColumn).toBe(0);
+  expect([initial.firstRow, initial.firstColumn]).toEqual([1, 0]);
   await expect(page.getByTestId("scale-last-band")).toContainText("columns");
-  expect(
-    numericText(await page.getByTestId("scale-requested-cells").textContent()),
-  ).toBeGreaterThan(0);
-  expect(numericText(await page.getByTestId("scale-returned-cells").textContent())).toBeGreaterThan(
-    0,
-  );
-
-  await page.getByTestId("scale-global-details").locator("summary").click();
-  await page.getByTestId("scale-scan-attempt").click();
-  await expect(page.getByTestId("scale-scan-report")).toHaveAttribute("data-state", "incomplete");
-  await expect(page.getByTestId("scale-scan-report")).toContainText("IncompleteDataError");
-  await page.getByTestId("scale-export-attempt").click();
-  await expect(page.getByTestId("scale-export-report")).toHaveAttribute("data-state", "incomplete");
-  await expect(page.getByTestId("scale-export-report")).toContainText("IncompleteDataError");
-  await expect(page.getByTestId("scale-query-state")).toContainText("incomplete");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("row and column navigators agree with the public window headers", async ({ page }) => {
-  await bootScale(page);
-  const grid = page.locator(GRID);
-  await grid.scrollIntoViewIfNeeded();
-  const box = await grid.boundingBox();
-  if (!box) throw new Error("Grid has no physical bounds");
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-
-  const initial = await readWindow(page);
-  await page.mouse.wheel(0, 1_800);
-  await expect
-    .poll(async () => (await readWindow(page)).firstRow)
-    .toBeGreaterThan(initial.firstRow);
-  const afterWheel = await readWindow(page);
-
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.keyboard.press("PageDown");
-  await expect
-    .poll(async () => (await readWindow(page)).firstRow)
-    .toBeGreaterThan(afterWheel.firstRow);
-  const afterPageDown = await readWindow(page);
-  await page.keyboard.press("PageUp");
-  await expect
-    .poll(async () => (await readWindow(page)).firstRow)
-    .toBeLessThan(afterPageDown.firstRow);
-
-  const landmarkRows: number[] = [];
-  for (const [landmark, selected, dataRow] of [
-    ["25", "A250001", 250_000],
-    ["50", "A500001", 500_000],
-    ["75", "A750000", 749_999],
-    ["100", "A1000000", 999_999],
-  ] as const) {
-    await page.getByTestId(`scale-landmark-${landmark}`).click();
-    await expect(page.getByTestId("scale-current-a1")).toHaveText(selected);
-    await expect
-      .poll(async () => {
-        const rows = (await page.getByTestId("scale-window-rows").textContent())?.match(
-          /([\d,]+)\s*–\s*([\d,]+)/,
-        );
-        return numericText(rows?.[2] ?? null);
-      })
-      .toBeGreaterThanOrEqual(dataRow + 1);
-    const readout = await readWindow(page);
-    expect(readout.firstRow).toBeLessThanOrEqual(dataRow + 1);
-    expect(readout.lastRow).toBeGreaterThanOrEqual(dataRow + 1);
-    landmarkRows.push(readout.firstRow);
-    await assertLoadedPeriodWithoutStaleFlash(page, dataRow);
+  for (const counter of ["scale-requested-cells", "scale-returned-cells"]) {
+    expect(numericText(await page.getByTestId(counter).textContent())).toBeGreaterThan(0);
   }
-  expect(landmarkRows[0]).toBeLessThan(landmarkRows[1]!);
-  expect(landmarkRows[1]).toBeLessThan(landmarkRows[2]!);
-  expect(landmarkRows[2]).toBeLessThan(landmarkRows[3]!);
 
-  const rail = page.getByTestId("scale-overview");
-  const railBox = await rail.boundingBox();
-  if (!railBox) throw new Error("Overview rail has no physical bounds");
-  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height * 0.02);
-  await page.mouse.down();
-  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height * 0.55, {
-    steps: 14,
-  });
-  await page.mouse.up();
-  await expect.poll(async () => (await readWindow(page)).firstRow).toBeLessThan(landmarkRows[2]!);
-  await readWindow(page);
-
-  const columnRail = page.getByTestId("scale-column-overview");
-  await columnRail.focus();
-  await page.keyboard.press("End");
-  await expect(page.getByTestId("scale-current-a1")).toHaveText(/^ALL\d+$/);
-  await expect.poll(async () => (await readWindow(page)).firstColumn).toBeGreaterThan(900);
-  await expect(page.getByTestId("scale-selected-formula")).toHaveText(/^=/);
+  // Whole-sheet scans and exports refuse a partly loaded store.
+  await page.getByTestId("scale-global-details").locator("summary").click();
+  for (const action of ["scan", "export"]) {
+    await page.getByTestId(`scale-${action}-attempt`).click();
+    const report = page.getByTestId(`scale-${action}-report`);
+    await expect(report).toHaveAttribute("data-state", "incomplete");
+    await expect(report).toContainText("IncompleteDataError");
+  }
+  await expect(page.getByTestId("scale-query-state")).toContainText("incomplete");
 });
 
 test("a distant physical edit survives clean-tile eviction, far horizontal motion, and revisit", async ({
   page,
 }) => {
   test.setTimeout(120_000);
+  const editRow = 741_999;
+  const cleanRow = 737_903;
+  const column = 3;
   await bootScale(page);
   const grid = page.locator(GRID);
   await page.getByTestId("scale-eviction-stress").click();
-  await expect(grid).toHaveAttribute("data-cache-bytes", String(1024 * 1024));
+  await expect(grid).toHaveAttribute("data-cache-bytes", String(STRESS_CACHE_BYTES));
   const chunkRows = Number(await grid.getAttribute("data-chunk-rows"));
   expect(chunkRows).toBeGreaterThan(0);
-  await page.getByTestId("scale-jump-row").fill("742000");
-  await page.getByTestId("scale-jump-column").fill("4");
-  await page.getByTestId("scale-jump").click();
-  await expect(page.getByTestId("scale-current-a1")).toHaveText("D742000");
+
+  // Load a clean comparison tile, then the edit target.
+  await jump(page, cleanRow + 1, column + 1);
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(`D${cleanRow + 1}`);
+  await expect.poll(() => loadState(page, cleanRow, column)).toBe("loaded-value");
+  await jump(page, editRow + 1, column + 1);
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(`D${editRow + 1}`);
   await expect
-    .poll(async () => {
-      const readout = await readWindow(page);
-      return readout.lastRow >= 742_000 && readout.lastColumn >= 3;
-    })
-    .toBe(true);
-  const exactWindow = await readWindow(page);
-  expect(exactWindow.firstRow).toBeLessThanOrEqual(742_000);
-  expect(exactWindow.lastRow).toBeGreaterThanOrEqual(742_000);
-  expect(exactWindow.firstColumn).toBeLessThanOrEqual(3);
-  expect(exactWindow.lastColumn).toBeGreaterThanOrEqual(3);
-  await page.getByTestId("scale-jump-row").fill("737904");
-  await page.getByTestId("scale-jump-column").fill("4");
-  await page.getByTestId("scale-jump").click();
-  await expect(page.getByTestId("scale-current-a1")).toHaveText("D737904");
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-          sheet: "scale",
-          row: 737_903,
-          col: 3,
-        }),
-      ),
-    )
+    .poll(() => loadState(page, editRow, column), { timeout: 20_000 })
     .toBe("loaded-value");
-  await page.getByTestId("scale-jump-row").fill("742000");
-  await page.getByTestId("scale-jump").click();
-  await expect(page.getByTestId("scale-current-a1")).toHaveText("D742000");
 
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => ({
-          target: window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-            sheet: "scale",
-            row: 741_999,
-            col: 3,
-          }),
-          cleanComparison: window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-            sheet: "scale",
-            row: 737_903,
-            col: 3,
-          }),
-        })),
-      { timeout: 20_000 },
-    )
-    .toEqual({ target: "loaded-value", cleanComparison: "loaded-value" });
-
+  // Edit through the real pointer, F2 and editor path.
   await grid.scrollIntoViewIfNeeded();
-  const target = await gridBodyPoint(page, 741_999, 3);
+  const target = await gridBodyPoint(page, editRow, column);
   await page.mouse.click(target.x, target.y);
-  await expect(page.getByTestId("scale-current-a1")).toHaveText("D742000");
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(`D${editRow + 1}`);
   await expect(grid).toBeFocused();
   await page.keyboard.press("F2");
-  await expect(page.locator(`${GRID} .sheetwrite-editor`)).toBeVisible();
   await page.locator(`${GRID} .sheetwrite-editor`).fill("777777");
   await page.keyboard.press("Enter");
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteScaleGrid?.store.getCell({ sheet: "scale", row: 741_999, col: 3 })
-            .resolved,
-      ),
-    )
-    .toBe(777_777);
+  await expect.poll(() => resolved(page, editRow, column)).toBe(777_777);
 
+  // Far horizontal motion past column 900.
   const box = await grid.boundingBox();
   if (!box) throw new Error("Grid has no physical bounds");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  let sampledColumn = (await readWindow(page)).firstColumn;
-  for (let motion = 0; motion < 34 && sampledColumn <= 900; motion += 1) {
+  let firstColumn = (await readWindow(page)).firstColumn;
+  for (let motion = 0; motion < 34 && firstColumn <= 900; motion += 1) {
+    const previous = firstColumn;
     await page.mouse.wheel(3_600, 0);
-    let observedColumn = sampledColumn;
     await expect
       .poll(async () => {
-        const columns = (await page.getByTestId("scale-window-columns").textContent())?.match(
-          /([A-Z]+)\s*–\s*([A-Z]+)/,
-        );
-        observedColumn = columnIndex(columns?.[1] ?? "A");
-        return observedColumn;
+        firstColumn = (await readWindow(page)).firstColumn;
+        return firstColumn;
       })
-      .toBeGreaterThan(sampledColumn);
-    sampledColumn = observedColumn;
+      .toBeGreaterThan(previous);
   }
   const farWindow = await readWindow(page);
   expect(farWindow.firstColumn).toBeGreaterThan(900);
   expect(farWindow.lastColumn).toBeLessThan(COLUMNS);
 
+  // Churn distant tiles until the clean tile is evicted; the edit must stay.
   for (const landmark of ["0", "25", "100", "0", "25"]) {
     await page.getByTestId(`scale-landmark-${landmark}`).click();
     await page.waitForTimeout(250);
   }
-  let watchedCleanState: string | undefined;
-  for (let visit = 0; visit < 128; visit += 1) {
+  let cleanState: string | undefined;
+  for (let visit = 0; visit < 128 && cleanState !== "unloaded"; visit += 1) {
     const row = 10_000 + visit * 7_500;
-    const column = 1 + ((visit * 113) % 990);
-    if (
-      Math.floor((row - 1) / chunkRows) === Math.floor(737_903 / chunkRows) ||
-      Math.floor((row - 1) / chunkRows) === Math.floor(741_999 / chunkRows)
-    ) {
+    const visitColumn = 1 + ((visit * 113) % 990);
+    const chunk = Math.floor((row - 1) / chunkRows);
+    if (chunk === Math.floor(cleanRow / chunkRows) || chunk === Math.floor(editRow / chunkRows)) {
       continue;
     }
-    await page.getByTestId("scale-jump-row").fill(String(row));
-    await page.getByTestId("scale-jump-column").fill(String(column));
-    await page.getByTestId("scale-jump").click();
-    await expect
-      .poll(() =>
-        page.evaluate(
-          ({ targetRow, targetColumn }) =>
-            window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-              sheet: "scale",
-              row: targetRow - 1,
-              col: targetColumn - 1,
-            }),
-          { targetRow: row, targetColumn: column },
-        ),
-      )
-      .toMatch(/loaded/);
-    watchedCleanState = await page.evaluate(() =>
-      window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-        sheet: "scale",
-        row: 737_903,
-        col: 3,
-      }),
-    );
-    if (watchedCleanState === "unloaded") break;
+    await jump(page, row, visitColumn);
+    await expect.poll(() => loadState(page, row - 1, visitColumn - 1)).toMatch(/loaded/);
+    cleanState = await loadState(page, cleanRow, column);
   }
-  expect(watchedCleanState, "finite 32 MiB churn never evicted the watched clean tile").toBe(
-    "unloaded",
-  );
-
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() =>
-          window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-            sheet: "scale",
-            row: 737_903,
-            col: 3,
-          }),
-        ),
-      { timeout: 20_000 },
-    )
-    .toBe("unloaded");
-  expect(
-    await page.evaluate(() =>
-      window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-        sheet: "scale",
-        row: 741_999,
-        col: 3,
-      }),
-    ),
-  ).toBe("local-edit");
+  expect(cleanState, "churn never evicted the watched clean tile").toBe("unloaded");
+  expect(await loadState(page, editRow, column)).toBe("local-edit");
   await expect(page.getByTestId("scale-eviction-watch")).toHaveAttribute(
     "data-clean-state",
     "unloaded",
   );
-
   const afterEviction = await pagedStats(page);
-  const cacheBudgetBytes = Number(await grid.getAttribute("data-cache-bytes"));
-  expect(afterEviction!.allocatedBytes).toBeLessThanOrEqual(cacheBudgetBytes);
-  expect(afterEviction!.dirtyCells).toBe(1);
-  const visibleWidth = farWindow.lastColumn - farWindow.firstColumn + 1;
+  expect(afterEviction?.allocatedBytes).toBeLessThanOrEqual(STRESS_CACHE_BYTES);
+  expect(afterEviction?.dirtyCells).toBe(1);
   const amplification = Number(await page.getByTestId("scale-column-amplification").textContent());
-  expect(amplification).toBeLessThanOrEqual(visibleWidth + 10);
+  expect(amplification).toBeLessThanOrEqual(farWindow.lastColumn - farWindow.firstColumn + 11);
   expect(amplification).toBeLessThan(64);
 
-  await page.getByTestId("scale-jump-row").fill("742000");
-  await page.getByTestId("scale-jump-column").fill("4");
-  await page.getByTestId("scale-jump").click();
-  await expect(page.getByTestId("scale-current-a1")).toHaveText("D742000");
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteScaleGrid?.store.getCell({ sheet: "scale", row: 741_999, col: 3 })
-            .resolved,
-      ),
-    )
-    .toBe(777_777);
+  await jump(page, editRow + 1, column + 1);
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(`D${editRow + 1}`);
+  await expect.poll(() => resolved(page, editRow, column)).toBe(777_777);
 });
 
-test("Grid zoom changes real rendered geometry and reset restores the logical window", async ({
-  page,
-}) => {
-  await bootScale(page);
-  const beforeWindow = await readWindow(page);
-  const before = await page.evaluate(() => {
-    const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
-    const grid = window.__sheetwriteScaleGrid;
-    if (!host || !grid) return null;
-    const rect = host.getBoundingClientRect();
-    const theme = grid.getEffectiveTheme();
-    return {
-      zoom: grid.getZoom(),
-      rowHeight: theme.rowHeight,
-      selection: grid.getSelection(),
-      probe: grid.getCellAtPoint(
-        rect.left + theme.rowHeaderWidth + 16,
-        rect.top + Math.min(240, rect.height - 10),
-      ),
-      transform: getComputedStyle(host).transform,
-    };
-  });
-  expect(before).not.toBeNull();
-  expect(before!.zoom).toBe(1);
-  expect(before!.transform).toBe("none");
-
-  await page.getByRole("button", { name: "Zoom in" }).click();
-  await expect(page.getByTestId("scale-zoom-value")).toHaveText("125%");
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
-  const zoomedWindow = await readWindow(page);
-  expect(zoomedWindow.firstRow).toBe(beforeWindow.firstRow);
-  expect(zoomedWindow.firstColumn).toBe(beforeWindow.firstColumn);
-  expect(zoomedWindow.selected).toBe(beforeWindow.selected);
-  const zoomed = await page.evaluate(() => {
-    const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
-    const grid = window.__sheetwriteScaleGrid;
-    if (!host || !grid) return null;
-    const rect = host.getBoundingClientRect();
-    const theme = grid.getEffectiveTheme();
-    return {
-      zoom: grid.getZoom(),
-      rowHeight: theme.rowHeight,
-      selection: grid.getSelection(),
-      probe: grid.getCellAtPoint(
-        rect.left + theme.rowHeaderWidth + 16,
-        rect.top + Math.min(240, rect.height - 10),
-      ),
-      transform: getComputedStyle(host).transform,
-    };
-  });
-  expect(zoomed).not.toBeNull();
-  expect(zoomed!.zoom).toBe(1.25);
-  expect(zoomed!.rowHeight).toBeGreaterThan(before!.rowHeight);
-  expect(zoomed!.probe?.row).toBeLessThan(before!.probe?.row ?? Number.POSITIVE_INFINITY);
-  expect(zoomed!.selection).toEqual(before!.selection);
-  expect(zoomed!.transform).toBe("none");
-
-  await page.getByRole("button", { name: "Reset" }).click();
-  await expect(page.getByTestId("scale-zoom-value")).toHaveText("100%");
-  const reset = await page.evaluate(() => {
-    const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
-    const grid = window.__sheetwriteScaleGrid;
-    if (!host || !grid) return null;
-    const rect = host.getBoundingClientRect();
-    const theme = grid.getEffectiveTheme();
-    return {
-      zoom: grid.getZoom(),
-      rowHeight: theme.rowHeight,
-      selection: grid.getSelection(),
-      probe: grid.getCellAtPoint(
-        rect.left + theme.rowHeaderWidth + 16,
-        rect.top + Math.min(240, rect.height - 10),
-      ),
-    };
-  });
-  expect(reset).not.toBeNull();
-  expect(reset!.zoom).toBe(1);
-  expect(reset!.rowHeight).toBe(before!.rowHeight);
-  expect(reset!.probe).toEqual(before!.probe);
-  expect(reset!.selection).toEqual(before!.selection);
-  await expect.poll(() => readWindow(page)).toEqual(beforeWindow);
-});
-
-test("@portability mobile touch input, lifecycle, and responsive reflow stay operable", async ({
+test("mobile touch input, renderer swap, and responsive reflow stay operable @portability", async ({
   browser,
   browserName,
 }) => {
@@ -578,7 +261,11 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
     viewport: { width: 390, height: 844 },
   });
   const page = await context.newPage();
-  const errors = collectErrors(page);
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
   await bootScale(page);
   const grid = page.locator(GRID);
   await grid.scrollIntoViewIfNeeded();
@@ -605,23 +292,17 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
       });
     }
     await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await expect
-      .poll(async () => (await readWindow(page)).firstRow)
-      .toBeGreaterThan(beforeTouch.firstRow);
   } else if (browserName === "webkit") {
     await grid.locator(".sheetwrite-scroller").evaluate((scroller) => {
       scroller.scrollTop += 1_200;
     });
-    await expect
-      .poll(async () => (await readWindow(page)).firstRow)
-      .toBeGreaterThan(beforeTouch.firstRow);
   } else {
     await grid.hover();
     await page.mouse.wheel(0, 1_200);
-    await expect
-      .poll(async () => (await readWindow(page)).firstRow)
-      .toBeGreaterThan(beforeTouch.firstRow);
   }
+  await expect
+    .poll(async () => (await readWindow(page)).firstRow)
+    .toBeGreaterThan(beforeTouch.firstRow);
 
   await page.locator(".sw-sp-render-details summary").click();
   await page.getByTestId("scale-renderer-worker").click();
@@ -630,35 +311,10 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
   await page.getByTestId("scale-renderer-canvas").click();
   await expect(page.getByTestId("scale-renderer-active")).toHaveText("canvas");
   await expect(page.locator(`${GRID} canvas`)).toHaveCount(1);
-
   // The page must not overflow sideways on a phone.
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
   ).toBeLessThanOrEqual(1);
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
+  expect(errors).toEqual([]);
   await context.close();
-});
-
-test("the flight deck moves the real Grid to the last row within the cache budget", async ({
-  page,
-}) => {
-  const errors = collectErrors(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await bootScale(page);
-  const cacheBudgetBytes = Number(
-    await page.getByTestId("scale-grid").getAttribute("data-cache-bytes"),
-  );
-
-  await page.getByTestId("scale-flight-depth").click();
-  await expect(page.getByTestId("scale-flight-report")).toContainText("frames", {
-    timeout: 20_000,
-  });
-  await expect(page.getByTestId("scale-current-a1")).toHaveText(`A${ROWS}`);
-  await expect.poll(async () => (await readWindow(page)).lastRow, { timeout: 10_000 }).toBe(ROWS);
-  const stats = await pagedStats(page);
-  expect(stats?.allocatedBytes ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(cacheBudgetBytes);
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
 });

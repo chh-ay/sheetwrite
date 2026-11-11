@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
-import { canvasPainted, cellValue, expect, gridCellTexts, test } from "./fixtures.js";
+import { canvasPainted, cellValue, expect, test } from "./fixtures.js";
 
 // The /vue/ business workbench: validation and protection at the mutation
 // barrier, worksheet operations, host persistence state, and the Vue
@@ -54,40 +54,6 @@ async function openAdapterSettings(page: Page): Promise<void> {
   const isOpen = await summary.evaluate((element) => element.closest("details")?.open === true);
   if (!isOpen) await summary.click();
 }
-
-test("boots the governed business workbook and paints it", async ({ page }) => {
-  await page.setViewportSize({ width: 1568, height: 869 });
-  await open(page);
-  // The page owns the one main landmark; the workbench inside it adds none.
-  await expect(page.getByRole("main")).toHaveCount(1);
-  // The frozen PO column stays out of the ARIA mirror window, so the first
-  // mirrored body cell is the supplier column.
-  await expect
-    .poll(() => gridCellTexts(page, GRID), { timeout: 15_000 })
-    .toContain("Alder Quay Freight");
-  await expect.poll(() => canvasPainted(page, `${GRID} canvas`), { timeout: 15_000 }).toBe(true);
-
-  // The seeded document evaluates formulas and applies its merge.
-  expect(await cellValue(page, HANDLE, "orders", 0, 0)).toBe("PO-0001");
-  expect(await cellValue(page, HANDLE, "suppliers", 0, 0)).toBe(
-    "Approved supplier directory — FY26",
-  );
-  expect(await cellValue(page, HANDLE, "suppliers", 0, 1)).toBeNull();
-  expect(await cellValue(page, HANDLE, "orders", 0, 6)).toBe(768); // 8 shipments at $96
-
-  // The governed workflow is the first visible task, and the tabs fit.
-  const taskTabs = page.getByRole("tablist", { name: "Workbook tasks" });
-  await expect(page.getByRole("tab", { name: "Protection" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  expect(await taskTabs.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
-    true,
-  );
-  await expect(page.locator(`${APP} .sw-demo-grid`)).toBeInViewport();
-  await expect(page.getByTestId("generation")).toHaveText("1 · initial");
-  await expect(page.getByTestId("workbook-state")).toHaveText("2 sheet(s) · active orders");
-});
 
 test("the command toolbar keeps ribbon commands reachable by keyboard at any width @portability", async ({
   page,

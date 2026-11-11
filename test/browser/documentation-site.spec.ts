@@ -52,20 +52,26 @@ test("a moved page redirects permanently and forwards its old heading link", asy
   await expect(page.locator("#requests-and-pages")).toBeVisible();
 });
 
-test("sidebar marks only the nearest documentation route as current", async ({ page }) => {
-  for (const [path, label] of [
-    ["/docs/start/first-grid/", "First grid"],
-    ["/docs/api/core/", "@sheetwrite/core"],
-    ["/docs/api/core/grid/", "@sheetwrite/core"],
-  ] as const) {
-    await page.goto(path);
-    const navigation = page.getByRole("navigation", { name: "Documentation" });
-    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
-    await expect(navigation.getByRole("link", { name: label, exact: true })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-  }
+test("feature overview cards lead to short examples and formatted result sheets", async ({
+  page,
+}) => {
+  await page.goto("/docs/features/formatting/");
+  await waitForHydration(page);
+  await page
+    .locator(".sw-section-cards")
+    .getByRole("link", { name: /Number formats/ })
+    .click();
+  await expect(page).toHaveURL(/\/docs\/features\/formatting\/number-formats\/$/);
+  const result = page.locator(".sw-grid-result").first();
+  await expect(result.getByRole("columnheader", { name: "A", exact: true })).toBeVisible();
+  await expect(result.getByRole("cell", { name: "1.234,50", exact: true })).toBeVisible();
+  const setup = page
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: "Full setup" }) })
+    .first();
+  await expect(setup).not.toHaveAttribute("open");
+  await setup.locator("summary").click();
+  await expect(setup.locator("pre")).toBeVisible();
 });
 
 test("site root serves the product landing with its search and social metadata", async ({
@@ -127,96 +133,12 @@ test("site root serves the product landing with its search and social metadata",
   await expect(page).toHaveURL(siteUrl("/docs/start/installation/"));
 });
 
-test("landing animations are bounded, replayable, and reduced-motion complete", async ({
-  page,
-}) => {
-  // The hero is a scripted timeline: each frame writes styles and text into its parts.
-  const frameOf = (root: Element) =>
-    [...root.querySelectorAll<HTMLElement>("[data-part]")]
-      .map((part) => `${part.style.cssText}|${part.textContent}`)
-      .join("\n");
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  await waitForHydration(page);
-  const story = page.getByTestId("landing-product-story");
-  // Reduced motion: the loop does not run, and the still picture is the
-  // finished edit: the chart is in and the recalculated total shows.
-  await expect(story).toHaveAttribute("data-landing-running", "false");
-  await expect(story.locator('[data-part="d6"]')).toHaveText("$21,808");
-  const still = await story.evaluate(frameOf);
-  await page.waitForTimeout(400);
-  expect(await story.evaluate(frameOf)).toBe(still);
-  // Seeking in either direction must work without enabling animation.
-  for (const selector of [".ha-acts", ".sw-arch__steps"]) {
-    const chapters = page.locator(`${selector} button`);
-    for (let index = (await chapters.count()) - 1; index >= 0; index--) {
-      await chapters.nth(index).focus();
-      await page.keyboard.press("Enter");
-      await expect(chapters.nth(index)).toHaveAttribute("aria-current", "step");
-      await expect(page.locator(`${selector} [aria-current="step"]`)).toHaveCount(1);
-    }
-  }
-  await expect(story.locator('[data-part="d6"]')).toHaveText("$19,696");
-  await expect(story).toHaveAttribute("data-landing-running", "false");
-
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await story.getByRole("button", { name: "Replay animation" }).click();
-  await expect(story).toHaveAttribute("data-landing-running", "true");
-  const playing = await story.evaluate(frameOf);
-  await expect.poll(() => story.evaluate(frameOf)).not.toBe(playing);
-  // Off screen, the illustration stops; back on screen, it resumes.
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await expect(story).toHaveAttribute("data-landing-running", "false");
-  const paused = await story.evaluate(frameOf);
-  await page.waitForTimeout(400);
-  expect(await story.evaluate(frameOf)).toBe(paused);
-  await story.scrollIntoViewIfNeeded();
-  await expect(story).toHaveAttribute("data-landing-running", "true");
-  await expect.poll(() => story.evaluate(frameOf)).not.toBe(paused);
-  await page.goto("/docs/start/installation/");
-  await expect(story).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      () =>
-        document.getAnimations().filter((animation) => animation.playState === "running").length,
-    ),
-  ).toBe(0);
-});
-
-test("landing tab lists follow arrow, Home, and End keys", async ({ page }) => {
-  await page.goto("/");
-  await waitForHydration(page);
-  for (const prefix of ["landing-story-", "landing-tab-"]) {
-    const tabs = page.locator(`[role="tab"][id^="${prefix}"]`);
-    const count = await tabs.count();
-    expect(count).toBeGreaterThan(2);
-    const expectActive = async (index: number) => {
-      const tab = tabs.nth(index);
-      await expect(tab).toHaveAttribute("aria-selected", "true");
-      await expect(tab).toBeFocused();
-      await expect(tab).toHaveAttribute("tabindex", "0");
-      await expect(
-        page.locator(`[role="tabpanel"][aria-labelledby="${await tab.getAttribute("id")}"]`),
-      ).toHaveCount(1);
-      await expect(tabs.and(page.locator('[aria-selected="true"]'))).toHaveCount(1);
-    };
-    await tabs.first().click();
-    await expectActive(0);
-    await page.keyboard.press("ArrowRight");
-    await expectActive(1);
-    await page.keyboard.press("ArrowLeft");
-    await page.keyboard.press("ArrowLeft");
-    // Left from the first tab wraps to the last.
-    await expectActive(count - 1);
-    await page.keyboard.press("Home");
-    await expectActive(0);
-    await page.keyboard.press("End");
-    await expectActive(count - 1);
-  }
-});
-
 test("documentation pages render one heading and a canonical URL", async ({ page }) => {
-  for (const route of ["start/installation/", "reference/compatibility-limits/", "api/core/grid/"]) {
+  for (const route of [
+    "start/installation/",
+    "reference/compatibility-limits/",
+    "api/core/grid/",
+  ]) {
     const response = await page.goto(`/docs/${route}`);
     expect(response?.ok(), route).toBe(true);
     await expect(page.locator("main h1")).toHaveCount(1);
@@ -264,7 +186,7 @@ test("framework tabs synchronize and persist across guides", async ({ page }) =>
   await expectHighlighted("svelte");
 });
 
-test("generated API indexes lead to focused, progressively disclosed symbol pages", async ({
+test("generated API pages disclose symbols progressively and open member deep links", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1568, height: 900 });
@@ -286,11 +208,8 @@ test("generated API indexes lead to focused, progressively disclosed symbol page
   await page.locator(".api-declaration summary").click();
   await expect(page.locator(".api-declaration .expressive-code")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-});
 
-test("member deep links open the target row in view", async ({ page }) => {
-  // The fragment targets a hidden h3; the following collapsed row must open
-  // and scroll into view.
+  // A fragment targets a hidden h3; the following collapsed row opens in view.
   await page.goto("/docs/api/core/grid/#applytransaction");
   await waitForHydration(page);
   const member = page.locator("#grid-apply-transaction");

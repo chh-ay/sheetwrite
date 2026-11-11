@@ -303,7 +303,10 @@ test.describe("collaboration proof", () => {
       `All ${COLLABORATION_WORKBOOK_ROWS * COLLABORATION_WORKBOOK_COLUMNS} cells match`,
     );
     // Both clients end on the server head with nothing queued.
-    await expectBothClients(page, (await page.getByTestId("clb-server-version").textContent()) ?? "");
+    await expectBothClients(
+      page,
+      (await page.getByTestId("clb-server-version").textContent()) ?? "",
+    );
   });
 
   test("applies a multi-version restore as one atomic batch on the peer", async ({ page }) => {
@@ -358,4 +361,22 @@ test.describe("collaboration proof", () => {
     // Ana's rebased edit lands on top of the server-authored commit at both clients.
     await expectBothClients(page, "v4");
   });
+});
+
+test("a manual retry of a commit whose acknowledgement was lost applies it once", async ({
+  page,
+}) => {
+  await openDatabase(page);
+  await page.getByTestId("dbx-diagnostics").locator("summary").click();
+  // The server stores v1 but the client keeps the commit pending; the retry
+  // with the same mutation id must not apply it twice.
+  await page.getByRole("button", { name: "Lose next acknowledgement" }).click();
+  await page.getByRole("button", { name: "Commit sample edit" }).click();
+  await expect(page.getByTestId("dbx-pending")).toHaveText("1");
+  await expect(page.getByTestId("dbx-version")).toHaveText("1");
+  const committedTotal = (await page.getByTestId("dbx-total").textContent()) ?? "";
+  await page.getByRole("button", { name: "Retry pending commit" }).click();
+  await expect(page.getByTestId("dbx-pending")).toHaveText("0");
+  await expect(page.getByTestId("dbx-version")).toHaveText("1");
+  await expect(page.getByTestId("dbx-total")).toHaveText(committedTotal);
 });

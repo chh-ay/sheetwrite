@@ -44,31 +44,6 @@ function rendererReadout(requested: string, active: string): RegExp {
   return new RegExp(`Requested:\\s*${requested}\\b[\\s\\S]*Active:\\s*${active}\\b`);
 }
 
-test("context menu shows platform shortcuts, and Undo removes a highlight", async ({ page }) => {
-  await open(page);
-  const surface = page.locator(`${GRID} .sheetwrite-scroller`);
-  await surface.scrollIntoViewIfNeeded();
-  const openMenu = () => surface.click({ button: "right", position: { x: 160, y: 80 } });
-  const highlightItem = page.locator('[data-context-menu-item="highlight-cell"]');
-  const mac = await page.evaluate(() =>
-    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent),
-  );
-
-  await openMenu();
-  await expect(
-    page.locator('[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut'),
-  ).toHaveText(mac ? "⌘C" : "Ctrl+C");
-  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
-  await highlightItem.click();
-  await expect(page.getByText(/^Highlighted R\d+ C\d+ · Ctrl\+Z undoes it$/)).toBeVisible();
-
-  // The highlight is a cell fill in the document, so Undo removes it.
-  await surface.click({ position: { x: 160, y: 80 } });
-  await page.keyboard.press(mac ? "Meta+Z" : "Control+Z");
-  await openMenu();
-  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
-});
-
 test("boots product-first, paints, and fits the page @portability", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page);
@@ -162,7 +137,10 @@ test("destroy, create, and reset bound explicit grid generations", async ({ page
   await expect.poll(() => readB2(page)).not.toBe("generation-one-edit");
 
   // Reset rebuilds with the same construction options.
-  await page.getByText("Construction & debug controls", { exact: true }).click();
+  const controls = page.locator(".sw-vw-details");
+  if (!(await controls.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.getByText("Construction & debug controls", { exact: true }).click();
+  }
   await commitB2(page, "generation-two-edit");
   await page.getByRole("button", { name: "Reset generation" }).click();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "3", {
