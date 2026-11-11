@@ -903,6 +903,10 @@ const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
+    #[allow(
+        clippy::disallowed_types,
+        reason = "keys are already hashes of the text, so the hasher passes them through unchanged"
+    )]
     lookup:
         std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
     pub(crate) epoch: u32,

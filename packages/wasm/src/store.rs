@@ -1,10 +1,9 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
 
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
@@ -348,8 +347,8 @@ pub struct CellStore {
     // every store, and most workbooks never reorder tabs.
     #[allow(clippy::box_collection)]
     sheet_order: Option<Box<Vec<u32>>>,
-    pub(crate) sheet_lookup: HashMap<String, usize>,
-    pub(crate) sheet_ids: HashMap<String, usize>,
+    pub(crate) sheet_lookup: FxHashMap<String, usize>,
+    pub(crate) sheet_ids: FxHashMap<String, usize>,
     pub(crate) strings: StringStorage,
     /// Stable ids keep formula passes independent of address-index allocation.
     pub(crate) formula_slots: FormulaStore,
@@ -369,8 +368,8 @@ pub struct CellStore {
     #[cfg(feature = "analysis")]
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
-    defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
-    tables: HashMap<String, TableDefinition>,
+    defined_names: FxHashMap<(Option<u32>, String), names::DefinedName>,
+    tables: FxHashMap<String, TableDefinition>,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
@@ -457,8 +456,8 @@ impl CellStore {
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
             sheet_order: None,
-            sheet_lookup: HashMap::new(),
-            sheet_ids: HashMap::new(),
+            sheet_lookup: FxHashMap::default(),
+            sheet_ids: FxHashMap::default(),
             strings: StringStorage::new(),
             formula_slots: FormulaStore::default(),
             formula_results: None,
@@ -471,7 +470,7 @@ impl CellStore {
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
-            defined_names: HashMap::new(),
+            defined_names: FxHashMap::default(),
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
@@ -479,7 +478,7 @@ impl CellStore {
             pivots: None,
             #[cfg(feature = "analysis")]
             relationships: None,
-            tables: HashMap::new(),
+            tables: FxHashMap::default(),
         }
     }
 
@@ -828,7 +827,7 @@ impl CellStore {
         let name_key = sheet_name_key(name);
 
         if name.is_empty()
-            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || self.sheet_alive.get(sheet) != Some(&true)
             || self.sheet_ids.get(id) != Some(&sheet)
             || self
                 .sheet_lookup
@@ -871,7 +870,7 @@ impl CellStore {
     /// Tombstone a stable sheet handle and invalidate every formula reference to it.
     #[wasm_bindgen(js_name = removeSheet)]
     pub fn remove_sheet(&mut self, sheet: usize) -> bool {
-        if !self.sheet_alive.get(sheet).copied().unwrap_or(false) {
+        if self.sheet_alive.get(sheet) != Some(&true) {
             return false;
         }
 
@@ -957,7 +956,8 @@ impl CellStore {
         let valid = order.len() == current.len()
             && order.iter().all(|&handle| {
                 let index = handle as usize;
-                let fresh = self.sheet_alive.get(index).copied().unwrap_or(false) && !seen[index];
+                let fresh =
+                    self.sheet_alive.get(index).copied().unwrap_or_default() && !seen[index];
                 if fresh {
                     seen[index] = true;
                 }
@@ -1209,7 +1209,7 @@ impl CellStore {
         }
 
         let mut destination_cells = Vec::with_capacity(offsets.len());
-        let mut entry_offsets = HashSet::with_capacity(offsets.len());
+        let mut entry_offsets = FxHashSet::with_capacity_and_hasher(offsets.len(), FxBuildHasher);
 
         for &offset in offsets {
             if offset as usize >= cell_count || !entry_offsets.insert(offset) {
@@ -1220,10 +1220,11 @@ impl CellStore {
             destination_cells.push((start_row + offset / cols, start_col + offset % cols));
         }
 
-        let mut source_offsets = HashSet::with_capacity(
+        let mut source_offsets = FxHashSet::with_capacity_and_hasher(
             formula_offsets
                 .len()
                 .saturating_add(reference_offsets.len()),
+            FxBuildHasher,
         );
 
         for &offset in formula_offsets {
@@ -1238,7 +1239,8 @@ impl CellStore {
             }
         }
 
-        let mut prepared_sources = HashMap::with_capacity(source_offsets.len());
+        let mut prepared_sources =
+            FxHashMap::with_capacity_and_hasher(source_offsets.len(), FxBuildHasher);
 
         for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
             let offset_index = offset as usize;
@@ -1263,7 +1265,7 @@ impl CellStore {
             };
             let target_sheet = target.sheet as usize;
 
-            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+            if self.sheet_alive.get(target_sheet) != Some(&true)
                 || !self.sheets[target_sheet]
                     .cells
                     .contains_cell(target.row as usize, target.col as usize)
@@ -1658,12 +1660,12 @@ impl CellStore {
         target_sheet: usize,
         max_entries: usize,
     ) -> Option<Vec<u32>> {
-        if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false) {
+        if self.sheet_alive.get(target_sheet) != Some(&true) {
             return Some(Vec::new());
         }
         let mut sources = Vec::new();
         for (source_sheet, data) in self.sheets.iter().enumerate() {
-            if !self.sheet_alive.get(source_sheet).copied().unwrap_or(false) {
+            if self.sheet_alive.get(source_sheet) != Some(&true) {
                 continue;
             }
             for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
@@ -1712,7 +1714,7 @@ impl CellStore {
         {
             return false;
         }
-        let mapping: HashMap<u32, u32> = old_ids
+        let mapping: FxHashMap<u32, u32> = old_ids
             .iter()
             .copied()
             .zip(new_ids.iter().copied())
@@ -1893,7 +1895,8 @@ impl CellStore {
         {
             return false;
         }
-        let mut sources = HashMap::with_capacity(snapshot.formulas.len());
+        let mut sources =
+            FxHashMap::with_capacity_and_hasher(snapshot.formulas.len(), FxBuildHasher);
         for (row, col, entry) in &snapshot.formulas {
             let Some(key) = cell_key(r0 + *row as usize, c0 + *col as usize) else {
                 return false;
@@ -1905,7 +1908,7 @@ impl CellStore {
                     return false;
                 };
                 let target_sheet = target.sheet as usize;
-                if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+                if self.sheet_alive.get(target_sheet) != Some(&true)
                     || !self.sheets[target_sheet]
                         .cells
                         .contains_cell(target.row as usize, target.col as usize)
@@ -2361,7 +2364,7 @@ impl CellStore {
         let Some(scope) = self.defined_name_scope(name, scope) else {
             return false;
         };
-        if !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+        if self.sheet_alive.get(sheet) != Some(&true)
             || row_start > row_end
             || col_start > col_end
             || row_end >= self.sheets[sheet].cells.row_count()
@@ -2462,7 +2465,7 @@ impl CellStore {
             || column_ids.is_empty()
             || column_ids.len() > MAX_TABLE_COLUMNS
             || column_ids.len() != column_names.len()
-            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || self.sheet_alive.get(sheet) != Some(&true)
             || row_start > row_end
             || col_start > col_end
             || row_end >= self.sheets[sheet].cells.row_count()
@@ -2488,8 +2491,8 @@ impl CellStore {
         {
             return false;
         }
-        let mut ids = HashSet::with_capacity(column_ids.len());
-        let mut names = HashSet::with_capacity(column_names.len());
+        let mut ids = FxHashSet::with_capacity_and_hasher(column_ids.len(), FxBuildHasher);
+        let mut names = FxHashSet::with_capacity_and_hasher(column_names.len(), FxBuildHasher);
         let mut columns = Vec::with_capacity(column_ids.len());
         for (column_index, (column_id, column_name)) in
             column_ids.into_iter().zip(column_names).enumerate()
@@ -2971,10 +2974,11 @@ impl CellStore {
         }
 
         let mut source_kinds = vec![0u8; cell_count];
-        let mut seen_offsets = HashSet::with_capacity(
+        let mut seen_offsets = FxHashSet::with_capacity_and_hasher(
             formula_offsets
                 .len()
                 .saturating_add(reference_offsets.len()),
+            FxBuildHasher,
         );
         for &offset in formula_offsets {
             let offset = offset as usize;
@@ -2991,7 +2995,7 @@ impl CellStore {
             source_kinds[offset] = 2;
         }
 
-        let mut prepared = HashMap::with_capacity(seen_offsets.len());
+        let mut prepared = FxHashMap::with_capacity_and_hasher(seen_offsets.len(), FxBuildHasher);
         for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
             let offset = offset as usize;
             let (row_offset, col_offset) = order.coordinates(offset, rows, cols);
@@ -3013,7 +3017,7 @@ impl CellStore {
                 col: reference_targets[target_index + 2],
             };
             let target_sheet = target.sheet as usize;
-            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+            if self.sheet_alive.get(target_sheet) != Some(&true)
                 || !self.sheets[target_sheet]
                     .cells
                     .contains_cell(target.row as usize, target.col as usize)
@@ -3111,7 +3115,7 @@ impl CellStore {
         start: (usize, usize),
         dimensions: (usize, usize),
         revision: Option<u64>,
-        sources: HashMap<(u32, u32), FormulaEntry>,
+        sources: FxHashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
         if let Some(rect) = DirtyRect::new(
@@ -3136,7 +3140,7 @@ impl CellStore {
         start: (usize, usize),
         dimensions: (usize, usize),
         revision: Option<u64>,
-        mut sources: HashMap<(u32, u32), FormulaEntry>,
+        mut sources: FxHashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
         // A literal-only dense block needs no per-cell source decision: write
@@ -3746,7 +3750,7 @@ impl CellStore {
         self.sheet_alive
             .get(scope as usize)
             .copied()
-            .unwrap_or(false)
+            .unwrap_or_default()
             .then_some(Some(scope))
     }
 
@@ -4068,7 +4072,7 @@ impl CellStore {
 
     fn recompute_all_sheets(&mut self) {
         let live: Vec<usize> = (0..self.sheets.len())
-            .filter(|&sheet| self.sheet_alive.get(sheet).copied().unwrap_or(false))
+            .filter(|&sheet| self.sheet_alive.get(sheet).copied().unwrap_or_default())
             .collect();
 
         // One pass for every sheet: a pass per sheet would recalculate the
@@ -4150,12 +4154,7 @@ impl CellStore {
     fn refresh_named_formula_entries(&mut self) {
         self.resolve_name_definitions();
         for formula_sheet in 0..self.sheets.len() {
-            if !self
-                .sheet_alive
-                .get(formula_sheet)
-                .copied()
-                .unwrap_or(false)
-            {
+            if self.sheet_alive.get(formula_sheet) != Some(&true) {
                 continue;
             }
             let sources: Vec<_> = self.sheets[formula_sheet]

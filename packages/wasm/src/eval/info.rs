@@ -80,7 +80,7 @@ impl CellStore {
         };
 
         let target = range.sheet as usize;
-        let in_bounds = self.sheet_alive.get(target).copied().unwrap_or(false)
+        let in_bounds = self.sheet_alive.get(target).copied().unwrap_or_default()
             && self.sheets[target]
                 .cells
                 .contains_cell(range.row_start as usize, range.col_start as usize);
@@ -274,7 +274,7 @@ impl CellStore {
         self.sheet_lookup
             .get(&sheet_name_key(name))
             .copied()
-            .filter(|&handle| self.sheet_alive.get(handle).copied().unwrap_or(false))
+            .filter(|&handle| self.sheet_alive.get(handle).copied().unwrap_or_default())
     }
 
     /// SHEETS([reference]): every sheet of the workbook, or the sheets a

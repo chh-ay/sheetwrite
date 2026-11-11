@@ -6,7 +6,7 @@ use super::matrix::EvalMatrix;
 use super::{ast_produces_array, range_from_ast, CellStore, EvalPass};
 use crate::calc::{parse, Ast};
 use crate::types::{FormulaError, Value};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 /// One evaluated argument: a scalar is a 1 x 1 block. Values are row-major.
@@ -42,7 +42,7 @@ pub(crate) struct CustomFunction {
     pub(crate) volatile: bool,
 }
 
-pub(crate) type CustomFunctions = HashMap<String, CustomFunction>;
+pub(crate) type CustomFunctions = FxHashMap<String, CustomFunction>;
 
 impl CellStore {
     /// Adds or replaces a host function and recalculates the workbook.
@@ -363,8 +363,8 @@ mod javascript {
         fn push_text(&mut self, text: &str) {
             self.text.push_str(text);
             // UTF-16 offsets, because the wrapper slices a JavaScript string.
-            let end =
-                self.text_ends.last().copied().unwrap_or(0) + text.encode_utf16().count() as u32;
+            let end = self.text_ends.last().copied().unwrap_or_default()
+                + text.encode_utf16().count() as u32;
             self.text_ends.push(end);
         }
     }

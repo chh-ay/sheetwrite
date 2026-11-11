@@ -137,8 +137,8 @@ impl CellStore {
                 break;
             };
 
-            let num = nums.get(i).copied().unwrap_or(0.0);
-            let flag = flags.get(i).copied().unwrap_or(0);
+            let num = nums.get(i).copied().unwrap_or_default();
+            let flag = flags.get(i).copied().unwrap_or_default();
             let match_case = flag & 1 != 0;
 
             let pred = match kind {

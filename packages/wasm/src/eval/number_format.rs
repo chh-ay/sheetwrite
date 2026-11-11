@@ -135,7 +135,7 @@ impl Decimal {
 
     /// The digits before the decimal point, without leading zeros.
     fn integer_digits(&self) -> String {
-        let point = usize::try_from(self.point).unwrap_or(0);
+        let point = usize::try_from(self.point).unwrap_or_default();
         let kept = point.min(self.digits.len());
         let mut text = String::with_capacity(point);
         text.push_str(&self.digits[..kept]);
@@ -145,10 +145,10 @@ impl Decimal {
 
     /// The digits after the decimal point, without trailing zeros.
     fn fraction_digits(&self) -> String {
-        let point = usize::try_from(self.point).unwrap_or(0);
+        let point = usize::try_from(self.point).unwrap_or_default();
         let mut text = String::new();
         push_zeros(&mut text, self.point.min(0).unsigned_abs() as usize);
-        text.push_str(self.digits.get(point..).unwrap_or(""));
+        text.push_str(self.digits.get(point..).unwrap_or_default());
         text
     }
 }

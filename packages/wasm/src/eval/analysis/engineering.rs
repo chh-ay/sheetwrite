@@ -322,7 +322,7 @@ fn error_function(x: f64) -> f64 {
 /// erfc(x) = Q(1/2, x^2) for x >= 0 and 2 - Q(1/2, x^2) below. Q is
 /// calculated directly, so small right tails keep their precision.
 fn complementary_error_function(x: f64) -> f64 {
-    let tail = gamma_probability(HALF, x * x, true).unwrap_or(0.0);
+    let tail = gamma_probability(HALF, x * x, true).unwrap_or_default();
 
     if x < 0.0 {
         2.0 - tail

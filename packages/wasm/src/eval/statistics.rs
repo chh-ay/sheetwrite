@@ -295,7 +295,7 @@ fn counted_extreme(values: &FuncAccumulator, is_maximum: bool) -> Result<f64, Fo
         numbers.iter().copied().reduce(f64::min)
     };
 
-    Ok(extreme.unwrap_or(0.0))
+    Ok(extreme.unwrap_or_default())
 }
 
 fn counted_variance(
@@ -525,7 +525,7 @@ fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
             Value::Text(_) | Value::Bool(_) | Value::Blank => {}
         }
     }
-    Value::number(result.unwrap_or(0.0))
+    Value::number(result.unwrap_or_default())
 }
 
 #[cfg(test)]
