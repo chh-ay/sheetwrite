@@ -1962,6 +1962,37 @@ mod tests {
     }
 
     #[test]
+    fn a_reused_formula_id_moves_its_edges_before_the_next_pass() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 4);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 1, 0, 10.0, 0);
+        store.set_formula(sheet, 0, 1, "=A1*2", 0);
+        store.set_formula(sheet, 1, 1, "=SUM(A1:A2)", 0);
+        store.recompute(sheet);
+        let removed = store
+            .formula_id(AbsCellKey::new(sheet, 0, 1))
+            .expect("formula");
+
+        // The removed slot is free for the next formula, at another address
+        // and with other reads, before any pass applies the removal.
+        store.clear_cell(sheet, 0, 1, 0);
+        store.set_formula(sheet, 2, 2, "=A2+B2", 0);
+        assert_eq!(
+            store.formula_id(AbsCellKey::new(sheet, 2, 2)),
+            Some(removed)
+        );
+        store.recompute(sheet);
+        assert_patch_matches_rebuild(&mut store);
+        assert_eq!(store.get_cell(sheet, 2, 2).num(), 21.0);
+
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, 0, 1).num(), 0.0);
+        assert_eq!(store.get_cell(sheet, 2, 2).num(), 25.0);
+    }
+
+    #[test]
     fn batch_clears_patch_a_shared_group_until_a_rebuild_is_cheaper() {
         const READERS: usize = 1_200;
         // Within both the floor and a quarter of the formulas left after it.

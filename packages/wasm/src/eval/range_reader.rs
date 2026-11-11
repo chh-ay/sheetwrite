@@ -296,6 +296,49 @@ mod tests {
         Ok(values)
     }
 
+    #[test]
+    fn wide_paged_streams_preserve_loading() {
+        const COLUMNS: usize = 65;
+        const ROWS: usize = 2;
+        let mut store = CellStore::new();
+        let sheet = store.add_paged_sheet(COLUMNS + 1, ROWS, ROWS, 0, ROWS * COLUMNS);
+        for col in 0..COLUMNS {
+            store.set_column_numbers(sheet, col, 0, &[0.0; ROWS], 0);
+        }
+        store.set_number(sheet, 0, 0, 7.0, 0);
+        store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
+        store.recompute(sheet);
+
+        let affected = FormulaWork::default();
+        let mut results = FormulaResults::default();
+
+        let mut pass = EvalPass {
+            affected: &affected,
+            results: &mut results,
+        };
+        let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
+        let mut reader = RangeReader::new(&store, range, 0).unwrap();
+        let mut count = 0;
+        let mut sum = 0.0;
+        while let Some(value) = reader.next(&mut pass).unwrap() {
+            count += 1;
+            if let Value::Number(number) = value {
+                sum += number;
+            }
+        }
+        assert_eq!(count, ROWS * COLUMNS);
+        assert_eq!(sum, 16.0);
+
+        // Extending the same multirow walk into one unknown column must still
+        // stop at its first unloaded cell, not report a cached blank.
+        let range = CellRange::new(sheet as u32, 0, 0, 1, COLUMNS as u32);
+        let mut reader = RangeReader::new(&store, range, 0).unwrap();
+        for _ in 0..COLUMNS {
+            assert!(reader.next(&mut pass).unwrap().is_some());
+        }
+        assert!(matches!(reader.next(&mut pass), Err(FormulaError::Loading)));
+    }
+
     fn streamed_values_allowing_errors(
         store: &CellStore,
         range: CellRange,

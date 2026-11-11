@@ -89,3 +89,17 @@ fn rejects_invalid_runs_and_missing_sheets() {
     assert!(!store.set_hidden_rows(sheet + 1, &[0, 0], &[]));
     assert_eq!(results(&store, sheet, 1), ["303"]);
 }
+
+#[test]
+fn hidden_rows_move_with_inserted_and_deleted_rows() {
+    let (mut store, sheet) = microsoft_example(&["=SUBTOTAL(109,A1:A4)"]);
+    assert!(store.set_hidden_rows(sheet, &[1, 1], &[]));
+
+    assert!(store.add_rows(sheet, 0, 1));
+    store.commit_sources();
+    assert_eq!(store.get_cell(sheet, 1, FORMULA_COLUMN).num(), 293.0);
+
+    assert!(store.remove_rows(sheet, 2, 1));
+    store.commit_sources();
+    assert_eq!(store.get_cell(sheet, 1, FORMULA_COLUMN).num(), 293.0);
+}
