@@ -1927,7 +1927,8 @@ impl PivotCache {
         wanted.len() == aggregation.len() + 4 + field.len()
             && wanted.is_char_boundary(aggregation.len())
             && same_name(aggregation, &wanted[..aggregation.len()])
-            && wanted[aggregation.len()..].starts_with(" of ")
+            && wanted.is_char_boundary(aggregation.len() + 4)
+            && same_name(&wanted[aggregation.len()..aggregation.len() + 4], " of ")
             && same_name(&field, &wanted[aggregation.len() + 4..])
             || (!wanted.is_ascii() && same_name(&self.value_caption(slot), wanted))
     }
