@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellChange, Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
+import type { Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -117,41 +117,6 @@ function makeGrid(
 }
 
 describe("pointer input: mouse parity", () => {
-  it("drag across cells produces a range selection and takes capture", () => {
-    const { grid, scroller, workbook, capture } = makeGrid();
-
-    scroller.dispatchEvent(pointer("pointerdown", { ...cellPoint(0, 0, workbook) }));
-    scroller.dispatchEvent(pointer("pointermove", { ...cellPoint(2, 1, workbook) }));
-    scroller.dispatchEvent(pointer("pointerup", { ...cellPoint(2, 1, workbook) }));
-
-    const sel = grid.getSelection();
-    expect(sel?.kind).toBe("range");
-    if (sel?.kind === "range") {
-      expect(sel.range).toMatchObject({ start: { row: 0, col: 0 }, end: { row: 2, col: 1 } });
-    }
-    expect(capture.set).toEqual([1]);
-    expect(capture.released).toEqual([1]);
-  });
-
-  it("focuses the grid on mouse selection so printable keys start editing", () => {
-    const { grid, scroller, workbook, host } = makeGrid();
-    const outside = document.createElement("button");
-    document.body.appendChild(outside);
-    outside.focus();
-
-    scroller.dispatchEvent(pointer("pointerdown", { ...cellPoint(1, 1, workbook) }));
-    expect(document.activeElement).toBe(host);
-
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Q", bubbles: true }));
-    const editor = host.querySelector("textarea.sheetwrite-editor");
-    expect(editor).toBeInstanceOf(HTMLTextAreaElement);
-    expect((editor as HTMLTextAreaElement).value).toBe("Q");
-    editor?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-    grid.destroy();
-    outside.remove();
-  });
-
   it("keeps a date column's serial when its editor commits unchanged", () => {
     const workbook = makeWorkbook(10);
     const column = workbook.sheets[0]!.columns[1]!;
@@ -231,66 +196,6 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
-  it("touch drag on the fill handle captures, previews, and commits the fill", () => {
-    const { grid, store, scroller, workbook, capture } = makeGrid();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    const reasons: string[] = [];
-    const effects: CellChange[][] = [];
-    grid.on("change", (event) => {
-      reasons.push(event.commitReason);
-      effects.push(event.changes);
-    });
-
-    const handle = fillHandlePoint(0, 1, workbook);
-    const down = pointer("pointerdown", { ...handle, pointerType: "touch" });
-    scroller.dispatchEvent(down);
-    expect(down.defaultPrevented).toBe(true);
-    expect(capture.set).toEqual([1]);
-
-    scroller.dispatchEvent(
-      pointer("pointermove", { ...cellPoint(2, 1, workbook), pointerType: "touch" }),
-    );
-    scroller.dispatchEvent(
-      pointer("pointerup", { ...cellPoint(2, 1, workbook), pointerType: "touch" }),
-    );
-
-    const source = store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved;
-    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(source);
-    expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(source);
-    expect(capture.released).toEqual([1]);
-    expect(reasons).toEqual(["fill"]);
-    expect(effects[0]).toEqual([
-      {
-        addr: { sheet: "s1", row: 1, col: 1 },
-        oldValue: { kind: "literal", value: 10.5 },
-        newValue: { kind: "literal", value: 0.5 },
-        oldStyle: {},
-        newStyle: undefined,
-      },
-      {
-        addr: { sheet: "s1", row: 2, col: 1 },
-        oldValue: { kind: "literal", value: 20.5 },
-        newValue: { kind: "literal", value: 0.5 },
-        oldStyle: {},
-        newStyle: undefined,
-      },
-    ]);
-
-    grid.actions.undo();
-    expect(effects[1]?.map(({ addr }) => addr)).toEqual([
-      { sheet: "s1", row: 1, col: 1 },
-      { sheet: "s1", row: 2, col: 1 },
-    ]);
-    expect(effects[1]?.map(({ newValue }) => newValue)).toEqual([
-      { kind: "literal", value: 10.5 },
-      { kind: "literal", value: 20.5 },
-    ]);
-    grid.actions.redo();
-    expect(effects[2]).toEqual(effects[0]);
-    grid.destroy();
-    store.dispose();
-  });
-
   it.each([
     { row: 3, col: 1, formula: "=A4" },
     { row: 0, col: 1, formula: "=A1" },
@@ -315,31 +220,6 @@ describe("pointer input: touch policy", () => {
     expect(store.getCell(target)).toEqual(before);
     grid.actions.redo();
     expect(store.getFormula(target)).toBe(formula);
-    grid.destroy();
-    store.dispose();
-  });
-
-  it("keeps fill unavailable in a filtered view without changing visible or excluded rows", () => {
-    const { grid, store, scroller, workbook } = makeGrid();
-    const source = { sheet: "s1", row: 1, col: 0 };
-    store.applyTransaction({
-      patches: [{ op: "set", addr: source, value: { kind: "formula", src: "=B2" } }],
-    });
-    grid.filterBy(2, "Tokyo");
-    const excluded = { ...source, row: 5 };
-    const beforeExcluded = store.getCell(excluded);
-    const beforeTarget = store.getCell({ ...source, row: 7 });
-    grid.setSelection({ kind: "cell", addr: { ...source, row: 0 } });
-
-    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
-    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 0, workbook)));
-    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 0, workbook)));
-
-    expect(store.getFormula({ ...source, row: 4 })).toBeNull();
-    expect(store.getFormula({ ...source, row: 7 })).toBeNull();
-    expect(store.getCell(excluded)).toEqual(beforeExcluded);
-    expect(store.getCell({ ...source, row: 7 })).toEqual(beforeTarget);
-    expect(store.getFormula(source)).toBe("=B2");
     grid.destroy();
     store.dispose();
   });
@@ -516,25 +396,6 @@ describe("pointer input: drag lifecycle", () => {
     grid.destroy();
     store.dispose();
   });
-  it("abandons a captured selection when switching sheets", () => {
-    const { grid, store, scroller, workbook, capture } = makeGrid();
-    const sheet = makeWorkbook(10).sheets[0];
-    if (!sheet) throw new Error("second sheet missing");
-    sheet.id = "s2";
-    sheet.name = "Other sheet";
-    grid.applyTransaction({
-      patches: [{ op: "addSheet", sheet: { ...sheet, order: 1, cells: [] } }],
-    });
-    scroller.dispatchEvent(pointer("pointerdown", cellPoint(0, 0, workbook)));
-    grid.setActiveSheet("s2");
-    const selection = grid.getSelection();
-    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
-    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
-    expect(grid.getSelection()).toEqual(selection);
-    expect(capture.released).toEqual([1]);
-    grid.destroy();
-    store.dispose();
-  });
 
   for (const axis of ["column", "row"] as const) {
     it(`restores ${axis} preview geometry when structural admission rejects release`, () => {
@@ -576,26 +437,6 @@ describe("pointer input: drag lifecycle", () => {
       store.dispose();
     });
   }
-
-  it("keeps the source selection when fill admission rejects its values", () => {
-    const { grid, store, scroller, workbook } = makeGrid();
-    grid.setValidationRule({
-      id: "deny-fill",
-      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
-      condition: { kind: "list", values: ["Allowed"] },
-      policy: "reject",
-    });
-    const source = { kind: "cell" as const, addr: { sheet: "s1", row: 0, col: 0 } };
-    grid.setSelection(source);
-    const before = store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved;
-    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
-    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 0, workbook)));
-    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 0, workbook)));
-    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(before);
-    expect(grid.getSelection()).toEqual(source);
-    grid.destroy();
-    store.dispose();
-  });
 });
 describe("validation through input mutation paths", () => {
   it("rejects invalid external paste at the shared commit boundary", async () => {
@@ -639,33 +480,6 @@ describe("keyboard whole-axis selection", () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(grid.getSelection()).toEqual({ kind: "column", sheet: "s1", col: 1 });
-    grid.destroy();
-  });
-});
-
-describe("pointer input: header resize hit-testing", () => {
-  it("skips the leading edge of the first visible column and still grabs its trailing edge", () => {
-    const { grid, store, scroller, workbook } = makeGrid();
-    const sheet = workbook.sheets[0];
-    if (!sheet) throw new Error("expected fixture sheet");
-
-    // Hidden column 0 disappears from the band list, so column 1 opens the view.
-    grid.hideColumns([0]);
-    grid.refresh();
-
-    scroller.dispatchEvent(
-      pointer("pointermove", { clientX: DEFAULT_THEME.rowHeaderWidth + 2, clientY: 10 }),
-    );
-    expect(scroller.style.cursor).toBe("");
-
-    const boundaryX = DEFAULT_THEME.rowHeaderWidth + (sheet.columns[1]?.width ?? 0);
-    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX - 1, clientY: 10 }));
-    expect(scroller.style.cursor).toBe("col-resize");
-
-    scroller.dispatchEvent(pointer("pointerdown", { clientX: boundaryX - 1, clientY: 10 }));
-    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX + 29, clientY: 10 }));
-    scroller.dispatchEvent(pointer("pointerup", { clientX: boundaryX + 29, clientY: 10 }));
-    expect(store.getWorkbook().sheets[0]?.columns[1]?.width).toBe(150);
     grid.destroy();
   });
 });

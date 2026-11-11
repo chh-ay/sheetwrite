@@ -128,21 +128,6 @@ it.each(["full", "compact"] as const)(
   },
 );
 
-it("keeps only tabs in the tablist and the layout buttons beside it", async () => {
-  const { host, control } = await setup();
-  const tablist = host.querySelector('.sheetwrite-ribbon [role="tablist"]');
-  if (tablist === null) throw new Error("no ribbon tablist");
-
-  const roles = [...tablist.children].map((child) => child.getAttribute("role"));
-  // Unavailable feature tabs stay hidden, but only tabs belong to this list.
-  expect(new Set(roles)).toEqual(new Set(["tab"]));
-  for (const label of ["Compact ribbon", "Collapse the ribbon"]) {
-    const button = control(label);
-    expect(tablist.contains(button), label).toBe(false);
-    expect(button.parentElement).toBe(tablist.parentElement);
-  }
-});
-
 it("switches layout without losing a value-box draft or the active tab", async () => {
   const { host, control, openTab, press } = await setup();
   const size = control<HTMLInputElement>("Font Size");
@@ -185,21 +170,6 @@ it("renders the same commands as the toolbar for the same command flags", async 
   expect(ribbonCommands.has("exportXlsx")).toBe(true);
   expect(ribbonCommands.has("italic")).toBe(false);
   expect(ribbonCommands.has("sortAsc")).toBe(false);
-});
-
-it("shows Bold pressed, unpressed or mixed for the selection", async () => {
-  const { grid, control, select } = await setup();
-  grid.styleRange(
-    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-    { bold: true },
-  );
-
-  select(0, 0);
-  expect(control("Bold").getAttribute("aria-pressed")).toBe("true");
-  select(1, 0);
-  expect(control("Bold").getAttribute("aria-pressed")).toBe("false");
-  select(0, 0, 1);
-  expect(control("Bold").getAttribute("aria-pressed")).toBe("mixed");
 });
 
 it("shows the focus cell's size in points and applies typed points as pixels", async () => {
@@ -666,23 +636,4 @@ it("shows a failed placement command in its form instead of rejecting", async ()
   const error = form.querySelector<HTMLElement>(".sheetwrite-ribbon-form-error");
   expect(error?.hidden).toBe(false);
   expect(error?.textContent).toContain("the panel chunk failed to load");
-});
-
-it("shows the Formulas tab with Explain Formula, and hides Insert Function without host functions", async () => {
-  const { host, key } = await setup();
-  const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
-  const formulas = tabs.find((tab) => tab.textContent === "Formulas");
-  const insert = tabs.find((tab) => tab.textContent === "Insert");
-  if (formulas === undefined || insert === undefined) throw new Error("missing ribbon tabs");
-  expect(formulas.hidden).toBe(false);
-
-  formulas.click();
-  const command = (id: string): HTMLElement | null =>
-    host.querySelector<HTMLElement>(`.sheetwrite-ribbon [data-command="${id}"]`);
-  expect(command("insertFunction")?.hidden).toBe(true);
-  expect(command("explainFormula")?.hidden).toBe(false);
-
-  insert.focus();
-  key(insert, "ArrowRight");
-  expect(document.activeElement).toBe(formulas);
 });

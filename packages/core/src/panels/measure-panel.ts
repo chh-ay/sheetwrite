@@ -26,7 +26,7 @@ function measureStatusText(status: MeasureStatus): string | null {
 }
 
 /** The first `measure-N` ID that no measure uses. */
-export function nextMeasureId(measures: readonly Measure[]): string {
+function nextMeasureId(measures: readonly Measure[]): string {
   const ids = new Set(measures.map((measure) => measure.id));
   let index = 1;
   while (ids.has(`measure-${index}`)) index += 1;
@@ -37,7 +37,7 @@ export function nextMeasureId(measures: readonly Measure[]): string {
  * The measures of each table that holds some, in table order, then the
  * measures whose table is gone, under a null table.
  */
-export function measuresByTable(
+function measuresByTable(
   measures: readonly Measure[],
   tables: readonly WorkbookTable[],
 ): Array<[WorkbookTable | null, Measure[]]> {
