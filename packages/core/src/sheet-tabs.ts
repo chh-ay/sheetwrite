@@ -520,6 +520,9 @@ export class SheetTabs {
       menu.className = "sheetwrite-tab-menu";
       menu.setAttribute("role", "menu");
       menu.setAttribute("aria-label", `${sheet.name} sheet options`);
+      // WebKit does not focus a pressed button, so a press would move focus out
+      // of the menu and close it before the click; keep focus where it is.
+      menu.addEventListener("mousedown", (event) => event.preventDefault());
 
       if (this.onRename) {
         menu.appendChild(
@@ -620,6 +623,9 @@ export class SheetTabs {
     choices.setAttribute("role", "group");
     choices.setAttribute("aria-label", "Hidden sheets");
     choices.hidden = true;
+    // WebKit does not focus a pressed button, so a press would move focus out
+    // of the menu and close it before the click; keep focus where it is.
+    choices.addEventListener("mousedown", (event) => event.preventDefault());
     const close = (restoreFocus: boolean): void => {
       if (typeof choices.hidePopover === "function") {
         try {
