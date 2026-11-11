@@ -1,9 +1,10 @@
 import { type Component, createComponent, type JSX, sharedConfig } from "solid-js";
 
 import type { ShowcaseIslandName } from "../showcases/islands.js";
+import type { TestFixtureIslandName } from "../test-fixtures/islands.js";
 
 /** Every island a page can hold; islands/client.tsx has one loader per name. */
-export type IslandName = CoreIslandName | ShowcaseIslandName;
+export type IslandName = CoreIslandName | ShowcaseIslandName | TestFixtureIslandName;
 
 /** The docs shell's, the content pipeline's and the landing's islands. */
 export type CoreIslandName =

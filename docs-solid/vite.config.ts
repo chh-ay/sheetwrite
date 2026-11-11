@@ -71,6 +71,8 @@ export const REACT_WORKBENCH_FILES = [
   "showcases/ui/DemoSelect.tsx",
   "components/Icon.tsx",
   "lib/use-action.tsx",
+  // The React fixture of /test/framework-lifecycle/react/ (test builds only).
+  "test-fixtures/framework-lifecycle/ReactFixture.tsx",
 ].map((file) => `${DOCS_SOURCE}${file}`);
 
 /** The compilers of the React and Svelte workbenches; both configs use them. */
@@ -228,6 +230,11 @@ export default defineConfig({
         // Static hosts serve /404.html for every URL without a page; the
         // deployment fallback supplies the 404 status for unknown URLs.
         { path: "/404/", prerender: { enabled: true, outputPath: "/404.html" } },
+        // The framework lifecycle fixture is one dynamic route; the test build
+        // prerenders a page per framework (the filter below drops them otherwise).
+        ...["react", "vue", "svelte"].map((framework) => ({
+          path: `/test/framework-lifecycle/${framework}/`,
+        })),
       ],
       prerender: {
         enabled: true,

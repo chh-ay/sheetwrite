@@ -17,6 +17,7 @@ import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
 
 import { installDocsShell } from "../lib/shell.js";
 import { SHOWCASE_ISLANDS, type ShowcaseIsland } from "../showcases/islands.js";
+import { TEST_FIXTURE_ISLANDS } from "../test-fixtures/islands.js";
 import type { CoreIslandName, IslandName } from "./Island.js";
 import type { StaticRunnableCodeProps, StaticTabsProps } from "./StaticMarkup.js";
 
@@ -87,6 +88,12 @@ const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
   ...(Object.fromEntries(
     Object.entries<ShowcaseIsland>(SHOWCASE_ISLANDS).map(([name, island]) => [name, island.load]),
   ) as Record<keyof typeof SHOWCASE_ISLANDS, () => Promise<IslandRender>>),
+  ...(Object.fromEntries(
+    Object.entries<ShowcaseIsland>(TEST_FIXTURE_ISLANDS).map(([name, island]) => [
+      name,
+      island.load,
+    ]),
+  ) as Record<keyof typeof TEST_FIXTURE_ISLANDS, () => Promise<IslandRender>>),
 };
 
 function isIslandName(name: string | undefined): name is IslandName {

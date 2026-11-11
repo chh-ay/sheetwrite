@@ -35,7 +35,13 @@ import { Route as ShowcasesRecalculationRouteImport } from './routes/showcases.r
 import { Route as ShowcasesSortRouteImport } from './routes/showcases.sort'
 import { Route as ShowcasesSpreadsheetRouteImport } from './routes/showcases.spreadsheet'
 import { Route as ShowcasesVersionHistoryRouteImport } from './routes/showcases.version-history'
+import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
+import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
+import { Route as TestGridMemoryRouteImport } from './routes/test.grid-memory'
 import { Route as TestIslandsRouteImport } from './routes/test.islands'
+import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
+import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
+import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/test.framework-lifecycle.$framework'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -168,11 +174,42 @@ const ShowcasesVersionHistoryRoute = ShowcasesVersionHistoryRouteImport.update({
   path: '/showcases/version-history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestCollaborationRoute = TestCollaborationRouteImport.update({
+  id: '/test/collaboration',
+  path: '/test/collaboration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestFormulasEngineRoute = TestFormulasEngineRouteImport.update({
+  id: '/test/formulas-engine',
+  path: '/test/formulas-engine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestGridMemoryRoute = TestGridMemoryRouteImport.update({
+  id: '/test/grid-memory',
+  path: '/test/grid-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestIslandsRoute = TestIslandsRouteImport.update({
   id: '/test/islands',
   path: '/test/islands',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestPrefetchRoute = TestPrefetchRouteImport.update({
+  id: '/test/prefetch',
+  path: '/test/prefetch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestXlsxRoute = TestXlsxRouteImport.update({
+  id: '/test/xlsx',
+  path: '/test/xlsx',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestFrameworkLifecycleFrameworkRoute =
+  TestFrameworkLifecycleFrameworkRouteImport.update({
+    id: '/test/framework-lifecycle/$framework',
+    path: '/test/framework-lifecycle/$framework',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -199,9 +236,15 @@ export interface FileRoutesByFullPath {
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/showcases/version-history': typeof ShowcasesVersionHistoryRoute
+  '/test/collaboration': typeof TestCollaborationRoute
+  '/test/formulas-engine': typeof TestFormulasEngineRoute
+  '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/islands': typeof TestIslandsRoute
+  '/test/prefetch': typeof TestPrefetchRoute
+  '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
+  '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -228,9 +271,15 @@ export interface FileRoutesByTo {
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/showcases/version-history': typeof ShowcasesVersionHistoryRoute
+  '/test/collaboration': typeof TestCollaborationRoute
+  '/test/formulas-engine': typeof TestFormulasEngineRoute
+  '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/islands': typeof TestIslandsRoute
+  '/test/prefetch': typeof TestPrefetchRoute
+  '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
+  '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -258,9 +307,15 @@ export interface FileRoutesById {
   '/showcases/sort': typeof ShowcasesSortRoute
   '/showcases/spreadsheet': typeof ShowcasesSpreadsheetRoute
   '/showcases/version-history': typeof ShowcasesVersionHistoryRoute
+  '/test/collaboration': typeof TestCollaborationRoute
+  '/test/formulas-engine': typeof TestFormulasEngineRoute
+  '/test/grid-memory': typeof TestGridMemoryRoute
   '/test/islands': typeof TestIslandsRoute
+  '/test/prefetch': typeof TestPrefetchRoute
+  '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
+  '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -289,9 +344,15 @@ export interface FileRouteTypes {
     | '/showcases/sort'
     | '/showcases/spreadsheet'
     | '/showcases/version-history'
+    | '/test/collaboration'
+    | '/test/formulas-engine'
+    | '/test/grid-memory'
     | '/test/islands'
+    | '/test/prefetch'
+    | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
+    | '/test/framework-lifecycle/$framework'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -318,9 +379,15 @@ export interface FileRouteTypes {
     | '/showcases/sort'
     | '/showcases/spreadsheet'
     | '/showcases/version-history'
+    | '/test/collaboration'
+    | '/test/formulas-engine'
+    | '/test/grid-memory'
     | '/test/islands'
+    | '/test/prefetch'
+    | '/test/xlsx'
     | '/docs'
     | '/showcases'
+    | '/test/framework-lifecycle/$framework'
   id:
     | '__root__'
     | '/'
@@ -347,9 +414,15 @@ export interface FileRouteTypes {
     | '/showcases/sort'
     | '/showcases/spreadsheet'
     | '/showcases/version-history'
+    | '/test/collaboration'
+    | '/test/formulas-engine'
+    | '/test/grid-memory'
     | '/test/islands'
+    | '/test/prefetch'
+    | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
+    | '/test/framework-lifecycle/$framework'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -377,9 +450,15 @@ export interface RootRouteChildren {
   ShowcasesSortRoute: typeof ShowcasesSortRoute
   ShowcasesSpreadsheetRoute: typeof ShowcasesSpreadsheetRoute
   ShowcasesVersionHistoryRoute: typeof ShowcasesVersionHistoryRoute
+  TestCollaborationRoute: typeof TestCollaborationRoute
+  TestFormulasEngineRoute: typeof TestFormulasEngineRoute
+  TestGridMemoryRoute: typeof TestGridMemoryRoute
   TestIslandsRoute: typeof TestIslandsRoute
+  TestPrefetchRoute: typeof TestPrefetchRoute
+  TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
+  TestFrameworkLifecycleFrameworkRoute: typeof TestFrameworkLifecycleFrameworkRoute
 }
 
 declare module '@tanstack/solid-router' {
@@ -566,11 +645,53 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ShowcasesVersionHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test/collaboration': {
+      id: '/test/collaboration'
+      path: '/test/collaboration'
+      fullPath: '/test/collaboration'
+      preLoaderRoute: typeof TestCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/formulas-engine': {
+      id: '/test/formulas-engine'
+      path: '/test/formulas-engine'
+      fullPath: '/test/formulas-engine'
+      preLoaderRoute: typeof TestFormulasEngineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/grid-memory': {
+      id: '/test/grid-memory'
+      path: '/test/grid-memory'
+      fullPath: '/test/grid-memory'
+      preLoaderRoute: typeof TestGridMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/test/islands': {
       id: '/test/islands'
       path: '/test/islands'
       fullPath: '/test/islands'
       preLoaderRoute: typeof TestIslandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/prefetch': {
+      id: '/test/prefetch'
+      path: '/test/prefetch'
+      fullPath: '/test/prefetch'
+      preLoaderRoute: typeof TestPrefetchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/xlsx': {
+      id: '/test/xlsx'
+      path: '/test/xlsx'
+      fullPath: '/test/xlsx'
+      preLoaderRoute: typeof TestXlsxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/framework-lifecycle/$framework': {
+      id: '/test/framework-lifecycle/$framework'
+      path: '/test/framework-lifecycle/$framework'
+      fullPath: '/test/framework-lifecycle/$framework'
+      preLoaderRoute: typeof TestFrameworkLifecycleFrameworkRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -601,9 +722,15 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesSortRoute: ShowcasesSortRoute,
   ShowcasesSpreadsheetRoute: ShowcasesSpreadsheetRoute,
   ShowcasesVersionHistoryRoute: ShowcasesVersionHistoryRoute,
+  TestCollaborationRoute: TestCollaborationRoute,
+  TestFormulasEngineRoute: TestFormulasEngineRoute,
+  TestGridMemoryRoute: TestGridMemoryRoute,
   TestIslandsRoute: TestIslandsRoute,
+  TestPrefetchRoute: TestPrefetchRoute,
+  TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,
+  TestFrameworkLifecycleFrameworkRoute: TestFrameworkLifecycleFrameworkRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
