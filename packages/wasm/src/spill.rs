@@ -122,7 +122,7 @@ impl OwnedRun {
         self.anchor != Self::VACANT
     }
 
-    fn rows(self) -> usize {
+    const fn rows(self) -> usize {
         (self.row_end - self.row_start) as usize + 1
     }
 }
@@ -165,7 +165,7 @@ impl SpillState {
         self.ranges.is_empty() && self.owned_cells == 0
     }
 
-    pub(crate) fn owner_count(&self) -> usize {
+    pub(crate) const fn owner_count(&self) -> usize {
         self.owned_cells
     }
 
@@ -823,6 +823,20 @@ mod tests {
 
     const NONE: (u32, u32) = (u32::MAX, u32::MAX);
 
+    /// Each of the stacked spills owns exactly its first `height` rows.
+    fn assert_stacked_heights(store: &CellStore, sheet: usize, height: u32) {
+        for anchor_row in [0u32, 5, 10, 15] {
+            for row in anchor_row..anchor_row + 4 {
+                let expected = if row < anchor_row + height {
+                    (anchor_row, 0)
+                } else {
+                    NONE
+                };
+                assert_eq!(anchor(store, sheet, row as usize, 0), expected);
+            }
+        }
+    }
+
     /// Spills stacked in one column own disjoint runs. One that shrinks and
     /// grows back takes its vacated run again, and its neighbours keep theirs;
     /// one that grows into a neighbour is obstructed and owns nothing.
@@ -840,27 +854,12 @@ mod tests {
             store.set_formula(sheet, anchor_row, 0, "=TAKE($E$1:$E$20,$C$1)", 0);
         }
         store.recompute(sheet);
-        for anchor_row in [0u32, 5, 10, 15] {
-            for row in anchor_row..anchor_row + 3 {
-                assert_eq!(anchor(&store, sheet, row as usize, 0), (anchor_row, 0));
-            }
-            assert_eq!(anchor(&store, sheet, anchor_row as usize + 3, 0), NONE);
-        }
+        assert_stacked_heights(&store, sheet, 3);
 
-        for scale in [2.0, 3.0, 2.0, 3.0] {
-            store.set_number(sheet, 0, 2, scale, 0);
+        for height in [2, 3, 2, 3] {
+            store.set_number(sheet, 0, 2, f64::from(height), 0);
             store.recompute(sheet);
-            let height = scale as u32;
-            for anchor_row in [0u32, 5, 10, 15] {
-                for row in anchor_row..anchor_row + 4 {
-                    let expected = if row < anchor_row + height {
-                        (anchor_row, 0)
-                    } else {
-                        NONE
-                    };
-                    assert_eq!(anchor(&store, sheet, row as usize, 0), expected);
-                }
-            }
+            assert_stacked_heights(&store, sheet, height);
         }
 
         store.set_number(sheet, 0, 2, 7.0, 0);
