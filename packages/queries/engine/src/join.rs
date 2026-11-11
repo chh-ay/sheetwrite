@@ -3,7 +3,7 @@
 use crate::budget::OutputBudget;
 use crate::buffers::{at, at_mut, flat_index, row_index};
 use crate::column::{validate_names, Batch, Column, Value};
-use crate::keys::{compare_keys, sorted_rows};
+use crate::keys::{compare_keys, sorted_rows, KeyColumns};
 use crate::plan::{Diagnostic, JoinKind, Limits};
 use std::{cmp::Ordering, ops::Range};
 
@@ -67,10 +67,14 @@ impl<'a> Merge<'a> {
                 Ordering::Less
             } else {
                 compare_keys(
-                    self.left,
-                    self.right,
-                    &self.left_keys,
-                    &self.right_keys,
+                    KeyColumns {
+                        batch: self.left,
+                        keys: &self.left_keys,
+                    },
+                    KeyColumns {
+                        batch: self.right,
+                        keys: &self.right_keys,
+                    },
                     *at(&self.left_rows, left)?,
                     *at(&self.right_rows, right)?,
                 )?
@@ -181,10 +185,11 @@ impl<'a> JoinOutput<'a> {
 
 fn run_end(batch: &Batch, keys: &[u32], rows: &[u32], start: usize) -> Result<usize, Diagnostic> {
     let first = *at(rows, start)?;
+    let side = KeyColumns { batch, keys };
     let mut end = start + 1;
 
     while end < rows.len() {
-        if compare_keys(batch, batch, keys, keys, first, *at(rows, end)?)? != Ordering::Equal {
+        if compare_keys(side, side, first, *at(rows, end)?)? != Ordering::Equal {
             break;
         }
 
@@ -205,7 +210,9 @@ fn run_count(
             JoinKind::LeftSemi => Ok(left),
             JoinKind::RightSemi => Ok(right),
             JoinKind::LeftAnti | JoinKind::RightAnti => Ok(0),
-            _ => left.checked_mul(right).ok_or_else(Diagnostic::limit),
+            JoinKind::Inner | JoinKind::Left | JoinKind::Right | JoinKind::Full => {
+                left.checked_mul(right).ok_or_else(Diagnostic::limit)
+            }
         };
     }
 
@@ -213,7 +220,7 @@ fn run_count(
         JoinKind::Left | JoinKind::LeftAnti => left,
         JoinKind::Right | JoinKind::RightAnti => right,
         JoinKind::Full => left + right,
-        _ => 0,
+        JoinKind::Inner | JoinKind::LeftSemi | JoinKind::RightSemi => 0,
     })
 }
 
