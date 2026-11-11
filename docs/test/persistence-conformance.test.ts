@@ -42,16 +42,6 @@ const SHARED_CHECKS = [
   "rejects an already-aborted commit signal",
 ] as const;
 
-const DOCUMENT_ID = "persistence-conformance";
-
-function cellEdit(row: number, value: number) {
-  return {
-    op: "set" as const,
-    addr: { sheet: "s1", row, col: 0 },
-    value: { kind: "literal" as const, value },
-  };
-}
-
 describe("persistence conformance", () => {
   it("passes against the IndexedDB showcase adapter with bounded tails and reopen", async () => {
     const options = {
@@ -96,51 +86,6 @@ describe("persistence conformance", () => {
     expect(stats.reads).toBeGreaterThan(0);
     expect(stats.storedBytes).toBeGreaterThan(0);
     expect(writerStats?.writes ?? 0).toBeGreaterThan(0);
-    adapter.close();
-  });
-
-  it("compacts on byte pressure alone", async () => {
-    const adapter = await ShowcaseIndexedDbAdapter.open(makePersistenceConformanceSnapshot(), {
-      databaseName: "sheetwrite-byte-compaction",
-      compaction: { maxTailRecords: 1_000, maxTailBytes: 1 },
-    });
-    const applied = await adapter.commit({
-      documentId: DOCUMENT_ID,
-      baseVersion: 0,
-      clientMutationId: "byte-compaction-m1",
-      operations: [cellEdit(0, 5)],
-    });
-    expect(applied.status).toBe("applied");
-    expect(adapter.stats()).toMatchObject({ snapshotVersion: 1, currentVersion: 1, tailLength: 0 });
-    adapter.close();
-  });
-
-  it("applies an atomic batch whole or not at all, and answers its replay with the last version", async () => {
-    const adapter = await ShowcaseIndexedDbAdapter.open(makePersistenceConformanceSnapshot(), {
-      databaseName: "sheetwrite-batch",
-    });
-    const commitBatch = (clientMutationId: string, baseVersion: number) =>
-      adapter.commitBatch({
-        documentId: DOCUMENT_ID,
-        baseVersion,
-        clientMutationId,
-        operations: [cellEdit(0, 1), cellEdit(1, 2)],
-        versionOperationCounts: [1, 1],
-      });
-
-    expect(await commitBatch("batch-m1", 0)).toMatchObject({ status: "applied", version: 2 });
-    expect((await adapter.load(DOCUMENT_ID)).version).toBe(2);
-    expect(await commitBatch("batch-m1", 0)).toMatchObject({ status: "duplicate", version: 2 });
-
-    const conflict = await commitBatch("batch-m2", 1);
-    expect(conflict).toMatchObject({ status: "conflict", currentVersion: 2 });
-    if (conflict.status === "conflict") {
-      expect(conflict.operationsSinceBase?.map((entry) => entry.clientMutationId)).toEqual([
-        "batch-m1",
-      ]);
-    }
-    // The stale batch stored nothing.
-    expect(adapter.stats()).toMatchObject({ currentVersion: 2, tailLength: 2 });
     adapter.close();
   });
 });

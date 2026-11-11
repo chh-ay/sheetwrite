@@ -1,12 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { initializeCodeEnhancements } from "../src/lib/code-enhancements.js";
+import { installCodePopovers } from "../src/lib/code-popovers.js";
 import {
   installRecordingResizeObserver,
   RecordingResizeObserver,
 } from "./resize-observer-recorder.js";
 
 const PANEL_ID = "popover-undo";
+/** Longer than the popover close delay, so a scheduled close has run. */
+const AFTER_CLOSE_DELAY_MS = 150;
 
 /** Mutation observers report in a microtask after the DOM change. */
 async function flushMutations(): Promise<void> {
@@ -32,12 +35,25 @@ function mountCodeBlock(): { page: HTMLElement; trigger: HTMLElement } {
   page.innerHTML = `
     <div class="expressive-code"><pre><code><span tabindex="0" data-sw-code-popover-trigger="${PANEL_ID}" aria-describedby="${PANEL_ID}">undo</span>();</code></pre></div>
     <template class="sw-code-popover-store">
-      <span id="${PANEL_ID}" role="tooltip" data-sw-code-popover-panel="">Undoes the last change.</span>
+      <span id="${PANEL_ID}" role="tooltip" data-sw-code-popover-panel=""><a href="/docs/api/core/grid/">Undoes the last change.</a></span>
     </template>`;
   document.body.append(page);
   const trigger = page.querySelector<HTMLElement>("[data-sw-code-popover-trigger]");
   if (trigger === null) throw new Error("The code block has no trigger");
   return { page, trigger };
+}
+
+/** True when the panel is in the document and shown. */
+function isOpen(): boolean {
+  return document.getElementById(PANEL_ID)?.hasAttribute("data-open") ?? false;
+}
+
+function pointer(type: "pointerover" | "pointerout", target: Element, relatedTarget?: Element) {
+  target.dispatchEvent(new PointerEvent(type, { bubbles: true, relatedTarget }));
+}
+
+function pressKey(target: Element, key: string) {
+  target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 }
 
 let uninstall: () => void = () => {};
@@ -50,6 +66,7 @@ afterEach(() => {
   uninstall();
   uninstall = () => {};
   document.body.replaceChildren();
+  vi.useRealTimers();
 });
 
 describe("code enhancements", () => {
@@ -65,23 +82,63 @@ describe("code enhancements", () => {
     expect(trigger.getAttribute("data-popover-open")).toBe("true");
   });
 
-  it("stops observing code blocks that a route removes", async () => {
+  it("stops observing a code block that a route removes, and removes its open panel", async () => {
     const restoreResizeObserver = installRecordingResizeObserver();
     try {
       uninstall = initializeCodeEnhancements();
-      const { page } = mountCodeBlock();
+      const { page, trigger } = mountCodeBlock();
       await flushMutations();
       expect(RecordingResizeObserver.observed.size).toBe(1);
+      trigger.focus();
 
       page.remove();
       await flushMutations();
 
       expect(RecordingResizeObserver.observed.size).toBe(0);
+      expect(document.getElementById(PANEL_ID)).toBeNull();
     } finally {
       uninstall();
       uninstall = () => {};
       restoreResizeObserver();
     }
+  });
+
+  it("closes a hovered panel after the pointer leaves the trigger, not on the way into the panel", () => {
+    vi.useFakeTimers();
+    const { trigger, page } = mountCodeBlock();
+    uninstall = installCodePopovers();
+    pointer("pointerover", trigger);
+    const panel = document.getElementById(PANEL_ID);
+    if (panel === null) throw new Error("The panel did not open");
+
+    pointer("pointerout", trigger, panel);
+    pointer("pointerover", panel, trigger);
+    vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
+    expect(isOpen()).toBe(true);
+
+    pointer("pointerout", panel, page);
+    pointer("pointerover", trigger, page);
+    pointer("pointerout", trigger, page);
+    vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
+    expect(isOpen()).toBe(false);
+    expect(trigger.hasAttribute("data-popover-open")).toBe(false);
+  });
+
+  it("closes a panel on Escape from the trigger or from inside it, giving focus back", () => {
+    const { trigger } = mountCodeBlock();
+    uninstall = installCodePopovers();
+    trigger.focus();
+    pressKey(trigger, "Escape");
+    expect(isOpen()).toBe(false);
+
+    trigger.blur();
+    trigger.focus();
+    const link = document.getElementById(PANEL_ID)?.querySelector("a");
+    if (!link) throw new Error("No open panel holds a link");
+    link.focus();
+    pressKey(link, "Escape");
+    expect(isOpen()).toBe(false);
+    expect(document.activeElement === trigger).toBe(true);
   });
 
   it("moves the block's one Tab stop with the arrow keys", () => {
@@ -98,11 +155,11 @@ describe("code enhancements", () => {
     uninstall = initializeCodeEnhancements();
     first.focus();
 
-    first.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    pressKey(first, "ArrowRight");
     expect(document.activeElement === second).toBe(true);
     expect([first.tabIndex, second.tabIndex, third.tabIndex]).toEqual([-1, 0, -1]);
 
-    second.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+    pressKey(second, "End");
     expect(document.activeElement === third).toBe(true);
     expect([first.tabIndex, second.tabIndex, third.tabIndex]).toEqual([-1, -1, 0]);
   });

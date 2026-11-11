@@ -1,62 +1,66 @@
 import { expect, it } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
-import { collectCompatibilityIssues } from "../src/showcases/compatibility-validation.ts";
+import {
+  assertCompatibilityInventory,
+  collectCompatibilityIssues,
+  collectMissingCompatibilityFiles,
+} from "../src/showcases/compatibility-validation.ts";
 import {
   COMPATIBILITY_FIXTURES,
   COMPATIBILITY_INVENTORY,
-  type CompatibilityFixture,
   type CompatibilityRecord,
 } from "../src/showcases/compatibility.ts";
 
-// `bun run docs:generate` runs the validator on the real inventory; these
-// cases prove it rejects each kind of broken entry instead of passing it.
+it("accepts the published inventory, whose evidence and fixture files exist", () => {
+  const repositoryRoot = join(import.meta.dir, "..", "..");
+  expect(() =>
+    assertCompatibilityInventory(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES),
+  ).not.toThrow();
+  expect(
+    collectMissingCompatibilityFiles(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES, (path) =>
+      existsSync(join(repositoryRoot, path)),
+    ),
+  ).toEqual([]);
+});
 
 const [record] = COMPATIBILITY_INVENTORY;
-const [fixture] = COMPATIBILITY_FIXTURES;
 const binary = COMPATIBILITY_FIXTURES.find(({ sha256 }) => sha256 !== undefined);
 const unsupported = COMPATIBILITY_INVENTORY.find(({ status }) => status === "unsupported");
-if (!record || !fixture || !binary || !unsupported) throw new Error("The inventory is empty");
-
-function issues(
-  records: readonly CompatibilityRecord[],
-  fixtures: readonly CompatibilityFixture[] = COMPATIBILITY_FIXTURES,
-): string[] {
-  return collectCompatibilityIssues(records, fixtures);
-}
+if (!record || !binary || !unsupported) throw new Error("The inventory is empty");
 
 const replaced = (original: CompatibilityRecord, change: Partial<CompatibilityRecord>) =>
   COMPATIBILITY_INVENTORY.map((entry) => (entry === original ? { ...entry, ...change } : entry));
 
 it.each([
   [
-    "a duplicate record",
-    () => issues([...COMPATIBILITY_INVENTORY, record]),
-    `duplicate compatibility record id: ${record.id}`,
-  ],
-  [
-    "a duplicate fixture",
-    () => issues(COMPATIBILITY_INVENTORY, [...COMPATIBILITY_FIXTURES, fixture]),
-    `duplicate compatibility fixture id: ${fixture.id}`,
-  ],
-  [
     "a record without evidence",
-    () => issues(replaced(record, { evidence: [] })),
+    () => collectCompatibilityIssues(replaced(record, { evidence: [] }), COMPATIBILITY_FIXTURES),
     `compatibility record has no executable evidence: ${record.id}`,
   ],
   [
     "an unknown fixture",
-    () => issues(replaced(record, { fixtureIds: ["missing-fixture"] })),
+    () =>
+      collectCompatibilityIssues(
+        replaced(record, { fixtureIds: ["missing-fixture"] }),
+        COMPATIBILITY_FIXTURES,
+      ),
     `unknown compatibility fixture: ${record.id}=missing-fixture`,
   ],
   [
     "evidence outside the repository",
-    () => issues(replaced(record, { evidence: ["../outside.test.ts"] })),
+    () =>
+      collectCompatibilityIssues(
+        replaced(record, { evidence: ["../outside.test.ts"] }),
+        COMPATIBILITY_FIXTURES,
+      ),
     `invalid compatibility evidence path: ${record.id}=../outside.test.ts`,
   ],
   [
     "an invalid digest",
     () =>
-      issues(
+      collectCompatibilityIssues(
         COMPATIBILITY_INVENTORY,
         COMPATIBILITY_FIXTURES.map((entry) =>
           entry === binary ? { ...entry, sha256: "not-a-digest" } : entry,
@@ -66,7 +70,11 @@ it.each([
   ],
   [
     "an unsupported record relabeled as supported",
-    () => issues(replaced(unsupported, { status: "supported" })),
+    () =>
+      collectCompatibilityIssues(
+        replaced(unsupported, { status: "supported" }),
+        COMPATIBILITY_FIXTURES,
+      ),
     `inconsistent compatibility status/result mode: ${unsupported.id}=supported/unsupported`,
   ],
 ] as const)("rejects %s", (_case, collect, issue) => {

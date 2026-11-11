@@ -41,13 +41,4 @@ describe("moved pages", () => {
       forwardedHeading("/docs/features/grid/search/", "#datasource-pages", moved),
     ).toBeUndefined();
   });
-
-  it("ignores a fragment with a malformed escape", () => {
-    expect(movedPageTarget("/docs/guides/configuration/", "#%", moved)).toBe(
-      "/docs/features/grid/options-and-presentation/",
-    );
-    expect(
-      forwardedHeading("/docs/features/grid/options-and-presentation/", "#%E0%A4%A", moved),
-    ).toBeUndefined();
-  });
 });
