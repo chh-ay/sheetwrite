@@ -4,14 +4,16 @@ use std::time::Instant;
 
 const N: usize = 100_000;
 
-fn grouping(store: &mut CellStore, formula: &str) -> usize {
-    let sheet = store.add_sheet(12, N);
-    let region: Vec<String> = (0..N).map(|r| format!("R{}", r % 10)).collect();
-    let product: Vec<String> = (0..N).map(|r| format!("P{:02}", r % 100)).collect();
-    let quarter: Vec<String> = (0..N).map(|r| format!("Q{}", (r / 7) % 4)).collect();
+fn grouping(store: &mut CellStore, formula: &str, n: usize) -> usize {
+    const N: usize = 0;
+    let _ = N;
+    let sheet = store.add_sheet(12, n);
+    let region: Vec<String> = (0..n).map(|r| format!("R{}", r % 10)).collect();
+    let product: Vec<String> = (0..n).map(|r| format!("P{:02}", r % 100)).collect();
+    let quarter: Vec<String> = (0..n).map(|r| format!("Q{}", (r / 7) % 4)).collect();
     store.set_column_strings(sheet, 0, 0, region, 0);
     store.set_column_strings(sheet, 1, 0, product, 0);
-    store.set_column_numbers(sheet, 2, 0, &vec![1.0; N], 0);
+    store.set_column_numbers(sheet, 2, 0, &vec![1.0; n], 0);
     store.set_column_strings(sheet, 3, 0, quarter, 0);
     store.set_formula(sheet, 0, 5, formula, 0);
     store.recompute(sheet);
@@ -48,12 +50,12 @@ fn main() {
     let mut store = CellStore::new();
     let mut edit: Box<dyn FnMut(&mut CellStore, usize)> = match row {
         "groupby" => {
-            let sheet = grouping(&mut store, &format!("=GROUPBY(A1:B{N},C1:C{N},SUM,0,2)"));
+            let sheet = grouping(&mut store, &format!("=GROUPBY(A1:B{N},C1:C{N},SUM,0,2)"), N);
             println!("check {}", store.get_cell(sheet, 110, 7).num());
             Box::new(move |s, i| { s.set_number(sheet, 0, 2, 1.0 + (i % 2) as f64, 0); s.recompute(sheet); })
         }
         "pivotby" => {
-            let sheet = grouping(&mut store, &format!("=PIVOTBY(A1:B{N},D1:D{N},C1:C{N},PERCENTOF,0,2,,1,,,2)"));
+            let sheet = grouping(&mut store, "=PIVOTBY(A1:B50000,D1:D50000,C1:C50000,PERCENTOF,0,2,,1,,,2)", 50_000);
             println!("check {}", store.get_cell(sheet, 111, 7).num());
             Box::new(move |s, i| { s.set_number(sheet, 0, 2, 1.0 + (i % 2) as f64, 0); s.recompute(sheet); })
         }
