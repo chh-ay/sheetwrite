@@ -59,6 +59,8 @@
   grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   padding-inline: var(--sw-docs-outside);
+  /* The top bar's edge reaches past the frame (below); nothing scrolls sideways. */
+  overflow-x: clip;
   /* The sidebar is sticky and one screen tall; its surface (out to the
      screen's left edge) and hairline run the full page height from here. */
   background: linear-gradient(
@@ -238,6 +240,19 @@ details[open] > summary > .sw-disclosure-icon {
   border-bottom: var(--sw-border-width) solid var(--sw-border);
   background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
   backdrop-filter: blur(12px);
+}
+/* Past the frame, the bar's surface and bottom edge run on to the screen's
+   right edge, as the page's surface does below it. */
+.sw-docs-bar::after {
+  position: absolute;
+  top: 0;
+  bottom: calc(-1 * var(--sw-border-width));
+  left: 100%;
+  width: 50vw;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: inherit;
+  backdrop-filter: inherit;
+  content: "";
 }
 .sw-docs-bar__brand {
   display: none;
