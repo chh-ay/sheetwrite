@@ -175,12 +175,6 @@ function WindowNavigator() {
               </code>
             ),
           },
-          {
-            label: "Resident tiles",
-            get value() {
-              return `${residentTiles()} live · ${recentEvictions()} evicted`;
-            },
-          },
         ]}
       />
     </div>
@@ -231,7 +225,7 @@ function DrawingControls() {
       </details>
       <p class="sw-showcase__control-description" id="scale-stress-description">
         A tight {STRESS_CEILING_MIB} MiB ceiling remounts the Grid so clean tiles evict early;
-        sparse edits survive. Now {evictionStress() ? STRESS_CEILING_MIB : DEFAULT_CEILING_MIB} MiB.
+        sparse edits survive.
       </p>
       <Button
         aria-describedby="scale-stress-description"
@@ -243,6 +237,22 @@ function DrawingControls() {
         <Icon name="gauge" />
         {evictionStress() ? "Tight ceiling active" : "Use the tight ceiling"}
       </Button>
+      <ShowcaseReadout
+        items={[
+          {
+            label: "Clean-tile ceiling",
+            get value() {
+              return `${evictionStress() ? STRESS_CEILING_MIB : DEFAULT_CEILING_MIB} MiB`;
+            },
+          },
+          {
+            label: "Resident tiles",
+            get value() {
+              return `${residentTiles()} live · ${recentEvictions()} evicted`;
+            },
+          },
+        ]}
+      />
     </>
   );
 }
@@ -332,7 +342,7 @@ function JumpControls() {
   );
 }
 
-/** The side panel: flights and exact jumps. */
+/** The band under the stage: flights, what a flight measures, and exact jumps. */
 function WorkbenchControls(props: Readonly<{ flight: ScaleFlight }>) {
   return (
     <>
@@ -341,6 +351,11 @@ function WorkbenchControls(props: Readonly<{ flight: ScaleFlight }>) {
         title="Fly the Grid"
       >
         <FlightControls flight={props.flight} ready={ready()} />
+      </ShowcaseControlGroup>
+      <ShowcaseControlGroup
+        description="Read from the Grid while it moves."
+        title="Flight readings"
+      >
         <FlightReadout
           flight={props.flight}
           origin={cellA1(firstRow(), firstColumn())}
