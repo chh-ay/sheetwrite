@@ -44,6 +44,10 @@
 /* Layout: a full-height sidebar beside one column that holds the top bar and
    the page. Below 64rem the sidebar moves into the menu drawer. */
 .sw-docs {
+  /* The reading column's width (its tracks, outline included), whose edges
+     the top bar's content shares. */
+  --sw-docs-frame-max: var(--sw-content-width);
+
   display: grid;
   grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
@@ -213,7 +217,7 @@ details[open] > summary > .sw-disclosure-icon {
   justify-content: space-between;
   gap: var(--sw-space-6);
   min-height: var(--sw-header-height);
-  padding: 0 var(--sw-page-gutter);
+  padding: 0 max(var(--sw-page-gutter), (100% - var(--sw-docs-frame-max)) / 2);
   border-bottom: var(--sw-border-width) solid var(--sw-border);
   background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
   backdrop-filter: blur(12px);
@@ -671,6 +675,11 @@ html:has(.sw-nav-dialog[open]) {
 }
 
 @media (min-width: 88rem) {
+  .sw-docs:not(.sw-docs--api) {
+    --sw-docs-frame-max: calc(
+      var(--sw-content-width) + var(--sw-space-16) + var(--sw-docs-outline-width)
+    );
+  }
   .sw-docs:not(.sw-docs--api) .sw-document {
     grid-template-columns:
       min(100% - var(--sw-docs-outline-width) - var(--sw-space-16), var(--sw-content-width))
@@ -742,9 +751,10 @@ html:has(.sw-nav-dialog[open]) {
   }
 }
 /* The search control as its icon; its label stays as the accessible name.
-   Phones use it beside the brand; between the sidebar's breakpoint and a wide
-   screen it keeps the tabs their room, and GitHub leaves the bar. */
-@media (min-width: 64rem) and (max-width: 79.999rem), (max-width: 42rem) {
+   Phones use it beside the brand. Between the sidebar's breakpoint and the
+   outline's, the bar shares the narrow reading column's edges, so it keeps
+   the tabs their room and GitHub leaves the bar. */
+@media (min-width: 64rem) and (max-width: 87.999rem), (max-width: 42rem) {
   .sw-docs .sw-search-button {
     width: var(--sw-control-height);
     height: var(--sw-control-height);
@@ -791,11 +801,15 @@ html:has(.sw-nav-dialog[open]) {
 
 /* Site 404 and route error pages. This sheet loads on every page, including
    documentation pages, which skip the showcase stylesheet. */
+/* The message starts on the page frame's left edge, under the header's
+   brand; its lines keep a reading measure. */
 .sw-route-fallback {
   display: grid;
   gap: var(--sw-space-4);
-  max-width: 40rem;
   padding-block: var(--sw-space-16);
+}
+.sw-route-fallback > * {
+  max-width: 40rem;
 }
 .sw-route-fallback__actions {
   display: flex;

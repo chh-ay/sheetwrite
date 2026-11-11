@@ -181,7 +181,12 @@ export function Select(props: SelectProps) {
   });
 
   return (
-    <div class={["sw-select", props.class].filter(Boolean).join(" ")} ref={root}>
+    <div
+      class={["sw-select", props.class].filter(Boolean).join(" ")}
+      ref={(element) => {
+        root = element;
+      }}
+    >
       <span class="sw-select__label" id={`${props.id}-label`}>
         {props.label}
       </span>
@@ -204,13 +209,16 @@ export function Select(props: SelectProps) {
             if (!root?.contains(event.relatedTarget as Node | null)) close();
           }}
           onKeyDown={onKeyDown}
-          ref={combobox}
+          ref={(element) => {
+            combobox = element;
+          }}
           role="combobox"
           tabIndex={0}
         >
           <span class="sw-select__value">{props.options[selectedIndex()]?.label}</span>
           <Icon class="sw-select__icon" name="chevron-down" />
         </div>
+        {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- a select-only combobox keeps focus on the field; the list's active option is aria-activedescendant. */}
         <div
           aria-labelledby={`${props.id}-label`}
           class="sw-select__list"
@@ -221,11 +229,14 @@ export function Select(props: SelectProps) {
           // mouse press moves focus; cancelling the pointer press would also
           // cancel a touch's click.
           onMouseDown={(event) => event.preventDefault()}
-          ref={list}
+          ref={(element) => {
+            list = element;
+          }}
           role="listbox"
         >
           <For each={props.options}>
             {(option, index) => (
+              // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- options are chosen with keys on the focused field (Enter, Space); a click is the pointer path.
               <div
                 aria-selected={index() === selectedIndex() ? "true" : "false"}
                 class="sw-select__option"

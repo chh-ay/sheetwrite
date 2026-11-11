@@ -160,6 +160,7 @@ export function DocsSearch() {
         <span>Search docs</span>
         <kbd>{shortcutLabel()}</kbd>
       </button>
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- only a backdrop click closes the dialog; Escape is the keyboard path. */}
       <dialog
         aria-label="Search documentation"
         class="sw-search-dialog"
@@ -171,7 +172,9 @@ export function DocsSearch() {
         onKeyDown={(event) => {
           if (event.key === "Escape") event.currentTarget.close();
         }}
-        ref={dialog}
+        ref={(element) => {
+          dialog = element;
+        }}
       >
         <form method="dialog">
           <label>
@@ -181,7 +184,9 @@ export function DocsSearch() {
               autocomplete="off"
               onInput={(event) => setQuery(event.currentTarget.value)}
               placeholder="Search APIs, guides, and examples"
-              ref={input}
+              ref={(element) => {
+                input = element;
+              }}
               type="search"
               value={query()}
             />

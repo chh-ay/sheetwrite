@@ -24,7 +24,7 @@ function scriptRequests(page: Page): string[] {
   return scripts;
 }
 
-test("Try it runs the example, reruns an edit, reports an error at its line, and resets", async ({
+test("Try it runs the example, reruns an edit, reports an error at its line, and resets @portability", async ({
   page,
 }) => {
   const scripts = scriptRequests(page);

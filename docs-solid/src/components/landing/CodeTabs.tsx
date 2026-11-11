@@ -29,7 +29,7 @@ export function CodeTabs(props: CodeTabsProps) {
   const ids = CODE_TAB_FRAMEWORKS.map((framework) => framework.id);
   return (
     <div class="sw-code-tabs">
-      {/* The tabs inside take focus; the tab list itself does not. */}
+      {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Framework"
         class="sw-code-tabs__list"

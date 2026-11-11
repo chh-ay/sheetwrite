@@ -304,6 +304,12 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "percentile-covariance", size: range }),
     formulaWorkloadKey({ id: "let-reuse-edit", size: range }),
     formulaWorkloadKey({ id: "let-repeat", size: range }),
+    ...(smoke ? [1_000] : LET_MANY_SIZES).map((size) =>
+      formulaWorkloadKey({ id: "let-many", size }),
+    ),
+    ...SHAPE_ROW_IDS.flatMap((id) =>
+      (smoke ? [1_000] : SHAPE_ROW_SIZES).map((size) => formulaWorkloadKey({ id, size })),
+    ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
   );
@@ -330,6 +336,12 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "sumifs-3-criteria",
   "countif-100k",
   "let-repeat",
+  "let-many",
+  "round-many",
+  "concat-many",
+  "offset-many",
+  "indirect-many",
+  "let-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -426,6 +438,22 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return 3 * (size + 1);
     case "let-repeat":
       return `${LET_REPEAT_FACTOR * LOOKUP_RESULT_FACTOR * (size - 1)}:${size - 1}`;
+    case "let-many": {
+      const x = size * LET_MANY_EDITED_SCALE;
+      return x + (x + 1) + (x + 1) * x;
+    }
+    case "round-many":
+      return Number(((size + ROUND_MANY_FRACTION) * SHAPE_EDITED_SCALE).toFixed(2));
+    case "concat-many":
+      return `item${(size - 1) % CONCAT_MANY_LABELS} ${CONCAT_MANY_EDITED_SUFFIX}`;
+    case "offset-many":
+    case "indirect-many":
+      return size + SHAPE_EDITED_SCALE;
+    case "let-calls": {
+      const x = size * SHAPE_EDITED_SCALE + 1;
+      const y = Math.round((x / 3) * 100) / 100;
+      return x + y + y * x;
+    }
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -1784,6 +1812,184 @@ function letReuseFixture(count: number): TimedFixture {
   };
 }
 
+/** The `let-many` sizes: a normal sheet and a large one. */
+const LET_MANY_SIZES = [10_000, 100_000] as const;
+/** Every `let-many` formula reads this scale from `$C$1`, so one edit dirties all of them. */
+const LET_MANY_SCALE = 2;
+const LET_MANY_EDITED_SCALE = 3;
+
+/**
+ * Rows for formula shapes the other rows do not exercise: ROUND, text
+ * concatenation, OFFSET, INDIRECT and LETs that bind function calls, one
+ * formula per row. Each formula reads `$C$1`, so the timed edit recalculates
+ * all of them.
+ */
+const SHAPE_ROW_IDS = [
+  "round-many",
+  "concat-many",
+  "offset-many",
+  "indirect-many",
+  "let-calls",
+] as const;
+const SHAPE_ROW_SIZES = [10_000, 100_000] as const;
+const SHAPE_SCALE = 2;
+const SHAPE_EDITED_SCALE = 3;
+/** Column A's fractional part: a multiple of it never ends in a rounding tie at two places. */
+const ROUND_MANY_FRACTION = 0.1234;
+/** Column A cycles through this many text labels. */
+const CONCAT_MANY_LABELS = 97;
+const CONCAT_MANY_SUFFIX = "a";
+const CONCAT_MANY_EDITED_SUFFIX = "b";
+
+/** A sheet with one formula per row in column B; `$C$1` holds what the timed edit changes. */
+function shapeRowsFixture(
+  count: number,
+  fill: (store: CellStore, sheet: number, rows: number) => void,
+  formula: (row: number) => string,
+  source: string | number,
+  edited: string | number,
+  check: (store: CellStore, sheet: number) => number | string,
+): TimedFixture {
+  const store = new CellStore();
+  // OFFSET and INDIRECT read up to `SHAPE_EDITED_SCALE` rows below the last formula.
+  const rows = count + SHAPE_EDITED_SCALE;
+  const sheet = store.addSheet(3, rows);
+  fill(store, sheet, rows);
+  const setSource = (value: string | number) =>
+    typeof value === "string"
+      ? store.setString(sheet, 0, 2, value, 0)
+      : store.setNumber(sheet, 0, 2, value, 0);
+  setSource(source);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, formula(row), 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      setSource(edited);
+      store.recompute(sheet);
+    },
+    check: () => check(store, sheet),
+    dispose: () => store.free(),
+    restore: () => {
+      setSource(source);
+      store.recompute(sheet);
+    },
+  };
+}
+
+function numbersInA(fraction = 0): (store: CellStore, sheet: number, rows: number) => void {
+  return (store, sheet, rows) =>
+    store.setColumnNumbers(
+      sheet,
+      0,
+      0,
+      numericColumn(rows, (row) => row + 1 + fraction),
+      0,
+    );
+}
+
+function shapeRowFixture(id: (typeof SHAPE_ROW_IDS)[number], count: number): TimedFixture {
+  const last = (store: CellStore, sheet: number) => numberAt(store, sheet, count - 1, 1);
+  switch (id) {
+    case "round-many":
+      return shapeRowsFixture(
+        count,
+        numbersInA(ROUND_MANY_FRACTION),
+        (row) => `=ROUND(A${row + 1}*$C$1,2)`,
+        SHAPE_SCALE,
+        SHAPE_EDITED_SCALE,
+        last,
+      );
+    case "concat-many":
+      return shapeRowsFixture(
+        count,
+        (store, sheet, rows) => {
+          for (let row = 0; row < rows; row++) {
+            store.setString(sheet, row, 0, `item${row % CONCAT_MANY_LABELS}`, 0);
+          }
+        },
+        (row) => `=A${row + 1}&" "&$C$1`,
+        CONCAT_MANY_SUFFIX,
+        CONCAT_MANY_EDITED_SUFFIX,
+        (store, sheet) => textAt(store, sheet, count - 1, 1) ?? "",
+      );
+    case "offset-many":
+      return shapeRowsFixture(
+        count,
+        numbersInA(),
+        (row) => `=OFFSET(A${row + 1},$C$1,0)`,
+        SHAPE_SCALE,
+        SHAPE_EDITED_SCALE,
+        last,
+      );
+    case "indirect-many":
+      return shapeRowsFixture(
+        count,
+        numbersInA(),
+        () => `=INDIRECT("A"&(ROW()+$C$1))`,
+        SHAPE_SCALE,
+        SHAPE_EDITED_SCALE,
+        last,
+      );
+    case "let-calls":
+      return shapeRowsFixture(
+        count,
+        numbersInA(),
+        letCallsFormula,
+        SHAPE_SCALE,
+        SHAPE_EDITED_SCALE,
+        last,
+      );
+  }
+}
+
+/** `let-many` with function-call bindings: even rows one, odd rows three. */
+function letCallsFormula(row: number): string {
+  const source = `A${row + 1}*$C$1`;
+  return row % 2 === 0
+    ? `=LET(x,ROUND(${source},2),x+x+x)`
+    : `=LET(x,SUM(${source},1),y,ROUND(x/3,2),z,y*x,x+y+z)`;
+}
+
+/** Even rows bind one name, odd rows bind three that build on each other. */
+function letManyFormula(row: number): string {
+  const source = `A${row + 1}*$C$1`;
+  return row % 2 === 0 ? `=LET(x,${source},x+x+x)` : `=LET(x,${source},y,x+1,z,y*x,x+y+z)`;
+}
+
+/**
+ * A LET in every row, as modern workbooks write them. The timed edit changes
+ * the shared scale, so every LET recalculates.
+ */
+function letManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, LET_MANY_SCALE, 0);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, letManyFormula(row), 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, LET_MANY_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: LET_MANY_SCALE }),
+  };
+}
+
 /** The LET binding is used three times (`x+x+x`), so a re-evaluated binding costs that multiple. */
 const LET_REPEAT_FACTOR = 3;
 
@@ -1921,6 +2127,14 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("percentile-covariance", range, () => percentileCovarianceFixture(range));
   add("let-reuse-edit", range, () => letReuseFixture(range));
   add("let-repeat", range, () => letRepeatFixture(range));
+  for (const size of smoke ? [1_000] : LET_MANY_SIZES) {
+    add("let-many", size, () => letManyFixture(size));
+  }
+  for (const id of SHAPE_ROW_IDS) {
+    for (const size of smoke ? [1_000] : SHAPE_ROW_SIZES) {
+      add(id, size, () => shapeRowFixture(id, size));
+    }
+  }
   add("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000));
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
@@ -2567,6 +2781,8 @@ function validateFormulaEvidence(
       "percentile-covariance",
       "let-reuse-edit",
       "let-repeat",
+      "let-many",
+      ...SHAPE_ROW_IDS,
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
     ]) {

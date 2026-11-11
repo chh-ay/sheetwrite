@@ -339,6 +339,10 @@
   --sw-page-gutter: clamp(1rem, 4vw, 4rem);
   --sw-page-max: 92rem;
   --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
+  /* The width of the page's outermost content, whose edges the site header
+     shares. A page with a wider or narrower frame sets it on its root (the
+     landing's 80rem; a showcase stage's 120rem). */
+  --sw-frame-max: var(--sw-page-max);
   --sw-control-height: 2.25rem;
   --sw-control-height-lg: 2.75rem;
 
