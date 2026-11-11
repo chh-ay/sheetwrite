@@ -140,7 +140,11 @@ impl CellStore {
                 // Excel rejects text that is empty, where the shared number
                 // coercion would read zero.
                 Value::Text(text) if text.trim().is_empty() => Err(FormulaError::Value),
-                value => number_from_value(&value),
+                value @ (Value::Number(_)
+                | Value::Text(_)
+                | Value::Bool(_)
+                | Value::Blank
+                | Value::Error(_)) => number_from_value(&value),
             };
         let bounds = bound(bottom, pass).and_then(|low| integer_bounds(low, bound(top, pass)?));
 

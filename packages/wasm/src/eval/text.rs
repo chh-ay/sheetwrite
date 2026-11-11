@@ -10,6 +10,10 @@ use super::wildcard::Wildcard;
 const MAX_TEXT_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_SEARCH_STEPS: usize = 4_000_000;
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Len => unary_text(values, |text| {

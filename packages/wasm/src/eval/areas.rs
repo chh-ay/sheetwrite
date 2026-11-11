@@ -128,9 +128,40 @@ impl CellStore {
                 .runtime_range(*func, args, sheet, pass, depth + 1)
                 .map(|_| 1),
             Ast::InvalidRef => Err(FormulaError::Ref),
-            other => range_from_ast(other, sheet)
+            other @ (Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. }) => range_from_ast(other, sheet)
                 .map(|_| 1)
                 .ok_or(FormulaError::Value),
+            #[cfg(feature = "analysis")]
+            other @ (Ast::BoundMatrix { .. } | Ast::RegexPattern(_)) => {
+                range_from_ast(other, sheet)
+                    .map(|_| 1)
+                    .ok_or(FormulaError::Value)
+            }
         }
     }
 
@@ -215,7 +246,34 @@ impl CellStore {
                 .err()
                 .unwrap_or(FormulaError::Value)),
             Ast::InvalidRef => Err(FormulaError::Ref),
-            _ => Err(FormulaError::Value),
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => Err(FormulaError::Value),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => Err(FormulaError::Value),
         }
     }
 
@@ -236,7 +294,35 @@ impl CellStore {
         match reference {
             Ast::Func(Func::Union, areas) => areas.get(index).ok_or(FormulaError::Ref),
             _ if index == 0 => Ok(reference),
-            _ => Err(FormulaError::Ref),
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => Err(FormulaError::Ref),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => Err(FormulaError::Ref),
         }
     }
 }

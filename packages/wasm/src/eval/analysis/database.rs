@@ -64,7 +64,7 @@ fn field_column(headers: &[Value], field: &Value) -> Result<usize, FormulaError>
             matches!(header, Value::Text(text) if compare_text_case_insensitive(text, label).is_eq())
         }).ok_or(FormulaError::Value),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Number(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
     }
 }
 

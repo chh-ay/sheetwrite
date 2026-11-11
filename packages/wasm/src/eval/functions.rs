@@ -380,6 +380,10 @@ fn financial_family(func: Func, values: &FuncAccumulator) -> EvalResult {
     financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+)]
 fn logical_reduce(func: Func, values: &FuncAccumulator) -> Value {
     if values.len() == 0 {
         return match func {
@@ -458,6 +462,10 @@ pub(super) struct ReductionFold {
 
 impl ReductionFold {
     /// The fold for `func`, or `None` when the function needs its values.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn new(func: Func) -> Option<Self> {
         let kind = match func {
             Func::Sum => ReductionKind::Sum,
@@ -494,7 +502,10 @@ impl ReductionFold {
                     self.count += 1;
                 }
             }
-            _ => {
+            ReductionKind::Sum
+            | ReductionKind::Average
+            | ReductionKind::Minimum
+            | ReductionKind::Maximum => {
                 if let Some(number) = aggregate_number(value, true)? {
                     self.count += 1;
                     self.sum += number;
@@ -515,7 +526,10 @@ impl ReductionFold {
         self.cells += 1;
         match self.kind {
             ReductionKind::Count | ReductionKind::CountA => self.count += 1,
-            _ => {
+            ReductionKind::Sum
+            | ReductionKind::Average
+            | ReductionKind::Minimum
+            | ReductionKind::Maximum => {
                 self.count += 1;
                 self.sum += number;
                 self.min = self.min.min(number);

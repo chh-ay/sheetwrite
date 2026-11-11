@@ -787,7 +787,33 @@ impl Ast {
                     expression: bound, ..
                 } => bound,
                 Self::NamedFormula(named) => &named.expression,
-                _ => return expression,
+                Self::Num(_)
+                | Self::Str(_)
+                | Self::Bool(_)
+                | Self::Missing
+                | Self::BoundMatrix { .. }
+                | Self::RegexPattern(_)
+                | Self::Name(_)
+                | Self::NamedRange(_)
+                | Self::UnresolvedStructured(_)
+                | Self::Structured(_)
+                | Self::Cell(..)
+                | Self::SheetCell(..)
+                | Self::AbsCell(..)
+                | Self::Range(..)
+                | Self::SheetRange(..)
+                | Self::AbsRange(..)
+                | Self::SheetSpan(_)
+                | Self::InvalidRef
+                | Self::Func(..)
+                | Self::UnknownFunc(..)
+                | Self::Bin(..)
+                | Self::Cmp(..)
+                | Self::Neg(_)
+                | Self::Pos(_)
+                | Self::Percent(_)
+                | Self::LetName { .. }
+                | Self::Array { .. } => return expression,
             };
         }
     }
@@ -1050,7 +1076,23 @@ impl AreaEnd {
             Tok::Num(number) if number.fract() == 0.0 && *number <= f64::from(SHEET_ROWS) => {
                 row_index(*number as u32).map(|row| Self::Row(row, false))
             }
-            _ => None,
+            Tok::Num(_)
+            | Tok::Str(_)
+            | Tok::Structured(_)
+            | Tok::Op(_)
+            | Tok::LParen
+            | Tok::RParen
+            | Tok::Comma
+            | Tok::Semicolon
+            | Tok::LBrace
+            | Tok::RBrace
+            | Tok::Colon
+            | Tok::Bang
+            | Tok::Cmp(_)
+            | Tok::Error(_)
+            | Tok::Hash
+            | Tok::Intersect
+            | Tok::End => None,
         }
     }
 
@@ -1684,7 +1726,23 @@ fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
         Tok::Op('*') => (MULTIPLICATION, BinaryOperator::Op(Op::Mul)),
         Tok::Op('/') => (MULTIPLICATION, BinaryOperator::Op(Op::Div)),
         Tok::Op('^') => (POWER, BinaryOperator::Op(Op::Pow)),
-        _ => return None,
+        Tok::Num(_)
+        | Tok::Str(_)
+        | Tok::Ident(..)
+        | Tok::Structured(_)
+        | Tok::Op(_)
+        | Tok::LParen
+        | Tok::RParen
+        | Tok::Comma
+        | Tok::Semicolon
+        | Tok::LBrace
+        | Tok::RBrace
+        | Tok::Colon
+        | Tok::Bang
+        | Tok::Error(_)
+        | Tok::Hash
+        | Tok::Intersect
+        | Tok::End => return None,
     })
 }
 
@@ -2395,7 +2453,25 @@ where
         Ast::Percent(inner) => Ok(Ast::Percent(Box::new(resolve_sheet_refs(
             *inner, resolve, place_span,
         )?))),
-        other => Ok(other),
+        other @ (Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::AbsRange(..)
+        | Ast::InvalidRef
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. }) => Ok(other),
+        #[cfg(feature = "analysis")]
+        other @ (Ast::BoundMatrix { .. } | Ast::RegexPattern(_)) => Ok(other),
     }
 }
 
@@ -2445,7 +2521,38 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
                 true
             }
         }
-        _ => ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {
+            ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
+        }
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+            ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
+        }
     }
 }
 
@@ -2738,7 +2845,27 @@ where
             formula_col,
             resolve,
         ))),
-        other => other,
+        other @ (Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. }) => other,
+        #[cfg(feature = "analysis")]
+        other @ (Ast::BoundMatrix { .. } | Ast::RegexPattern(_)) => other,
     }
 }
 
@@ -3088,7 +3215,39 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
             Axis::Row => edit.move_span(&mut reference.row_start, &mut reference.row_end),
             Axis::Col => edit.move_index(&mut reference.col),
         },
-        _ => return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {
+            return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
+        }
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+            return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
+        }
     };
 
     if moved == Moved::Deleted {
@@ -3232,7 +3391,38 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
             }
             changed
         }
-        _ => ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {
+            ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
+        }
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+            ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
+        }
     }
 }
 

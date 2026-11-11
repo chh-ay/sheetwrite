@@ -343,7 +343,9 @@ impl CellStore {
                         Ok(())
                     }
                     CriteriaFold::Sum { .. } => sums.add(&folded_value(strings, kind, payload)),
-                    _ => extremes.add(&folded_value(strings, kind, payload)),
+                    CriteriaFold::Count | CriteriaFold::Extreme { .. } => {
+                        extremes.add(&folded_value(strings, kind, payload))
+                    }
                 };
 
                 if let Err(error) = folded {
@@ -354,7 +356,7 @@ impl CellStore {
 
         match fold {
             CriteriaFold::Sum { average } => sums.finish(average),
-            _ => extremes.finish(),
+            CriteriaFold::Count | CriteriaFold::Extreme { .. } => extremes.finish(),
         }
     }
 }
