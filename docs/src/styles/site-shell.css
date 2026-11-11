@@ -856,7 +856,9 @@ html:has(.sw-nav-dialog[open]) {
     .sw-runnable__actions .sw-button,
     .sw-terminal__copy,
     .sw-document__colophon a,
-    .sw-release-strip a
+    .sw-release-strip a,
+    .sw-prose td a,
+    .sw-prose .api-metadata dd a
   ) {
     position: relative;
   }
@@ -865,6 +867,8 @@ html:has(.sw-nav-dialog[open]) {
     .sw-runnable__actions .sw-button,
     .sw-terminal__copy,
     .sw-release-strip a,
+    .sw-prose td a,
+    .sw-prose .api-metadata dd a,
     .sw-document__colophon a
   )::after {
     position: absolute;
@@ -900,6 +904,17 @@ html:has(.sw-nav-dialog[open]) {
   }
   .sw-toc-inline > summary {
     min-height: 44px;
+  }
+  /* A symbol's member index and the figures' rows grow to 44 px rows. The
+     index's names stay one line with their ellipsis, centred by the line
+     height. */
+  .sw-prose .api-member-index a {
+    padding-block: 0;
+    line-height: 44px;
+  }
+  .fig-range-row__name {
+    min-height: 44px;
+    align-items: center;
   }
   /* The open outline's rows are 44 px tall. */
   .sw-toc-inline a {
