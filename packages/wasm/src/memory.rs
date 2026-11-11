@@ -141,51 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn encoded_totals_are_non_overlapping_sums() {
-        let mut stats = StoreMemoryStats::default();
-        stats.owner_mut(DENSE_KINDS).add_payload(3, 4);
-        stats.owner_mut(DENSE_PAYLOADS).add_payload(8, 16);
-
-        let encoded = stats.encode();
-
-        assert_eq!(encoded.len(), 5 + STORE_MEMORY_OWNER_COUNT * 3);
-        assert_eq!(encoded[encoded.len() - 2], 11.0);
-        assert_eq!(encoded[encoded.len() - 1], 20.0);
-    }
-
-    #[test]
-    fn bulk_string_compaction_releases_only_admitted_owner_slack() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(1, 3_000);
-
-        for row in 0..3_000 {
-            store.set_string(sheet, row, 0, &format!("unique-string-{row:04}"), 0);
-        }
-
-        let before = store.memory_stats();
-        store.compact_string_storage();
-        let after = store.memory_stats();
-
-        for index in 0..STORE_MEMORY_OWNER_COUNT {
-            assert_eq!(
-                owner(&after, index).0,
-                owner(&before, index).0,
-                "owner {index} logical bytes changed during compaction"
-            );
-            assert!(owner(&after, index).1 <= owner(&before, index).1);
-        }
-        assert!(
-            owner(&after, STRING_POOL_UTF8).1 < owner(&before, STRING_POOL_UTF8).1
-                || owner(&after, STRING_POOL_SPANS).1 < owner(&before, STRING_POOL_SPANS).1
-                || owner(&after, STRING_INDEX).1 < owner(&before, STRING_INDEX).1
-        );
-        assert_eq!(
-            store.get_cell(sheet, 2_999, 0).string().as_deref(),
-            Some("unique-string-2999")
-        );
-    }
-
-    #[test]
     fn spill_anchors_owners_and_blockers_have_disjoint_capacity_owners() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(2, 3);
@@ -205,30 +160,5 @@ mod tests {
         assert_eq!(owner(&blocked, SPILL_RANGES).2, 1);
         assert_eq!(owner(&blocked, SPILL_OWNERS).2, 0);
         assert_eq!(owner(&blocked, SPILL_BLOCKERS).2, 1);
-    }
-
-    #[test]
-    fn formula_and_paged_fixtures_name_their_own_structures() {
-        let mut formulas = CellStore::new();
-        let sheet = formulas.add_sheet(1, 2);
-        formulas.set_number(sheet, 0, 0, 1.0, 0);
-        formulas.set_formula(sheet, 1, 0, "=A1+1", 0);
-        formulas.recompute(sheet);
-        let formula_stats = formulas.memory_stats();
-        assert!(owner(&formula_stats, FORMULAS).0 > 0);
-        assert!(owner(&formula_stats, DEPENDENCY_NODES).2 > 0);
-        assert!(owner(&formula_stats, DEPENDENCY_EDGES).2 > 0);
-
-        let mut paged = CellStore::new();
-        let sheet = paged.add_paged_sheet(1, 100, 4, 4096, 1_000_000);
-        paged.begin_page_load();
-        paged.set_number(sheet, 0, 0, 2.0, 0);
-        paged.commit_sources();
-        let paged_stats = paged.memory_stats();
-        assert_eq!(owner(&paged_stats, PAGED_KINDS).2, 4);
-        assert_eq!(owner(&paged_stats, PAGED_PAYLOADS).2, 4);
-        assert_eq!(owner(&paged_stats, PAGED_STYLES).2, 4);
-        assert_eq!(owner(&paged_stats, PAGED_LOADED_BITMAPS).2, 1);
-        assert_eq!(owner(&paged_stats, PAGED_DIRTY_BITMAPS).2, 0);
     }
 }

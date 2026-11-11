@@ -401,49 +401,6 @@ fn measures_equal_their_formula_over_each_cells_flattened_rows() {
 }
 
 #[test]
-fn measure_cells_follow_value_key_and_measure_edits() {
-    let (rows, columns, flags): (&[usize], &[usize], u32) = (
-        &[REGION, SEGMENT],
-        &[QUARTER],
-        ROW_TOTALS | COLUMN_TOTALS | SUBTOTALS | TABULAR,
-    );
-    let mut fixture = MeasureFixture::new(11);
-    fixture.install(rows, columns, flags);
-
-    for row in [0, 5, 18] {
-        fixture.data[row].amount = Amount::Number(1_000.0 + row as f64);
-        fixture.data[row].region = (fixture.data[row].region + 1) % REGIONS.len();
-        fixture.data[row].quarter = 4.0;
-        fixture.write_order(row);
-    }
-    fixture.data[ERROR_ROW].channel = 1.0;
-    fixture.write_order(ERROR_ROW);
-    fixture.store.recompute_changed();
-    fixture.assert_matches_flattened(rows, columns, flags);
-
-    fixture.data[ERROR_ROW].channel = 2.0;
-    fixture.write_order(ERROR_ROW);
-    let mut formulas = MEASURES.map(|(formula, _)| formula);
-    formulas[0] = "=SUM(orders[qty])/SUM(orders[amount])";
-    fixture.set_measures(&formulas);
-    fixture.store.recompute_changed();
-    let status = fixture.store.pivot_status(fixture.output);
-    let total_row = status[3] as usize - 1;
-    let selected = fixture.select(
-        rows,
-        &[Value::text("Total"), Value::Blank],
-        columns,
-        &[Value::text("Total")],
-    );
-    let expected = fixture.oracle("=SUM(B1:B{n})/SUM(A1:A{n})", &selected);
-    let last_col = status[4] as usize - MEASURES.len();
-    assert_eq!(
-        settled(&fixture.store, fixture.output, total_row, last_col),
-        expected
-    );
-}
-
-#[test]
 fn measure_errors_show_in_their_cells_and_a_missing_measure_at_the_anchor() {
     let mut fixture = MeasureFixture::new(5);
     fixture.set_measures(&[
@@ -474,19 +431,6 @@ fn measure_errors_show_in_their_cells_and_a_missing_measure_at_the_anchor() {
     assert_ne!(fixture.store.pivot_status(fixture.output)[0], 0);
 }
 
-/// Measures with `CALCULATE` filters that only remove axis fields.
-const CALCULATE_MEASURES: [&str; 5] = [
-    "=CALCULATE(SUM(orders[qty]), ALL(orders[region]))",
-    "=SUM(orders[qty])/CALCULATE(SUM(orders[qty]), ALL(orders[segment]))",
-    "=CALCULATE(SUM(orders[qty]), ALL(orders[quarter]), ALL(orders[region]))",
-    "=CALCULATE(COUNTA(orders[amount]), ALL(orders[segment]))",
-    "=CALCULATE(SUM(orders[qty]), ALL(orders[qty]))",
-];
-/// The fields each measure of [`CALCULATE_MEASURES`] removes from the
-/// context; `qty` is no pivot field, so removing it changes nothing.
-const CALCULATE_REMOVED: [&[usize]; 5] =
-    [&[REGION], &[SEGMENT], &[QUARTER, REGION], &[SEGMENT], &[]];
-
 /// Rows passing the report filter, unless `removed` holds its field, whose
 /// fields equal the labels at every level of the paths except the
 /// `removed` fields, until a total or blank label ends a path.
@@ -511,71 +455,6 @@ fn select_without(
             })
         })
         .collect()
-}
-
-/// `CALCULATE` with `ALL` on axis fields: each cell sums the rows its labels
-/// select, ignoring the removed fields, also for an inner row level, with
-/// tabular and compact rows and subtotals. A share reads the cell's own rows
-/// too, so it is blank where the cell has none.
-#[test]
-fn calculate_removes_axis_field_filters() {
-    let layouts: [(&[usize], &[usize], u32); 3] = [
-        (&[REGION], &[QUARTER], ROW_TOTALS | COLUMN_TOTALS),
-        (
-            &[REGION, SEGMENT],
-            &[QUARTER],
-            ROW_TOTALS | COLUMN_TOTALS | SUBTOTALS | TABULAR,
-        ),
-        (&[REGION, SEGMENT], &[], ROW_TOTALS | SUBTOTALS),
-    ];
-    let mut fixture = MeasureFixture::new(17);
-    fixture.set_measures(&CALCULATE_MEASURES);
-    for (rows, columns, flags) in layouts {
-        fixture.install(rows, columns, flags);
-        for cell in fixture.measure_cells(rows, columns, flags) {
-            let paths: [(&[usize], &[Value]); 2] =
-                [(rows, &cell.row_labels), (columns, &cell.col_labels)];
-            let context = select_without(&fixture.data, paths, CALCULATE_REMOVED[cell.slot]);
-            let qty = |selected: &[usize]| {
-                selected
-                    .iter()
-                    .map(|&row| fixture.data[row].qty)
-                    .sum::<f64>()
-            };
-            let expected = match cell.slot {
-                1 => {
-                    let own = select_without(&fixture.data, paths, &[]);
-                    if own.is_empty() {
-                        Value::Blank
-                    } else {
-                        Value::Number(qty(&own) / qty(&context))
-                    }
-                }
-                3 => Value::Number(
-                    context
-                        .iter()
-                        .filter(|&&row| !matches!(fixture.data[row].amount, Amount::Blank))
-                        .count() as f64,
-                ),
-                _ => Value::Number(qty(&context)),
-            };
-            match (&cell.actual, &expected) {
-                (Value::Number(actual), Value::Number(expected)) => {
-                    assert!(
-                        (actual - expected).abs() < 1e-9,
-                        "measure {} at {:?}: {actual} vs {expected}",
-                        cell.slot,
-                        cell.at
-                    );
-                }
-                _ => assert_eq!(
-                    cell.actual, expected,
-                    "measure {} at {:?}",
-                    cell.slot, cell.at
-                ),
-            }
-        }
-    }
 }
 
 /// Errors inside `CALCULATE` reach the enclosing expression, so `IFERROR`

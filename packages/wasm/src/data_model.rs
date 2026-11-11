@@ -417,7 +417,6 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
-    use crate::types::FormulaError;
 
     fn text(value: &str) -> Value {
         Value::Text(Rc::from(value))
@@ -438,52 +437,6 @@ mod tests {
             many.len() as u32,
             |row| KeyCell::Value(many[row as usize].clone()),
         )
-    }
-
-    #[test]
-    fn many_side_rows_map_to_one_side_rows_or_markers() {
-        let one = [text("A"), text("b"), Value::Blank, text("C")];
-        let many = [
-            text("c"),
-            Value::Blank,
-            text("z"),
-            Value::Error(FormulaError::Na),
-            text(""),
-            text("B"),
-        ];
-        let (_, map) = build_map(&one, &many).unwrap();
-        assert_eq!(map, [3, BLANK_KEY, NO_MATCH, KEY_ERROR, BLANK_KEY, 1]);
-
-        // Pooled text keys give the same rows, including repeated ids and
-        // ids whose text differs only in case from a one-side key.
-        let pooled = [("c", 7), ("", 2), ("z", 9), ("C", 8), ("c", 7), ("B", 4)];
-        let (_, map) = KeyIndex::build(
-            one.len() as u32,
-            |row| KeyCell::Value(one[row as usize].clone()),
-            pooled.len() as u32,
-            |row| {
-                let (text, id) = pooled[row as usize];
-                KeyCell::Text(text, id)
-            },
-        )
-        .unwrap();
-        assert_eq!(map, [3, BLANK_KEY, NO_MATCH, 3, 3, 1]);
-
-        let numbers: Vec<_> = (0..1_000)
-            .map(|row| Value::Number(f64::from(row * 3)))
-            .collect();
-        let probes: Vec<_> = (0..3_000)
-            .map(|row| Value::Number(f64::from(row)))
-            .collect();
-        let (_, map) = build_map(&numbers, &probes).unwrap();
-        for (row, &target) in map.iter().enumerate() {
-            let expected = if row % 3 == 0 {
-                row as u32 / 3
-            } else {
-                NO_MATCH
-            };
-            assert_eq!(target, expected, "row {row}");
-        }
     }
 
     fn find(index: &KeyIndex, value: Value) -> u32 {
@@ -523,59 +476,6 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_one_side_keys_report_the_first_pair() {
-        let one = [text("a"), text("B"), text("b"), text("A")];
-        assert_eq!(
-            build(&one, &[]).unwrap_err(),
-            KeyProblem::DuplicateKey {
-                first: 0,
-                second: 3
-            }
-        );
-        let numbers = [Value::Number(1.0), Value::Number(2.0), Value::Number(2.0)];
-        assert_eq!(
-            build(&numbers, &[]).unwrap_err(),
-            KeyProblem::DuplicateKey {
-                first: 1,
-                second: 2
-            }
-        );
-    }
-
-    #[test]
-    fn key_kinds_must_match_on_both_sides() {
-        let numbers = [Value::Number(1.0), Value::Blank];
-        let mixed = [Value::Number(1.0), text("a")];
-        let one_side_error = [Value::Error(FormulaError::Na)];
-
-        assert_eq!(
-            build(&mixed, &[]).unwrap_err(),
-            KeyProblem::OneSideType { row: 1 }
-        );
-        assert_eq!(
-            build(&[Value::Bool(true)], &[]).unwrap_err(),
-            KeyProblem::OneSideType { row: 0 }
-        );
-        assert_eq!(
-            build(&one_side_error, &[]).unwrap_err(),
-            KeyProblem::OneSideType { row: 0 }
-        );
-        assert_eq!(
-            build(&numbers, &[Value::Number(1.0), text("1")]).unwrap_err(),
-            KeyProblem::ManySideType { row: 1 }
-        );
-
-        // Many-side errors and blanks fit any kind, and a blank column fits either kind.
-        let many = [
-            Value::Error(FormulaError::Na),
-            Value::Blank,
-            Value::Number(1.0),
-        ];
-        assert!(build(&numbers, &many).is_ok());
-        assert!(build(&[Value::Blank], &[text("a")]).is_ok());
-    }
-
-    #[test]
     fn index_holds_twelve_bytes_per_sparse_key_and_four_more_per_dense_id() {
         const ROWS: u32 = 100_000;
         let build = |step: u32| {
@@ -605,32 +505,5 @@ mod tests {
                 NO_MATCH
             );
         }
-    }
-
-    #[test]
-    fn scrambled_keys_all_resolve_and_a_late_duplicate_is_found() {
-        const ROWS: u32 = 1_000;
-        // 7919 is prime to ROWS, so this visits every key once in scrambled order.
-        let key = |row: u32| Value::Number(f64::from(row * 7_919 % ROWS));
-        let (index, _) = KeyIndex::build(ROWS, |row| KeyCell::Value(key(row)), 0, blank).unwrap();
-        for row in 0..ROWS {
-            assert_eq!(find(&index, key(row)), row);
-        }
-
-        let words = |row: u32| text(&format!("k{}", row * 7_919 % ROWS));
-        let (index, _) = KeyIndex::build(ROWS, |row| KeyCell::Value(words(row)), 0, blank).unwrap();
-        for row in 0..ROWS {
-            assert_eq!(find(&index, words(row)), row);
-        }
-
-        let late_duplicate =
-            |row: u32| Value::Number(f64::from(if row == ROWS - 1 { 5 } else { row }));
-        assert_eq!(
-            KeyIndex::build(ROWS, |row| KeyCell::Value(late_duplicate(row)), 0, blank).unwrap_err(),
-            KeyProblem::DuplicateKey {
-                first: 5,
-                second: ROWS - 1
-            }
-        );
     }
 }

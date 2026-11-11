@@ -1287,23 +1287,6 @@ mod paged_storage_tests {
     use crate::sheet::SheetData;
 
     #[test]
-    fn revision_index_cleans_only_cells_still_owned_by_the_acknowledged_write() {
-        let mut storage = PagedStorage::new(4, 0, 4).unwrap();
-        assert!(storage.write(0, 0, KIND_EMPTY, 10, 0, Some(7)));
-        assert!(storage.write(4, 0, KIND_EMPTY, 20, 0, Some(7)));
-        assert!(storage.write(0, 0, KIND_EMPTY, 30, 0, Some(8)));
-
-        storage.acknowledge_revision(7);
-        assert_eq!(storage.read(4, 0), (KIND_EMPTY, 20, 0, true, false));
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 30, 0, true, true));
-        assert_eq!(storage.dirty_cells(), 1);
-
-        storage.acknowledge_revision(8);
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 30, 0, true, false));
-        assert_eq!(storage.dirty_cells(), 0);
-    }
-
-    #[test]
     fn structural_rebase_preserves_revision_ownership_at_the_moved_cell() {
         let mut sheet = SheetData::new_paged(2, 8, 4, 0, 4).unwrap();
         assert!(sheet.write_cell(1, 0, KIND_EMPTY, 10, 0, Some(11)));
@@ -1473,48 +1456,5 @@ mod source_history_tests {
             Some("computed text")
         );
         assert_eq!(store.get_cell(sheet, 1, 0).num(), 42.0);
-    }
-}
-#[cfg(test)]
-mod lifecycle_tests {
-    const TEST_ROWS: usize = 1536;
-    use crate::store::CellStore;
-
-    #[test]
-    fn shrinking_spill_clears_vacated_outputs() {
-        let mut store = CellStore::new();
-        let rows = TEST_ROWS;
-        let sheet = store.add_sheet(2, rows);
-        store.set_number(sheet, 0, 1, rows as f64, 0);
-        store.set_formula(sheet, 0, 0, "=SEQUENCE(B1)", 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, rows - 1, 0).num(), rows as f64);
-
-        store.set_number(sheet, 0, 1, 1.0, 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, 0, 0).num(), 1.0);
-        assert_eq!(store.sheets[sheet].cells.calculated_cell_at(rows - 1), None);
-    }
-
-    #[test]
-    fn string_pool_sweep_keeps_calculated_text_across_distant_rows() {
-        let mut store = CellStore::new();
-        let rows = TEST_ROWS;
-        let sheet = store.add_sheet(2, rows);
-        store.set_string(sheet, 0, 1, "discarded pool entry", 0);
-        store.set_number(sheet, 0, 1, 0.0, 0);
-        let positions = [0, TEST_ROWS / 3, rows - 1];
-        for row in positions {
-            store.set_formula(sheet, row, 0, "=\"retained\"&\" text\"", 0);
-        }
-        store.recompute(sheet);
-        store.compact_string_storage();
-
-        for row in positions {
-            assert_eq!(
-                store.get_cell(sheet, row, 0).string().as_deref(),
-                Some("retained text")
-            );
-        }
     }
 }

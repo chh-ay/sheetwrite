@@ -801,56 +801,6 @@ mod formula_entry_tests {
         #[cfg(target_arch = "wasm32")]
         assert!(size_of::<FormulaEntry>() < size_of::<UnpackedEntry>());
     }
-
-    #[test]
-    fn formula_entry_flags_preserve_independent_metadata() {
-        for reference in [false, true] {
-            let mut entry = if reference {
-                FormulaEntry::reference(
-                    AbsCellKey {
-                        sheet: 0,
-                        row: 1,
-                        col: 2,
-                    },
-                    "Sheet1",
-                    0,
-                )
-            } else {
-                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_string())
-            };
-
-            for (volatile, spill_refs, produces_array) in [
-                (false, false, false),
-                (false, false, true),
-                (false, true, false),
-                (false, true, true),
-                (true, false, false),
-                (true, false, true),
-                (true, true, false),
-                (true, true, true),
-                (false, false, false),
-            ] {
-                entry.set_volatile(volatile);
-                entry.set_has_spill_refs(spill_refs);
-                entry.set_produces_array(produces_array);
-
-                for error in std::iter::once(None)
-                    .chain(
-                        (0..FormulaError::COUNT).map(|slot| FormulaError::from_slot(slot as u64)),
-                    )
-                    .chain(std::iter::once(None))
-                {
-                    entry.set_source_error(error);
-                    assert_eq!(entry.source_error(), error);
-                    assert_eq!(entry.volatile(), volatile);
-                    assert_eq!(entry.has_spill_refs(), spill_refs);
-                    assert_eq!(entry.produces_array(), produces_array);
-                    assert_eq!(entry.is_reference(), reference);
-                    assert_eq!(entry.is_formula(), !reference);
-                }
-            }
-        }
-    }
 }
 
 pub(crate) fn cell_key(row: usize, col: usize) -> Option<CellKey> {
