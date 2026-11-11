@@ -59,13 +59,13 @@ impl IterationLimits {
 
     /// Whether a value moved by more than the maximum change. Only numbers
     /// have a distance; any other change keeps the sweep going.
-    fn moved(self, previous: &Value, next: &Value) -> bool {
-        match (previous, next) {
+    fn moved(self, previous_value: &Value, next_value: &Value) -> bool {
+        match (previous_value, next_value) {
             (Value::Number(previous), Value::Number(next)) => {
                 let change = (previous - next).abs();
                 change > self.max_change || change.is_nan()
             }
-            _ => previous != next,
+            _ => previous_value != next_value,
         }
     }
 }
@@ -121,8 +121,8 @@ pub(super) fn enter_runtime_formula(key: AbsCellKey) {
 /// Only iterating passes call it, so it stays out of the read path.
 #[inline(never)]
 pub(super) fn record_iteration_read(key: AbsCellKey) {
-    BACK_EDGES.with(|state| {
-        let mut state = state.borrow_mut();
+    BACK_EDGES.with(|slot| {
+        let mut state = slot.borrow_mut();
         let Some(edges) = state.as_mut() else {
             return;
         };
@@ -143,8 +143,8 @@ impl CellStore {
     /// The value a runtime reference reads from a formula still on the
     /// evaluation path: its previous value while the pass iterates.
     pub(super) fn back_edge_value(&self, key: AbsCellKey) -> EvalResult {
-        let iterating = BACK_EDGES.with(|state| {
-            let mut state = state.borrow_mut();
+        let iterating = BACK_EDGES.with(|slot| {
+            let mut state = slot.borrow_mut();
             let Some(edges) = state.as_mut() else {
                 return false;
             };
@@ -255,12 +255,12 @@ impl CellStore {
     #[inline(never)]
     fn iterate_component(
         &mut self,
-        members: &[AbsCellKey],
+        component: &[AbsCellKey],
         affected: &FormulaWork,
         results: &mut FormulaResults,
         limits: IterationLimits,
     ) {
-        let mut members = members.to_vec();
+        let mut members = component.to_vec();
         BACK_EDGES.with(|state| {
             if let Some(edges) = state.borrow_mut().as_mut() {
                 edges.active = Some(ActiveComponent {
@@ -325,8 +325,8 @@ impl CellStore {
         key: AbsCellKey,
         pass: &mut EvalPass<'_>,
     ) -> Option<EvalResult> {
-        let members = BACK_EDGES.with(|state| {
-            let mut state = state.borrow_mut();
+        let pending = BACK_EDGES.with(|slot| {
+            let mut state = slot.borrow_mut();
             let edges = state.as_mut()?;
             let finished = edges.path.pop();
             debug_assert_eq!(finished, Some(key));
@@ -340,7 +340,7 @@ impl CellStore {
             }
             Some(std::mem::take(&mut edges.pending))
         })?;
-        let mut members: Vec<_> = members.into_iter().collect();
+        let mut members: Vec<_> = pending.into_iter().collect();
         members.sort_unstable_by_key(|member| (member.sheet, member.row, member.col));
         let limits = self.iteration.as_deref().copied()?;
         for _ in 1..limits.max_iterations {

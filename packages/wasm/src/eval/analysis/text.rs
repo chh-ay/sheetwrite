@@ -637,10 +637,10 @@ pub(super) fn shape(
         affected: &affected,
         results: &mut results,
     };
-    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
+    let evaluated = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
 
     results.swap_scratch(outer.results);
-    let matrix = matrix?;
+    let matrix = evaluated?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
 pub(super) fn bound(

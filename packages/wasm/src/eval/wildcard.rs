@@ -147,13 +147,13 @@ fn match_prefix<E>(
             continue;
         }
 
-        let Some((retry_token, star_end)) = star else {
+        let Some((retry_token, previous_star_end)) = star else {
             return Ok(false);
         };
-        let Some(skipped) = text[star_end..].chars().next() else {
+        let Some(skipped) = text[previous_star_end..].chars().next() else {
             return Ok(false);
         };
-        let star_end = star_end + skipped.len_utf8();
+        let star_end = previous_star_end + skipped.len_utf8();
         star = Some((retry_token, star_end));
         token_index = retry_token;
         text_index = star_end;

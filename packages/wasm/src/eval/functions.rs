@@ -732,8 +732,8 @@ pub(super) fn numeric_entries<'a>(
 ) -> Result<Vec<f64>, FormulaError> {
     let iter = entries.into_iter();
     let mut numbers = Vec::new();
-    let (_, upper) = iter.size_hint();
-    if let Some(upper) = upper {
+    let (_, upper_bound) = iter.size_hint();
+    if let Some(upper) = upper_bound {
         numbers.try_reserve(upper).map_err(|_| FormulaError::Num)?;
     }
     for entry in iter {
