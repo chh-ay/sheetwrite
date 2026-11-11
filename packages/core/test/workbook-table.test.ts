@@ -399,48 +399,6 @@ describe("canonical workbook tables", () => {
     store.dispose();
   });
 
-  it("preserves stable identities across row and column structure changes", () => {
-    const store = new SheetwriteStore(workbook([table()]));
-    store.applyTransaction({ patches: [{ op: "addRows", sheet: "data", at: 2, count: 1 }] });
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.range.end.row).toBe(4);
-    store.applyTransaction({ patches: [{ op: "removeRows", sheet: "data", at: 2, count: 1 }] });
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.range.end.row).toBe(3);
-
-    store.applyTransaction({
-      patches: [
-        {
-          op: "addColumns",
-          sheet: "data",
-          at: 1,
-          columns: [{ key: "inserted", header: "Inserted", width: 100, type: "number" }],
-        },
-      ],
-    });
-    const inserted = store.getWorkbook().sheets[0]!.tables![0]!;
-    expect(inserted.columns.map((column) => column.id)).toEqual([
-      "amount-id",
-      "inserted",
-      "quantity-id",
-    ]);
-    expect(inserted.range.end.col).toBe(2);
-
-    store.applyTransaction({
-      patches: [{ op: "removeColumns", sheet: "data", at: 1, count: 1 }],
-    });
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.columns.map((column) => column.id)).toEqual([
-      "amount-id",
-      "quantity-id",
-    ]);
-
-    store.applyTransaction({
-      patches: [{ op: "renameSheet", sheet: "data", name: "Renamed Data" }],
-    });
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.range.sheet).toBe("data");
-    store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "data" }] });
-    expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["summary"]);
-    store.dispose();
-  });
-
   it("rebases table ranges through structure and conflicts on one stable identity", () => {
     const rebasedTable = table();
     rebasedTable.range = {

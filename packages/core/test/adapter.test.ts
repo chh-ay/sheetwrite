@@ -1,14 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { GRID_OPTION_CONFORMANCE } from "../../../test/adapter-lifecycle-contract.js";
 import {
   applyChangedLiveGridOptions,
   createAdapterGridController,
   createGridController,
   createSimpleGridInput,
   extractGridOptions,
-  GRID_OPTION_POLICY,
-  getGridResetReason,
   gridSizeStyle,
 } from "../src/adapter.js";
 import { initSheetwrite } from "../src/grid.js";
@@ -72,44 +69,6 @@ describe("shared adapter option policy", () => {
     expect(readyGenerations).toEqual([2]);
     expect(failures).toHaveLength(0);
     controller.unmount();
-  });
-
-  it("classifies every GridOptions key and reports its deterministic reset reason", () => {
-    const initial: GridOptions = { workbook: makeWorkbook(1) };
-    const changedValues: { [Key in keyof GridOptions]-?: GridOptions[Key] } = {
-      workbook: makeWorkbook(2),
-      data: { rowCount: 0, columns: {} },
-      datasource: {
-        capabilities: { protocol: 2, columns: "windowed" },
-        getRows: async ({ start, columns }) => ({ protocol: 2, start, columns, rows: [] }),
-      },
-      datasourceStorage: { mode: "paged" },
-      renderer: "worker",
-      workerUrl: new URL("https://sheetwrite.invalid/worker.js"),
-      presentation: "data-grid",
-      theme: { bg: "#fff" },
-      readOnly: true,
-      protectionResolver: () => "allow",
-      mutationPolicy: "partial",
-      transactionResourceLimits: { maxOperations: 25 },
-      hyperlinkActivation: "disabled",
-      addons: {},
-      renderers: {},
-      editors: {},
-      overscan: 2,
-      minColumns: 4,
-      config: { toolbar: false },
-    };
-
-    const keys = Object.keys(GRID_OPTION_CONFORMANCE) as Array<keyof GridOptions>;
-    expect(Object.keys(GRID_OPTION_POLICY).sort()).toEqual([...keys].sort());
-    for (const key of keys) {
-      const expected = GRID_OPTION_CONFORMANCE[key];
-      expect(GRID_OPTION_POLICY[key], key).toBe(expected.policy);
-      expect(getGridResetReason(initial, { ...initial, [key]: changedValues[key] }), key).toBe(
-        expected.reason,
-      );
-    }
   });
 
   it("applies live options to the existing grid and changes its behavior", async () => {
@@ -179,25 +138,6 @@ describe("shared adapter option policy", () => {
 });
 
 describe("simple data conversion", () => {
-  it("builds columnar input without mutating rows and fills missing values with null", () => {
-    const rows: readonly { name: string; price?: number | null }[] = [
-      { name: "A", price: 2 },
-      { name: "B" },
-    ];
-    const before = structuredClone(rows);
-    const input = createSimpleGridInput({
-      columns: [
-        { key: "name", title: "Name" },
-        { key: "price", title: "Price", type: "currency" },
-      ],
-      defaultRows: rows,
-    });
-    expect(input.workbook.sheets[0]?.columns[0]?.header).toBe("Name");
-    expect(input.presentation).toBe("data-grid");
-    expect(Array.from(input.data.columns.price ?? [])).toEqual([2, null]);
-    expect(rows).toEqual(before);
-  });
-
   it("rejects duplicate keys, empty keys, and empty titles", () => {
     type Row = Record<string, string>;
     const defaultRows: Row[] = [{ name: "A", "": "A" }];

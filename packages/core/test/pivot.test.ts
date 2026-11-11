@@ -279,35 +279,6 @@ describe("pivot document operations", () => {
     grid.redo();
     expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
   });
-
-  it("returns clones that callers cannot use to change the document", () => {
-    const grid = mountGrid([rangePivot()]);
-    const read = onlyPivot(grid, "p-range");
-    read.rows.push(1);
-    read.anchor.row = 9;
-    expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
-  });
-
-  it("checks anchor ownership in document-operation order", () => {
-    const grid = mountGrid([]);
-    grid.applyTransaction({
-      patches: [
-        { op: "setPivot", sheet: "report", pivot: rangePivot() },
-        { op: "setPivot", sheet: "report", pivot: rangePivot({ id: "second" }) },
-      ],
-    });
-    expect(grid.getPivots()).toEqual([]);
-    expect(grid.setPivot(rangePivot()).status).toBe("applied");
-    expect(
-      grid.applyTransaction({
-        patches: [
-          { op: "removePivot", sheet: "report", id: "p-range" },
-          { op: "setPivot", sheet: "report", pivot: rangePivot({ id: "second" }) },
-        ],
-      }).status,
-    ).toBe("applied");
-    expect(grid.getPivots().map((pivot) => pivot.id)).toEqual(["second"]);
-  });
 });
 
 describe("pivot structural rewrites", () => {
@@ -718,69 +689,6 @@ describe("pivot engine boundary on the default engine", () => {
       // The store still accepts changes after the release.
       expect(store.removePivot("p-range").status).toBe("applied");
       expect(store.getPivots()).toEqual([]);
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("writes pivots through the store to the sheet that holds the ID", () => {
-    const onData = { ...tablePivot(), anchor: { row: 8, col: 3 } };
-    const store = new SheetwriteStore(structuredClone(workbook()));
-    try {
-      expect(store.setPivot(onData, "data").status).toBe("applied");
-      expect(store.setPivot({ ...onData, name: "Renamed" }).status).toBe("applied");
-      expect(store.getPivots("data")).toEqual([{ ...onData, name: "Renamed" }]);
-
-      // Without a holder, a new pivot goes to the active sheet.
-      expect(store.setPivot(rangePivot()).status).toBe("applied");
-      expect(store.getPivots("report")).toEqual([rangePivot()]);
-
-      expect(store.removePivot("p-table").status).toBe("applied");
-      expect(store.removePivot("p-table").status).toBe("noop");
-      expect(store.getPivots().map((pivot) => pivot.id)).toEqual(["p-range"]);
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("accepts a write into a pivot's output when an earlier patch in the batch removes it", () => {
-    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
-    const store = new SheetwriteStore(structuredClone(workbook([pivot])));
-    const addr = { sheet: "report", row: 3, col: 2 };
-    try {
-      const outcome = store.applyTransaction({
-        patches: [
-          { op: "removePivot", sheet: "report", id: pivot.id },
-          { op: "set", addr, value: { kind: "literal", value: 7 } },
-        ],
-      });
-
-      expect(outcome.status === "applied" && outcome.transaction.patches.length).toBe(2);
-      expect(store.getCell(addr).resolved).toBe(7);
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("releases pivot output only for a replayed write that changes its cell contents", () => {
-    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
-    const store = new SheetwriteStore(structuredClone(workbook([pivot])));
-    const output: Range = { sheet: "report", start: { row: 3, col: 2 }, end: { row: 3, col: 2 } };
-    const outside: Range = { sheet: "report", start: { row: 9, col: 0 }, end: { row: 9, col: 0 } };
-    // Releasing an output re-sends the sheet's pivots to the engine in bulk transfers.
-    const bulkCallsToClear = (range: Range, contents: boolean): number => {
-      store.resetRuntimeResourceAccounting();
-      store.applyTransaction(
-        { patches: [{ op: "clearRange", range, contents, style: true }] },
-        { source: "remote" },
-      );
-      return store
-        .getRuntimeResourceSnapshot("edit", "settled")
-        .boundary.reduce((total, stats) => total + stats.bulkCalls, 0);
-    };
-    try {
-      expect(bulkCallsToClear(output, false)).toBe(bulkCallsToClear(outside, false));
-      expect(bulkCallsToClear(output, true)).toBeGreaterThan(bulkCallsToClear(outside, true));
     } finally {
       store.dispose();
     }

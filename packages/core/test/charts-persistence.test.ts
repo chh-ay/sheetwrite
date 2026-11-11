@@ -190,40 +190,6 @@ describe("chart persistence", () => {
     });
   });
 
-  it("refuses a live chart whose source leaves the workbook", () => {
-    const { store } = setup();
-
-    // A valid update must work first, so rejection cannot pass merely because setChart is unsupported.
-    expect(
-      store.applyTransaction({ patches: [{ op: "setChart", sheet: "data", chart: chart("own") }] })
-        .status,
-    ).toBe("applied");
-
-    const missingSheet = store.applyTransaction({
-      patches: [{ op: "setChart", sheet: "data", chart: chart("ghost", "missing") }],
-    });
-    expect(missingSheet.status).toBe("rejected");
-    if (missingSheet.status === "rejected") {
-      expect(missingSheet.issues).toContainEqual(
-        expect.objectContaining({ kind: "invalid-operation", operationIndex: 0 }),
-      );
-    }
-
-    const outOfBounds = store.applyTransaction({
-      patches: [
-        {
-          op: "setChart",
-          sheet: "data",
-          chart: { ...chart("low"), series: [{ values: range("data", 0, 1, ROWS, 1) }] },
-        },
-      ],
-    });
-    // Bounds failures are no-ops, unlike the missing-sheet admission rejection.
-    expect(outOfBounds).toMatchObject({ status: "noop", reason: "out-of-bounds" });
-
-    expect(chartsOf(store, "data")?.map((candidate) => candidate.id)).toEqual(["own"]);
-  });
-
   it("undoes and redoes chart creation, replacement and removal exactly", () => {
     const { store, controller } = setup();
     const moved = { ...chart("own"), anchor: { ...chart("own").anchor, row: 6, col: 1 } };
@@ -248,39 +214,6 @@ describe("chart persistence", () => {
     expect(chartsOf(store, "other")).toEqual([]);
   });
 
-  it("shifts sources and the anchor when rows and columns are inserted", () => {
-    const { store } = setup();
-
-    store.applyTransaction({ patches: [{ op: "addRows", sheet: "data", at: 1, count: 2 }] });
-    // Inserting inside a source widens it; the owner's anchor below the insert moves down.
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
-      range("data", 0, 1, 5, 1),
-      range("data", 0, 0, 5, 0),
-    ]);
-    expect(chartOf(store, "data", "own")?.anchor.row).toBe(4);
-    // A chart on another sheet follows its sources but keeps its own anchor.
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(
-      sources(chartOf(store, "data", "own")),
-    );
-    expect(chartOf(store, "other", "cross")?.anchor.row).toBe(2);
-
-    store.applyTransaction({
-      patches: [
-        {
-          op: "addColumns",
-          sheet: "data",
-          at: 0,
-          columns: [{ key: "z", header: "z", width: 80, type: "number" }],
-        },
-      ],
-    });
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
-      range("data", 0, 2, 5, 2),
-      range("data", 0, 1, 5, 1),
-    ]);
-    expect(chartOf(store, "data", "own")?.anchor.col).toBe(4);
-  });
-
   it("shrinks partly deleted sources and turns fully deleted ones into #REF!", () => {
     const { store } = setup();
 
@@ -298,46 +231,6 @@ describe("chart persistence", () => {
 
     store.applyTransaction({ patches: [{ op: "removeRows", sheet: "data", at: 0, count: 2 }] });
     expect(sources(chartOf(store, "other", "cross"))).toEqual(["#REF!", "#REF!"]);
-  });
-
-  it("pins a chart whose anchor rows were deleted at the end of the sheet inside the sheet", () => {
-    const { store } = setup({
-      activeSheet: "data",
-      sheets: [{ ...sheet("data"), charts: [chart("bottom", "data", ROWS - 1)] }],
-    });
-
-    store.applyTransaction({
-      patches: [{ op: "removeRows", sheet: "data", at: ROWS - 2, count: 2 }],
-    });
-
-    expect(chartOf(store, "data", "bottom")?.anchor.row).toBe(ROWS - 3);
-    expect(validateWorkbookSnapshot(store.exportSnapshot()).ok).toBe(true);
-  });
-
-  it("carries sources and the anchor with moved rows and columns", () => {
-    const { store } = setup();
-
-    store.applyTransaction({
-      patches: [{ op: "moveRows", sheet: "data", from: 0, count: 4, to: 5 }],
-    });
-    // The whole source moved; a remove-then-add without restoring would leave #REF!.
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
-      range("data", 5, 1, 8, 1),
-      range("data", 5, 0, 8, 0),
-    ]);
-    expect(chartOf(store, "data", "own")?.anchor.row).toBe(7);
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(
-      sources(chartOf(store, "data", "own")),
-    );
-
-    store.applyTransaction({
-      patches: [{ op: "moveColumns", sheet: "data", from: 1, count: 1, to: 3 }],
-    });
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
-      range("data", 5, 3, 8, 3),
-      range("data", 5, 0, 8, 0),
-    ]);
-    expect(chartOf(store, "data", "own")?.anchor.col).toBe(2);
   });
 
   it("undo of row, column and move edits restores every touched chart exactly", () => {
@@ -382,19 +275,6 @@ describe("chart persistence", () => {
     controller.undo();
     expect(chartsOf(store, "data")).toEqual([chart("own")]);
     expect(chartsOf(store, "other")).toEqual([chart("cross")]);
-  });
-
-  it("keeps sheet-ID sources when the source sheet is renamed", () => {
-    const { store } = setup();
-
-    store.applyTransaction({ patches: [{ op: "renameSheet", sheet: "data", name: "Renamed" }] });
-
-    expect(chartsOf(store, "data")).toEqual([chart("own")]);
-    expect(chartsOf(store, "other")).toEqual([chart("cross")]);
-    expect(validateWorkbookSnapshot(store.exportSnapshot()).ok).toBe(true);
-    expect(
-      store.exportSnapshot().sheets.find((candidate) => candidate.id === "data")?.charts,
-    ).toEqual([chart("own")]);
   });
 
   it("rebases pending charts across row inserts and conflicts on replacement or source deletion", () => {

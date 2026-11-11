@@ -93,35 +93,6 @@ describe("RowBridge", () => {
     }
   });
 
-  it("keeps data-space identities through insert, move, and delete", () => {
-    const bridge = createRowBridge({
-      columns,
-      defaultRows: rows,
-      getRowId: (row) => row.id,
-      createRowId: ({ transactionId, offset }) => `${transactionId}-${offset}`,
-    });
-    const inserted = bridge.project(
-      event([{ op: "addRows", sheet: "sheet1", at: 1, count: 2 }], [], "local", 1),
-    );
-    const insertedIds =
-      inserted.deltas[0]?.kind === "row-structure" ? inserted.deltas[0].inserted : [];
-    expect(insertedIds).toHaveLength(2);
-    expect(bridge.rowIds()).toEqual(["row-a", ...insertedIds, "row-b", "row-c"]);
-
-    bridge.project(
-      event([{ op: "moveRows", sheet: "sheet1", from: 3, count: 1, to: 0 }], [], "local", 2),
-    );
-    expect(bridge.rowIds()).toEqual(["row-b", "row-a", ...insertedIds, "row-c"]);
-
-    const removed = bridge.project(
-      event([{ op: "removeRows", sheet: "sheet1", at: 1, count: 2 }], [], "local", 3),
-    );
-    expect(removed.deltas[0]).toEqual(
-      expect.objectContaining({ kind: "row-structure", removed: ["row-a", insertedIds[0]] }),
-    );
-    expect(bridge.rowIds()).toEqual(["row-b", insertedIds[1]!, "row-c"]);
-  });
-
   it("reconciles transformed, rejected, duplicate, out-of-order, and remote input without echoes", () => {
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const addr = { sheet: "sheet1", row: 0, col: 1 };

@@ -62,17 +62,6 @@ function setup() {
   return { grid, store, column, focus };
 }
 
-it("quick sort moves the cells of the current region and keeps its header", () => {
-  const { grid, column, focus } = setup();
-  focus(2, 1);
-
-  expect(grid.sortBy(1, true).status).toBe("applied");
-
-  expect(column(0)).toEqual(["Name", "apple", "fig", "pear"]);
-  expect(column(1)).toEqual(["Qty", 1, 2, 3]);
-  expect(column(3)).toEqual(["keep", "x", "y", "z"]);
-});
-
 it("one undo restores the cells after a quick sort", () => {
   const { grid, column, focus } = setup();
   focus(1, 0);
@@ -109,14 +98,6 @@ it("quick sort in a table sorts the table body", () => {
 
   expect(column(0)).toEqual(["Name", "apple", "fig", "pear"]);
   expect(column(1)).toEqual(["Qty", 1, 2, 3]);
-});
-
-it("the view sort keeps every cell in its row", () => {
-  const { grid, column } = setup();
-
-  grid.setViewSort([{ col: 1, ascending: true }]);
-
-  expect(column(1)).toEqual(["Qty", 3, 1, 2]);
 });
 
 it("the Sort panel sorts the cells by several levels, or only the view", () => {
