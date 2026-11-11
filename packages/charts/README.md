@@ -73,6 +73,6 @@ host.replaceChildren(renderChartSvg(view, { width: 320, height: 200 }));
 - Line, area and scatter series with more points than the plot has pixels keep only the lowest and highest point of each pixel column.
 - The element has `role="img"`, a `<title>` with the chart title and kind, and a `<desc>` with the series names and point counts.
 
-Series colors come from the CSS variables `--sheetwrite-chart-1` to `--sheetwrite-chart-8`, and text uses `--sheetwrite-fg`. Core styles set these variables for the light and dark themes. Set them on the grid or the page to change the colors.
+Series colors come from the CSS variables `--sheetwrite-chart-1` to `--sheetwrite-chart-8`, and text uses `--sheetwrite-fg`. `@sheetwrite/core/styles/charts.css`, which `@sheetwrite/core/styles.css` includes, sets these variables for the light and dark themes. Set them on the grid or the page to change the colors.
 
 `createChartRenderer(store)` is the renderer that `chartsAddon()` gives to core. A grid uses it to draw each chart in its box. A chart draws again only when an edit changes it or its box size changes, at most once in each animation frame.
