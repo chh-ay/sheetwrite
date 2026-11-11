@@ -95,6 +95,15 @@ describe("CI and release workflow contracts", () => {
     }
   });
 
+  it("checks the XLSX isolation of the examples in the production docs build", () => {
+    const steps = job("ci", "docs-build").steps ?? [];
+    const build = steps.findIndex((step) => step.name === "Build production docs");
+    const check = steps.findIndex((step) => step.name === "Example XLSX isolation");
+    expect(build).toBeGreaterThanOrEqual(0);
+    expect(check).toBeGreaterThan(build);
+    expect(steps[check]?.run).toBe("bun scripts/verify-example-xlsx-isolation.ts");
+  });
+
   it("deploys docs from the release commit only after its GitHub release", () => {
     const publish = job("release", "publish");
     const docs = job("release", "docs");
@@ -241,15 +250,6 @@ describe("CI and release workflow contracts", () => {
     }
     expect(exitCode({ DOCS_REQUIRED: "false", DOCS: "skipped", BROWSER: "skipped" })).toBe(0);
     expect(exitCode({ DOCS_REQUIRED: "false" })).not.toBe(0);
-  });
-
-  it("checks the XLSX isolation of the examples in the production docs build", () => {
-    const steps = job("ci", "docs-build").steps ?? [];
-    const build = steps.findIndex((step) => step.name === "Build production docs");
-    const check = steps.findIndex((step) => step.name === "Example XLSX isolation");
-    expect(build).toBeGreaterThanOrEqual(0);
-    expect(check).toBeGreaterThan(build);
-    expect(steps[check]?.run).toBe("bun scripts/verify-example-xlsx-isolation.ts");
   });
 
   it("rejects every missing Vercel credential before invoking the deployment CLI", () => {
