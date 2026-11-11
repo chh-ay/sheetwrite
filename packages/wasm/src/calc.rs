@@ -2314,6 +2314,82 @@ pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
     }
 }
 
+/// Prototype: [`resolve_sheet_refs`] in place, moving each sheet name into
+/// its resolved reference instead of rebuilding the tree and copying names.
+pub(crate) fn resolve_sheet_refs_in_place<F, S>(
+    ast: &mut Ast,
+    resolve: &F,
+    place_span: &S,
+) -> Result<(), String>
+where
+    F: Fn(&str) -> Option<u32>,
+    S: Fn(&mut SheetSpanRef) -> bool,
+{
+    match ast {
+        Ast::SheetCell(sheet_ref, row, col, flags) => {
+            let Some(handle) = resolve(&sheet_ref.name) else {
+                if is_external_sheet(&sheet_ref.name) {
+                    return Ok(());
+                }
+                return Err(format!("unknown sheet: {}", sheet_ref.name));
+            };
+            *ast = Ast::AbsCell(
+                SheetRef {
+                    handle,
+                    name: std::mem::take(&mut sheet_ref.name),
+                    quoted: sheet_ref.quoted,
+                },
+                *row,
+                *col,
+                *flags,
+            );
+            Ok(())
+        }
+        Ast::SheetRange(sheet_ref, r0, c0, r1, c1, flags) => {
+            let Some(handle) = resolve(&sheet_ref.name) else {
+                if is_external_sheet(&sheet_ref.name) {
+                    return Ok(());
+                }
+                return Err(format!("unknown sheet: {}", sheet_ref.name));
+            };
+            *ast = Ast::AbsRange(
+                SheetRef {
+                    handle,
+                    name: std::mem::take(&mut sheet_ref.name),
+                    quoted: sheet_ref.quoted,
+                },
+                *r0,
+                *c0,
+                *r1,
+                *c1,
+                *flags,
+            );
+            Ok(())
+        }
+        Ast::SheetSpan(span) => {
+            for endpoint in [&mut span.first, &mut span.last] {
+                endpoint.handle = resolve(&endpoint.name)
+                    .ok_or_else(|| format!("unknown sheet: {}", endpoint.name))?;
+            }
+            if place_span(span) {
+                Ok(())
+            } else {
+                Err(format!("unknown sheet: {}", span.first.name))
+            }
+        }
+        _ => {
+            let mut result = Ok(());
+            ast.fold_children_mut(&mut |child| {
+                if result.is_ok() {
+                    result = resolve_sheet_refs_in_place(child, resolve, place_span);
+                }
+                false
+            });
+            result
+        }
+    }
+}
+
 /// Resolve sheet-qualified refs to numeric sheet handles once, at formula ingest.
 /// `place_span` gives a resolved 3-D reference the sheets it spans, and fails
 /// when an endpoint is not in the tab order.

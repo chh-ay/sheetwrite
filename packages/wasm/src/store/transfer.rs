@@ -41,6 +41,265 @@ fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<S
         .collect()
 }
 
+/// Prototype: whether `write_tree` covers every node of `ast`.
+fn tree_encodable(ast: &Ast) -> bool {
+    match ast {
+        Ast::Num(_)
+        | Ast::Bool(_)
+        | Ast::Str(_)
+        | Ast::Missing
+        | Ast::InvalidRef
+        | Ast::Cell(..)
+        | Ast::Range(..)
+        | Ast::AbsCell(..)
+        | Ast::AbsRange(..)
+        | Ast::NamedRange(_) => true,
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            tree_encodable(left) && tree_encodable(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => tree_encodable(inner),
+        _ => false,
+    }
+}
+
+const TREE_NUM: u32 = 0;
+const TREE_BOOL: u32 = 1;
+const TREE_STR: u32 = 2;
+const TREE_MISSING: u32 = 3;
+const TREE_INVALID: u32 = 4;
+const TREE_CELL: u32 = 5;
+const TREE_RANGE: u32 = 6;
+const TREE_SHEET_CELL: u32 = 7;
+const TREE_SHEET_RANGE: u32 = 8;
+const TREE_NAMED_RANGE: u32 = 9;
+const TREE_BIN: u32 = 10;
+const TREE_CMP: u32 = 11;
+const TREE_NEG: u32 = 12;
+const TREE_POS: u32 = 13;
+const TREE_PERCENT: u32 = 14;
+const NO_SCOPE: u32 = u32::MAX;
+
+fn ref_flag_bits(flags: crate::calc::RefFlags) -> u32 {
+    u32::from(flags.row_abs) | u32::from(flags.col_abs) << 1
+}
+
+fn range_flag_bits(flags: crate::calc::RangeFlags) -> u32 {
+    ref_flag_bits(flags.start) | ref_flag_bits(flags.end) << 2
+}
+
+fn op_code(op: crate::calc::Op) -> u32 {
+    use crate::calc::Op;
+    match op {
+        Op::Add => 0,
+        Op::Sub => 1,
+        Op::Mul => 2,
+        Op::Div => 3,
+        Op::Pow => 4,
+        Op::Concat => 5,
+    }
+}
+
+fn cmp_code(op: crate::calc::CmpOp) -> u32 {
+    use crate::calc::CmpOp;
+    match op {
+        CmpOp::Eq => 0,
+        CmpOp::Ne => 1,
+        CmpOp::Lt => 2,
+        CmpOp::Gt => 3,
+        CmpOp::Le => 4,
+        CmpOp::Ge => 5,
+    }
+}
+
+/// Prototype: the tree in pre-order, one tag and its fields per node. A
+/// sheet reference keeps only its handle; the reader takes the name from
+/// the transferred sheet names.
+fn write_tree(out: &mut Writer, ast: &Ast) {
+    match ast {
+        Ast::Num(value) => {
+            out.u32(TREE_NUM);
+            out.u64(value.to_bits());
+        }
+        Ast::Bool(value) => {
+            out.u32(TREE_BOOL);
+            out.bool(*value);
+        }
+        Ast::Str(value) => {
+            out.u32(TREE_STR);
+            out.text(value);
+        }
+        Ast::Missing => out.u32(TREE_MISSING),
+        Ast::Cell(row, col, flags) => {
+            out.u32(TREE_CELL);
+            out.u32(*row);
+            out.u32(*col);
+            out.u32(ref_flag_bits(*flags));
+        }
+        Ast::Range(r0, c0, r1, c1, flags) => {
+            out.u32(TREE_RANGE);
+            for value in [*r0, *c0, *r1, *c1, range_flag_bits(*flags)] {
+                out.u32(value);
+            }
+        }
+        Ast::AbsCell(sheet, row, col, flags) => {
+            out.u32(TREE_SHEET_CELL);
+            out.u32(sheet.handle);
+            out.bool(sheet.quoted);
+            out.u32(*row);
+            out.u32(*col);
+            out.u32(ref_flag_bits(*flags));
+        }
+        Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
+            out.u32(TREE_SHEET_RANGE);
+            out.u32(sheet.handle);
+            out.bool(sheet.quoted);
+            for value in [*r0, *c0, *r1, *c1, range_flag_bits(*flags)] {
+                out.u32(value);
+            }
+        }
+        Ast::NamedRange(range) => {
+            out.u32(TREE_NAMED_RANGE);
+            out.text(&range.name);
+            out.u32(range.scope.unwrap_or(NO_SCOPE));
+            for value in [
+                range.sheet,
+                range.row_start,
+                range.col_start,
+                range.row_end,
+                range.col_end,
+            ] {
+                out.u32(value);
+            }
+        }
+        Ast::Bin(op, left, right) => {
+            out.u32(TREE_BIN);
+            out.u32(op_code(*op));
+            write_tree(out, left);
+            write_tree(out, right);
+        }
+        Ast::Cmp(op, left, right) => {
+            out.u32(TREE_CMP);
+            out.u32(cmp_code(*op));
+            write_tree(out, left);
+            write_tree(out, right);
+        }
+        Ast::Neg(inner) => {
+            out.u32(TREE_NEG);
+            write_tree(out, inner);
+        }
+        Ast::Pos(inner) => {
+            out.u32(TREE_POS);
+            write_tree(out, inner);
+        }
+        Ast::Percent(inner) => {
+            out.u32(TREE_PERCENT);
+            write_tree(out, inner);
+        }
+        _ => out.u32(TREE_INVALID),
+    }
+}
+
+#[cfg(any(target_arch = "wasm32", test))]
+fn ref_flags(bits: u32) -> RefFlags {
+    RefFlags {
+        row_abs: bits & 1 != 0,
+        col_abs: bits & 2 != 0,
+    }
+}
+
+#[cfg(any(target_arch = "wasm32", test))]
+fn range_flags(bits: u32) -> crate::calc::RangeFlags {
+    crate::calc::RangeFlags {
+        start: ref_flags(bits),
+        end: ref_flags(bits >> 2),
+    }
+}
+
+#[cfg(any(target_arch = "wasm32", test))]
+fn read_tree(input: &mut Reader<'_>, sheet_names: &[String]) -> TransferResult<Ast> {
+    use crate::calc::{CmpOp, Op};
+    let sheet = |input: &mut Reader<'_>| -> TransferResult<SheetRef> {
+        let handle = sheet_handle(input, sheet_names.len())?;
+        Ok(SheetRef {
+            handle,
+            name: sheet_names[handle as usize].clone(),
+            quoted: input.bool()?,
+        })
+    };
+    let child = |input: &mut Reader<'_>| -> TransferResult<Box<Ast>> {
+        Ok(Box::new(read_tree(input, sheet_names)?))
+    };
+    Ok(match input.u32()? {
+        TREE_NUM => Ast::Num(f64::from_bits(input.u64()?)),
+        TREE_BOOL => Ast::Bool(input.bool()?),
+        TREE_STR => Ast::Str(input.text()?),
+        TREE_MISSING => Ast::Missing,
+        TREE_INVALID => Ast::InvalidRef,
+        TREE_CELL => Ast::Cell(input.u32()?, input.u32()?, ref_flags(input.u32()?)),
+        TREE_RANGE => Ast::Range(
+            input.u32()?,
+            input.u32()?,
+            input.u32()?,
+            input.u32()?,
+            range_flags(input.u32()?),
+        ),
+        TREE_SHEET_CELL => {
+            let sheet = sheet(input)?;
+            Ast::AbsCell(sheet, input.u32()?, input.u32()?, ref_flags(input.u32()?))
+        }
+        TREE_SHEET_RANGE => {
+            let sheet = sheet(input)?;
+            Ast::AbsRange(
+                sheet,
+                input.u32()?,
+                input.u32()?,
+                input.u32()?,
+                input.u32()?,
+                range_flags(input.u32()?),
+            )
+        }
+        TREE_NAMED_RANGE => {
+            let name = input.text()?;
+            let scope = input.u32()?;
+            Ast::NamedRange(crate::calc::NamedRangeRef {
+                name,
+                scope: (scope != NO_SCOPE).then_some(scope),
+                sheet: input.u32()?,
+                row_start: input.u32()?,
+                col_start: input.u32()?,
+                row_end: input.u32()?,
+                col_end: input.u32()?,
+            })
+        }
+        TREE_BIN => {
+            let op = match input.u32()? {
+                0 => Op::Add,
+                1 => Op::Sub,
+                2 => Op::Mul,
+                3 => Op::Div,
+                4 => Op::Pow,
+                _ => Op::Concat,
+            };
+            Ast::Bin(op, child(input)?, child(input)?)
+        }
+        TREE_CMP => {
+            let op = match input.u32()? {
+                0 => CmpOp::Eq,
+                1 => CmpOp::Ne,
+                2 => CmpOp::Lt,
+                3 => CmpOp::Gt,
+                4 => CmpOp::Le,
+                _ => CmpOp::Ge,
+            };
+            Ast::Cmp(op, child(input)?, child(input)?)
+        }
+        TREE_NEG => Ast::Neg(child(input)?),
+        TREE_POS => Ast::Pos(child(input)?),
+        TREE_PERCENT => Ast::Percent(child(input)?),
+        _ => return Err("invalid transferred tree".to_string()),
+    })
+}
+
 pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) {
     out.text(&entry.source());
     out.bool(entry.is_reference());
@@ -53,6 +312,13 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     }
 
     out.bool(entry.ast.is_some());
+    if let Some(ast) = entry.ast.as_ref().filter(|_| !entry.is_reference()) {
+        let encodable = tree_encodable(ast);
+        out.bool(encodable);
+        if encodable {
+            write_tree(out, ast);
+        }
+    }
     out.error(entry.source_error());
     out.bool(entry.volatile());
     out.bool(entry.has_spill_refs());
@@ -114,10 +380,13 @@ impl CellStore {
             if is_reference {
                 reference_ast
             } else {
-                Some(
+                let tree = if input.bool()? {
+                    read_tree(input, &self.sheet_names)?
+                } else {
                     self.resolve_formula_ast(&source, sheet, row, col)
-                        .map_err(|_| "invalid transferred formula".to_string())?,
-                )
+                        .map_err(|_| "invalid transferred formula".to_string())?
+                };
+                Some(tree)
             }
         } else {
             None

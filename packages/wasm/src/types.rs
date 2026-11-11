@@ -753,6 +753,15 @@ impl FormulaEntry {
         self.rewrite_ast(formula_sheet, |ast| refresh_sheet_spans(ast, order, names))
     }
 
+    /// Prototype: moves the relative references by `row_delta` rows, as a
+    /// sort adjusts a formula that moves with its row.
+    pub(crate) fn translate_rows(&mut self, row_delta: i64, formula_sheet: u32) -> bool {
+        self.rewrite_ast(formula_sheet, |ast| {
+            crate::calc::translate_relative_refs(ast, row_delta, 0);
+            true
+        })
+    }
+
     pub(crate) fn update_table<F>(
         &mut self,
         table_id: &str,
@@ -765,6 +774,65 @@ impl FormulaEntry {
         self.rewrite_ast(formula_sheet, |ast| {
             update_structured_refs(ast, table_id, resolve)
         })
+    }
+
+    /// Prototype: moves the structured references to table `table_id` to the
+    /// span `span` gives (`None` makes them `#REF!`), in place. Returns an
+    /// entry holding the previous reads when any reference changed, for the
+    /// dependency index.
+    pub(crate) fn update_table_reads<F>(
+        &mut self,
+        table_id: &str,
+        formula_sheet: u32,
+        span: &F,
+    ) -> Option<FormulaEntry>
+    where
+        F: Fn(&StructuredRef) -> Option<(u32, u32, u32)>,
+    {
+        fn walk<F>(ast: &mut Ast, table_id: &str, span: &F) -> bool
+        where
+            F: Fn(&StructuredRef) -> Option<(u32, u32, u32)>,
+        {
+            if let Ast::Structured(reference) = ast {
+                if reference.table_id != table_id {
+                    return false;
+                }
+                return match span(reference) {
+                    Some(next) if next == (reference.row_start, reference.row_end, reference.col) => {
+                        false
+                    }
+                    Some((row_start, row_end, col)) => {
+                        reference.row_start = row_start;
+                        reference.row_end = row_end;
+                        reference.col = col;
+                        true
+                    }
+                    None => {
+                        *ast = Ast::InvalidRef;
+                        true
+                    }
+                };
+            }
+            ast.fold_children_mut(&mut |child| walk(child, table_id, span))
+        }
+        let produces_array = self.produces_array();
+        let ast = self.ast.as_mut()?;
+        if !walk(ast, table_id, span) {
+            return None;
+        }
+        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
+        let previous_reads = std::mem::replace(&mut self.reads, reads);
+        let has_text = self.flags & Self::REFERENCE == 0;
+        self.set_flag(Self::STALE_REFERENCES, has_text);
+        self.set_volatile(volatile);
+        let mut previous = Self {
+            ast: None,
+            source: String::new(),
+            reads: previous_reads,
+            flags: 0,
+        };
+        previous.set_produces_array(produces_array);
+        Some(previous)
     }
 
     /// Heap allocations owned by this formula entry. The inline entry is

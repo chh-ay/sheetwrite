@@ -303,6 +303,8 @@ pub struct CellStore {
     loading_page: usize,
     defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
     tables: HashMap<String, TableDefinition>,
+    /// Prototype: formulas by the names and tables they use.
+    binding_users: Option<Box<BindingUsers>>,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
@@ -411,6 +413,7 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             relationships: None,
             tables: HashMap::new(),
+            binding_users: None,
         }
     }
 
@@ -2273,9 +2276,10 @@ impl CellStore {
             row_end: row_end as u32,
             col_end: col_end as u32,
         };
+        let users = workbook_name_key(name);
         self.defined_names
             .insert(key, names::DefinedName::Range(definition));
-        self.refresh_named_formula_entries();
+        self.rebind_name_users(&[users]);
         self.recompute_all_sheets();
         true
     }
@@ -2288,7 +2292,7 @@ impl CellStore {
         if self.defined_names.remove(&key).is_none() {
             return false;
         }
-        self.refresh_named_formula_entries();
+        self.rebind_name_users(&[key.1]);
         self.recompute_all_sheets();
         true
     }
@@ -2428,12 +2432,17 @@ impl CellStore {
         }) {
             return false;
         }
-        if let Some(previous_key) = existing_key {
-            self.rewrite_table_formula_entries(id, Some(&definition));
+        let rebound = if let Some(previous_key) = existing_key {
             self.tables.remove(&previous_key);
+            self.tables.insert(name_key, definition);
+            self.rebind_table_users(id)
+        } else {
+            self.tables.insert(name_key, definition);
+            false
+        };
+        if !rebound {
+            self.refresh_formula_entries();
         }
-        self.tables.insert(name_key, definition);
-        self.refresh_formula_entries();
         #[cfg(feature = "analysis")]
         self.invalidate_table_pivots();
         self.recompute_all_sheets();
@@ -2513,7 +2522,7 @@ impl CellStore {
             let sheet_data = &self.sheets[sheet];
             sheet_data.cells.num_at(sheet_data.cells.idx(row, col))
         };
-        if self.replace_cell_source(CellSourceWrite {
+        let stored = self.replace_cell_source(CellSourceWrite {
             sheet,
             row,
             col,
@@ -2523,7 +2532,13 @@ impl CellStore {
             source: Some(entry),
             revision: dirty_revision,
             hydrating: false,
-        }) {
+        });
+        if stored && self.binding_users.is_some() {
+            if let Some(id) = self.sheets[sheet].formulas.id(key) {
+                self.note_binding_uses(id);
+            }
+        }
+        if stored {
             carried
         } else {
             f64::NAN
@@ -3416,9 +3431,16 @@ impl CellStore {
         }
         self.drop_invalid_references();
         self.rebase_table_rows(edited_sheet, at, delta);
-        let ranges_changed = self.rebase_named_rows(edited_sheet, at, delta);
-        if self.shift_named_formulas(edited_sheet, at, delta, false) || ranges_changed {
+        let moved_names = self.named_ranges_on(edited_sheet);
+        let moved_tables = self.tables_on(edited_sheet);
+        self.rebase_named_rows(edited_sheet, at, delta);
+        if self.shift_named_formulas(edited_sheet, at, delta, false) {
             self.refresh_named_formula_entries();
+        } else {
+            self.rebind_name_users(&moved_names);
+            for table in moved_tables {
+                self.rebind_table_users(&table);
+            }
         }
     }
 
@@ -4025,6 +4047,203 @@ impl CellStore {
             sheet.formulas.mark_all_dirty();
         }
         self.graph.invalidate();
+    }
+
+    /// Prototype: the keys of the named ranges on `sheet`.
+    fn named_ranges_on(&self, sheet: u32) -> Vec<String> {
+        self.defined_names
+            .iter()
+            .filter_map(|((_, key), definition)| match definition {
+                names::DefinedName::Range(range) if range.sheet == sheet => Some(key.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Prototype: the ids of the tables on `sheet`.
+    fn tables_on(&self, sheet: u32) -> Vec<String> {
+        self.tables
+            .values()
+            .filter(|table| table.sheet == sheet)
+            .map(|table| table.id.clone())
+            .collect()
+    }
+
+    /// Prototype: records the names and tables formula `id` uses.
+    fn note_binding_uses(&mut self, id: FormulaId) {
+        let Some(users) = self.binding_users.as_mut() else {
+            return;
+        };
+        let Some(ast) = self.formula_slots.get(id).and_then(|entry| entry.ast.as_ref()) else {
+            return;
+        };
+        collect_binding_uses(ast, id, users);
+    }
+
+    /// Prototype: builds the index from every formula the first time a name or
+    /// table changes; `set_formula` keeps it up to date afterwards.
+    fn ensure_binding_users(&mut self) {
+        if self.binding_users.is_some() {
+            return;
+        }
+        let mut users = Box::<BindingUsers>::default();
+        for (id, _) in self.formula_slots.occupied() {
+            if let Some(ast) = self.formula_slots.get(id).and_then(|entry| entry.ast.as_ref()) {
+                collect_binding_uses(ast, id, &mut users);
+            }
+        }
+        self.binding_users = Some(users);
+    }
+
+    /// Prototype: resolves again only the formulas that use one of `keys`
+    /// and marks them dirty, instead of every formula in the workbook.
+    fn rebind_name_users(&mut self, keys: &[String]) {
+        let has_formula_names = self
+            .defined_names
+            .values()
+            .any(|definition| matches!(definition, names::DefinedName::Formula(_)));
+        if has_formula_names {
+            self.refresh_named_formula_entries();
+            return;
+        }
+        self.ensure_binding_users();
+        let mut ids: Vec<FormulaId> = Vec::new();
+        if let Some(users) = &self.binding_users {
+            for key in keys {
+                if let Some(list) = users.names.get(key) {
+                    ids.extend_from_slice(list);
+                }
+            }
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        for id in ids {
+            let Some(location) = self.formula_slots.location(id) else {
+                continue;
+            };
+            let Some(entry) = self.formula_slots.get(id).filter(|entry| entry.is_formula()) else {
+                continue;
+            };
+            let source = entry.source().into_owned();
+            let (sheet, key) = (location.sheet, (location.row, location.col));
+            let rebound = match self.resolve_formula_ast(&source, sheet, key.0, key.1) {
+                Ok(ast) => FormulaEntry::parsed_source(ast, sheet, source),
+                Err(error) => FormulaEntry::error(&source, error),
+            };
+            let data = &mut self.sheets[sheet as usize];
+            self.graph.replace_entry(
+                &mut data.formulas,
+                &mut self.formula_slots,
+                sheet as usize,
+                key,
+                Some(rebound),
+            );
+            data.formulas.mark_cell_dirty(key);
+        }
+    }
+
+    /// Prototype: points the structured references of the formulas that use
+    /// table `table_id` at its definition, marking dirty only the formulas
+    /// whose reads changed. Returns false when the table is gone.
+    fn rebind_table_users(&mut self, table_id: &str) -> bool {
+        let Some(table) = self.tables.values().find(|table| table.id == table_id).cloned() else {
+            return false;
+        };
+        self.ensure_binding_users();
+        let mut ids = self
+            .binding_users
+            .as_ref()
+            .and_then(|users| users.tables.get(table_id))
+            .cloned()
+            .unwrap_or_default();
+        ids.sort_unstable();
+        ids.dedup();
+        for id in ids {
+            let Some(location) = self.formula_slots.location(id) else {
+                continue;
+            };
+            let Some(entry) = self.formula_slots.get_mut(id) else {
+                continue;
+            };
+            let Some(previous) = entry.update_table_reads(table_id, location.sheet, &|reference| {
+                structured_span(&table, reference)
+            }) else {
+                continue;
+            };
+            self.formula_slots.refresh_flags(id);
+            let next = self.formula_slots.get(id);
+            self.graph.record_replacement(id, Some(previous), next);
+            self.sheets[location.sheet as usize]
+                .formulas
+                .mark_cell_dirty((location.row, location.col));
+        }
+        true
+    }
+}
+
+/// Prototype: where a structured reference to `table` points now, without
+/// building a new reference: `(row_start, row_end, col)`.
+fn structured_span(table: &TableDefinition, reference: &StructuredRef) -> Option<(u32, u32, u32)> {
+    let column = table
+        .columns
+        .iter()
+        .find(|column| column.id == reference.column_id)?;
+    let body_start = table.row_start + u32::from(table.header_row);
+    let body_end = table.row_end.checked_sub(u32::from(table.totals_row))?;
+    let (row_start, row_end) = match reference.section {
+        TableSection::Headers if table.header_row => (table.row_start, table.row_start),
+        TableSection::Totals if table.totals_row => (table.row_end, table.row_end),
+        TableSection::Body if body_start <= body_end => (body_start, body_end),
+        TableSection::CurrentRow
+            if reference.row_start >= body_start && reference.row_start <= body_end =>
+        {
+            (reference.row_start, reference.row_start)
+        }
+        _ => return None,
+    };
+    Some((row_start, row_end, column.col))
+}
+
+/// Prototype: the formulas that use each defined name (by folded key) and
+/// each table (by id). Lists may hold stale ids; a rebind of a formula that
+/// no longer uses the key only costs the rebind.
+#[derive(Default)]
+struct BindingUsers {
+    names: HashMap<String, Vec<FormulaId>>,
+    tables: HashMap<String, Vec<FormulaId>>,
+}
+
+fn collect_binding_uses(ast: &Ast, id: FormulaId, users: &mut BindingUsers) {
+    match ast {
+        Ast::Name(name) => users
+            .names
+            .entry(workbook_name_key(name))
+            .or_default()
+            .push(id),
+        Ast::NamedRange(range) => users
+            .names
+            .entry(workbook_name_key(&range.name))
+            .or_default()
+            .push(id),
+        Ast::NamedFormula(named) => {
+            users
+                .names
+                .entry(workbook_name_key(&named.name))
+                .or_default()
+                .push(id);
+            collect_binding_uses(&named.expression, id, users);
+        }
+        Ast::Structured(reference) => users
+            .tables
+            .entry(reference.table_id.clone())
+            .or_default()
+            .push(id),
+        _ => {
+            ast.any_child(&mut |child| {
+                collect_binding_uses(child, id, users);
+                false
+            });
+        }
     }
 }
 

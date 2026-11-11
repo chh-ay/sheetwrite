@@ -42,6 +42,8 @@ struct PermutedBlock {
 enum MovedSource {
     Formula(String),
     Reference(AbsCellKey),
+    /// Prototype: the formula's tree, moved with its row.
+    Entry(FormulaEntry),
 }
 
 #[wasm_bindgen]
@@ -431,6 +433,18 @@ impl CellStore {
         col: usize,
         row_delta: i32,
     ) -> Option<MovedSource> {
+        let key = cell_key(row, col)?;
+        if let Some(entry) = self.sheets[sheet]
+            .formulas
+            .get(key, &self.formula_slots)
+            .filter(|entry| entry.is_formula() && entry.ast.is_some())
+        {
+            let mut entry = entry.clone();
+            if row_delta != 0 {
+                entry.translate_rows(i64::from(row_delta), sheet as u32);
+            }
+            return Some(MovedSource::Entry(entry));
+        }
         if let Some(text) = self.formula_source(sheet, row, col) {
             let text = if row_delta == 0 {
                 text
@@ -522,6 +536,7 @@ impl CellStore {
             MovedSource::Formula(text) => {
                 self.parse_formula_entry(&text, sheet as u32, key.0, key.1)
             }
+            MovedSource::Entry(entry) => entry,
             MovedSource::Reference(target) => FormulaEntry::reference(
                 target,
                 &self.sheet_names[target.sheet as usize],
