@@ -135,10 +135,9 @@ function faultClient(page: Page, slug: "a" | "b"): Locator {
   return page.locator(`[data-fault-client="${slug}"]`);
 }
 
-async function openAdvancedFaults(page: Page): Promise<void> {
-  const advanced = page.locator(".sw-clb__advanced");
-  await advanced.locator("summary").click();
-  await expect(advanced).toHaveAttribute("open", "");
+// The fault panels render open, beside their diagram.
+async function expectAdvancedFaultsOpen(page: Page): Promise<void> {
+  await expect(page.locator(".sw-clb__advanced")).toHaveAttribute("open", "");
 }
 
 test.describe("database proof", () => {
@@ -243,7 +242,7 @@ test.describe("database proof", () => {
     ).toHaveCount(1);
 
     // The same page proves the oversize path: a dropped entry, an older undo kept.
-    await page.getByTestId("dbx-diagnostics").locator("summary").click();
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     await page.getByTestId("dbx-tight-limit").click();
     const limitReport = page.getByTestId("dbx-limit-report");
     await expect(limitReport).toHaveAttribute("data-state", "passed");
@@ -259,8 +258,7 @@ test.describe("database proof", () => {
     await page.goto(DATABASE_URL);
     await databaseReady(page);
 
-    const diagnostics = page.getByTestId("dbx-diagnostics");
-    await diagnostics.locator("summary").click();
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     await page.getByRole("button", { name: "Lose next acknowledgement" }).click();
     await page.getByRole("button", { name: "Commit sample edit" }).click();
 
@@ -291,9 +289,7 @@ test.describe("database proof", () => {
     await page.goto(DATABASE_URL);
     await databaseReady(page);
 
-    const diagnostics = page.getByTestId("dbx-diagnostics");
-    await diagnostics.locator("summary").click();
-    await expect(diagnostics).toHaveAttribute("open", "");
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
 
     // Lost acknowledgement: the server stores v1, the client keeps the commit
     // pending, and the retry with the same mutation id must not apply it twice.
@@ -470,7 +466,7 @@ test.describe("collaboration proof", () => {
     const errors = collectErrors(page);
     await page.goto(COLLABORATION_URL);
     await collaborationReady(page);
-    await openAdvancedFaults(page);
+    await expectAdvancedFaultsOpen(page);
 
     const anaEdit = client(page, "a").getByRole("button", { name: `Add $500 to ${ANA_ACCOUNT}` });
     // Gap: Bram's link holds v1 back, v2 arrives first and buffers.
