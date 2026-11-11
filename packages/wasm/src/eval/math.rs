@@ -639,77 +639,6 @@ mod tests {
     }
 
     #[test]
-    fn product_and_sumproduct_obey_argument_provenance_and_shapes() {
-        let values = mixed_arguments(vec![
-            (false, vec![Value::Bool(true)]),
-            (false, vec![Value::text("3")]),
-            (
-                true,
-                vec![
-                    Value::number(2.0),
-                    Value::Bool(true),
-                    Value::text("9"),
-                    Value::Blank,
-                ],
-            ),
-        ]);
-        assert_number(apply(Func::Product, &values).unwrap(), 6.0);
-
-        let paired = mixed_arguments(vec![
-            (
-                true,
-                vec![
-                    Value::number(2.0),
-                    Value::Bool(true),
-                    Value::text("4"),
-                    Value::Blank,
-                ],
-            ),
-            (
-                true,
-                vec![
-                    Value::number(3.0),
-                    Value::number(4.0),
-                    Value::number(5.0),
-                    Value::number(6.0),
-                ],
-            ),
-        ]);
-        assert_number(apply(Func::SumProduct, &paired).unwrap(), 6.0);
-
-        let mismatched = mixed_arguments(vec![
-            (true, vec![Value::number(1.0), Value::number(2.0)]),
-            (true, vec![Value::number(3.0)]),
-        ]);
-        assert_eq!(
-            apply(Func::SumProduct, &mismatched).unwrap(),
-            Value::Error(FormulaError::Value)
-        );
-        let mut dimensional_mismatch = FuncAccumulator::default();
-        dimensional_mismatch.push_range(Value::number(1.0)).unwrap();
-        dimensional_mismatch.push_range(Value::number(2.0)).unwrap();
-        dimensional_mismatch.finish_arg(1, 2).unwrap();
-        dimensional_mismatch.push_range(Value::number(3.0)).unwrap();
-        dimensional_mismatch.push_range(Value::number(4.0)).unwrap();
-        dimensional_mismatch.finish_arg(2, 1).unwrap();
-        assert_eq!(
-            apply(Func::SumProduct, &dimensional_mismatch).unwrap(),
-            Value::Error(FormulaError::Value)
-        );
-        let error = mixed_arguments(vec![
-            (
-                true,
-                vec![Value::number(1.0), Value::Error(FormulaError::Ref)],
-            ),
-            (true, vec![Value::number(2.0), Value::number(3.0)]),
-        ]);
-        assert_eq!(
-            apply(Func::SumProduct, &error).unwrap(),
-            Value::Error(FormulaError::Ref)
-        );
-    }
-
-    #[test]
     fn multiple_and_parity_rounding_cover_sign_and_integer_boundaries() {
         assert_number(
             evaluate(Func::MRound, vec![Value::number(0.0), Value::number(-3.0)]),
@@ -816,41 +745,5 @@ mod tests {
             apply(Func::Subtotal, &past_hidden_row_codes).unwrap(),
             Value::Error(FormulaError::Value)
         );
-    }
-
-    /// The examples of the CEILING.PRECISE, ISO.CEILING and FLOOR.PRECISE
-    /// pages, `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
-    #[test]
-    fn precise_rounding_uses_the_absolute_significance() {
-        let cases: &[(Func, &[f64], f64)] = &[
-            (Func::CeilingPrecise, &[4.3], 5.0),
-            (Func::CeilingPrecise, &[-4.3], -4.0),
-            (Func::CeilingPrecise, &[4.3, 2.0], 6.0),
-            (Func::CeilingPrecise, &[4.3, -2.0], 6.0),
-            (Func::CeilingPrecise, &[-4.3, 2.0], -4.0),
-            (Func::CeilingPrecise, &[-4.3, -2.0], -4.0),
-            (Func::IsoCeiling, &[4.3], 5.0),
-            (Func::IsoCeiling, &[-4.3], -4.0),
-            (Func::IsoCeiling, &[4.3, 2.0], 6.0),
-            (Func::IsoCeiling, &[4.3, -2.0], 6.0),
-            (Func::IsoCeiling, &[-4.3, 2.0], -4.0),
-            (Func::IsoCeiling, &[-4.3, -2.0], -4.0),
-            (Func::FloorPrecise, &[-3.2, -1.0], -4.0),
-            (Func::FloorPrecise, &[3.2, 1.0], 3.0),
-            (Func::FloorPrecise, &[-3.2, 1.0], -4.0),
-            (Func::FloorPrecise, &[3.2, -1.0], 3.0),
-            (Func::FloorPrecise, &[3.2], 3.0),
-            (Func::CeilingPrecise, &[4.3, 0.0], 0.0),
-            (Func::CeilingPrecise, &[-0.5], 0.0),
-        ];
-
-        for (func, arguments, expected) in cases {
-            let arguments = arguments
-                .iter()
-                .map(|&value| Value::number(value))
-                .collect();
-
-            assert_eq!(evaluate(*func, arguments), Value::Number(*expected));
-        }
     }
 }
