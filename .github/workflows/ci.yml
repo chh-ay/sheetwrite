@@ -457,9 +457,9 @@ jobs:
         run: bun run compatibility:validate
       - name: Timing probe (temporary)
         run: |
-          bun scripts/workspace-tooling.ts build-rust 2>&1 | grep -E "workspace-node|Compiling sheetwrite|Finished"
-          bun run build:packages 2>&1 | grep -E "workspace-node|Compiling sheetwrite|Finished|Done in"
-          git clean -fdxq packages/core/dist packages/core/src/generated packages/xlsx/dist packages/queries/dist packages/charts/dist packages/react/dist packages/vue/dist
+          rustup component list --installed
+          time bun scripts/workspace-tooling.ts build-rust
+          time bun run build:packages
       - name: Build and pack once
         run: bun run release:prepare -- --mode release --output test-results/release-artifacts
       - name: Verify local compatibility results
