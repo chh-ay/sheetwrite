@@ -322,7 +322,9 @@ function ExampleFrame(props: ExampleFrameProps) {
     <iframe
       class="sw-playground__frame"
       onLoad={start}
-      ref={frame}
+      ref={(element) => {
+        frame = element;
+      }}
       // Scripts run so the example can; the frame cannot navigate the page or open windows.
       sandbox="allow-scripts allow-same-origin"
       srcdoc={frameSource}

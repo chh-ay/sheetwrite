@@ -69,7 +69,9 @@ export function LiveGrid(rawProps: LiveGridProps) {
         aria-busy={state() === "loading"}
         aria-label={props.label}
         class="sw-live-grid__host"
-        ref={host}
+        ref={(element) => {
+          host = element;
+        }}
         role="region"
         style={{ height: `${props.height}px` }}
       >

@@ -92,6 +92,7 @@ export function ApiSymbolFilter(props: {
 
   return (
     <search aria-label="Filter exported symbols" class="sw-symbol-filter">
+      {/* oxlint-disable-next-line jsx-a11y/label-has-associated-control -- `for` names the input; the rule knows only React's `htmlFor`. */}
       <label class="sw-symbol-filter__label" for={inputId}>
         Filter exported symbols
       </label>
