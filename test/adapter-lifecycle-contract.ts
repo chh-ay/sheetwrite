@@ -12,6 +12,7 @@ import type {
   DataSource,
   DataSourcePage,
   Grid,
+  GridEvents,
   GridOptions,
   Workbook,
 } from "../packages/core/src/index.js";
@@ -93,6 +94,17 @@ function makeDatasource(label: string): DataSource {
 export function present<T>(value: T | null | undefined, what: string): T {
   if (value === null || value === undefined) throw new Error(`Missing ${what}`);
   return value;
+}
+
+const WAIT_FOR_EVENT_MS = 5_000;
+
+/** Lets tasks run until `predicate` holds. */
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + WAIT_FOR_EVENT_MS;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for adapter event");
+    await Bun.sleep(0);
+  }
 }
 
 export interface AdapterConformanceProps
@@ -422,7 +434,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         grid.applyTransaction({ patches: [{ op: "set", addr: locked, value }] });
         grid.actions.exportXlsx();
         await exported.promise;
-        while (events.length < 4) await Bun.sleep(0);
+        await waitFor(() => events.length === 4);
       } finally {
         setXlsxTableExportBackend(installedTableExport);
       }
@@ -434,6 +446,52 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         "mutation protection",
       ]);
       await mounted.unmount();
+    });
+
+    it("drops stale datasource delivery after replacement and unmount", async () => {
+      const delivered: string[] = [];
+      /** A datasource whose requests stay pending until the returned `fail` runs. */
+      const pendingDatasource = () => {
+        const request = Promise.withResolvers<DataSourcePage>();
+        const state = { requests: 0 };
+        const datasource: DataSource = {
+          capabilities: { protocol: 2, columns: "windowed" },
+          getRows() {
+            state.requests += 1;
+            return request.promise;
+          },
+        };
+        return { datasource, state, fail: (message: string) => request.reject(new Error(message)) };
+      };
+      const stale = pendingDatasource();
+      const { mounted, props, grid } = await mountRecorded(mount, {
+        data: undefined,
+        datasource: stale.datasource,
+        onDatasourceError: () => delivered.push("stale"),
+      });
+      await waitFor(() => stale.state.requests > 0);
+
+      const current = pendingDatasource();
+      const onDatasourceError = (event: GridEvents["datasource-error"]) =>
+        delivered.push(event.error.message);
+      await mounted.render({ ...props, datasource: current.datasource, onDatasourceError });
+      await waitFor(() => current.state.requests > 0);
+      expect(mounted.getPublishedGrid()).not.toBe(grid);
+
+      stale.fail("stale generation");
+      await Bun.sleep(0);
+      expect(delivered).toEqual([]);
+      current.fail("current generation");
+      await waitFor(() => delivered.length === 1);
+      expect(delivered).toEqual(["current generation"]);
+
+      const unmounted = pendingDatasource();
+      await mounted.render({ ...props, datasource: unmounted.datasource, onDatasourceError });
+      await waitFor(() => unmounted.state.requests > 0);
+      await mounted.unmount();
+      unmounted.fail("unmounted generation");
+      await Bun.sleep(0);
+      expect(delivered).toEqual(["current generation"]);
     });
 
     it("forwards semantic headers and custom editor lifecycle through the framework boundary", async () => {
