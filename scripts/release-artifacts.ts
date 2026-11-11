@@ -408,13 +408,36 @@ export const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>>
     "dist/worker.d.ts",
     "dist/worker.js",
     "styles.css",
+    "styles/grid.css",
+    "styles/icons.svg",
     "shell.css",
   ],
   "@sheetwrite/xlsx": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
   "@sheetwrite/charts": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
-  "@sheetwrite/react": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
-  "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
-  "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],
+  "@sheetwrite/react": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "styles.css",
+    "styles/grid.css",
+  ],
+  "@sheetwrite/vue": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "styles.css",
+    "styles/grid.css",
+  ],
+  "@sheetwrite/svelte": [
+    "README.md",
+    "LICENSE",
+    "src/Grid.svelte",
+    "src/index.ts",
+    "styles.css",
+    "styles/grid.css",
+  ],
 };
 
 function manifestEntryExists(entry: string, files: readonly string[]): boolean {
@@ -880,15 +903,6 @@ async function cli(): Promise<void> {
     await packBuiltPackages(requiredOption(args, "--output"));
     return;
   }
-  if (command === "build") {
-    const output = requiredOption(args, "--output");
-    const manifest = await buildReleaseArtifacts(output, "verification");
-    console.log(
-      `Built ${manifest.packages.length} canonical release tarballs in ${resolve(output)}`,
-    );
-    console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(output)}`);
-    return;
-  }
   if (command === "prepare") {
     const mode = requiredOption(args, "--mode");
     if (mode !== "verification" && mode !== "release") {
@@ -902,8 +916,8 @@ async function cli(): Promise<void> {
     console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(output)}`);
     return;
   }
-  if (command === "verify" || command === "verify-input") {
-    const artifacts = requiredOption(args, command === "verify" ? "--artifacts" : "--input");
+  if (command === "verify-input") {
+    const artifacts = requiredOption(args, "--input");
     const manifest = await verifyReleaseArtifacts(artifacts);
     console.log(
       `Verified ${manifest.packages.length} canonical release tarballs from ${manifest.sourceCommit}`,
@@ -912,7 +926,7 @@ async function cli(): Promise<void> {
     return;
   }
   throw new Error(
-    "Usage: bun scripts/release-artifacts.ts pack --output <directory> | build --output <directory> | prepare --mode <verification|release> --output <directory> | verify --artifacts <directory> | verify-input --input <directory>",
+    "Usage: bun scripts/release-artifacts.ts pack --output <directory> | prepare --mode <verification|release> --output <directory> | verify-input --input <directory>",
   );
 }
 

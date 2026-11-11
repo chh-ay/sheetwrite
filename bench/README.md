@@ -663,6 +663,25 @@ bun run bench:render:validate
 bun run bench:core-paths
 ```
 
+Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
+
+| Entry | What it runs |
+| --- | --- |
+| `bench:range`, `bench:range:smoke` | Range operations (such as exact auto-fit) at 10k–1M rows (`src/range-bench.ts`) |
+| `bench:paged:smoke` | Smoke matrix of the paged capture (`src/paged-bench.ts`) |
+| `bench:paged-storage` | Paged storage: local edits, their acknowledgement, clean-page eviction and range reads through formulas (`src/paged-storage-bench.ts`) |
+| `bench:windows` | Window ownership: scroll and off-screen edits against the painted window (`src/window-ownership-bench.ts`) |
+| `bench:epochs` | Edit-to-paint cost for changes that may or may not reach the painted window (`src/epoch-split-bench.ts`) |
+| `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator (`src/sync-queue-depth-bench.ts`) |
+| `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
+| `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
+| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference (`src/panel-read-bench.ts`) |
+| `bench:view-index` | Packed view-row index against a map baseline (`src/view-index-bench.ts`) |
+| `bench:resource`, `bench:resource:smoke` | Ingest memory and string-pool resources at 1M rows (`src/resource-bench.ts`) |
+| `bench:streaming-memory` | XLSX buffered and streaming memory, baseline and candidate interleaved in fresh processes (`src/streaming-memory-bench.ts`) |
+| `bench:data:smoke`, `bench:core-paths:smoke`, `bench:xlsx:smoke` | Smoke matrices of `bench:data`, `bench:core-paths` and `bench:xlsx` |
+| `test:gates` | The bench package tests (`bun test test`) |
+
 The Performance pages in `docs/src/content/docs/performance/` publish every
 artifact above. `bench:release` captures render-scale, the interaction
 evidence, paged storage, data, core paths, chart tracking, pivot, formula,

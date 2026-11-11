@@ -3,6 +3,8 @@ node_modules/
 
 # Build outputs
 dist/
+# The webpack bundler fixture's stylesheet build (webpack.styles.config.js).
+test/bundler-fixtures/webpack/dist-styles/
 *.tsbuildinfo
 .astro/
 .tanstack/

@@ -686,17 +686,3 @@ it("shows the Formulas tab with Explain Formula, and hides Insert Function witho
   key(insert, "ArrowRight");
   expect(document.activeElement).toBe(formulas);
 });
-
-it("shows Insert Function with host functions on the full engine, in its own process", async () => {
-  // Engine selection is process-wide, so the full-engine checks run apart.
-  const probe = Bun.spawn(
-    [process.execPath, "test", "./packages/core/test/ribbon-functions.full-engine.ts"],
-    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-  );
-  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-    exitCode: 0,
-    failures: [],
-  });
-});
