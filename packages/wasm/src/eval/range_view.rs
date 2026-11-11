@@ -63,7 +63,7 @@ impl<'a> RangeView<'a> {
     }
 
     /// The number of rows and columns after clipping.
-    pub(super) fn shape(&self) -> (usize, usize) {
+    pub(super) const fn shape(&self) -> (usize, usize) {
         (self.rows, self.cols)
     }
 
@@ -155,7 +155,7 @@ pub(super) enum ArrayView<'a> {
 
 impl ArrayView<'_> {
     /// The number of rows and columns.
-    pub(super) fn shape(&self) -> (usize, usize) {
+    pub(super) const fn shape(&self) -> (usize, usize) {
         match self {
             Self::Range(range) => range.shape(),
             Self::Matrix(matrix) => (matrix.rows, matrix.cols),
@@ -168,8 +168,7 @@ impl ArrayView<'_> {
             Self::Range(range) => range.cell(row, col, pass),
             Self::Matrix(matrix) => matrix
                 .get(row, col)
-                .cloned()
-                .unwrap_or_else(|| Value::Error(FormulaError::Ref)),
+                .map_or(Value::Error(FormulaError::Ref), Clone::clone),
         }
     }
 }
