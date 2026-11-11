@@ -17,6 +17,11 @@
    for text that needs it. The latin heading and body files are preloaded
    first in the document head (routes/__root.tsx).
 
+   Every face is `font-display: optional`: a face that is not ready for the
+   first paint is not swapped in later, so a font never moves the layout
+   (CLS). That page view keeps the metric-matched fallback below; the font,
+   now cached, renders from the next view on.
+
    The latin heading file (src/fonts, licence beside it) is the fontsource
    optical-size file cut to what headings use: one weight (650) for every
    heading role, the 14–72 optical sizes, and latin text characters:
@@ -27,7 +32,7 @@
 @font-face {
   font-family: "Bricolage Grotesque Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600 700;
   src: url("../fonts/bricolage-grotesque-latin-650-opsz.woff2") format("woff2-variations");
   unicode-range:
@@ -41,7 +46,7 @@
 @font-face {
   font-family: "Bricolage Grotesque Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600 700;
   src: url("@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-ext-opsz-normal.woff2")
     format("woff2-variations");
@@ -54,7 +59,7 @@
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400 700;
   src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
     format("woff2-variations");
@@ -66,7 +71,7 @@
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400 700;
   src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-ext-wght-normal.woff2")
     format("woff2-variations");
@@ -79,7 +84,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2");
   unicode-range:
@@ -90,7 +95,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-400-normal.woff2")
     format("woff2");
@@ -103,7 +108,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2") format("woff2");
   unicode-range:
@@ -114,7 +119,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-600-normal.woff2")
     format("woff2");
@@ -126,16 +131,16 @@
 
 /* Metric-matched fallbacks: Arial (Liberation Sans on Linux) scaled to each
    face's width, with line metrics from the face's hhea table divided by the
-   scale, so text keeps its line breaks and height while the web fonts load.
+   scale, so a view that misses the web fonts looks as close to them as the
+   fallback allows.
    Each weight the site sets has its own band, scaled by the width ratio of
    the web font to the fallback on the text the site sets at that weight
    (navigation 600, emphasis 700; the heading file is one 650 instance).
-   Two bands are fitted where a swap moved the layout: 500 on the docs tabs
-   (the tab row's width matches within 1.5 px, so the tabs after the current
-   one stay put), and 400 at the scale that keeps the landing's lead on the
-   same lines in hinted Linux text, whose glyph widths snap to whole pixels
-   (102.1%, the ratio on body text, re-wraps it). Instrument Sans: ascent
-   0.97, descent 0.25. Bricolage: 0.93, 0.27. */
+   Two bands are fitted on particular text: 500 on the docs tabs (the tab
+   row's width matches within 1.5 px), and 400 at the scale that keeps the
+   landing's lead on the same lines in hinted Linux text, whose glyph widths
+   snap to whole pixels. Instrument Sans: ascent 0.97, descent 0.25.
+   Bricolage: 0.93, 0.27. */
 @font-face {
   font-family: "Bricolage Grotesque Fallback";
   font-weight: 100 549;
