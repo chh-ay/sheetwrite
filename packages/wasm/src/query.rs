@@ -1312,6 +1312,7 @@ fn sort_finite_number_column_comparison(
     }
 
     order.sort_unstable_by(|&a, &b| {
+        #[allow(unsafe_code, reason = "calls `payload_unchecked`; see its reason")]
         let (left, right) = if sheet.cells.is_paged() {
             (
                 sheet.cells.num_at(base + a as usize),

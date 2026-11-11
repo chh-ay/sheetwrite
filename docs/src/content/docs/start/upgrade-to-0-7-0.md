@@ -345,7 +345,7 @@ export function safeStyle(untrusted: unknown) {
 
 | Change | What to do |
 | --- | --- |
-| `icons.css` loads `icons.svg` from beside it. | Nothing with Vite, webpack or Next.js. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. |
+| `icons.css` loads `icons.svg` from beside it. | Nothing with Vite, webpack or Next.js. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. Without one, the build fails with `No loader is configured for ".svg" files: icons.svg`. |
 | The default icon sheet is a file from your origin, not a `data:` URL. | If you set `--sheetwrite-icon-sheet` only because your Content Security Policy blocks `data:` images, you can remove it. |
 | The parts are published under `@sheetwrite/core/styles/` and in each framework adapter. | To ship less CSS, import only the parts your grid uses; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts). |
 
