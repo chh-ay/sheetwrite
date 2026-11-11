@@ -220,8 +220,6 @@ async function runSupplyChecks(): Promise<void> {
       "--manifest-path",
       resolve(dir, "Cargo.toml"),
       "check",
-      "--config",
-      resolve(root, "deny.toml"),
       "licenses",
       "bans",
       "sources",
