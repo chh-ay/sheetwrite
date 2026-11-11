@@ -539,12 +539,19 @@ impl FormulaEntry {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
 
-    pub(crate) fn parsed_source(mut ast: Ast, sheet: u32, source: String) -> Self {
+    /// `detached_sheets` tells whether the tree may hold a detached sheet
+    /// reference; only then is it walked for a missing local sheet.
+    pub(crate) fn parsed_source(
+        mut ast: Ast,
+        sheet: u32,
+        source: String,
+        detached_sheets: bool,
+    ) -> Self {
+        let missing_local = detached_sheets && has_unresolved_local_sheets(&ast);
         // A formula of values, cells and operators has no function, range,
         // name or array: every flag below stays clear, and its reads are the
         // only metadata that needs a walk.
         if ast_is_plain(&ast) {
-            let missing_local = has_unresolved_local_sheets(&ast);
             let mut entry = Self {
                 flags: 0,
                 reads: ReadSet::from_ast(&ast, sheet),
@@ -574,7 +581,7 @@ impl FormulaEntry {
         if contains_let && !entry.has_spill_refs() {
             crate::eval::resolve_let_names(&mut ast);
         }
-        entry.set_source_error(has_unresolved_local_sheets(&ast).then_some(FormulaError::Ref));
+        entry.set_source_error(missing_local.then_some(FormulaError::Ref));
         entry.ast = Some(ast);
 
         entry
@@ -706,7 +713,7 @@ impl FormulaEntry {
         }
         let ast = self.ast.take()?;
         let mut replacement =
-            Self::parsed_source(ast, formula_sheet, std::mem::take(&mut self.source));
+            Self::parsed_source(ast, formula_sheet, std::mem::take(&mut self.source), true);
         replacement.flags |= self.flags & (Self::REFERENCE | Self::STALE_REFERENCES);
         Some(replacement)
     }
@@ -857,7 +864,7 @@ mod formula_entry_tests {
                     0,
                 )
             } else {
-                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_string())
+                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_string(), false)
             };
 
             for (volatile, spill_refs, produces_array) in [

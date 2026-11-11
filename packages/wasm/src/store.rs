@@ -3720,21 +3720,24 @@ impl CellStore {
         formula_col: u32,
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
-            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_string()),
+            Ok((ast, detached_sheets)) => {
+                FormulaEntry::parsed_source(ast, formula_sheet, source.to_string(), detached_sheets)
+            }
             Err(error) => FormulaEntry::error(source, error),
         }
     }
 
     /// Parses a formula and resolves its sheets, defined names and table
     /// references. Each step runs only when the parse found a node it
-    /// rewrites, so a formula of plain cells is parsed in one pass.
+    /// rewrites, so a formula of plain cells is parsed in one pass. The flag
+    /// tells whether a sheet reference stayed detached.
     fn resolve_formula_ast(
         &self,
         source: &str,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
-    ) -> Result<Ast, FormulaError> {
+    ) -> Result<ResolvedFormula, FormulaError> {
         let (mut ast, features) =
             parse_bound_with_features(source, &|name| self.sheet_handle(name), &|span| {
                 place_span(span, &self.tab_order())
@@ -3752,7 +3755,7 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         let ast = self.bind_regex_patterns(source, ast);
-        Ok(ast)
+        Ok((ast, features.detached_sheets))
     }
 
     /// Resolves a parsed formula as if it were in the cell at
@@ -4102,6 +4105,10 @@ impl CellStore {
         self.graph.invalidate();
     }
 }
+
+/// A resolved formula tree, and whether a sheet reference in it stayed
+/// detached.
+type ResolvedFormula = (Ast, bool);
 
 /// Result of a single-cell read.
 #[wasm_bindgen]

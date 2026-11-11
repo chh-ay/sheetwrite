@@ -114,7 +114,8 @@ impl CellStore {
             } else {
                 Some(
                     self.resolve_formula_ast(&source, sheet, row, col)
-                        .map_err(|_| "invalid transferred formula".to_string())?,
+                        .map_err(|_| "invalid transferred formula".to_string())?
+                        .0,
                 )
             }
         } else {

@@ -1787,6 +1787,9 @@ pub(crate) struct ParseFeatures {
     pub(crate) names: bool,
     /// A table reference.
     pub(crate) table_refs: bool,
+    /// A sheet reference left detached: an external link or a sheet that the
+    /// workbook does not have.
+    pub(crate) detached_sheets: bool,
 }
 
 /// Binary operator levels, loosest first. A comparison does not chain.
@@ -1827,6 +1830,15 @@ struct Parser<'a, 's> {
     cursor: Cursor<'a>,
     features: ParseFeatures,
     sheets: Option<SheetBinding<'s>>,
+    /// The arguments of the calls being parsed, innermost last. Each call
+    /// moves its own into one exact allocation when it closes.
+    args: Vec<Ast>,
+}
+
+thread_local! {
+    /// The argument stack, kept between parses so ingest does not allocate
+    /// it for every formula.
+    static PARSE_ARGS: std::cell::Cell<Vec<Ast>> = const { std::cell::Cell::new(Vec::new()) };
 }
 
 impl<'a> Parser<'a, '_> {
@@ -2152,14 +2164,15 @@ impl<'a> Parser<'a, '_> {
     /// The arguments of a call to `name` after its `(`.
     fn call_at(&mut self, name: Cow<'a, str>, depth: usize) -> Result<Ast, String> {
         let func = lookup_func(name.as_ref());
-        let mut args = Vec::new();
+        let first = self.args.len();
         if self.peek() != Some(&Tok::RParen) {
             loop {
-                if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
-                    args.push(Ast::Missing);
+                let arg = if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
+                    Ast::Missing
                 } else {
-                    args.push(self.expr_at(depth + 1)?);
-                }
+                    self.expr_at(depth + 1)?
+                };
+                self.args.push(arg);
                 match self.peek() {
                     Some(Tok::Comma) => {
                         let _ = self.next();
@@ -2169,13 +2182,14 @@ impl<'a> Parser<'a, '_> {
             }
         }
         self.close_paren()?;
+        let args: Box<[Ast]> = self.args.drain(first..).collect();
         Ok(match func {
-            Some(func) => Ast::Func(func, args.into()),
+            Some(func) => Ast::Func(func, args),
             None => {
                 self.features.names = true;
                 Ast::UnknownFunc(Box::new(UnknownCall {
                     name: name.into_owned(),
-                    args: args.into(),
+                    args,
                 }))
             }
         })
@@ -2203,6 +2217,7 @@ impl<'a> Parser<'a, '_> {
         let bound = self
             .sheets
             .and_then(|binding| (binding.resolve)(&sheet_name));
+        self.features.detached_sheets |= bound.is_none();
         if let Some(Tok::Colon) = self.peek() {
             let _ = self.next();
             let (end_sheet, end) = self.sheet_range_end(&sheet_name)?;
@@ -2285,10 +2300,10 @@ impl<'a> Parser<'a, '_> {
             flags: range_flags,
             cell,
         };
-        if let Some(binding) = self.sheets {
-            if span.first.handle != UNRESOLVED_SHEET && span.last.handle != UNRESOLVED_SHEET {
-                (binding.place_span)(&mut span);
-            }
+        if span.first.handle == UNRESOLVED_SHEET || span.last.handle == UNRESOLVED_SHEET {
+            self.features.detached_sheets = true;
+        } else if let Some(binding) = self.sheets {
+            (binding.place_span)(&mut span);
         }
         Ok(Ast::SheetSpan(Box::new(span)))
     }
@@ -2450,12 +2465,16 @@ fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
         cursor: Cursor::over_text(trimmed),
         features: ParseFeatures::default(),
         sheets,
+        args: PARSE_ARGS.take(),
     };
     let parsed = parser.expr();
     let trailing = match parsed {
         Ok(_) => parser.peek().map(trailing_token_error),
         Err(_) => None,
     };
+    // A failed parse leaves the arguments of its open calls behind.
+    parser.args.clear();
+    PARSE_ARGS.set(std::mem::take(&mut parser.args));
     if let Some(error) = parser.cursor.lex_error() {
         return Err(error);
     }
@@ -2476,6 +2495,7 @@ pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
         cursor: Cursor::over_tokens(toks),
         features: ParseFeatures::default(),
         sheets: None,
+        args: Vec::new(),
     };
 
     let result = parser.expr();

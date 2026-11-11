@@ -303,6 +303,14 @@ impl FormulaStore {
     }
 
     fn track_unresolved_sheets(&mut self, id: FormulaId) {
+        // Only a formula that names a missing local sheet has a #REF! source
+        // error with a tree; every other formula skips the walk.
+        let missing = self.get(id).is_some_and(|entry| {
+            entry.ast.is_some() && entry.source_error() == Some(FormulaError::Ref)
+        });
+        if !missing && self.unresolved_by_formula.is_empty() {
+            return;
+        }
         if let Some(names) = self.unresolved_by_formula.remove(&id) {
             for name in names {
                 if let Some(users) = self.unresolved_sheets.get_mut(&name) {
@@ -314,8 +322,10 @@ impl FormulaStore {
             }
         }
         let mut names = Vec::new();
-        if let Some(ast) = self.get(id).and_then(|entry| entry.ast.as_ref()) {
-            unresolved_sheet_names(ast, &mut names);
+        if missing {
+            if let Some(ast) = self.get(id).and_then(|entry| entry.ast.as_ref()) {
+                unresolved_sheet_names(ast, &mut names);
+            }
         }
         if !names.is_empty() {
             names.sort_unstable();
