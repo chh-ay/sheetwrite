@@ -33,6 +33,9 @@ const PAGES = [
     diagram: "recalculation",
   },
   { id: "vanilla", path: "/vanilla/" },
+  { id: "react", path: "/react/" },
+  { id: "vue", path: "/vue/" },
+  { id: "svelte", path: "/svelte/" },
   {
     id: "analysis",
     path: "/showcases/analysis/",
@@ -114,7 +117,7 @@ const parts = await partsPage.$$eval("[data-part]", (nodes) =>
 );
 await partsPage.close();
 
-function transform({ parts, explain, diagram }) {
+function transform({ parts, explain, diagram, id }) {
   const el = (tag, className, html) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -215,7 +218,7 @@ function transform({ parts, explain, diagram }) {
   if (map) {
     const lanes = map.querySelectorAll(".sw-proofs-boundary__lane");
     const boundary = el("div", "mk-boundary");
-    boundary.append(lanes[0], el("div", "mk-seam", parts["seam:collaboration"] ?? ""), lanes[1]);
+    boundary.append(lanes[0], el("div", "mk-seam", parts[`seam:${id}`] ?? ""), lanes[1]);
     map.replaceWith(boundary);
   }
 }
@@ -234,7 +237,7 @@ for (const { id, path, explain, diagram } of PAGES) {
     if (theme === "dark")
       await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
     await page.addStyleTag({ content: css });
-    await page.evaluate(transform, { parts, explain, diagram });
+    await page.evaluate(transform, { parts, explain, diagram, id });
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);

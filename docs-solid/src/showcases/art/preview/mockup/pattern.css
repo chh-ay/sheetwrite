@@ -327,12 +327,24 @@
   }
 }
 
-/* ---- Framework workbenches: the instrument panel goes under the grid ------- */
-.sw-vw-workspace {
+/* ---- Framework workbenches: the side panel goes under the grid ------------- */
+.sw-vw-workspace,
+.sw-rwb-workspace,
+.sw-vuewb-workspace,
+.sw-demo-workspace {
   grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  height: auto !important;
+  max-height: none !important;
 }
 
-.sw-vw-instrument {
+/* The grid keeps a working height once the panel no longer sets the row's. */
+:is(.sw-vw-workspace, .sw-rwb-workspace, .sw-vuewb-workspace, .sw-demo-workspace) > :first-child {
+  height: clamp(26rem, 64vh, 38rem);
+  min-height: 0;
+}
+
+:is(.sw-vw-instrument, .sw-rwb-state, .sw-vuewb-panel, .sw-svw-rail) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   align-items: start;
@@ -340,31 +352,13 @@
   border-left: 0 !important;
 }
 
-/* Long code: the first lines, then the whole file on request. */
-.mk-row--code .sw-showcase__code pre {
-  max-height: 26rem;
-  overflow: hidden;
-  mask-image: linear-gradient(#000 80%, transparent);
-}
-
-.mk-more {
-  justify-self: start;
-}
-
-@media (min-width: 72rem) {
-  .mk-row--code > .mk-aside {
-    position: sticky;
-    top: var(--sw-space-8);
-  }
+:is(.sw-vw-instrument, .sw-rwb-state, .sw-vuewb-panel, .sw-svw-rail) > * {
+  align-content: start;
 }
 
 .sw-showcase-page__proof > .mk-proofs,
 .sw-showcase-page__proof .mk-proofs {
   grid-column: 1 / -1;
-}
-
-.sw-vw-instrument > * {
-  align-content: start;
 }
 
 .sw-showcase-page__proof .mk-proofs > li {

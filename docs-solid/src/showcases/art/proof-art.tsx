@@ -3,7 +3,7 @@
 // title and text state the same facts.
 import { For, type JSX } from "solid-js";
 
-import { CardArt, head, Sheet } from "./Art.js";
+import { Bar, CardArt, docPath, foldPath, head, Sheet } from "./Art.js";
 
 /** Proof pictures share the 2:1 framework-card canvas. */
 const PROOF_HEIGHT = 160;
@@ -64,7 +64,11 @@ function Note(props: Readonly<{ x: number; y: number; text: string; class?: stri
         x={props.x}
         y={props.y}
       />
-      <text class="small strong" x={props.x + 8} y={props.y + 13}>
+      <text
+        class={props.class === "hue" ? "small on-hue" : "small strong"}
+        x={props.x + 8}
+        y={props.y + 13}
+      >
         {props.text}
       </text>
     </>
@@ -364,4 +368,583 @@ export const VANILLA_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
   "Construction-bound truth": ConstructionArt,
   "Host-owned paging": HostPagingArt,
   "Honest Worker fallback": WorkerFallbackArt,
+};
+
+/** A small database cylinder whose top-left is (x, y). */
+function Cylinder(props: Readonly<{ x: number; y: number; w: number; h: number }>) {
+  const rx = () => props.w / 2;
+  return (
+    <>
+      <path
+        class="panel"
+        d={`M${props.x} ${props.y + 8}v${props.h - 16}a${rx()} 8 0 0 0 ${props.w} 0V${props.y + 8}`}
+      />
+      <ellipse class="hue-soft" cx={props.x + rx()} cy={props.y + 8} rx={rx()} ry={8} />
+    </>
+  );
+}
+
+/** Two writers on the same base: one serialized queue accepts the first, the stale one gets a conflict. */
+function AtomicSequencingArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Note class="hue-soft" text="A · base v5" x={12} y={30} />
+      <Note class="alt-soft" text="B · base v5" x={12} y={92} />
+      <path
+        class="ink-line"
+        d={`M104 40c20 0 24 26 40 30${head(144, 70, 15)}M104 102c20 0 24-20 40-24${head(144, 78, -15)}`}
+      />
+      <rect class="panel" height={52} rx={8} width={74} x={148} y={48} />
+      <text class="small strong" text-anchor="middle" x={185} y={66}>
+        one queue
+      </text>
+      <For each={[0, 1, 2]}>
+        {(index) => (
+          <rect class="hue-tint" height={12} rx={3} width={16} x={160 + index * 18} y={76} />
+        )}
+      </For>
+      <Message class="hue-line" from={222} to={246} y={60} />
+      <Note class="hue" text="v6" x={250} y={51} />
+      <Message class="error-line" from={222} to={246} y={92} />
+      <Note class="error-soft" text="conflict" x={250} y={83} />
+      <text class="small" x={12} y={146}>
+        stale writers recover; nothing is lost
+      </text>
+    </CardArt>
+  );
+}
+
+/** A retry with the same mutation id gets the original version back; one record is stored. */
+function IdempotentRetryArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Lanes
+        lanes={[
+          [48, "Client"],
+          [196, "Adapter"],
+        ]}
+      />
+      <Message class="hue-line" from={48} label="commit m7" to={196} y={48} />
+      <path class="error-line dash" d="M196 72H110" />
+      <path class="error-line" d="M100 66l10 10M110 66l-10 10" />
+      <Message class="hue-line" from={48} label="retry m7" to={196} y={100} />
+      <Message from={196} label="duplicate · v6" to={48} y={128} />
+      <Cylinder h={68} w={60} x={250} y={44} />
+      <rect class="hue" height={12} rx={3} width={40} x={260} y={74} />
+      <text class="small" text-anchor="middle" x={280} y={128}>
+        m7 × 1
+      </text>
+    </CardArt>
+  );
+}
+
+/** The operation tail grows to a bound, then folds into one compacted snapshot record. */
+function BoundedStorageArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <rect class="hue-soft" height={46} rx={6} width={78} x={14} y={22} />
+      <text class="small strong" x={24} y={42}>
+        snapshot
+      </text>
+      <text class="small" x={24} y={58}>
+        compacted
+      </text>
+      <For each={[0, 1, 2, 3, 4, 5]}>
+        {(index) => (
+          <rect class="alt-soft" height={30} rx={4} width={18} x={110 + index * 24} y={30} />
+        )}
+      </For>
+      <path class="hue-line" d={`M190 66c0 24-70 24-104 8${head(88, 72, -160)}`} />
+      <text class="small" x={14} y={112}>
+        records
+      </text>
+      <rect class="soft" height={8} rx={4} width={200} x={74} y={104} />
+      <rect class="hue" height={8} rx={4} width={176} x={74} y={104} />
+      <path class="error-line" d="M250 98v20" />
+      <text class="small" x={14} y={138}>
+        bytes
+      </text>
+      <rect class="soft" height={8} rx={4} width={200} x={74} y={130} />
+      <rect class="hue" height={8} rx={4} width={110} x={74} y={130} />
+      <path class="error-line" d="M250 124v20" />
+    </CardArt>
+  );
+}
+
+/** A reload brings committed state and the durable pending queue back from IndexedDB, once. */
+function ReloadRecoveryArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Cylinder h={84} w={70} x={16} y={34} />
+      <text class="small" text-anchor="middle" x={51} y={142}>
+        IndexedDB
+      </text>
+      <path class="hue-line" d={`M96 76h56${head(152, 76, 0)}`} />
+      <path class="hue-line" d="M120 58a12 12 0 1 1 -2 -10" />
+      <path class="hue-line" d={head(116, 48, -60)} />
+      <rect class="panel" height={96} rx={8} width={140} x={160} y={28} />
+      <rect class="soft" height={14} rx={6} width={138.5} x={160.75} y={28.75} />
+      <rect class="hue-soft" height={22} rx={5} width={116} x={172} y={50} />
+      <text class="small strong" x={180} y={65}>
+        committed state
+      </text>
+      <rect class="alt-soft" height={22} rx={5} width={116} x={172} y={80} />
+      <text class="small strong" x={180} y={95}>
+        pending queue
+      </text>
+      <Note class="hue" text="exactly once" x={182} y={130} />
+    </CardArt>
+  );
+}
+
+/** Clearing 100,000 cells and undoing once: one compressed restoreBlock commit, one version. */
+function LargeUndoArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <Sheet ch={12} cols={4} cw={18} rows={6} x={14} y={24} />
+      <text class="small" x={14} y={118}>
+        100,000 cells
+      </text>
+      <path class="hue-line" d={`M96 60h28${head(124, 60, 0)}`} />
+      <text class="small hue-text" text-anchor="middle" x={110} y={50}>
+        undo
+      </text>
+      <rect class="hue-soft" height={40} rx={8} width={104} x={130} y={40} />
+      <text class="small strong" x={140} y={58}>
+        restoreBlock
+      </text>
+      <text class="small" x={140} y={72}>
+        one commit
+      </text>
+      <text class="small" x={248} y={42}>
+        bytes
+      </text>
+      <rect class="alt" height={10} rx={3} width={58} x={248} y={50} />
+      <rect class="hue" height={10} rx={3} width={14} x={248} y={66} />
+      <Note class="panel" text="1 step · 1 version" x={130} y={98} />
+    </CardArt>
+  );
+}
+
+/** An undo over the transaction limit is rejected and dropped; older history stays undoable. */
+function OversizedUndoArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="teal">
+      <text class="small" x={14} y={24}>
+        history
+      </text>
+      <rect class="error-soft" height={20} rx={4} width={96} x={14} y={32} />
+      <path class="error-line" d="M20 42h84" />
+      <For each={[0, 1, 2]}>
+        {(index) => (
+          <rect class="hue-soft" height={20} rx={4} width={96} x={14} y={58 + index * 24} />
+        )}
+      </For>
+      <text class="small" x={14} y={146}>
+        older steps stay
+      </text>
+      <rect class="soft" height={10} rx={5} width={150} x={140} y={40} />
+      <rect class="error-soft" height={10} rx={5} width={150} x={140} y={40} />
+      <path class="ink-line" d="M200 32v26" />
+      <text class="small" x={204} y={70}>
+        limit 128 bytes
+      </text>
+      <rect class="alt-soft" height={42} rx={8} width={160} x={136} y={86} />
+      <text class="small strong" x={146} y={104}>
+        mutation-rejected
+      </text>
+      <text class="small" x={146} y={119}>
+        resource-limit issue
+      </text>
+    </CardArt>
+  );
+}
+
+/** Proof pictures by proof title, for the database showcase. */
+export const DATABASE_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
+  "Atomic sequencing": AtomicSequencingArt,
+  "Idempotent retries": IdempotentRetryArt,
+  "Bounded storage": BoundedStorageArt,
+  "Reload recovery": ReloadRecoveryArt,
+  "Large undo": LargeUndoArt,
+  "Oversized undo": OversizedUndoArt,
+};
+
+/** A labelled chip list in a panel: a component's state. */
+function StatePanel(
+  props: Readonly<{ x: number; y: number; title: string; items: readonly string[] }>,
+) {
+  return (
+    <>
+      <rect
+        class="panel"
+        height={30 + props.items.length * 24}
+        rx={8}
+        width={112}
+        x={props.x}
+        y={props.y}
+      />
+      <text class="small hue-text" x={props.x + 10} y={props.y + 18}>
+        {props.title}
+      </text>
+      <For each={props.items}>
+        {(item, index) => (
+          <Note class="hue-soft" text={item} x={props.x + 8} y={props.y + 26 + index() * 24} />
+        )}
+      </For>
+    </>
+  );
+}
+
+/** React state drives the grid's filters, ranking and search. */
+function ControlledQueriesArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="react">
+      <StatePanel
+        items={["market", "segment", "rank", "search"]}
+        title="React state"
+        x={12}
+        y={14}
+      />
+      <path class="hue-line" d={`M128 70h40${head(168, 70, 0)}`} />
+      <Sheet
+        ch={18}
+        cols={3}
+        cw={40}
+        fill={<rect class="hue-tint" height={36} width={120} x={176} y={44} />}
+        head={14}
+        rows={6}
+        x={176}
+        y={30}
+      />
+      <path class="hue" d="M262 16h14l-5 6v5l-4 2v-7z" />
+    </CardArt>
+  );
+}
+
+/** KPI cards read real formulas over the grid and recalculate on every edit. */
+function FormulaKpisArt() {
+  const kpis = ["SUM(named range)", "AVG", "SUMIF · market"] as const;
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="react">
+      <Sheet
+        ch={18}
+        cols={2}
+        cw={40}
+        fill={<rect class="hue-tint" height={108} width={40} x={52} y={30} />}
+        head={12}
+        rows={6}
+        x={12}
+        y={18}
+      />
+      <For each={kpis}>
+        {(kpi, index) => (
+          <>
+            <path
+              class="ink-line"
+              d={`M96 ${70 + (index() - 1) * 6}C116 ${70 + (index() - 1) * 6} 116 ${36 + index() * 44} 134 ${36 + index() * 44}`}
+            />
+            <rect class="panel" height={36} rx={6} width={172} x={136} y={18 + index() * 44} />
+            <text class="small hue-text" x={146} y={34 + index() * 44}>
+              ={kpi}
+            </text>
+            <rect
+              class="ink"
+              height={6}
+              rx={3}
+              width={40 + index() * 16}
+              x={146}
+              y={41 + index() * 44}
+            />
+          </>
+        )}
+      </For>
+    </CardArt>
+  );
+}
+
+/** A dataset reload or renderer swap rebuilds the grid; React state re-applies on ready. */
+function ResetReconciliationArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="react">
+      <rect class="panel" height={56} rx={6} width={86} x={12} y={22} />
+      <Sheet ch={10} cols={3} cw={22} rows={3} x={22} y={38} />
+      <path class="ink-line" d={`M102 50h44${head(146, 50, 0)}`} />
+      <text class="small" text-anchor="middle" x={124} y={42}>
+        rebuild
+      </text>
+      <rect class="hue-soft" height={56} rx={6} width={86} x={152} y={22} />
+      <Sheet ch={10} cols={3} cw={22} rows={3} x={162} y={38} />
+      <text class="small" x={248} y={46}>
+        new grid
+      </text>
+      <Note class="alt-soft" text="React state" x={150} y={116} />
+      <path class="alt-line" d={`M195 114V84${head(195, 82, -90)}`} />
+      <text class="small alt-text" x={204} y={102}>
+        on ready
+      </text>
+      <text class="small" x={12} y={100}>
+        dataset reload
+      </text>
+      <text class="small" x={12} y={116}>
+        renderer swap
+      </text>
+    </CardArt>
+  );
+}
+
+/** CSV import lands as one undoable commit; CSV and XLSX exports leave the grid. */
+function DataWorkflowsArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="react">
+      <path class="panel" d={docPath(12, 30, 56, 70)} />
+      <path class="rule" d={foldPath(12, 30, 56)} />
+      <text class="small hue-text" x={20} y={82}>
+        CSV
+      </text>
+      <path class="hue-line" d={`M72 64h36${head(108, 64, 0)}`} />
+      <Sheet ch={16} cols={3} cw={28} head={10} rows={5} x={114} y={20} />
+      <Note class="hue-soft" text="one undoable commit" x={92} y={122} />
+      <path class="alt-line" d={`M202 50h30${head(232, 50, 0)}M202 80h30${head(232, 80, 0)}`} />
+      <Note text="CSV" x={238} y={41} />
+      <Note text="XLSX" x={238} y={71} />
+    </CardArt>
+  );
+}
+
+/** One causal view: the cell, its access rule, the rejection, the role change, the accepted commit. */
+function PolicyTimelineArt() {
+  const steps = [
+    ["cell", "hue-soft"],
+    ["rule", "panel"],
+    ["rejected", "error-soft"],
+    ["role", "alt-soft"],
+    ["commit", "hue"],
+  ] as const;
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="vue">
+      <path class="rule" d="M24 80h272" stroke-width={2} />
+      <For each={steps}>
+        {([label, tone], index) => (
+          <>
+            <circle class={tone} cx={32 + index() * 64} cy={80} r={9} />
+            <text
+              class="small strong"
+              text-anchor="middle"
+              x={32 + index() * 64}
+              y={index() % 2 === 0 ? 60 : 108}
+            >
+              {label}
+            </text>
+          </>
+        )}
+      </For>
+      <path class="hue-line" d="M24 130h272" stroke-dasharray="2 4" />
+      <text class="small" x={24} y={146}>
+        one view, in causal order
+      </text>
+    </CardArt>
+  );
+}
+
+/** Reactive props drive the adapter; every workbook change crosses the Grid API. */
+function VueAuthorityArt() {
+  const chain = [
+    ["props", "hue-soft"],
+    ["adapter", "panel"],
+    ["Grid API", "panel"],
+  ] as const;
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="vue">
+      <For each={chain}>
+        {([label, tone], index) => (
+          <>
+            <rect class={tone} height={34} rx={8} width={72} x={12 + index() * 84} y={60} />
+            <text class="small strong" text-anchor="middle" x={48 + index() * 84} y={81}>
+              {label}
+            </text>
+            <path
+              class="hue-line"
+              d={`M${86 + index() * 84} 77h8${head(94 + index() * 84, 77, 0)}`}
+            />
+          </>
+        )}
+      </For>
+      <Sheet ch={14} cols={2} cw={28} head={10} rows={5} x={256} y={34} />
+      <text class="small hue-text" x={12} y={44}>
+        reactive
+      </text>
+    </CardArt>
+  );
+}
+
+/** The note editor and event feed sit beside the grid; native tabs own the sheets. */
+function WorkbookToolsArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="vue">
+      <Sheet ch={16} cols={3} cw={36} head={10} rows={5} x={12} y={14} />
+      <rect class="hue-line" height={16} width={36} x={48} y={40} />
+      <path class="alt" d="M78 40h6v6z" />
+      <rect class="hue-soft" height={14} rx={3} width={36} x={12} y={110} />
+      <rect class="panel" height={14} rx={3} width={36} x={52} y={110} />
+      <rect class="panel" height={14} rx={3} width={36} x={92} y={110} />
+      <text class="small" x={12} y={142}>
+        native sheet tabs
+      </text>
+      <rect class="alt-soft" height={52} rx={6} width={150} x={158} y={14} />
+      <text class="small strong" x={168} y={32}>
+        note editor
+      </text>
+      <Bar class="alt" w={100} x={168} y={42} />
+      <Bar class="alt" w={70} x={168} y={52} />
+      <rect class="panel" height={66} rx={6} width={150} x={158} y={76} />
+      <text class="small strong" x={168} y={94}>
+        event feed
+      </text>
+      <For each={[0, 1, 2]}>
+        {(index) => <Bar w={110 - index * 18} x={168} y={104 + index * 11} />}
+      </For>
+    </CardArt>
+  );
+}
+
+/** An accepted edit enters the pending queue before the host's version advances. */
+function HostAcknowledgementArt() {
+  return (
+    <CardArt alt="violet" height={PROOF_HEIGHT} hue="vue">
+      <Note class="hue-soft" text="accepted edit" x={12} y={30} />
+      <path class="hue-line" d={`M60 52v18${head(60, 70, 90)}`} />
+      <rect class="panel" height={58} rx={8} width={110} x={12} y={74} />
+      <text class="small hue-text" x={22} y={92}>
+        pending queue
+      </text>
+      <For each={[0, 1, 2]}>
+        {(index) => (
+          <rect class="hue-soft" height={14} rx={7} width={24} x={22 + index * 30} y={104} />
+        )}
+      </For>
+      <path class="ink-line" d={`M126 103h44${head(170, 103, 0)}`} />
+      <text class="small" text-anchor="middle" x={148} y={95}>
+        then
+      </text>
+      <Note text="host v12" x={176} y={94} />
+      <path class="alt-line" d={`M260 103h14${head(274, 103, 0)}`} />
+      <Note class="alt-soft" text="v13" x={278} y={94} />
+    </CardArt>
+  );
+}
+
+/** The grid stays editable while the connection is down. */
+function OfflineEditsArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="svelte">
+      <rect class="panel" height={124} rx={8} width={196} x={12} y={20} />
+      <Sheet ch={18} cols={4} cw={44} head={12} rows={5} x={22} y={30} />
+      <rect class="hue-tint" height={18} width={44} x={66} y={78} />
+      <rect class="hue-line" height={18} width={44} x={66} y={78} />
+      <path class="hue" d="M104 92v14l4-3.5 3 6 3-1.4-3-6h6z" />
+      <path class="panel" d="M232 76a12 12 0 0 1 2-24a17 17 0 0 1 32-4a12 12 0 0 1 4 28z" />
+      <path class="ink-line" d="M234 42l34 40" stroke-width={2.5} />
+      <text class="small" text-anchor="middle" x={252} y={104}>
+        offline
+      </text>
+      <text class="small hue-text" text-anchor="middle" x={252} y={124}>
+        still editable
+      </text>
+    </CardArt>
+  );
+}
+
+/** IndexedDB owns each edit; reconnect drains the outbox in order. */
+function DurableOutboxArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="svelte">
+      <Cylinder h={96} w={84} x={14} y={28} />
+      <For each={[0, 1, 2]}>
+        {(index) => (
+          <>
+            <rect class="hue-soft" height={16} rx={8} width={60} x={26} y={52 + index * 22} />
+            <text class="small strong" x={34} y={64 + index * 22}>
+              edit {index + 1}
+            </text>
+          </>
+        )}
+      </For>
+      <text class="small" text-anchor="middle" x={56} y={144}>
+        outbox
+      </text>
+      <path class="hue-line" d={`M104 76h112${head(216, 76, 0)}`} />
+      <text class="small hue-text" text-anchor="middle" x={160} y={68}>
+        1, 2, 3 in order
+      </text>
+      <path class="panel" d="M228 100a14 14 0 0 1 2-28a20 20 0 0 1 38-6a15 15 0 0 1 6 34z" />
+      <path class="alt-line" d="M238 84l6 6l12-12" stroke-width={2.5} />
+    </CardArt>
+  );
+}
+
+/** Presence stays on the board; queue state and server versions sit beside it. */
+function CausalBoardArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="svelte">
+      <Sheet ch={20} cols={4} cw={40} head={12} rows={5} x={12} y={18} />
+      <rect class="hue-line" height={20} width={40} x={52} y={50} />
+      <path class="hue" d="M88 62v14l4-3.5 3 6 3-1.4-3-6h6z" />
+      <rect class="alt-line" height={20} width={40} x={132} y={90} />
+      <path class="alt" d="M168 102v14l4-3.5 3 6 3-1.4-3-6h6z" />
+      <rect class="panel" height={52} rx={6} width={112} x={196} y={18} />
+      <text class="small" x={206} y={36}>
+        queue
+      </text>
+      <text class="small strong" x={206} y={56}>
+        2 pending
+      </text>
+      <rect class="panel" height={52} rx={6} width={112} x={196} y={80} />
+      <text class="small" x={206} y={98}>
+        server
+      </text>
+      <text class="small strong" x={206} y={118}>
+        v8
+      </text>
+    </CardArt>
+  );
+}
+
+/** Version conflicts and remount restoration stay visible on demand. */
+function ExplicitRecoveryArt() {
+  return (
+    <CardArt alt="green" height={PROOF_HEIGHT} hue="svelte">
+      <Note class="error-soft" text="version conflict" x={12} y={22} />
+      <text class="small" x={12} y={62}>
+        base v6 · head v8
+      </text>
+      <rect class="panel" height={66} rx={8} width={92} x={190} y={20} />
+      <Sheet ch={12} cols={3} cw={24} rows={3} x={200} y={36} />
+      <path class="hue-line" d="M236 104a26 26 0 1 1 18 -6" />
+      <path class="hue-line" d={head(254, 98, -40)} />
+      <text class="small hue-text" x={12} y={110}>
+        remount
+      </text>
+      <text class="small" x={12} y={128}>
+        state restored
+      </text>
+      <path class="ink-line dash" d={`M130 46h54${head(184, 46, 0)}`} />
+    </CardArt>
+  );
+}
+
+/** Proof pictures by proof title, for the React, Vue and Svelte workbenches. */
+export const FRAMEWORK_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
+  "Controlled queries": ControlledQueriesArt,
+  "Formulas and KPIs": FormulaKpisArt,
+  "Reset reconciliation": ResetReconciliationArt,
+  "Data workflows": DataWorkflowsArt,
+  "Policy result beside the mutation": PolicyTimelineArt,
+  "Vue-native authority": VueAuthorityArt,
+  "Attached workbook tools": WorkbookToolsArt,
+  "Host acknowledgement": HostAcknowledgementArt,
+  "Offline ticket edits": OfflineEditsArt,
+  "Durable outbox": DurableOutboxArt,
+  "Causal collaboration": CausalBoardArt,
+  "Explicit recovery": ExplicitRecoveryArt,
 };
