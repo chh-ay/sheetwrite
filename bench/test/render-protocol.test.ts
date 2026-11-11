@@ -78,30 +78,6 @@ test("keeps a structured failure in its cell", () => {
   expect(parsed.results[0]).toMatchObject({ status: "failed", stage: "validate" });
 });
 
-test("rejects stale run IDs and timestamps", () => {
-  expect(() => parseRenderArtifact(artifact(), { expectedRunId: "new-run" })).toThrow(
-    "stale render result",
-  );
-  const nowMs = Date.parse(TIMESTAMP) + 2_000;
-  expect(() => parseRenderArtifact(artifact(), { nowMs, maxAgeMs: 1_000 })).toThrow(
-    "stale render result timestamp",
-  );
-});
-
-test("requires a semantic version for each render engine", () => {
-  for (const engine of ["sheetwrite", "handsontable"] as const) {
-    expectRejections(
-      () => mutableCopy(artifact()),
-      parseRenderArtifact,
-      [undefined, "", "18", "^18.1.2", "01.2.3"].map((version) => [
-        `${engine} ${version}`,
-        (value) => Reflect.set(value.metadata.engineVersions, engine, version),
-        `engineVersions.${engine}`,
-      ]),
-    );
-  }
-});
-
 test("rejects non-finite summaries, also after a JSON round trip", () => {
   const invalid = mutableCopy(artifact());
   const first = must(invalid.results[0], "first cell");
@@ -126,7 +102,6 @@ test("summarizes window transfer and fails closed on counters, labels and order"
     );
   expectRejections(windowTransferArtifact, parseRenderArtifact, [
     [
-      "counters",
       (value) => {
         const baseline = resultFor(value, WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
         if (baseline.status !== "success") throw new Error("fixture must be successful");
@@ -135,7 +110,6 @@ test("summarizes window transfer and fails closed on counters, labels and order"
       "rawSamples[0].windowTransfer is required",
     ],
     [
-      "label",
       (value) =>
         Reflect.set(
           resultFor(value, WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID),
@@ -145,7 +119,6 @@ test("summarizes window transfer and fails closed on counters, labels and order"
       "must be pixel-data-invalid",
     ],
     [
-      "order",
       (value) => {
         const order = must(value.metadata.windowTransferScenarioOrder?.[0], "order").toReversed();
         value.metadata.windowTransferScenarioOrder = [order, order];

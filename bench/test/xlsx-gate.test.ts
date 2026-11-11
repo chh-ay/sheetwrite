@@ -151,7 +151,6 @@ it("accepts a complete comparison and rejects drifted versions, summaries and ou
     ...(["sheetwrite", "exceljs"] as const).map(
       (engine) =>
         [
-          `${engine} version`,
           (artifact: Artifact) => Reflect.set(artifact.metadata.engineVersions, engine, "^4.4.0"),
           `engineVersions.${engine}`,
         ] as const,
@@ -159,7 +158,6 @@ it("accepts a complete comparison and rejects drifted versions, summaries and ou
     ...(["durationMs", "returnAllocationDeltaBytes", "retainedAfterGcDeltaBytes"] as const).map(
       (metric) =>
         [
-          `${metric} summary`,
           (artifact: Artifact) => {
             const [first, ...rest] = artifact.summaries;
             if (!first) throw new Error("fixture has no summary");
@@ -172,7 +170,6 @@ it("accepts a complete comparison and rejects drifted versions, summaries and ou
         ] as const,
     ),
     [
-      "nondeterministic output",
       (artifact) => {
         const secondRound = artifact.samples.map((value) => ({
           ...value,

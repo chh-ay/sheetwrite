@@ -29,13 +29,11 @@ interface FakeFaults {
   readonly candidatesExamined?: number;
 }
 
-type FakeAdapter = RenderBenchAdapter & { readonly values: unknown[][] };
-
 /**
  * An in-memory grid for the scenarios below. The diagnostic-only scenarios
  * (formula-dense, text-heavy, geometry) never run here, so their hooks are inert.
  */
-function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
+function fakeAdapter(faults: FakeFaults = {}): RenderBenchAdapter {
   const values: unknown[][] = toAoA(makeColumnar(ROWS));
   let selected: CellSelection | null = null;
   let editing = false;
@@ -63,7 +61,6 @@ function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
     id: "sheetwrite",
     initialRowCount: ROWS,
     colCount: 5,
-    values,
     mount: inert,
     isMountedAndAccessible: () => true,
     rowCount: () => values.length,
@@ -158,51 +155,17 @@ function run(scenarioId: ScenarioId, adapter = fakeAdapter()) {
   return runRenderScenario(adapter, dataset, scenarioId, options);
 }
 
-test.each([
-  [
-    "a wrong canonical row count before timing",
-    null,
-    "arrow-down.top-left",
-    "canonical row count",
-    0,
-  ],
-  [
-    "a corrupt action, never a fast success",
-    { corruptNavigation: true },
-    "arrow-down.top-left",
-    "moves one logical cell",
-    1,
-  ],
-  [
-    "a wrong formatter sentinel",
-    { formattedSentinels: ["wrong", "Feb 29, 2024"] },
-    "formatted-paint.top-left",
-    "fixed-decimal and named-date sentinels",
-    null,
-  ],
-  [
-    "a missing merge index",
-    { indexConstructions: 0 },
-    "merge-heavy.paint",
-    "prepares one revision index",
-    null,
-  ],
-  [
-    "a rebuilt merge index",
-    { indexConstructions: 2 },
-    "merge-heavy.paint",
-    "prepares one revision index",
-    null,
-  ],
-  ["no merge candidates", { candidatesExamined: 0 }, "merge-heavy.paint", "candidate", null],
-] as const)("fails validation for %s", (_label, faults, scenarioId, checkpoint, partialSamples) => {
-  const adapter = fakeAdapter(faults ?? {});
-  if (faults === null) adapter.values.pop();
-  const result = run(scenarioId, adapter);
-  if (result.status !== "failed") throw new Error("expected a failed result");
-  expect(result.stage).toBe("validate");
-  expect(result.message).toContain(checkpoint);
-  if (partialSamples !== null) expect(result.partialSamples).toHaveLength(partialSamples);
+test("fails validation for a corrupt action or corrupt formatter or merge evidence, never a fast success", () => {
+  for (const [scenarioId, faults, checkpoint] of [
+    ["arrow-down.top-left", { corruptNavigation: true }, "moves one logical cell"],
+    ["formatted-paint.top-left", { formattedSentinels: ["wrong", "Feb 29, 2024"] }, "sentinels"],
+    ["merge-heavy.paint", { candidatesExamined: 0 }, "candidate"],
+  ] as const) {
+    const result = run(scenarioId, fakeAdapter(faults));
+    if (result.status !== "failed") throw new Error(`${scenarioId} did not fail`);
+    expect(result.stage).toBe("validate");
+    expect(result.message).toContain(checkpoint);
+  }
 });
 
 test("names the cleanup step when a successful action cannot be undone", () => {

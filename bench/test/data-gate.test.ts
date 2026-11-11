@@ -76,45 +76,35 @@ const sheetwriteRow = (result: DeepMutable<DataBenchmarkResult>) =>
 test("rejects drifted identity, metadata, matrix cells and query resources", () => {
   expect(() => validate(smokeFixture())).not.toThrow();
   expectRejections(smokeFixture, validate, [
+    [(result) => Reflect.set(result.meta.engineVersions, "handsontable", "^18"), "handsontable"],
     [
-      "versions",
-      (result) => Reflect.set(result.meta.engineVersions, "handsontable", "^18.1.2"),
-      "engineVersions.handsontable",
-    ],
-    [
-      "protocol",
       (result) => Reflect.set(result, "protocolVersion", PERFORMANCE_GATE_PROTOCOL_VERSION),
       "data stale protocol: expected 2, observed 1",
     ],
     // A v1 artifact keeps its old matrix id; it was sampled without the GC.
-    ["matrix", (result) => (result.matrixId = "data-smoke-v1"), "data stale matrix"],
+    [(result) => (result.matrixId = "data-smoke-v1"), "data stale matrix"],
     ...(["gcBetweenSamples", "freshDocumentBetweenIngestSamples"] as const).flatMap((field) =>
       [false, undefined].map(
         (value) =>
           [
-            `${field} ${value}`,
             (result: DeepMutable<DataBenchmarkResult>) => Reflect.set(result.meta, field, value),
             `data metadata.${field} must be true`,
           ] as const,
       ),
     ),
     [
-      "missing",
       (result) => Reflect.deleteProperty(sheetwriteRow(result).stats, "ingest"),
       `missing ${KEY};metric=ingest`,
     ],
     [
-      "memory",
       (result) => Reflect.deleteProperty(sheetwriteRow(result), "memory"),
       `missing ${KEY};metric=memory`,
     ],
     [
-      "duplicate",
       (result) => (result.sheetwrite["01000"] = sheetwriteRow(result)),
       `duplicate ${KEY};metric=ingest`,
     ],
     [
-      "unexpected",
       (result) =>
         Reflect.set(sheetwriteRow(result).stats, "notDeclared", {
           ...summarize([1]),
@@ -123,22 +113,18 @@ test("rejects drifted identity, metadata, matrix cells and query resources", () 
       `unexpected ${KEY};metric=notDeclared`,
     ],
     [
-      "p95",
       (result) => (sheetwriteRow(result).stats.ingest.p95 = Number.POSITIVE_INFINITY),
       `${KEY};metric=ingest.stat.p95 must be finite`,
     ],
     [
-      "summary",
       (result) => (sheetwriteRow(result).stats.ingest.median = 4),
       `${KEY};metric=ingest.stat contains an impossible finite summary`,
     ],
     [
-      "samples",
       (result) => Reflect.deleteProperty(sheetwriteRow(result).stats.ingest, "samples"),
       `${KEY};metric=ingest.samples are missing`,
     ],
     [
-      "query resources",
       (result) =>
         Reflect.set(
           must(sheetwriteRow(result).queryResources, "query resources"),

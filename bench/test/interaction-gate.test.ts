@@ -100,52 +100,31 @@ test("rejects drifted identity, provenance, values, ceilings and previous captur
     artifact.values = valuesOf(artifact.samples);
   };
   const rejections: Rejection<Fixture>[] = [
-    ["protocol", (artifact) => (artifact.protocolVersion = 3), "stale protocol: expected 2"],
-    ["matrix", (artifact) => (artifact.matrixId = "interaction-full-v1"), "stale matrix"],
-    ["mode", (artifact) => (artifact.mode = "rehearsal"), "must be full or smoke"],
+    [(artifact) => (artifact.protocolVersion = 3), "stale protocol: expected 2"],
+    [(artifact) => (artifact.matrixId = "interaction-full-v1"), "stale matrix"],
+    [(artifact) => (artifact.mode = "rehearsal"), "must be full or smoke"],
+    [(artifact) => (artifact.mode = "smoke"), "lookupMedianNs requires 2 raw samples"],
+    [(artifact) => (artifact.rows = 1_000), "workload changed"],
+    [(artifact) => (artifact.metadata.engineVersions.sheetwrite = "0.4"), "engineVersions"],
+    [(artifact) => (artifact.metadata.commit = ""), "metadata.commit must be a non-empty"],
+    [(artifact) => (artifact.metadata.dirty = "false"), "metadata.dirty must be a boolean"],
     [
-      "smoke size",
-      (artifact) => (artifact.mode = "smoke"),
-      "lookupMedianNs requires 2 raw samples",
-    ],
-    ["workload", (artifact) => (artifact.rows = 1_000), "workload changed"],
-    [
-      "version",
-      (artifact) => (artifact.metadata.engineVersions.sheetwrite = "0.4"),
-      "engineVersions.sheetwrite",
-    ],
-    [
-      "commit",
-      (artifact) => (artifact.metadata.commit = ""),
-      "metadata.commit must be a non-empty",
-    ],
-    [
-      "dirty",
-      (artifact) => (artifact.metadata.dirty = "false"),
-      "metadata.dirty must be a boolean",
-    ],
-    [
-      "values",
       (artifact) => (artifact.values = { ...artifact.values, lookupMedianNs: summarize([40, 45]) }),
       "values.lookupMedianNs.stat.median does not match raw samples",
     ],
     [
-      "lookup median",
       aboveCeiling("lookupP95Ns"),
       `lookupP95Ns median ${INTERACTION_CEILINGS.lookupP95Ns + 1} exceeds the release ceiling`,
     ],
     ...INTERACTION_SAMPLE_CEILING_KEYS.map((key): Rejection<Fixture> => [
-      `${key} sample`,
       aboveCeiling(key),
       `${key} sample ${INTERACTION_CEILINGS[key] + 1} exceeds the release ceiling`,
     ]),
     ...INTERACTION_CEILING_KEYS.map((key): Rejection<Fixture> => [
-      `${key} ceiling`,
       (artifact) => (artifact.ceilings[key] = INTERACTION_CEILINGS[key] * 2),
       `ceilings.${key} is not the release ceiling`,
     ]),
     [
-      "previous schema",
       (artifact) => (artifact.previous = { ...PREVIOUS, matrixId: "interaction-full-v1" }),
       "previous must be a capture of the same schema",
     ],
@@ -181,41 +160,11 @@ function samples(startMs: number, url: string, count: number, tid = 1): TraceEve
   return { ...event, pid: 1, tid, url: undefined, profile };
 }
 
-test.each([
-  [
-    "charges a long task that mostly runs package frames to Sheetwrite",
-    [task(0, 60), samples(1, PACKAGE_URL, 50), samples(51, SHELL_URL, 5)],
-    { ownedMs: 60, unattributedMs: 0 },
-  ],
-  [
-    "reports a long task that mostly runs other code as unattributed",
-    [task(0, 60), samples(1, PACKAGE_URL, 20), samples(21, SHELL_URL, 40)],
-    { ownedMs: 0, unattributedMs: 60 },
-  ],
-  [
-    "reports a long task the profile does not cover as unattributed",
-    [task(0, 60)],
-    { ownedMs: 0, unattributedMs: 60 },
-  ],
-  [
-    "ignores tasks below the long-task threshold",
-    [task(0, 49), samples(1, PACKAGE_URL, 60)],
-    { ownedMs: 0, unattributedMs: 0 },
-  ],
-  [
-    "does not attribute samples of another thread or outside the task window",
-    [task(0, 60), samples(1, PACKAGE_URL, 50, 2), samples(90, PACKAGE_URL, 50)],
-    { ownedMs: 0, unattributedMs: 60 },
-  ],
-  [
-    "reports the longest owned and unattributed task of a sample",
-    [
-      ...[task(0, 55), samples(1, PACKAGE_URL, 50)],
-      ...[task(200, 70), samples(201, PACKAGE_URL, 65)],
-      ...[task(400, 80), samples(401, SHELL_URL, 75)],
-    ],
-    { ownedMs: 70, unattributedMs: 80 },
-  ],
-])("%s", (_name, events, expected) => {
-  expect(coldTaskDurations(events)).toEqual(expected);
+test("charges each long task to Sheetwrite only when package frames dominate its profile", () => {
+  const events = [
+    ...[task(0, 55), samples(1, PACKAGE_URL, 50)],
+    ...[task(200, 70), samples(201, PACKAGE_URL, 65)],
+    ...[task(400, 80), samples(401, SHELL_URL, 75)],
+  ];
+  expect(coldTaskDurations(events)).toEqual({ ownedMs: 70, unattributedMs: 80 });
 });

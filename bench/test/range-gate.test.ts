@@ -85,22 +85,19 @@ const resultOf = (value: DeepMutable<RangeGateArtifact>, workload: Workload) =>
 
 it("fails closed on incomplete matrices, retained revisions and oversized auto-fit windows", () => {
   expectRejections(artifact, (value) => validateRangeArtifact(value, "smoke"), [
-    ["incomplete", (value) => value.results.shift(), /missing 10000:style merge and clear/],
+    [(value) => value.results.shift(), /missing 10000:style merge and clear/],
     [
-      "retained",
       (value) =>
         (resultOf(value, "datasource revision retention").retainedRevisionRectanglesAfter = 1),
       /retained revision rectangles/,
     ],
     [
-      "stale limit",
       (value) =>
         (resultOf(value, "large exact auto-fit").autoFitChunkCellLimit =
           RANGE_AUTO_FIT_CHUNK_CELLS + 1),
       /reported a stale auto-fit chunk-cell limit/,
     ],
     [
-      "oversized",
       (value) =>
         (resultOf(value, "large exact auto-fit").maxVisibleWindowCells =
           RANGE_AUTO_FIT_CHUNK_CELLS + 1),

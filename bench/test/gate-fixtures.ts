@@ -60,12 +60,8 @@ export function mutableCopy<T>(value: T): DeepMutable<T> {
   return structuredClone(value) as unknown as DeepMutable<T>;
 }
 
-/** One rejection case: a label, an edit of a fresh valid fixture, and the expected error. */
-export type Rejection<T> = readonly [
-  label: string,
-  edit: (value: T) => void,
-  error?: string | RegExp,
-];
+/** One rejection case: an edit of a fresh valid fixture and the expected error. */
+export type Rejection<T> = readonly [edit: (value: T) => void, error?: string | RegExp];
 
 /** Applies each edit to a fresh fixture and expects `validate` to reject the result. */
 export function expectRejections<T>(
@@ -73,10 +69,10 @@ export function expectRejections<T>(
   validate: (value: T) => unknown,
   rejections: readonly Rejection<T>[],
 ): void {
-  for (const [label, edit, error] of rejections) {
+  for (const [index, [edit, error]] of rejections.entries()) {
     const value = fixture();
     edit(value);
-    expect(() => validate(value), label).toThrow(error);
+    expect(() => validate(value), `rejection ${index}: ${String(error)}`).toThrow(error);
   }
 }
 
@@ -212,16 +208,6 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
     completeness: summarizeCompleteness(config, rounds, results),
     reproductionCommands: ["fixture"],
   };
-}
-
-/** The exact `render-smoke-v1` matrix: one round of Sheetwrite at 200 rows. */
-export function makeSmokeRenderArtifact(): RenderBenchmarkArtifact {
-  return makeRenderArtifact({
-    rounds: 1,
-    engines: ["sheetwrite"],
-    rows: [200],
-    measuredSamples: 1,
-  });
 }
 
 /** `artifact` with its first cell replaced by a typed failure, completeness recomputed. */
