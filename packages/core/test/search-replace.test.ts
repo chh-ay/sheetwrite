@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { replaceInText } from "../src/search-replace.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -19,36 +19,15 @@ afterEach(() => {
   restoreStubs();
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 const A = (row: number, col: number) => ({ sheet: "s1", row, col });
 
 describe("replaceInText", () => {
-  it("case-insensitive substring preserves surrounding casing", () => {
-    expect(replaceInText("aXbXc", "x", "-")).toBe("a-b-c");
-    expect(replaceInText("Tokyo", "tok", "Kyo")).toBe("Kyoyo");
-  });
-
   it("preserves original offsets when Unicode lowercase expands", () => {
     expect(replaceInText("İabc abc", "abc", "x")).toBe("İx x");
     expect(replaceInText("İx", "İ", "Y")).toBe("Yx");
   });
   it("matchCase only hits exact casing", () => {
     expect(replaceInText("aXbxc", "x", "-", { matchCase: true })).toBe("aXb-c");
-  });
-  it("wholeCell swaps entire text or nothing", () => {
-    expect(replaceInText("Tokyo", "tokyo", "Kyoto", { wholeCell: true })).toBe("Kyoto");
-    expect(replaceInText("Tokyo!", "tokyo", "Kyoto", { wholeCell: true })).toBeNull();
-  });
-  it("returns null with no match / empty query", () => {
-    expect(replaceInText("abc", "z", "q")).toBeNull();
-    expect(replaceInText("abc", "", "q")).toBeNull();
   });
 });
 

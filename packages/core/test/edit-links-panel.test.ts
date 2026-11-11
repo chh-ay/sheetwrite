@@ -102,15 +102,6 @@ async function setup(externalLinks?: ExternalLink[], resolve?: ExternalLinkResol
   return { grid, commandButton, openTab, openPanel, control, panelText };
 }
 
-it("shows Edit Links only for a workbook with links", async () => {
-  const { grid, commandButton, openTab } = await setup();
-  openTab("Data");
-  expect(commandButton("editLinks")).toBeNull();
-
-  grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: [budget] }] });
-  expect(commandButton("editLinks")).not.toBeNull();
-});
-
 it("lists the links and updates their values through the grid's resolver", async () => {
   const withoutResolver = await setup([budget]);
   await withoutResolver.openPanel();

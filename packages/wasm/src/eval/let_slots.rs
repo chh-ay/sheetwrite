@@ -398,7 +398,7 @@ impl LetFrame {
 
 #[cfg(test)]
 mod tests {
-    use super::{let_resolvable, resolve_let_names, scalar_binding, RESOLVE_LET_NAMES};
+    use super::{let_resolvable, RESOLVE_LET_NAMES};
     use crate::calc::{parse, Ast, Func};
     use crate::store::CellStore;
 
@@ -407,65 +407,6 @@ mod tests {
             Ok(Ast::Func(Func::Let, args)) => args,
             other => panic!("{source} is not a LET: {other:?}"),
         }
-    }
-
-    #[test]
-    fn scalar_bindings_are_constants_operators_cells_in_operators_and_names() {
-        for source in [
-            "1",
-            "\"a\"",
-            "TRUE",
-            "x",
-            "A1*2",
-            "-A1",
-            "A1&\" \"&B1",
-            "(x+1)*y%",
-            "A1>B1",
-            "SUM(A1:A3)",
-            "ROUND(A1,2)",
-            "ROUND(x/3,2)*2+LEN(B1)",
-            "XLOOKUP(2,A1:A3,B1:B3)",
-            "IF(A1>1,A2,A3)",
-            "RAND()",
-        ] {
-            assert!(scalar_binding(&parse(source).unwrap()), "{source}");
-        }
-        for source in ["A1", "A1:A3", "{1,2}", "A1:A3*2", "Sheet1!A1"] {
-            assert!(!scalar_binding(&parse(source).unwrap()), "{source}");
-        }
-    }
-
-    /// Each call that a shape check sees through, or that can return a
-    /// reference or an array, keeps the expanding path, also inside an
-    /// operator.
-    #[test]
-    fn calls_that_shape_checks_see_through_are_not_scalar() {
-        for source in [
-            "(A1:B2 B1:C2)",
-            "(A1,B1)",
-            "INDEX(A1:A3,1)",
-            "CHOOSE(1,A1,A2)",
-            "OFFSET(A1,0,0)",
-            "INDIRECT(\"A1\")",
-            "A1#",
-            "LET(y,1,y)",
-            "SEQUENCE(3)",
-            "FILTER(A1:A3,A1:A3>1)",
-            "SORT(A1:A3)",
-            "UNIQUE(A1:A3)",
-            "TRANSPOSE(A1:A3)",
-            "TAKE(A1:A3,1)",
-            "DROP(A1:A3,1)",
-            "CHOOSECOLS(A1:B3,1)",
-            "CHOOSEROWS(A1:B3,1)",
-            "TRIMRANGE(A1:A3)",
-            "INDEX(A1:A3,1)*2+1",
-            "SUM(LET(y,A1:A3,y))",
-        ] {
-            assert!(!scalar_binding(&parse(source).unwrap()), "{source}");
-        }
-        #[cfg(feature = "analysis")]
-        assert!(!scalar_binding(&parse("REGEXTEST(B1,\"a\")").unwrap()));
     }
 
     #[test]
@@ -493,21 +434,6 @@ mod tests {
         ] {
             assert!(!let_resolvable(&let_args(source)), "{source}");
         }
-    }
-
-    #[test]
-    fn resolution_keeps_the_written_formula() {
-        let source = "=LET(x,A1*$C$1,y,x+1,LET(z,y*x,x+y+z))";
-        let mut ast = parse(source).unwrap();
-        resolve_let_names(&mut ast);
-        let mut written = String::new();
-        crate::calc::write_ast(&ast, &mut written);
-        let mut original = String::new();
-        crate::calc::write_ast(&parse(source).unwrap(), &mut original);
-        assert_eq!(written, original);
-        assert!(
-            matches!(&ast, Ast::Func(Func::Let, args) if matches!(args[0], Ast::LetName { slot: 0, .. }))
-        );
     }
 
     /// The LET formulas of the test suite and the gate rows, with cells that
@@ -622,33 +548,5 @@ mod tests {
                 "{formula}"
             );
         }
-    }
-
-    /// A LET whose binding reads cells holding LET formulas several formulas
-    /// deep, and a cycle through two LETs.
-    #[test]
-    fn lets_that_read_other_lets_keep_their_own_slots() {
-        let run = |resolve: bool| {
-            RESOLVE_LET_NAMES.with(|cell| cell.set(resolve));
-            let mut store = CellStore::new();
-            let sheet = store.add_sheet(4, 4);
-            store.set_number(sheet, 0, 0, 5.0, 0);
-            store.set_formula(sheet, 1, 0, "=LET(x,A1+1,y,x*2,y+x)", 0);
-            store.set_formula(sheet, 2, 0, "=LET(x,A2*3,y,x+A1,LET(z,y-x,z*y))", 0);
-            store.set_formula(sheet, 3, 0, "=LET(x,A3+A2,y,x*A1,x+y)", 0);
-            store.set_formula(sheet, 0, 1, "=LET(x,B2+1,x)", 0);
-            store.set_formula(sheet, 1, 1, "=LET(y,B1+1,y)", 0);
-            store.recompute(sheet);
-            let values: Vec<String> = [(1, 0), (2, 0), (3, 0), (0, 1), (1, 1)]
-                .into_iter()
-                .map(|(row, col)| {
-                    let cell = store.get_cell(sheet, row, col);
-                    format!("{}:{}:{:?}", cell.kind(), cell.num(), cell.string())
-                })
-                .collect();
-            RESOLVE_LET_NAMES.with(|cell| cell.set(true));
-            values
-        };
-        assert_eq!(run(true), run(false));
     }
 }

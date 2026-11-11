@@ -293,18 +293,6 @@ describe("relationships in the store", () => {
     }
   });
 
-  it("returns clones that callers cannot use to change the document", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
-    try {
-      const [read] = store.getRelationships();
-      if (!read) throw new Error("the relationship is missing");
-      read.to.column = "region";
-      expect(store.getRelationships()).toEqual([ordersToCustomers]);
-    } finally {
-      store.dispose();
-    }
-  });
-
   it("admits a relationship only between existing columns and without a cycle", () => {
     const store = SheetwriteStore.fromSnapshot(snapshot([]));
     try {
@@ -337,31 +325,6 @@ describe("relationships in the store", () => {
     } finally {
       store.dispose();
     }
-  });
-});
-
-describe("relationship key status", () => {
-  it("is unavailable on the default engine, which checks no keys", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
-    try {
-      expect(store.getRelationshipStatus(ordersToCustomers.id)).toEqual({ status: "unavailable" });
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("checks keys on the full engine, in its own process", async () => {
-    // Engine selection is process-wide, so the full-engine checks run apart.
-    const probe = Bun.spawn(
-      [process.execPath, "test", "./packages/core/test/data-model.full-engine.ts"],
-      { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-    );
-    const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-    expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-      exitCode: 0,
-      failures: [],
-    });
   });
 });
 

@@ -685,14 +685,18 @@ pub struct PivotFields {
 
 #[wasm_bindgen]
 impl PivotFields {
-    /// Field names: header text, or `ColumnN` for a blank header.
-    pub fn names(&self) -> Vec<String> {
-        self.names.clone()
+    /// Surrenders the field names: header text, or `ColumnN` for a blank
+    /// header. The list keeps an empty buffer afterwards.
+    #[wasm_bindgen(js_name = takeNames)]
+    pub fn take_names(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.names)
     }
 
-    /// Field types: 0 blank, 1 number, 2 text, 3 boolean, 4 mixed.
-    pub fn types(&self) -> Vec<u8> {
-        self.types.clone()
+    /// Surrenders the field types: 0 blank, 1 number, 2 text, 3 boolean,
+    /// 4 mixed.
+    #[wasm_bindgen(js_name = takeTypes)]
+    pub fn take_types(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.types)
     }
 }
 
@@ -890,19 +894,24 @@ impl PivotOutput {
 
 #[wasm_bindgen]
 impl PivotOutput {
-    /// Cell kinds: 0 blank, 1 number, 2 text, 3 boolean, 4 error.
-    pub fn kinds(&self) -> Vec<u8> {
-        self.kinds.clone()
+    /// Surrenders the cell kinds: 0 blank, 1 number, 2 text, 3 boolean,
+    /// 4 error. The output keeps an empty buffer afterwards.
+    #[wasm_bindgen(js_name = takeKinds)]
+    pub fn take_kinds(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.kinds)
     }
 
-    /// Per cell: the number, the boolean as 0 or 1, or the error slot.
-    pub fn numbers(&self) -> Vec<f64> {
-        self.numbers.clone()
+    /// Surrenders, per cell, the number, the boolean as 0 or 1, or the error
+    /// slot.
+    #[wasm_bindgen(js_name = takeNumbers)]
+    pub fn take_numbers(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.numbers)
     }
 
-    /// The text cells, in order.
-    pub fn texts(&self) -> Vec<String> {
-        self.texts.clone()
+    /// Surrenders the text cells, in order.
+    #[wasm_bindgen(js_name = takeTexts)]
+    pub fn take_texts(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.texts)
     }
 
     /// `[rows, cols, headerRows, labelCols]` of the output; zeros without a layout.

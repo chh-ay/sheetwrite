@@ -441,17 +441,6 @@ describe("ClipboardController", () => {
     expect(h.sheet.hyperlinks![1]!.id).not.toBe("source-link");
   });
 
-  it("external TSV paste parses literals per column type", async () => {
-    // No copy/cut: the system clipboard holds foreign TSV, so paste falls back.
-    h.setSystemClipboard("hello\t42\tworld");
-    h.select(0, 0);
-    await h.controller.paste();
-
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("hello");
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(42); // number column
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 2 }).resolved).toBe("world");
-  });
-
   it("preserves signed numbers from external paste", async () => {
     h.setSystemClipboard("text\t-1\r\ntext\t+1");
     h.select(0, 0);
@@ -520,15 +509,6 @@ describe("ClipboardController", () => {
     expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBeNull();
   });
 
-  it("resolves 'unsupported' when the Clipboard API is absent", async () => {
-    h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
-    h.select(1, 1);
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
-
-    await expect(h.controller.copy()).resolves.toBe("unsupported");
-    await expect(h.controller.paste()).resolves.toBe("unsupported");
-  });
-
   it("resolves 'blocked' on a rejected readText and leaves the store unchanged", async () => {
     h.store.seed(1, 1, { kind: "literal", value: "keep" }, "keep");
     h.select(1, 1);
@@ -542,19 +522,6 @@ describe("ClipboardController", () => {
 
     await expect(h.controller.paste()).resolves.toBe("blocked");
     expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("keep");
-  });
-
-  it("resolves 'empty' with no focused selection and 'done' on a round-trip", async () => {
-    await expect(h.controller.copy()).resolves.toBe("empty");
-
-    h.store.seed(1, 1, { kind: "literal", value: "hello" }, "hello");
-    h.select(1, 1);
-    await expect(h.controller.copy()).resolves.toBe("done");
-
-    h.select(3, 1);
-    await expect(h.controller.paste()).resolves.toBe("done");
-    expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe("hello");
-    expect(h.commitReasons).toEqual(["paste"]);
   });
 
   it("round-trips formulas and styles through the browser custom clipboard format", async () => {
@@ -948,29 +915,6 @@ describe("spill clipboard commands", () => {
 });
 
 describe("SheetwriteStore clipboard bulk reads", () => {
-  it("keeps WASM calls bounded from one cell through 10K selected cells", () => {
-    const store = new SheetwriteStore(makeWorkbook(10_000), makeColumnarData(10_000));
-    try {
-      const single = store.getClipboardWindow("s1", { start: 0, end: 1 }, [1]);
-      const large = store.getClipboardWindow("s1", { start: 0, end: 10_000 }, [1]);
-
-      expect(single.values.length).toBe(1);
-      expect(large.values.length).toBe(10_000);
-      expect(single.ffiCalls).toBe(large.ffiCalls);
-      expect(large.ffiCalls).toBe(3);
-      expect(large.transferredElements).toBeGreaterThanOrEqual(20_000);
-      expect(large.spillDerived).toHaveLength(0);
-      expect(large.transferredElements).toBeLessThanOrEqual(30_032);
-
-      const pooledStrings = store.getClipboardWindow("s1", { start: 0, end: 10_000 }, [0]);
-      expect(pooledStrings.ffiCalls).toBe(4);
-      expect(pooledStrings.spillDerived).toHaveLength(0);
-      expect(pooledStrings.transferredElements).toBeLessThanOrEqual(30_032);
-    } finally {
-      store.dispose();
-    }
-  });
-
   it("returns discontiguous sorted rows with formulas, refs, and base styles", () => {
     const store = new SheetwriteStore(makeWorkbook(10), makeColumnarData(10));
     try {

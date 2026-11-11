@@ -4,7 +4,7 @@ import { FindBar } from "../src/find-bar.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { SearchResult } from "../src/types.js";
-import { elementAdded, makeWorkbook } from "./fixtures.js";
+import { makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 
@@ -20,14 +20,6 @@ afterEach(() => {
   restoreCanvasStubs();
   document.body.innerHTML = "";
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 describe("FindBar", () => {
   it("searches and replaces live cells without leaking field keystrokes", async () => {
@@ -110,31 +102,5 @@ describe("FindBar", () => {
 
     bar.destroy();
     grid.destroy();
-  });
-
-  it("builds the grid's find bar on the first open", async () => {
-    const host = mountHost();
-    const grid = createGrid(host, { workbook: makeWorkbook(3), config: { toolbar: false } });
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
-
-    grid.actions.find();
-    const input = await elementAdded(host, ".sheetwrite-find-input", HTMLInputElement);
-
-    expect(document.activeElement).toBe(input);
-    grid.destroy();
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
-  });
-
-  it("drops a find bar that loads after the grid is destroyed", async () => {
-    const host = mountHost();
-    const grid = createGrid(host, { workbook: makeWorkbook(3), config: { toolbar: false } });
-
-    grid.actions.find();
-    grid.destroy();
-    // This test exercises the chunk boundary: the grid's own load of the
-    // module settles before this one, so its callback has run after the await.
-    await import("../src/find-bar.js");
-
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
   });
 });

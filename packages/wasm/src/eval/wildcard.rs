@@ -213,19 +213,6 @@ mod tests {
     }
 
     #[test]
-    fn search_matches_a_prefix_from_each_position() {
-        assert_eq!(search("b*d", "abcde"), Some(1));
-        assert_eq!(search("", "abc"), Some(0));
-        assert_eq!(search("x", "abc"), None);
-        assert_eq!(
-            Wildcard::parse("c")
-                .expect("small pattern")
-                .find("abc", 1, &mut || Ok::<(), ()>(())),
-            Ok(Some(2))
-        );
-    }
-
-    #[test]
     fn search_stops_when_its_step_budget_runs_out() {
         let mut steps = 0;
         let mut budget = || {

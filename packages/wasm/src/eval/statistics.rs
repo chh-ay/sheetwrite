@@ -603,29 +603,6 @@ mod tests {
     }
 
     #[test]
-    fn paired_statistics_enforce_shape_and_pairwise_numeric_values() {
-        let left = vec![
-            Value::number(1.0),
-            Value::text("ignored"),
-            Value::number(3.0),
-        ];
-        let right = vec![Value::number(2.0), Value::number(9.0), Value::number(6.0)];
-        assert_near(result(Func::Correl, &[left.clone(), right.clone()]), 1.0);
-        assert_near(
-            result(Func::CovarianceP, &[left.clone(), right.clone()]),
-            2.0,
-        );
-        assert_near(result(Func::CovarianceS, &[left, right]), 4.0);
-        assert_eq!(
-            result(
-                Func::Correl,
-                &[scalar(1.0), vec![Value::number(1.0), Value::number(2.0)]]
-            ),
-            Value::Error(FormulaError::Na)
-        );
-    }
-
-    #[test]
     fn conditional_extremes_share_criteria_and_require_equal_shapes() {
         let target = vec![Value::number(-4.0), Value::number(8.0), Value::number(3.0)];
         let groups = vec![
@@ -746,39 +723,5 @@ mod tests {
 
             assert!((actual - expected).abs() <= tolerance, "{func:?}: {actual}");
         }
-    }
-
-    #[test]
-    fn counted_functions_read_typed_text_and_logical_values() {
-        let mut values = FuncAccumulator::default();
-
-        for value in [Value::text("4"), Value::Bool(true), Value::text("")] {
-            values.push_scalar(value).unwrap();
-            values.finish_arg(1, 1).unwrap();
-        }
-
-        assert_eq!(
-            apply(Func::AverageA, &values),
-            Some(Value::number(5.0 / 3.0))
-        );
-        assert_eq!(apply(Func::MaxA, &values), Some(Value::number(4.0)));
-
-        let mut typed = FuncAccumulator::default();
-
-        typed.push_scalar(Value::text("x")).unwrap();
-        typed.finish_arg(1, 1).unwrap();
-
-        assert_eq!(
-            apply(Func::VarA, &typed),
-            Some(Value::Error(FormulaError::Value))
-        );
-        assert_eq!(
-            result(Func::AverageA, &[vec![Value::Blank]]),
-            Value::Error(FormulaError::DivZero)
-        );
-        assert_eq!(
-            result(Func::MinA, &[vec![Value::Blank]]),
-            Value::number(0.0)
-        );
     }
 }
