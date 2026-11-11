@@ -990,6 +990,18 @@ html:has(.sw-nav-dialog[open]) {
   .sw-prose .sw-formula-table summary {
     line-height: 44px;
   }
+  /* An opened contract lists its four profile links as 44 px rows under the
+     summary (their line breaks are then the rows' edges). */
+  .sw-prose .sw-formula-table details a {
+    display: flex;
+    min-height: 44px;
+    flex-wrap: wrap;
+    column-gap: 0.25em;
+    align-items: center;
+  }
+  .sw-prose .sw-formula-table details br {
+    display: none;
+  }
   .sw-formula-filter input,
   .sw-formula-filter__engine .sw-demo-select__trigger {
     min-height: 44px;
