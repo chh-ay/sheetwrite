@@ -1,8 +1,8 @@
 import { type CodeToken, tokenizeCode } from "@docs/lib/code-tokens.js";
+import type { ExampleError } from "@docs/playground/example-error.js";
 import { EDITOR_HINT, expectedResultHeight } from "@docs/playground/layout.js";
 import {
   type ConsoleEntry,
-  type ExampleError,
   followSiteTheme,
   frameDocument,
   runExample,
