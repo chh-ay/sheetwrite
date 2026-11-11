@@ -68,10 +68,26 @@ if (!String(uninitializedError?.message).includes("does not initialize core")) {
 
 await Core.initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon()] });
 
+// styles.css imports the parts; each must be an export of the packed package.
 const cssUrl = import.meta.resolve("@sheetwrite/core/styles.css");
 const css = await readFile(fileURLToPath(cssUrl), "utf8");
-if (!css.includes(".sheetwrite")) {
-  throw new Error("The packed core stylesheet is missing Sheetwrite rules");
+const parts = [...css.matchAll(/@import "\.\/styles\/([a-z-]+)\.css";/g)].map((match) => match[1]);
+if (!parts.includes("grid")) {
+  throw new Error("The packed core stylesheet does not import styles/grid.css");
+}
+for (const part of parts) {
+  const partUrl = import.meta.resolve(`@sheetwrite/core/styles/${part}.css`);
+  const partCss = await readFile(fileURLToPath(partUrl), "utf8");
+  if (!partCss.includes(`--sheetwrite-${part}-ready`)) {
+    throw new Error(`The packed stylesheet part ${part}.css is missing its rules`);
+  }
+}
+const iconSheet = await readFile(
+  fileURLToPath(import.meta.resolve("@sheetwrite/core/styles/icons.svg")),
+  "utf8",
+);
+if (!iconSheet.includes('<g id="undo"')) {
+  throw new Error("The packed icon sheet is missing its glyphs");
 }
 
 const shellCssUrl = import.meta.resolve("@sheetwrite/core/shell.css");
