@@ -1864,6 +1864,7 @@ impl CellStore {
         }
         // SAFETY: a resolved name occurs only inside its LET, which binds the
         // slot before evaluating anything in it and is still being evaluated.
+        #[allow(unsafe_code, reason = "calls `LetFrame::binding`; see its reason")]
         let Some(expression) = (unsafe { frame.binding(slot) }) else {
             return Value::Error(FormulaError::Name);
         };

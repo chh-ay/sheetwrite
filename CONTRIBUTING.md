@@ -19,7 +19,7 @@ bun test path/to/focused.test.ts
 bun run verify:ci
 ```
 
-Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm` and `bun run lint:rust`, which runs Clippy with warnings denied for both engine builds on the native and WASM targets.
+Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm` and `bun run lint:rust`, which runs rustfmt, then Clippy on every crate for the native and WASM targets and fails when a lint count differs from `scripts/rust-lint-baseline.json`. Before you change Rust code, read [Rust code](docs/contributing/rust.md): the lint policy and the performance conventions every crate follows.
 
 A change to the engine (the Rust source in `packages/wasm`, which also builds `@sheetwrite/formulas`) or to its TypeScript callers must also pass two benchmark checks before it merges, not only at the release capture. For engine changes, run the paired formula gate against a checkout with a built base engine: `bun bench/src/formula-gate.ts --base <built-base-checkout>`, pinned to one idle core where the system allows it (for example `taskset -c <core>` on Linux). The gate loads only the engine packages from each checkout, so changes to TypeScript callers need the benchmark that covers their path. Use the quiet-machine release capture, `bun run src/formula-bench.ts` from `bench/`, only when updating release evidence. Run the engine memory probe described in [`bench/README.md`](bench/README.md#engine-memory-release-gate). Byte counters must not grow unless a reviewed `--accept-bytes` file names the exact candidate engine, row, maximum and measured reason (see [the formula gate](bench/README.md#formula-gate-for-changes-on-a-shared-machine)).
 
