@@ -19,6 +19,7 @@ import {
   RecalculationDiagram,
 } from "../diagrams.js";
 import { DOCS_CARD_ART, DOCS_DIAGRAMS } from "../docs-art.js";
+import { MECHANISM_DIAGRAMS } from "../docs-mechanisms.js";
 import {
   ChartReadsCellsDiagram,
   DashboardDiagram,
@@ -371,6 +372,9 @@ function DocParts() {
   const parts: readonly (readonly [string, () => JSX.Element])[] = [
     ...Object.entries(DOCS_CARD_ART).map(([id, Art]) => [`card:${id}`, Art] as const),
     ...Object.entries(DOCS_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(MECHANISM_DIAGRAMS).map(
       ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
     ),
     ...marks.map((name) => [`mark:${name}`, () => <SectionMark name={name} />] as const),

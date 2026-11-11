@@ -397,6 +397,8 @@ a {
   color: var(--sw-fg-strong);
   background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
   font: 0.86em var(--sw-font-mono);
+  /* A long identifier breaks inside the chip instead of widening the page. */
+  overflow-wrap: anywhere;
 }
 
 /* Linked inline code (entry points, symbol references) must read as a link. */

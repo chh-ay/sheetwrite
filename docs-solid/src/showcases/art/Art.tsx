@@ -2,6 +2,11 @@
 // hub cards' decorative pictures and the labelled in-page diagrams.
 import { createUniqueId, type JSX, Show } from "solid-js";
 
+/** What every illustration component accepts: an extra class for the box it sits in. */
+export interface ArtProps {
+  readonly class?: string;
+}
+
 /** A site hue an illustration can lead with; art.css maps each to a token. */
 export type ArtHue =
   | "green"
@@ -33,14 +38,20 @@ const round = (value: number) => Math.round(value * 10) / 10;
  * box of any shape is filled.
  */
 export function CardArt(
-  props: Readonly<{ hue: ArtHue; alt?: ArtAlt; height?: number; children: JSX.Element }>,
+  props: Readonly<{
+    hue: ArtHue;
+    alt?: ArtAlt;
+    height?: number;
+    class?: string;
+    children: JSX.Element;
+  }>,
 ) {
   const grid = `sw-art-grid-${createUniqueId()}`;
   const height = () => props.height ?? CARD_HEIGHT;
   return (
     <svg
       aria-hidden="true"
-      class="sw-art"
+      class={props.class === undefined ? "sw-art" : `sw-art ${props.class}`}
       data-alt={props.alt}
       data-hue={props.hue}
       focusable="false"

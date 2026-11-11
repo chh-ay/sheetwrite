@@ -47,6 +47,14 @@
   display: grid;
   grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
+  /* The sidebar is sticky and one screen tall; its column's surface and
+     hairline run the full page height from here. */
+  background: linear-gradient(
+    to right,
+    var(--sw-surface-0) calc(var(--sw-sidebar-width) - var(--sw-border-width)),
+    var(--sw-border) 0 var(--sw-sidebar-width),
+    var(--sw-surface-1) 0
+  );
 }
 
 .sw-sidebar {
@@ -706,6 +714,7 @@ html:has(.sw-nav-dialog[open]) {
   .sw-docs {
     --sw-docs-tab-row-height: 2.75rem;
     grid-template-columns: minmax(0, 1fr);
+    background: var(--sw-surface-1);
   }
   .sw-sidebar {
     display: none;

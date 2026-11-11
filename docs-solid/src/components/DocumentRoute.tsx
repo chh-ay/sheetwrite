@@ -8,8 +8,11 @@ import {
   type DocumentRecord,
   loadedDocumentComponent,
 } from "../lib/content.js";
+import { pageHasArt } from "../showcases/art/docs-pictures.js";
 import { DocsShell } from "./DocsShell.js";
 import PerfFigure from "./PerfFigure.js";
+
+import artStylesheet from "../showcases/art/art.css?url";
 
 /*
  * A documentation page, for the docs routes (routes/docs.$.tsx and the
@@ -34,7 +37,10 @@ export function documentHead(metadata: DocumentMetadata) {
       { property: "og:type", content: "article" },
       ...pageImageMeta(href, title),
     ],
-    links: metadata.stylesheets.map((stylesheet) => ({ rel: "stylesheet", href: stylesheet })),
+    // A page whose header or body shows art links its stylesheet once.
+    links: [
+      ...new Set([...metadata.stylesheets, ...(pageHasArt(href) ? [artStylesheet] : [])]),
+    ].map((stylesheet) => ({ rel: "stylesheet", href: stylesheet })),
     scripts: [
       {
         type: "application/ld+json",

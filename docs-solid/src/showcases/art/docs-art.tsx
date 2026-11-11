@@ -4,6 +4,7 @@
 import { For, type JSX } from "solid-js";
 
 import {
+  type ArtProps,
   Bar,
   CardArt,
   docPath,
@@ -46,9 +47,9 @@ function Pill(props: Readonly<{ x: number; y: number; text: string; class?: stri
 }
 
 /** Install, create, calculate: three numbered steps to a working grid. */
-function GettingStartedArt() {
+function GettingStartedArt(props: ArtProps) {
   return (
-    <CardArt alt="blue" height={DOCS_CARD_HEIGHT} hue="green">
+    <CardArt class={props.class} alt="blue" height={DOCS_CARD_HEIGHT} hue="green">
       <For each={[1, 2, 3]}>
         {(step, index) => (
           <>
@@ -94,7 +95,7 @@ function GettingStartedArt() {
 }
 
 /** One grid, mounted from plain JavaScript, React, Vue or Svelte. */
-function FrameworksArt() {
+function FrameworksArt(props: ArtProps) {
   const mounts = [
     ["JavaScript", 14, 22],
     ["React", 14, 104],
@@ -102,7 +103,7 @@ function FrameworksArt() {
     ["Svelte", 236, 104],
   ] as const;
   return (
-    <CardArt alt="violet" height={DOCS_CARD_HEIGHT} hue="blue">
+    <CardArt class={props.class} alt="violet" height={DOCS_CARD_HEIGHT} hue="blue">
       <Sheet ch={16} cols={3} cw={30} head={12} rows={5} x={115} y={30} />
       <For each={mounts}>
         {([name, x, y]) => (
@@ -134,14 +135,14 @@ function FrameworksArt() {
 }
 
 /** A path of three stages, from a first grid to a full spreadsheet app. */
-function TutorialsArt() {
+function TutorialsArt(props: ArtProps) {
   const badges = [
     [14, 22],
     [110, 84],
     [222, 14],
   ] as const;
   return (
-    <CardArt alt="green" height={DOCS_CARD_HEIGHT} hue="amber">
+    <CardArt class={props.class} alt="green" height={DOCS_CARD_HEIGHT} hue="amber">
       <path class="hue-line dash" d="M44 68C44 104 80 109 106 109M184 109C232 109 264 104 264 78" />
       <Panel h={44} w={60} x={14} y={22} />
       <Sheet ch={8} cols={3} cw={14} rows={3} x={22} y={32} />
@@ -171,9 +172,9 @@ function TutorialsArt() {
 }
 
 /** Who owns what: your app around the store, the engine and the renderer. */
-function ConceptsArt() {
+function ConceptsArt(props: ArtProps) {
   return (
-    <CardArt alt="violet" height={DOCS_CARD_HEIGHT} hue="teal">
+    <CardArt class={props.class} alt="violet" height={DOCS_CARD_HEIGHT} hue="teal">
       <rect class="rule dash" fill="none" height={132} rx={10} width={296} x={12} y={14} />
       <text class="small hue-text" x={22} y={30}>
         your app: workbook, data, lifecycle
@@ -206,9 +207,9 @@ function ConceptsArt() {
 }
 
 /** The grid with its features called out: format, filter, chart, note, lock. */
-function FeaturesArt() {
+function FeaturesArt(props: ArtProps) {
   return (
-    <CardArt alt="blue" height={DOCS_CARD_HEIGHT} hue="pink">
+    <CardArt class={props.class} alt="blue" height={DOCS_CARD_HEIGHT} hue="pink">
       <Sheet ch={18} cols={4} cw={40} head={16} headClass="hue-tint" rows={6} x={14} y={18} />
       <path class="hue" d="M110 20h10l-3.6 4.8v4l-2.8 1.4v-5.4z" />
       <rect class="hue" height={18} width={40} x={14} y={52} />
@@ -229,9 +230,9 @@ function FeaturesArt() {
 }
 
 /** XLSX and CSV files exchanged with the grid. */
-function ImportExportArt() {
+function ImportExportArt(props: ArtProps) {
   return (
-    <CardArt alt="amber" height={DOCS_CARD_HEIGHT} hue="blue">
+    <CardArt class={props.class} alt="amber" height={DOCS_CARD_HEIGHT} hue="blue">
       <path class="panel" d={docPath(16, 14, 64, 60)} />
       <path class="rule" d={foldPath(16, 14, 64)} />
       <Pill class="hue" text="XLSX" x={22} y={46} />
@@ -252,7 +253,7 @@ function ImportExportArt() {
 }
 
 /** Reference entries by kind: functions, classes, types and events. */
-function ApiReferenceArt() {
+function ApiReferenceArt(props: ArtProps) {
   const entries = [
     ["fn", "createGrid", "hue"],
     ["class", "Grid", "alt"],
@@ -260,7 +261,7 @@ function ApiReferenceArt() {
     ["event", "change", "alt"],
   ] as const;
   return (
-    <CardArt alt="violet" height={DOCS_CARD_HEIGHT} hue="blue">
+    <CardArt class={props.class} alt="violet" height={DOCS_CARD_HEIGHT} hue="blue">
       <Panel h={132} w={218} x={14} y={14} />
       <For each={entries}>
         {([kind, name, tone], index) => (
@@ -291,14 +292,14 @@ function ApiReferenceArt() {
 }
 
 /** The function catalog: families in columns, each function tagged with its build. */
-function FormulaCatalogArt() {
+function FormulaCatalogArt(props: ArtProps) {
   const families = [
     ["Math", ["SUM", "ROUND"]],
     ["Lookup", ["XLOOKUP", "INDEX"]],
     ["Stats", ["STDEV.S", "T.TEST"]],
   ] as const;
   return (
-    <CardArt alt="green" height={DOCS_CARD_HEIGHT} hue="violet">
+    <CardArt class={props.class} alt="green" height={DOCS_CARD_HEIGHT} hue="violet">
       <For each={families}>
         {([family, names], column) => (
           <>
@@ -335,10 +336,10 @@ function FormulaCatalogArt() {
 }
 
 /** Measured results per release: paired bars per benchmark, one release against the next. */
-function PerformanceResultsArt() {
+function PerformanceResultsArt(props: ArtProps) {
   const bars = [62, 40, 86, 54] as const;
   return (
-    <CardArt alt="blue" height={DOCS_CARD_HEIGHT} hue="amber">
+    <CardArt class={props.class} alt="blue" height={DOCS_CARD_HEIGHT} hue="amber">
       <Panel h={132} w={212} x={14} y={14} />
       <For each={bars}>
         {(width, index) => (
@@ -356,7 +357,7 @@ function PerformanceResultsArt() {
 }
 
 /** Docs section cards by section id. */
-export const DOCS_CARD_ART: Readonly<Record<string, () => JSX.Element>> = {
+export const DOCS_CARD_ART: Readonly<Record<string, (props: ArtProps) => JSX.Element>> = {
   "getting-started": GettingStartedArt,
   frameworks: FrameworksArt,
   tutorials: TutorialsArt,
