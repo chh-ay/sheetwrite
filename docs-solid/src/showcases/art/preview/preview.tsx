@@ -18,6 +18,18 @@ import {
   DIAGRAMS,
   RecalculationDiagram,
 } from "../diagrams.js";
+import {
+  ChartReadsCellsDiagram,
+  DashboardDiagram,
+  EngineApiDiagram,
+  FormattingDiagram,
+  FunctionEnginesDiagram,
+  HostImportDiagram,
+  QueriesRefreshDiagram,
+  SortModesDiagram,
+  StorageDiagram,
+  VersionsDiagram,
+} from "../explain-diagrams.js";
 import { HUB_ART } from "../hub-art.js";
 import { COLLABORATION_PROOF_ART, VANILLA_PROOF_ART } from "../proof-art.js";
 
@@ -298,6 +310,16 @@ function Parts() {
     ),
     ...Object.entries(VANILLA_PROOF_ART).map(([title, Art]) => [`proof:${title}`, Art] as const),
     ["command-model", CommandModelDiagram],
+    ["analysis", ChartReadsCellsDiagram],
+    ["dashboards", DashboardDiagram],
+    ["queries", QueriesRefreshDiagram],
+    ["sort", SortModesDiagram],
+    ["functions", FunctionEnginesDiagram],
+    ["version-history", VersionsDiagram],
+    ["formulas", EngineApiDiagram],
+    ["database", StorageDiagram],
+    ["host-rows", HostImportDiagram],
+    ["formatting", FormattingDiagram],
     ["data-model", DataModelDiagram],
     ["recalculation", RecalculationDiagram],
     ["collaboration-recovery", CollaborationRecoveryDiagram],
