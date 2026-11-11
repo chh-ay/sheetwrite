@@ -5,7 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellEditor, CellEditorContext, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountGridWithData } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountGridWithData, pressLikeWebKit } from "./fixtures.js";
 
 let restoreCanvas: () => void;
 let reportErrorDescriptor: PropertyDescriptor | undefined;
@@ -362,6 +362,50 @@ describe("custom editor canonical lifecycle", () => {
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
     expect({ cancels, destroys }).toEqual({ cancels: 3, destroys: 3 });
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("keeps a custom editor open for a press on its own button that does not focus the button", () => {
+    const workbook = makeWorkbook(1);
+    workbook.sheets[0]!.columns[0]!.editor = "stepper";
+    const store = new SheetwriteStore(workbook, makeColumnarData(1));
+    const host = mountHost();
+    let commits = 0;
+    let steps = 0;
+    const editor: CellEditor = {
+      mount(root) {
+        const input = document.createElement("input");
+        const step = document.createElement("button");
+        step.type = "button";
+        step.addEventListener("click", () => {
+          steps += 1;
+        });
+        root.append(input, step);
+        return {
+          update() {},
+          reposition() {},
+          commit() {
+            commits += 1;
+            return input.value;
+          },
+          cancel() {},
+          destroy() {},
+        };
+      },
+    };
+    const grid = new GridImpl(host, { workbook, editors: { stepper: editor } }, store);
+
+    grid.beginEdit(0, 0);
+    expect(document.activeElement).toBe(activeEditorInput(host));
+    pressLikeWebKit(host.querySelector<HTMLButtonElement>(".sheetwrite-custom-editor button")!);
+    expect({ commits, steps }).toEqual({ commits: 0, steps: 1 });
+    expect(host.querySelector(".sheetwrite-custom-editor")).not.toBeNull();
+    activeEditorInput(host).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    expect(commits).toBe(1);
 
     grid.destroy();
     store.dispose();

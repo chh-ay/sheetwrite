@@ -160,3 +160,22 @@ export function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSo
     rows: rows.map((row) => coveredRow(request, row)),
   };
 }
+
+/**
+ * Presses `target` the way WebKit on macOS does: pressing a button does not
+ * focus it, so unless the press is cancelled, focus moves to the nearest
+ * ancestor with a tabindex, or leaves for the body when there is none. The
+ * click only lands if `target` is still shown after that focus change.
+ */
+export function pressLikeWebKit(target: HTMLElement): void {
+  target.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+  const focusMoves = target.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+  );
+  if (focusMoves) {
+    const focusable = target.parentElement?.closest<HTMLElement>("[tabindex]");
+    if (focusable) focusable.focus();
+    else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  }
+  if (target.isConnected && !target.closest("[hidden]")) target.click();
+}

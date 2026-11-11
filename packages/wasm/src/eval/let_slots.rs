@@ -10,8 +10,12 @@
 //!
 //! Every shape check (`range_from_ast`, array bounds and shapes) treats a
 //! scalar binding's use as a scalar, which is what it sees through the
-//! expansion too: such a binding is never a range, a reference, an array or a
-//! function result. So results do not depend on which path a LET takes.
+//! expansion too: such a binding is never a range, a reference or an array.
+//! A function call qualifies only when no shape check looks inside it
+//! ([`call_has_scalar_result`]): those checks see through `INTERSECT`, the
+//! array functions, `INDEX`, `CHOOSE`, `OFFSET`, `INDIRECT` and spill
+//! references, and take the scalar path for every other call. So results do
+//! not depend on which path a LET takes.
 
 use std::ptr;
 
@@ -20,7 +24,7 @@ use crate::memory::MemoryOwnerStats;
 use crate::types::EvalResult;
 
 use super::reference::ast_contains_runtime_ref;
-use super::{expand_let_ast, valid_let_name};
+use super::{ast_produces_array, expand_let_ast, valid_let_name};
 
 /// Rewrites, in place, the uses of the bindings of every LET in `ast` that
 /// [`let_resolvable`] accepts. Each outermost such LET numbers its slots from
@@ -101,16 +105,17 @@ fn nested_lets_scalar(ast: &Ast) -> bool {
     }
 }
 
-/// Whether a binding expression is a plain scalar computation: a constant, an
-/// operator over constants, single cells and names, or another binding's
-/// name. A bare cell is not one, because a function reads it as a one-cell
-/// range.
+/// Whether a binding expression is a scalar computation: a constant, another
+/// binding's name, a call with a scalar result ([`call_has_scalar_result`]),
+/// or an operator over constants, single cells, names and such calls. A bare
+/// cell is not one, because a function reads it as a one-cell range.
 pub(crate) fn scalar_binding(expression: &Ast) -> bool {
     match expression {
         Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Name(_) => true,
         Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_) => {
             scalar_operand(expression)
         }
+        Ast::Func(..) => call_has_scalar_result(expression),
         _ => false,
     }
 }
@@ -128,8 +133,43 @@ fn scalar_operand(ast: &Ast) -> bool {
             scalar_operand(left) && scalar_operand(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner),
+        Ast::Func(..) => call_has_scalar_result(ast),
         _ => false,
     }
+}
+
+/// Whether `call` is a scalar to every shape check, so a
+/// name bound to it reads like the call itself. Excluded:
+/// - calls that can return a reference or that shape checks see through:
+///   `INTERSECT`, `UNION`, `INDEX`, `CHOOSE`, `OFFSET`, `INDIRECT`,
+///   `ANCHORARRAY` (spill references) and `LET`;
+/// - calls that produce an array ([`ast_produces_array`]): the array
+///   functions and anything over them;
+/// - on the full engine, analysis functions, whose array hooks decide their
+///   shape;
+/// - calls whose arguments hold a LET that cannot resolve.
+fn call_has_scalar_result(call: &Ast) -> bool {
+    let Ast::Func(func, args) = call else {
+        return false;
+    };
+    #[cfg(feature = "analysis")]
+    if matches!(func, Func::Analysis(_)) {
+        return false;
+    }
+    if matches!(
+        func,
+        Func::Intersect
+            | Func::Union
+            | Func::Index
+            | Func::Choose
+            | Func::Offset
+            | Func::Indirect
+            | Func::AnchorArray
+            | Func::Let
+    ) {
+        return false;
+    }
+    !ast_produces_array(call) && args.iter().all(nested_lets_scalar)
 }
 
 /// One visible binding while resolving: its name and slot.
@@ -377,20 +417,51 @@ mod tests {
             "A1&\" \"&B1",
             "(x+1)*y%",
             "A1>B1",
+            "SUM(A1:A3)",
+            "ROUND(A1,2)",
+            "ROUND(x/3,2)*2+LEN(B1)",
+            "XLOOKUP(2,A1:A3,B1:B3)",
+            "IF(A1>1,A2,A3)",
+            "RAND()",
         ] {
             assert!(scalar_binding(&parse(source).unwrap()), "{source}");
         }
+        for source in ["A1", "A1:A3", "{1,2}", "A1:A3*2", "Sheet1!A1"] {
+            assert!(!scalar_binding(&parse(source).unwrap()), "{source}");
+        }
+    }
+
+    /// Each call that a shape check sees through, or that can return a
+    /// reference or an array, keeps the expanding path, also inside an
+    /// operator.
+    #[test]
+    fn calls_that_shape_checks_see_through_are_not_scalar() {
         for source in [
-            "A1",
-            "A1:A3",
-            "SUM(A1:A3)",
-            "ROUND(A1,2)",
-            "{1,2}",
-            "A1:A3*2",
-            "Sheet1!A1",
+            "(A1:B2 B1:C2)",
+            "(A1,B1)",
+            "INDEX(A1:A3,1)",
+            "CHOOSE(1,A1,A2)",
+            "OFFSET(A1,0,0)",
+            "INDIRECT(\"A1\")",
+            "A1#",
+            "LET(y,1,y)",
+            "SEQUENCE(3)",
+            "FILTER(A1:A3,A1:A3>1)",
+            "SORT(A1:A3)",
+            "UNIQUE(A1:A3)",
+            "TRANSPOSE(A1:A3)",
+            "TAKE(A1:A3,1)",
+            "DROP(A1:A3,1)",
+            "CHOOSECOLS(A1:B3,1)",
+            "CHOOSEROWS(A1:B3,1)",
+            "TRIMRANGE(A1:A3)",
+            "INDEX(A1:A3,1)*2+1",
+            "SUM(LET(y,A1:A3,y))",
         ] {
             assert!(!scalar_binding(&parse(source).unwrap()), "{source}");
         }
+        #[cfg(feature = "analysis")]
+        assert!(!scalar_binding(&parse("REGEXTEST(B1,\"a\")").unwrap()));
     }
 
     #[test]
@@ -402,6 +473,9 @@ mod tests {
             "=LET(x,1/0,x+1)",
             "=LET(x,1,x,2,x+10)",
             "=LET(x,2,SUM(A1:A3)*x)",
+            "=LET(s,SUM(A1:A3),r,ROUND(s/7,2),s+r)",
+            "=LET(x,SUM(A1:A3),LET(y,ROUND(x/7,3),x+y))",
+            "=LET(v,XLOOKUP(2,A1:A3,A1:A3),v*10)",
         ] {
             assert!(let_resolvable(&let_args(source)), "{source}");
         }
@@ -465,6 +539,34 @@ mod tests {
         "=LET(total,A1+A2+A3,total*total)",
         "=-LET(x,SEQUENCE(3),1)",
         "=LET(x,SEQUENCE(3),25)%",
+        // Aggregates.
+        "=LET(s,SUM(A1:A3),a,AVERAGE(A1:A3),c,COUNTIF(A1:A3,\">1\"),s*a+c)",
+        // Rounding and maths, and calls over earlier bindings.
+        "=LET(r,ROUND(A2/3,2),m,MOD(A3,2),r+m)",
+        "=LET(x,A1*2,y,ROUND(x/3,2),z,MAX(x,y),x+y+z)",
+        "=LET(x,ROUND(A1,0)*2+LEN(B2),x*x)",
+        "=LET(x,SUM(A1:A3),LET(y,ROUND(x/7,3),x+y))",
+        // Lookups: one cell, a whole row, and the classic lookups.
+        "=LET(v,XLOOKUP(2,A1:A3,A1:A3),v*10)",
+        "=LET(v,XLOOKUP(2,A1:A3,A1:C3),v)",
+        "=LET(v,XLOOKUP(2,A1:A3,A1:C3),SUM(v))",
+        "=LET(v,VLOOKUP(3,A1:C3,1,FALSE),m,MATCH(2,A1:A3,0),v+m)",
+        // Conditionals.
+        "=LET(c,IF(A1>1,A2,A3),e,IFERROR(1/0,7),c+e)",
+        // Text.
+        "=LET(n,LEN(B1),t,TEXT(A3,\"0.0\"),j,CONCAT(B1,B2),n&t&j)",
+        // A volatile binding is evaluated once per evaluation of its LET.
+        "=LET(r,RAND(),r-r)",
+        // Errors.
+        "=LET(e,SQRT(-1),IFERROR(e,5)+ISERROR(e))",
+        "=LET(e,1/0,n,ROUND(e,1),IFERROR(n,3))",
+        // Bindings used where arrays are evaluated.
+        "=LET(k,MAX(A1:A3),SUMPRODUCT((A1:A3<k)*A1:A3))",
+        "=LET(k,MIN(A1:A3),FILTER(A1:A3,A1:A3>k))",
+        "=LET(k,SUM(A1:A2),SEQUENCE(k))",
+        "=LET(k,ROUND(A1,0),A1:A3*k)",
+        "=LET(k,COUNT(A1:A3),INDEX(A1:A3,k))",
+        "=LET(k,LEN(B1),ROWS(A1:A3)+k)",
     ];
 
     /// Values of `formula` in D1 of a small sheet, before and after an edit.

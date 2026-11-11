@@ -77,6 +77,9 @@ export class CustomEditorController {
     wrapper.className = "sheetwrite-custom-editor";
     wrapper.setAttribute("role", "group");
     wrapper.setAttribute("aria-label", options.label);
+    // Focusable so a press on an editor button that does not take focus (WebKit
+    // never focuses pressed buttons) moves focus to the wrapper, not out of it.
+    wrapper.tabIndex = -1;
     wrapper.style.position = "absolute";
     wrapper.style.zIndex = "6";
     wrapper.style.pointerEvents = "auto";
@@ -206,7 +209,6 @@ export class CustomEditorController {
       "input,textarea,select,button,[contenteditable=true],[tabindex]",
     );
     const focusTarget = target ?? active.wrapper;
-    if (!target) active.wrapper.tabIndex = -1;
     if (!focusTarget.hasAttribute("aria-label") && !focusTarget.hasAttribute("aria-labelledby")) {
       focusTarget.setAttribute("aria-label", active.state.label);
     }
