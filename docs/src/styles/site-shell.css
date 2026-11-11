@@ -892,8 +892,7 @@ html:has(.sw-nav-dialog[open]) {
     .sw-terminal__copy,
     .sw-document__colophon a,
     .sw-release-strip a,
-    .sw-prose td a,
-    .sw-prose .api-metadata dd a
+    .sw-prose td a
   ) {
     position: relative;
   }
@@ -903,7 +902,6 @@ html:has(.sw-nav-dialog[open]) {
     .sw-terminal__copy,
     .sw-release-strip a,
     .sw-prose td a,
-    .sw-prose .api-metadata dd a,
     .sw-document__colophon a
   )::after {
     position: absolute;
@@ -953,6 +951,14 @@ html:has(.sw-nav-dialog[open]) {
   /* A link that is a whole list item or paragraph ("See also", next steps,
      "Read the notes", from markLinkRows in vite.config.ts), and a release's
      version link: 44 px rows. */
+  /* A symbol's source link is a 44 px box of its own (WebKit does not hit-test
+     a pseudo-element's area outside the link); its path wraps inside it. */
+  .sw-prose .api-metadata dd a {
+    display: inline-flex;
+    max-width: 100%;
+    min-height: 44px;
+    align-items: center;
+  }
   .sw-prose .sw-link-row,
   .sw-docs .sw-prose .sw-update__version a {
     display: inline-flex;

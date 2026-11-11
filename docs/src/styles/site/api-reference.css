@@ -78,11 +78,9 @@
   margin: var(--sw-space-6) 0 var(--sw-space-8);
 }
 
-/* The labels take one fixed column, so the values line up and do not move
-   when the web font replaces its fallback (a label's width changes then). */
 .api-metadata div {
-  display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--sw-space-2);
   align-items: baseline;
 }
@@ -105,6 +103,8 @@
   background: transparent;
   color: inherit;
   font-size: var(--sw-text-caption);
+  /* A path wraps anywhere, even one short enough to be a one-token chip. */
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 
