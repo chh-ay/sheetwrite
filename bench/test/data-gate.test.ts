@@ -75,8 +75,18 @@ const sheetwriteRow = (result: DeepMutable<DataBenchmarkResult>) =>
 
 test("rejects drifted identity, metadata, matrix cells and query resources", () => {
   expect(() => validate(smokeFixture())).not.toThrow();
+  for (const engine of ["sheetwrite", "handsontable"]) {
+    for (const version of [undefined, "", "18", "^18.1.2", "01.2.3"]) {
+      const artifact = smokeFixture();
+      Reflect.set(artifact.meta.engineVersions, engine, version);
+      expect(() => validate(artifact)).toThrow(`engineVersions.${engine}`);
+    }
+  }
   expectRejections(smokeFixture, validate, [
-    [(result) => Reflect.set(result.meta.engineVersions, "handsontable", "^18"), "handsontable"],
+    [
+      (result) => Reflect.set(result.meta.engineVersions, "handsontable", "^18.1.2"),
+      "engineVersions.handsontable",
+    ],
     [
       (result) => Reflect.set(result, "protocolVersion", PERFORMANCE_GATE_PROTOCOL_VERSION),
       "data stale protocol: expected 2, observed 1",

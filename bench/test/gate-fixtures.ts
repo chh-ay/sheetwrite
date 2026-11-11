@@ -60,7 +60,7 @@ export function mutableCopy<T>(value: T): DeepMutable<T> {
   return structuredClone(value) as unknown as DeepMutable<T>;
 }
 
-/** One rejection case: an edit of a fresh valid fixture and the expected error. */
+/** One rejection case: an edit of a fresh valid fixture, and the expected error. */
 export type Rejection<T> = readonly [edit: (value: T) => void, error?: string | RegExp];
 
 /** Applies each edit to a fresh fixture and expects `validate` to reject the result. */

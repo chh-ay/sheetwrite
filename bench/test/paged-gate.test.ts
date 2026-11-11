@@ -102,14 +102,29 @@ test("accepts the exact smoke and full matrices", () => {
   expect(() => validatePagedBenchmark(fixture("full"), "full")).not.toThrow();
 });
 
+test("rejects a drifted full traversal", () => {
+  const corrupted = fixture("full");
+  probeOf(corrupted, "scroll-100").loadedCells -= 1;
+  expect(() => validatePagedBenchmark(corrupted, "full")).toThrow(
+    "rows=1000000;probe=scroll-100 does not match the cache-bounded full traversal",
+  );
+});
+
 test("rejects missing versions and provenance and out-of-bounds resource counters", () => {
+  for (const engine of ["sheetwrite"]) {
+    for (const version of [undefined, "", "0.4", "^0.4.0"]) {
+      const artifact = fixture("smoke");
+      Reflect.set(artifact.meta.engineVersions, engine, version);
+      expect(() => validatePagedBenchmark(artifact, "smoke")).toThrow(`engineVersions.${engine}`);
+    }
+  }
   expectRejections(
     () => fixture("smoke"),
     (result) => validatePagedBenchmark(result, "smoke"),
     [
       [
         (result) => Reflect.deleteProperty(result.meta.engineVersions, "sheetwrite"),
-        "engineVersions",
+        "engineVersions.sheetwrite",
       ],
       [
         (result) => Object.assign(result.meta, { commit: "", timestamp: "not a timestamp" }),
@@ -119,7 +134,10 @@ test("rejects missing versions and provenance and out-of-bounds resource counter
         (result) => (probeOf(result, "viewport").allocatedBytes = result.cacheBudgetBytes + 1),
         "rows=10000;probe=viewport resource counters violate",
       ],
-      [(result) => (probeOf(result, "viewport").fullyLoaded = true), ";probe=viewport.fullyLoaded"],
+      [
+        (result) => (probeOf(result, "viewport").fullyLoaded = true),
+        "rows=10000;probe=viewport.fullyLoaded",
+      ],
     ],
   );
 });

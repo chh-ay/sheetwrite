@@ -93,6 +93,13 @@ test("accepts a full capture, its smoke rehearsal and a previous capture", () =>
 });
 
 test("rejects drifted identity, provenance, values, ceilings and previous captures", () => {
+  for (const engine of ["sheetwrite"]) {
+    for (const version of [undefined, "", "0.4", "^0.4.0"]) {
+      const artifact = fixture();
+      Reflect.set(artifact.metadata.engineVersions, engine, version);
+      expect(() => validateInteractionArtifact(artifact)).toThrow(`engineVersions.${engine}`);
+    }
+  }
   const aboveCeiling = (key: InteractionCeilingMetric) => (artifact: Fixture) => {
     const samples = [...FULL_SAMPLES[key]];
     samples.fill(INTERACTION_CEILINGS[key] + 1, 0, 3);
@@ -105,7 +112,10 @@ test("rejects drifted identity, provenance, values, ceilings and previous captur
     [(artifact) => (artifact.mode = "rehearsal"), "must be full or smoke"],
     [(artifact) => (artifact.mode = "smoke"), "lookupMedianNs requires 2 raw samples"],
     [(artifact) => (artifact.rows = 1_000), "workload changed"],
-    [(artifact) => (artifact.metadata.engineVersions.sheetwrite = "0.4"), "engineVersions"],
+    [
+      (artifact) => (artifact.metadata.engineVersions.sheetwrite = "0.4"),
+      "engineVersions.sheetwrite",
+    ],
     [(artifact) => (artifact.metadata.commit = ""), "metadata.commit must be a non-empty"],
     [(artifact) => (artifact.metadata.dirty = "false"), "metadata.dirty must be a boolean"],
     [
@@ -160,11 +170,41 @@ function samples(startMs: number, url: string, count: number, tid = 1): TraceEve
   return { ...event, pid: 1, tid, url: undefined, profile };
 }
 
-test("charges each long task to Sheetwrite only when package frames dominate its profile", () => {
-  const events = [
-    ...[task(0, 55), samples(1, PACKAGE_URL, 50)],
-    ...[task(200, 70), samples(201, PACKAGE_URL, 65)],
-    ...[task(400, 80), samples(401, SHELL_URL, 75)],
-  ];
-  expect(coldTaskDurations(events)).toEqual({ ownedMs: 70, unattributedMs: 80 });
+test.each([
+  [
+    "charges a long task that mostly runs package frames to Sheetwrite",
+    [task(0, 60), samples(1, PACKAGE_URL, 50), samples(51, SHELL_URL, 5)],
+    { ownedMs: 60, unattributedMs: 0 },
+  ],
+  [
+    "reports a long task that mostly runs other code as unattributed",
+    [task(0, 60), samples(1, PACKAGE_URL, 20), samples(21, SHELL_URL, 40)],
+    { ownedMs: 0, unattributedMs: 60 },
+  ],
+  [
+    "reports a long task the profile does not cover as unattributed",
+    [task(0, 60)],
+    { ownedMs: 0, unattributedMs: 60 },
+  ],
+  [
+    "ignores tasks below the long-task threshold",
+    [task(0, 49), samples(1, PACKAGE_URL, 60)],
+    { ownedMs: 0, unattributedMs: 0 },
+  ],
+  [
+    "does not attribute samples of another thread or outside the task window",
+    [task(0, 60), samples(1, PACKAGE_URL, 50, 2), samples(90, PACKAGE_URL, 50)],
+    { ownedMs: 0, unattributedMs: 60 },
+  ],
+  [
+    "reports the longest owned and unattributed task of a sample",
+    [
+      ...[task(0, 55), samples(1, PACKAGE_URL, 50)],
+      ...[task(200, 70), samples(201, PACKAGE_URL, 65)],
+      ...[task(400, 80), samples(401, SHELL_URL, 75)],
+    ],
+    { ownedMs: 70, unattributedMs: 80 },
+  ],
+])("%s", (_name, events, expected) => {
+  expect(coldTaskDurations(events)).toEqual(expected);
 });

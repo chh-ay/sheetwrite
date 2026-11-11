@@ -147,6 +147,13 @@ function comparedArtifact(importRatio = 1): XlsxBenchmarkArtifact {
 
 it("accepts a complete comparison and rejects drifted versions, summaries and outputs", () => {
   expect(() => validateXlsxBenchmarkArtifact(comparedArtifact())).not.toThrow();
+  for (const engine of ["sheetwrite", "exceljs"]) {
+    for (const version of [undefined, "", "4", "^4.4.0", "01.2.3"]) {
+      const artifact = mutableCopy(comparedArtifact());
+      Reflect.set(artifact.metadata.engineVersions, engine, version);
+      expect(() => validateXlsxBenchmarkArtifact(artifact)).toThrow(`engineVersions.${engine}`);
+    }
+  }
   expectRejections(() => mutableCopy(comparedArtifact()), validateXlsxBenchmarkArtifact, [
     ...(["sheetwrite", "exceljs"] as const).map(
       (engine) =>

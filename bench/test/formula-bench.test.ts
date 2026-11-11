@@ -100,6 +100,14 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): Fixture {
 
 const firstWorkload = (result: Fixture) => must(result.workloads[0], "workload");
 
+/** A full capture whose first workload has `samples` as its timings. */
+function withSamples(samples: number[]): Fixture {
+  const result = formulaFixture("full");
+  firstWorkload(result).samplesMs = samples;
+  firstWorkload(result).stat = summarize(samples);
+  return result;
+}
+
 describe("formula benchmark schema", () => {
   it("rejects drifted workload identities, raw samples, summaries and provenance", () => {
     const named = (result: Fixture) =>
@@ -129,8 +137,14 @@ describe("formula benchmark schema", () => {
         (result) => Object.defineProperty(named(result), "size", { value: "1000" }),
         "formula workload contains a malformed identity",
       ],
-      [(result) => (firstWorkload(result).samplesMs = []), "contain 2 post-warmup raw samples"],
-      [(result) => (firstWorkload(result).allocationSamples = []), "must contain 2 raw samples"],
+      [
+        (result) => (firstWorkload(result).samplesMs = []),
+        "must contain 2 post-warmup raw samples",
+      ],
+      [
+        (result) => (firstWorkload(result).allocationSamples = []),
+        "allocationSamples must contain 2 raw samples",
+      ],
       [
         (result) => (firstWorkload(result).stat = { ...firstWorkload(result).stat, stddev: 0.1 }),
         "does not match raw samples",
@@ -155,6 +169,31 @@ describe("formula benchmark schema", () => {
 });
 
 describe("formula regression gate", () => {
+  it("gates median and p95 from raw samples, with a 0.3 ms median floor below 1 ms", () => {
+    const subMillisecond = withSamples([0.5, 0.5, 0.5, 0.5, 0.5]);
+    const millisecond = withSamples([1, 1, 1, 1, 1]);
+    for (const [baseline, samples, error] of [
+      [subMillisecond, [0.5, 0.5, 0.5, 0.5, 3], null],
+      [subMillisecond, [0.75, 0.75, 0.75, 0.75, 0.75], null],
+      [
+        subMillisecond,
+        [0.85, 0.85, 0.85, 0.85, 0.85],
+        ".median regression: baseline 0.5, candidate 0.85, limit 0.8",
+      ],
+      [millisecond, [1.24, 1.24, 1.24, 1.24, 1.24], null],
+      [
+        millisecond,
+        [1.3, 1.3, 1.3, 1.3, 1.3],
+        ".median regression: baseline 1, candidate 1.3, limit 1.25",
+      ],
+      [millisecond, [1, 1, 1, 1, 1.4], ".p95 regression"],
+    ] as const) {
+      const check = () => validateFormulaRegression(withSamples([...samples]), baseline);
+      if (error === null) expect(check).not.toThrow();
+      else expect(check).toThrow(error);
+    }
+  });
+
   it("gates attributed per-workload allocation and aggregate WASM allocation", () => {
     const baseline = formulaFixture("full");
     expectRejections(formulaFixture, (result) => validateFormulaRegression(result, baseline), [
@@ -179,5 +218,29 @@ describe("formula regression gate", () => {
     const unbound = "not bound to the supplied baseline provenance";
     expect(() => validateFormulaRegression(candidate, baseline)).toThrow(unbound);
     expect(() => validateFormulaCapture(candidate, baseline)).toThrow(unbound);
+  });
+
+  it("compares a smoke candidate with the compatible workloads of a legacy full baseline", () => {
+    const expanded = new Set([
+      "spill-filter-resize",
+      "sumproduct-vector-edit",
+      "sumproduct-matrix-edit",
+      "criteria-multi-range-edit",
+      "unicode-text-date-edit",
+      "percentile-covariance",
+      "let-reuse-edit",
+      "let-many",
+      "round-many",
+      "concat-many",
+      "offset-many",
+      "indirect-many",
+      "let-calls",
+      "iterative-finance",
+      "incremental-dependency-closure-edit",
+      "spill-sequence-admission",
+    ]);
+    const baseline = formulaFixture("full");
+    baseline.workloads = baseline.workloads.filter((workload) => !expanded.has(workload.id));
+    expect(() => validateFormulaRegression(formulaFixture("smoke"), baseline)).not.toThrow();
   });
 });

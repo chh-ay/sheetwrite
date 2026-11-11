@@ -8,6 +8,7 @@ import {
   type MatchedRawArtifact,
   validateMatchedEvidence,
 } from "../src/matched-formula-evidence.js";
+import { expectRejections } from "./gate-fixtures.js";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url));
 const sha256 = (path: string) => createHash("sha256").update(read(path)).digest("hex");
@@ -19,6 +20,7 @@ const ARTIFACT = JSON.parse(
   read("../results/formula-regression-results.json").toString(),
 ) as MatchedFormulaEvidence;
 const RAW = JSON.parse(read(RAW_PATH).toString()) as MatchedRawArtifact;
+const ZERO_DIGEST = "0".repeat(64);
 
 function rebuild(value: MatchedRawArtifact): MatchedFormulaEvidence {
   return buildMatchedEvidence(value, {
@@ -46,3 +48,19 @@ test("rebuilds the tracked evidence from the portable raw artifact", () => {
   absolute.sides.baseline.pkg = "/tmp/checkout/packages/wasm/pkg";
   expect(() => rebuild(absolute)).toThrow("raw package paths must be relative");
 }, 60_000);
+
+test("rejects tampered hashes, controls, boundaries and samples", () => {
+  expectRejections(() => structuredClone(ARTIFACT), validate, [
+    [(value) => (value.rawArtifactSha256 = ZERO_DIGEST)],
+    [(value) => (value.harnessSha256 = ZERO_DIGEST)],
+    [(value) => (value.controls.governor = "performance")],
+    [(value) => delete value.workloadBoundaries["wide-fan-out-edit/1000"]],
+    [
+      (value) => {
+        const samples = value.workloads["independent-parse-load/1000"]?.raw.baselineMs;
+        if (samples?.[0] === undefined) throw new Error("fixture has no baseline sample");
+        samples[0] += 1;
+      },
+    ],
+  ]);
+});

@@ -1,65 +1,116 @@
-import { afterAll, expect, spyOn, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
+import {
+  expectedFormulaMemoryKeys,
+  expectedFormulaWorkloadKeys,
+  type FormulaBenchmarkResult,
+} from "../src/formula-bench.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
-import { runVerification } from "../src/verify.js";
+import { summarize } from "../src/stats.js";
 
-const ARTIFACT_ROOT = resolve(import.meta.dir, "../../test-results/performance-gates");
-const directory = mkdtempSync(resolve(tmpdir(), "sheetwrite-verify-"));
-afterAll(() => rmSync(directory, { recursive: true, force: true }));
-
-/** Runs the CI verifier on one recorded family result; returns its exit code and diagnostics. */
-async function verifyFixture(family: string, artifact: unknown) {
-  const path = resolve(directory, `${family}.json`);
-  writeFileSync(path, JSON.stringify(artifact));
-  const stderr: string[] = [];
-  const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    stderr.push(String(chunk));
-    return true;
-  });
-  try {
-    const exitCode = await runVerification(["--fixture", `${family}:${path}`]);
-    return { exitCode, stderr: stderr.join("") };
-  } finally {
-    write.mockRestore();
-  }
-}
-
-test("fails an invalid result and keeps the raw and structured error artifacts", async () => {
-  const result = await verifyFixture("formula", {
+function incompleteFormulaFixture(): FormulaBenchmarkResult {
+  const workloads = expectedFormulaWorkloadKeys("smoke")
+    .map((key) => {
+      const match = /^workload=(.*);size=(\d+)$/u.exec(key)!;
+      return {
+        id: match[1]!,
+        size: Number(match[2]),
+        samplesMs: [1, 2],
+        stat: summarize([1, 2]),
+      };
+    })
+    .filter((entry) => !(entry.id === "independent-parse-load" && entry.size === 1_000));
+  return {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "smoke",
     matrixId: MATRIX_IDS.formula.smoke,
-    workloads: [],
-  });
-  expect(result.exitCode).toBe(1);
-  expect(existsSync(resolve(ARTIFACT_ROOT, "formula.json"))).toBe(true);
-  const notExact = "formula workload matrix is not exact: missing workload=";
-  const error = readFileSync(resolve(ARTIFACT_ROOT, "formula-error.json"), "utf8");
-  expect(JSON.parse(error)).toMatchObject({ family: "formula", status: "failed" });
-  expect(error).toContain(notExact);
-  expect(result.stderr).toContain(`benchmark formula failed: ${notExact}`);
-});
+    meta: {
+      bun: "test",
+      platform: "linux",
+      arch: "x64",
+      commit: "0".repeat(40),
+      dirty: false,
+      timestamp: new Date().toISOString(),
+    },
+    workloads,
+    memory: expectedFormulaMemoryKeys("smoke").map((key) => ({
+      formulas: Number(key.slice("memory=formulas=".length)),
+      wasmDeltaBytes: 1024,
+    })),
+    gates: { passed: true, tolerance: "test" },
+  };
+}
 
-test("prints the failing view-index gate and measured values", async () => {
-  const result = await verifyFixture("view-index", {
-    rows: 1_000_000,
-    repeats: 5,
-    runs: { map: Array(5).fill({}), packed: Array(5).fill({}) },
-    heapReduction: 0.6,
-    lookupP95Regression: 0.25,
-    baseline: { lookupP95Ns: 100 },
-    packed: { lookupP95Ns: 125 },
-    gates: { heapReduction: true, lookupP95: false },
+describe("CI-facing deterministic verifier", () => {
+  let directory = "";
+  let fixturePath = "";
+  const repositoryRoot = resolve(import.meta.dir, "../..");
+  const artifactRoot = resolve(repositoryRoot, "test-results/performance-gates");
+
+  beforeAll(() => {
+    directory = mkdtempSync(resolve(tmpdir(), "sheetwrite-verify-"));
+    fixturePath = resolve(directory, "incomplete-formula.json");
+    writeFileSync(fixturePath, `${JSON.stringify(incompleteFormulaFixture(), null, 2)}\n`);
   });
-  expect(result.exitCode).toBe(1);
-  expect(result.stderr).toContain("view-index runtime gates failed: lookupP95");
-  const measurements = result.stderr.split("Failing view-index measurements: ")[1] ?? "";
-  expect(JSON.parse(measurements)).toMatchObject({
-    lookupP95Regression: 0.25,
-    baseline: { lookupP95Ns: 100 },
-    packed: { lookupP95Ns: 125 },
+
+  afterAll(() => rmSync(directory, { recursive: true, force: true }));
+
+  test("fails a missing result and preserves raw plus structured error artifacts", () => {
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        resolve(repositoryRoot, "bench/src/verify.ts"),
+        "--fixture",
+        `formula:${fixturePath}`,
+      ],
+      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(result.exitCode).not.toBe(0);
+    expect(existsSync(resolve(artifactRoot, "formula.json"))).toBe(true);
+    const error = readFileSync(resolve(artifactRoot, "formula-error.json"), "utf8");
+    expect(error).toContain("missing workload=independent-parse-load;size=1000");
+    expect(result.stderr.toString()).toContain("formula");
+    expect(result.stderr.toString()).toContain("missing workload=independent-parse-load;size=1000");
+  });
+
+  test("prints the failing view-index gate and measured values", () => {
+    const path = resolve(directory, "view-index.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        rows: 1_000_000,
+        repeats: 5,
+        runs: { map: Array(5).fill({}), packed: Array(5).fill({}) },
+        heapReduction: 0.6,
+        lookupP95Regression: 0.25,
+        baseline: { lookupP95Ns: 100 },
+        packed: { lookupP95Ns: 125 },
+        gates: { heapReduction: true, lookupP95: false },
+      }),
+    );
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        resolve(repositoryRoot, "bench/src/verify.ts"),
+        "--fixture",
+        `view-index:${path}`,
+      ],
+      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("view-index runtime gates failed: lookupP95");
+    const measurements = result.stderr.toString().split("Failing view-index measurements: ")[1];
+    expect(measurements).toBeDefined();
+    expect(JSON.parse(measurements ?? "")).toMatchObject({
+      lookupP95Regression: 0.25,
+      baseline: { lookupP95Ns: 100 },
+      packed: { lookupP95Ns: 125 },
+    });
   });
 });

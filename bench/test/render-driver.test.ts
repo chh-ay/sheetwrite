@@ -46,8 +46,15 @@ test("completes a capture with only the known comparison overflow and fails any 
   const failure = must(known[0], "overflow failure");
   for (const changed of [
     { engine: "sheetwrite" as const },
+    { rows: 100_000 },
+    { scenarioId: "arrow-down.top-left" as const },
+    { errorClass: "Error" },
+    { message: "another error" },
+    { message: "action step failed: another error" },
     { message: `action step failed: ${OVERFLOW} unexpectedly` },
+    { timeout: true },
     { crash: true },
+    { consoleErrors: ["unexpected console failure"] },
     { pageErrors: ["unexpected page failure"] },
   ]) {
     expect(renderCaptureExitCode([...known, { ...failure, ...changed }])).toBe(1);

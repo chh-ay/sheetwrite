@@ -21,8 +21,10 @@ import {
   withFailedFirstCell,
 } from "./gate-fixtures.js";
 
+const TIMESTAMP = "2026-07-14T12:00:00.000Z";
+
 function artifact(): RenderBenchmarkArtifact {
-  return makeRenderArtifact({ rows: [200], measuredSamples: 2 });
+  return makeRenderArtifact({ rows: [200], measuredSamples: 2, timestamp: TIMESTAMP });
 }
 
 /** Window-read counters for `frames` logical frames; the upper bound reads nothing. */
@@ -74,6 +76,29 @@ test("keeps a structured failure in its cell", () => {
   expect(parsed.completeness).toMatchObject({ complete: true, successful: false });
   expect(parsed.completeness.failedKeys).toHaveLength(1);
   expect(parsed.results[0]).toMatchObject({ status: "failed", stage: "validate" });
+});
+
+test("rejects stale run IDs and timestamps", () => {
+  expect(() => parseRenderArtifact(artifact(), { expectedRunId: "new-run" })).toThrow(
+    "stale render result",
+  );
+  const nowMs = Date.parse(TIMESTAMP) + 2_000;
+  expect(() => parseRenderArtifact(artifact(), { nowMs, maxAgeMs: 1_000 })).toThrow(
+    "stale render result timestamp",
+  );
+});
+
+test("requires a semantic version for each render engine", () => {
+  for (const engine of ["sheetwrite", "handsontable"] as const) {
+    expectRejections(
+      () => mutableCopy(artifact()),
+      parseRenderArtifact,
+      [undefined, "", "18", "^18.1.2", "01.2.3"].map((version) => [
+        (value) => Reflect.set(value.metadata.engineVersions, engine, version),
+        `engineVersions.${engine}`,
+      ]),
+    );
+  }
 });
 
 test("rejects non-finite summaries, also after a JSON round trip", () => {
