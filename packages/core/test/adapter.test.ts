@@ -11,7 +11,7 @@ import {
 import { initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridOptions } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 
@@ -27,14 +27,6 @@ afterEach(() => {
   restoreCanvasStubs();
   document.body.innerHTML = "";
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 describe("shared adapter option policy", () => {
   it("does not report rejected publication from an unmounted attachment after remount", async () => {

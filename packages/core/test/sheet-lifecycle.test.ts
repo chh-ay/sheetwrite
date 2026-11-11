@@ -5,6 +5,7 @@ import { createGridFromSnapshot } from "../src/persistence.js";
 import { rebaseDocumentOperations } from "../src/rebase.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { SheetLifecycleResult, Workbook } from "../src/types.js";
+import { mountHost } from "./fixtures.js";
 
 const column = { key: "value", header: "Value", width: 100, type: "text" as const };
 
@@ -20,14 +21,6 @@ function workbook(
     activeSheet,
     sheets: sheets.map((sheet) => ({ ...sheet, rowCount: 2, columns: [{ ...column }] })),
   };
-}
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
 }
 
 function lifecycleCode(result: SheetLifecycleResult): string | undefined {

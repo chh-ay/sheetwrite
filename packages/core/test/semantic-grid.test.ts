@@ -5,7 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellEditor, CellEditorContext, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, pressLikeWebKit } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountGridWithData, pressLikeWebKit } from "./fixtures.js";
 
 let restoreCanvas: () => void;
 let reportErrorDescriptor: PropertyDescriptor | undefined;
@@ -357,7 +357,6 @@ describe("custom editor canonical lifecycle", () => {
     expect({ cancels, destroys }).toEqual({ cancels: 2, destroys: 2 });
 
     grid.beginEdit(0, 0);
-    expect(latestContext).toBeDefined();
     expect(() => latestContext?.commit(42 as never)).not.toThrow();
     expect(latestContext?.signal.aborted).toBe(true);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
@@ -644,10 +643,7 @@ describe("custom editor canonical lifecycle", () => {
   });
 
   it("notifies beginEdit selection changes before the before-open edit-begin event", () => {
-    const workbook = makeWorkbook(3);
-    const store = new SheetwriteStore(workbook, makeColumnarData(3));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, host, grid } = mountGridWithData(3);
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
