@@ -4,6 +4,7 @@
 import "@sheetwrite/core/styles.css";
 import { initFullEngine, whenStylesReady } from "@docs/lib/full-engine.js";
 import { observeSiteTheme } from "@docs/lib/site-theme.js";
+import { siteGridTheme } from "@docs/showcases/site-grid-theme.js";
 import {
   ANALYSIS_SHEET_ID,
   apacPromotionOps,
@@ -69,6 +70,7 @@ export async function startFormulasWorkbook(
     workbook: createFormulasWorkbook(),
     data: ledger.data,
     presentation: "data-grid",
+    theme: siteGridTheme(),
     config: {
       toolbar: false,
       contextMenu: (context) => [
@@ -111,11 +113,11 @@ export async function startFormulasWorkbook(
   const unsubscribes = [
     grid.on("active-sheet", ({ sheet }) => handlers.onActiveSheet(sheet)),
     grid.on("change", () => handlers.onChange()),
-    observeSiteTheme(() => grid.replaceTheme({})),
+    observeSiteTheme(() => grid.replaceTheme(siteGridTheme())),
   ];
   // Canvas text is measured with the web font; repaint once it has loaded.
   void document.fonts.ready.then(() => {
-    if (!isDisposed()) grid.replaceTheme({});
+    if (!isDisposed()) grid.replaceTheme(siteGridTheme());
   });
 
   const describeResult = (row: number, col: number): string => {
