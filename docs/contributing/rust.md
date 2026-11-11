@@ -28,6 +28,11 @@ bun scripts/rust-lint.ts --update    # record lower counts after a fix
   `--update` in the same change.
 - **Deny once clean.** When a lint reaches zero in all three crates, set it to
   `deny` in the three tables. `correctness` and `perf` are denied already.
+- **Spelling and dependencies.** The same check runs `typos` over the crate
+  sources (`typos.toml` lists the Excel function names it would flag) and
+  `cargo deny` for the licenses, bans and sources of every dependency
+  (`deny.toml`). `bun scripts/install-rust-checks.ts` installs both at the
+  versions CI uses.
 
 ## Lint policy
 
